@@ -3,7 +3,7 @@
 [![codecov](https://codecov.io/gh/REPLACE_WITH_OWNER_ACCOUNT/holodeck/branch/master/graph/badge.svg)](https://codecov.io/gh/REPLACE_WITH_OWNER_ACCOUNT/holodeck/branch/master)
 
 
-Supermassive binary black hole simulator for pulsar timing array signals and galaxy population  statistics.
+Supermassive binary black hole simulator for pulsar timing array signals and galaxy population statistics.
 
 ### Copyright
 

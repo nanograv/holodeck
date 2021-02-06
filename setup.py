@@ -1,6 +1,8 @@
 """
 holodeck
+
 Supermassive binary black hole simulator for pulsar timing array signals and galaxy population  statistics.
+
 """
 import sys
 from setuptools import setup, find_packages
@@ -12,11 +14,11 @@ short_description = __doc__.split("\n")
 needs_pytest = {'pytest', 'test', 'ptr'}.intersection(sys.argv)
 pytest_runner = ['pytest-runner'] if needs_pytest else []
 
-try:
-    with open("README.md", "r") as handle:
-        long_description = handle.read()
-except:
-    long_description = "\n".join(short_description[2:])
+with open("README.md", "r") as handle:
+    long_description = handle.read()
+
+with open("requirements.txt", "r") as handle:
+    requirements = handle.read()
 
 
 setup(
@@ -30,6 +32,10 @@ setup(
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
     license='MIT',
+    url="https://github.com/NANOGrav/holodeck/",
+
+    # External dependencies loaded from 'requirements.txt'
+    install_requires=requirements,
 
     # Which Python importable modules should be included when your package is installed
     # Handled automatically by setuptools. Use 'exclude' to prevent some specific
