@@ -1,6 +1,7 @@
 include LICENSE
 include MANIFEST.in
-include CODE_OF_CONDUCT.md
+include CONTRIBUTING.md
+include CHANGELOG.md
 include versioneer.py
 
 graft holodeck

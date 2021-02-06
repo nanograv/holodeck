@@ -1,6 +1,20 @@
-# Contributor Covenant Code of Conduct
+# Contributing Guidelines
 
-## Our Pledge
+All contributed code should be [PEP8](https://www.python.org/dev/peps/pep-0008/) compliant, using maximum line lengths between 100-120 characters.  The `master` branch should only be updated with stable releases including full testing and documentation.  All additions should be developed in a feature or bug branch, and then merged into the `dev` branch.  All contributors are expected to abide by the *Code of Conduct* below.
+
+## Adding features or fixing bugs
+
+* [Open an issue](https://github.com/nanograv/holodeck/issues) for discussion and record-keeping
+* Fork the repo
+* Check out a new feature or bug branch
+* Add your changes, and add/update tests
+* Update the CHANGELOG for any API changes
+* Submit a pull request to the dev branch of the upstream repo
+* Add description of your changes
+* Ensure tests are passing
+* Ensure branch is mergeable
+
+## Code of Conduct
 
 In the interest of fostering an open and welcoming environment, we as
 contributors and maintainers pledge to making participation in our project and
@@ -9,7 +23,7 @@ body size, disability, ethnicity, gender identity and expression, level of
 experience, nationality, personal appearance, race, religion, or sexual
 identity and orientation.
 
-## Our Standards
+### Our Standards
 
 Examples of behavior that contributes to creating a positive environment include:
 
@@ -27,7 +41,7 @@ Examples of unacceptable behavior by participants include:
 * Publishing others' private information, such as a physical or electronic address, without explicit permission
 * Other conduct which could reasonably be considered inappropriate in a professional setting
 
-## Our Responsibilities
+### Our Responsibilities
 
 Project maintainers are responsible for clarifying the standards of acceptable
 behavior and are expected to take appropriate and fair corrective action in
@@ -45,7 +59,7 @@ from outside the group of project maintainers are strongly welcomed but the
 final decision as to whether commits are merged into the codebase rests with
 the team of project maintainers.
 
-## Scope
+### Scope
 
 This Code of Conduct applies both within project spaces and in public spaces
 when an individual is representing the project or its community. Examples of
@@ -54,7 +68,7 @@ address, posting via an official social media account, or acting as an
 appointed representative at an online or offline event. Representation of a
 project may be further defined and clarified by project maintainers.
 
-## Enforcement
+### Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported by contacting the project team at 'luke.kelley@nanograv.org'. The project team will
@@ -67,7 +81,7 @@ Project maintainers who do not follow or enforce the Code of Conduct in good
 faith may face temporary or permanent repercussions as determined by other
 members of the project's leadership.
 
-## Attribution
+### Attribution
 
 This Code of Conduct is adapted from the [Contributor Covenant][homepage],
 version 1.4, available at
