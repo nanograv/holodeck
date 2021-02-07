@@ -1,2 +1,4 @@
 numpy
 matplotlib
+h5py
+kalepy
