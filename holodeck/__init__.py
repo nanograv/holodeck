@@ -3,8 +3,8 @@ holodeck
 Supermassive binary black hole simulator for pulsar timing array signals and galaxy population  statistics.
 """
 
-# Add imports here
-from .holodeck import *
+from . import utils     # noqa
+from . import holodeck  # noqa
 
 # Handle versioneer
 from ._version import get_versions
