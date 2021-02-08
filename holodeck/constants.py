@@ -1,5 +1,6 @@
 """
 """
+import numpy as np
 import astropy as ap
 import astropy.constants  # noqa
 
@@ -37,9 +38,9 @@ JY = ap.units.jansky.to(ap.units.g/ap.units.s**2)  # Jansky in [erg/s/cm^2/Hz]
 
 # Derived Constants
 # -----------------
-# SCHW = 2*NWTG/(SPLC*SPLC)                        # Schwarzschild Constant (2*G/c^2)
+SCHW = 2*NWTG/(SPLC*SPLC)                        # Schwarzschild Constant (2*G/c^2)
 # HTAU = 1.0/H0                                    # Hubble Time - 1/H0 [sec]
-# EDDC = 4.0*np.pi*NWTG*SPLC*MPRT/SIGMA_T          # Eddington Luminosity factor [erg/s/g]
+EDDT = 4.0*np.pi*NWTG*SPLC*MPRT/SIGMA_T          # Eddington Luminosity factor [erg/s/g]
 
 # Electron-Scattering Opacity ($\kappa_{es} = n_e \sigma_T / \rho = \mu_e \sigma_T / m_p$)
 #     Where $\mu_e$ is the mean-mass per electron, for a total mass-density $\rho$.
