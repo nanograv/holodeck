@@ -6,10 +6,17 @@ import copy
 import numpy as np
 import h5py
 
+from .constants import NWTG, SCHW
+
 
 def a_to_z(scfa):
     redz = (1.0 / scfa) - 1.0
     return redz
+
+
+def z_to_a(redz):
+    scfa = 1.0 / (redz + 1.0)
+    return scfa
 
 
 def load_hdf5(fname, keys=None):
@@ -63,3 +70,24 @@ def m1m2_from_mtmr(mt, mr):
     m1 = mt/(1.0 + mr)
     m2 = mt - m1
     return np.array([m1, m2])
+
+
+def kepler_freq_from_sep(mass, sep):
+    freq = (1.0/(2.0*np.pi))*np.sqrt(NWTG*mass)/np.power(sep, 1.5)
+    return freq
+
+
+def kepler_sep_from_freq(mass, freq):
+    sep = np.power(NWTG*mass/np.square(2.0*np.pi*freq), 1.0/3.0)
+    return sep
+
+
+def rad_isco(m1, m2, factor=3.0):
+    """Inner-most Stable Circular Orbit, radius at which binaries 'merge'.
+    """
+    return factor * schwarzschild_radius(m1+m2)
+
+
+def schwarzschild_radius(mass):
+    rs = SCHW * mass
+    return rs
