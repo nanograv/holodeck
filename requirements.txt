@@ -2,3 +2,5 @@ numpy
 matplotlib
 h5py
 kalepy
+scipy
+astropy
