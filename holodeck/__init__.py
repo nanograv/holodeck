@@ -3,10 +3,9 @@ holodeck
 Supermassive binary black hole simulator for pulsar timing array signals and galaxy population  statistics.
 """
 
-import astropy
-import astropy.cosmology
-cosmo = astropy.cosmology.WMAP9
-del astropy
+# Must load and initialize cosmology FIRST!
+from . import cosmology
+cosmo = cosmology.Cosmology()
 
 from . import utils     # noqa
 from . import holodeck  # noqa
