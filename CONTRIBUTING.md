@@ -1,8 +1,12 @@
 # Contributing Guidelines
 
-All contributed code should be [PEP8](https://www.python.org/dev/peps/pep-0008/) compliant, using maximum line lengths between 100-120 characters.  The `master` branch should only be updated with stable releases including full testing and documentation.  All additions should be developed in a feature or bug branch, and then merged into the `dev` branch.  All contributors are expected to abide by the *Code of Conduct* below.
+All contributed code should be [PEP8](https://www.python.org/dev/peps/pep-0008/) compliant, using maximum line lengths between 100-120 characters.  The `main` (formerly: `master`) branch should only be updated with stable releases including full testing and documentation, and approval by the full dev team.  All additions should be developed in a dedicated feature or bug branch, and then merged into the `dev` branch including basic documentation.  All merges require review/approval by a member of the dev team, and PR authors cannot merge their own PRs.
 
-## Adding features or fixing bugs
+All API functionality should use cgs (centimeter, gram, second) units: both input (arguments) and output (return values).  In both function and class docstrings, include the git username of the original author, and the names of contributors who make substantial changes or additions.  Dependencies (external packages) should be minimized, within reason, and must be installable with a single pip/conda command.  External packages must also be open, tested, documented, and actively maintained.
+
+All contributors are expected to abide by the *Code of Conduct* below.
+
+## Adding features or bug fixes
 
 * [Open an issue](https://github.com/nanograv/holodeck/issues) for discussion and record-keeping
 * Fork the repo
