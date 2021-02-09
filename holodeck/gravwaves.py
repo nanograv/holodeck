@@ -2,19 +2,22 @@
 """
 
 import numpy as np
+import tqdm
 
-from holodeck import utils
+from holodeck import utils, cosmo
+from holodeck.constants import SPLC
 
-_CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'time', 'eccs']
+
+_CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'time', 'eccen']
 
 
 class GWB:
 
-    def __init__(self, bin_evo, freqs, box_vol_cgs, nharms=30, nreals=100, calculate=True):
+    def __init__(self, bin_evo, freqs, nharms=30, nreals=100, calculate=True):
         self.freqs = freqs
         self.nharms = nharms
         self.nreals = nreals
-        self._box_vol_cgs = box_vol_cgs
+        self._box_vol_cgs = bin_evo._sample_volume
         self._bin_evo = bin_evo
 
         if calculate:
@@ -30,7 +33,7 @@ class GWB:
         box_vol = self._box_vol_cgs
 
         if eccen is None:
-            eccen = (bin_evo.eccs is not None)
+            eccen = (bin_evo.eccen is not None)
 
         if eccen not in [True, False]:
             raise ValueError("`eccen` '{}' is invalid!".format(eccen))
@@ -85,6 +88,8 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
     """
     """
 
+    import zcode.math as zmath
+
     # ---- Interpolate data to all harmonics of this frequency
     harm_range = np.asarray(harm_range)
     # Each parameter will be (N, H) = (binaries, harmonics)
@@ -98,20 +103,21 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
     # Broadcast harmonics numbers to correct shape
     harms = np.ones_like(redz, dtype=int) * harm_range[np.newaxis, :]
     # Select the elements corresponding to the n=2 (circular) harmonic, to use later
-    sel_n2 = np.zeros_like(redz, dtype=int)
+    sel_n2 = np.zeros_like(redz, dtype=bool)
     sel_n2[(harms == 2)] = 1
     # Select only the valid elements, also converts to 1D, i.e. (N, H) ==> (V,)
     sel_n2 = sel_n2[valid]
     harms = harms[valid]
     redz = redz[valid]
     # If there are eccentricities, calculate the freq-dist-function
-    eccs = data_harms['eccs']
-    if eccs is None:
+    eccen = data_harms['eccen']
+    if eccen is None:
         gne = 1
     else:
-        gne = utils.gw_freq_dist_func(harms, ee=eccs[valid])
+        gne = utils.gw_freq_dist_func(harms, ee=eccen[valid])
         # BUG: FIX: NOTE: this fails for zero eccentricities (at times?) fix manually!
-        sel_e0 = (eccs[valid] == 0.0)
+        # sel_e0 = (eccen[valid] == 0.0)
+        sel_e0 = (eccen[valid] < 1e-8)
         gne[sel_e0] = 0.0
         gne[sel_n2 & sel_e0] = 1.0
 
