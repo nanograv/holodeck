@@ -7,7 +7,7 @@ import abc
 import numpy as np
 
 from holodeck import utils, cosmo
-from holodeck.constants import GYR
+from holodeck.constants import GYR, PC
 
 _DEF_TIME_DELAY = (5.0*GYR, 0.2)
 
@@ -20,14 +20,18 @@ class EVO(enum.Enum):
 
 class _Binary_Evolution(abc.ABC):
 
-    _EVO_PARS = ['mass', 'sepa', 'eccs', 'redz', 'dadt', 'tlbk']
-    _LIN_INTERP_PARS = ['eccs', 'redz', 'tlbk']
+    _EVO_PARS = ['mass', 'sepa', 'eccen', 'time', 'dadt', 'tlbk']
+    _LIN_INTERP_PARS = ['eccen', 'time', 'tlbk']
     _SELF_CONSISTENT = None
+    _STORE_FROM_POP = ['_sample_volume']
 
     def __init__(self, bin_pop, nsteps=100, mods=None, check=True):
         self._bin_pop = bin_pop
         self._nsteps = nsteps
         self._mods = mods
+
+        for par in self._STORE_FROM_POP:
+            setattr(self, par, getattr(bin_pop, par))
 
         size = bin_pop.size
         shape = (size, nsteps)
@@ -38,11 +42,11 @@ class _Binary_Evolution(abc.ABC):
         self.sepa = np.zeros(shape)
         self.mass = np.zeros(shape + (2,))
 
-        if bin_pop.eccs is not None:
-            self.eccs = np.zeros(shape)
+        if bin_pop.eccen is not None:
+            self.eccen = np.zeros(shape)
             self.dedt = np.zeros(shape)
         else:
-            self.eccs = None
+            self.eccen = None
             self.dedt = None
 
         # NOTE: these values should be stored as positive values
@@ -102,8 +106,8 @@ class _Binary_Evolution(abc.ABC):
         self.tlbk[:, 0] = tlbk
         self.mass[:, 0, :] = bin_pop.mass
 
-        if (bin_pop.eccs is not None):
-            self.eccs[:, 0] = bin_pop.eccs
+        if (bin_pop.eccen is not None):
+            self.eccen[:, 0] = bin_pop.eccen
 
         return
 
@@ -113,7 +117,7 @@ class _Binary_Evolution(abc.ABC):
 
     def _check(self):
         _check_var_names = ['sepa', 'time', 'mass', 'tlbk', 'dadt']
-        _check_var_names_eccs = ['eccs', 'dedt']
+        _check_var_names_eccen = ['eccen', 'dedt']
 
         def check_vars(names):
             for cv in names:
@@ -124,10 +128,10 @@ class _Binary_Evolution(abc.ABC):
 
         check_vars(_check_var_names)
 
-        if self.eccs is None:
+        if self.eccen is None:
             return
 
-        check_vars(_check_var_names_eccs)
+        check_vars(_check_var_names_eccen)
 
         return
 
@@ -325,12 +329,14 @@ class _Binary_Evolution(abc.ABC):
         return vals
 
 
-class BE_Magic_Delay(_Binary_Evolution):
+class BE_Magic_Delay_Circ(_Binary_Evolution):
 
     _SELF_CONSISTENT = False
 
-    def __init__(self, *args, time_delay=None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, bin_pop, *args, time_delay=None, **kwargs):
+        # if bin_pop.eccen is not None:
+        #     raise ValueError("Cannot use {} on eccentric population!".format(self.__class__))
+        super().__init__(bin_pop, *args, **kwargs)
         self._time_delay = utils._parse_log_norm_pars(time_delay, self.shape[0], default=_DEF_TIME_DELAY)
         return
 
@@ -358,3 +364,125 @@ class BE_Magic_Delay(_Binary_Evolution):
 
     def _take_next_step(self, step):
         return EVO.END
+
+
+class BE_Magic_Delay_Eccen(_Binary_Evolution):
+
+    _SELF_CONSISTENT = False
+
+    def __init__(self, bin_pop, *args, time_delay=None, **kwargs):
+        super().__init__(bin_pop, *args, **kwargs)
+        self._time_delay = utils._parse_log_norm_pars(time_delay, self.shape[0], default=_DEF_TIME_DELAY)
+        return
+
+    def _init_step_zero(self):
+        super()._init_step_zero()
+        nbins, nsteps = self.shape
+        mass = self.mass[:, 0, :]
+        m1, m2 = mass.T
+        tlbk = self.tlbk[:, 0]
+        sepa = self.sepa[:, 0]
+        eccen = self.eccen
+        if eccen is not None:
+            eccen = eccen[:, 0]
+
+        # Time delay (N,)
+        dtime = self._time_delay
+        # Instantly step-forward this amount, discontinuously
+        tlbk = np.clip(tlbk - dtime, 0.0, None)
+        self.tlbk[:, 1:] = tlbk[:, np.newaxis]
+        # calculate new scalefactors
+        redz = cosmo.tlbk_to_z(tlbk)
+        self.time[:, 1:] = utils.z_to_a(redz)[:, np.newaxis]
+
+        # Masses don't evolve
+        self.mass[:, :, :] = mass[:, np.newaxis, :]
+        self.dadt[:, 0] = - utils.gw_hardening_rate_dadt(m1, m2, sepa, eccen=eccen)
+        if eccen is not None:
+            self.dedt[:, 0] = - utils.gw_dedt(m1, m2, sepa, eccen)
+        return
+
+    def _take_next_step(self, step):
+        size, nsteps = self.shape
+        if step >= nsteps:
+            return EVO.END
+
+        # Get values at left-edge of step
+        m1, m2 = self.mass[:, step-1, :].T
+        a0 = self.sepa[:, step-1]
+        a1 = self.sepa[:, step]
+        # NOTE: `da` defined to be positive!
+        da = a0 - a1
+        t0 = self.tlbk[:, step-1]
+        e0 = self.eccen
+        if e0 is not None:
+            e0 = e0[:, step-1]
+
+        # Get derivatives at left edge of the step
+        dadt_0 = self.dadt[:, step-1]
+        # e0 = self.eccen
+        # if e0 is not None:
+        #     e0 = e0[:, step-1]
+        #     dedt_0 = self.dedt[:, step-1]
+
+        dt = da / dadt_0
+        # if e0 is not None:
+        #     de = dedt_0 * dt
+        #     e1 = e0 - de
+
+        if e0 is not None:
+            dade = utils.gw_dade(m1, m2, a0, e0)
+            de = da / dade
+            e1 = e0 - de
+        else:
+            e1 = None
+
+        '''
+        # Estimate values at right-edge of step
+        if e0 is not None:
+            # Estimate time-step size
+            dt = da / dadt_0
+            de = dedt_0 * dt
+            e1 = e0 - de
+            # FIX - Temporary: don't let eccentricity drop by more than 10x
+            e1 = np.clip(e1, e0/10.0, 1.0)
+        else:
+            e1 = None
+
+        # Estimate derivatives at right-edge of step
+        #    NOTE: `gw_hardening_rate_dadt` is given as negative, but we're storing them as positive
+        dadt_1 = - utils.gw_hardening_rate_dadt(m1, m2, a1, eccen=e1)
+        if e1 is not None:
+            dedt_1 = - utils.gw_dedt(m1, m2, a1, e1)
+
+        # Update time-step size
+        dt = utils.trapezoid_loglog([1/dadt_1, 1/dadt_0], [a1, a0], axis=0).squeeze()
+
+        # Update right-edge values
+        if e1 is not None:
+            de = np.zeros_like(dedt_0)
+            idx = ((dedt_0 > 0.0) | (dedt_1 > 0.0)) & (dt < 1000*GYR)
+            if np.any(idx):
+                # NOTE: times are decreasing, so reverse order to get a positive value out
+                times = [t0-dt, t0]
+                times = [tt[idx] for tt in times]
+                # NOTE: `times` must be positive for `cumtrapz_loglog` to work! normalization doesn't matter
+                times = np.asarray(times) + 2*np.max(np.fabs(times))
+                de[idx] = utils.trapezoid_loglog([dedt_0[idx], dedt_1[idx]], times, axis=0).squeeze()
+            e1 = e0 - de
+            e1 = np.clip(e1, 0.0, 1.0)
+        '''
+
+        dadt_1 = - utils.gw_hardening_rate_dadt(m1, m2, a1, eccen=e1)
+        if e1 is not None:
+            dedt_1 = - utils.gw_dedt(m1, m2, a1, e1)
+
+        # Store
+        self.dadt[:, step] = dadt_1
+        if e1 is not None:
+            self.dedt[:, step] = dedt_1
+            self.eccen[:, step] = e1
+
+        # print(f"\n{step=}\n{a1/PC=}\n{e1=}\n{dadt_1*GYR/PC=}\n{dedt_1=}\n{dt/GYR=}\n{da/PC=}\n{de=}")
+
+        return EVO.CONT
