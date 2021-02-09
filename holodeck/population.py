@@ -13,8 +13,9 @@ _DEF_ECCEN_DIST = (1.0, 0.2)
 
 class _Binary_Population(abc.ABC):
 
-    def __init__(self, fname, *args, mods=None, **kwargs):
+    def __init__(self, fname, *args, mods=None, check=True, **kwargs):
         self._fname = fname
+        self._check_flag = check
 
         # Initial binary values (i.e. at time of formation)
         self.time = None    # scale factor        (N,)
@@ -27,11 +28,8 @@ class _Binary_Population(abc.ABC):
 
         # Initialize the population
         self._init_from_file(fname)
-        # Apply modifications (using `Modifer` instances)
+        # Apply modifications (using `Modifer` instances), run `_finalize` and `_check()`
         self.modify(mods)
-
-        if self.size is None:
-            raise
         return
 
     @abc.abstractmethod
@@ -63,14 +61,59 @@ class _Binary_Population(abc.ABC):
 
         if not updated:
             self._update_derived()
+
         self._finalize()
-        self._check()
+        if self._check_flag:
+            self._check()
         return
 
     def _finalize(self):
         pass
 
     def _check(self):
+        ErrorType = ValueError
+        msg = "{}._check() Failed!  ".format(self.__class__.__name__)
+        array_names = ['time', 'sepa', 'mass', 'eccen']
+        two_dim = ['mass']
+        allow_none = ['eccen']
+
+        size = self.size
+        if size is None:
+            err = msg + " `self.size` is 'None'!"
+            raise ErrorType(err)
+
+        for name in array_names:
+            vals = getattr(self, name)
+            if vals is None:
+                if name in allow_none:
+                    continue
+                err = msg + "`{}` is 'None'!".format(name)
+                raise ErrorType(err)
+
+            shape = np.shape(vals)
+            bad_shape = False
+            if size != shape[0]:
+                bad_shape = True
+
+            if name in two_dim:
+                if (len(shape) != 2) or (shape[1] != 2):
+                    bad_shape = True
+            elif len(shape) != 1:
+                bad_shape = True
+
+            if bad_shape:
+                err = msg + "`{}` has invalid shape {} (size: {})!".format(name, shape, size)
+                raise ErrorType(err)
+
+            bads = ~np.isfinite(vals)
+            if np.any(bads):
+                bads = np.where(bads)
+                print("bad entries: ", bads)
+                for nn in array_names:
+                    print("{}: {}".format(nn, getattr(self, nn)[bads]))
+                err = msg + "`{}` has {} non-finite values!".format(name, len(bads[0]))
+                raise ErrorType(err)
+
         return
 
 
@@ -175,7 +218,7 @@ class PM_Resample(Population_Modifier):
         old_size = pop.size
         new_size = old_size * resample
 
-        kde = kale.KDE(old_data, reflect=reflect)
+        kde = kale.KDE(old_data, reflect=reflect, bw_rescale=0.25)
         new_data = kde.resample(new_size)
 
         mt = MSOL * 10**new_data[0]
