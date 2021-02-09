@@ -7,6 +7,7 @@ References:
 """
 
 import copy
+import abc
 
 import numpy as np
 import h5py
@@ -19,6 +20,17 @@ _GW_DADT_SEP_CONST = - 64 * np.power(NWTG, 3) / 5 / np.power(SPLC, 5)
 _GW_DEDT_ECC_CONST = - 304 * np.power(NWTG, 3) / 15 / np.power(SPLC, 5)
 # EN07, Eq.2.2
 _GW_LUM_CONST = (32.0 / 5.0) * np.power(NWTG, 7.0/3.0) * np.power(SPLC, -5.0)
+
+
+class _Modifier(abc.ABC):
+
+    def __call__(self, base):
+        self.modify(base)
+        return
+
+    @abc.abstractmethod
+    def modify(self, base):
+        pass
 
 
 # ==== General Logistical ====
@@ -168,13 +180,13 @@ def chirp_mass(m1, m2=None):
     return mc
 
 
-def dfdt_from_dadt(dadt, sma, mtot=None, freq_orb=None):
+def dfdt_from_dadt(dadt, sepa, mtot=None, freq_orb=None):
     if mtot is None and freq_orb is None:
         raise ValueError("Either `mtot` or `freq_orb` must be provided!")
     if freq_orb is None:
-        freq_orb = kepler_freq_from_sep(mtot, sma)
+        freq_orb = kepler_freq_from_sep(mtot, sepa)
 
-    dfda = -(3.0/2.0) * (freq_orb / sma)
+    dfda = -(3.0/2.0) * (freq_orb / sepa)
     dfdt = dfda * dadt
     return dfdt
 
@@ -198,17 +210,34 @@ def gw_char_strain(hs, dur_obs, freq_orb_obs, freq_orb_rst, dfdt):
     return hc
 
 
-def gw_dedt(m1, m2, sma, ecc):
+def gw_dedt(m1, m2, sepa, eccen):
     """GW Eccentricity Evolution rate (de/dt).
+
+    returned value is positive (e and a go in same direction).
+
+    See Peters 1964, Eq. 5.8
+    http://adsabs.harvard.edu/abs/1964PhRv..136.1224P
+    """
+    cc = _GW_DEDT_ECC_CONST
+    e2 = eccen**2
+    dedt = cc * m1 * m2 * (m1 + m2) / np.power(sepa, 4)
+    dedt *= (1.0 + e2*121.0/304.0) * eccen / np.power(1 - e2, 5.0/2.0)
+    return dedt
+
+
+def gw_dade(m1, m2, sepa, eccen):
+    """GW Eccentricity Evolution rate (de/dt).
+
+    returned value is negative.
 
     See Peters 1964, Eq. 5.7
     http://adsabs.harvard.edu/abs/1964PhRv..136.1224P
     """
-    cc = _GW_DEDT_ECC_CONST
-    e2 = ecc**2
-    dedt = cc * m1 * m2 * (m1 + m2) / np.power(sma, 4)
-    dedt *= (1.0 + e2*121.0/304.0) * ecc / np.power(1 - e2, 5.0/2.0)
-    return dedt
+    e2 = eccen**2
+    num = (1 + (73.0/24.0)*e2 + (37.0/96.0)*e2*e2)
+    den = (1 - e2) * (1.0 + (121.0/304.0)*e2)
+    dade = (12.0 / 19.0) * (sepa / eccen) * (num / den)
+    return dade
 
 
 def gw_freq_dist_func(nn, ee=0.0):
@@ -242,16 +271,18 @@ def gw_freq_dist_func(nn, ee=0.0):
     return gg
 
 
-def gw_hardening_rate_dadt(m1, m2, sma, ecc=None):
+def gw_hardening_rate_dadt(m1, m2, sepa, eccen=None):
     """GW Hardening rate (da/dt).
+
+    returned value is negative.
 
     See Peters 1964, Eq. 5.6
     http://adsabs.harvard.edu/abs/1964PhRv..136.1224P
     """
     cc = _GW_DADT_SEP_CONST
-    dadt = cc * m1 * m2 * (m1 + m2) / np.power(sma, 3)
-    if ecc is not None:
-        fe = _gw_ecc_func(ecc)
+    dadt = cc * m1 * m2 * (m1 + m2) / np.power(sepa, 3)
+    if eccen is not None:
+        fe = _gw_ecc_func(eccen)
         dadt *= fe
     return dadt
 
@@ -296,14 +327,71 @@ def time_to_merge_at_sep(m1, m2, sep):
     return delta_sep/(GW_CONST*m1*m2*(m1+m2))
 
 
-def _gw_ecc_func(ecc):
+def _gw_ecc_func(eccen):
     """GW Hardening rate eccentricitiy dependence F(e).
 
     See Peters 1964, Eq. 5.6
     EN07: Eq. 2.3
     """
-    e2 = ecc*ecc
+    e2 = eccen*eccen
     num = 1 + (73/24)*e2 + (37/96)*e2*e2
     den = np.power(1 - e2, 7/2)
     fe = num / den
     return fe
+
+
+def trapezoid_loglog(yy, xx, axis=-1, dlogx=None, lntol=1e-2):
+    """Calculate integral, given `y = dA/dx` or `y = dA/dlogx` w/ trapezoid rule in log-log space.
+
+    We are calculating the integral `A` given sets of values for `y` and `x`.
+    To associate `yy` with `dA/dx` then `dlogx = None` [default], otherwise,
+    to associate `yy` with `dA/dlogx` then `dlogx = True` for natural-logarithm, or `dlogx = b`
+    for a logarithm of base `b`.
+
+    For each interval (x[i+1], x[i]), calculate the integral assuming that y is of the form,
+        `y = a * x^gamma`
+
+    """
+    yy = np.asarray(yy)
+    xx = np.asarray(xx)
+
+    log_base = np.e
+    if dlogx is not None:
+        # If `dlogx` is True, then we're using log-base-e (i.e. natural-log)
+        # Otherwise, set the log-base to the given value
+        if dlogx is not True:
+            log_base = dlogx
+
+    # Numerically calculate the local power-law index
+    xx = np.moveaxis(xx, axis, 0)
+    yy = np.moveaxis(yy, axis, 0)
+    delta_logx = np.diff(np.log(xx), axis=0)[0]
+    gamma = np.diff(np.log(yy), axis=0)[0] / delta_logx
+
+    # aa = np.mean([xx[:-1] * yy[:-1], xx[1:] * yy[1:]], axis=0)
+    assert np.shape(xx)[0] == 2 and np.shape(yy)[0] == 2, "BAD SHAPE!"
+    aa = np.mean([xx[0] * yy[0], xx[1] * yy[1]], axis=0)
+    aa = np.moveaxis(aa, 0, axis)
+    xx = np.moveaxis(xx, 0, axis)
+    yy = np.moveaxis(yy, 0, axis)
+
+    # Integrate dA/dx
+    # A = (x1*y1 - x0*y0) / (gamma + 1)
+    if dlogx is None:
+        dz = np.diff(yy * xx, axis=axis).squeeze()
+        trapz = dz / (gamma + 1)
+        # when the power-law is (near) '-1' then, `A = a * log(x1/x0)`
+        idx = np.isclose(gamma, -1.0, atol=lntol, rtol=lntol)
+
+    # Integrate dA/dlogx
+    # A = (y1 - y0) / gamma
+    else:
+        dy = np.diff(yy, axis=axis).squeeze()
+        trapz = dy / gamma
+        # when the power-law is (near) '-1' then, `A = a * log(x1/x0)`
+        idx = np.isclose(gamma, 0.0, atol=lntol, rtol=lntol)
+
+    trapz[idx] = aa[idx] * delta_logx[idx]
+
+    integ = np.log(log_base) * np.cumsum(trapz, axis=axis)
+    return integ
