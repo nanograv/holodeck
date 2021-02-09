@@ -8,30 +8,30 @@ import numpy as np
 from holodeck import utils
 from holodeck.constants import PC, MSOL
 
-_DEF_ECCS_DIST = (1.0, 0.2)
+_DEF_ECCEN_DIST = (1.0, 0.2)
 
 
 class _Binary_Population(abc.ABC):
 
-    def __init__(self, fname, *args, mods=None, check=True, **kwargs):
+    def __init__(self, fname, *args, mods=None, **kwargs):
         self._fname = fname
 
         # Initial binary values (i.e. at time of formation)
         self.time = None    # scale factor        (N,)
         self.sepa = None    # binary separation a (N,)
         self.mass = None    # blackhole masses    (N, 2)
-        self._size = None
+        self.eccen = None    # eccentricities      (N,) [optional]
 
-        self.eccs = None
+        self._size = None
         self._sample_volume = None
 
         # Initialize the population
         self._init_from_file(fname)
         # Apply modifications (using `Modifer` instances)
         self.modify(mods)
-        # Perform diagnostics
-        if check:
-            self._check()
+
+        if self.size is None:
+            raise
         return
 
     @abc.abstractmethod
@@ -54,12 +54,21 @@ class _Binary_Population(abc.ABC):
             mods = [mods]
 
         # Run Modifiers
+        updated = False
         for mod in mods:
-            mod(self)
+            if mod is not None:
+                mod(self)
+                self._update_derived()
+                updated = True
 
-        # Update derived quantites (following modifications)
-        self._update_derived()
+        if not updated:
+            self._update_derived()
+        self._finalize()
+        self._check()
         return
+
+    def _finalize(self):
+        pass
 
     def _check(self):
         return
@@ -90,32 +99,21 @@ class BP_Illustris(_Binary_Population):
         return
 
 
-class _Modifier(abc.ABC):
-
-    def __call__(self, base):
-        self.modify(base)
-        return
-
-    @abc.abstractmethod
-    def modify(self, base):
-        pass
-
-
-class Population_Modifier(_Modifier):
+class Population_Modifier(utils._Modifier):
     pass
 
 
 class PM_Eccentricity(Population_Modifier):
 
-    def __init__(self, eccs_dist=_DEF_ECCS_DIST):
-        self.eccs_dist = eccs_dist
+    def __init__(self, eccen_dist=_DEF_ECCEN_DIST):
+        self.eccen_dist = eccen_dist
         return
 
     def modify(self, pop):
-        eccs_dist = self.eccs_dist
+        eccen_dist = self.eccen_dist
         size = pop.size
-        eccs = eccs_func(*eccs_dist, size)
-        pop.eccs = eccs
+        eccen = eccen_func(*eccen_dist, size)
+        pop.eccen = eccen
         return
 
 
@@ -154,10 +152,10 @@ class PM_Resample(Population_Modifier):
             None,
         ]
 
-        eccs = pop.eccs
-        if eccs is not None:
-            labels.append('eccs')
-            old_data.append(eccs)
+        eccen = pop.eccen
+        if eccen is not None:
+            labels.append('eccen')
+            old_data.append(eccen)
             reflect.append([0.0, 1.0])
 
         opt_idx = []
@@ -186,7 +184,7 @@ class PM_Resample(Population_Modifier):
         pop.mass = utils.m1m2_from_mtmr(mt, mr).T
         pop.time = new_data[2]
         pop.sepa = PC * 10**new_data[3]
-        pop.eccs = None if (eccs is None) else new_data[4]
+        pop.eccen = None if (eccen is None) else new_data[4]
 
         for opt, idx in zip(self._additional_keys, opt_idx):
             if idx is None:
@@ -390,7 +388,7 @@ class PM_KH13(PM_Mass_Reset):
     }
 
 
-def eccs_func(norm, std, size):
-    eccs = utils.log_normal_base_10(1.0/norm, std, size=size)
-    eccs = 1.0 / (eccs + 1.0)
-    return eccs
+def eccen_func(norm, std, size):
+    eccen = utils.log_normal_base_10(1.0/norm, std, size=size)
+    eccen = 1.0 / (eccen + 1.0)
+    return eccen

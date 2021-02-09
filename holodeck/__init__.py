@@ -7,10 +7,18 @@ Supermassive binary black hole simulator for pulsar timing array signals and gal
 from . import cosmology
 cosmo = cosmology.Cosmology()
 
-from . import utils     # noqa
-from . import holodeck  # noqa
+from . import constants  # noqa
+# from .constants import *  # noqa
+from . import evolution  # noqa
+from .evolution import *  # noqa
+from . import gravwaves  # noqa
+from .gravwaves import *  # noqa
 from . import observations # noqa
-
+from .observations import *  # noqa
+from . import population  # noqa
+from .population import *  # noqa
+from . import utils     # noqa
+from .utils import *  # noqa
 
 # Handle versioneer
 from ._version import get_versions
