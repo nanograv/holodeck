@@ -77,6 +77,30 @@ def nyquist_freqs(dur=15.0, cad=0.1, trim=None):
     return freqs
 
 
+def _parse_log_norm_pars(vals, size, default=None):
+    """
+    vals:
+        ()   ==> (N,)
+        (2,) ==> (N,) log_normal(vals)
+        (N,) ==> (N,)
+
+    """
+    if (vals is None):
+        if default is None:
+            return None
+        vals = default
+
+    if np.isscalar(vals):
+        vals = vals * np.ones(size)
+    elif (isinstance(vals, tuple) or isinstance(vals, list)) and (len(vals) == 2):
+        vals = log_normal_base_10(*vals, size=size)
+    elif np.shape(vals) != (size,):
+        err = "`vals` must be scalar, (2,) of scalar, or array (nbins={},) of scalar!".format(size)
+        raise ValueError(err)
+
+    return vals
+
+
 # ==== General Astronomy ====
 
 
