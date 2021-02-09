@@ -413,19 +413,19 @@ class BE_Magic_Delay_Eccen(_Binary_Evolution):
         a1 = self.sepa[:, step]
         # NOTE: `da` defined to be positive!
         da = a0 - a1
-        t0 = self.tlbk[:, step-1]
+        # t0 = self.tlbk[:, step-1]
         e0 = self.eccen
         if e0 is not None:
             e0 = e0[:, step-1]
 
         # Get derivatives at left edge of the step
-        dadt_0 = self.dadt[:, step-1]
+        # dadt_0 = self.dadt[:, step-1]
         # e0 = self.eccen
         # if e0 is not None:
         #     e0 = e0[:, step-1]
         #     dedt_0 = self.dedt[:, step-1]
 
-        dt = da / dadt_0
+        # dt = da / dadt_0
         # if e0 is not None:
         #     de = dedt_0 * dt
         #     e1 = e0 - de

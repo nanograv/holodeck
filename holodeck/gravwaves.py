@@ -88,8 +88,6 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
     """
     """
 
-    import zcode.math as zmath
-
     # ---- Interpolate data to all harmonics of this frequency
     harm_range = np.asarray(harm_range)
     # Each parameter will be (N, H) = (binaries, harmonics)
@@ -141,16 +139,7 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
     # Calculate weightings
     #    Sesana+08, Eq.10
     num_frac = vfac * tfac * zp1
-    try:
-        num_pois = np.random.poisson(num_frac, (nreals, num_frac.size)).T
-    except:
-        print(f"{dlum=}")
-        print(f"{redz=}")
-        print(f"{vfac=}")
-        print(f"{tfac=}")
-        print(f"{zp1=}")
-        print(f"{num_frac=}")
-        raise
+    num_pois = np.random.poisson(num_frac, (nreals, num_frac.size)).T
 
     # --- Calculate GW Signals
     temp = hs2 * gne * (2.0 / harms)**2
