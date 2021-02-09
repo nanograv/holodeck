@@ -5,6 +5,7 @@ import abc
 import enum
 
 import numpy as np
+import tqdm
 
 # import holodeck as holo
 from holodeck import utils, cosmo
@@ -76,7 +77,7 @@ class BP_Illustris(_Binary_Population):
 
     def _init_from_file(self, fname):
         header, data = utils.load_hdf5(fname)
-        self._sample_volume = header['box_volume_mpc'] * (1e6*PC**3)
+        self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3
 
         # Select the stellar radius
         part_names = header['part_names'].tolist()
@@ -785,7 +786,6 @@ class GWB:
         circ_back = np.zeros((freqs.size, nreals))
         circ_both = np.zeros((freqs.size, nreals))
         loudest = np.zeros((freqs.size, nloudest, nreals))
-        fore_idx = np.zeros((freqs.size, nreals), dtype=int)
         sa_eccen = np.zeros_like(freqs)
         sa_circ = np.zeros_like(freqs)
 
@@ -794,12 +794,12 @@ class GWB:
         else:
             harm_range = [2]
 
-        for ii, fobs_yr in enumerate(freqs):
+        for ii, fobs in tqdm.tqdm(enumerate(freqs), total=len(freqs)):
             rv = _calc_mc_at_fobs(
-                fobs_yr, harm_range, nreals, bin_evo, box_vol,
+                fobs, harm_range, nreals, bin_evo, box_vol,
                 loudest=nloudest
             )
-            mc_ecc, mc_circ, ret_sa_ecc, ret_sa_circ, ret_stats, fidx, loud = rv
+            mc_ecc, mc_circ, ret_sa_ecc, ret_sa_circ, loud = rv
             eccen_fore[ii, :] = mc_ecc[0]
             eccen_back[ii, :] = mc_ecc[1]
             eccen_both[ii, :] = mc_ecc[2]
@@ -808,7 +808,6 @@ class GWB:
             circ_both[ii, :] = mc_circ[2]
             sa_eccen[ii] = ret_sa_ecc
             sa_circ[ii] = ret_sa_circ
-            fore_idx[ii, :] = fidx
             loudest[ii, :] = loud
 
         self.eccen_fore = np.sqrt(eccen_fore)
@@ -822,7 +821,6 @@ class GWB:
         self.sa_eccen = np.sqrt(sa_eccen)
         self.sa_circ = np.sqrt(sa_circ)
         self.loudest = np.sqrt(loudest)
-        self.fore_idx = fore_idx
 
         return
 
@@ -839,7 +837,7 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
     # Only examine binaries reaching the given locations before redshift zero (other redz=inifinite)
     redz = data_harms['time']
     redz = utils.a_to_z(redz)
-    valid = np.isfinite(redz)
+    valid = np.isfinite(redz) & (redz > 0.0)
 
     # Broadcast harmonics numbers to correct shape
     harms = np.ones_like(redz, dtype=int) * harm_range[np.newaxis, :]
@@ -851,7 +849,6 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
     harms = harms[valid]
     redz = redz[valid]
     # If there are eccentricities, calculate the freq-dist-function
-    # timings.start('freq_dist')
     eccs = data_harms['eccs']
     if eccs is None:
         gne = 1
@@ -881,11 +878,12 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
 
     # Calculate weightings
     #    Sesana+08, Eq.10
-    #    NOTE: BUG: is the `(1+z)^+1 factor here correct???
     num_frac = vfac * tfac * zp1
     try:
         num_pois = np.random.poisson(num_frac, (nreals, num_frac.size)).T
     except:
+        print(f"{dlum=}")
+        print(f"{redz=}")
         print(f"{vfac=}")
         print(f"{tfac=}")
         print(f"{zp1=}")
@@ -900,7 +898,6 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
     sa_ecc = np.sum(temp * num_frac, axis=0)
     sa_circ = np.sum(temp * num_frac * sel_n2, axis=0)
 
-    fore_idx = None
     if np.count_nonzero(num_pois) > 0:
         # Find the L loudest binaries in each realizations
         loud = np.sort(temp[:, np.newaxis] * (num_pois > 0), axis=0)[::-1, :]
@@ -909,7 +906,6 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
 
         mc_circ_fore = np.max(temp[:, np.newaxis] * (num_pois > 0) * sel_n2[:, np.newaxis], axis=0)
     else:
-        # fore_idx = -1 * np.ones(nreals, dtype=int)
         mc_ecc_fore = np.zeros_like(mc_ecc_both)
         mc_circ_fore = np.zeros_like(mc_circ_both)
         loud = np.zeros((loudest, nreals))
@@ -921,7 +917,7 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
     mc_ecc = [mc_ecc_fore, mc_ecc_back, mc_ecc_both]
     mc_circ = [mc_circ_fore, mc_circ_back, mc_circ_both]
 
-    return mc_ecc, mc_circ, sa_ecc, sa_circ, fore_idx, loud
+    return mc_ecc, mc_circ, sa_ecc, sa_circ, loud
 
 
 # ============    Utlity    ============
