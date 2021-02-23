@@ -272,7 +272,7 @@ def gw_freq_dist_func(nn, ee=0.0):
 
 
 def gw_hardening_rate_dadt(m1, m2, sepa, eccen=None):
-    """GW Hardening rate (da/dt).
+    """GW Hardening rate in separation (da/dt).
 
     returned value is negative.
 
@@ -285,6 +285,15 @@ def gw_hardening_rate_dadt(m1, m2, sepa, eccen=None):
         fe = _gw_ecc_func(eccen)
         dadt *= fe
     return dadt
+
+
+def gw_hardening_rate_dfdt(m1, m2, freq, eccen=None):
+    """GW Hardening rate in frequency (df/dt).
+    """
+    sepa = kepler_sep_from_freq(m1+m2, freq)
+    dfdt = gw_hardening_rate_dadt(m1, m2, sepa, eccen=eccen)
+    dfdt = dfdt_from_dadt(dfdt, sepa, mtot=m1+m2)
+    return dfdt
 
 
 def gw_lum_circ(mchirp, freq_orb_rest):
