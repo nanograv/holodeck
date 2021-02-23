@@ -413,22 +413,9 @@ class BE_Magic_Delay_Eccen(_Binary_Evolution):
         a1 = self.sepa[:, step]
         # NOTE: `da` defined to be positive!
         da = a0 - a1
-        # t0 = self.tlbk[:, step-1]
         e0 = self.eccen
         if e0 is not None:
             e0 = e0[:, step-1]
-
-        # Get derivatives at left edge of the step
-        # dadt_0 = self.dadt[:, step-1]
-        # e0 = self.eccen
-        # if e0 is not None:
-        #     e0 = e0[:, step-1]
-        #     dedt_0 = self.dedt[:, step-1]
-
-        # dt = da / dadt_0
-        # if e0 is not None:
-        #     de = dedt_0 * dt
-        #     e1 = e0 - de
 
         if e0 is not None:
             dade = utils.gw_dade(m1, m2, a0, e0)
@@ -436,42 +423,6 @@ class BE_Magic_Delay_Eccen(_Binary_Evolution):
             e1 = e0 - de
         else:
             e1 = None
-
-        '''
-        # Estimate values at right-edge of step
-        if e0 is not None:
-            # Estimate time-step size
-            dt = da / dadt_0
-            de = dedt_0 * dt
-            e1 = e0 - de
-            # FIX - Temporary: don't let eccentricity drop by more than 10x
-            e1 = np.clip(e1, e0/10.0, 1.0)
-        else:
-            e1 = None
-
-        # Estimate derivatives at right-edge of step
-        #    NOTE: `gw_hardening_rate_dadt` is given as negative, but we're storing them as positive
-        dadt_1 = - utils.gw_hardening_rate_dadt(m1, m2, a1, eccen=e1)
-        if e1 is not None:
-            dedt_1 = - utils.gw_dedt(m1, m2, a1, e1)
-
-        # Update time-step size
-        dt = utils.trapezoid_loglog([1/dadt_1, 1/dadt_0], [a1, a0], axis=0).squeeze()
-
-        # Update right-edge values
-        if e1 is not None:
-            de = np.zeros_like(dedt_0)
-            idx = ((dedt_0 > 0.0) | (dedt_1 > 0.0)) & (dt < 1000*GYR)
-            if np.any(idx):
-                # NOTE: times are decreasing, so reverse order to get a positive value out
-                times = [t0-dt, t0]
-                times = [tt[idx] for tt in times]
-                # NOTE: `times` must be positive for `cumtrapz_loglog` to work! normalization doesn't matter
-                times = np.asarray(times) + 2*np.max(np.fabs(times))
-                de[idx] = utils.trapezoid_loglog([dedt_0[idx], dedt_1[idx]], times, axis=0).squeeze()
-            e1 = e0 - de
-            e1 = np.clip(e1, 0.0, 1.0)
-        '''
 
         dadt_1 = - utils.gw_hardening_rate_dadt(m1, m2, a1, eccen=e1)
         if e1 is not None:
@@ -482,7 +433,5 @@ class BE_Magic_Delay_Eccen(_Binary_Evolution):
         if e1 is not None:
             self.dedt[:, step] = dedt_1
             self.eccen[:, step] = e1
-
-        # print(f"\n{step=}\n{a1/PC=}\n{e1=}\n{dadt_1*GYR/PC=}\n{dedt_1=}\n{dt/GYR=}\n{da/PC=}\n{de=}")
 
         return EVO.CONT
