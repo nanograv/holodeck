@@ -1,0 +1,4 @@
+-r requirements.txt
+kalepy
+pytest
+versioneer
