@@ -3,6 +3,9 @@ holodeck
 Supermassive binary black hole simulator for pulsar timing array signals and galaxy population  statistics.
 """
 import os
+import logging
+
+log = logging.getLogger('holodeck')
 
 # --- Setup root package variables
 
@@ -47,4 +50,4 @@ __git_revision__ = versions['full-revisionid']
 del get_versions, versions
 
 # Full cleanup
-del os, _check_paths
+del os, _check_paths, logging
