@@ -5,7 +5,7 @@ import abc
 
 import numpy as np
 
-from holodeck import utils
+from holodeck import utils, log
 from holodeck.constants import PC, MSOL
 
 _DEF_ECCEN_DIST = (1.0, 0.2)
@@ -84,15 +84,17 @@ class _Binary_Population(abc.ABC):
 
         for name in array_names:
             vals = getattr(self, name)
+            shape = np.shape(vals)
+            msg = None if (vals is None) else shape
+            log.debug(f"{name:>10s} :: {msg}")
             if vals is None:
                 if name in allow_none:
                     continue
                 err = msg + "`{}` is 'None'!".format(name)
                 raise ErrorType(err)
 
-            shape = np.shape(vals)
             bad_shape = False
-            if size != shape[0]:
+            if (len(shape) == 0) or (size != shape[0]):
                 bad_shape = True
 
             if name in two_dim:
@@ -139,6 +141,33 @@ class BP_Illustris(_Binary_Population):
 
     def _update_derived(self):
         self._size = self.sepa.size
+        return
+
+
+class BP_Continuous(_Binary_Population):
+
+    def _init_from_file(self, fname):
+        data = np.load(fname)
+        mt = data['mtot'] * MSOL
+        mr = data['mrat']
+        sc = utils.z_to_a(data['redz'])
+        ww = data['pops'][..., 0]
+        self._mtot = mt
+        self._mrat = mr
+        self._redz = data['redz']
+
+        mt, mr, sc = [xx.flatten() for xx in np.meshgrid(mt, mr, sc, indexing='ij')]
+        self.mtot = mt
+        self.mrat = mr
+        self.time = sc
+        self.weight = ww.flatten()
+        self.sepa = 1e5 * PC * np.ones_like(mt)
+        self.mass = utils.m1m2_from_mtmr(self.mtot, self.mrat).T
+
+        return
+
+    def _update_derived(self):
+        self._size = self.mtot.size
         return
 
 
