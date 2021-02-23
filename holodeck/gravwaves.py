@@ -5,27 +5,32 @@ import numpy as np
 import tqdm
 
 from holodeck import utils, cosmo
-from holodeck.constants import SPLC
+from holodeck.constants import SPLC, MPC, MSOL
+
+# import zcode.math as zmath    # FIX: REMOVE
 
 
 _CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'time', 'eccen']
 
 
-class GWB:
+class Grav_Waves:
 
-    def __init__(self, bin_evo, freqs, nharms=30, nreals=100, calculate=True):
+    def __init__(self, bin_evo, freqs, nharms=30, nreals=100):
         self.freqs = freqs
         self.nharms = nharms
         self.nreals = nreals
-        self._box_vol_cgs = bin_evo._sample_volume
         self._bin_evo = bin_evo
-
-        if calculate:
-            self.calculate(bin_evo)
-
         return
 
-    def calculate(self, bin_evo, eccen=None, stats=False, progress=True, nloudest=5):
+
+class GW_Discrete(Grav_Waves):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._box_vol_cgs = self._bin_evo._sample_volume
+        return
+
+    def emit(self, eccen=None, stats=False, progress=True, nloudest=5):
         freqs = self.freqs
         nharms = self.nharms
         nreals = self.nreals
@@ -82,6 +87,64 @@ class GWB:
         self.loudest = np.sqrt(loudest)
 
         return
+
+
+class GW_Continuous(Grav_Waves):
+
+    # def __init__(self, *args, **kwargs):
+    #     super().__init__(*args, **kwargs)
+    #     return
+
+    def emit(self, eccen=None, stats=False, progress=True, nloudest=5):
+        freqs = self.freqs
+        # nharms = self.nharms
+        # nreals = self.nreals
+        bin_evo = self._bin_evo
+        bin_pop = bin_evo._bin_pop
+        weight = bin_pop.weight
+        dm = np.log10(bin_pop._mtot[1]/MSOL) - np.log10(bin_pop._mtot[0]/MSOL)
+        dq = bin_pop._mrat[1] - bin_pop._mrat[0]
+        dz = bin_pop._redz[1] - bin_pop._redz[0]
+
+        # (N,) ==> (1, N)    for later conversion to (F, N)
+        m1, m2 = [mm[np.newaxis, :] for mm in bin_pop.mass.T]
+
+        H0 = cosmo.H0*1e5 / MPC   # convert from [km/s/Mpc] to [1/s]
+        redz = cosmo._a_to_z(bin_pop.time)                     # (N,)
+        redz = np.clip(redz, 0.1, None)
+        # print(f"redz={zmath.stats_str(redz)}")
+        dlum = cosmo.luminosity_distance(redz).cgs.value
+        # print(f"dlum={zmath.stats_str(dlum)}")
+        dzdt = H0 * cosmo.efunc(redz) * np.square(1.0 + redz)  # (N,)
+        # print(f"dzdt={zmath.stats_str(dzdt)}")
+
+        frest = freqs[:, np.newaxis] / (1.0 + redz[np.newaxis, :])  # (F, N)
+        # print(f"frest={zmath.stats_str(frest)}")
+        dtr_dlnfr = frest / utils.gw_hardening_rate_dfdt(m1, m2, frest)  # (F, N)
+        # print(f"dtr_dlnfr={zmath.stats_str(dtr_dlnfr)}")
+
+        mchirp = utils.chirp_mass(m1, m2)
+        # print(f"frest={zmath.stats_str(frest)}")
+        # Calculate source-strain for each source (h;  NOT characteristic strain)
+        strain = utils.gw_strain_source(mchirp, dlum[np.newaxis, :], frest)  # (F, N)
+        # print(f"hs={zmath.stats_str(hs)}")
+
+        time_fac = dzdt * dtr_dlnfr
+        # print(f"time_fac={zmath.stats_str(time_fac)}")
+        # Calculate characteristic-strain (squared)
+        strain = weight[np.newaxis, :] * time_fac * strain**2
+        # print(f"strain={zmath.stats_str(strain)}")
+
+        dvol = dm * dq * dz
+        # dvol = 1.0
+        # print(f"{dvol=:.2e}")
+        # print(f"numbers = {zmath.stats_str(dvol*weight)}")
+        # print(f"number  = {np.sum(dvol*weight):.2e}")
+
+        strain = np.sqrt(np.sum(strain * dvol, axis=1))
+        # print(f"hc={zmath.stats_str(strain)}")
+
+        return strain
 
 
 def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
