@@ -2,3 +2,4 @@
 kalepy
 pytest
 versioneer
+testbook
