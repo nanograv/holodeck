@@ -31,5 +31,7 @@ def test_discrete(tb_discrete):
     pass
 
 
+'''
 def test_continuous(tb_continuous):
     pass
+'''
