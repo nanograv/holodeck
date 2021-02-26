@@ -1,5 +1,6 @@
 -r requirements.txt
 kalepy
 pytest
+pytest-cov
 versioneer
 testbook
