@@ -43,15 +43,9 @@ class GW_Discrete(Grav_Waves):
         if eccen not in [True, False]:
             raise ValueError("`eccen` '{}' is invalid!".format(eccen))
 
-        eccen_fore = np.zeros((freqs.size, nreals))
-        eccen_back = np.zeros((freqs.size, nreals))
-        eccen_both = np.zeros((freqs.size, nreals))
-        circ_fore = np.zeros((freqs.size, nreals))
-        circ_back = np.zeros((freqs.size, nreals))
-        circ_both = np.zeros((freqs.size, nreals))
         loudest = np.zeros((freqs.size, nloudest, nreals))
-        sa_eccen = np.zeros_like(freqs)
-        sa_circ = np.zeros_like(freqs)
+        fore = np.zeros((freqs.size, nreals))
+        back = np.zeros((freqs.size, nreals))
 
         if eccen:
             harm_range = range(1, nharms+1)
@@ -59,33 +53,18 @@ class GW_Discrete(Grav_Waves):
             harm_range = [2]
 
         for ii, fobs in tqdm.tqdm(enumerate(freqs), total=len(freqs)):
-            rv = _calc_mc_at_fobs(
+            _fore, _back, _loud = _calc_mc_at_fobs(
                 fobs, harm_range, nreals, bin_evo, box_vol,
                 loudest=nloudest
             )
-            mc_ecc, mc_circ, ret_sa_ecc, ret_sa_circ, loud = rv
-            eccen_fore[ii, :] = mc_ecc[0]
-            eccen_back[ii, :] = mc_ecc[1]
-            eccen_both[ii, :] = mc_ecc[2]
-            circ_fore[ii, :] = mc_circ[0]
-            circ_back[ii, :] = mc_circ[1]
-            circ_both[ii, :] = mc_circ[2]
-            sa_eccen[ii] = ret_sa_ecc
-            sa_circ[ii] = ret_sa_circ
-            loudest[ii, :] = loud
+            loudest[ii, :] = _loud
+            fore[ii, :] = _fore
+            back[ii, :] = _back
 
-        self.eccen_fore = np.sqrt(eccen_fore)
-        self.eccen_back = np.sqrt(eccen_back)
-        self.eccen_both = np.sqrt(eccen_both)
-
-        self.circ_fore = np.sqrt(circ_fore)
-        self.circ_back = np.sqrt(circ_back)
-        self.circ_both = np.sqrt(circ_both)
-
-        self.sa_eccen = np.sqrt(sa_eccen)
-        self.sa_circ = np.sqrt(sa_circ)
-        self.loudest = np.sqrt(loudest)
-
+        self.fore = np.sqrt(fore)
+        self.back = np.sqrt(back)
+        self.strain = np.sqrt(back + fore)
+        self.loudest = loudest
         return
 
 
@@ -97,8 +76,6 @@ class GW_Continuous(Grav_Waves):
 
     def emit(self, eccen=None, stats=False, progress=True, nloudest=5):
         freqs = self.freqs
-        # nharms = self.nharms
-        # nreals = self.nreals
         bin_evo = self._bin_evo
         bin_pop = bin_evo._bin_pop
         weight = bin_pop.weight
@@ -143,8 +120,8 @@ class GW_Continuous(Grav_Waves):
 
         strain = np.sqrt(np.sum(strain * dvol, axis=1))
         # print(f"hc={zmath.stats_str(strain)}")
-
-        return strain
+        self.strain = strain
+        return
 
 
 def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
@@ -207,10 +184,9 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
     # --- Calculate GW Signals
     temp = hs2 * gne * (2.0 / harms)**2
     mc_ecc_both = np.sum(temp[:, np.newaxis] * num_pois, axis=0)
-    mc_circ_both = np.sum(temp[:, np.newaxis] * num_pois * sel_n2[:, np.newaxis], axis=0)
-
-    sa_ecc = np.sum(temp * num_frac, axis=0)
-    sa_circ = np.sum(temp * num_frac * sel_n2, axis=0)
+    # mc_circ_both = np.sum(temp[:, np.newaxis] * num_pois * sel_n2[:, np.newaxis], axis=0)
+    # sa_ecc = np.sum(temp * num_frac, axis=0)
+    # sa_circ = np.sum(temp * num_frac * sel_n2, axis=0)
 
     if np.count_nonzero(num_pois) > 0:
         # Find the L loudest binaries in each realizations
@@ -218,17 +194,18 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
         mc_ecc_fore = loud[0, :]
         loud = loud[:loudest, :]
 
-        mc_circ_fore = np.max(temp[:, np.newaxis] * (num_pois > 0) * sel_n2[:, np.newaxis], axis=0)
+        # mc_circ_fore = np.max(temp[:, np.newaxis] * (num_pois > 0) * sel_n2[:, np.newaxis], axis=0)
     else:
         mc_ecc_fore = np.zeros_like(mc_ecc_both)
-        mc_circ_fore = np.zeros_like(mc_circ_both)
+        # mc_circ_fore = np.zeros_like(mc_circ_both)
         loud = np.zeros((loudest, nreals))
 
     mc_ecc_back = mc_ecc_both - mc_ecc_fore
-    mc_circ_back = mc_circ_both - mc_circ_fore
+    # mc_circ_back = mc_circ_both - mc_circ_fore
 
     # Package and return
-    mc_ecc = [mc_ecc_fore, mc_ecc_back, mc_ecc_both]
-    mc_circ = [mc_circ_fore, mc_circ_back, mc_circ_both]
+    # mc_ecc = [mc_ecc_fore, mc_ecc_back, mc_ecc_both]
+    # mc_circ = [mc_circ_fore, mc_circ_back, mc_circ_both]
 
-    return mc_ecc, mc_circ, sa_ecc, sa_circ, loud
+    # return mc_ecc, mc_circ, sa_ecc, sa_circ, loud
+    return mc_ecc_fore, mc_ecc_back, loud
