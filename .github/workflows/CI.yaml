@@ -6,17 +6,16 @@ on:
   # Both are tracked here to keep legacy and new codes working
   push:
     branches:
-      - "master"
       - "main"
   pull_request:
     branches:
-      - "master"
       - "main"
-  schedule:
+      - "dev"
+  #schedule:
     # Nightly tests run on master by default:
     #   Scheduled workflows run on the latest commit on the default or base branch.
     #   (from https://help.github.com/en/actions/reference/events-that-trigger-workflows#scheduled-events-schedule)
-    - cron: "0 0 * * *"
+  #  - cron: "0 0 * * *"
 
 jobs:
   test:
@@ -24,7 +23,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macOS-latest, ubuntu-latest, windows-latest]
+        os: [ubuntu-latest] #[macOS-latest, ubuntu-latest, windows-latest]
         python-version: [3.7, 3.8, 3.9]
 
     steps:
