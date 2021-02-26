@@ -1,9 +1,6 @@
 name: CI
 
 on:
-  # GitHub has started calling new repo's first branch "main" https://github.com/github/renaming
-  # Existing codes likely still have "master" as the primary branch
-  # Both are tracked here to keep legacy and new codes working
   push:
     branches:
       - "main"
@@ -28,43 +25,36 @@ jobs:
         python-version: [3.7, 3.8, 3.9]
 
     steps:
-    - uses: actions/checkout@v1
 
-    - name: Additional info about the build
-      shell: bash
-      run: |
-        uname -a
-        df -h
-        ulimit -a
+    - name: Check out repository
+      uses: actions/checkout@v2
 
-
-    # More info on options: https://github.com/conda-incubator/setup-miniconda
-    - uses: conda-incubator/setup-miniconda@v2
+    - name: Set up Python ${{ matrix.python }}
+      uses: actions/setup-python@v2
       with:
-        python-version: ${{ matrix.python-version }}
-        environment-file: devtools/conda-envs/test_env.yaml
+        python-version: ${{ matrix.python }}
 
-        channels: defaults
+    - name: Pre-install
+      run: |
+        python -m pip install --upgrade pip
 
-        activate-environment: test
-        auto-update-conda: false
-        auto-activate-base: false
-        show-channel-urls: true
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
 
     - name: Install package
-
-      # conda setup requires this special shell
-      shell: bash -l {0}
       run: |
         python -m pip install . --no-deps
-        conda list
 
+    - name: Display versions
+      run: |
+        python -c "import sys; print(f'Python {sys.version}')"
+        python -c "import pip; print(f'pip {pip.__version__}')"
+        python -c "import setuptools; print(f'setuptools {setuptools.__version__}')"
+        pip freeze
 
     - name: Run tests
-
-      # conda setup requires this special shell
-      shell: bash -l {0}
-
       run: |
         pytest -v --cov=holodeck --cov-report=xml --color=yes holodeck/tests/
 
