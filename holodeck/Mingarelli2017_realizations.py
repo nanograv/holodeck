@@ -430,6 +430,6 @@ def single_realization(gal_no, k_mag, f_min=1e-9):
     
     #Compute min and max primary mass among PTA sources
     prim_BHmass_min = min(prim_mass_sources)
-    prim_BHmass_max = min(prim_mass_sources)
+    prim_BHmass_max = max(prim_mass_sources)
 
     return no_of_samples, prim_BHmass_min, prim_BHmass_max
