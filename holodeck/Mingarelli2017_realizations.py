@@ -458,30 +458,51 @@ def quasar_formation_rate(log_mass, z, log_formation_rate_normalization=-3.830,
     z : float
         Redshift coordinate.
     log_formation_rate_normalization : float, optional
-        DESCRIPTION. The default is -3.830.
+        Base 10 logarithm of quasar formation rate normalization. The
+        default is -3.830.
     log_formation_rate_power_law_slope : float, optional
-        DESCRIPTION. The default is -4.02.
+        Power law slope of formation rate normalization evolution over
+        redshift. The default is -4.02.
     log_mass_break_normalization : float, optional
-        DESCRIPTION. The default is 8.959.
+        Base 10 logarithm of "break mass". The default is 8.959.
     log_mass_break_k_1 : float, optional
-        DESCRIPTION. The default is 1.18.
+        Linear coefficient in break mass quadratic evolution. The default
+        is 1.18.
     log_mass_break_k_2 : float, optional
-        DESCRIPTION. The default is -6.68.
+        Quadratic coefficient in break mass quadratic evolution. The
+        default is -6.68.
     low_mass_slope : float, optional
-        DESCRIPTION. The default is .2.
+        Low mass slope in the double power law mass function. The default
+        is .2.
     high_mass_slope_normalization : float, optional
-        DESCRIPTION. The default is 2.86.
+        Local normalization of the high mass slope in the double power law
+        mass function. The default is 2.86.
     high_mass_slope_k_1 : float, optional
-        DESCRIPTION. The default is 1.80.
+        Low redshift slope of high mass slope double power law evolution.
+        The default is 1.80.
     high_mass_slope_k_2 : float, optional
-        DESCRIPTION. The default is -1.13.
+        High redshift slope of high mass slope double power law evolution.
+        The default is -1.13.
     z_ref : float, optional
-        DESCRIPTION. The default is 2.
+        Reference redshift (see Hopkins et al. (2007)[[1]_]). The default
+        is 2.
 
     Returns
     -------
     float
         Differential quasar formation rate per unit log mass and redshift.
+
+    Notes
+    -----
+    Based on the quasar formation rate model in
+    Hopkins et al. (2007)[[1]_], including default parameter values.
+
+    References
+    ----------
+    .. [1] P. F. Hopkins, G. T. Richards, and L. Hernquist, "An
+       Observational Determination of the Bolometric Quasar Luminosity
+       Function", The Astrophysical Journal 654, 731 (2007).
+
 
     """
     z_rescale = (1 + z) / (1 + z_ref)
@@ -514,10 +535,50 @@ def quasar_formation_rate(log_mass, z, log_formation_rate_normalization=-3.830,
     return (10 ** (log_normalization - log_mass_distribution)) * dtdz
 
 
-def continuous_pop(log_m_min, log_m_max, z_max, num_local_binaries,
-                   log_m_min_local, log_m_max_local, q_min, mu_log_q=0,
+def continuous_pop(num_local_binaries, log_m_min_local, log_m_max_local,
+                   log_m_min=7, log_m_max=11, z_max=1.5, q_min=.25, mu_log_q=0,
                    std_log_q=.5):
+    """
+    Continuous differential number density of SMBHBs.
 
+    Taken with respect to unit logarithmic mass, redshift, and mass ratio,
+    computed over a range of the same parameters.
+
+    Parameters
+    ----------
+    num_local_binaries : int
+        The number of local (redshift ~0) binaries.
+    log_m_min_local : float
+        Minimum base 10 logarithmic mass of the local population.
+    log_m_max_local : float
+        Maximum base 10 logarithmic mass of the local population.
+    log_m_min : float, optional
+        Minimum base 10 logarithmic mass of the considered SMBHB
+        population. The default is 7.
+    log_m_max : float, optional
+        Maximum base 10 logarithmic mass of the considered SMBHB
+        population. The default is 11.
+    z_max : float, optional
+        Maximum redshift of the considered SMBHB population. The default
+        is 1.5.
+    q_min : float, optional
+        Minimum binary mass ratio to consider (where 0 <= q <= 1). The
+        default is .25.
+    mu_log_q : float, optional
+        Mean log q. Used for assumed log-normal distribution of q. The
+        default is 0.
+    std_log_q : float, optional
+        Standard deviation of log q. Used for assumed log-normal
+        distribution of q. The default is .5.
+
+    Returns
+    -------
+    binary_pop : ndarray
+        Differential number density of SMBHB sources over log_mass,
+        redshift, and mass ratio. Returned as a 3d array with axes
+        corresponding to (log mass, redshift, mass ratio).
+
+    """
     # compute the local binary number density
     distance = 225 * u.Mpc
     z_225 = z_at_value(Planck15.angular_diameter_distance, distance, zmax=.25)
@@ -526,20 +587,19 @@ def continuous_pop(log_m_min, log_m_max, z_max, num_local_binaries,
 
     # renorm quasar formation rate density to get binary density
     local_agn_number_density = quad(quasar_formation_rate, log_m_min_local,
-                                    log_m_max_local, args=(0,))  # at z=0
+                                    log_m_max_local, args=(0,))[0]  # at z=0
     binary_norm = local_binary_number_density / local_agn_number_density
 
+    # sample the SMBHB population
     log_m_range = np.linspace(log_m_min, log_m_max)
     z_range = np.linspace(0, z_max)
     q_range = np.linspace(q_min, 1)
 
-    p_q = lognorm.pdf(q_range, std_log_q,
-                      loc=mu_log_q)[np.newaxis, np.newaxis, :]
+    p_q = lognorm.pdf(q_range, std_log_q, loc=mu_log_q)
     binary_pop = np.array([[quasar_formation_rate(log_m, z)
                             for log_m in log_m_range]
-                           for z in z_range])[..., np.newaxis]
+                           for z in z_range])
 
     binary_pop *= binary_norm
-    binary_pop *= p_q
-
+    binary_pop = binary_pop[np.newaxis, np.newaxis, :] * p_q[..., np.newaxis]
     return binary_pop
