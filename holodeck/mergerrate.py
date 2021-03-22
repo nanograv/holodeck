@@ -1,5 +1,5 @@
 import numpy as np
-from holodeck import _Binary_Evolution
+from holodeck.evolution import _Binary_Evolution
 
 # some cosmological functions
 
