@@ -606,5 +606,18 @@ def continuous_pop(num_local_binaries, log_m_min_local, log_m_max_local,
                            for z in z_range])
 
     binary_pop *= binary_norm
-    binary_pop = binary_pop[np.newaxis, np.newaxis, :] * p_q[..., np.newaxis]
+    binary_pop = binary_pop[..., np.newaxis] * p_q[np.newaxis, np.newaxis, :]
     return binary_pop
+
+
+def main():
+    args = sys.argv[1:]
+
+    if not args:
+        print('usage: [--flags options] [inputs] ')
+        sys.exit(1)
+
+# Main body
+if __name__ == '__main__':
+    smbhb_pop = continuous_pop(91, 8.5, 10)
+    main()
