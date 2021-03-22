@@ -505,28 +505,33 @@ def quasar_formation_rate(log_mass, z, log_formation_rate_normalization=-3.830,
 
 
     """
-    z_rescale = (1 + z) / (1 + z_ref)
-    xi = np.log10(z_rescale)
+    # Hopkins et al. (2007) eq. 10
+    xi = np.log10((1 + z) / (1 + z_ref))
 
-    z_term = np.maximum(1, z_rescale ** log_formation_rate_power_law_slope)
+    # log form of Hopkins et al. (2007) eq. 25
+    z_term = np.where(z <= z_ref, 0, xi * log_formation_rate_power_law_slope)
+    log_normalization = log_formation_rate_normalization + z_term
 
-    log_normalization = log_formation_rate_normalization + np.log10(z_term)
-
+    # Hopkins et al. (2007) eq. 19
     high_mass_slope = (2 * high_mass_slope_normalization
                        / ((10 ** (xi * high_mass_slope_k_1))
                           + (10 ** (xi * high_mass_slope_k_2))))
 
+    # Hopkins et al. (2007) eq. 9
     log_mass_break = (log_mass_break_normalization
                       + (log_mass_break_k_1 * xi)
                       + (log_mass_break_k_2 * (xi ** 2)))
 
+    # no sense computing this more than once
     log_mass_ratio = log_mass - log_mass_break
 
+    # log form of denominator in Hopkins et al. (2007) eq. 24
     low_mass_contribution = 10 ** (log_mass_ratio * low_mass_slope)
     high_mass_contribution = 10 ** (log_mass_ratio * high_mass_slope)
     log_mass_distribution = np.log10(low_mass_contribution
                                      + high_mass_contribution)
 
+    # convert from rate to differential redshift density (d/dt to d/dz)
     dtdz = 1 / (Planck15.H0 * (1 + z)
                 * np.sqrt(Planck15.Om0 * ((1 + z) ** 3)
                           + Planck15.Ok0 * ((1 + z) ** 2)
