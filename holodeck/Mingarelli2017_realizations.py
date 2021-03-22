@@ -2,7 +2,7 @@
 
 # This code is reproduced and modified from the original repository https://github.com/morgan-nanez/nanohertz_GWs that is based
 # on results from Mingarelli et al. (2017) (https://zenodo.org/badge/latestdoi/90664185)
-# Related paper : https://www.nature.com/articles/s41550-017-0299-6 
+# Related paper : https://www.nature.com/articles/s41550-017-0299-6
 
 # # Computing probabilistic numbers of PTA binaries from MASSIVE and 2MASS, and making realizations of GW skies with ILLUSTRIS merger model
 # ### Chiara Mingarelli, mingarelli@mpifr-bonn.mpg.de
@@ -395,15 +395,15 @@ def single_realization(gal_no, k_mag, f_min=1e-9):
     # mass with the dynamically measured one.
 
     for yy in range(gal_no):
-	q_choice[yy] = np.random.choice(np.logspace(-0.6020599913279624,0,num=5000))  # random q > 0.25 each time
+        q_choice[yy] = np.random.choice(np.logspace(-0.6020599913279624,0,num=5000))  # random q > 0.25 each time
 
     for xx in range(gal_no):
-	chirp_mass_vec[xx] = mchirp_q(q_choice[xx], tot_mass[xx])/s_mass # chirp mass with that q, M_tot from catalogue
+        chirp_mass_vec[xx] = mchirp_q(q_choice[xx], tot_mass[xx])/s_mass # chirp mass with that q, M_tot from catalogue
 
      # prob of binary being in PTA band
     for zz in range(gal_no):
         p_i_vec[zz], z_loop[zz], T_zLoop[zz], mergRate_loop[zz], t2c_loop[zz],  r_inf_loop[zz], friction_t_loop[zz], hardening_t_loop[zz] = i_prob_Illustris(m_bulge[zz], tot_mass[zz], q_choice[zz], f_min)
-	    
+
     # number of stalled binaries
 
     num_zeros = (p_i_vec == 0).sum()
@@ -419,15 +419,15 @@ def single_realization(gal_no, k_mag, f_min=1e-9):
     #number of stalled binaries and their indexs
     num_stalled = (p_i_vec == 0).sum()
     prob_of_each_gal_stalled = p_i_vec/num_stalled
-    gal_choice_stalled = [gal for gal in range(gal_no) if p_i_vec[gal] == 0] 
-    
+    gal_choice_stalled = [gal for gal in range(gal_no) if p_i_vec[gal] == 0]
+
     #get the primary masses of all binaries and the PTA sources
-    prim_mass = tot_mass/(1+q_choice) 
+    prim_mass = tot_mass/(1+q_choice)
     prim_mass_sources = []
     #collect data for all desires galaxies
     for pr in gal_choice:
-        prim_mass_sources.append(prim_mass[pr]) 
-    
+        prim_mass_sources.append(prim_mass[pr])
+
     #Compute min and max primary mass among PTA sources
     prim_BHmass_min = min(prim_mass_sources)
     prim_BHmass_max = max(prim_mass_sources)
