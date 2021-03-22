@@ -13,6 +13,7 @@ from math import sqrt, cos, sin, pi
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.integrate import quad
+from scipy.stats import lognorm
 import astropy
 import astropy.units as u
 from astropy.cosmology import Planck15, z_at_value
@@ -20,7 +21,7 @@ import collections
 import sys
 
 # Read in file name
-arg_number = int(sys.argv[1])
+# arg_number = int(sys.argv[1])
 
 # physical constants for natural units c = G = 1
 c=2.99792458*(10**8)
@@ -421,7 +422,7 @@ def single_realization(gal_no, k_mag, f_min=1e-9):
     prob_of_each_gal_stalled = p_i_vec/num_stalled
     gal_choice_stalled = [gal for gal in range(gal_no) if p_i_vec[gal] == 0]
 
-    #get the primary masses of all binaries and the PTA sources
+    # get the primary masses of all binaries and the PTA sources
     prim_mass = tot_mass/(1+q_choice)
     prim_mass_sources = []
     #collect data for all desires galaxies
@@ -433,3 +434,112 @@ def single_realization(gal_no, k_mag, f_min=1e-9):
     prim_BHmass_max = max(prim_mass_sources)
 
     return no_of_samples, prim_BHmass_min, prim_BHmass_max
+
+
+def quasar_formation_rate(log_mass, z, log_formation_rate_normalization=-3.830,
+                          log_formation_rate_power_law_slope=-4.02,
+                          log_mass_break_normalization=8.959,
+                          log_mass_break_k_1=1.18, log_mass_break_k_2=-6.68,
+                          low_mass_slope=.2,
+                          high_mass_slope_normalization=2.86,
+                          high_mass_slope_k_1=1.80, high_mass_slope_k_2=-1.13,
+                          z_ref=2):
+    """
+    Compute the differential quasar formation rate density.
+
+    Differential quasar formation rate density computed per unit
+    redshift and logarithmic mass, as a function of redshift and
+    logarithmic mass.
+
+    Parameters
+    ----------
+    log_mass : float
+        Base 10 logarithm of the mass coordinate.
+    z : float
+        Redshift coordinate.
+    log_formation_rate_normalization : float, optional
+        DESCRIPTION. The default is -3.830.
+    log_formation_rate_power_law_slope : float, optional
+        DESCRIPTION. The default is -4.02.
+    log_mass_break_normalization : float, optional
+        DESCRIPTION. The default is 8.959.
+    log_mass_break_k_1 : float, optional
+        DESCRIPTION. The default is 1.18.
+    log_mass_break_k_2 : float, optional
+        DESCRIPTION. The default is -6.68.
+    low_mass_slope : float, optional
+        DESCRIPTION. The default is .2.
+    high_mass_slope_normalization : float, optional
+        DESCRIPTION. The default is 2.86.
+    high_mass_slope_k_1 : float, optional
+        DESCRIPTION. The default is 1.80.
+    high_mass_slope_k_2 : float, optional
+        DESCRIPTION. The default is -1.13.
+    z_ref : float, optional
+        DESCRIPTION. The default is 2.
+
+    Returns
+    -------
+    float
+        Differential quasar formation rate per unit log mass and redshift.
+
+    """
+    z_rescale = (1 + z) / (1 + z_ref)
+    xi = np.log10(z_rescale)
+
+    z_term = np.maximum(1, z_rescale ** log_formation_rate_power_law_slope)
+
+    log_normalization = log_formation_rate_normalization + np.log10(z_term)
+
+    high_mass_slope = (2 * high_mass_slope_normalization
+                       / ((10 ** (xi * high_mass_slope_k_1))
+                          + (10 ** (xi * high_mass_slope_k_2))))
+
+    log_mass_break = (log_mass_break_normalization
+                      + (log_mass_break_k_1 * xi)
+                      + (log_mass_break_k_2 * (xi ** 2)))
+
+    log_mass_ratio = log_mass - log_mass_break
+
+    low_mass_contribution = 10 ** (log_mass_ratio * low_mass_slope)
+    high_mass_contribution = 10 ** (log_mass_ratio * high_mass_slope)
+    log_mass_distribution = np.log10(low_mass_contribution
+                                     + high_mass_contribution)
+
+    dtdz = 1 / (Planck15.H0 * (1 + z)
+                * np.sqrt(Planck15.Om0 * ((1 + z) ** 3)
+                          + Planck15.Ok0 * ((1 + z) ** 2)
+                          + Planck15.Ode0)).to(u.Gyr ** -1).value
+
+    return (10 ** (log_normalization - log_mass_distribution)) * dtdz
+
+
+def continuous_pop(log_m_min, log_m_max, z_max, num_local_binaries,
+                   log_m_min_local, log_m_max_local, q_min, mu_log_q=0,
+                   std_log_q=.5):
+
+    # compute the local binary number density
+    distance = 225 * u.Mpc
+    z_225 = z_at_value(Planck15.angular_diameter_distance, distance, zmax=.25)
+    vol = Planck15.comoving_volume(z_225).value
+    local_binary_number_density = num_local_binaries / vol
+
+    # renorm quasar formation rate density to get binary density
+    local_agn_number_density = quad(quasar_formation_rate, log_m_min_local,
+                                    log_m_max_local, args=(0,))  # at z=0
+    binary_norm = local_binary_number_density / local_agn_number_density
+
+    log_m_range = np.linspace(log_m_min, log_m_max)
+    z_range = np.linspace(0, z_max)
+    q_range = np.linspace(q_min, 1)
+
+    p_q = lognorm.pdf(q_range, std_log_q,
+                      loc=mu_log_q)[np.newaxis, np.newaxis, :]
+    binary_pop = np.array([[quasar_formation_rate(log_m, z)
+                            for log_m in log_m_range]
+                           for z in z_range])[..., np.newaxis]
+
+    binary_pop *= binary_norm
+    binary_pop *= p_q
+
+    return binary_pop
