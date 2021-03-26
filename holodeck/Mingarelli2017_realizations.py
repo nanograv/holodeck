@@ -315,60 +315,6 @@ def i_prob_Illustris(Mstar, Mtot, q, min_freq):
         ans = t2c*mergRate/1e9
         return ans, z, Tz, mergRate, t2c, r_inf_here, friction_t, hardening_t
 
-# # Main Part of Code
-
-# ### Choose a galaxy catalog
-
-# this is the revised list from Jenny with galaxy names in the final column
-
-catalog = np.loadtxt("data/2mass_galaxies.lst", usecols = (1,2,3,4))
-cat_name = np.genfromtxt("data/2mass_galaxies.lst",  usecols=(5), dtype='str')
-
-
-# ## List of supermassive black holes with dynamic mass measurements
-
-dyn_smbh_name = np.genfromtxt("data/schutzMa_extension.txt", usecols=(0), dtype='str', skip_header = 2)
-dyn_smbh_mass = np.genfromtxt("data/schutzMa_extension.txt", usecols = (4), skip_header = 2)
-
-ext_catalog = np.loadtxt("data/added_Mks.lst", usecols = (1,2,3,4,5), skiprows = 2)
-ext_name = np.genfromtxt("data/added_Mks.lst", usecols=(0), dtype='str', skip_header = 2)
-
-# ## Extract values from catalogues
-
-# Identify galaxies with dynamically measured supermassive black holes (33)
-
-ext_bh_mass = ext_catalog[:,3] # in units of solar masses
-
-all_dyn_bh_name = np.hstack((dyn_smbh_name, ext_name)) # names of galaxies w dyn. BH masses
-all_dyn_bh_mass = np.hstack((dyn_smbh_mass, ext_bh_mass)) #BH masses of these galaxies
-
-#all_dyn_bh_mass.size
-
-# Given parameters (derived or from 2MASS)
-RA = pi/180*catalog[:,0]
-DEC = pi/180*catalog[:,1]
-distance = catalog[:,2]
-k_mag = catalog[:,3]
-
-# Extend catalog with galaxies having dynmically measured SMBHs which are not in original list
-
-RA = np.hstack((RA, pi/180*ext_catalog[:,0]))
-DEC = np.hstack((DEC, pi/180*ext_catalog[:,1]))
-distance = np.hstack((distance, ext_catalog[:,2]))
-k_mag = np.hstack((k_mag, ext_catalog[:,4]))
-cat_name = np.hstack((cat_name, ext_name))
-
-# Total number of galaxies (could really take the size of any above parameters)
-gal_no = RA.size
-dyn_BHs = all_dyn_bh_name.size
-cat_name = cat_name.tolist()
-
-# vector which holds the probablity of each binary being in PTA band
-p_i_vec = np.zeros([gal_no])
-chirp_mass_vec = np.zeros([gal_no])
-
-# minimum PTA frequency
-f_min = 1e-9 #
 
 # ## Create multiple gravitational-wave sky realizations from the catalog.
 
@@ -610,14 +556,67 @@ def continuous_pop(num_local_binaries, log_m_min_local, log_m_max_local,
     return binary_pop
 
 
-def main():
-    args = sys.argv[1:]
+def pipeline():
+    # # Main Part of Code
 
-    if not args:
-        print('usage: [--flags options] [inputs] ')
-        sys.exit(1)
+    # ### Choose a galaxy catalog
 
-# Main body
-if __name__ == '__main__':
-    smbhb_pop = continuous_pop(91, 8.5, 10)
-    main()
+    # this is the revised list from Jenny with galaxy names in the final column
+
+    catalog = np.loadtxt("data/2mass_galaxies.lst", usecols = (1,2,3,4))
+    cat_name = np.genfromtxt("data/2mass_galaxies.lst",  usecols=(5), dtype='str')
+
+
+    # ## List of supermassive black holes with dynamic mass measurements
+
+    dyn_smbh_name = np.genfromtxt("data/schutzMa_extension.txt", usecols=(0), dtype='str', skip_header = 2)
+    dyn_smbh_mass = np.genfromtxt("data/schutzMa_extension.txt", usecols = (4), skip_header = 2)
+
+    ext_catalog = np.loadtxt("data/added_Mks.lst", usecols = (1,2,3,4,5), skiprows = 2)
+    ext_name = np.genfromtxt("data/added_Mks.lst", usecols=(0), dtype='str', skip_header = 2)
+
+    # ## Extract values from catalogues
+
+    # Identify galaxies with dynamically measured supermassive black holes (33)
+
+    ext_bh_mass = ext_catalog[:,3] # in units of solar masses
+
+    all_dyn_bh_name = np.hstack((dyn_smbh_name, ext_name)) # names of galaxies w dyn. BH masses
+    all_dyn_bh_mass = np.hstack((dyn_smbh_mass, ext_bh_mass)) #BH masses of these galaxies
+
+    #all_dyn_bh_mass.size
+
+    # Given parameters (derived or from 2MASS)
+    RA = pi/180*catalog[:,0]
+    DEC = pi/180*catalog[:,1]
+    distance = catalog[:,2]
+    k_mag = catalog[:,3]
+
+    # Extend catalog with galaxies having dynmically measured SMBHs which are not in original list
+
+    RA = np.hstack((RA, pi/180*ext_catalog[:,0]))
+    DEC = np.hstack((DEC, pi/180*ext_catalog[:,1]))
+    distance = np.hstack((distance, ext_catalog[:,2]))
+    k_mag = np.hstack((k_mag, ext_catalog[:,4]))
+    cat_name = np.hstack((cat_name, ext_name))
+
+    # Total number of galaxies (could really take the size of any above parameters)
+    gal_no = RA.size
+    dyn_BHs = all_dyn_bh_name.size
+    cat_name = cat_name.tolist()
+
+    # vector which holds the probablity of each binary being in PTA band
+    p_i_vec = np.zeros([gal_no])
+    chirp_mass_vec = np.zeros([gal_no])
+
+    # minimum PTA frequency
+    f_min = 1e-9
+
+    no_of_bhb, prim_BHmass_min, prim_BHmass_max = single_realization(gal_no,
+                                                                     k_mag,
+                                                                     f_min)
+    log_m_bh_min = np.log10(prim_BHmass_min)
+    log_m_bh_max = np.log10(prim_BHmass_max)
+
+    bhb_pop = continuous_pop(no_of_bhb, log_m_bh_min, log_m_bh_max)
+    return bhb_pop
