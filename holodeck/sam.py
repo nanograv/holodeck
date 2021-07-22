@@ -159,10 +159,18 @@ class BP_Semi_Analytic(_Binary_Evolution):
         tau0 = SAM.merger_time(M1, q, zp, self.merger_time, self.merger_alpha, self.merger_beta, self.merger_gamma)
         age = cosmo.age(zp).to('Gyr').value
         new_age = age + tau0
-        if new_age < _AGE_UNIVERSE_GYR:
-            redz = cosmo.tage_to_z(new_age * GYR)
-        else:
-            redz = -1
+        # see if this is a scalar
+        try:
+            if new_age < _AGE_UNIVERSE_GYR:
+                redz = cosmo.tage_to_z(new_age * GYR)
+            else:
+                redz = -1
+
+        # handle it as a vector
+        except ValueError:
+            redz = -1.0 * np.ones_like(new_age)
+            idx = (new_age < _AGE_UNIVERSE_GYR)
+            redz[idx] = cosmo.tage_to_z(new_age[idx] * GYR)
 
         return redz
 
@@ -238,19 +246,27 @@ class BP_Semi_Analytic(_Binary_Evolution):
             #     unitless because `mbh1_delta` is Delta log10(M) (i.e. unitless)
             bin_vol = 4.0 * self.mbh1_delta * self.mrat_delta
 
-            for i, j, k in np.ndindex(*shape):
-                z = self.zprime(self.mstar_pri[i], self.mrat[j], self.redz[k])
-                if z <= 0.0:
-                    dnbh[i, j, k] = 0.0
-                else:
-                    temp = self._dnbh_dlog10m(self.mstar_pri[i], self.mrat[j], z)
-                    dnbh[i, j, k] = temp * bin_vol
+            # Convert from (N,) (M,) (L,) ==> (N,1,1) (1,M,1) (1,1,L)
+            args = utils.broadcastable(self.mstar_pri, self.mrat, self.redz)
+            # (N,M,L)
+            zprime = self.zprime(*args)
+            # find valid entries
+            idx = (zprime > 0.0)
+
+            # Broadcast arrays [e.g. (1,M,1) ==> (N,M,L)] and select valid entries
+            args = [aa[idx] for aa in utils.expand_broadcastable(*args)]
+            # Calculate number densities at valid entries
+            dnbh[idx] = self._dnbh_dlog10m(*args)
+            # multiply by bin sizes
+            dnbh *= bin_vol
 
             self._dnbh = dnbh
 
         return self._dnbh
 
     def gwb_sa(self, freqs):
+        freqs = np.atleast_1d(freqs)
+        assert freqs.ndim == 1, "Invalid `freqs` given!  shape={}".format(np.shape(freqs))
         gwb = None
         # shape: (m1, q, z)
         dnbh = self.dnbh()
