@@ -36,6 +36,32 @@ class _Modifier(abc.ABC):
 # ==== General Logistical ====
 
 
+def broadcastable(*args):
+    """Expand N, 1D arrays be able to be broadcasted into N, ND arrays.
+
+    e.g. from arrays of len `3`,`4`,`2`, returns arrays with shapes: `3,1,1`, `1,4,1` and `1,1,2`.
+    """
+    ndim = len(args)
+    assert np.all([1 == np.ndim(aa) for aa in args]), "Each array in `args` must be 1D!"
+
+    cut_ref = [slice(None)] + [np.newaxis for ii in range(ndim-1)]
+    cuts = [np.roll(cut_ref, ii).tolist() for ii in range(ndim)]
+    outs = [aa[tuple(cc)] for aa, cc in zip(args, cuts)]
+    return outs
+
+
+def expand_broadcastable(*args):
+    try:
+        shape = np.shape(np.product(args, axis=0))
+    except ValueError:
+        shapes = [np.shape(aa) for aa in args]
+        raise ValueError("Argument arrays are not broadcastable!  shapes={}".format(shapes))
+
+    print([np.shape(aa) for aa in args])
+    vals = [aa * np.ones(shape) for aa in args]
+    return vals
+
+
 def load_hdf5(fname, keys=None):
     squeeze = False
     if (keys is not None) and np.isscalar(keys):
