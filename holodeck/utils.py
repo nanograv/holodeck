@@ -57,7 +57,6 @@ def expand_broadcastable(*args):
         shapes = [np.shape(aa) for aa in args]
         raise ValueError("Argument arrays are not broadcastable!  shapes={}".format(shapes))
 
-    print([np.shape(aa) for aa in args])
     vals = [aa * np.ones(shape) for aa in args]
     return vals
 
