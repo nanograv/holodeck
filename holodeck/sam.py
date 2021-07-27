@@ -52,20 +52,9 @@ class BP_Semi_Analytic(_Binary_Evolution):
             mmbulge_alpha :
         """
 
-        # # mstar_pri: stellar mass of primary galaxy [Msol]
-        # self.mstar_pri = np.logspace(9, 13, 21)
-        # # mrat: mass ratio between galaxies
-        # self.mrat = np.linspace(0.1, 1.0, 10)
-        # # redz: redshift
-        # self.redz = np.linspace(0.0, 2.0, 11+1)[1:]
-
         self.mstar_pri = np.logspace(*mstar_pri)
         self.mrat = np.linspace(*mrat)
-        # self.redz = np.logspace(*np.log10(redz[:2]), redz[2])
         self.redz = np.linspace(*redz)
-        # redz = [rz for rz in redz]
-        # redz[-1] = redz[-1] + 1
-        # self.redz = np.linspace(*redz)[1:]
 
         # ---- Default Parameters
         # See: [Chen19] Table 1
