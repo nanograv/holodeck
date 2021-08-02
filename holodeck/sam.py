@@ -7,12 +7,12 @@ https://ui.adsabs.harvard.edu/abs/2019MNRAS.488..401C/abstract
 """
 
 import numpy as np
-import scipy as sp
+# import scipy as sp
 from holodeck import cosmo, utils
-from holodeck.constants import GYR, NWTG, SPLC, MSOL, MPC
-from holodeck.evolution import _Binary_Evolution
+from holodeck.constants import GYR, SPLC, MSOL, MPC, YR
+# from holodeck.evolution import _Binary_Evolution
 
-import zcode.math as zmath
+# import zcode.math as zmath
 
 
 # [Chen19] Eq.16 this is `b * M_0`
@@ -22,16 +22,17 @@ _MMBULGE_MASS_REF = 1.0e11  # [Msol]
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
 
-class BP_Semi_Analytic(_Binary_Evolution):
+class BP_Semi_Analytic:   # (_Binary_Evolution):
 
     _SELF_CONSISTENT = False
 
     def __init__(
-        self, mstar_pri=[8.5, 13, 46], mrat=[0.02, 1.0, 20], redz=[0.0, 6.0, 61],
+        self, mstar_pri=[8.5, 13, 46], mrat=[0.02, 1.0, 50], redz=[0.0, 6.0, 61],
         smf_phi0=None, smf_phi_z=None, log_smf_mass=None, smf_alpha0=None, smf_alpha_z=None,
         pair_frac_rate=None, pair_alpha=None, pair_beta=None, pair_gamma=None,
-        merger_time=None, merger_alpha=None, merger_beta=None, merger_gamma=None,
-        log_mmbulge_mstar=None, mmbulge_alpha=None):
+        merger_time_tau=None, merger_alpha=None, merger_beta=None, merger_gamma=None,
+        log_mmbulge_mstar=None, mmbulge_alpha=None
+    ):
         """
         galaxy stellar mass function
             smf_phi0, smf_phi_z: galaxy stellar mass function renormalisation rate
@@ -43,7 +44,7 @@ class BP_Semi_Analytic(_Binary_Evolution):
             pair_beta  : redshift power law
             pair_gamma : mass ratio power law
         merger time scale:
-            merger_time : time scale,
+            merger_time_tau : time scale,
             merger_alpha : mass power law,
             merger_beta : redshift power law,
             merger_gamma : mass ratio power law
@@ -82,8 +83,8 @@ class BP_Semi_Analytic(_Binary_Evolution):
             pair_gamma = 0.0        # b/t [-0.2, +0.2]  [-0.2, +0.2]
 
         # merger time
-        if merger_time is None:
-            merger_time = 0.55      # b/t [0.1, 2.0]  [0.1, 10.0]
+        if merger_time_tau is None:
+            merger_time_tau = 0.55      # b/t [0.1, 2.0]  [0.1, 10.0]
         if merger_alpha is None:
             merger_alpha = 0.0      # b/t [-0.2, +0.2]  [-0.2, +0.2]
         if merger_beta is None:
@@ -113,10 +114,10 @@ class BP_Semi_Analytic(_Binary_Evolution):
         self.pair_gamma = pair_gamma
 
         # merger time-scale
-        self.merger_time = merger_time   # `tau_0`  in [Chen19]
-        self.merger_alpha = merger_alpha # `alpha_tau`  in [Chen19]
-        self.merger_beta = merger_beta   # `beta_tau`  in [Chen19]
-        self.merger_gamma = merger_gamma # `gamma_tau`  in [Chen19]
+        self.merger_time_tau = merger_time_tau    # `tau_0`  in [Chen19]
+        self.merger_alpha = merger_alpha  # `alpha_tau`  in [Chen19]
+        self.merger_beta = merger_beta    # `beta_tau`  in [Chen19]
+        self.merger_gamma = merger_gamma  # `gamma_tau`  in [Chen19]
 
         # MBH-Mstar relation
         self.mmbulge_mstar = 10.0 ** log_mmbulge_mstar
@@ -146,25 +147,44 @@ class BP_Semi_Analytic(_Binary_Evolution):
         self.mrat_delta = grid_space(self.mrat)
         self.redz_delta = grid_space(self.redz)
 
+        self._edges = [self.mstar_pri, self.mrat, self.redz]
         self._dnbh = None
+        self._dc_mpc = None
         return
+
+    @property
+    def _dist_com_mpc(self):
+        """Comoving distance [Mpc] to `self.redz` redshift values.
+        """
+        if self._dc_mpc is None:
+            zz = self.redz
+            self._dc_mpc = cosmo.comoving_distance(zz).to('Mpc').value
+
+        return self._dc_mpc
+
+    @property
+    def edges(self):
+        return self._edges
 
     def _init_step_zero(self):
         super()._init_step_zero()
-        self.mergerrate = self.output() #for black hole chirp mass: self.grid()
+        self.mergerrate = self.output()  # for black hole chirp mass: self.grid()
         return
 
-    def _take_next_step(self, step):
-        return EVO.END
+    def merger_time(self, mass, mrat, redz):
+        """
+        """
+        tau = SAM.merger_time(
+            mass, mrat, redz,
+            self.merger_time_tau, self.merger_alpha, self.merger_beta, self.merger_gamma
+        )
+        return tau
 
     def zprime(self, mass, mrat, redz):
         """
         redshift condition, need to improve cut at the age of the universe
         """
-        tau0 = SAM.merger_time(
-            mass, mrat, redz,
-            self.merger_time, self.merger_alpha, self.merger_beta, self.merger_gamma
-        )
+        tau0 = self.merger_time(mass, mrat, redz)
         age = cosmo.age(redz).to('Gyr').value
         new_age = age + tau0
         # see if this is a scalar
@@ -202,7 +222,7 @@ class BP_Semi_Analytic(_Binary_Evolution):
         alpha_eff = alpha0 + self.pair_alpha - self.merger_alpha   # [Chen19] Eq.18
 
         # [Chen19] Eq.18  ---  this should be [Mpc^-3 Msol^-1 Gyr^-1]
-        neff = phi0 * self.pair_frac_rate / self.smf_mass / self.merger_time
+        neff = phi0 * self.pair_frac_rate / self.smf_mass / self.merger_time_tau
         neff *= (0.4 / cosmo.h) ** self.merger_alpha
         neff *= (1.0e11 / self.smf_mass) ** (self.merger_alpha - self.pair_alpha)
 
@@ -240,7 +260,7 @@ class BP_Semi_Analytic(_Binary_Evolution):
     def dnbh(self):
         """
         This is `dnbh / [dlog10m dq dz]` multiplied by dq dlog10m, i.e.
-        `dnbh / dz` for each 3D bin (m, mrat, redz)
+        `dnbh / dz` for each 3D bin (m, mrat, redz), in units of [Mpc^-3]
 
         input 3 x 1d array M1,mrat,redz
         output 3d array (M1,mrat,redz) (galaxy mass, galaxy mass ratio, redshift) of values for function
@@ -272,6 +292,53 @@ class BP_Semi_Analytic(_Binary_Evolution):
 
         return self._dnbh
 
+    def num_mbhb(self, fobs):
+        """Convert from number-density to finite Number, per log-frequency interval
+
+        d N / d ln f_r = (dn/dz) * (dz/dt) * (dt/d ln f_r) * (dVc/dz)
+                       = (dn/dz) * (f_r / [df_r/dt]) * 4 pi c D_c^2 (1+z) * dz
+
+        """
+        # shape: (m1, mrat, redz)
+        dnbh = self.dnbh()   # dn/dz  units: [Mpc^-3]
+
+        dc = self._dist_com_mpc    # comoving-distance in Mpc
+        dz = self.redz_delta * 2.0    # `delta` is half of bin-width, so multiply by 2
+        print(f"dc={utils.stats(dc)}")
+        # [Mpc^3/s]
+        cosmo_fact = 4 * np.pi * (SPLC/MPC) * np.square(dc) * dz
+        print(f"cosmo_fact={utils.stats(cosmo_fact)}")
+
+        # (m1, q)
+        mchirp = self.mchirp * MSOL
+        # (m1, q, 1, 1)
+        mchirp = mchirp[..., np.newaxis, np.newaxis]
+        # print(f"mchirp/Msol={utils.stats(mchirp/MSOL)}")
+        # (z, f)
+        frst = fobs[np.newaxis, :] * (1.0 + self.redz[:, np.newaxis])
+        # (1, 1, z, f)
+        frst = frst[np.newaxis, np.newaxis, :, :]
+        # print(f"frst*yr={utils.stats(frst*YR)}")
+        # (m1, q, z, f)
+        tau = utils.gw_hardening_timescale(mchirp, frst)
+        print(f"tau/GYR={utils.stats(tau/GYR)}")
+        bads = (tau/GYR > 2.0)
+        tau[bads] = 0.0
+        print(f"tau/GYR={utils.stats(tau/GYR)}")
+
+        dl = dc * (1.0 + self.redz) * MPC
+        dl = dl[np.newaxis, np.newaxis, :, np.newaxis]
+        dl[dl <= 0.0] = np.nan
+        hs = utils.gw_strain_source(mchirp, dl, frst)
+        # hs[dl <= 0.0] = 0.0
+        hs = np.nan_to_num(hs)
+
+        # (m1, q, z)
+        num = dnbh * cosmo_fact
+        # (m1, q, z, f)
+        num = num[..., np.newaxis] * tau
+        return num, hs
+
     def gwb_sa(self, freqs):
         freqs = np.atleast_1d(freqs)
         assert freqs.ndim == 1, "Invalid `freqs` given!  shape={}".format(np.shape(freqs))
@@ -280,16 +347,11 @@ class BP_Semi_Analytic(_Binary_Evolution):
         dnbh = self.dnbh()
         zz = self.redz
 
-        # dz = self.redz_delta * 2.0    # `delta` is half of bin-width, so multiply by 2
-        # cosmo_fact = cosmo.comoving_distance(zz).to('Mpc').value * dz
         cosmo_fact = cosmo.comoving_distance(zz).to('Mpc').value
 
         dz = self.redz_delta * 2.0    # `delta` is half of bin-width, so multiply by 2
         # Now [Mpc^3 / s]
         cosmo_fact = 4*np.pi*(SPLC/MPC) * np.square(cosmo_fact) * dz
-        # test = dnbh[:, :, 1].mean()
-        # print(f"{test=:.2e}")
-        # print(f"{zz[:5]=}\n{cosmo_fact[-5:]=}")
 
         m1 = np.power(10.0, self.mbh1[np.newaxis, :, np.newaxis]) * MSOL
         m2 = np.power(10.0, self.mbh2[np.newaxis, :, :]) * MSOL
@@ -318,7 +380,7 @@ class SAM:
         """
         mass of the black hole Mstar-Mbulge relation without scattering
         """
-        NORM = _MMBULGE_MASS_REF # [Msol]
+        NORM = _MMBULGE_MASS_REF   # [Msol]
         mbh = scaling(amp, NORM, pow, mbulge)
         return mbh
 
@@ -327,7 +389,7 @@ class SAM:
         """
         dMBH/dMG
         """
-        NORM = _MMBULGE_MASS_REF # [Msol]
+        NORM = _MMBULGE_MASS_REF   # [Msol]
         rv = scaling(amp, NORM, pow, mbulge)
         rv *= pow / mbulge
         return rv
