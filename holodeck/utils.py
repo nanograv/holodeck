@@ -10,6 +10,7 @@ import copy
 import abc
 
 import numpy as np
+import scipy as sp
 import h5py
 
 from .constants import NWTG, SCHW, SPLC
@@ -97,7 +98,35 @@ def minmax(vals):
     return extr
 
 
+def stats(vals, percs=None):
+    if percs is None:
+        percs = [sp.stats.norm.cdf(1), 0.95, 1.0]
+        percs = np.array(percs)
+        percs = np.concatenate([1-percs[::-1], [0.5], percs])
+
+    stats = np.percentile(vals, percs*100)
+    rv = ["{:.2e}".format(ss) for ss in stats]
+    rv = ", ".join(rv)
+    return rv
+
+
 def nyquist_freqs(dur=15.0, cad=0.1, trim=None):
+    """Calculate Nyquist frequencies for the given timing parameters.
+
+    Arguments
+    ---------
+    dur : scalar, duration of observations
+    cad : scalar, cadence of observations
+    trim : (2,) or None,
+        Specification of minimum and maximum frequencies outside of which to remove values.
+        `None` can be used in place of either boundary, e.g. [0.1, None] would mean removing
+        frequencies below `0.1` (and not trimming values above a certain limit).
+
+    Returns
+    -------
+    freqs : array of scalar, Nyquist frequencies
+
+    """
     fmin = 1.0 / dur
     fmax = 1.0 / cad
     # df = fmin / sample
@@ -319,6 +348,15 @@ def gw_hardening_rate_dfdt(m1, m2, freq, eccen=None):
     dfdt = gw_hardening_rate_dadt(m1, m2, sepa, eccen=eccen)
     dfdt = dfdt_from_dadt(dfdt, sepa, mtot=m1+m2)
     return dfdt
+
+
+def gw_hardening_timescale(mchirp, frst):
+    """tau = f_r / (df_r / dt)
+
+    e.g. Enoki & Nagashima 2007 Eq.2.9
+    """
+    tau = (5.0 / 96.0) * np.power(NWTG*mchirp/SPLC**3, -5.0/3.0) * np.power(2*np.pi*frst, -8.0/3.0)
+    return tau
 
 
 def gw_lum_circ(mchirp, freq_orb_rest):
