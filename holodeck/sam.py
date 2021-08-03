@@ -4,16 +4,21 @@ Chen, Sesana, Conselice 2019 = [Chen19]
 Constraining astrophysical observables of galaxy and supermassive black hole binary mergers using pulsar timing arrays
 https://ui.adsabs.harvard.edu/abs/2019MNRAS.488..401C/abstract
 
+
+To-Do
+-----
+[ ] Check: pair-fraction `f` is used correctly (as opposed to f-prime, the mass-ratio independent version)
+[ ] Check: mass-variable is consistently used (should be *primary* mass, from [Chen19] _not_ *total* mass)
+
+
 """
+
+import logging
 
 import numpy as np
 # import scipy as sp
 from holodeck import cosmo, utils
-from holodeck.constants import GYR, SPLC, MSOL, MPC, YR
-# from holodeck.evolution import _Binary_Evolution
-
-# import zcode.math as zmath
-
+from holodeck.constants import GYR, SPLC, MSOL, MPC
 
 # [Chen19] Eq.16 this is `b * M_0`
 _MERGER_TIME_MASS = (0.4 / cosmo.h) * 1.0e11   # Msol
@@ -51,6 +56,9 @@ class BP_Semi_Analytic:   # (_Binary_Evolution):
         Mbh-Mstar Relation
             log_mmbulge_mstar :
             mmbulge_alpha :
+
+        [-2.8,-0.2,11.25,-1.25,0.,0.025,0.,0.8,0.,1.,0.,-0.5,0.,8.25,1.]#,0.4,0.5,0.]
+
         """
 
         self.mstar_pri = np.logspace(*mstar_pri)
@@ -108,7 +116,11 @@ class BP_Semi_Analytic:   # (_Binary_Evolution):
         self.smf_alpha_z = smf_alpha_z
 
         # galaxy pair fractions
-        self.pair_frac_rate = pair_frac_rate    # `f_0'` in [Chen19]  -- I think this is the primed version! [CHECK]
+        #     galaxy pair fraction normalization
+        pow = self.gammaf + 1.0
+        pair_norm = (self.mrat[0]**pow - self.mrat[-1]**pow) / pow
+        pair_frac_rate = pair_frac_rate / pair_norm
+        self.pair_frac_rate = pair_frac_rate    # `f_0'` in [Chen19]
         self.pair_alpha = pair_alpha
         self.pair_beta = pair_beta
         self.pair_gamma = pair_gamma
@@ -147,7 +159,7 @@ class BP_Semi_Analytic:   # (_Binary_Evolution):
         self.mrat_delta = grid_space(self.mrat)
         self.redz_delta = grid_space(self.redz)
 
-        self._edges = [self.mstar_pri, self.mrat, self.redz]
+        self._edges = [10.0**self.mbh1, self.mrat, self.redz]
         self._dnbh = None
         self._dc_mpc = None
         return
@@ -165,11 +177,6 @@ class BP_Semi_Analytic:   # (_Binary_Evolution):
     @property
     def edges(self):
         return self._edges
-
-    def _init_step_zero(self):
-        super()._init_step_zero()
-        self.mergerrate = self.output()  # for black hole chirp mass: self.grid()
-        return
 
     def merger_time(self, mass, mrat, redz):
         """
@@ -304,10 +311,10 @@ class BP_Semi_Analytic:   # (_Binary_Evolution):
 
         dc = self._dist_com_mpc    # comoving-distance in Mpc
         dz = self.redz_delta * 2.0    # `delta` is half of bin-width, so multiply by 2
-        print(f"dc={utils.stats(dc)}")
+        # print(f"dc={utils.stats(dc)}")
         # [Mpc^3/s]
         cosmo_fact = 4 * np.pi * (SPLC/MPC) * np.square(dc) * dz
-        print(f"cosmo_fact={utils.stats(cosmo_fact)}")
+        # print(f"cosmo_fact={utils.stats(cosmo_fact)}")
 
         # (m1, q)
         mchirp = self.mchirp * MSOL
@@ -321,10 +328,15 @@ class BP_Semi_Analytic:   # (_Binary_Evolution):
         # print(f"frst*yr={utils.stats(frst*YR)}")
         # (m1, q, z, f)
         tau = utils.gw_hardening_timescale(mchirp, frst)
-        print(f"tau/GYR={utils.stats(tau/GYR)}")
-        bads = (tau/GYR > 2.0)
-        tau[bads] = 0.0
-        print(f"tau/GYR={utils.stats(tau/GYR)}")
+        # print(f"tau/GYR={utils.stats(tau/GYR)}")
+
+        TAU_LIMIT = None
+        TAU_LIMIT = 2.0
+        if (TAU_LIMIT is not None):
+            logging.warning(f"WARNING: limiting tau to < {TAU_LIMIT:.2f} Gyr")
+            bads = (tau/GYR > 2.0)
+            tau[bads] = 0.0
+            print(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
 
         dl = dc * (1.0 + self.redz) * MPC
         dl = dl[np.newaxis, np.newaxis, :, np.newaxis]
