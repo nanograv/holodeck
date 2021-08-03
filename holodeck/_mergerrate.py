@@ -38,6 +38,7 @@ class GM_Semi_Analytic(_Binary_Evolution):
         Mstar, alphastar: M*-MBH relation
         e0: eccentricity of the binaries
         rho0: galaxy density parameter
+        [-2.8,-0.2,11.25,-1.25,0.,0.025,0.,0.8,0.,1.,0.,-0.5,0.,8.25,1.]#,0.4,0.5,0.]
         """
         self.M1 = np.logspace(9,12,25)
         self.M1diff = (M1.max()-M1.min())/(len(M1)-1.)/2.
@@ -54,7 +55,7 @@ class GM_Semi_Analytic(_Binary_Evolution):
         self.alphastar = alphastar
         self.zp = np.linspace(0.,1.5,5)
         self.zpdiff = (zp.max()-zp.min())/(len(zp)-1.)/2.
-        self._f0 = f0
+        self._f0 = f0/self.fpair_norm()
         self._Phi0 = Phi0
         self._PhiI = PhiI
         self._M0 = 10.**M0
@@ -98,6 +99,12 @@ class GM_Semi_Analytic(_Binary_Evolution):
         merger time scale
         """
         return self.t0*(M1/5.7e10)**(self.alphatau)*(1.+z)**self.betatau*q**self.gammatau
+
+    def fpair_norm(self,qlow=0.25,qhigh=1.):
+        """
+        galaxy pair fraction normalization
+        """
+        return (qhigh**(self.gammaf+1.)-qlow**(self.gammaf+1.))/(self.gammaf+1.)
 
     def dndM1par(self,M1,q,z,n2,alpha1):
         """
