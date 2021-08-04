@@ -306,6 +306,8 @@ class BP_Semi_Analytic:   # (_Binary_Evolution):
                        = (dn/dz) * (f_r / [df_r/dt]) * 4 pi c D_c^2 (1+z) * dz
 
         """
+        edges_fobs = self.edges + [fobs, ]
+
         # shape: (m1, mrat, redz)
         dnbh = self.dnbh()   # dn/dz  units: [Mpc^-3]
 
@@ -341,17 +343,25 @@ class BP_Semi_Analytic:   # (_Binary_Evolution):
         dl = dc * (1.0 + self.redz) * MPC
         dl = dl[np.newaxis, np.newaxis, :, np.newaxis]
         dl[dl <= 0.0] = np.nan
-        hs = utils.gw_strain_source(mchirp, dl, frst)
+        hs_mbhb = utils.gw_strain_source(mchirp, dl, frst)
         # hs[dl <= 0.0] = 0.0
-        hs = np.nan_to_num(hs)
+        hs_mbhb = np.nan_to_num(hs_mbhb)
 
         # (m1, q, z)
-        num = dnbh * cosmo_fact
+        num_mbhb = dnbh * cosmo_fact
         # (m1, q, z, f)
-        num = num[..., np.newaxis] * tau
-        return num, hs
+        num_mbhb = num_mbhb[..., np.newaxis] * tau
+        return edges_fobs, num_mbhb, hs_mbhb
 
-    def gwb_sa(self, freqs):
+    def gwb_continuous(self, freqs):
+        """
+
+        Arguments
+        ---------
+        freqs : (F,) array_like of scalar,
+            Target frequencies of interest in units of [Hz] = [1/s]
+
+        """
         freqs = np.atleast_1d(freqs)
         assert freqs.ndim == 1, "Invalid `freqs` given!  shape={}".format(np.shape(freqs))
 
@@ -380,6 +390,18 @@ class BP_Semi_Analytic:   # (_Binary_Evolution):
         gwb = dnbh * (hs**2) * cosmo_fact * fterm
         gwb[:, :, :, 0] = 0.0
         return gwb
+
+    def gwb_discrete(self, freqs):
+        """
+
+        Arguments
+        ---------
+        freqs : (F,) array_like of scalar,
+            Target frequencies of interest in units of [Hz] = [1/s]
+
+        """
+        edges, num_mbhb, hs_bins = self.num_mbhb(freqs)
+
 
 
 class SAM:
