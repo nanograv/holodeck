@@ -117,8 +117,8 @@ class BP_Semi_Analytic:   # (_Binary_Evolution):
 
         # galaxy pair fractions
         #     galaxy pair fraction normalization
-        pow = self.gammaf + 1.0
-        pair_norm = (self.mrat[0]**pow - self.mrat[-1]**pow) / pow
+        pow = pair_gamma + 1.0
+        pair_norm = (self.mrat[-1]**pow - self.mrat[0]**pow) / pow
         pair_frac_rate = pair_frac_rate / pair_norm
         self.pair_frac_rate = pair_frac_rate    # `f_0'` in [Chen19]
         self.pair_alpha = pair_alpha
