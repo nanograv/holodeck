@@ -15,8 +15,10 @@ To-Do
 
 import logging
 
+import numba
 import numpy as np
 # import scipy as sp
+
 from holodeck import cosmo, utils
 from holodeck.constants import GYR, SPLC, MSOL, MPC
 
@@ -403,7 +405,6 @@ class BP_Semi_Analytic:   # (_Binary_Evolution):
         edges, num_mbhb, hs_bins = self.num_mbhb(freqs)
 
 
-
 class SAM:
 
     def __init__(self):
@@ -447,3 +448,40 @@ def scaling(amp, norm, power, value):
 
     """
     return amp * np.power(value / norm, power)
+
+
+@numba.njit
+def gws_from_sampled_strains(freqs, fobs, hs, weights):
+    num_samp = fobs.size
+    num_freq = freqs.size - 1
+    gwback = np.zeros(num_freq)
+    gwfore = np.zeros_like(gwback)
+    gwf_freqs = np.zeros_like(gwback)
+
+    idx = np.argsort(fobs)
+    weights = weights[idx]
+    fobs = fobs[idx]
+    hs = hs[idx]
+
+    ii = 0
+    for ff in range(num_freq):
+        hi = freqs[ff+1]
+        fmax = 0.0
+        hmax = 0.0
+        while (fobs[ii] < hi) and (ii < num_samp):
+            if hs[ii] > hmax:
+                hmax = hs[ii]
+                fmax = fobs[ii]
+            h2temp = hs[ii] ** 2
+            if weights[ii] > 1.0:
+                h2temp *= np.random.poisson(weights[ii])
+            gwback[ff] += h2temp
+            ii += 1
+
+        gwfore[ff] = hmax
+        gwf_freqs[ff] = fmax
+        gwback[ff] -= hmax**2
+
+    gwback = np.sqrt(gwback)
+
+    return gwf_freqs, gwfore, gwback
