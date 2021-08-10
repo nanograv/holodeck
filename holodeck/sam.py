@@ -19,6 +19,8 @@ import numba
 import numpy as np
 # import scipy as sp
 
+import kalepy as kale
+
 from holodeck import cosmo, utils
 from holodeck.constants import GYR, SPLC, MSOL, MPC
 
@@ -29,9 +31,7 @@ _MMBULGE_MASS_REF = 1.0e11  # [Msol]
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
 
-class BP_Semi_Analytic:   # (_Binary_Evolution):
-
-    _SELF_CONSISTENT = False
+class BP_Semi_Analytic:
 
     def __init__(
         self, mstar_pri=[8.5, 13, 46], mrat=[0.02, 1.0, 50], redz=[0.0, 6.0, 61],
@@ -355,55 +355,6 @@ class BP_Semi_Analytic:   # (_Binary_Evolution):
         num_mbhb = num_mbhb[..., np.newaxis] * tau
         return edges_fobs, num_mbhb, hs_mbhb
 
-    def gwb_continuous(self, freqs):
-        """
-
-        Arguments
-        ---------
-        freqs : (F,) array_like of scalar,
-            Target frequencies of interest in units of [Hz] = [1/s]
-
-        """
-        freqs = np.atleast_1d(freqs)
-        assert freqs.ndim == 1, "Invalid `freqs` given!  shape={}".format(np.shape(freqs))
-
-        # shape: (m1, mrat, redz)
-        dnbh = self.dnbh()
-        zz = self.redz
-
-        cosmo_fact = cosmo.comoving_distance(zz).to('Mpc').value
-
-        dz = self.redz_delta * 2.0    # `delta` is half of bin-width, so multiply by 2
-        # Now [Mpc^3 / s]
-        cosmo_fact = 4*np.pi*(SPLC/MPC) * np.square(cosmo_fact) * dz
-
-        m1 = np.power(10.0, self.mbh1[np.newaxis, :, np.newaxis]) * MSOL
-        m2 = np.power(10.0, self.mbh2[np.newaxis, :, :]) * MSOL
-        fr = freqs[:, np.newaxis, np.newaxis, np.newaxis] / (1.0 + zz[np.newaxis, np.newaxis, np.newaxis, :])
-        fterm = utils.gw_hardening_rate_dfdt(m1[..., np.newaxis], m2[..., np.newaxis], fr)
-        # f / (df/dt)   [s]
-        fterm = fr / fterm
-
-        mc = self.mchirp[np.newaxis, :, :, np.newaxis] * MSOL
-        dl = cosmo.luminosity_distance(zz).cgs.value[np.newaxis, np.newaxis, np.newaxis, :]
-
-        # [-] dimensionless strain
-        hs = utils.gw_strain_source(mc, dl, fr)
-        gwb = dnbh * (hs**2) * cosmo_fact * fterm
-        gwb[:, :, :, 0] = 0.0
-        return gwb
-
-    def gwb_discrete(self, freqs):
-        """
-
-        Arguments
-        ---------
-        freqs : (F,) array_like of scalar,
-            Target frequencies of interest in units of [Hz] = [1/s]
-
-        """
-        edges, num_mbhb, hs_bins = self.num_mbhb(freqs)
-
 
 class SAM:
 
@@ -448,6 +399,85 @@ def scaling(amp, norm, power, value):
 
     """
     return amp * np.power(value / norm, power)
+
+
+def gwb_continuous(sam, freqs):
+    """
+
+    Arguments
+    ---------
+    freqs : (F,) array_like of scalar,
+        Target frequencies of interest in units of [Hz] = [1/s]
+
+    """
+    freqs = np.atleast_1d(freqs)
+    assert freqs.ndim == 1, "Invalid `freqs` given!  shape={}".format(np.shape(freqs))
+
+    # shape: (m1, mrat, redz)
+    dnbh = sam.dnbh()
+    zz = sam.redz
+
+    cosmo_fact = cosmo.comoving_distance(zz).to('Mpc').value
+
+    dz = sam.redz_delta * 2.0    # `delta` is half of bin-width, so multiply by 2
+    # Now [Mpc^3 / s]
+    cosmo_fact = 4*np.pi*(SPLC/MPC) * np.square(cosmo_fact) * dz
+
+    m1 = np.power(10.0, sam.mbh1[np.newaxis, :, np.newaxis]) * MSOL
+    m2 = np.power(10.0, sam.mbh2[np.newaxis, :, :]) * MSOL
+    fr = freqs[:, np.newaxis, np.newaxis, np.newaxis] / (1.0 + zz[np.newaxis, np.newaxis, np.newaxis, :])
+    fterm = utils.gw_hardening_rate_dfdt(m1[..., np.newaxis], m2[..., np.newaxis], fr)
+    # f / (df/dt)   [s]
+    fterm = fr / fterm
+
+    mc = sam.mchirp[np.newaxis, :, :, np.newaxis] * MSOL
+    dl = cosmo.luminosity_distance(zz).cgs.value[np.newaxis, np.newaxis, np.newaxis, :]
+
+    # [-] dimensionless strain
+    hs = utils.gw_strain_source(mc, dl, fr)
+    gwb = dnbh * (hs**2) * cosmo_fact * fterm
+    gwb[:, :, :, 0] = 0.0
+    return gwb
+
+
+def gwb_discrete(sam, freqs, sample_threshold=10.0, cut_below_mass=1e6):
+    """
+
+    Arguments
+    ---------
+    freqs : (F,) array_like of scalar,
+        Target frequencies of interest in units of [Hz] = [1/s]
+
+    """
+    edges_fobs, num_mbhb_fobs, _ = sam.num_mbhb(freqs)
+    log_edges_fobs = [np.log10(edges_fobs[0]), edges_fobs[1], edges_fobs[2], np.log10(edges_fobs[3])]
+
+    if cut_below_mass is not None:
+        m2 = edges_fobs[0][:, np.newaxis] * edges_fobs[1][np.newaxis, :]
+        bads = (m2 < cut_below_mass)
+        num_mbhb_fobs[bads] = 0.0
+
+    vals, weights = kale.sample_outliers(log_edges_fobs, num_mbhb_fobs, sample_threshold)
+
+    if cut_below_mass is not None:
+        bads = ((10.0 ** vals[0]) * vals[1] < cut_below_mass)
+        vals = vals.T[~bads].T
+        weights = weights[~bads]
+
+    vals[0] = 10.0 ** vals[0]
+    vals[1] = vals[1] * vals[0]
+    mc = utils.chirp_mass(vals[0], vals[1])
+    dl = vals[2, :]
+    frst = (10.0 ** vals[3]) * (1.0 + dl)
+    dl = cosmo.luminosity_distance(dl).cgs.value
+    hs = utils.gw_strain_source(mc * MSOL, dl, frst)
+    fo = vals[-1, :]
+    del vals
+
+    gff, gwf, gwb = gws_from_sampled_strains(log_edges_fobs[-1], fo, hs, weights)
+    gff = (10.0 ** gff)
+
+    return gff, gwf, gwb
 
 
 @numba.njit
