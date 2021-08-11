@@ -315,24 +315,19 @@ class BP_Semi_Analytic:
 
         dc = self._dist_com_mpc    # comoving-distance in Mpc
         dz = self.redz_delta * 2.0    # `delta` is half of bin-width, so multiply by 2
-        # print(f"dc={utils.stats(dc)}")
         # [Mpc^3/s]
         cosmo_fact = 4 * np.pi * (SPLC/MPC) * np.square(dc) * dz
-        # print(f"cosmo_fact={utils.stats(cosmo_fact)}")
 
         # (m1, q)
         mchirp = self.mchirp * MSOL
         # (m1, q, 1, 1)
         mchirp = mchirp[..., np.newaxis, np.newaxis]
-        # print(f"mchirp/Msol={utils.stats(mchirp/MSOL)}")
         # (z, f)
         frst = fobs[np.newaxis, :] * (1.0 + self.redz[:, np.newaxis])
         # (1, 1, z, f)
         frst = frst[np.newaxis, np.newaxis, :, :]
-        # print(f"frst*yr={utils.stats(frst*YR)}")
         # (m1, q, z, f)
         tau = utils.gw_hardening_timescale(mchirp, frst)
-        # print(f"tau/GYR={utils.stats(tau/GYR)}")
 
         TAU_LIMIT = None
         TAU_LIMIT = 2.0
@@ -340,13 +335,12 @@ class BP_Semi_Analytic:
             logging.warning(f"WARNING: limiting tau to < {TAU_LIMIT:.2f} Gyr")
             bads = (tau/GYR > 2.0)
             tau[bads] = 0.0
-            print(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
+            # print(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
 
         dl = dc * (1.0 + self.redz) * MPC
         dl = dl[np.newaxis, np.newaxis, :, np.newaxis]
         dl[dl <= 0.0] = np.nan
         hs_mbhb = utils.gw_strain_source(mchirp, dl, frst)
-        # hs[dl <= 0.0] = 0.0
         hs_mbhb = np.nan_to_num(hs_mbhb)
 
         # (m1, q, z)
