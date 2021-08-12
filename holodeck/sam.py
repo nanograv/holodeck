@@ -12,7 +12,7 @@ To-Do
 
 
 """
-
+import abc
 import logging
 
 import numba
@@ -29,6 +29,79 @@ _MERGER_TIME_MASS = (0.4 / cosmo.h) * 1.0e11   # Msol
 _BULGE_MASS_FRAC = 0.615
 _MMBULGE_MASS_REF = 1.0e11  # [Msol]
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
+
+
+class _Galaxy_Stellar_Mass_Function(abc.ABC):
+
+    @abc.abstractmethod
+    def __init__(self, *args, **kwargs):
+        return
+
+    @abc.abstractmethod
+    def __call__(self, mass, redz):
+        return
+
+
+class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
+    """Single Schechter Function - Galaxy Stellar Mass Function.
+    """
+
+    def __init__(self, phi0, phiz, mref0, mrefz, alpha0, alphaz):
+        self._phi0 = phi0
+        self._phiz = phiz
+        self._mref0 = mref0
+        self._mrefz = mrefz
+        self._alpha0 = alpha0
+        self._alphaz = alphaz
+        return
+
+    def __call__(self, mass, redz):
+        phi = self.phi(redz)
+        mref = self.mref(redz)
+        alpha = self.alpha(redz)
+        xx = mass / mref
+        rv = np.log(10.0) * phi * np.power(xx, 1.0 + alpha) * np.exp(-xx)
+        return rv
+
+    def phi(self, redz):
+        return np.power(10.0, self._phi0 + self._phiz * redz)
+
+    def mref(self, redz):
+        return self._mref0 + self._mrefz * redz
+
+    def alpha(self, redz):
+        return self._alpha0 + self._alphaz * redz
+
+
+class _Galaxy_Pair_Fraction(abc.ABC):
+
+    @abc.abstractmethod
+    def __init__(self, *args, **kwargs):
+        return
+
+    @abc.abstractmethod
+    def __call__(self, mass, redz):
+        return
+
+
+class GPF_Power_Law(_Galaxy_Pair_Fraction):
+
+    def __init__(self, frac_norm, mref, malpha, zbeta, qgamma):
+        self._frac_norm = frac_norm   # f0'  i.e. f0-prime
+        self._mref = mref   # NOTE: this is `a * M_0 = 1e11` in papers
+        self._malpha = malpha
+        self._zbeta = zbeta
+        self._qgamma = qgamma
+        return
+
+    def __call__(self, mass, redz, mrat):
+        f0p = self._frac_norm
+        am0 = self._mref
+        aa = self._malpha
+        bb = self._zbeta
+        gg = self._qgamma
+        rv = f0p * np.power(mass/am0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
+        return rv
 
 
 class BP_Semi_Analytic:
