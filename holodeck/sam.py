@@ -22,7 +22,7 @@ import numpy as np
 import kalepy as kale
 
 from holodeck import cosmo, utils
-from holodeck.constants import GYR, SPLC, MSOL, MPC
+from holodeck.constants import GYR, SPLC, MSOL, MPC, YR
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
@@ -366,7 +366,7 @@ class Semi_Analytic_Model:
 
         Arguments
         ---------
-        fobs : observed frequency in Hertz [1/s]
+        fobs : observed frequency in [1/yr]
 
         d N / d ln f_r = (dn/dz) * (dz/dt) * (dt/d ln f_r) * (dVc/dz)
                        = (dn/dz) * (f_r / [df_r/dt]) * 4 pi c D_c^2 (1+z) * dz
@@ -388,8 +388,8 @@ class Semi_Analytic_Model:
         mchirp = utils.chirp_mass(*mchirp) * MSOL   # convert to [grams]
         # (M, Q, 1, 1)
         mchirp = mchirp[..., np.newaxis, np.newaxis]
-        # (Z, F) find rest-frame frequencies
-        frst = fobs[np.newaxis, :] * (1.0 + self.redz[:, np.newaxis])
+        # (Z, F) find rest-frame frequencies in Hz [1/sec]
+        frst = fobs[np.newaxis, :] * (1.0 + self.redz[:, np.newaxis]) / YR
         # (1, 1, Z, F)
         frst = frst[np.newaxis, np.newaxis, :, :]
         # (M, Q, Z, F)
@@ -424,6 +424,38 @@ class Semi_Analytic_Model:
         # (M, Q, Z, F) units: [] unitless, i.e. number
         number = number[..., np.newaxis] * tau
         return edges, number, strain
+
+    def gwb(self, fobs, realize=True, **kwargs):
+        """
+        Arguments
+        ---------
+        fobs : units of [1/yr]
+
+        """
+        import numbers
+
+        squeeze = False
+        if np.isscalar(fobs):
+            fobs = np.atleast_1d(fobs)
+            squeeze = True
+
+        # `num` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
+        edges, num, hs = self.number_at_fobs(fobs)
+
+        if realize is True:
+            num = np.random.poisson(num)
+        elif isinstance(realize, numbers.Integral):
+            shape = num.shape + (realize,)
+            num = np.random.poisson(num[..., np.newaxis], size=shape)
+            hs = hs[..., np.newaxis]
+        elif realize not in [None, False]:
+            err = "`realize` ({}) must be one of [True, False, integer]!".format(realize)
+            raise ValueError(err)
+
+        hs = np.sqrt(np.sum(num*np.square(hs), axis=(0, 1, 2)))
+        if squeeze:
+            hs = hs.squeeze()
+        return hs
 
 
 def gwb_continuous(sam, freqs):
