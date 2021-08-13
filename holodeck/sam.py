@@ -458,45 +458,6 @@ class Semi_Analytic_Model:
         return hs
 
 
-def gwb_continuous(sam, freqs):
-    """
-
-    Arguments
-    ---------
-    freqs : (F,) array_like of scalar,
-        Target frequencies of interest in units of [Hz] = [1/s]
-
-    """
-    freqs = np.atleast_1d(freqs)
-    assert freqs.ndim == 1, "Invalid `freqs` given!  shape={}".format(np.shape(freqs))
-
-    # shape: (m1, mrat, redz)
-    dnbh = sam.dnbh()
-    zz = sam.redz
-
-    cosmo_fact = cosmo.comoving_distance(zz).to('Mpc').value
-
-    dz = sam.redz_delta * 2.0    # `delta` is half of bin-width, so multiply by 2
-    # Now [Mpc^3 / s]
-    cosmo_fact = 4*np.pi*(SPLC/MPC) * np.square(cosmo_fact) * dz
-
-    m1 = np.power(10.0, sam.mbh1[np.newaxis, :, np.newaxis]) * MSOL
-    m2 = np.power(10.0, sam.mbh2[np.newaxis, :, :]) * MSOL
-    fr = freqs[:, np.newaxis, np.newaxis, np.newaxis] * (1.0 + zz[np.newaxis, np.newaxis, np.newaxis, :])
-    fterm = utils.gw_hardening_rate_dfdt(m1[..., np.newaxis], m2[..., np.newaxis], fr)
-    # f / (df/dt)   [s]
-    fterm = fr / fterm
-
-    mc = sam.mchirp[np.newaxis, :, :, np.newaxis] * MSOL
-    dl = cosmo.luminosity_distance(zz).cgs.value[np.newaxis, np.newaxis, np.newaxis, :]
-
-    # [-] dimensionless strain
-    hs = utils.gw_strain_source(mc, dl, fr)
-    gwb = dnbh * (hs**2) * cosmo_fact * fterm
-    gwb[:, :, :, 0] = 0.0
-    return gwb
-
-
 def gwb_discrete(sam, freqs, sample_threshold=10.0, cut_below_mass=1e6):
     """
 
