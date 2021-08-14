@@ -423,6 +423,7 @@ class Semi_Analytic_Model:
         number = dens * cosmo_fact
         # (M, Q, Z, F) units: [] unitless, i.e. number
         number = number[..., np.newaxis] * tau
+
         return edges, number, strain
 
     def gwb(self, fobs, realize=True, **kwargs):
@@ -458,43 +459,57 @@ class Semi_Analytic_Model:
         return hs
 
 
-def gwb_discrete(sam, freqs, sample_threshold=10.0, cut_below_mass=1e6):
+def sample_sam(sam, fobs, sample_threshold=10.0, cut_below_mass=1e6, limit_merger_time=2.0):
+    """
+    fobs in units of [1/yr]
+    """
+    # edges: Mtot [Msol], mrat (q), redz (z), fobs (f) [1/yr]
+    edges, number, _ = sam.number_at_fobs(fobs, limit_merger_time=limit_merger_time)
+    log_edges = [np.log10(edges[0]), edges[1], edges[2], np.log10(edges[3])]
+
+    if cut_below_mass is not None:
+        m2 = edges[0][:, np.newaxis] * edges[1][np.newaxis, :]
+        bads = (m2 < cut_below_mass)
+        number[bads] = 0.0
+
+    vals, weights = kale.sample_outliers(log_edges, number, sample_threshold)
+    vals[0] = 10.0 ** vals[0]
+    vals[3] = 10.0 ** vals[3]
+
+    if cut_below_mass is not None:
+        bads = (vals[0] * vals[1] < cut_below_mass)
+        vals = vals.T[~bads].T
+        weights = weights[~bads]
+
+    return vals, weights
+
+
+def _gws_from_samples(vals, weights, fobs):
+    mc = utils.chirp_mass(*utils.m1m2_from_mtmr(vals[0], vals[1]))
+    dl = vals[2, :]
+    frst = (vals[3] / YR) * (1.0 + dl)
+    dl = cosmo.luminosity_distance(dl).cgs.value
+    hs = utils.gw_strain_source(mc * MSOL, dl, frst)
+    fo = vals[-1]
+    del vals
+
+    gff, gwf, gwb = gws_from_sampled_strains(fobs, fo, hs, weights)
+    # gff = (10.0 ** gff)
+
+    return gff, gwf, gwb
+
+
+def sampled_gws_from_sam(sam, fobs, **kwargs):
     """
 
     Arguments
     ---------
-    freqs : (F,) array_like of scalar,
-        Target frequencies of interest in units of [Hz] = [1/s]
+    fobs : (F,) array_like of scalar,
+        Target frequencies of interest in units of [1/yr]
 
     """
-    edges_fobs, num_mbhb_fobs, _ = sam.num_mbhb(freqs)
-    log_edges_fobs = [np.log10(edges_fobs[0]), edges_fobs[1], edges_fobs[2], np.log10(edges_fobs[3])]
-
-    if cut_below_mass is not None:
-        m2 = edges_fobs[0][:, np.newaxis] * edges_fobs[1][np.newaxis, :]
-        bads = (m2 < cut_below_mass)
-        num_mbhb_fobs[bads] = 0.0
-
-    vals, weights = kale.sample_outliers(log_edges_fobs, num_mbhb_fobs, sample_threshold)
-
-    if cut_below_mass is not None:
-        bads = ((10.0 ** vals[0]) * vals[1] < cut_below_mass)
-        vals = vals.T[~bads].T
-        weights = weights[~bads]
-
-    vals[0] = 10.0 ** vals[0]
-    vals[1] = vals[1] * vals[0]
-    mc = utils.chirp_mass(vals[0], vals[1])
-    dl = vals[2, :]
-    frst = (10.0 ** vals[3]) * (1.0 + dl)
-    dl = cosmo.luminosity_distance(dl).cgs.value
-    hs = utils.gw_strain_source(mc * MSOL, dl, frst)
-    fo = vals[-1, :]
-    del vals
-
-    gff, gwf, gwb = gws_from_sampled_strains(log_edges_fobs[-1], fo, hs, weights)
-    gff = (10.0 ** gff)
-
+    vals, weights = sample_sam(sam, fobs, **kwargs)
+    gff, gwf, gwb = _gws_from_samples(vals, weights, fobs)
     return gff, gwf, gwb
 
 
