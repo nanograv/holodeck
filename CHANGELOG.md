@@ -1,4 +1,6 @@
-# To-Do
+# Change Log
+
+## Future (To-Do)
 
 * Structures for comprehensive binary evolution / hardening modules
     - [ ] a class-based structure allowing for modular hardening processes to be added/removed/modified easily.
@@ -20,8 +22,17 @@
     - [ ] constraints on kpc--Mpc scale galaxy and AGN mergers
     - [ ] constraints on sub-kpc separation binary AGN based on EM candidates (and upper-limits)
 
+----
 
-# Current
+## Current
+
+
+----
+
+## Past
+
+### v0.1 - 2021/08/15
+
 
 * Basic GW spectra can be generated using simple versions of population synthesis based on:
     - A finite, discrete population of binaries from the Illustris simulations
@@ -30,3 +41,4 @@
 * A class-based implementation is used in a way to facilitate subclassing (i.e. extensibility).
 * Only the simplest models for binary evolution (i.e. fixed time-delays and GW emission) are currently included.
 * Continuous population distributions can be easily interfaced with the `kalepy` package to facilitate discrete sampling.  Even without formal discrete sampling, proper GW (foreground and background) statistics can be approximated.
+* Cosmology class (subclass of astropy.cosomology) providing convenience functions and more rapid calculations on arrays (via interpolation).
