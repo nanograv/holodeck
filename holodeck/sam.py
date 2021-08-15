@@ -7,8 +7,6 @@ https://ui.adsabs.harvard.edu/abs/2019MNRAS.488..401C/abstract
 
 To-Do
 -----
-[ ] Check: pair-fraction `f` is used correctly (as opposed to f-prime, the mass-ratio independent version)
-[ ] Check: mass-variable is consistently used (should be *primary* mass, from [Chen19] _not_ *total* mass)
 
 
 """

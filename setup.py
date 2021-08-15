@@ -1,7 +1,7 @@
 """
 holodeck
 
-Supermassive binary black hole simulator for pulsar timing array signals and galaxy population  statistics.
+Supermassive binary black hole simulator for pulsar timing array signals and galaxy population statistics.
 
 """
 import sys
