@@ -1,4 +1,4 @@
-name: CI
+name: basic pip CI tests
 
 on:
   push:
