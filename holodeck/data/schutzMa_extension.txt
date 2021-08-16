@@ -1,0 +1,27 @@
+Name		RA			DEC			D_L(Mpc)	Mass	 Comment	
+
+NGC4486		187.7059304  	12.3911231	16.7		6.2e9  	M87, removed from 2mass list
+NGC4649 	185.378315   	14.924625	16.5		4.7e9	M60, removed from 2mass list
+NGC1407		55.049417  	-18.580111	29		4.7e9	removed from 2mass list
+NGC3842 	176.008958   	19.949806	98.4		9.7e9	removed from 2mass list
+NGC4472		187.4448412   8.0004758	16.7		2.4e9	M49, removed from 2mass list
+IC1459 		344.294195	-36.4622222	30.9		2.8e9	removed from 2mass list
+NGC3091		150.059543  	-19.636961	52.7		3.7e9	removed from 2mass list
+NGC5516 	213.977875  	-48.114861	60.1		3.5e9	removed from 2mass list
+NGC1399 	54.620941  	-35.450657	20.9		1.3e9	removed from 2mass list (strange, since 2MASS absolute mag is -24.65 in NED, but -25.1 in list)
+NGC7619 	350.0605492   8.2062458	53.9		2.3e9	removed from 2mass list
+NGC6086 	243.148053    	29.484791	139		3.8e9	removed from 2mass list
+NGC4594		189.9976325 	-11.6230544	10		0.67e9	M104; Sombrero
+NGC4374		186.2655971  	12.8869831	18.5		0.92e9	M84; removed from 2mass list
+A3565BCG	204.16167   	-33.95833	54.4		1.4e9	removed from 2mass list
+NGC7681		352.228708   	17.309639	96.8		5.6e9	removed from 2mass list
+NGC2693 	134.246955   	51.347440	74.8		4.8e9	removed from 2mass list
+NGC1453		56.613542   	-3.968778	56.4		3.4e9	removed from 2mass list
+NGC7619		350.060549   	8.2062458	54.0		3.2e9	removed from 2mass list
+NGC6482		267.953375   	23.071944	61.4		3.1e9	removed from 2mass list
+NGC0057 	3.878617   	17.328519	76.3		3.3e9	removed from 2mass list
+NGC2832 	139.945259   	33.749741	105		3.6e9	removed from 2mass list (distance 79 Mpc in NED)
+NGC5353		208.3612208  40.2830306	41.1		1.7e9	removed from 2mass list
+NGC4555 	188.9215692  26.5231150	104		2.9e9	removed from 2mass list
+NGC6575 	272.739542   31.116194		106		2.3e9	removed from 2mass list
+

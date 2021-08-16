@@ -255,3 +255,14 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
         if not cgs:
             retval = retval.to('Mpc3')
         return retval
+
+    def dtdz(self, zz):
+        """Differential lookback time of the Universe.
+
+        From Hogg1999 Eq. 30
+        """
+        efac = self.efunc(zz)
+        time_hub = self.hubble_time.to('s').value
+
+        retval = time_hub / (1.0 + zz) / efac
+        return retval
