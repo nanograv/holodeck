@@ -29,7 +29,7 @@ pi = np.pi
 sqrt = np.sqrt
 
 
-class BP_Observational(holo.population._Binary_Population):
+class BP_Observational(holo.population._Population):
 
     FREQ_MIN = 1e-9    # Hz, minimum of PTA band of interest
 

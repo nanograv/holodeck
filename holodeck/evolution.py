@@ -435,3 +435,10 @@ class BE_Magic_Delay_Eccen(_Binary_Evolution):
             self.eccen[:, step] = e1
 
         return EVO.CONT
+
+
+class GW_Hardening:
+
+    @classmethod
+    def dadt(cls):
+        pass

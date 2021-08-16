@@ -11,7 +11,7 @@ from holodeck.constants import PC, MSOL
 _DEF_ECCEN_DIST = (1.0, 0.2)
 
 
-class _Binary_Population(abc.ABC):
+class _Population(abc.ABC):
 
     def __init__(self, fname, *args, mods=None, check=True, **kwargs):
         self._fname = fname
@@ -21,7 +21,8 @@ class _Binary_Population(abc.ABC):
         self.time = None    # scale factor        (N,)
         self.sepa = None    # binary separation a (N,)
         self.mass = None    # blackhole masses    (N, 2)
-        self.eccen = None    # eccentricities      (N,) [optional]
+        self.eccen = None   # eccentricities      (N,) [optional]
+        self.weight = None  # weight of each binary as a sample  (N,) [optional]
 
         self._size = None
         self._sample_volume = None
@@ -119,7 +120,7 @@ class _Binary_Population(abc.ABC):
         return
 
 
-class BP_Illustris(_Binary_Population):
+class BP_Illustris(_Population):
 
     def _init_from_file(self, fname):
         header, data = utils.load_hdf5(fname)
@@ -144,7 +145,7 @@ class BP_Illustris(_Binary_Population):
         return
 
 
-class BP_Continuous(_Binary_Population):
+class BP_Continuous(_Population):
 
     def _init_from_file(self, fname):
         data = np.load(fname)
