@@ -77,17 +77,17 @@ class GW_Continuous(Grav_Waves):
     def emit(self, eccen=None, stats=False, progress=True, nloudest=5):
         freqs = self.freqs
         bin_evo = self._bin_evo
-        bin_pop = bin_evo._bin_pop
-        weight = bin_pop.weight
-        dm = np.log10(bin_pop._mtot[1]/MSOL) - np.log10(bin_pop._mtot[0]/MSOL)
-        dq = bin_pop._mrat[1] - bin_pop._mrat[0]
-        dz = bin_pop._redz[1] - bin_pop._redz[0]
+        pop = bin_evo._pop
+        weight = pop.weight
+        dm = np.log10(pop._mtot[1]/MSOL) - np.log10(pop._mtot[0]/MSOL)
+        dq = pop._mrat[1] - pop._mrat[0]
+        dz = pop._redz[1] - pop._redz[0]
 
         # (N,) ==> (1, N)    for later conversion to (F, N)
-        m1, m2 = [mm[np.newaxis, :] for mm in bin_pop.mass.T]
+        m1, m2 = [mm[np.newaxis, :] for mm in pop.mass.T]
 
         H0 = cosmo.H0*1e5 / MPC   # convert from [km/s/Mpc] to [1/s]
-        redz = cosmo._a_to_z(bin_pop.time)                     # (N,)
+        redz = cosmo._a_to_z(pop.time)                     # (N,)
         redz = np.clip(redz, 0.1, None)
         # print(f"redz={zmath.stats_str(redz)}")
         dlum = cosmo.luminosity_distance(redz).cgs.value
