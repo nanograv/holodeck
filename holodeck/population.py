@@ -2,19 +2,21 @@
 """
 
 import abc
+import os
 
 import numpy as np
 
-from holodeck import utils, log
+from holodeck import utils, log, _PATH_DATA
 from holodeck.constants import PC, MSOL
 
 _DEF_ECCEN_DIST = (1.0, 0.2)
+_DEF_ILLUSTRIS_FNAME = "illustris-galaxy-mergers_L75n1820FP_gas-100_dm-100_star-100_bh-000.hdf5"
 
 
 class _Population(abc.ABC):
 
-    def __init__(self, fname, *args, mods=None, check=True, **kwargs):
-        self._fname = fname
+    def __init__(self, *args, mods=None, check=True, **kwargs):
+        # self._fname = fname
         self._check_flag = check
 
         # Initial binary values (i.e. at time of formation)
@@ -28,13 +30,13 @@ class _Population(abc.ABC):
         self._sample_volume = None
 
         # Initialize the population
-        self._init_from_file(fname)
+        self._init()
         # Apply modifications (using `Modifer` instances), run `_finalize` and `_check()`
         self.modify(mods)
         return
 
     @abc.abstractmethod
-    def _init_from_file(self, fname):
+    def _init(self):
         pass
 
     @abc.abstractmethod
@@ -120,9 +122,19 @@ class _Population(abc.ABC):
         return
 
 
-class BP_Illustris(_Population):
+class Pop_Illustris(_Population):
 
-    def _init_from_file(self, fname):
+    def __init__(self, fname=None, **kwargs):
+        if fname is None:
+            fname = _DEF_ILLUSTRIS_FNAME
+            fname = os.path.join(_PATH_DATA, fname)
+
+        self._fname = fname
+        super().__init__(**kwargs)
+        return
+
+    def _init(self):
+        fname = self._fname
         header, data = utils.load_hdf5(fname)
         self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3
 
