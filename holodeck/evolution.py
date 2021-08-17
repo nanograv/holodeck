@@ -25,15 +25,15 @@ class _Binary_Evolution(abc.ABC):
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
 
-    def __init__(self, bin_pop, nsteps=100, mods=None, check=True):
-        self._bin_pop = bin_pop
+    def __init__(self, pop, nsteps=100, mods=None, check=True):
+        self._pop = pop
         self._nsteps = nsteps
         self._mods = mods
 
         for par in self._STORE_FROM_POP:
-            setattr(self, par, getattr(bin_pop, par))
+            setattr(self, par, getattr(pop, par))
 
-        size = bin_pop.size
+        size = pop.size
         shape = (size, nsteps)
 
         self._shape = shape
@@ -42,7 +42,7 @@ class _Binary_Evolution(abc.ABC):
         self.sepa = np.zeros(shape)
         self.mass = np.zeros(shape + (2,))
 
-        if bin_pop.eccen is not None:
+        if pop.eccen is not None:
             self.eccen = np.zeros(shape)
             self.dedt = np.zeros(shape)
         else:
@@ -89,25 +89,25 @@ class _Binary_Evolution(abc.ABC):
         return self._coal
 
     def _init_step_zero(self):
-        bin_pop = self._bin_pop
+        pop = self._pop
         _, nsteps = self.shape
 
         # Initialize ALL separations ranging from initial to mutual-ISCO, for each binary
-        rad_isco = utils.rad_isco(*bin_pop.mass.T)
+        rad_isco = utils.rad_isco(*pop.mass.T)
         # (2, N)
-        sepa = np.log10([bin_pop.sepa, rad_isco])
+        sepa = np.log10([pop.sepa, rad_isco])
         # Get log-space range of separations for each of N ==> (N, nsteps)
         sepa = np.apply_along_axis(lambda xx: np.logspace(*xx, nsteps), 0, sepa).T
         self.sepa[:, :] = sepa
 
-        self.time[:, 0] = bin_pop.time
-        redz = utils.a_to_z(bin_pop.time)
+        self.time[:, 0] = pop.time
+        redz = utils.a_to_z(pop.time)
         tlbk = cosmo.z_to_tlbk(redz)
         self.tlbk[:, 0] = tlbk
-        self.mass[:, 0, :] = bin_pop.mass
+        self.mass[:, 0, :] = pop.mass
 
-        if (bin_pop.eccen is not None):
-            self.eccen[:, 0] = bin_pop.eccen
+        if (pop.eccen is not None):
+            self.eccen[:, 0] = pop.eccen
 
         return
 
@@ -333,10 +333,10 @@ class BE_Magic_Delay_Circ(_Binary_Evolution):
 
     _SELF_CONSISTENT = False
 
-    def __init__(self, bin_pop, *args, time_delay=None, **kwargs):
-        # if bin_pop.eccen is not None:
+    def __init__(self, pop, *args, time_delay=None, **kwargs):
+        # if pop.eccen is not None:
         #     raise ValueError("Cannot use {} on eccentric population!".format(self.__class__))
-        super().__init__(bin_pop, *args, **kwargs)
+        super().__init__(pop, *args, **kwargs)
         self._time_delay = utils._parse_log_norm_pars(time_delay, self.shape[0], default=_DEF_TIME_DELAY)
         return
 
@@ -370,8 +370,8 @@ class BE_Magic_Delay_Eccen(_Binary_Evolution):
 
     _SELF_CONSISTENT = False
 
-    def __init__(self, bin_pop, *args, time_delay=None, **kwargs):
-        super().__init__(bin_pop, *args, **kwargs)
+    def __init__(self, pop, *args, time_delay=None, **kwargs):
+        super().__init__(pop, *args, **kwargs)
         self._time_delay = utils._parse_log_norm_pars(time_delay, self.shape[0], default=_DEF_TIME_DELAY)
         return
 
@@ -435,6 +435,13 @@ class BE_Magic_Delay_Eccen(_Binary_Evolution):
             self.eccen[:, step] = e1
 
         return EVO.CONT
+
+
+class _Hardening(abc.ABC):
+
+    @abc.abstractmethod
+    def dadt(self, ):
+        pass
 
 
 class GW_Hardening:
