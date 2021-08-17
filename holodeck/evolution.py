@@ -18,7 +18,7 @@ class EVO(enum.Enum):
     END = -1
 
 
-class _Binary_Evolution(abc.ABC):
+class _Evolution(abc.ABC):
 
     _EVO_PARS = ['mass', 'sepa', 'eccen', 'time', 'dadt', 'tlbk']
     _LIN_INTERP_PARS = ['eccen', 'time', 'tlbk']
@@ -329,7 +329,7 @@ class _Binary_Evolution(abc.ABC):
         return vals
 
 
-class BE_Magic_Delay_Circ(_Binary_Evolution):
+class Evo_Magic_Delay_Circ(_Evolution):
 
     _SELF_CONSISTENT = False
 
@@ -366,7 +366,7 @@ class BE_Magic_Delay_Circ(_Binary_Evolution):
         return EVO.END
 
 
-class BE_Magic_Delay_Eccen(_Binary_Evolution):
+class Evo_Magic_Delay_Eccen(_Evolution):
 
     _SELF_CONSISTENT = False
 
