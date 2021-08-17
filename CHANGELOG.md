@@ -3,6 +3,7 @@
 ## Future (To-Do)
 * General
     - [ ] combine galaxy-scaling relationship implementations in `holodeck.observations` and `holodeck.sam`.
+    - [ ] Add fit/interpolated GW spectra from Chen19 into SAM modules.
 * Structures for comprehensive binary evolution / hardening modules
     - [ ] a class-based structure allowing for modular hardening processes to be added/removed/modified easily.
     - [ ] structures allowing for storing host-galaxy information (e.g. based on semi-analytic models, Illustris, observations, etc) that can be used for hardening calculations
