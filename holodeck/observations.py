@@ -4,7 +4,7 @@
 import numpy as np
 
 from holodeck import log
-from holodeck.constants import GYR, SPLC, MSOL, MPC, YR
+from holodeck.constants import MSOL
 
 
 def load_mcconnell_ma_2013(fname):
