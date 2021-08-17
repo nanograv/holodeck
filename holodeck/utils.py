@@ -1,6 +1,7 @@
 """
 
 References:
+- Peters-1964 : [Peters 1964](https://ui.adsabs.harvard.edu/abs/1964PhRv..136.1224P/abstract)
 - EN07 : [Enoki & Nagashima 2007](https://ui.adsabs.harvard.edu/abs/2007PThPh.117..241E/abstract)
 - Sesana+2004 : [Sesana+2004](http://adsabs.harvard.edu/abs/2004ApJ...611..623S)
 
@@ -267,7 +268,7 @@ def gw_char_strain(hs, dur_obs, freq_orb_obs, freq_orb_rst, dfdt):
 def gw_dedt(m1, m2, sepa, eccen):
     """GW Eccentricity Evolution rate (de/dt).
 
-    returned value is positive (e and a go in same direction).
+    returned value is negative.
 
     See Peters 1964, Eq. 5.8
     http://adsabs.harvard.edu/abs/1964PhRv..136.1224P
@@ -282,7 +283,7 @@ def gw_dedt(m1, m2, sepa, eccen):
 def gw_dade(m1, m2, sepa, eccen):
     """GW Eccentricity Evolution rate (de/dt).
 
-    returned value is negative.
+    returned value is positive (e and a go in same direction).
 
     See Peters 1964, Eq. 5.7
     http://adsabs.harvard.edu/abs/1964PhRv..136.1224P
