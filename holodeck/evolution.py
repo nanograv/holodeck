@@ -1,15 +1,46 @@
 """
+Holodeck - evolution submodule.
+
+To-Do
+-----
+* [ ] evolution modifiers should act at each step, instead of after all steps?  This would be a way to implement a
+    changing accretion rate, for example; or to set a max/min hardening rate.
+
+References
+----------
+* [Quinlan96] :: Quinlan 1996
+    The dynamical evolution of massive black hole binaries I. Hardening in a fixed stellar background
+    https://ui.adsabs.harvard.edu/abs/1996NewA....1...35Q/abstract
+* [SHM06] :: Sesana, Haardt & Madau et al. 2006
+    Interaction of Massive Black Hole Binaries with Their Stellar Environment. I. Ejection of Hypervelocity Stars
+    https://ui.adsabs.harvard.edu/abs/2006ApJ...651..392S/abstract
+* [Sesana10] :: Sesana 2010
+    Self Consistent Model for the Evolution of Eccentric Massive Black Hole Binaries in Stellar Environments:
+    Implications for Gravitational Wave Observations
+    https://ui.adsabs.harvard.edu/abs/2010ApJ...719..851S/abstract
+* [Chen17] : Chen, Sesana, & Del Pozzo 2017
+    Efficient computation of the gravitational wave spectrum emitted by eccentric massive black hole binaries
+    in stellar environments
+    https://ui.adsabs.harvard.edu/abs/2017MNRAS.470.1738C/abstract
+
 """
 
-import enum
 import abc
+import enum
+import inspect
+import json
+import os
 
 import numpy as np
+import scipy as sp
+import scipy.interpolate   # noqa
 
-from holodeck import utils, cosmo
-from holodeck.constants import GYR, PC
+import holodeck
+from holodeck import utils, cosmo, log, _PATH_DATA
+from holodeck.constants import GYR, NWTG
 
 _DEF_TIME_DELAY = (5.0*GYR, 0.2)
+_SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 
 
 @enum.unique
@@ -25,8 +56,11 @@ class _Evolution(abc.ABC):
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
 
-    def __init__(self, pop, nsteps=100, mods=None, check=True):
+    def __init__(self, pop, hard, nsteps=100, mods=None, check=True):
         self._pop = pop
+        if np.isscalar(hard):
+            hard = [hard, ]
+        self._hard = hard
         self._nsteps = nsteps
         self._mods = mods
 
@@ -41,6 +75,7 @@ class _Evolution(abc.ABC):
         self.tlbk = np.zeros(shape)
         self.sepa = np.zeros(shape)
         self.mass = np.zeros(shape + (2,))
+        self.mdot = np.zeros(shape + (2,))
 
         if pop.eccen is not None:
             self.eccen = np.zeros(shape)
@@ -111,9 +146,46 @@ class _Evolution(abc.ABC):
 
         return
 
-    @abc.abstractmethod
-    def _take_next_step(self, ii):
-        pass
+    def _take_next_step(self, step):
+        size, nsteps = self.shape
+        left = step - 1
+        right = step
+
+        dadt_1 = np.zeros(size)
+        dadt_2 = np.zeros_like(dadt_1)
+        if self.eccen is not None:
+            deccdt_1 = np.zeros_like(dadt_1)
+            deccdt_2 = np.zeros_like(dadt_2)
+
+        # Get hardening rates and left (step-1) and right (step) edges
+        for hard in self._hard:
+            _a1, _e1 = hard.dadt_dedt(self, left)
+            _a2, _e2 = hard.dadt_dedt(self, right)
+            dadt_1[:] += _a1
+            dadt_2[:] += _a2
+            if self.eccen is not None:
+                deccdt_1[:] += _e1
+                deccdt_2[:] += _a2
+
+        # Calculate time between edges
+        dadt = 0.5 * np.log10([dadt_1, dadt_2]).sum(axis=0)
+        dadt = np.power(10.0, dadt)
+        # NOTE: `da` defined to be positive!
+        da = self.sepa[:, left] - self.sepa[:, right]
+        dt = da / dadt
+        if np.any(dt < 0.0):
+            err = f"Negative time-steps found at step={step}!"
+            log.error(err)
+            raise ValueError(err)
+        self.tlbk[:, right] = self.tlbk[:, left] + dt
+        self.time[:, right] = cosmo.tlbk_to_z(self.tlbk[:, right])
+
+        if self.eccen is not None:
+            deccdt = np.mean([deccdt_1, deccdt_2], axis=0)
+            decc = deccdt * dt
+            self.eccen[:, right] = self.eccen[:, left] + decc
+
+        return EVO.CONT
 
     def _check(self):
         _check_var_names = ['sepa', 'time', 'mass', 'tlbk', 'dadt']
@@ -404,8 +476,6 @@ class Evo_Magic_Delay_Eccen(_Evolution):
 
     def _take_next_step(self, step):
         size, nsteps = self.shape
-        if step >= nsteps:
-            return EVO.END
 
         # Get values at left-edge of step
         m1, m2 = self.mass[:, step-1, :].T
@@ -440,12 +510,216 @@ class Evo_Magic_Delay_Eccen(_Evolution):
 class _Hardening(abc.ABC):
 
     @abc.abstractmethod
-    def dadt(self, ):
+    def dadt_dedt(self, evo, step, *args, **kwargs):
         pass
 
 
-class GW_Hardening:
+class Hard_GW(_Hardening):
 
-    @classmethod
-    def dadt(cls):
-        pass
+    @staticmethod
+    def dadt_dedt(evo, step):
+        m1, m2 = evo.mass[:, step, :].T    # (Binaries, Steps, 2) ==> (2, Binaries)
+        dadt = utils.gw_hardening_rate_dadt(m1, m2, evo.sepa, eccen=evo.eccen)
+
+        if evo.eccen is not None:
+            dedt = utils.gw_dedt(m1, m2, evo.sepa, evo.eccen)
+
+        return dadt, dedt
+
+
+class Quinlan1996:
+
+    @staticmethod
+    def dadt(sepa, rho, sigma, hparam):
+        """
+        [Sesana10] Eq.8
+        """
+        rv = (sepa ** 2) * NWTG * rho * hparam / sigma
+        return rv
+
+    @staticmethod
+    def dedt(sepa, rho, sigma, hparam, kparam):
+        """
+        [Sesana10] Eq.9
+        """
+        rv = sepa * NWTG * rho * hparam * kparam / sigma
+        return rv
+
+    @staticmethod
+    def radius_hardening(msec, sigma):
+        """
+        [Sesana10] Eq. 10
+        """
+        rv = NWTG * msec / (4 * sigma**2)
+        return rv
+
+
+class SHM06:
+
+    def __init__(self):
+        self._bound_H = [0.0, 40.0]    # See [SHM06] Fig.3
+        self._bound_K = [0.0, 0.4]     # See [SHM06] Fig.4
+
+        # Get the data filename
+        fname = os.path.join(_PATH_DATA, _SCATTERING_DATA_FILENAME)
+        if not os.path.isfile(fname):
+            err = f"file ({fname}) not does exist!"
+            log.error(err)
+            raise FileNotFoundError(err)
+
+        # Load Data
+        data = json.load(open(fname, 'r'))
+        self._data = data['SHM06']
+        # 'H' : Hardening Rate
+        self._init_h()
+        # 'K' : Eccentricity growth
+        self._init_k()
+        return
+
+    def H(self, mrat, sepa):
+        """
+
+        Arguments
+        ---------
+        sepa : binary separation in units of hardening radius (r_h)
+
+        """
+        xx = sepa / self._H_a0(mrat)
+        hh = self._H_A(mrat) * np.power(1.0 + xx, self._H_g(mrat))
+        hh = np.clip(hh, *self._bound_H)
+        return hh
+
+    def K(self, mrat, sepa, ecc):
+        """
+
+        Arguments
+        ---------
+        sepa : binary separation in units of hardening radius (r_h)
+
+        """        # `interp2d` return a matrix of X x Y results... want diagonal of that
+        use_a = (sepa/self._K_a0(mrat, ecc))
+        A = self._K_A(mrat, ecc)
+        g = self._K_g(mrat, ecc)
+        B = self._K_B(mrat, ecc)
+
+        use_a = use_a.diagonal()
+        A = A.diagonal()
+        g = g.diagonal()
+        B = B.diagonal()
+
+        kk = A * np.power((1 + use_a), g) + B
+        return kk
+        kk = np.clip(kk, *self._bound_K)
+        return kk
+
+    def _init_k(self):
+        data = self._data['K']
+        #    Get all of the mass ratios (ignore other keys)
+        _kq_keys = list(data.keys())
+        kq_keys = []
+        for kq in _kq_keys:
+            try:
+                int(kq)
+                kq_keys.append(kq)
+            except (TypeError, ValueError):
+                pass
+
+        nq = len(kq_keys)
+        if nq < 2:
+            raise ValueError("Something is wrong... `kq_keys` = '{}'\ndata:\n{}".format(kq_keys, data))
+        k_mass_ratios = 1.0/np.array(sorted([int(kq) for kq in kq_keys]))
+        k_eccen = np.array(data[kq_keys[0]]['e'])
+        ne = len(k_eccen)
+        k_A = np.zeros((ne, nq))
+        k_a0 = np.zeros((ne, nq))
+        k_g = np.zeros((ne, nq))
+        k_B = np.zeros((ne, nq))
+
+        for ii, kq in enumerate(kq_keys):
+            _dat = data[kq]
+            k_A[:, ii] = _dat['A']
+            k_a0[:, ii] = _dat['a0']
+            k_g[:, ii] = _dat['g']
+            k_B[:, ii] = _dat['B']
+
+        self._K_A = sp.interpolate.interp2d(k_mass_ratios, k_eccen, k_A, kind='linear')
+        self._K_a0 = sp.interpolate.interp2d(k_mass_ratios, k_eccen, k_a0, kind='linear')
+        self._K_g = sp.interpolate.interp2d(k_mass_ratios, k_eccen, k_g, kind='linear')
+        self._K_B = sp.interpolate.interp2d(k_mass_ratios, k_eccen, k_B, kind='linear')
+        return
+
+    def _init_h(self):
+        _dat = self._data['H']
+        k_mass_ratios = 1.0/np.array(_dat['q'])
+        k_A = np.array(_dat['A'])
+        k_a0 = np.array(_dat['a0'])
+        k_g = np.array(_dat['g'])
+
+        self._H_A = sp.interpolate.interp1d(k_mass_ratios, k_A, kind='linear', fill_value='extrapolate')
+        self._H_a0 = sp.interpolate.interp1d(k_mass_ratios, k_a0, kind='linear', fill_value='extrapolate')
+        self._H_g = sp.interpolate.interp1d(k_mass_ratios, k_g, kind='linear', fill_value='extrapolate')
+        return
+
+
+class Sesana_Scattering(_Hardening):
+    """
+
+    Notes
+    -----
+    * Fiducial Dehnen inner density profile slope gamma=1.0 is used in [Chen17]
+
+    """
+
+    def __init__(self, gamma_dehnen=1.0, gbh=None):
+        if gbh is None:
+            gbh = holodeck.observations.Kormendy_Ho_2013
+
+        if inspect.isclass(gbh):
+            gbh = gbh()
+        elif not isinstance(gbh, holodeck.observations._Galaxy_Blackhole_Relation):
+            err = "`gbh` must be an instance or subclass of `holodeck.observations._Galaxy_Blackhole_Relation`!"
+            log.error(err)
+            raise ValueError(err)
+
+        self._gbh = gbh
+        self._gamma_dehnen = gamma_dehnen
+        self._shm06 = SHM06()
+        return
+
+    def dadt_dedt(self, evo, step):
+        mass = evo.mass[:, step]
+        sepa = evo.sepa[:, step]
+        eccen = evo.eccen[:, step] if evo.eccen is not None else None
+        mtot, mrat = utils.mtmr_from_m1m2(*mass)
+        hh = self._shm06.H(mrat, sepa)
+        if eccen is not None:
+            kk = self._shm06.K(mrat, sepa, eccen)
+
+        vdisp = self._gbh.vdisp_from_mbh(mtot)
+        mbulge = self._gbh.mbulge_from_mbh(mtot)
+        dens = self._rho_infl_dehnen(mtot, mbulge)
+
+        dadt = Quinlan1996.dadt(sepa, dens, vdisp, hh)
+        if eccen is not None:
+            dedt = Quinlan1996.dedt(sepa, dens, vdisp, hh, kk)
+        else:
+            dedt = None
+
+        return dadt, dedt
+
+    def _rho_infl_dehnen(self, mbh, mstar):
+        """
+
+        [Chen17] Eq.26
+
+        """
+
+        gamma = self._gamma_dehnen
+
+        # [Chen17] Eq.27 - from [Dabringhausen+2008]
+        rchar = 239 * PC * (np.power(2.0, 1.0/(3.0 - gamma)) - 1.0)
+        rchar *= np.power(mstar / (1e9*MSOL), 0.596
+
+        dens = mstar * (3.0 - gamma) / np.power(rchar, 3.0) / (4.0 * np.pi)
+        dens *= np.power(2*mbh / mstar, gamma / (gamma - 3.0))
+        return dens
