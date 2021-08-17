@@ -37,7 +37,7 @@ import scipy.interpolate   # noqa
 
 import holodeck
 from holodeck import utils, cosmo, log, _PATH_DATA
-from holodeck.constants import GYR, NWTG
+from holodeck.constants import GYR, NWTG, PC, MSOL
 
 _DEF_TIME_DELAY = (5.0*GYR, 0.2)
 _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
@@ -718,7 +718,7 @@ class Sesana_Scattering(_Hardening):
 
         # [Chen17] Eq.27 - from [Dabringhausen+2008]
         rchar = 239 * PC * (np.power(2.0, 1.0/(3.0 - gamma)) - 1.0)
-        rchar *= np.power(mstar / (1e9*MSOL), 0.596
+        rchar *= np.power(mstar / (1e9*MSOL), 0.596)
 
         dens = mstar * (3.0 - gamma) / np.power(rchar, 3.0) / (4.0 * np.pi)
         dens *= np.power(2*mbh / mstar, gamma / (gamma - 3.0))
