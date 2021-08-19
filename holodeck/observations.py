@@ -376,24 +376,65 @@ class _StellarMass_HaloMass(abc.ABC):
     _MHALO_GRID_EXTR = [9, 16]
 
     def __init__(self):
-        mhalo = np.logspace(*self._MHALO_GRID_EXTR, self._NUM_GRID) * MSOL
-        mstar = self.stellar_mass(mhalo)
-        self._mhalo_log = np.log10(mhalo)
-        self._mstar_log = np.log10(mstar)
+        self._mhalo_grid = np.logspace(*self._MHALO_GRID_EXTR, self._NUM_GRID) * MSOL
+        self._mstar = self.stellar_mass(self._mhalo)
+
+        xx = np.log10(self._mstar / MSOL)
+        yy = np.log10(self._mhalo_grid / MSOL)
+        self._mhalo_from_mstar = sp.interpolate.interp1d(xx, yy, kind='linear', bounds_error=False, fill_value=np.nan)
         return
 
     @abc.abstractmethod
-    def stellar_mass(self, mhalo, redz=0.0):
+    def stellar_mass(self, mhalo):
         pass
 
-    def halo_mass(self, mstar, redz=0.0):
-        if redz != 0.0:
-            raise ValueError("Non-redshift-zero values unsupported!")
+    def halo_mass(self, mstar):
+        ynew = MSOL * 10.0 ** self._mhalo_from_mstar(np.log10(mstar/MSOL))
+        return ynew
 
-        xold = self._mass_grid_star_log
-        yold = self._mass_grid_halo_log
-        ynew = np.interp(np.log10(mstar), xold, yold, left=np.nan, right=np.nan)
-        ynew = np.power(10.0, ynew)
+
+class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
+
+    _REDZ_GRID_EXTR = [0.0, 9.0]
+
+    def __init__(self):
+        self._mhalo_grid = np.logspace(*self._MHALO_GRID_EXTR, self._NUM_GRID) * MSOL
+        self._redz_grid = np.linspace(*self._REDZ_GRID_EXTR, self._NUM_GRID+2)
+        mhalo = self._mhalo_grid[:, np.newaxis]
+        redz = self._redz_grid[np.newaxis, :]
+        self._mstar = self.stellar_mass(mhalo, redz)  # should be units of [Msol]
+
+        # ---- Construct interpolator to go from (mstar, redz) ==> (mhalo)
+        # first: convert data to grid of (mstar, redz) ==> (mhalo)
+        mstar = np.log10(self._mstar / MSOL)
+        redz = self._redz_grid
+        mhalo = np.log10(self._mhalo_grid / MSOL)
+        aa = mstar.ravel()
+        cc, bb = np.meshgrid(mhalo, redz, indexing='ij')
+        bb, cc = [bc.ravel() for bc in [bb, cc]]
+
+        shape = self._mstar.shape
+        xx = np.linspace(aa.min(), aa.max(), shape[0])
+        yy = redz
+        xg, yg = np.meshgrid(xx, yy, indexing='ij')
+        grid = sp.interpolate.griddata((aa, bb), cc, (xg, yg))
+        # second: construct interpolator from grid to arbitrary scatter points
+        interp = sp.interpolate.RegularGridInterpolator((xx, yy), grid)
+        self._mhalo_from_mstar_redz = interp
+        return
+
+    @abc.abstractmethod
+    def stellar_mass(self, mhalo, redz):
+        pass
+
+    def halo_mass(self, mstar, redz):
+        if (np.ndim(mstar) != 1) or np.any(np.shape(mstar) != np.shape(redz)):
+            err = f"both `mstar` ({np.shape(mstar)}) and `redz` ({np.shape(redz)}) must be 1D and same length!"
+            log.error(err)
+            raise ValueError(err)
+
+        vals = np.array([np.log10(mstar/MSOL), redz])
+        ynew = MSOL * 10.0 ** self._mhalo_from_mstar_redz(vals.T)
         return ynew
 
 
@@ -418,7 +459,7 @@ class Guo_2010(_StellarMass_HaloMass):
         return mstar
 
 
-class Behroozi_2013(_StellarMass_HaloMass):
+class Behroozi_2013(_StellarMass_HaloMass_Redshift):
     """
     [Behroozi+2013] best fit values are at the beginning of Section 5 (pg.9), uncertainties are 1-sigma
     """
@@ -429,22 +470,17 @@ class Behroozi_2013(_StellarMass_HaloMass):
         return
 
     def _nu_func(sca):
-        """
-        [Behroozi+2013] Eq. 4
-        """
+        """[Behroozi+2013] Eq. 4"""
         return np.exp(-4.0 * sca*sca)
 
     @classmethod
     def _param_func(cls, redz, v0, va, vz, va2=None):
-        """
-        [Behroozi+2013] Eq. 4
-        """
+        """[Behroozi+2013] Eq. 4"""
         rv = v0
-        if redz > 0.0:
-            sca = cosmo._z_to_a(redz)
-            rv += cls._nu_func(sca) * (va * (sca - 1.0) + vz * redz)
-            if va2 is not None:
-                rv += va2 * (sca - 1.0)
+        sca = cosmo._z_to_a(redz)
+        rv = rv + cls._nu_func(sca) * (va * (sca - 1.0) + vz * redz)
+        if va2 is not None:
+            rv += va2 * (sca - 1.0)
         return rv
 
     @classmethod
@@ -490,9 +526,7 @@ class Behroozi_2013(_StellarMass_HaloMass):
 
     @classmethod
     def _xsi(cls, redz=0.0):
-        """
-        [Behroozi+2013] Eq.5
-        """
+        """[Behroozi+2013] Eq.5"""
         x0 = 0.218   # +0.011 -0.033
         xa = -0.023  # +0.052 -0.068
 
@@ -505,10 +539,7 @@ class Behroozi_2013(_StellarMass_HaloMass):
 
     @classmethod
     def _f_func(cls, xx, redz=0.0):
-        """
-        [Behroozi+2013] Eq.3 (lower)
-        """
-        # alpha, delta, gamma
+        """[Behroozi+2013] Eq.3 (lower)"""
         alpha = cls._alpha(redz)
         delta = cls._delta(redz)
         gamma = cls._gamma(redz)
@@ -519,10 +550,8 @@ class Behroozi_2013(_StellarMass_HaloMass):
         ff = t1 + delta * t2 / t3
         return ff
 
-    def stellar_mass(self, mhalo, redz=0.0):
-        """
-        [Behroozi+2013] Eq.3 (upper)
-        """
+    def stellar_mass(self, mhalo, redz):
+        """[Behroozi+2013] Eq.3 (upper)"""
         eps = self._eps(redz)
         m1 = self._m1(redz)
         mstar = np.log10(eps*m1/MSOL) + self._f_func(np.log10(mhalo/m1), redz) - self._f0
