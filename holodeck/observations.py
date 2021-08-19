@@ -1,5 +1,10 @@
 """
 
+To-Do
+-----
+* [ ] Pass concentration-relation (or other method to calculate) to NFW classes on instantiation
+
+
 References
 ----------
 * [NFW-97] : Navarro, Frenk & White 1997
@@ -33,8 +38,8 @@ import abc
 import numpy as np
 import scipy as sp
 
-from holodeck import log, cosmo
-from holodeck.constants import MSOL
+from holodeck import log, cosmo, utils
+from holodeck.constants import MSOL, NWTG
 
 
 def load_mcconnell_ma_2013(fname):
@@ -285,6 +290,11 @@ class Kormendy_Ho_2013(_Galaxy_Blackhole_Relation):
     }
 
 
+# =================================================================================================
+# ====                              Density Profiles & Relations                               ====
+# =================================================================================================
+
+
 class Klypin_2016:
     """Interpolate between redshifts and masses to find DM halo concentrations.
 
@@ -335,19 +345,70 @@ class Klypin_2016:
 
 
 class _Density_Profile(abc.ABC):
-    pass
+
+    @abc.abstractmethod
+    def density(self, rads, *args, **kwargs):
+        pass
+
+    @classmethod
+    def mass(cls, rads, *args, **kwargs):
+        dens = cls.density(rads, *args, **kwargs)
+        yy = 4*np.pi*rads**2 * dens
+        mass = utils.cumtrapz_loglog(yy, rads)
+        m0 = dens[0] * (4.0/3.0) * np.pi * rads[0] ** 3
+        mass = np.concatenate([[m0], mass + m0])
+        return mass
+
+    @classmethod
+    def time_dynamical(cls, rads, *args, **kwargs):
+        """Dynamical time, defined as (G M_enc / r^3) ^ -1/2 = r / v_circ
+        """
+        tdyn = rads / cls.velocity_circular(rads, *args, **kwargs)
+        return tdyn
+
+    @classmethod
+    def velocity_circular(cls, rads, *args, **kwargs):
+        """Circular velocity, defined as (G M_enc / r) ^ -1/2
+        """
+        mass = cls.mass(rads, *args, **kwargs)
+        time = NWTG * mass / rads
+        time = time ** -0.5
+        return time
 
 
 class NFW(_Density_Profile):
 
+    @classmethod
+    def density(cls, rads, mhalo, redz):
+        # Get Halo concentration
+        conc = cls._concentration(mhalo, redz)
+        dens = cls._density(rads, mhalo, conc, redz)
+        return dens
+
     @staticmethod
-    def density(rads, mhalo, redz):
+    def _concentration(mhalo, redz):
+        return Klypin_2016.concentration(mhalo, redz)
+
+    @classmethod
+    def radius_scale(cls, mhalo, redz):
+        conc = cls._concentration(mhalo, redz)
+        log_c_term = np.log(1 + conc) - conc/(1+conc)
+
+        # Critical over-density
+        delta_c = (200/3) * (conc**3) / log_c_term
+        # NFW density (*not* the density at the characteristic-radius)
+        rho_s = cosmo.critical_density(redz).cgs.value * delta_c
+        # scale-radius
+        rs = mhalo / (4*np.pi*rho_s*log_c_term)
+        rs = np.power(rs, 1.0/3.0)
+        return rs
+
+    @staticmethod
+    def _density(rads, mhalo, conc, redz):
         """NFW DM Density profile.
 
         [NFW-97]
         """
-        # Get Halo concentration
-        conc = Klypin_2016.concentration(mhalo, redz)
         log_c_term = np.log(1 + conc) - conc/(1+conc)
 
         # Critical over-density
@@ -428,13 +489,18 @@ class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
         pass
 
     def halo_mass(self, mstar, redz):
-        if (np.ndim(mstar) != 1) or np.any(np.shape(mstar) != np.shape(redz)):
+        if (np.ndim(mstar) not in [0, 1]) or np.any(np.shape(mstar) != np.shape(redz)):
             err = f"both `mstar` ({np.shape(mstar)}) and `redz` ({np.shape(redz)}) must be 1D and same length!"
             log.error(err)
             raise ValueError(err)
 
+        squeeze = np.isscalar(mstar)
+
         vals = np.array([np.log10(mstar/MSOL), redz])
         ynew = MSOL * 10.0 ** self._mhalo_from_mstar_redz(vals.T)
+        if squeeze:
+            ynew = ynew.squeeze()
+
         return ynew
 
 
