@@ -16,28 +16,25 @@ _DEF_ILLUSTRIS_FNAME = "illustris-galaxy-mergers_L75n1820FP_gas-100_dm-100_star-
 class _Population(abc.ABC):
 
     def __init__(self, *args, mods=None, check=True, **kwargs):
-        # self._fname = fname
         self._check_flag = check
-
-        # Initial binary values (i.e. at time of formation)
-        self.time = None    # scale factor        (N,)
-        self.sepa = None    # binary separation a (N,)
-        self.mass = None    # blackhole masses    (N, 2)
-        self.eccen = None   # eccentricities      (N,) [optional]
-        self.weight = None  # weight of each binary as a sample  (N,) [optional]
-
-        self._size = None
-        self._sample_volume = None
-
         # Initialize the population
         self._init()
         # Apply modifications (using `Modifer` instances), run `_finalize` and `_check()`
         self.modify(mods)
         return
 
-    @abc.abstractmethod
     def _init(self):
-        pass
+        # Initial binary values (i.e. at time of formation)
+        self.time = None    # scale factor        (N,)
+        self.sepa = None    # binary separation a (N,)
+        self.mass = None    # blackhole masses    (N, 2)
+
+        self.eccen = None   # eccentricities      (N,) [optional]
+        self.weight = None  # weight of each binary as a sample  (N,) [optional]
+
+        self._size = None
+        self._sample_volume = None
+        return
 
     @abc.abstractmethod
     def _update_derived(self):
@@ -51,7 +48,7 @@ class _Population(abc.ABC):
         # Sanitize
         if mods is None:
             mods = []
-        elif not isinstance(mods, list):
+        elif not np.iterable(mods):
             mods = [mods]
 
         # Run Modifiers
@@ -157,6 +154,22 @@ class Pop_Illustris(_Population):
         return
 
 
+def Pop_SAM(_Population):
+
+    def __init__(self, sam, sepa, **kwargs):
+        self._sam = sam
+        self._sepa_init = sepa
+        super().__init__(**kwargs)
+        return
+
+    def _init(self):
+        sam = self._sam
+        sepa = self._sepa_init
+
+
+
+
+'''
 class BP_Continuous(_Population):
 
     def _init_from_file(self, fname):
@@ -182,6 +195,7 @@ class BP_Continuous(_Population):
     def _update_derived(self):
         self._size = self.mtot.size
         return
+'''
 
 
 class Population_Modifier(utils._Modifier):
