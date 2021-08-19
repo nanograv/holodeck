@@ -661,6 +661,20 @@ class SHM06:
         return
 
 
+def _get_galaxy_blackhole_relation(gbh=None):
+    if gbh is None:
+        gbh = holodeck.observations.Kormendy_Ho_2013
+
+    if inspect.isclass(gbh):
+        gbh = gbh()
+    elif not isinstance(gbh, holodeck.observations._Galaxy_Blackhole_Relation):
+        err = "`gbh` must be an instance or subclass of `holodeck.observations._Galaxy_Blackhole_Relation`!"
+        log.error(err)
+        raise ValueError(err)
+
+    return gbh
+
+
 class Sesana_Scattering(_Hardening):
     """
 
@@ -671,16 +685,7 @@ class Sesana_Scattering(_Hardening):
     """
 
     def __init__(self, gamma_dehnen=1.0, gbh=None):
-        if gbh is None:
-            gbh = holodeck.observations.Kormendy_Ho_2013
-
-        if inspect.isclass(gbh):
-            gbh = gbh()
-        elif not isinstance(gbh, holodeck.observations._Galaxy_Blackhole_Relation):
-            err = "`gbh` must be an instance or subclass of `holodeck.observations._Galaxy_Blackhole_Relation`!"
-            log.error(err)
-            raise ValueError(err)
-
+        gbh = _get_galaxy_blackhole_relation(gbh)
         self._gbh = gbh
         self._gamma_dehnen = gamma_dehnen
         self._shm06 = SHM06()
@@ -690,36 +695,54 @@ class Sesana_Scattering(_Hardening):
         mass = evo.mass[:, step]
         sepa = evo.sepa[:, step]
         eccen = evo.eccen[:, step] if evo.eccen is not None else None
-        mtot, mrat = utils.mtmr_from_m1m2(*mass)
-        hh = self._shm06.H(mrat, sepa)
-        if eccen is not None:
-            kk = self._shm06.K(mrat, sepa, eccen)
+        dadt, dedt = self._dadt_dedt(mass, sepa, eccen)
+        return dadt, dedt
 
+    def _dadt_dedt(self, mass, sepa, eccen):
+        mtot, mrat = utils.mtmr_from_m1m2(*mass)
         vdisp = self._gbh.vdisp_from_mbh(mtot)
         mbulge = self._gbh.mbulge_from_mbh(mtot)
-        dens = self._rho_infl_dehnen(mtot, mbulge)
+        dens = _density_at_influence_radius_dehnen(mtot, mbulge, self._gamma_dehnen)
 
+        hh = self._shm06.H(mrat, sepa)
         dadt = Quinlan1996.dadt(sepa, dens, vdisp, hh)
         if eccen is not None:
+            kk = self._shm06.K(mrat, sepa, eccen)
             dedt = Quinlan1996.dedt(sepa, dens, vdisp, hh, kk)
         else:
             dedt = None
 
         return dadt, dedt
 
-    def _rho_infl_dehnen(self, mbh, mstar):
-        """
 
-        [Chen17] Eq.26
+class Dynamical_Friction_BBR80(_Hardening):
 
-        """
+    def __init__(self, gbh=None, coulomb=10.0):
+        gbh = _get_galaxy_blackhole_relation(gbh)
+        self._gbh = gbh
+        self._coulomb = 10.0
+        return
 
-        gamma = self._gamma_dehnen
+    # def dadt_dedt():
 
-        # [Chen17] Eq.27 - from [Dabringhausen+2008]
-        rchar = 239 * PC * (np.power(2.0, 1.0/(3.0 - gamma)) - 1.0)
-        rchar *= np.power(mstar / (1e9*MSOL), 0.596)
+    def _dadt_dedt(self, mass_eff, sepa):
+        dedt = None
+        return dadt, dedt
 
-        dens = mstar * (3.0 - gamma) / np.power(rchar, 3.0) / (4.0 * np.pi)
-        dens *= np.power(2*mbh / mstar, gamma / (gamma - 3.0))
-        return dens
+
+def _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma=1.0):
+    # [Chen17] Eq.27 - from [Dabringhausen+2008]
+    rchar = 239 * PC * (np.power(2.0, 1.0/(3.0 - gamma)) - 1.0)
+    rchar *= np.power(mstar / (1e9*MSOL), 0.596)
+    return rchar
+
+
+def _density_at_influence_radius_dehnen(mbh, mstar, gamma=1.0):
+    """
+    [Chen17] Eq.26
+    """
+    # [Chen17] Eq.27 - from [Dabringhausen+2008]
+    rchar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
+    dens = mstar * (3.0 - gamma) / np.power(rchar, 3.0) / (4.0 * np.pi)
+    dens *= np.power(2*mbh / mstar, gamma / (gamma - 3.0))
+    return dens
