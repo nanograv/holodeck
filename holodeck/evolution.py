@@ -675,6 +675,20 @@ def _get_galaxy_blackhole_relation(gbh=None):
     return gbh
 
 
+def _get_stellar_mass_halo_mass_relation(smhm=None):
+    if smhm is None:
+        smhm = holodeck.observations.Behroozi_2013
+
+    if inspect.isclass(smhm):
+        smhm = smhm()
+    elif not isinstance(smhm, holodeck.observations._StellarMass_HaloMass):
+        err = "`smhm` must be an instance or subclass of `holodeck.observations._StellarMass_HaloMass`!"
+        log.error(err)
+        raise ValueError(err)
+
+    return smhm
+
+
 class Sesana_Scattering(_Hardening):
     """
 
@@ -715,17 +729,25 @@ class Sesana_Scattering(_Hardening):
         return dadt, dedt
 
 
-class Dynamical_Friction_BBR80(_Hardening):
+class Dynamical_Friction_NFW(_Hardening):
 
-    def __init__(self, gbh=None, coulomb=10.0):
+    def __init__(self, gbh=None, smhm=None, coulomb=10.0):
         gbh = _get_galaxy_blackhole_relation(gbh)
+        smhm = _get_stellar_mass_halo_mass_relation(smhm)
         self._gbh = gbh
+        self._smhm = smhm
         self._coulomb = 10.0
         return
+
+    def _dvdt(self, mass_eff, dens, velo):
+        dvdt = 2*np.pi * mass_eff * dens * self._coulomb * np.square(NWTG / velo)
+        return dvdt
 
     # def dadt_dedt():
 
     def _dadt_dedt(self, mass_eff, sepa):
+        dvdt = self._dvdt(mass_eff, dens, velo)
+
         dedt = None
         return dadt, dedt
 
