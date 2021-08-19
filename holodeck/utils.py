@@ -14,7 +14,8 @@ import numpy as np
 import scipy as sp
 import h5py
 
-from .constants import NWTG, SCHW, SPLC
+from holodeck import log
+from holodeck.constants import NWTG, SCHW, SPLC
 
 # e.g. Sesana+2004 Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
@@ -166,6 +167,110 @@ def _parse_log_norm_pars(vals, size, default=None):
         raise ValueError(err)
 
     return vals
+
+
+def interp(xnew, xold, yold, left=np.nan, right=np.nan, xlog=True, ylog=True):
+    x1 = np.asarray(xnew)
+    x0 = np.asarray(xold)
+    y0 = np.asarray(yold)
+    if xlog:
+        x1 = np.log10(x1)
+        x0 = np.log10(x0)
+    if ylog:
+        y0 = np.log10(y0)
+        if (left is not None) and np.isfinite(left):
+            left = np.log10(left)
+        if (right is not None) and np.isfinite(right):
+            right = np.log10(right)
+
+    y1 = np.interp(x1, x0, y0, left=left, right=right)
+    if ylog:
+        y1 = np.power(10.0, y1)
+    return y1
+
+
+def cumtrapz_loglog(yy, xx, bounds=None, lntol=1e-2):
+    """Calculate integral, given `y = dA/dx` or `y = dA/dlogx` w/ trapezoid rule in log-log space.
+
+    We are calculating the integral `A` given sets of values for `y` and `x`.
+
+    For each interval (x[i+1], x[i]), calculate the integral assuming that y is of the form,
+        `y = a * x^gamma`
+
+    Notes
+    -----
+    - When bounds are given that are not identical to input `xx` values, then interpolation must
+      be performed.  This can be done on the resulting cumsum'd values, or on the input integrand
+      values.  The cumsum values are *not necessarily a power-law* (for negative indices), and thus
+      the interpolation is better performed on the input `yy` values.
+
+    """
+    yy = np.asarray(yy)
+    xx = np.asarray(xx)
+    axis = -1
+    if yy.ndim > 1:
+        err = "multidimensional functions not yet implemented!"
+        log.error(err)
+        raise ValueError(err)
+
+    if bounds is not None:
+        if len(bounds) != 2:
+            err = f"Invalid `bounds` = '{bounds}'!"
+            log.error(err)
+            raise ValueError(err)
+        if np.ndim(yy) > 1:
+            err = "multidimensional functions not implemented with `bounds`!"
+            log.error(err)
+            raise ValueError(err)
+
+        newy = interp(bounds, xx, yy, xlog=True, ylog=True)
+        ii = np.searchsorted(xx, bounds)
+        xx = np.insert(xx, ii, bounds, axis=axis)
+        yy = np.insert(yy, ii, newy, axis=axis)
+        ii = np.array([ii[0], ii[1]+1])
+        if not np.alltrue(xx[ii] == bounds):
+            err = "Interpolation to `bounds` failed!"
+            log.error(err)
+            raise ValueError(err)
+
+    # yy = np.ma.masked_values(yy, value=0.0, atol=0.0)
+
+    if np.ndim(yy) != np.ndim(xx):
+        if np.ndim(yy) < np.ndim(xx):
+            raise ValueError("BAD SHAPES")
+        cut = [slice(None)] + [np.newaxis for ii in range(np.ndim(yy)-1)]
+        xx = xx[tuple(cut)]
+
+    # Numerically calculate the local power-law index
+    delta_logx = np.diff(np.log(xx), axis=axis)
+    gamma = np.diff(np.log(yy), axis=axis) / delta_logx
+
+    # xx = np.moveaxis(xx, axis, 0)   # NOTE: these are needed for multidimensional arrays
+    # yy = np.moveaxis(yy, axis, 0)   # NOTE: these are needed for multidimensional arrays
+    aa = np.mean([xx[:-1] * yy[:-1], xx[1:] * yy[1:]], axis=0)
+    # aa = np.moveaxis(aa, 0, axis)   # NOTE: these are needed for multidimensional arrays
+    # xx = np.moveaxis(xx, 0, axis)   # NOTE: these are needed for multidimensional arrays
+    # yy = np.moveaxis(yy, 0, axis)   # NOTE: these are needed for multidimensional arrays
+
+    # Integrate dA/dx = y = a * x^gamma
+    # A = (x1*y1 - x0*y0) / (gamma + 1)
+    dz = np.diff(yy * xx, axis=axis)
+    trapz = dz / (gamma + 1)
+
+    # when the power-law is (near) '-1' then, `A = a * log(x1/x0)`
+    idx = np.isclose(gamma, -1.0, atol=lntol, rtol=lntol)
+    trapz[idx] = aa[idx] * delta_logx[idx]
+
+    integ = np.cumsum(trapz, axis=axis)
+    if bounds is not None:
+        # NOTE: **DO NOT INTERPOLATE INTEGRAL** this works badly for negative power-laws
+        # lo, hi = interpolate.interp(bounds, xx[1:], integ, xlog=True, ylog=True, valid=False)
+        # integ = hi - lo
+        integ = np.moveaxis(integ, axis, 0)
+        lo, hi = integ[ii-1, ...]
+        integ = hi - lo
+
+    return integ
 
 
 # ==== General Astronomy ====
