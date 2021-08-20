@@ -25,7 +25,7 @@ class _Population(abc.ABC):
 
     def _init(self):
         # Initial binary values (i.e. at time of formation)
-        self.time = None    # scale factor        (N,)
+        self.scafa = None    # scale factor        (N,)
         self.sepa = None    # binary separation a (N,)
         self.mass = None    # blackhole masses    (N, 2)
 
@@ -73,7 +73,7 @@ class _Population(abc.ABC):
     def _check(self):
         ErrorType = ValueError
         msg = "{}._check() Failed!  ".format(self.__class__.__name__)
-        array_names = ['time', 'sepa', 'mass', 'eccen']
+        array_names = ['scafa', 'sepa', 'mass', 'eccen']
         two_dim = ['mass']
         allow_none = ['eccen']
 
@@ -146,7 +146,7 @@ class Pop_Illustris(_Population):
         self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :]
         self.vdisp = data['SubhaloVelDisp']
         self.mass = data['SubhaloBHMass']
-        self.time = data['time']
+        self.scafa = data['time']
         return
 
     def _update_derived(self):
@@ -185,7 +185,7 @@ class BP_Continuous(_Population):
         mt, mr, sc = [xx.flatten() for xx in np.meshgrid(mt, mr, sc, indexing='ij')]
         self.mtot = mt
         self.mrat = mr
-        self.time = sc
+        self.scafa = sc
         self.weight = ww.flatten()
         self.sepa = 1e5 * PC * np.ones_like(mt)
         self.mass = utils.m1m2_from_mtmr(self.mtot, self.mrat).T
@@ -241,7 +241,7 @@ class PM_Resample(Population_Modifier):
         old_data = [
             np.log10(mt / MSOL),
             np.log10(mr),
-            pop.time,      # resample linearly in scale-factor
+            pop.scafa,      # resample linearly in scale-factor
             np.log10(pop.sepa / PC)
         ]
         reflect = [
@@ -281,7 +281,7 @@ class PM_Resample(Population_Modifier):
         mr = 10**new_data[1]
 
         pop.mass = utils.m1m2_from_mtmr(mt, mr).T
-        pop.time = new_data[2]
+        pop.scafa = new_data[2]
         pop.sepa = PC * 10**new_data[3]
         pop.eccen = None if (eccen is None) else new_data[4]
 

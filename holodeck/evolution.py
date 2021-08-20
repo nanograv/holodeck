@@ -51,8 +51,8 @@ class EVO(enum.Enum):
 
 class _Evolution(abc.ABC):
 
-    _EVO_PARS = ['mass', 'sepa', 'eccen', 'time', 'dadt', 'tlbk']
-    _LIN_INTERP_PARS = ['eccen', 'time', 'tlbk']
+    _EVO_PARS = ['mass', 'sepa', 'eccen', 'scafa', 'dadt', 'tlbk']
+    _LIN_INTERP_PARS = ['eccen', 'scafa', 'tlbk']
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
 
@@ -71,7 +71,7 @@ class _Evolution(abc.ABC):
         shape = (size, nsteps)
 
         self._shape = shape
-        self.time = np.zeros(shape)
+        self.scafa = np.zeros(shape)
         self.tlbk = np.zeros(shape)
         self.sepa = np.zeros(shape)
         self.mass = np.zeros(shape + (2,))
@@ -135,8 +135,8 @@ class _Evolution(abc.ABC):
         sepa = np.apply_along_axis(lambda xx: np.logspace(*xx, nsteps), 0, sepa).T
         self.sepa[:, :] = sepa
 
-        self.time[:, 0] = pop.time
-        redz = utils.a_to_z(pop.time)
+        self.scafa[:, 0] = pop.scafa
+        redz = utils.a_to_z(pop.scafa)
         tlbk = cosmo.z_to_tlbk(redz)
         self.tlbk[:, 0] = tlbk
         self.mass[:, 0, :] = pop.mass
@@ -178,7 +178,7 @@ class _Evolution(abc.ABC):
             log.error(err)
             raise ValueError(err)
         self.tlbk[:, right] = self.tlbk[:, left] + dt
-        self.time[:, right] = cosmo.tlbk_to_z(self.tlbk[:, right])
+        self.scafa[:, right] = cosmo.tlbk_to_z(self.tlbk[:, right])
 
         if self.eccen is not None:
             deccdt = np.mean([deccdt_1, deccdt_2], axis=0)
@@ -188,7 +188,7 @@ class _Evolution(abc.ABC):
         return EVO.CONT
 
     def _check(self):
-        _check_var_names = ['sepa', 'time', 'mass', 'tlbk', 'dadt']
+        _check_var_names = ['sepa', 'scafa', 'mass', 'tlbk', 'dadt']
         _check_var_names_eccen = ['eccen', 'dedt']
 
         def check_vars(names):
@@ -250,7 +250,7 @@ class _Evolution(abc.ABC):
 
     @property
     def freq_orb_obs(self):
-        redz = utils.a_to_z(self.time)
+        redz = utils.a_to_z(self.scafa)
         fobs = self.freq_orb_rest / (1.0 + redz)
         return fobs
 
@@ -295,14 +295,14 @@ class _Evolution(abc.ABC):
         if xpar == 'fobs':
             # frequency is already increasing
             _xvals = np.log10(self.freq_orb_obs)
-            time = self.time[:, :]
+            scafa = self.scafa[:, :]
             tt = np.log10(targets)
             rev = False
         # Binary-Separation, units of pc
         elif xpar == 'sepa':
             # separation is decreasing, reverse to increasing
             _xvals = np.log10(self.sepa)[:, ::-1]
-            time = self.time[:, ::-1]
+            scafa = self.scafa[:, ::-1]
             tt = np.log10(targets)
             rev = True
         else:
@@ -321,7 +321,7 @@ class _Evolution(abc.ABC):
         select = (tt[np.newaxis, :, np.newaxis] <= _xvals[:, np.newaxis, :])
         # Select only binaries that coalesce before redshift zero (a=1.0)
         if coal:
-            select = select & (time[:, np.newaxis, :] > 0.0) & (time[:, np.newaxis, :] < 1.0)
+            select = select & (scafa[:, np.newaxis, :] > 0.0) & (scafa[:, np.newaxis, :] < 1.0)
 
         # (N, T), find the index of the xvalue following each target point (T,), for each binary (N,)
         aft = np.argmax(select, axis=-1)
@@ -334,7 +334,7 @@ class _Evolution(abc.ABC):
         cut = np.array([aft, bef])
         # Valid binaries must be valid at both `bef` and `aft` indices
         for cc in cut:
-            valid = valid & np.isfinite(np.take_along_axis(time, cc, axis=-1))
+            valid = valid & np.isfinite(np.take_along_axis(scafa, cc, axis=-1))
 
         inval = ~valid
         # Get the x-values before and after the target locations  (2, N, T)
@@ -427,7 +427,7 @@ class Evo_Magic_Delay_Circ(_Evolution):
         self.tlbk[:, 1:] = tlbk[:, np.newaxis]
         # calculate new scalefactors
         redz = cosmo.tlbk_to_z(tlbk)
-        self.time[:, 1:] = utils.z_to_a(redz)[:, np.newaxis]
+        self.scafa[:, 1:] = utils.z_to_a(redz)[:, np.newaxis]
 
         # Masses don't evolve
         self.mass[:, :, :] = mass[:, np.newaxis, :]
@@ -465,7 +465,7 @@ class Evo_Magic_Delay_Eccen(_Evolution):
         self.tlbk[:, 1:] = tlbk[:, np.newaxis]
         # calculate new scalefactors
         redz = cosmo.tlbk_to_z(tlbk)
-        self.time[:, 1:] = utils.z_to_a(redz)[:, np.newaxis]
+        self.scafa[:, 1:] = utils.z_to_a(redz)[:, np.newaxis]
 
         # Masses don't evolve
         self.mass[:, :, :] = mass[:, np.newaxis, :]
@@ -739,15 +739,23 @@ class Dynamical_Friction_NFW(_Hardening):
         self._coulomb = 10.0
         return
 
-    def _dvdt(self, mass_eff, dens, velo):
-        dvdt = 2*np.pi * mass_eff * dens * self._coulomb * np.square(NWTG / velo)
+    def _dvdt(self, mass_sec_eff, dens, velo):
+        dvdt = 2*np.pi * mass_sec_eff * dens * self._coulomb * np.square(NWTG / velo)
         return dvdt
 
-    # def dadt_dedt():
+    def dadt_dedt(self, evo, step):
+        mass = evo.mass[:, step]
+        sepa = evo.sepa[:, step]
+        scal = evo.scafa[:, step]
+        return
 
-    def _dadt_dedt(self, mass_eff, sepa):
-        dvdt = self._dvdt(mass_eff, dens, velo)
-
+    def _dadt_dedt(self, mass_sec_eff, mhalo, sepa, redz):
+        NFW = holodeck.observations.NFW
+        dens = NFW.density(sepa, mhalo, redz)
+        velo = NFW.velocity_circular(sepa, mhalo, redz)
+        tdyn = NFW.time_dynamical(sepa, mhalo, redz)
+        dvdt = self._dvdt(mass_sec_eff, dens, velo)
+        dadt = 2 * tdyn * dvdt
         dedt = None
         return dadt, dedt
 
