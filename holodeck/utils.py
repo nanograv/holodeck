@@ -276,16 +276,6 @@ def cumtrapz_loglog(yy, xx, bounds=None, lntol=1e-2):
 # ==== General Astronomy ====
 
 
-def a_to_z(scfa):
-    redz = (1.0 / scfa) - 1.0
-    return redz
-
-
-def z_to_a(redz):
-    scfa = 1.0 / (redz + 1.0)
-    return scfa
-
-
 def mtmr_from_m1m2(m1, m2=None):
     if m2 is not None:
         masses = np.stack([m1, m2], axis=-1)

@@ -87,7 +87,7 @@ class GW_Continuous(Grav_Waves):
         m1, m2 = [mm[np.newaxis, :] for mm in pop.mass.T]
 
         H0 = cosmo.H0*1e5 / MPC   # convert from [km/s/Mpc] to [1/s]
-        redz = cosmo._a_to_z(pop.time)                     # (N,)
+        redz = cosmo.a_to_z(pop.time)                     # (N,)
         redz = np.clip(redz, 0.1, None)
         # print(f"redz={zmath.stats_str(redz)}")
         dlum = cosmo.luminosity_distance(redz).cgs.value
@@ -135,7 +135,7 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
 
     # Only examine binaries reaching the given locations before redshift zero (other redz=inifinite)
     redz = data_harms['time']
-    redz = utils.a_to_z(redz)
+    redz = cosmo.a_to_z(redz)
     valid = np.isfinite(redz) & (redz > 0.0)
 
     # Broadcast harmonics numbers to correct shape

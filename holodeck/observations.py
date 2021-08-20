@@ -543,7 +543,7 @@ class Behroozi_2013(_StellarMass_HaloMass_Redshift):
     def _param_func(cls, redz, v0, va, vz, va2=None):
         """[Behroozi+2013] Eq. 4"""
         rv = v0
-        sca = cosmo._z_to_a(redz)
+        sca = cosmo.z_to_a(redz)
         rv = rv + cls._nu_func(sca) * (va * (sca - 1.0) + vz * redz)
         if va2 is not None:
             rv += va2 * (sca - 1.0)

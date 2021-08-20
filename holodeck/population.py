@@ -131,6 +131,7 @@ class Pop_Illustris(_Population):
         return
 
     def _init(self):
+        super()._init()
         fname = self._fname
         header, data = utils.load_hdf5(fname)
         self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3
@@ -154,6 +155,7 @@ class Pop_Illustris(_Population):
         return
 
 
+'''
 def Pop_SAM(_Population):
 
     def __init__(self, sam, sepa, **kwargs):
@@ -165,8 +167,7 @@ def Pop_SAM(_Population):
     def _init(self):
         sam = self._sam
         sepa = self._sepa_init
-
-
+'''
 
 
 '''
@@ -176,7 +177,7 @@ class BP_Continuous(_Population):
         data = np.load(fname)
         mt = data['mtot'] * MSOL
         mr = data['mrat']
-        sc = utils.z_to_a(data['redz'])
+        sc = cosmo.z_to_a(data['redz'])
         ww = data['pops'][..., 0]
         self._mtot = mt
         self._mrat = mr
