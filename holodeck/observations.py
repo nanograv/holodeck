@@ -438,7 +438,7 @@ class _StellarMass_HaloMass(abc.ABC):
 
     def __init__(self):
         self._mhalo_grid = np.logspace(*self._MHALO_GRID_EXTR, self._NUM_GRID) * MSOL
-        self._mstar = self.stellar_mass(self._mhalo)
+        self._mstar = self.stellar_mass(self._mhalo_grid)
 
         xx = np.log10(self._mstar / MSOL)
         yy = np.log10(self._mhalo_grid / MSOL)
