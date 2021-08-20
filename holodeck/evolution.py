@@ -18,6 +18,9 @@ References
     Self Consistent Model for the Evolution of Eccentric Massive Black Hole Binaries in Stellar Environments:
     Implications for Gravitational Wave Observations
     https://ui.adsabs.harvard.edu/abs/2010ApJ...719..851S/abstract
+* [Kelley17] : Kelley, Blecha & Hernquist 2017
+    Massive black hole binary mergers in dynamical galactic environments
+    https://ui.adsabs.harvard.edu/abs/2017MNRAS.464.3131K/abstract
 * [Chen17] : Chen, Sesana, & Del Pozzo 2017
     Efficient computation of the gravitational wave spectrum emitted by eccentric massive black hole binaries
     in stellar environments
@@ -734,6 +737,7 @@ class Dynamical_Friction_NFW(_Hardening):
     def __init__(self, gbh=None, smhm=None, coulomb=10.0):
         gbh = _get_galaxy_blackhole_relation(gbh)
         smhm = _get_stellar_mass_halo_mass_relation(smhm)
+        self._NFW = holodeck.observations.NFW
         self._gbh = gbh
         self._smhm = smhm
         self._coulomb = 10.0
@@ -744,16 +748,31 @@ class Dynamical_Friction_NFW(_Hardening):
         return dvdt
 
     def dadt_dedt(self, evo, step):
-        mass = evo.mass[:, step]
+        mass = evo.mass[:, step, :]
         sepa = evo.sepa[:, step]
-        scal = evo.scafa[:, step]
-        return
+        dt = evo.tlbk[:, 0] - evo.tlbk[:, step]   # positive time-duration since 'formation'
+        redz = cosmo.a_to_z(evo.scafa[:, step])
+
+        # ---- Get Host DM-Halo mass
+        # use "bulge-mass" as a proxy for total stellar mass
+        mstar = self._gbh.mbulge_from_mbh(mass[:, 0])   # use primary-bh's mass (index 0)
+        mhalo = self._smhm.halo_mass(mstar, redz)
+
+        # ---- Get effective mass of inspiraling secondary
+        m2 = mass[:, 1]
+        mstar = self._gbh.mbulge_from_mbh(m2)
+        tdyn = self._NFW.time_dynamical(sepa, mhalo, redz)
+        # model tidal-stripping of secondary's bulge (see: [Kelley17] Eq.6)
+        pow = np.clip(1.0 - dt / tdyn, 0.0, 1.0)
+        meff = m2 * np.power((m2 + mstar)/m2, pow)
+
+        dadt, dedt = self._dadt_dedt(meff, mhalo, sepa, redz)
+        return dadt, dedt
 
     def _dadt_dedt(self, mass_sec_eff, mhalo, sepa, redz):
-        NFW = holodeck.observations.NFW
-        dens = NFW.density(sepa, mhalo, redz)
-        velo = NFW.velocity_circular(sepa, mhalo, redz)
-        tdyn = NFW.time_dynamical(sepa, mhalo, redz)
+        dens = self._NFW.density(sepa, mhalo, redz)
+        velo = self._NFW.velocity_circular(sepa, mhalo, redz)
+        tdyn = self._NFW.time_dynamical(sepa, mhalo, redz)
         dvdt = self._dvdt(mass_sec_eff, dens, velo)
         dadt = 2 * tdyn * dvdt
         dedt = None
