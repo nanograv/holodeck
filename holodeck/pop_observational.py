@@ -1,3 +1,11 @@
+"""
+
+To-Do
+-----
+* [ ] Use only `cosmo` (instead of other astropy.cosmology utils e.g. `Planck15`)
+
+
+"""
 # This code is reproduced and modified from the original repository https://github.com/morgan-nanez/nanohertz_GWs that is based
 # on results from Mingarelli et al. (2017) (https://zenodo.org/badge/latestdoi/90664185)
 # Related paper : https://www.nature.com/articles/s41550-017-0299-6
@@ -15,7 +23,7 @@ from astropy.cosmology import Planck15, z_at_value
 import os
 
 import holodeck as holo
-from holodeck import _PATH_DATA
+from holodeck import _PATH_DATA, cosmo
 from holodeck.constants import MSOL
 
 # physical constants for natural units c = G = 1
@@ -53,7 +61,7 @@ class BP_Observational(holo.population._Population):
         self._size = mtot.size
 
         # Store standardized quantities
-        self.time = holo.utils.z_to_a(redz)
+        self.time = cosmo.z_to_a(redz)
         self.sepa = holo.utils.kepler_sep_from_freq(mtot, self.FREQ_MIN)
         self.mass = mass
         self.weight = pop.flatten()

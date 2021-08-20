@@ -52,7 +52,7 @@ class EVO(enum.Enum):
     END = -1
 
 
-class _Evolution(abc.ABC):
+class Evolution:
 
     _EVO_PARS = ['mass', 'sepa', 'eccen', 'scafa', 'dadt', 'tlbk']
     _LIN_INTERP_PARS = ['eccen', 'scafa', 'tlbk']
@@ -139,7 +139,7 @@ class _Evolution(abc.ABC):
         self.sepa[:, :] = sepa
 
         self.scafa[:, 0] = pop.scafa
-        redz = utils.a_to_z(pop.scafa)
+        redz = cosmo.a_to_z(pop.scafa)
         tlbk = cosmo.z_to_tlbk(redz)
         self.tlbk[:, 0] = tlbk
         self.mass[:, 0, :] = pop.mass
@@ -253,7 +253,7 @@ class _Evolution(abc.ABC):
 
     @property
     def freq_orb_obs(self):
-        redz = utils.a_to_z(self.scafa)
+        redz = cosmo.a_to_z(self.scafa)
         fobs = self.freq_orb_rest / (1.0 + redz)
         return fobs
 
@@ -404,6 +404,7 @@ class _Evolution(abc.ABC):
         return vals
 
 
+'''
 class Evo_Magic_Delay_Circ(_Evolution):
 
     _SELF_CONSISTENT = False
@@ -430,7 +431,7 @@ class Evo_Magic_Delay_Circ(_Evolution):
         self.tlbk[:, 1:] = tlbk[:, np.newaxis]
         # calculate new scalefactors
         redz = cosmo.tlbk_to_z(tlbk)
-        self.scafa[:, 1:] = utils.z_to_a(redz)[:, np.newaxis]
+        self.scafa[:, 1:] = cosmo.z_to_a(redz)[:, np.newaxis]
 
         # Masses don't evolve
         self.mass[:, :, :] = mass[:, np.newaxis, :]
@@ -468,7 +469,7 @@ class Evo_Magic_Delay_Eccen(_Evolution):
         self.tlbk[:, 1:] = tlbk[:, np.newaxis]
         # calculate new scalefactors
         redz = cosmo.tlbk_to_z(tlbk)
-        self.scafa[:, 1:] = utils.z_to_a(redz)[:, np.newaxis]
+        self.scafa[:, 1:] = cosmo.z_to_a(redz)[:, np.newaxis]
 
         # Masses don't evolve
         self.mass[:, :, :] = mass[:, np.newaxis, :]
@@ -508,6 +509,7 @@ class Evo_Magic_Delay_Eccen(_Evolution):
             self.eccen[:, step] = e1
 
         return EVO.CONT
+'''
 
 
 class _Hardening(abc.ABC):
@@ -522,9 +524,13 @@ class Hard_GW(_Hardening):
     @staticmethod
     def dadt_dedt(evo, step):
         m1, m2 = evo.mass[:, step, :].T    # (Binaries, Steps, 2) ==> (2, Binaries)
-        dadt = utils.gw_hardening_rate_dadt(m1, m2, evo.sepa, eccen=evo.eccen)
+        sepa = evo.sepa[:, step]
+        eccen = evo.eccen[:, step] if (evo.eccen is not None) else None
+        dadt = utils.gw_hardening_rate_dadt(m1, m2, sepa, eccen=eccen)
 
-        if evo.eccen is not None:
+        if eccen is None:
+            dedt = None
+        else:
             dedt = utils.gw_dedt(m1, m2, evo.sepa, evo.eccen)
 
         return dadt, dedt
@@ -709,14 +715,14 @@ class Sesana_Scattering(_Hardening):
         return
 
     def dadt_dedt(self, evo, step):
-        mass = evo.mass[:, step]
+        mass = evo.mass[:, step, :]
         sepa = evo.sepa[:, step]
         eccen = evo.eccen[:, step] if evo.eccen is not None else None
         dadt, dedt = self._dadt_dedt(mass, sepa, eccen)
         return dadt, dedt
 
     def _dadt_dedt(self, mass, sepa, eccen):
-        mtot, mrat = utils.mtmr_from_m1m2(*mass)
+        mtot, mrat = utils.mtmr_from_m1m2(mass)
         vdisp = self._gbh.vdisp_from_mbh(mtot)
         mbulge = self._gbh.mbulge_from_mbh(mtot)
         dens = _density_at_influence_radius_dehnen(mtot, mbulge, self._gamma_dehnen)
