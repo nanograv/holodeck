@@ -6,7 +6,7 @@ import os
 
 import numpy as np
 
-from holodeck import utils, log, _PATH_DATA
+from holodeck import utils, log, _PATH_DATA, cosmo
 from holodeck.constants import PC, MSOL
 
 _DEF_ECCEN_DIST = (1.0, 0.2)
@@ -242,13 +242,15 @@ class PM_Resample(Population_Modifier):
         old_data = [
             np.log10(mt / MSOL),
             np.log10(mr),
-            pop.scafa,      # resample linearly in scale-factor
+            # pop.scafa,      # resample linearly in scale-factor
+            cosmo.a_to_z(pop.scafa),
             np.log10(pop.sepa / PC)
         ]
         reflect = [
             None,
             [None, 0.0],
-            [0.0, 1.0],
+            # [0.0, 1.0],   # scafa
+            [0.0, None],   # redz
             None,
         ]
 
@@ -282,7 +284,8 @@ class PM_Resample(Population_Modifier):
         mr = 10**new_data[1]
 
         pop.mass = utils.m1m2_from_mtmr(mt, mr).T
-        pop.scafa = new_data[2]
+        # pop.scafa = new_data[2]
+        pop.scafa = cosmo.z_to_a(new_data[2])
         pop.sepa = PC * 10**new_data[3]
         pop.eccen = None if (eccen is None) else new_data[4]
 
