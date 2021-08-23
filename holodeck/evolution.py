@@ -3,25 +3,32 @@ Holodeck - evolution submodule.
 
 To-Do
 -----
-* [ ] evolution modifiers should act at each step, instead of after all steps?  This would be a way to implement a
-    changing accretion rate, for example; or to set a max/min hardening rate.
+*   General
+    -   [ ] evolution modifiers should act at each step, instead of after all steps?  This would be a way to implement a
+        changing accretion rate, for example; or to set a max/min hardening rate.
+    -   [ ] re-implement "magic" hardening models that coalesce in zero change-of-redshift or fixed amounts of time
+
+*   Dynamical_Friction_NFW
+    -   [ ] Allow stellar-density profiles to also be specified (instead of using a hard-coded Dehnan profile)
+    -   [ ] Generalize calculation of stellar characteristic radius.  Make self-consistent with stellar-profile,
+      and user-specifiable.
 
 References
 ----------
-* [Quinlan96] :: Quinlan 1996
+*   [Quinlan1996] :: Quinlan 1996
     The dynamical evolution of massive black hole binaries I. Hardening in a fixed stellar background
     https://ui.adsabs.harvard.edu/abs/1996NewA....1...35Q/abstract
-* [SHM06] :: Sesana, Haardt & Madau et al. 2006
+*   [SHM06] :: Sesana, Haardt & Madau et al. 2006
     Interaction of Massive Black Hole Binaries with Their Stellar Environment. I. Ejection of Hypervelocity Stars
     https://ui.adsabs.harvard.edu/abs/2006ApJ...651..392S/abstract
-* [Sesana10] :: Sesana 2010
+*   [Sesana10] :: Sesana 2010
     Self Consistent Model for the Evolution of Eccentric Massive Black Hole Binaries in Stellar Environments:
     Implications for Gravitational Wave Observations
     https://ui.adsabs.harvard.edu/abs/2010ApJ...719..851S/abstract
-* [Kelley17] : Kelley, Blecha & Hernquist 2017
+*   [Kelley17] : Kelley, Blecha & Hernquist 2017
     Massive black hole binary mergers in dynamical galactic environments
     https://ui.adsabs.harvard.edu/abs/2017MNRAS.464.3131K/abstract
-* [Chen17] : Chen, Sesana, & Del Pozzo 2017
+*   [Chen17] : Chen, Sesana, & Del Pozzo 2017
     Efficient computation of the gravitational wave spectrum emitted by eccentric massive black hole binaries
     in stellar environments
     https://ui.adsabs.harvard.edu/abs/2017MNRAS.470.1738C/abstract
@@ -50,22 +57,6 @@ _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 class EVO(enum.Enum):
     CONT = 1
     END = -1
-
-
-def print_bads(vals, isbool=False, raise_flag=True, **kwargs):
-    if isbool:
-        bads = vals
-    else:
-        bads = ~np.isfinite(vals)
-    if not np.any(bads):
-        return
-    print(f"bads = {utils.frac_str(bads)}")
-    for kk, vv in kwargs.items():
-        print(f"\t{kk}: {utils.stats(vv[bads])}")
-
-    if raise_flag:
-        raise
-    return
 
 
 class Evolution:
@@ -169,31 +160,43 @@ class Evolution:
         return
 
     def _take_next_step(self, step):
+        """Integrate the binary population forward (to smaller separations) by one step, to reach step `step`.
+        """
         debug = self._debug
         size, nsteps = self.shape
-        left = step - 1
-        right = step
+        left = step - 1     # the previous time-step (already completed)
+        right = step        # the next     time-step
 
+        # initialize storage for hardening rates in separation and eccentricity (if enabled)
         dadt_1 = np.zeros(size)
         if self.eccen is not None:
             deccdt_1 = np.zeros_like(dadt_1)
 
+        # addional record-keeping / diagnostics for debugging
         if debug and (self._dadt_0 is None):
+            # initialzie variables to store da/dt hardening rates from each hardening component
             for ii in range(len(self._hard)):
                 name = f"_dadt_{ii}"
                 setattr(self, name, np.zeros_like(self.dadt))
 
-        # Get hardening rates and left (step-1) and right (step) edges
+        # Get hardening rates for each hardening model
         for ii, hard in enumerate(self._hard):
             _a1, _e1 = hard.dadt_dedt(self, left)
             if debug:
                 log.debug(f"hard={hard} : dadt = {utils.stats(_a1)}")
-                name = f"_dadt_{ii}"
-                getattr(self, name)[:, left] = _a1[...]
                 if not np.all(np.isfinite(_a1)):
                     err = f"non-finite `dadt` for hard={hard}!"
                     log.error(err)
                     raise ValueError(err)
+
+                if np.any(_a1 > 0.0):
+                    err = f"found positive hardening rates for hard={hard}!"
+                    log.error(err)
+                    raise ValueError(err)
+
+                # Store individual hardening rates
+                name = f"_dadt_{ii}"
+                getattr(self, name)[:, left] = _a1[...]
 
             dadt_1[:] += _a1
             if self.eccen is not None:
@@ -202,7 +205,7 @@ class Evolution:
         # Calculate time between edges
         dadt = dadt_1
         self.dadt[:, left] = dadt
-        # NOTE: `da` defined to be negative!
+        # NOTE: `da` defined to be negative!  `dadt` is also negative
         da = self.sepa[:, right] - self.sepa[:, left]
         dt = da / dadt
         if np.any(dt < 0.0):
@@ -210,10 +213,13 @@ class Evolution:
             log.error(err)
             raise ValueError(err)
 
+        # Update lookback time based on duration of this step
         tlbk = self.tlbk[:, left] - dt
         self.tlbk[:, right] = tlbk
+        # update scale-factor for systems at z > 0.0 (i.e. a < 1.0 and tlbk > 0.0)
         val = (tlbk > 0.0)
         self.scafa[val, right] = cosmo.z_to_a(cosmo.tlbk_to_z(tlbk[val]))
+        # set systems after z = 0 to scale-factor of unity
         self.scafa[~val, right] = 1.0
         if debug:
             log.debug(f"{step=:4d}")
@@ -225,6 +231,7 @@ class Evolution:
                 f"\tdt     = {utils.stats(dt)}"
             )
 
+        # update eccentricity if it's being evolved
         if self.eccen is not None:
             deccdt = deccdt_1
             decc = deccdt * dt
@@ -555,6 +562,8 @@ class Evo_Magic_Delay_Eccen(_Evolution):
 
 
 class _Hardening(abc.ABC):
+    """Abstract class for binary-hardening models.  Subclasses must define `dadt_dedt(evo, step, ...)` method.
+    """
 
     @abc.abstractmethod
     def dadt_dedt(self, evo, step, *args, **kwargs):
@@ -562,6 +571,8 @@ class _Hardening(abc.ABC):
 
 
 class Hard_GW(_Hardening):
+    """Gravitational-wave driven binary hardening.
+    """
 
     @staticmethod
     def dadt_dedt(evo, step):
@@ -579,6 +590,11 @@ class Hard_GW(_Hardening):
 
 
 class Quinlan1996:
+    """Hardening rates from stellar scattering parametrized as in [Quinlan1996].
+
+    Fits from scattering experiments must be provided as `hparam` and `kparam`.
+
+    """
 
     @staticmethod
     def dadt(sepa, rho, sigma, hparam):
@@ -606,6 +622,11 @@ class Quinlan1996:
 
 
 class SHM06:
+    """Fits to stellar-scattering hardening rates from [SHM06], based on the [Quinlan1996] formalism.
+
+    Parameters describe the efficiency of hardening as a function of mass-ratio (`mrat`) and separation (`sepa`).
+
+    """
 
     def __init__(self):
         self._bound_H = [0.0, 40.0]    # See [SHM06] Fig.3
@@ -712,34 +733,6 @@ class SHM06:
         return
 
 
-def _get_galaxy_blackhole_relation(gbh=None):
-    if gbh is None:
-        gbh = holodeck.observations.Kormendy_Ho_2013
-
-    if inspect.isclass(gbh):
-        gbh = gbh()
-    elif not isinstance(gbh, holodeck.observations._Galaxy_Blackhole_Relation):
-        err = "`gbh` must be an instance or subclass of `holodeck.observations._Galaxy_Blackhole_Relation`!"
-        log.error(err)
-        raise ValueError(err)
-
-    return gbh
-
-
-def _get_stellar_mass_halo_mass_relation(smhm=None):
-    if smhm is None:
-        smhm = holodeck.observations.Behroozi_2013
-
-    if inspect.isclass(smhm):
-        smhm = smhm()
-    elif not isinstance(smhm, holodeck.observations._StellarMass_HaloMass):
-        err = "`smhm` must be an instance or subclass of `holodeck.observations._StellarMass_HaloMass`!"
-        log.error(err)
-        raise ValueError(err)
-
-    return smhm
-
-
 class Sesana_Scattering(_Hardening):
     """
 
@@ -785,23 +778,101 @@ class Sesana_Scattering(_Hardening):
 
 
 class Dynamical_Friction_NFW(_Hardening):
+    """Dynamical Friction (DF) hardening module assuming an NFW dark-matter density profile.
 
-    def __init__(self, gbh=None, smhm=None, coulomb=10.0, rbound_from_density=True):
+    This class calculates densities and orbital velocities based on a NFW profile with parameters based on those of
+    each MBH binary.  The `holodeck.observations.NFW` class is used for profile calculations, and the halo parameters
+    are calculated from Stellar-mass--Halo-mass relations (see 'arguments' below).  The 'effective-mass' of the
+    inspiralling secondary is modeled as a power-law decreasing from the sum of secondary MBH and its stellar-bulge
+    (calculated using the `gbh` - Galaxy-Blackhole relation), down to just the bare secondary MBH after 10 dynamical
+    times.  This is to model tidal-stripping of the secondary host galaxy.
+
+    Attenuation of the DF hardening rate is typically also included, to account for the inefficiency of DF once the
+    binary enters the hardened regime.  This is calculated using the prescription from [BBR1980].  The different
+    characteristic radii, needed for the attenuation calculation, currently use a fixed Dehnan stellar-density profile
+    as in [Chen17], and a fixed scaling relationship to find the characteristic stellar-radius.
+
+    This module does not evolve eccentricity.
+
+    Arguments
+    ---------
+    gbh : class, instance or None
+        Galaxy-blackhole relation (_Galaxy_Blackhole_Relation subclass)
+        If `None` the default is loaded.
+    smhm : class, instance or None
+        Stellar-mass--halo-mass relation (_StellarMass_HaloMass subclass)
+        If `None` the default is loaded.
+    coulomb : scalar,
+        coulomb-logarithm ("log(Lambda)"), typically in the range of 10-20.
+        This parameter is formally the log of the ratio of maximum to minimum impact parameters.
+    attenuate : bool,
+        Whether the DF hardening rate should be 'attenuated' due to stellar-scattering effects at
+        small radii.  If `True`, DF becomes significantly less effective for radii < R_hard and R_LC
+    rbound_from_density : bool,
+        Determines how the binding radius (of MBH pair) is calculated, which is used for attenuation.
+        NOTE: this is only used if `attenuate==True`
+        If True:  calculate R_bound using an assumed stellar density profile.
+        If False: calculate R_bound using a velocity dispersion (constant in radius, from `gbh` instance).
+
+    Additional Notes
+    ----------------
+    *   The hardening rate (da/dt) is not allowed to be larger than the orbital/virial velocity of the halo
+        (as a function of radius).
+
+    """
+
+    def __init__(self, gbh=None, smhm=None, coulomb=10.0, attenuate=True, rbound_from_density=True):
         gbh = _get_galaxy_blackhole_relation(gbh)
         smhm = _get_stellar_mass_halo_mass_relation(smhm)
-        self._NFW = holodeck.observations.NFW
         self._gbh = gbh
         self._smhm = smhm
-        self._coulomb = 10.0
-        self._time_dynamical = None
+        self._coulomb = coulomb
+        self._attenuate = attenuate
         self._rbound_from_density = rbound_from_density
+
+        self._NFW = holodeck.observations.NFW
+        self._time_dynamical = None
         return
 
     def _dvdt(self, mass_sec_eff, dens, velo):
-        dvdt = 2*np.pi * mass_sec_eff * dens * self._coulomb * np.square(NWTG / velo)
+        """Chandrasekhar dynamical friction formalism providing a deceleration (dv/dt).
+
+        Arguments
+        ---------
+        mass_sec_eff : (N,) array-like of scalar
+            Effective mass (i.e. the mass that should be used in this equation) of the inspiraling
+            secondary component in units of [gram].
+        dens : (N,) array-like of scalar
+            Effective density at the location of the inspiraling secondary in units of [g/cm^3].
+        velo : (N,) array-like of scalar
+            Effective velocity of the inspiraling secondary in units of [cm/s].
+
+        Returns
+        -------
+        dvdt (N,) np.ndarray of scalar
+            Deceleration rate of the secondary object in units of [cm/s^2].
+
+        """
+        dvdt = - 2*np.pi * mass_sec_eff * dens * self._coulomb * np.square(NWTG / velo)
         return dvdt
 
     def dadt_dedt(self, evo, step):
+        """Calculate DF hardening rate given `Evolution` instance, and an integration `step`.
+
+        Arguments
+        ---------
+        evo : `Evolution` instance
+        step : int,
+            Integration step at which to calculate hardening rates.
+
+        Returns
+        -------
+        dadt : (N,) np.ndarray of scalar,
+            Binary hardening rates in units of [cm/s].
+        dedt : (N,) np.ndarray of scalar, NOTE: always zero
+            Rate-of-change of eccentricity, which is not included in this calculation (i.e. zero)
+
+        """
         mass = evo.mass[:, step, :]
         sepa = evo.sepa[:, step]
         dt = evo.tlbk[:, 0] - evo.tlbk[:, step]   # positive time-duration since 'formation'
@@ -814,16 +885,29 @@ class Dynamical_Friction_NFW(_Hardening):
 
         return dadt, dedt
 
-    def _dadt_dedt(self, mass, sepa, redz, dt):
-        """
+    def _dadt_dedt(self, mass, sepa, redz, dt, attenuate=None):
+        """Calculate DF hardening rate given physical quantities.
 
         Arguments
         ---------
-        mass : (N, 2) masses of both MBHs
-        sepa : (N,) binary separation
-        redz : (N,)
+        mass : (N, 2) array-like of scalar,
+            Masses of both MBHs (0-primary, 1-secondary) in units of [grams].
+        sepa : (N,) array-like of scalar,
+            Binary separation in [cm].
+        redz : (N,) array-like of scalar,
+            Binary redshifts.
+
+        Returns
+        -------
+        dadt : (N,) np.ndarray of scalar,
+            Binary hardening rates in units of [cm/s].
+        dedt : (N,) np.ndarray of scalar, NOTE: always zero
+            Rate-of-change of eccentricity, which is not included in this calculation.
 
         """
+        if attenuate is None:
+            attenuate = self._attenuate
+
         # ---- Get Host DM-Halo mass
         # use "bulge-mass" as a proxy for total stellar mass
         mstar = self._gbh.mbulge_from_mbh(mass[:, 0])   # use primary-bh's mass (index 0)
@@ -842,12 +926,14 @@ class Dynamical_Friction_NFW(_Hardening):
         dens = self._NFW.density(sepa, mhalo, redz)
         velo = self._NFW.velocity_circular(sepa, mhalo, redz)
         tdyn = self._NFW.time_dynamical(sepa, mhalo, redz)
+        # Note: this should be returned as negative values
         dvdt = self._dvdt(meff, dens, velo)
 
-        dadt = - 2 * tdyn * dvdt
-        dedt = None
+        # convert from deceleration to hardening-rate assuming virialized orbit (i.e. ``GM/a = v^2``)
+        dadt = 2 * tdyn * dvdt
+        dedt = np.zeros_like(dadt)
 
-        atten = self._attenuation_bbr80(sepa, mass, mstar)
+        # Hardening rate cannot be larger than orbital/virial velocity
         clip = (np.fabs(dadt) > velo)
         if np.any(clip):
             log.info(f"clipping {utils.frac_str(clip)} `dadt` values to vcirc")
@@ -856,20 +942,47 @@ class Dynamical_Friction_NFW(_Hardening):
             log.debug(f"\t{utils.stats(prev*YR/PC)} ==> {utils.stats(dadt*YR/PC)}")
             del prev
 
-        dadt = dadt / atten
+        if attenuate:
+            atten = self._attenuation_bbr80(sepa, mass, mstar)
+            dadt = dadt / atten
+
         return dadt, dedt
 
     def _attenuation_bbr80(self, sepa, m1m2, mstar):
-        """Attentuation factor
+        """Calculate attentuation factor following [BBR1980] prescription.
+
+        Characteristic radii are currently calculated using hard-coded Dehnan stellar-density profiles, and a fixed
+        scaling-relationship between stellar-mass and stellar characteristic radius.
+
+        The binding radius can be calculated either using the stellar density profile, or from a velocity dispersion,
+        based on the `self._rbound_from_density` flag.  See the 'arguments' section of `docs::Dynamical_Friction_NFW`.
+
+        The attenuation factor is defined as >= 1.0, with 1.0 meaning no attenuation.
+
+        Arguments
+        ---------
+        sepa : (N,) array-like of scalar,
+            Binary separations in units of [cm].
+        m1m2 : (N, 2) array-like of scalar,
+            Masses of each binary component (0-primary, 1-secondary).
+        mstar : (N,) array-like of scalar,
+            Mass of the stellar-bulge / stellar-core (ambiguous).
+
+        Returns
+        -------
+        atten : (N,) np.ndarray of scalar
+            Attenuation factor (defined as >= 1.0).
 
         """
 
         m1, m2 = m1m2.T
         mbh = m1 + m2
 
+        # characteristic stellar radius in [cm]
         rstar = _radius_stellar_characteristic_dabringhausen_2008(mstar)
-
+        # characteristic hardening-radius in [cm]
         rhard = _radius_hard_bbr80_dehnan(mbh, mstar)
+        # characteristic loss-cone-radius in [cm]
         rlc = _radius_loss_cone_bbr80_dehnan(mbh, mstar)
 
         # Calculate R_bound based on stellar density profile (mass enclosed)
@@ -880,25 +993,56 @@ class Dynamical_Friction_NFW(_Hardening):
             vdisp = self._gbh.vdisp_from_mbh(m1)   # use primary-bh's mass (index 0)
             rbnd = NWTG * mbh / vdisp**2
 
+        # Number of stars in the stellar bulge/core
         nstar = mstar / (0.6 * MSOL)
-        # --- Below hardening radius
+        # --- Attenuation for separations less than the hardening radius
         # [BBR80] Eq.3
         atten_hard = np.maximum((rhard/sepa) * np.log(nstar), np.square(mbh/mstar) * nstar)
+        # use an exponential turn-on at larger radii
         cut = np.exp(-sepa/rhard)
         atten_hard *= cut
 
-        # --- Below loss-cone Radius
+        # --- Attenuation for separations less than the loss-cone Radius
         # [BBR80] Eq.2
         atten_lc = np.power(m2/m1, 1.75) * nstar * np.power(rbnd/rstar, 6.75) * (rlc / sepa)
         atten_lc = np.maximum(atten_lc, 1.0)
-        # effect only applies for r <~ R_LC (loss-cone radius)
+        # use an exponential turn-on at larger radii
         cut = np.exp(-sepa/rlc)
         atten_hard *= cut
 
         atten = np.maximum(atten_hard, atten_lc)
+        # Make sure that attenuation is always >= 1.0 (i.e. this never _increases_ the hardening rate)
         atten = np.maximum(atten, 1.0)
 
         return atten
+
+
+def _get_galaxy_blackhole_relation(gbh=None):
+    if gbh is None:
+        gbh = holodeck.observations.Kormendy_Ho_2013
+
+    if inspect.isclass(gbh):
+        gbh = gbh()
+    elif not isinstance(gbh, holodeck.observations._Galaxy_Blackhole_Relation):
+        err = "`gbh` must be an instance or subclass of `holodeck.observations._Galaxy_Blackhole_Relation`!"
+        log.error(err)
+        raise ValueError(err)
+
+    return gbh
+
+
+def _get_stellar_mass_halo_mass_relation(smhm=None):
+    if smhm is None:
+        smhm = holodeck.observations.Behroozi_2013
+
+    if inspect.isclass(smhm):
+        smhm = smhm()
+    elif not isinstance(smhm, holodeck.observations._StellarMass_HaloMass):
+        err = "`smhm` must be an instance or subclass of `holodeck.observations._StellarMass_HaloMass`!"
+        log.error(err)
+        raise ValueError(err)
+
+    return smhm
 
 
 def _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma=1.0):
