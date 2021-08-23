@@ -40,7 +40,7 @@ import scipy.interpolate   # noqa
 
 import holodeck
 from holodeck import utils, cosmo, log, _PATH_DATA
-from holodeck.constants import GYR, NWTG, PC, MSOL
+from holodeck.constants import GYR, NWTG, PC, MSOL, YR
 
 _DEF_TIME_DELAY = (5.0*GYR, 0.2)
 _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
@@ -52,6 +52,22 @@ class EVO(enum.Enum):
     END = -1
 
 
+def print_bads(vals, isbool=False, raise_flag=True, **kwargs):
+    if isbool:
+        bads = vals
+    else:
+        bads = ~np.isfinite(vals)
+    if not np.any(bads):
+        return
+    print(f"bads = {utils.frac_str(bads)}")
+    for kk, vv in kwargs.items():
+        print(f"\t{kk}: {utils.stats(vv[bads])}")
+
+    if raise_flag:
+        raise
+    return
+
+
 class Evolution:
 
     _EVO_PARS = ['mass', 'sepa', 'eccen', 'scafa', 'dadt', 'tlbk']
@@ -59,13 +75,15 @@ class Evolution:
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
 
-    def __init__(self, pop, hard, nsteps=100, mods=None, check=True):
+    def __init__(self, pop, hard, nsteps=100, mods=None, debug=False):
         self._pop = pop
+        self._debug = debug
+        self._nsteps = nsteps
+        self._mods = mods
+
         if np.isscalar(hard):
             hard = [hard, ]
         self._hard = hard
-        self._nsteps = nsteps
-        self._mods = mods
 
         for par in self._STORE_FROM_POP:
             setattr(self, par, getattr(pop, par))
@@ -89,6 +107,7 @@ class Evolution:
 
         # NOTE: these values should be stored as positive values
         self.dadt = np.zeros(shape)
+        self._dadt_0 = None
 
         # Derived parameters
         self._freq_orb_rest = None
@@ -108,10 +127,9 @@ class Evolution:
         # ---- Iterate through all integration steps
         size, nsteps = self.shape
         steps_list = range(1, nsteps)
-        for step in steps_list:
+        for step in utils.tqdm(steps_list):
             rv = self._take_next_step(step)
             if rv is EVO.END:
-                self._evolved = True
                 break
             elif rv not in EVO:
                 raise ValueError("Recieved bad `rv` ({}) after step {}!".format(rv, step))
@@ -143,6 +161,7 @@ class Evolution:
         tlbk = cosmo.z_to_tlbk(redz)
         self.tlbk[:, 0] = tlbk
         self.mass[:, 0, :] = pop.mass
+        self.mass[:, :, :] = self.mass[:, 0, np.newaxis, :]
 
         if (pop.eccen is not None):
             self.eccen[:, 0] = pop.eccen
@@ -150,41 +169,64 @@ class Evolution:
         return
 
     def _take_next_step(self, step):
+        debug = self._debug
         size, nsteps = self.shape
         left = step - 1
         right = step
 
         dadt_1 = np.zeros(size)
-        dadt_2 = np.zeros_like(dadt_1)
         if self.eccen is not None:
             deccdt_1 = np.zeros_like(dadt_1)
-            deccdt_2 = np.zeros_like(dadt_2)
+
+        if debug and (self._dadt_0 is None):
+            for ii in range(len(self._hard)):
+                name = f"_dadt_{ii}"
+                setattr(self, name, np.zeros_like(self.dadt))
 
         # Get hardening rates and left (step-1) and right (step) edges
-        for hard in self._hard:
+        for ii, hard in enumerate(self._hard):
             _a1, _e1 = hard.dadt_dedt(self, left)
-            _a2, _e2 = hard.dadt_dedt(self, right)
+            if debug:
+                log.debug(f"hard={hard} : dadt = {utils.stats(_a1)}")
+                name = f"_dadt_{ii}"
+                getattr(self, name)[:, left] = _a1[...]
+                if not np.all(np.isfinite(_a1)):
+                    err = f"non-finite `dadt` for hard={hard}!"
+                    log.error(err)
+                    raise ValueError(err)
+
             dadt_1[:] += _a1
-            dadt_2[:] += _a2
             if self.eccen is not None:
                 deccdt_1[:] += _e1
-                deccdt_2[:] += _a2
 
         # Calculate time between edges
-        dadt = 0.5 * np.log10([dadt_1, dadt_2]).sum(axis=0)
-        dadt = np.power(10.0, dadt)
-        # NOTE: `da` defined to be positive!
-        da = self.sepa[:, left] - self.sepa[:, right]
+        dadt = dadt_1
+        self.dadt[:, left] = dadt
+        # NOTE: `da` defined to be negative!
+        da = self.sepa[:, right] - self.sepa[:, left]
         dt = da / dadt
         if np.any(dt < 0.0):
             err = f"Negative time-steps found at step={step}!"
             log.error(err)
             raise ValueError(err)
-        self.tlbk[:, right] = self.tlbk[:, left] + dt
-        self.scafa[:, right] = cosmo.tlbk_to_z(self.tlbk[:, right])
+
+        tlbk = self.tlbk[:, left] - dt
+        self.tlbk[:, right] = tlbk
+        val = (tlbk > 0.0)
+        self.scafa[val, right] = cosmo.z_to_a(cosmo.tlbk_to_z(tlbk[val]))
+        self.scafa[~val, right] = 1.0
+        if debug:
+            log.debug(f"{step=:4d}")
+            log.debug(
+                f"\ta      = {utils.stats(self.sepa[:, left])}\n"
+                f"\tda     = {utils.stats(da)}\n"
+                f"\tdadt   = {utils.stats(dadt)}\n"
+                f"\ta/dadt = {utils.stats(self.sepa[:, left]/dadt)}"
+                f"\tdt     = {utils.stats(dt)}"
+            )
 
         if self.eccen is not None:
-            deccdt = np.mean([deccdt_1, deccdt_2], axis=0)
+            deccdt = deccdt_1
             decc = deccdt * dt
             self.eccen[:, right] = self.eccen[:, left] + decc
 
@@ -263,7 +305,7 @@ class Evolution:
 
         return
 
-    def at(self, xpar, targets, pars=None, coal=False):
+    def at(self, xpar, targets, pars=None, coal=False, lin_interp=None):
         """Interpolate evolution to the given observed, orbital frequency.
 
         Arguments
@@ -349,7 +391,7 @@ class Evolution:
         vals = dict()
         # Interpolate each target parameter
         for pp in pars:
-            lin_interp = (pp in self._LIN_INTERP_PARS)
+            lin_interp_flag = (pp in self._LIN_INTERP_PARS) if lin_interp is None else lin_interp
             # Either (N, M) or (N, M, 2)
             _data = getattr(self, pp)
             if _data is None:
@@ -372,7 +414,7 @@ class Evolution:
                 else:
                     raise ValueError("Unexpected shape of data: {}!".format(np.shape(_data)))
 
-            if not lin_interp:
+            if not lin_interp_flag:
                 _data = np.log10(_data)
 
             if rev:
@@ -392,7 +434,7 @@ class Evolution:
                 raise ValueError("Non-finite values after interpolation of '{}'".format(pp))
 
             # fill return dictionary
-            if not lin_interp:
+            if not lin_interp_flag:
                 new = 10.0 ** new
             if squeeze:
                 new = new.squeeze()
@@ -543,7 +585,7 @@ class Quinlan1996:
         """
         [Sesana10] Eq.8
         """
-        rv = (sepa ** 2) * NWTG * rho * hparam / sigma
+        rv = - (sepa ** 2) * NWTG * rho * hparam / sigma
         return rv
 
     @staticmethod
@@ -593,7 +635,7 @@ class SHM06:
         sepa : binary separation in units of hardening radius (r_h)
 
         """
-        xx = sepa / self._H_a0(mrat)
+        xx = sepa / (PC * self._H_a0(mrat))
         hh = self._H_A(mrat) * np.power(1.0 + xx, self._H_g(mrat))
         hh = np.clip(hh, *self._bound_H)
         return hh
@@ -659,14 +701,14 @@ class SHM06:
 
     def _init_h(self):
         _dat = self._data['H']
-        k_mass_ratios = 1.0/np.array(_dat['q'])
-        k_A = np.array(_dat['A'])
-        k_a0 = np.array(_dat['a0'])
-        k_g = np.array(_dat['g'])
+        h_mass_ratios = 1.0/np.array(_dat['q'])
+        h_A = np.array(_dat['A'])
+        h_a0 = np.array(_dat['a0'])
+        h_g = np.array(_dat['g'])
 
-        self._H_A = sp.interpolate.interp1d(k_mass_ratios, k_A, kind='linear', fill_value='extrapolate')
-        self._H_a0 = sp.interpolate.interp1d(k_mass_ratios, k_a0, kind='linear', fill_value='extrapolate')
-        self._H_g = sp.interpolate.interp1d(k_mass_ratios, k_g, kind='linear', fill_value='extrapolate')
+        self._H_A = sp.interpolate.interp1d(h_mass_ratios, h_A, kind='linear', fill_value='extrapolate')
+        self._H_a0 = sp.interpolate.interp1d(h_mass_ratios, h_a0, kind='linear', fill_value='extrapolate')
+        self._H_g = sp.interpolate.interp1d(h_mass_ratios, h_g, kind='linear', fill_value='extrapolate')
         return
 
 
@@ -726,9 +768,13 @@ class Sesana_Scattering(_Hardening):
         vdisp = self._gbh.vdisp_from_mbh(mtot)
         mbulge = self._gbh.mbulge_from_mbh(mtot)
         dens = _density_at_influence_radius_dehnen(mtot, mbulge, self._gamma_dehnen)
-
         hh = self._shm06.H(mrat, sepa)
         dadt = Quinlan1996.dadt(sepa, dens, vdisp, hh)
+
+        rbnd = _radius_influence_dehnan(mtot, mbulge)
+        atten = np.exp(-sepa / rbnd)
+        dadt = dadt * atten
+
         if eccen is not None:
             kk = self._shm06.K(mrat, sepa, eccen)
             dedt = Quinlan1996.dedt(sepa, dens, vdisp, hh, kk)
@@ -740,13 +786,15 @@ class Sesana_Scattering(_Hardening):
 
 class Dynamical_Friction_NFW(_Hardening):
 
-    def __init__(self, gbh=None, smhm=None, coulomb=10.0):
+    def __init__(self, gbh=None, smhm=None, coulomb=10.0, rbound_from_density=True):
         gbh = _get_galaxy_blackhole_relation(gbh)
         smhm = _get_stellar_mass_halo_mass_relation(smhm)
         self._NFW = holodeck.observations.NFW
         self._gbh = gbh
         self._smhm = smhm
         self._coulomb = 10.0
+        self._time_dynamical = None
+        self._rbound_from_density = rbound_from_density
         return
 
     def _dvdt(self, mass_sec_eff, dens, velo):
@@ -757,32 +805,100 @@ class Dynamical_Friction_NFW(_Hardening):
         mass = evo.mass[:, step, :]
         sepa = evo.sepa[:, step]
         dt = evo.tlbk[:, 0] - evo.tlbk[:, step]   # positive time-duration since 'formation'
-        redz = cosmo.a_to_z(evo.scafa[:, step])
+        # NOTE `scafa` is nan for systems "after" redshift zero (i.e. do not merge before redz=0)
+        redz = np.zeros_like(sepa)
+        val = (evo.scafa[:, step] > 0.0)
+        redz[val] = cosmo.a_to_z(evo.scafa[val, step])
 
+        dadt, dedt = self._dadt_dedt(mass, sepa, redz, dt)
+
+        return dadt, dedt
+
+    def _dadt_dedt(self, mass, sepa, redz, dt):
+        """
+
+        Arguments
+        ---------
+        mass : (N, 2) masses of both MBHs
+        sepa : (N,) binary separation
+        redz : (N,)
+
+        """
         # ---- Get Host DM-Halo mass
         # use "bulge-mass" as a proxy for total stellar mass
         mstar = self._gbh.mbulge_from_mbh(mass[:, 0])   # use primary-bh's mass (index 0)
-        mhalo = self._smhm.halo_mass(mstar, redz)
+        mhalo = self._smhm.halo_mass(mstar, redz, clip=True)
 
         # ---- Get effective mass of inspiraling secondary
         m2 = mass[:, 1]
-        mstar = self._gbh.mbulge_from_mbh(m2)
-        tdyn = self._NFW.time_dynamical(sepa, mhalo, redz)
+        mstar_sec = self._gbh.mbulge_from_mbh(m2)
+        if self._time_dynamical is None:
+            self._time_dynamical = self._NFW.time_dynamical(sepa, mhalo, redz) * 10
+
         # model tidal-stripping of secondary's bulge (see: [Kelley17] Eq.6)
-        pow = np.clip(1.0 - dt / tdyn, 0.0, 1.0)
-        meff = m2 * np.power((m2 + mstar)/m2, pow)
+        pow = np.clip(1.0 - dt / self._time_dynamical, 0.0, 1.0)
+        meff = m2 * np.power((m2 + mstar_sec)/m2, pow)
 
-        dadt, dedt = self._dadt_dedt(meff, mhalo, sepa, redz)
-        return dadt, dedt
-
-    def _dadt_dedt(self, mass_sec_eff, mhalo, sepa, redz):
         dens = self._NFW.density(sepa, mhalo, redz)
         velo = self._NFW.velocity_circular(sepa, mhalo, redz)
         tdyn = self._NFW.time_dynamical(sepa, mhalo, redz)
-        dvdt = self._dvdt(mass_sec_eff, dens, velo)
-        dadt = 2 * tdyn * dvdt
+        dvdt = self._dvdt(meff, dens, velo)
+
+        dadt = - 2 * tdyn * dvdt
         dedt = None
+
+        atten = self._attenuation_bbr80(sepa, mass, mstar)
+        clip = (np.fabs(dadt) > velo)
+        if np.any(clip):
+            log.info(f"clipping {utils.frac_str(clip)} `dadt` values to vcirc")
+            prev = dadt[:]
+            dadt[clip] = - velo[clip]
+            log.debug(f"\t{utils.stats(prev*YR/PC)} ==> {utils.stats(dadt*YR/PC)}")
+            del prev
+
+        dadt = dadt / atten
         return dadt, dedt
+
+    def _attenuation_bbr80(self, sepa, m1m2, mstar):
+        """Attentuation factor
+
+        """
+
+        m1, m2 = m1m2.T
+        mbh = m1 + m2
+
+        rstar = _radius_stellar_characteristic_dabringhausen_2008(mstar)
+
+        rhard = _radius_hard_bbr80_dehnan(mbh, mstar)
+        rlc = _radius_loss_cone_bbr80_dehnan(mbh, mstar)
+
+        # Calculate R_bound based on stellar density profile (mass enclosed)
+        if self._rbound_from_density:
+            rbnd = _radius_influence_dehnan(mbh, mstar)
+        # Calculate R_bound based on uniform velocity dispersion (MBH scaling relation)
+        else:
+            vdisp = self._gbh.vdisp_from_mbh(m1)   # use primary-bh's mass (index 0)
+            rbnd = NWTG * mbh / vdisp**2
+
+        nstar = mstar / (0.6 * MSOL)
+        # --- Below hardening radius
+        # [BBR80] Eq.3
+        atten_hard = np.maximum((rhard/sepa) * np.log(nstar), np.square(mbh/mstar) * nstar)
+        cut = np.exp(-sepa/rhard)
+        atten_hard *= cut
+
+        # --- Below loss-cone Radius
+        # [BBR80] Eq.2
+        atten_lc = np.power(m2/m1, 1.75) * nstar * np.power(rbnd/rstar, 6.75) * (rlc / sepa)
+        atten_lc = np.maximum(atten_lc, 1.0)
+        # effect only applies for r <~ R_LC (loss-cone radius)
+        cut = np.exp(-sepa/rlc)
+        atten_hard *= cut
+
+        atten = np.maximum(atten_hard, atten_lc)
+        atten = np.maximum(atten, 1.0)
+
+        return atten
 
 
 def _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma=1.0):
@@ -790,6 +906,16 @@ def _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma=1.0):
     rchar = 239 * PC * (np.power(2.0, 1.0/(3.0 - gamma)) - 1.0)
     rchar *= np.power(mstar / (1e9*MSOL), 0.596)
     return rchar
+
+
+def _radius_influence_dehnan(mbh, mstar, gamma=1.0):
+    """
+    [Chen17] Eq.25
+    """
+    rchar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
+    rinfl = np.power(2*mbh/mstar, 1.0/(gamma - 3.0))
+    rinfl = rchar / (rinfl - 1.0)
+    return rinfl
 
 
 def _density_at_influence_radius_dehnen(mbh, mstar, gamma=1.0):
@@ -801,3 +927,24 @@ def _density_at_influence_radius_dehnen(mbh, mstar, gamma=1.0):
     dens = mstar * (3.0 - gamma) / np.power(rchar, 3.0) / (4.0 * np.pi)
     dens *= np.power(2*mbh / mstar, gamma / (gamma - 3.0))
     return dens
+
+
+def _radius_hard_bbr80_dehnan(mbh, mstar, gamma=1.0):
+    """
+    [Kelley17] paragraph below Eq.8 - from [BBR80]
+    """
+    rbnd = _radius_influence_dehnan(mbh, mstar, gamma=gamma)
+    rstar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
+    rhard = rstar * (rbnd/rstar) ** 3
+    return rhard
+
+
+def _radius_loss_cone_bbr80_dehnan(mbh, mstar, gamma=1.0):
+    """
+    [Kelley17] Eq.9 - from [BBR80]
+    """
+    mass_of_a_star = 0.6 * MSOL
+    rbnd = _radius_influence_dehnan(mbh, mstar, gamma=gamma)
+    rstar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
+    rlc = np.power(mass_of_a_star / mbh, 0.25) * np.power(rbnd/rstar, 2.25) * rstar
+    return rlc
