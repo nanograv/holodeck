@@ -9,16 +9,17 @@ To-Do
         rate.
     -   [ ] re-implement "magic" hardening models that coalesce in zero change-of-redshift or fixed
         amounts of time.
-
 *   Dynamical_Friction_NFW
     -   [ ] Allow stellar-density profiles to also be specified (instead of using a hard-coded
         Dehnen profile)
     -   [ ] Generalize calculation of stellar characteristic radius.  Make self-consistent with
         stellar-profile, and user-specifiable.
-
 *   Sesana_Scattering
     -   [ ] Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
         and flexible.  Currently hard-coded to Dehnen profile estimate.
+*   _SHM06
+    -   [ ] Interpolants of hardening parameters return 2D arrays which we then take the diagonal
+        of, but there should be a better way of doing this.
 
 References
 ----------
@@ -564,7 +565,9 @@ class Sesana_Scattering(_Hardening):
         vdisp = self._gbh.vdisp_from_mbh(mtot)
         mbulge = self._gbh.mbulge_from_mbh(mtot)
         dens = _density_at_influence_radius_dehnen(mtot, mbulge, self._gamma_dehnen)
-        hh = self._shm06.H(mrat, sepa)
+
+        rhard = _Quinlan96.radius_hardening(mass[:, 1], vdisp)
+        hh = self._shm06.H(mrat, sepa/rhard)
         dadt = _Quinlan96.dadt(sepa, dens, vdisp, hh)
 
         rbnd = _radius_influence_dehnen(mtot, mbulge)
@@ -572,7 +575,7 @@ class Sesana_Scattering(_Hardening):
         dadt = dadt * atten
 
         if eccen is not None:
-            kk = self._shm06.K(mrat, sepa, eccen)
+            kk = self._shm06.K(mrat, sepa/rhard, eccen)
             dedt = _Quinlan96.dedt(sepa, dens, vdisp, hh, kk)
         else:
             dedt = None
@@ -840,16 +843,54 @@ class _Quinlan96:
 
     @staticmethod
     def dadt(sepa, rho, sigma, hparam):
-        """
+        """Binary hardening rate from stellar scattering.
+
         [Sesana10] Eq.8
+
+        Arguments
+        ---------
+        sepa : (N,) array-like of scalar
+            Binary separation in units of [cm].
+        rho : (N,) array-like of scalar
+            Effective stellar-density at binary separation in units of [g/cm^3].
+        sigma : (N,) array-like of scalar
+            Stellar velocity-dispersion at binary separation in units of [cm/s].
+        hparam : (N,) array-like of scalar
+            Binary hardening efficiency parameter "H" (unitless).
+
+        Returns
+        -------
+        rv : (N,) np.ndarray of scalar
+            Binary hardening rate in units of [cm/s].
+
         """
         rv = - (sepa ** 2) * NWTG * rho * hparam / sigma
         return rv
 
     @staticmethod
     def dedt(sepa, rho, sigma, hparam, kparam):
-        """
+        """Binary rate-of-change of eccentricity from stellar scattering.
+
         [Sesana10] Eq.9
+
+        Arguments
+        ---------
+        sepa : (N,) array-like of scalar
+            Binary separation in units of [cm].
+        rho : (N,) array-like of scalar
+            Effective stellar-density at binary separation in units of [g/cm^3].
+        sigma : (N,) array-like of scalar
+            Stellar velocity-dispersion at binary separation in units of [cm/s].
+        hparam : (N,) array-like of scalar
+            Binary hardening efficiency parameter "H" (unitless).
+        kparam : (N,) array-like of scalar
+            Binary eccentricity-change efficiency parameter "K" (unitless).
+
+        Returns
+        -------
+        rv : (N,) np.ndarray of scalar
+            Change of eccentricity rate in units of [1/s].
+
         """
         rv = sepa * NWTG * rho * hparam * kparam / sigma
         return rv
@@ -890,45 +931,66 @@ class _SHM06:
         self._init_k()
         return
 
-    def H(self, mrat, sepa):
-        """
+    def H(self, mrat, sepa_rhard):
+        """Hardening rate efficiency parameter.
 
         Arguments
         ---------
-        sepa : binary separation in units of hardening radius (r_h)
+        mrat : (N,) array-like of scalar
+            Binary mass-ratio (q = M2/M1 <= 1.0).
+        sepa_rhard : (N,) array-like of scalar
+            Binary separation in *units of hardening radius (r_h)*.
+
+        Returns
+        -------
+        hh : (N,) np.ndarray of scalar
+            Hardening parameter.
 
         """
-        xx = sepa / (PC * self._H_a0(mrat))
+        xx = sepa_rhard / self._H_a0(mrat)
         hh = self._H_A(mrat) * np.power(1.0 + xx, self._H_g(mrat))
         hh = np.clip(hh, *self._bound_H)
         return hh
 
-    def K(self, mrat, sepa, ecc):
-        """
+    def K(self, mrat, sepa_rhard, ecc):
+        """Eccentricity hardening rate efficiency parameter.
 
         Arguments
         ---------
-        sepa : binary separation in units of hardening radius (r_h)
+        mrat : (N,) array-like of scalar
+            Binary mass-ratio (q = M2/M1 <= 1.0).
+        sepa_rhard : (N,) array-like of scalar
+            Binary separation in *units of hardening radius (r_h)*.
+        ecc : (N,) array-like of scalar
+            Binary eccentricity.
 
-        """        # `interp2d` return a matrix of X x Y results... want diagonal of that
-        use_a = (sepa/self._K_a0(mrat, ecc))
+        Returns
+        -------
+        kk : (N,) np.ndarray of scalar
+            Eccentricity change parameter.
+
+        """
+        use_a = (sepa_rhard / self._K_a0(mrat, ecc))
         A = self._K_A(mrat, ecc)
         g = self._K_g(mrat, ecc)
         B = self._K_B(mrat, ecc)
 
+        # `interp2d` return a matrix of X x Y results... want diagonal of that
+        # NOTE: FIX: this could be improved!!
         use_a = use_a.diagonal()
         A = A.diagonal()
         g = g.diagonal()
         B = B.diagonal()
 
         kk = A * np.power((1 + use_a), g) + B
-        return kk
         kk = np.clip(kk, *self._bound_K)
         return kk
 
     def _init_k(self):
+        """Initialize and store the interpolants for calculating the K parameter.
+        """
         data = self._data['K']
-        #    Get all of the mass ratios (ignore other keys)
+        # Get all of the mass ratios (ignore other keys)
         _kq_keys = list(data.keys())
         kq_keys = []
         for kq in _kq_keys:
@@ -963,6 +1025,8 @@ class _SHM06:
         return
 
     def _init_h(self):
+        """Initialize and store the interpolants for calculating the H parameter.
+        """
         _dat = self._data['H']
         h_mass_ratios = 1.0/np.array(_dat['q'])
         h_A = np.array(_dat['A'])
