@@ -114,6 +114,7 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
         """Convert from scale-factor to redshift.
         """
         sf = np.asarray(sf)
+        # NOTE: this does not check for `nan`
         if np.any((sf > 1.0) | (sf < 0.0)):
             raise ValueError("Scale-factor must be [0.0, 1.0]")
 
@@ -124,6 +125,7 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
         """Convert from redshift to scale-factor.
         """
         redz = np.asarray(redz)
+        # NOTE: this does not check for `nan`
         if np.any(redz < 0.0):
             raise ValueError("Redshift must be [0.0, +inf)")
 
