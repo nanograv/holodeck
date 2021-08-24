@@ -6,6 +6,8 @@ import os
 import logging
 
 log = logging.getLogger('holodeck')
+log.setLevel(logging.WARNING)
+
 
 # --- Setup root package variables
 

@@ -492,8 +492,8 @@ class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
             extr = self._MSTAR_GRID_EXTR
             if extr[0] < aextr[0] or extr[1] > aextr[1]:
                 log.info("using wider range of stellar-mass than calculated from halo-mass grid!")
-                log.info(f"\tmstar(mhalo) = [{aextr[0]:.2e}, {aextr[1]:.2e}]")
-                log.info(f"\tmstar grid   = [{extr[0]:.2e}, {extr[1]:.2e}]")
+                log.debug(f"\tmstar(mhalo) = [{aextr[0]:.2e}, {aextr[1]:.2e}]")
+                log.debug(f"\tmstar grid   = [{extr[0]:.2e}, {extr[1]:.2e}]")
 
             aextr = extr
 
