@@ -982,7 +982,7 @@ class Timed(_Hardening):
 
         dadt, _ = cls._dadt_dedt(rads, norm, mt, mr, rchar, g1, g2)
 
-        tt = utils.cumtrapz_loglog(- 1.0 / dadt, rads, axis=-1)
+        tt = utils.trapz_loglog(- 1.0 / dadt, rads, axis=-1)
         tt = tt[:, -1]
         return tt
 

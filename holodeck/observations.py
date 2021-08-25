@@ -372,7 +372,7 @@ class _Density_Profile(abc.ABC):
     def mass(cls, rads, *args, **kwargs):
         dens = cls.density(rads, *args, **kwargs)
         yy = 4*np.pi*rads**2 * dens
-        mass = utils.cumtrapz_loglog(yy, rads)
+        mass = utils.trapz_loglog(yy, rads)
         m0 = dens[0] * (4.0/3.0) * np.pi * rads[0] ** 3
         mass = np.concatenate([[m0], mass + m0])
         return mass
