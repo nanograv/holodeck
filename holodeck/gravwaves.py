@@ -7,10 +7,8 @@ import tqdm
 from holodeck import utils, cosmo
 from holodeck.constants import SPLC, MPC, MSOL
 
-# import zcode.math as zmath    # FIX: REMOVE
 
-
-_CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'time', 'eccen']
+_CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen']
 
 
 class Grav_Waves:
@@ -134,7 +132,7 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
     data_harms = bin_evo.at('fobs', fobs / harm_range, pars=_CALC_MC_PARS)
 
     # Only examine binaries reaching the given locations before redshift zero (other redz=inifinite)
-    redz = data_harms['time']
+    redz = data_harms['scafa']
     redz = cosmo.a_to_z(redz)
     valid = np.isfinite(redz) & (redz > 0.0)
 
@@ -165,9 +163,7 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
     frst_orb = fobs * zp1 / harms
     mchirp = data_harms['mass'][valid]
     mchirp = utils.chirp_mass(*mchirp.T)
-    # NOTE: `dadt` is stored as positive values
-    dfdt = utils.dfdt_from_dadt(
-        -data_harms['dadt'][valid], data_harms['sepa'][valid], freq_orb=frst_orb)
+    dfdt = utils.dfdt_from_dadt(data_harms['dadt'][valid], data_harms['sepa'][valid], freq_orb=frst_orb)
     _tres = frst_orb / dfdt
 
     # Calculate strains from each source
