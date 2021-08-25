@@ -375,10 +375,12 @@ def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
 
     Notes
     -----
-    - When bounds are given that are not identical to input `xx` values, then interpolation must
-      be performed.  This can be done on the resulting cumsum'd values, or on the input integrand
-      values.  The cumsum values are *not necessarily a power-law* (for negative indices), and thus
-      the interpolation is better performed on the input `yy` values.
+    *   When bounds are given that are not identical to input `xx` values, then interpolation must
+        be performed.  This can be done on the resulting cumsum'd values, or on the input integrand
+        values.  The cumsum values are *not necessarily a power-law* (for negative indices), and thus
+        the interpolation is better performed on the input `yy` values.
+    *   Interpolating the cumulative-integral works very badly, instead interpolate the x/y values
+        initially to obtain the integral at the appropriate locations.
 
     """
     yy = np.asarray(yy)
@@ -424,16 +426,14 @@ def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
     aa = np.moveaxis(aa, 0, axis)
     xx = np.moveaxis(xx, 0, axis)
     yy = np.moveaxis(yy, 0, axis)
-    # Integrate dA/dx
-    # A = (x1*y1 - x0*y0) / (gamma + 1)
+    # Integrate dA/dx   ::   A = (x1*y1 - x0*y0) / (gamma + 1)
     if dlogx is None:
         dz = np.diff(yy * xx, axis=axis)
         trapz = dz / (gamma + 1)
         # when the power-law is (near) '-1' then, `A = a * log(x1/x0)`
         idx = np.isclose(gamma, -1.0, atol=lntol, rtol=lntol)
 
-    # Integrate dA/dlogx
-    # A = (y1 - y0) / gamma
+    # Integrate dA/dlogx    ::    A = (y1 - y0) / gamma
     else:
         dy = np.diff(yy, axis=axis)
         trapz = dy / gamma
@@ -444,9 +444,6 @@ def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
 
     integ = np.log(log_base) * np.cumsum(trapz, axis=axis)
     if bounds is not None:
-        # NOTE: **DO NOT INTERPOLATE INTEGRAL** this works badly for negative power-laws
-        # lo, hi = interpolate.interp(bounds, xx[1:], integ, xlog=True, ylog=True, valid=False)
-        # integ = hi - lo
         integ = np.moveaxis(integ, axis, 0)
         lo, hi = integ[ii-1, ...]
         integ = hi - lo
