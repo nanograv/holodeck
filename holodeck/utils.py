@@ -54,6 +54,11 @@ def broadcastable(*args):
     return outs
 
 
+def error(msg, etype=ValueError):
+    log.error(msg)
+    raise etype(msg)
+
+
 def expand_broadcastable(*args):
     try:
         shape = np.shape(np.product(args, axis=0))
@@ -101,7 +106,7 @@ def minmax(vals):
     return extr
 
 
-def stats(vals, percs=None):
+def stats(vals, percs=None, prec=2):
     if percs is None:
         percs = [sp.stats.norm.cdf(1), 0.95, 1.0]
         percs = np.array(percs)
@@ -109,12 +114,12 @@ def stats(vals, percs=None):
 
     # stats = np.percentile(vals, percs*100)
     stats = quantiles(vals, percs)
-    rv = ["{:.2e}".format(ss) for ss in stats]
+    rv = ["{val:.{prec}e}".format(prec=prec, val=ss) for ss in stats]
     rv = ", ".join(rv)
     return rv
 
 
-def frac_str(vals):
+def frac_str(vals, prec=2):
     """
 
     Arguments
@@ -125,7 +130,7 @@ def frac_str(vals):
     num = np.count_nonzero(vals)
     den = vals.size
     frc = num / den
-    rv = f"{num:.2e}/{den:.2e} = {frc:.2e}"
+    rv = f"{num:.{prec}e}/{den:.{prec}e} = {frc:.{prec}e}"
     return rv
 
 
@@ -206,10 +211,13 @@ def interp(xnew, xold, yold, left=np.nan, right=np.nan, xlog=True, ylog=True):
     return y1
 
 
-def cumtrapz_loglog(yy, xx, bounds=None, lntol=1e-2):
+def cumtrapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
     """Calculate integral, given `y = dA/dx` or `y = dA/dlogx` w/ trapezoid rule in log-log space.
 
     We are calculating the integral `A` given sets of values for `y` and `x`.
+    To associate `yy` with `dA/dx` then `dlogx = None` [default], otherwise,
+    to associate `yy` with `dA/dlogx` then `dlogx = True` for natural-logarithm, or `dlogx = b`
+    for a logarithm of base `b`.
 
     For each interval (x[i+1], x[i]), calculate the integral assuming that y is of the form,
         `y = a * x^gamma`
@@ -224,31 +232,22 @@ def cumtrapz_loglog(yy, xx, bounds=None, lntol=1e-2):
     """
     yy = np.asarray(yy)
     xx = np.asarray(xx)
-    axis = -1
-    if yy.ndim > 1:
-        err = "multidimensional functions not yet implemented!"
-        log.error(err)
-        raise ValueError(err)
 
     if bounds is not None:
-        if len(bounds) != 2:
-            err = f"Invalid `bounds` = '{bounds}'!"
-            log.error(err)
-            raise ValueError(err)
-        if np.ndim(yy) > 1:
-            err = "multidimensional functions not implemented with `bounds`!"
+        xextr = [xx.min(), xx.max()]
+        if (len(bounds) != 2) or (bounds[0] < xextr[0]) or (xextr[1] < bounds[1]):
+            err = f"Invalid `bounds` '{bounds}', xx extrema = '{xextr}'!"
             log.error(err)
             raise ValueError(err)
 
-        newy = interp(bounds, xx, yy, xlog=True, ylog=True)
+        newy = sp.interpolate.PchipInterpolator(np.log10(xx), np.log10(yy), extrapolate=False)
+        newy = newy(bounds)
+
         ii = np.searchsorted(xx, bounds)
         xx = np.insert(xx, ii, bounds, axis=axis)
         yy = np.insert(yy, ii, newy, axis=axis)
         ii = np.array([ii[0], ii[1]+1])
-        if not np.alltrue(xx[ii] == bounds):
-            err = "Interpolation to `bounds` failed!"
-            log.error(err)
-            raise ValueError(err)
+        assert np.alltrue(xx[ii] == bounds), "FAILED!"
 
     # yy = np.ma.masked_values(yy, value=0.0, atol=0.0)
 
@@ -258,27 +257,41 @@ def cumtrapz_loglog(yy, xx, bounds=None, lntol=1e-2):
         cut = [slice(None)] + [np.newaxis for ii in range(np.ndim(yy)-1)]
         xx = xx[tuple(cut)]
 
+    log_base = np.e
+    if dlogx is not None:
+        # If `dlogx` is True, then we're using log-base-e (i.e. natural-log)
+        # Otherwise, set the log-base to the given value
+        if dlogx is not True:
+            log_base = dlogx
+
     # Numerically calculate the local power-law index
     delta_logx = np.diff(np.log(xx), axis=axis)
     gamma = np.diff(np.log(yy), axis=axis) / delta_logx
-
-    # xx = np.moveaxis(xx, axis, 0)   # NOTE: these are needed for multidimensional arrays
-    # yy = np.moveaxis(yy, axis, 0)   # NOTE: these are needed for multidimensional arrays
+    xx = np.moveaxis(xx, axis, 0)
+    yy = np.moveaxis(yy, axis, 0)
     aa = np.mean([xx[:-1] * yy[:-1], xx[1:] * yy[1:]], axis=0)
-    # aa = np.moveaxis(aa, 0, axis)   # NOTE: these are needed for multidimensional arrays
-    # xx = np.moveaxis(xx, 0, axis)   # NOTE: these are needed for multidimensional arrays
-    # yy = np.moveaxis(yy, 0, axis)   # NOTE: these are needed for multidimensional arrays
-
-    # Integrate dA/dx = y = a * x^gamma
+    aa = np.moveaxis(aa, 0, axis)
+    xx = np.moveaxis(xx, 0, axis)
+    yy = np.moveaxis(yy, 0, axis)
+    # Integrate dA/dx
     # A = (x1*y1 - x0*y0) / (gamma + 1)
-    dz = np.diff(yy * xx, axis=axis)
-    trapz = dz / (gamma + 1)
+    if dlogx is None:
+        dz = np.diff(yy * xx, axis=axis)
+        trapz = dz / (gamma + 1)
+        # when the power-law is (near) '-1' then, `A = a * log(x1/x0)`
+        idx = np.isclose(gamma, -1.0, atol=lntol, rtol=lntol)
 
-    # when the power-law is (near) '-1' then, `A = a * log(x1/x0)`
-    idx = np.isclose(gamma, -1.0, atol=lntol, rtol=lntol)
+    # Integrate dA/dlogx
+    # A = (y1 - y0) / gamma
+    else:
+        dy = np.diff(yy, axis=axis)
+        trapz = dy / gamma
+        # when the power-law is (near) '-1' then, `A = a * log(x1/x0)`
+        idx = np.isclose(gamma, 0.0, atol=lntol, rtol=lntol)
+
     trapz[idx] = aa[idx] * delta_logx[idx]
 
-    integ = np.cumsum(trapz, axis=axis)
+    integ = np.log(log_base) * np.cumsum(trapz, axis=axis)
     if bounds is not None:
         # NOTE: **DO NOT INTERPOLATE INTEGRAL** this works badly for negative power-laws
         # lo, hi = interpolate.interp(bounds, xx[1:], integ, xlog=True, ylog=True, valid=False)
