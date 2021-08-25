@@ -211,7 +211,7 @@ def interp(xnew, xold, yold, left=np.nan, right=np.nan, xlog=True, ylog=True):
     return y1
 
 
-def cumtrapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
+def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
     """Calculate integral, given `y = dA/dx` or `y = dA/dlogx` w/ trapezoid rule in log-log space.
 
     We are calculating the integral `A` given sets of values for `y` and `x`.
@@ -704,60 +704,3 @@ def _gw_ecc_func(eccen):
     den = np.power(1 - e2, 7/2)
     fe = num / den
     return fe
-
-
-def trapezoid_loglog(yy, xx, axis=-1, dlogx=None, lntol=1e-2):
-    """Calculate integral, given `y = dA/dx` or `y = dA/dlogx` w/ trapezoid rule in log-log space.
-
-    We are calculating the integral `A` given sets of values for `y` and `x`.
-    To associate `yy` with `dA/dx` then `dlogx = None` [default], otherwise,
-    to associate `yy` with `dA/dlogx` then `dlogx = True` for natural-logarithm, or `dlogx = b`
-    for a logarithm of base `b`.
-
-    For each interval (x[i+1], x[i]), calculate the integral assuming that y is of the form,
-        `y = a * x^gamma`
-
-    """
-    yy = np.asarray(yy)
-    xx = np.asarray(xx)
-
-    log_base = np.e
-    if dlogx is not None:
-        # If `dlogx` is True, then we're using log-base-e (i.e. natural-log)
-        # Otherwise, set the log-base to the given value
-        if dlogx is not True:
-            log_base = dlogx
-
-    # Numerically calculate the local power-law index
-    xx = np.moveaxis(xx, axis, 0)
-    yy = np.moveaxis(yy, axis, 0)
-    delta_logx = np.diff(np.log(xx), axis=0)[0]
-    gamma = np.diff(np.log(yy), axis=0)[0] / delta_logx
-
-    # aa = np.mean([xx[:-1] * yy[:-1], xx[1:] * yy[1:]], axis=0)
-    assert np.shape(xx)[0] == 2 and np.shape(yy)[0] == 2, "BAD SHAPE!"
-    aa = np.mean([xx[0] * yy[0], xx[1] * yy[1]], axis=0)
-    aa = np.moveaxis(aa, 0, axis)
-    xx = np.moveaxis(xx, 0, axis)
-    yy = np.moveaxis(yy, 0, axis)
-
-    # Integrate dA/dx
-    # A = (x1*y1 - x0*y0) / (gamma + 1)
-    if dlogx is None:
-        dz = np.diff(yy * xx, axis=axis).squeeze()
-        trapz = dz / (gamma + 1)
-        # when the power-law is (near) '-1' then, `A = a * log(x1/x0)`
-        idx = np.isclose(gamma, -1.0, atol=lntol, rtol=lntol)
-
-    # Integrate dA/dlogx
-    # A = (y1 - y0) / gamma
-    else:
-        dy = np.diff(yy, axis=axis).squeeze()
-        trapz = dy / gamma
-        # when the power-law is (near) '-1' then, `A = a * log(x1/x0)`
-        idx = np.isclose(gamma, 0.0, atol=lntol, rtol=lntol)
-
-    trapz[idx] = aa[idx] * delta_logx[idx]
-
-    integ = np.log(log_base) * np.cumsum(trapz, axis=axis)
-    return integ
