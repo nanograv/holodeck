@@ -48,6 +48,7 @@ import enum
 import inspect
 import json
 import os
+import warnings
 
 import numpy as np
 import scipy as sp
@@ -67,9 +68,15 @@ _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 
 
 class Evolution:
+    """
 
-    _EVO_PARS = ['mass', 'sepa', 'eccen', 'scafa', 'dadt', 'tlbk']
-    _LIN_INTERP_PARS = ['eccen', 'scafa', 'tlbk']
+    Additional Notes
+    ----------------
+
+    """
+
+    _EVO_PARS = ['mass', 'sepa', 'eccen', 'scafa', 'tlbk', 'dadt', 'dedt']
+    _LIN_INTERP_PARS = ['eccen', 'scafa', 'tlbk', 'dadt', 'dedt']
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
 
@@ -79,7 +86,7 @@ class Evolution:
         self._nsteps = nsteps
         self._mods = mods
 
-        if np.isscalar(hard):
+        if not np.iterable(hard):
             hard = [hard, ]
         self._hard = hard
 
@@ -103,9 +110,8 @@ class Evolution:
             self.eccen = None
             self.dedt = None
 
-        # NOTE: these values should be stored as positive values
         self.dadt = np.zeros(shape)
-        self._dadt_0 = None
+        self._dadt_0 = None   # this is a placeholder for initializing debug output
 
         # Derived parameters
         self._freq_orb_rest = None
@@ -144,7 +150,9 @@ class Evolution:
 
     def _init_step_zero(self):
         pop = self._pop
-        _, nsteps = self.shape
+        size, nsteps = self.shape
+
+        # ---- Initialize basic parameters
 
         # Initialize ALL separations ranging from initial to mutual-ISCO, for each binary
         rad_isco = utils.rad_isco(*pop.mass.T)
@@ -161,13 +169,50 @@ class Evolution:
         self.mass[:, 0, :] = pop.mass
         self.mass[:, :, :] = self.mass[:, 0, np.newaxis, :]
 
+        # ---- Initialize hardening rate at first step
+
+        # Determine initial hardening rates
+        dadt = np.zeros(size)
+        if pop.eccen is not None:
+            dedt = np.zeros(self.shape)
+
+        # addional record-keeping / diagnostics for debugging
+        if self._debug:
+            # initialzie variables to store da/dt hardening rates from each hardening component
+            for ii in range(len(self._hard)):
+                setattr(self, f"_dadt_{ii}", np.zeros(self.shape))
+                if pop.eccen is not None:
+                    setattr(self, f"_dedt_{ii}", np.zeros(self.shape))
+
+        # Get hardening rates for each hardening model
+        for ii, hard in enumerate(self._hard):
+            _a1, _e1 = hard.dadt_dedt(self, 0)
+            if self._debug:
+                # Store individual hardening rates
+                getattr(self, f"_dadt_{ii}")[:, 0] = _a1[...]
+
+            dadt[:] += _a1
+            if pop.eccen is not None:
+                dedt[:] += _e1
+
+        self.dadt[:, 0] = dadt
+
+        # ---- Initialize eccentricities as needed
+
         if (pop.eccen is not None):
             self.eccen[:, 0] = pop.eccen
+            self.dedt[:, 0] = dedt
 
         return
 
     def _take_next_step(self, step):
-        """Integrate the binary population forward (to smaller separations) by one step, to reach step `step`.
+        """Integrate the binary population forward (to smaller separations) by one step.
+
+        Arguments
+        ---------
+        step : int
+            The destination integration step number, i.e. `step=1` means integrate from 0 to 1.
+
         """
         debug = self._debug
         size, nsteps = self.shape
@@ -175,42 +220,27 @@ class Evolution:
         right = step        # the next     time-step
 
         # initialize storage for hardening rates in separation and eccentricity (if enabled)
-        dadt_1 = np.zeros(size)
+        dadt_r = np.zeros(size)
         if self.eccen is not None:
-            deccdt_1 = np.zeros_like(dadt_1)
-
-        # addional record-keeping / diagnostics for debugging
-        if debug and (self._dadt_0 is None):
-            # initialzie variables to store da/dt hardening rates from each hardening component
-            for ii in range(len(self._hard)):
-                name = f"_dadt_{ii}"
-                setattr(self, name, np.zeros_like(self.dadt))
+            dedt_r = np.zeros_like(dadt_r)
 
         # Get hardening rates for each hardening model
         for ii, hard in enumerate(self._hard):
-            _a1, _e1 = hard.dadt_dedt(self, left)
+            _ar, _er = hard.dadt_dedt(self, right)
             if debug:
-                log.debug(f"hard={hard} : dadt = {utils.stats(_a1)}")
-                if not np.all(np.isfinite(_a1)):
-                    err = f"non-finite `dadt` for hard={hard}!"
-                    log.error(err)
-                    raise ValueError(err)
-
-                if np.any(_a1 > 0.0):
-                    err = f"found positive hardening rates for hard={hard}!"
-                    log.error(err)
-                    raise ValueError(err)
-
+                log.debug(f"hard={hard} : dadt = {utils.stats(_ar)}")
                 # Store individual hardening rates
-                name = f"_dadt_{ii}"
-                getattr(self, name)[:, left] = _a1[...]
+                getattr(self, f"_dadt_{ii}")[:, right] = _ar[...]
+                # Raise error on invalid entries
+                if not np.all(np.isfinite(_ar)) or np.any(_ar > 0.0):
+                    utils.error(f"invalid `dadt` for hard={hard}!")
 
-            dadt_1[:] += _a1
+            dadt_r[:] += _ar
             if self.eccen is not None:
-                deccdt_1[:] += _e1
+                dedt_r[:] += _er
 
         # Calculate time between edges
-        dadt = dadt_1
+        dadt = dadt_r
         self.dadt[:, left] = dadt
         # NOTE: `da` defined to be negative!  `dadt` is also negative
         da = self.sepa[:, right] - self.sepa[:, left]
@@ -240,9 +270,10 @@ class Evolution:
 
         # update eccentricity if it's being evolved
         if self.eccen is not None:
-            deccdt = deccdt_1
-            decc = deccdt * dt
+            dedt = dedt_r
+            decc = dedt * dt
             self.eccen[:, right] = self.eccen[:, left] + decc
+            self.dedt[:, right] = dedt_r
 
         return _EVO.CONT
 
@@ -444,8 +475,8 @@ class Evolution:
             # Set invalid binaries to nan
             new[inval, ...] = np.nan
 
-            if np.any(~np.isfinite(new[valid, ...])):
-                raise ValueError("Non-finite values after interpolation of '{}'".format(pp))
+            # if np.any(~np.isfinite(new[valid, ...])):
+            #     raise ValueError("Non-finite values after interpolation of '{}'".format(pp))
 
             # fill return dictionary
             if not lin_interp_flag:
@@ -454,8 +485,8 @@ class Evolution:
                 new = new.squeeze()
             vals[pp] = new
 
-            if np.any(~np.isfinite(new[valid, ...])):
-                raise ValueError("Non-finite values after exponentiation of '{}'".format(pp))
+            # if np.any(~np.isfinite(new[valid, ...])):
+            #     raise ValueError("Non-finite values after exponentiation of '{}'".format(pp))
 
         return vals
 
@@ -821,6 +852,215 @@ class Dynamical_Friction_NFW(_Hardening):
         atten = np.maximum(atten, 1.0)
 
         return atten
+
+
+class Timed(_Hardening):
+
+    _NUM_POINTS = 1e4
+    _NUM_PAD_FACTOR = 5.0
+
+    def __init__(self, time, rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5):
+        if not np.isscalar(rchar) and not callable(rchar):
+            err = f"Initialized `rchar` ({type(rchar)}) must be scalar or callable (`rchar(mt, mr)`)!"
+            log.error(err)
+            raise ValueError(err)
+
+        self._time = time
+        self._rchar_init = rchar
+        self._gamma_sc = gamma_sc
+        self._gamma_df = gamma_df
+
+        self._norm = None
+        self._rchar = None
+        self._interp = None
+        self._interp_backup = None
+        return
+
+    def _init(self, mt, mr, sepa):
+        time = self._time
+        rchar_init = self._rchar_init
+
+        if np.isscalar(time):
+            time = time * np.ones_like(mt)
+        elif callable(time):
+            time = time(mt, mr)
+        elif np.shape(time) != np.shape(mt):
+            err = f"Shape of initialized `time` ({np.shape(time)}) does not match `mt` ({np.shape(mt)})!"
+            log.error(err)
+            raise ValueError(err)
+
+        if callable(rchar_init):
+            rchar = rchar_init(mt, mr)
+        else:
+            rchar = rchar_init
+
+        # If there are lots of points, construct and use an interpolant
+        if len(mt) > self._NUM_PAD_FACTOR * self._NUM_POINTS:
+            log.info("constructing hardening normalization interpolant")
+            # both are callable as `interp(args)`, with `args` shaped (N, 4),
+            # the 4 parameters are:      [log10(M/MSOL), log10(q), time/Gyr, log10(Rmax/PC)]
+            # the interpolants return the log10 of the norm values
+            interp, backup = self._calculate_norm_interpolant(rchar_init, self._gamma_sc, self._gamma_df)
+            self._interp = interp
+            self._interp_backup = backup
+
+            points = [np.log10(mt/MSOL), np.log10(mr), time/GYR, np.log10(sepa/PC)]
+            points = np.array(points)
+            norm = self._interp(points.T)
+            bads = ~np.isfinite(norm)
+            if np.any(bads):
+                msg = f"Normal interpolant failed on {utils.frac_str(bads, 4)} points, using backup interpolant"
+                log.info(msg)
+                bp = points.T[bads]
+                norm[bads] = self._interp_backup(bp.T)
+                bads = ~np.isfinite(norm)
+                if np.any(bads):
+                    err = f"Backup interpolant failed on {utils.frac_str(bads, 4)} points!"
+                    log.error(err)
+                    raise ValueError(err)
+
+            norm = 10.0 ** norm
+
+        # For small numbers of points, calculate the normalization directly
+        else:
+            norm = self._get_norm_chunk(time, mt, mr, rchar, self._gamma_sc, self._gamma_df, sepa)
+
+        self._norm = norm
+        self._rchar = rchar
+        return
+
+    def dadt_dedt(self, evo, step):
+        mass = evo.mass[:, step, :]
+        sepa = evo.sepa[:, step]
+        mt, mr = utils.mtmr_from_m1m2(mass)
+
+        if self._norm is None:
+            self._init(mt, mr, sepa)
+
+        norm = self._norm
+        rchar = self._rchar
+
+        dadt, dedt = self._dadt_dedt(sepa, norm, mt, mr, rchar, self._gamma_sc, self._gamma_df)
+        return dadt, dedt
+
+    @classmethod
+    def _dadt_dedt(cls, sepa, norm, mt, mr, rchar, g1, g2):
+        m1, m2 = utils.m1m2_from_mtmr(mt, mr)
+        dadt_gw = utils.gw_hardening_rate_dadt(m1, m2, sepa)
+
+        xx = sepa / rchar
+        dadt = cls.function(norm, xx, g1, g2)
+        dadt = dadt + dadt_gw
+
+        dedt = None
+        return dadt, dedt
+
+    @classmethod
+    def function(cls, norm, xx, g1, g2):
+        dadt = - norm * np.power(1.0 + xx, -g2-1) / np.power(xx, g1-1)
+        return dadt
+
+    @classmethod
+    def _time_total(cls, norm, mt, mr, rchar, g1, g2, rmax, num=100):
+        rmin = 1.0e-5 * PC
+        norm = np.atleast_1d(norm)
+        args = [norm, mt, mr, rchar, g1, g2, rmax, rmin]
+        args = np.broadcast_arrays(*args)
+        norm, mt, mr, rchar, g1, g2, rmax, rmin = args
+        if np.ndim(norm) != 1:
+            raise
+
+        rextr = np.log10([rmin, rmax]).T
+        rads = np.linspace(0.0, 1.0, num)[np.newaxis, :]
+
+        rads = rextr[:, 0, np.newaxis] + rads * np.diff(rextr, axis=1)
+        rads = 10.0 ** rads
+
+        args = [norm, mt, mr, rchar, g1, g2]
+        args = [aa[:, np.newaxis] for aa in args]
+        norm, mt, mr, rchar, g1, g2 = args
+
+        dadt, _ = cls._dadt_dedt(rads, norm, mt, mr, rchar, g1, g2)
+
+        tt = utils.cumtrapz_loglog(- 1.0 / dadt, rads, axis=-1)
+        tt = tt[:, -1]
+        return tt
+
+    @classmethod
+    def _get_norm(cls, tau, *args, guess=1e0):
+        def integ(norm):
+            return cls._time_total(norm, *args)
+
+        g0 = guess * np.ones_like(tau)
+        test = integ(g0)
+        guess = g0 * (test / tau)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            rv = sp.optimize.newton(lambda xx: integ(xx) - tau, guess)
+        return rv
+
+    @classmethod
+    def _get_norm_chunk(cls, tau, *args, guess=1e0, chunk=1e3):
+        if np.ndim(tau) != 1:
+            raise
+        chunk = int(chunk)
+        size = np.size(tau)
+        if size <= chunk:
+            return cls._get_norm(tau, *args, guess=guess)
+
+        args = [tau, *args]
+        args = np.broadcast_arrays(*args)
+        tau, *args = args
+
+        num = int(np.ceil(size / chunk))
+        sol = np.zeros_like(tau)
+        for ii in utils.tqdm(range(num)):
+            lo = ii * chunk
+            hi = np.minimum((ii + 1) * chunk, size)
+            cut = slice(lo, hi)
+            sol[cut] = cls._get_norm(tau[cut], *[aa[cut] for aa in args], guess=guess)
+
+        return sol
+
+    @classmethod
+    def _calculate_norm_interpolant(cls, rchar, gamma_one, gamma_two):
+        mt = [1e6, 1e11]
+        mr = [1e-5, 1.0]
+        td = [0.0, 20.0]
+        rm = [1e3, 1e5]
+
+        num_points = int(cls._NUM_POINTS)
+        mt = 10.0 ** np.random.uniform(*np.log10(mt), num_points) * MSOL
+        mr = 10.0 ** np.random.uniform(*np.log10(mr), mt.size)
+        td = np.random.uniform(*td, mt.size+1)[1:] * GYR
+        rm = 10.0 ** np.random.uniform(*np.log10(rm), mt.size) * PC
+        # rm = 1e4 * PC
+
+        if callable(rchar):
+            rchar = rchar(mt, mr)
+        elif not np.isscalar(rchar):
+            err = f"`rchar` ({type(rchar)}) must be scalar or callable!"
+            log.error(err)
+            raise ValueError(err)
+
+        norm = cls._get_norm_chunk(td, mt, mr, rchar, gamma_one, gamma_two, rm)
+
+        valid = np.isfinite(norm) & (norm > 0.0)
+        if not np.all(valid):
+            err = f"Invalid normalizations!  {utils.frac_str(valid, 4)}"
+            log.error(err)
+            raise ValueError(err)
+
+        points = [mt, mr, td, rm]
+        units = [MSOL, 1.0, GYR, PC]
+        logs = [True, True, False, True]
+        points = [pp/uu for pp, uu in zip(points, units)]
+        points = [np.log10(pp) if ll else pp for pp, ll in zip(points, logs)]
+        points = np.array(points).T
+        interp = sp.interpolate.LinearNDInterpolator(points, np.log10(norm))
+        backup = sp.interpolate.NearestNDInterpolator(points, np.log10(norm))
+        return interp, backup
 
 
 # =================================================================================================
