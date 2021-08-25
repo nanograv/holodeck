@@ -214,17 +214,16 @@ class Evolution:
             The destination integration step number, i.e. `step=1` means integrate from 0 to 1.
 
         """
+        # ---- Initialize
         debug = self._debug
         size, nsteps = self.shape
         left = step - 1     # the previous time-step (already completed)
         right = step        # the next     time-step
-
-        # initialize storage for hardening rates in separation and eccentricity (if enabled)
         dadt_r = np.zeros(size)
         if self.eccen is not None:
             dedt_r = np.zeros_like(dadt_r)
 
-        # Get hardening rates for each hardening model
+        # ---- Get hardening rates for each hardening model
         for ii, hard in enumerate(self._hard):
             _ar, _er = hard.dadt_dedt(self, right)
             if debug:
@@ -239,16 +238,22 @@ class Evolution:
             if self.eccen is not None:
                 dedt_r[:] += _er
 
-        # Calculate time between edges
-        dadt = dadt_r
-        self.dadt[:, left] = dadt
-        # NOTE: `da` defined to be negative!  `dadt` is also negative
-        da = self.sepa[:, right] - self.sepa[:, left]
-        dt = da / dadt
+        # Store right-edge hardening rates
+        self.dadt[:, right] = dadt_r
+        if self.eccen is not None:
+            self.dedt[:, right] = dedt_r
+
+        # ---- Calculate time between edges
+
+        dtda = 1.0 / - self.dadt[:, (left, right)]   # convert dadt to positive
+        sepa = self.sepa[:, (right, left)]   # sepa is decreasing, so switch left-right order
+        dt = utils.trapz_loglog(dtda, sepa, axis=-1).squeeze()   # this should come out positive
+        log.warning(f" dt={utils.stats(dt)}")
+
         if np.any(dt < 0.0):
-            err = f"Negative time-steps found at step={step}!"
-            log.error(err)
-            raise ValueError(err)
+            utils.error(f"Negative time-steps found at step={step}!")
+
+        # ---- Update right-edge values
 
         # Update lookback time based on duration of this step
         tlbk = self.tlbk[:, left] - dt
@@ -258,22 +263,13 @@ class Evolution:
         self.scafa[val, right] = cosmo.z_to_a(cosmo.tlbk_to_z(tlbk[val]))
         # set systems after z = 0 to scale-factor of unity
         self.scafa[~val, right] = 1.0
-        if debug:
-            log.debug(f"{step=:4d}")
-            log.debug(
-                f"\ta      = {utils.stats(self.sepa[:, left])}\n"
-                f"\tda     = {utils.stats(da)}\n"
-                f"\tdadt   = {utils.stats(dadt)}\n"
-                f"\ta/dadt = {utils.stats(self.sepa[:, left]/dadt)}"
-                f"\tdt     = {utils.stats(dt)}"
-            )
 
         # update eccentricity if it's being evolved
         if self.eccen is not None:
-            dedt = dedt_r
-            decc = dedt * dt
+            dedt = self.dedt[:, (left, right)]
+            time = self.tlbk[:, (right, left)]   # tlbk is decreasing, so switch left-right order
+            decc = utils.trapz_loglog(dedt, time, axis=-1).squeeze()
             self.eccen[:, right] = self.eccen[:, left] + decc
-            self.dedt[:, right] = dedt_r
 
         return _EVO.CONT
 
