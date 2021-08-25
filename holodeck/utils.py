@@ -37,21 +37,9 @@ class _Modifier(abc.ABC):
         pass
 
 
-# ==== General Logistical ====
-
-
-def broadcastable(*args):
-    """Expand N, 1D arrays be able to be broadcasted into N, ND arrays.
-
-    e.g. from arrays of len `3`,`4`,`2`, returns arrays with shapes: `3,1,1`, `1,4,1` and `1,1,2`.
-    """
-    ndim = len(args)
-    assert np.all([1 == np.ndim(aa) for aa in args]), "Each array in `args` must be 1D!"
-
-    cut_ref = [slice(None)] + [np.newaxis for ii in range(ndim-1)]
-    cuts = [np.roll(cut_ref, ii).tolist() for ii in range(ndim)]
-    outs = [aa[tuple(cc)] for aa, cc in zip(args, cuts)]
-    return outs
+# =================================================================================================
+# ====    General Logistical    ====
+# =================================================================================================
 
 
 def error(msg, etype=ValueError):
@@ -59,15 +47,74 @@ def error(msg, etype=ValueError):
     raise etype(msg)
 
 
-def expand_broadcastable(*args):
-    try:
-        shape = np.shape(np.product(args, axis=0))
-    except ValueError:
-        shapes = [np.shape(aa) for aa in args]
-        raise ValueError("Argument arrays are not broadcastable!  shapes={}".format(shapes))
+def figax(figsize=[12, 6], ncols=1, nrows=1, sharex=False, sharey=False, squeeze=True,
+          scale=None, xscale='log', xlabel='', xlim=None, yscale='log', ylabel='', ylim=None,
+          left=None, bottom=None, right=None, top=None, hspace=None, wspace=None,
+          widths=None, heights=None, grid=True, **kwargs):
 
-    vals = [aa * np.ones(shape) for aa in args]
-    return vals
+    if scale is not None:
+        xscale = scale
+        yscale = scale
+
+    scales = [xscale, yscale]
+    for ii in range(2):
+        if scales[ii].startswith('lin'):
+            scales[ii] = 'linear'
+
+    xscale, yscale = scales
+
+    if (widths is not None) or (heights is not None):
+        gridspec_kw = dict()
+        if widths is not None:
+            gridspec_kw['width_ratios'] = widths
+        if heights is not None:
+            gridspec_kw['height_ratios'] = heights
+        kwargs['gridspec_kw'] = gridspec_kw
+
+    fig, axes = plt.subplots(figsize=figsize, squeeze=False, ncols=ncols, nrows=nrows,
+                             sharex=sharex, sharey=sharey, **kwargs)
+
+    plt.subplots_adjust(
+        left=left, bottom=bottom, right=right, top=top, hspace=hspace, wspace=wspace)
+
+    if ylim is not None:
+        shape = (nrows, ncols, 2)
+        if np.shape(ylim) == (2,):
+            ylim = np.array(ylim)[np.newaxis, np.newaxis, :]
+    else:
+        shape = (nrows, ncols,)
+
+    ylim = np.broadcast_to(ylim, shape)
+
+    if xlim is not None:
+        shape = (nrows, ncols, 2)
+        if np.shape(xlim) == (2,):
+            xlim = np.array(xlim)[np.newaxis, np.newaxis, :]
+    else:
+        shape = (nrows, ncols)
+
+    xlim = np.broadcast_to(xlim, shape)
+    _, xscale, xlabel = np.broadcast_arrays(axes, xscale, xlabel)
+    _, yscale, ylabel = np.broadcast_arrays(axes, yscale, ylabel)
+
+    for idx, ax in np.ndenumerate(axes):
+        ax.set(xscale=xscale[idx], xlabel=xlabel[idx], yscale=yscale[idx], ylabel=ylabel[idx])
+        if xlim[idx] is not None:
+            ax.set_xlim(xlim[idx])
+        if ylim[idx] is not None:
+            ax.set_ylim(ylim[idx])
+
+        if grid is True:
+            ax.set_axisbelow(True)
+            ax.grid(True, which='major', axis='both', c='0.6', zorder=2, alpha=0.4)
+            ax.grid(True, which='minor', axis='both', c='0.8', zorder=2, alpha=0.4)
+
+    if squeeze:
+        axes = np.squeeze(axes)
+        if np.ndim(axes) == 0:
+            axes = axes[()]
+
+    return fig, axes
 
 
 def load_hdf5(fname, keys=None):
@@ -95,28 +142,60 @@ def load_hdf5(fname, keys=None):
     return header, data
 
 
-def log_normal_base_10(mu, sigma, size=None, shift=0.0):
-    _sigma = np.log(10**sigma)
-    dist = np.random.lognormal(np.log(mu) + shift*np.log(10.0), _sigma, size)
-    return dist
+def python_environment():
+    """Tries to determine the current python environment, one of: 'jupyter', 'ipython', 'terminal'.
+    """
+    try:
+        # NOTE: `get_ipython` should not be explicitly imported from anything
+        ipy_str = str(type(get_ipython())).lower()  # noqa
+        # print("ipy_str = '{}'".format(ipy_str))
+        if 'zmqshell' in ipy_str:
+            return 'jupyter'
+        if 'terminal' in ipy_str:
+            return 'ipython'
+    except:
+        return 'terminal'
 
 
-def minmax(vals):
-    extr = np.array([np.min(vals), np.max(vals)])
-    return extr
+def tqdm(*args, **kwargs):
+    if python_environment().lower().startswith('jupyter'):
+        import tqdm.notebook
+        tqdm_method = tqdm.notebook.tqdm
+    else:
+        import tqdm
+        tqdm_method = tqdm.tqdm
+
+    return tqdm_method(*args, **kwargs)
 
 
-def stats(vals, percs=None, prec=2):
-    if percs is None:
-        percs = [sp.stats.norm.cdf(1), 0.95, 1.0]
-        percs = np.array(percs)
-        percs = np.concatenate([1-percs[::-1], [0.5], percs])
+# =================================================================================================
+# ====    Mathematical & Numerical    ====
+# =================================================================================================
 
-    # stats = np.percentile(vals, percs*100)
-    stats = quantiles(vals, percs)
-    rv = ["{val:.{prec}e}".format(prec=prec, val=ss) for ss in stats]
-    rv = ", ".join(rv)
-    return rv
+
+def broadcastable(*args):
+    """Expand N, 1D arrays be able to be broadcasted into N, ND arrays.
+
+    e.g. from arrays of len `3`,`4`,`2`, returns arrays with shapes: `3,1,1`, `1,4,1` and `1,1,2`.
+    """
+    ndim = len(args)
+    assert np.all([1 == np.ndim(aa) for aa in args]), "Each array in `args` must be 1D!"
+
+    cut_ref = [slice(None)] + [np.newaxis for ii in range(ndim-1)]
+    cuts = [np.roll(cut_ref, ii).tolist() for ii in range(ndim)]
+    outs = [aa[tuple(cc)] for aa, cc in zip(args, cuts)]
+    return outs
+
+
+def expand_broadcastable(*args):
+    try:
+        shape = np.shape(np.product(args, axis=0))
+    except ValueError:
+        shapes = [np.shape(aa) for aa in args]
+        raise ValueError("Argument arrays are not broadcastable!  shapes={}".format(shapes))
+
+    vals = [aa * np.ones(shape) for aa in args]
+    return vals
 
 
 def frac_str(vals, prec=2):
@@ -132,6 +211,37 @@ def frac_str(vals, prec=2):
     frc = num / den
     rv = f"{num:.{prec}e}/{den:.{prec}e} = {frc:.{prec}e}"
     return rv
+
+
+def interp(xnew, xold, yold, left=np.nan, right=np.nan, xlog=True, ylog=True):
+    x1 = np.asarray(xnew)
+    x0 = np.asarray(xold)
+    y0 = np.asarray(yold)
+    if xlog:
+        x1 = np.log10(x1)
+        x0 = np.log10(x0)
+    if ylog:
+        y0 = np.log10(y0)
+        if (left is not None) and np.isfinite(left):
+            left = np.log10(left)
+        if (right is not None) and np.isfinite(right):
+            right = np.log10(right)
+
+    y1 = np.interp(x1, x0, y0, left=left, right=right)
+    if ylog:
+        y1 = np.power(10.0, y1)
+    return y1
+
+
+def log_normal_base_10(mu, sigma, size=None, shift=0.0):
+    _sigma = np.log(10**sigma)
+    dist = np.random.lognormal(np.log(mu) + shift*np.log(10.0), _sigma, size)
+    return dist
+
+
+def minmax(vals):
+    extr = np.array([np.min(vals), np.max(vals)])
+    return extr
 
 
 def nyquist_freqs(dur=15.0, cad=0.1, trim=None):
@@ -167,48 +277,89 @@ def nyquist_freqs(dur=15.0, cad=0.1, trim=None):
     return freqs
 
 
-def _parse_log_norm_pars(vals, size, default=None):
-    """
-    vals:
-        ()   ==> (N,)
-        (2,) ==> (N,) log_normal(vals)
-        (N,) ==> (N,)
+def quantiles(values, percs=None, sigmas=None, weights=None, axis=None, values_sorted=False):
+    """Compute weighted percentiles.
+
+    NOTE: if `values` is a masked array, then only unmasked values are used!
+
+    Arguments
+    ---------
+    values: (N,)
+        input data
+    percs: (M,) scalar [0.0, 1.0]
+        Desired percentiles of the data.
+    weights: (N,) or `None`
+        Weighted for each input data point in `values`.
+    values_sorted: bool
+        If True, then input values are assumed to already be sorted.
+
+    Returns
+    -------
+    percs : (M,) float
+        Array of percentiles of the weighted input data.
 
     """
-    if (vals is None):
-        if default is None:
-            return None
-        vals = default
+    if not isinstance(values, np.ma.MaskedArray):
+        values = np.asarray(values)
 
-    if np.isscalar(vals):
-        vals = vals * np.ones(size)
-    elif (isinstance(vals, tuple) or isinstance(vals, list)) and (len(vals) == 2):
-        vals = log_normal_base_10(*vals, size=size)
-    elif np.shape(vals) != (size,):
-        err = "`vals` must be scalar, (2,) of scalar, or array (nbins={},) of scalar!".format(size)
+    if (percs is None) == (sigmas is None):
+        err = "either `percs` or `sigmas`, and not both, must be given!"
+        log.error(err)
         raise ValueError(err)
 
-    return vals
+    if percs is None:
+        percs = sp.stats.norm.cdf(sigmas)
+
+    if np.ndim(values) > 1:
+        if axis is None:
+            values = values.flatten()
+    elif (axis is not None):
+        raise ValueError("Cannot act along axis '{}' for 1D data!".format(axis))
+
+    percs = np.array(percs)
+    if weights is None:
+        weights = np.ones_like(values)
+    weights = np.array(weights)
+    try:
+        weights = np.ma.masked_array(weights, mask=values.mask)
+    except AttributeError:
+        pass
+
+    assert np.all(percs >= 0.0) and np.all(percs <= 1.0), 'percentiles should be in [0, 1]'
+
+    if not values_sorted:
+        sorter = np.argsort(values, axis=axis)
+        values = np.take_along_axis(values, sorter, axis=axis)
+        weights = np.take_along_axis(weights, sorter, axis=axis)
+
+    if axis is None:
+        weighted_quantiles = np.cumsum(weights) - 0.5 * weights
+        weighted_quantiles /= np.sum(weights)
+        percs = np.interp(percs, weighted_quantiles, values)
+        return percs
+
+    weights = np.moveaxis(weights, axis, -1)
+    values = np.moveaxis(values, axis, -1)
+
+    weighted_quantiles = np.cumsum(weights, axis=-1) - 0.5 * weights
+    weighted_quantiles /= np.sum(weights, axis=-1)[..., np.newaxis]
+    percs = [np.interp(percs, weighted_quantiles[idx], values[idx])
+             for idx in np.ndindex(values.shape[:-1])]
+    percs = np.array(percs)
+    return percs
 
 
-def interp(xnew, xold, yold, left=np.nan, right=np.nan, xlog=True, ylog=True):
-    x1 = np.asarray(xnew)
-    x0 = np.asarray(xold)
-    y0 = np.asarray(yold)
-    if xlog:
-        x1 = np.log10(x1)
-        x0 = np.log10(x0)
-    if ylog:
-        y0 = np.log10(y0)
-        if (left is not None) and np.isfinite(left):
-            left = np.log10(left)
-        if (right is not None) and np.isfinite(right):
-            right = np.log10(right)
+def stats(vals, percs=None, prec=2):
+    if percs is None:
+        percs = [sp.stats.norm.cdf(1), 0.95, 1.0]
+        percs = np.array(percs)
+        percs = np.concatenate([1-percs[::-1], [0.5], percs])
 
-    y1 = np.interp(x1, x0, y0, left=left, right=right)
-    if ylog:
-        y1 = np.power(10.0, y1)
-    return y1
+    # stats = np.percentile(vals, percs*100)
+    stats = quantiles(vals, percs)
+    rv = ["{val:.{prec}e}".format(prec=prec, val=ss) for ss in stats]
+    rv = ", ".join(rv)
+    return rv
 
 
 def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
@@ -303,175 +454,33 @@ def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
     return integ
 
 
-def figax(figsize=[12, 6], ncols=1, nrows=1, sharex=False, sharey=False, squeeze=True,
-          scale=None, xscale='log', xlabel='', xlim=None, yscale='log', ylabel='', ylim=None,
-          left=None, bottom=None, right=None, top=None, hspace=None, wspace=None,
-          widths=None, heights=None, grid=True, **kwargs):
-
-    if scale is not None:
-        xscale = scale
-        yscale = scale
-
-    scales = [xscale, yscale]
-    for ii in range(2):
-        if scales[ii].startswith('lin'):
-            scales[ii] = 'linear'
-
-    xscale, yscale = scales
-
-    if (widths is not None) or (heights is not None):
-        gridspec_kw = dict()
-        if widths is not None:
-            gridspec_kw['width_ratios'] = widths
-        if heights is not None:
-            gridspec_kw['height_ratios'] = heights
-        kwargs['gridspec_kw'] = gridspec_kw
-
-    fig, axes = plt.subplots(figsize=figsize, squeeze=False, ncols=ncols, nrows=nrows,
-                             sharex=sharex, sharey=sharey, **kwargs)
-
-    plt.subplots_adjust(
-        left=left, bottom=bottom, right=right, top=top, hspace=hspace, wspace=wspace)
-
-    if ylim is not None:
-        shape = (nrows, ncols, 2)
-        if np.shape(ylim) == (2,):
-            ylim = np.array(ylim)[np.newaxis, np.newaxis, :]
-    else:
-        shape = (nrows, ncols,)
-
-    ylim = np.broadcast_to(ylim, shape)
-
-    if xlim is not None:
-        shape = (nrows, ncols, 2)
-        if np.shape(xlim) == (2,):
-            xlim = np.array(xlim)[np.newaxis, np.newaxis, :]
-    else:
-        shape = (nrows, ncols)
-
-    xlim = np.broadcast_to(xlim, shape)
-    _, xscale, xlabel = np.broadcast_arrays(axes, xscale, xlabel)
-    _, yscale, ylabel = np.broadcast_arrays(axes, yscale, ylabel)
-
-    for idx, ax in np.ndenumerate(axes):
-        ax.set(xscale=xscale[idx], xlabel=xlabel[idx], yscale=yscale[idx], ylabel=ylabel[idx])
-        if xlim[idx] is not None:
-            ax.set_xlim(xlim[idx])
-        if ylim[idx] is not None:
-            ax.set_ylim(ylim[idx])
-
-        if grid is True:
-            ax.set_axisbelow(True)
-            ax.grid(True, which='major', axis='both', c='0.6', zorder=2, alpha=0.4)
-            ax.grid(True, which='minor', axis='both', c='0.8', zorder=2, alpha=0.4)
-
-    if squeeze:
-        axes = np.squeeze(axes)
-        if np.ndim(axes) == 0:
-            axes = axes[()]
-
-    return fig, axes
-
-
-def quantiles(values, percs=None, sigmas=None, weights=None, axis=None, values_sorted=False):
-    """Compute weighted percentiles.
-
-    NOTE: if `values` is a masked array, then only unmasked values are used!
-
-    Arguments
-    ---------
-    values: (N,)
-        input data
-    percs: (M,) scalar [0.0, 1.0]
-        Desired percentiles of the data.
-    weights: (N,) or `None`
-        Weighted for each input data point in `values`.
-    values_sorted: bool
-        If True, then input values are assumed to already be sorted.
-
-    Returns
-    -------
-    percs : (M,) float
-        Array of percentiles of the weighted input data.
+def _parse_log_norm_pars(vals, size, default=None):
+    """
+    vals:
+        ()   ==> (N,)
+        (2,) ==> (N,) log_normal(vals)
+        (N,) ==> (N,)
 
     """
-    if not isinstance(values, np.ma.MaskedArray):
-        values = np.asarray(values)
+    if (vals is None):
+        if default is None:
+            return None
+        vals = default
 
-    if (percs is None) == (sigmas is None):
-        err = "either `percs` or `sigmas`, and not both, must be given!"
-        log.error(err)
+    if np.isscalar(vals):
+        vals = vals * np.ones(size)
+    elif (isinstance(vals, tuple) or isinstance(vals, list)) and (len(vals) == 2):
+        vals = log_normal_base_10(*vals, size=size)
+    elif np.shape(vals) != (size,):
+        err = "`vals` must be scalar, (2,) of scalar, or array (nbins={},) of scalar!".format(size)
         raise ValueError(err)
 
-    if percs is None:
-        percs = sp.stats.norm.cdf(sigmas)
-
-    if np.ndim(values) > 1:
-        if axis is None:
-            values = values.flatten()
-    elif (axis is not None):
-        raise ValueError("Cannot act along axis '{}' for 1D data!".format(axis))
-
-    percs = np.array(percs)
-    if weights is None:
-        weights = np.ones_like(values)
-    weights = np.array(weights)
-    try:
-        weights = np.ma.masked_array(weights, mask=values.mask)
-    except AttributeError:
-        pass
-
-    assert np.all(percs >= 0.0) and np.all(percs <= 1.0), 'percentiles should be in [0, 1]'
-
-    if not values_sorted:
-        sorter = np.argsort(values, axis=axis)
-        values = np.take_along_axis(values, sorter, axis=axis)
-        weights = np.take_along_axis(weights, sorter, axis=axis)
-
-    if axis is None:
-        weighted_quantiles = np.cumsum(weights) - 0.5 * weights
-        weighted_quantiles /= np.sum(weights)
-        percs = np.interp(percs, weighted_quantiles, values)
-        return percs
-
-    weights = np.moveaxis(weights, axis, -1)
-    values = np.moveaxis(values, axis, -1)
-
-    weighted_quantiles = np.cumsum(weights, axis=-1) - 0.5 * weights
-    weighted_quantiles /= np.sum(weights, axis=-1)[..., np.newaxis]
-    percs = [np.interp(percs, weighted_quantiles[idx], values[idx])
-             for idx in np.ndindex(values.shape[:-1])]
-    percs = np.array(percs)
-    return percs
+    return vals
 
 
-def python_environment():
-    """Tries to determine the current python environment, one of: 'jupyter', 'ipython', 'terminal'.
-    """
-    try:
-        # NOTE: `get_ipython` should not be explicitly imported from anything
-        ipy_str = str(type(get_ipython())).lower()  # noqa
-        # print("ipy_str = '{}'".format(ipy_str))
-        if 'zmqshell' in ipy_str:
-            return 'jupyter'
-        if 'terminal' in ipy_str:
-            return 'ipython'
-    except:
-        return 'terminal'
-
-
-def tqdm(*args, **kwargs):
-    if python_environment().lower().startswith('jupyter'):
-        import tqdm.notebook
-        tqdm_method = tqdm.notebook.tqdm
-    else:
-        import tqdm
-        tqdm_method = tqdm.tqdm
-
-    return tqdm_method(*args, **kwargs)
-
-
-# ==== General Astronomy ====
+# =================================================================================================
+# ====    General Astronomy    ====
+# =================================================================================================
 
 
 def mtmr_from_m1m2(m1, m2=None):
@@ -517,7 +526,9 @@ def schwarzschild_radius(mass):
     return rs
 
 
-# ==== Gravitational Waves ====
+# =================================================================================================
+# ====    Gravitational Waves    ====
+# =================================================================================================
 
 
 def chirp_mass(m1, m2=None):
