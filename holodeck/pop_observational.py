@@ -23,7 +23,7 @@ from astropy.cosmology import Planck15, z_at_value
 import os
 
 import holodeck as holo
-from holodeck import _PATH_DATA, cosmo
+from holodeck import _PATH_DATA, cosmo, log
 from holodeck.constants import MSOL
 
 # physical constants for natural units c = G = 1
@@ -36,14 +36,30 @@ log10 = np.log10
 pi = np.pi
 sqrt = np.sqrt
 
+# _DEF_OBSERVATIONAL_FNAME = "mbhb-pops-continuous_casey-clyde_mingarelli_2021-02-17.npz"
+_DEF_OBSERVATIONAL_FNAME = "observational_2mass_galaxy-catalog_extended.npz"
+
 
 class BP_Observational(holo.population._Population):
 
     FREQ_MIN = 1e-9    # Hz, minimum of PTA band of interest
 
-    def _init_from_file(self, fname):
+    def __init__(self, fname=None, *args, **kwargs):
+        if fname is None:
+            fname = _DEF_OBSERVATIONAL_FNAME
+        if not os.path.isfile(fname):
+            fname = os.path.join(_PATH_DATA, fname)
+
+        self._fname = fname
+        super().__init__(*args, **kwargs)
+        return
+
+    def _init(self):
+        super()._init()
+        fname = self._fname
         data = np.load(fname)
-        k_mag = data['k_mag']
+        k_mag = data['k_mag'][:1000]
+        log.warning("WARNING: TRUNCATING `k_mag` FOR TESTING!")
 
         # Construct population
         no_of_bhb, prim_BHmass_min, prim_BHmass_max, binaries = single_realization(k_mag, self.FREQ_MIN)
@@ -53,12 +69,12 @@ class BP_Observational(holo.population._Population):
         self._mbhb_edges = edges
 
         # Convert from grid to 1D arrays
+        self._redz, self._mtot, self._mrat = edges
         redz, mtot, mrat = [xx.flatten() for xx in np.meshgrid(*edges, indexing='ij')]
         mtot = (10.0**mtot) * MSOL
         mass = holo.utils.m1m2_from_mtmr(mtot, mrat).T
 
-        print(f"{pop.shape=}, {pop.size=}, {redz.shape=}, {mtot.shape=}, {mass.shape=}")
-        self._size = mtot.size
+        # print(f"{pop.shape=}, {pop.size=}, {redz.shape=}, {mtot.shape=}, {mass.shape=}")
 
         # Store standardized quantities
         self.scafa = cosmo.z_to_a(redz)
@@ -69,10 +85,8 @@ class BP_Observational(holo.population._Population):
         return
 
     def _update_derived(self):
-        pass
-
-
-# ## Create multiple gravitational-wave sky realizations from the catalog.
+        self._size = self.sepa.size
+        return
 
 
 def pipeline(freq_min=1e-9):
