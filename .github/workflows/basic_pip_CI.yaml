@@ -57,7 +57,8 @@ jobs:
 
     - name: Run tests
       run: |
-        pytest -v --cov=holodeck --cov-report=xml --color=yes holodeck/tests/
+      	bash run_tests.sh
+        # pytest -v --cov=holodeck --cov-report=xml --color=yes holodeck/tests/
 
     - name: CodeCov
       uses: codecov/codecov-action@v1
