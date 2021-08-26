@@ -2,7 +2,6 @@
 """
 
 import numpy as np
-import tqdm
 
 from holodeck import utils, cosmo
 from holodeck.constants import SPLC, MPC, MSOL
@@ -50,7 +49,7 @@ class GW_Discrete(Grav_Waves):
         else:
             harm_range = [2]
 
-        for ii, fobs in tqdm.tqdm(enumerate(freqs), total=len(freqs)):
+        for ii, fobs in utils.tqdm(enumerate(freqs), total=len(freqs), desc='GW frequencies'):
             _fore, _back, _loud = _calc_mc_at_fobs(
                 fobs, harm_range, nreals, bin_evo, box_vol,
                 loudest=nloudest
@@ -85,7 +84,7 @@ class GW_Continuous(Grav_Waves):
         m1, m2 = [mm[np.newaxis, :] for mm in pop.mass.T]
 
         H0 = cosmo.H0*1e5 / MPC   # convert from [km/s/Mpc] to [1/s]
-        redz = cosmo.a_to_z(pop.time)                     # (N,)
+        redz = cosmo.a_to_z(pop.scafa)                     # (N,)
         redz = np.clip(redz, 0.1, None)
         # print(f"redz={zmath.stats_str(redz)}")
         dlum = cosmo.luminosity_distance(redz).cgs.value

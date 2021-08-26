@@ -61,7 +61,7 @@ class BP_Observational(holo.population._Population):
         self._size = mtot.size
 
         # Store standardized quantities
-        self.time = cosmo.z_to_a(redz)
+        self.scafa = cosmo.z_to_a(redz)
         self.sepa = holo.utils.kepler_sep_from_freq(mtot, self.FREQ_MIN)
         self.mass = mass
         self.weight = pop.flatten()

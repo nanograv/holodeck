@@ -83,7 +83,7 @@ def figax(figsize=[12, 6], ncols=1, nrows=1, sharex=False, sharey=False, squeeze
 
 def plot_bin_pop(pop):
     mt, mr = utils.mtmr_from_m1m2(pop.mass)
-    redz = cosmo.a_to_z(pop.time)
+    redz = cosmo.a_to_z(pop.scafa)
     data = [mt/MSOL, mr, pop.sepa/PC, 1+redz]
     data = [np.log10(dd) for dd in data]
     reflect = [None, [None, 0], None, [0, None]]
