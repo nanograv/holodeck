@@ -48,7 +48,7 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
         zgrid = self._init_interp_grid(self._Z_GRID, self._INTERP_POINTS)
         self._grid_z = zgrid
         self._sort_z = np.argsort(zgrid)
-        self._grid_a = self._z_to_a(zgrid)
+        self._grid_a = self.z_to_a(zgrid)
         self._sort_a = np.argsort(self._grid_a)
         # Calculate corresponding values in desired parameters
         #    Ages in seconds
@@ -110,20 +110,22 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
         return zgrid
 
     @staticmethod
-    def _a_to_z(sf):
+    def a_to_z(sf):
         """Convert from scale-factor to redshift.
         """
         sf = np.asarray(sf)
+        # NOTE: this does not check for `nan`
         if np.any((sf > 1.0) | (sf < 0.0)):
             raise ValueError("Scale-factor must be [0.0, 1.0]")
 
         return (1.0/sf) - 1.0
 
     @staticmethod
-    def _z_to_a(redz):
+    def z_to_a(redz):
         """Convert from redshift to scale-factor.
         """
         redz = np.asarray(redz)
+        # NOTE: this does not check for `nan`
         if np.any(redz < 0.0):
             raise ValueError("Redshift must be [0.0, +inf)")
 

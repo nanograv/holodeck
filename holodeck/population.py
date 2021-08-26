@@ -2,39 +2,39 @@
 """
 
 import abc
+import os
 
 import numpy as np
 
-from holodeck import utils, log
+from holodeck import utils, log, _PATH_DATA, cosmo
 from holodeck.constants import PC, MSOL
 
 _DEF_ECCEN_DIST = (1.0, 0.2)
+_DEF_ILLUSTRIS_FNAME = "illustris-galaxy-mergers_L75n1820FP_gas-100_dm-100_star-100_bh-000.hdf5"
 
 
-class _Binary_Population(abc.ABC):
+class _Population(abc.ABC):
 
-    def __init__(self, fname, *args, mods=None, check=True, **kwargs):
-        self._fname = fname
+    def __init__(self, *args, mods=None, check=True, **kwargs):
         self._check_flag = check
-
-        # Initial binary values (i.e. at time of formation)
-        self.time = None    # scale factor        (N,)
-        self.sepa = None    # binary separation a (N,)
-        self.mass = None    # blackhole masses    (N, 2)
-        self.eccen = None    # eccentricities      (N,) [optional]
-
-        self._size = None
-        self._sample_volume = None
-
         # Initialize the population
-        self._init_from_file(fname)
+        self._init()
         # Apply modifications (using `Modifer` instances), run `_finalize` and `_check()`
         self.modify(mods)
         return
 
-    @abc.abstractmethod
-    def _init_from_file(self, fname):
-        pass
+    def _init(self):
+        # Initial binary values (i.e. at time of formation)
+        self.scafa = None    # scale factor        (N,)
+        self.sepa = None    # binary separation a (N,)
+        self.mass = None    # blackhole masses    (N, 2)
+
+        self.eccen = None   # eccentricities      (N,) [optional]
+        self.weight = None  # weight of each binary as a sample  (N,) [optional]
+
+        self._size = None
+        self._sample_volume = None
+        return
 
     @abc.abstractmethod
     def _update_derived(self):
@@ -48,7 +48,7 @@ class _Binary_Population(abc.ABC):
         # Sanitize
         if mods is None:
             mods = []
-        elif not isinstance(mods, list):
+        elif not np.iterable(mods):
             mods = [mods]
 
         # Run Modifiers
@@ -73,7 +73,7 @@ class _Binary_Population(abc.ABC):
     def _check(self):
         ErrorType = ValueError
         msg = "{}._check() Failed!  ".format(self.__class__.__name__)
-        array_names = ['time', 'sepa', 'mass', 'eccen']
+        array_names = ['scafa', 'sepa', 'mass', 'eccen']
         two_dim = ['mass']
         allow_none = ['eccen']
 
@@ -119,9 +119,20 @@ class _Binary_Population(abc.ABC):
         return
 
 
-class BP_Illustris(_Binary_Population):
+class Pop_Illustris(_Population):
 
-    def _init_from_file(self, fname):
+    def __init__(self, fname=None, **kwargs):
+        if fname is None:
+            fname = _DEF_ILLUSTRIS_FNAME
+            fname = os.path.join(_PATH_DATA, fname)
+
+        self._fname = fname
+        super().__init__(**kwargs)
+        return
+
+    def _init(self):
+        super()._init()
+        fname = self._fname
         header, data = utils.load_hdf5(fname)
         self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3
 
@@ -136,7 +147,7 @@ class BP_Illustris(_Binary_Population):
         self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :]
         self.vdisp = data['SubhaloVelDisp']
         self.mass = data['SubhaloBHMass']
-        self.time = data['time']
+        self.scafa = data['time']
         return
 
     def _update_derived(self):
@@ -144,13 +155,29 @@ class BP_Illustris(_Binary_Population):
         return
 
 
-class BP_Continuous(_Binary_Population):
+'''
+def Pop_SAM(_Population):
+
+    def __init__(self, sam, sepa, **kwargs):
+        self._sam = sam
+        self._sepa_init = sepa
+        super().__init__(**kwargs)
+        return
+
+    def _init(self):
+        sam = self._sam
+        sepa = self._sepa_init
+'''
+
+
+'''
+class BP_Continuous(_Population):
 
     def _init_from_file(self, fname):
         data = np.load(fname)
         mt = data['mtot'] * MSOL
         mr = data['mrat']
-        sc = utils.z_to_a(data['redz'])
+        sc = cosmo.z_to_a(data['redz'])
         ww = data['pops'][..., 0]
         self._mtot = mt
         self._mrat = mr
@@ -159,7 +186,7 @@ class BP_Continuous(_Binary_Population):
         mt, mr, sc = [xx.flatten() for xx in np.meshgrid(mt, mr, sc, indexing='ij')]
         self.mtot = mt
         self.mrat = mr
-        self.time = sc
+        self.scafa = sc
         self.weight = ww.flatten()
         self.sepa = 1e5 * PC * np.ones_like(mt)
         self.mass = utils.m1m2_from_mtmr(self.mtot, self.mrat).T
@@ -169,6 +196,7 @@ class BP_Continuous(_Binary_Population):
     def _update_derived(self):
         self._size = self.mtot.size
         return
+'''
 
 
 class Population_Modifier(utils._Modifier):
@@ -214,13 +242,15 @@ class PM_Resample(Population_Modifier):
         old_data = [
             np.log10(mt / MSOL),
             np.log10(mr),
-            pop.time,      # resample linearly in scale-factor
+            # pop.scafa,      # resample linearly in scale-factor
+            cosmo.a_to_z(pop.scafa),
             np.log10(pop.sepa / PC)
         ]
         reflect = [
             None,
             [None, 0.0],
-            [0.0, 1.0],
+            # [0.0, 1.0],   # scafa
+            [0.0, None],   # redz
             None,
         ]
 
@@ -254,7 +284,8 @@ class PM_Resample(Population_Modifier):
         mr = 10**new_data[1]
 
         pop.mass = utils.m1m2_from_mtmr(mt, mr).T
-        pop.time = new_data[2]
+        # pop.scafa = new_data[2]
+        pop.scafa = cosmo.z_to_a(new_data[2])
         pop.sepa = PC * 10**new_data[3]
         pop.eccen = None if (eccen is None) else new_data[4]
 

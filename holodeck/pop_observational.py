@@ -1,3 +1,11 @@
+"""
+
+To-Do
+-----
+* [ ] Use only `cosmo` (instead of other astropy.cosmology utils e.g. `Planck15`)
+
+
+"""
 # This code is reproduced and modified from the original repository https://github.com/morgan-nanez/nanohertz_GWs that is based
 # on results from Mingarelli et al. (2017) (https://zenodo.org/badge/latestdoi/90664185)
 # Related paper : https://www.nature.com/articles/s41550-017-0299-6
@@ -15,7 +23,7 @@ from astropy.cosmology import Planck15, z_at_value
 import os
 
 import holodeck as holo
-from holodeck import _PATH_DATA
+from holodeck import _PATH_DATA, cosmo, log
 from holodeck.constants import MSOL
 
 # physical constants for natural units c = G = 1
@@ -28,14 +36,30 @@ log10 = np.log10
 pi = np.pi
 sqrt = np.sqrt
 
+# _DEF_OBSERVATIONAL_FNAME = "mbhb-pops-continuous_casey-clyde_mingarelli_2021-02-17.npz"
+_DEF_OBSERVATIONAL_FNAME = "observational_2mass_galaxy-catalog_extended.npz"
 
-class BP_Observational(holo.population._Binary_Population):
+
+class BP_Observational(holo.population._Population):
 
     FREQ_MIN = 1e-9    # Hz, minimum of PTA band of interest
 
-    def _init_from_file(self, fname):
+    def __init__(self, fname=None, *args, **kwargs):
+        if fname is None:
+            fname = _DEF_OBSERVATIONAL_FNAME
+        if not os.path.isfile(fname):
+            fname = os.path.join(_PATH_DATA, fname)
+
+        self._fname = fname
+        super().__init__(*args, **kwargs)
+        return
+
+    def _init(self):
+        super()._init()
+        fname = self._fname
         data = np.load(fname)
-        k_mag = data['k_mag']
+        k_mag = data['k_mag'][:1000]
+        log.warning("WARNING: TRUNCATING `k_mag` FOR TESTING!")
 
         # Construct population
         no_of_bhb, prim_BHmass_min, prim_BHmass_max, binaries = single_realization(k_mag, self.FREQ_MIN)
@@ -45,15 +69,15 @@ class BP_Observational(holo.population._Binary_Population):
         self._mbhb_edges = edges
 
         # Convert from grid to 1D arrays
+        self._redz, self._mtot, self._mrat = edges
         redz, mtot, mrat = [xx.flatten() for xx in np.meshgrid(*edges, indexing='ij')]
         mtot = (10.0**mtot) * MSOL
         mass = holo.utils.m1m2_from_mtmr(mtot, mrat).T
 
-        print(f"{pop.shape=}, {pop.size=}, {redz.shape=}, {mtot.shape=}, {mass.shape=}")
-        self._size = mtot.size
+        # print(f"{pop.shape=}, {pop.size=}, {redz.shape=}, {mtot.shape=}, {mass.shape=}")
 
         # Store standardized quantities
-        self.time = holo.utils.z_to_a(redz)
+        self.scafa = cosmo.z_to_a(redz)
         self.sepa = holo.utils.kepler_sep_from_freq(mtot, self.FREQ_MIN)
         self.mass = mass
         self.weight = pop.flatten()
@@ -61,10 +85,8 @@ class BP_Observational(holo.population._Binary_Population):
         return
 
     def _update_derived(self):
-        pass
-
-
-# ## Create multiple gravitational-wave sky realizations from the catalog.
+        self._size = self.sepa.size
+        return
 
 
 def pipeline(freq_min=1e-9):
@@ -625,10 +647,21 @@ delta1 = -0.4695
 # For Illustris galaxy-galaxy merger rate
 # functions for Illustris, Table 1 of Rodriguez-Gomez et al. (2016), assuming z != 0.
 
-def A_z(z): return A0*(1+z)**eta
-def alpha(z): return alpha0*(1+z)**alpha1
-def beta(z): return beta0*(1+z)**beta1
-def delta(z): return delta0*(1+z)**delta1
+
+def A_z(z):
+    return A0*(1+z)**eta
+
+
+def alpha(z):
+    return alpha0*(1+z)**alpha1
+
+
+def beta(z):
+    return beta0*(1+z)**beta1
+
+
+def delta(z):
+    return delta0*(1+z)**delta1
 
 
 def MzMnow(mu, sigma):

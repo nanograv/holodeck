@@ -146,9 +146,7 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
     """
     """
 
-    def __init__(
-        self, time_norm=0.55, mref=7.2e10, malpha=0.0, zbeta=-0.5, qgamma=0.0
-    ):
+    def __init__(self, time_norm=0.55, mref=7.2e10, malpha=0.0, zbeta=-0.5, qgamma=0.0):
         # tau0  [Gyr]
         self._time_norm = time_norm   # +0.55  b/t [+0.1, +2.0]  [+0.1, +10.0]
         self._malpha = malpha         # +0.0   b/t [-0.2, +0.2]  [-0.2, +0.2 ]
@@ -359,7 +357,7 @@ class Semi_Analytic_Model:
 
         return self._density
 
-    def number_at_fobs(self, fobs, limit_merger_time=None):
+    def number_at_gw_fobs(self, fobs, limit_merger_time=None):
         """Convert from number-density to finite Number, per log-frequency interval
 
         Arguments
@@ -439,7 +437,7 @@ class Semi_Analytic_Model:
             squeeze = True
 
         # `num` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
-        edges, num, hs = self.number_at_fobs(fobs)
+        edges, num, hs = self.number_at_gw_fobs(fobs)
 
         if realize is True:
             num = np.random.poisson(num)
@@ -462,7 +460,7 @@ def sample_sam(sam, fobs, sample_threshold=10.0, cut_below_mass=1e6, limit_merge
     fobs in units of [1/yr]
     """
     # edges: Mtot [Msol], mrat (q), redz (z), fobs (f) [1/yr]
-    edges, number, _ = sam.number_at_fobs(fobs, limit_merger_time=limit_merger_time)
+    edges, number, _ = sam.number_at_gw_fobs(fobs, limit_merger_time=limit_merger_time)
     log_edges = [np.log10(edges[0]), edges[1], edges[2], np.log10(edges[3])]
 
     if cut_below_mass is not None:
