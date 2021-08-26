@@ -436,6 +436,16 @@ class NFW(_Density_Profile):
         rs = np.power(rs, 1.0/3.0)
         return rho_s, rs
 
+    @classmethod
+    def radius_scale(cls, mhalo, redz):
+        rs = cls._nfw_rho_rad(mhalo, redz)[1]
+        return rs
+
+    @classmethod
+    def density_critical(cls, mhalo, redz):
+        rs = cls._nfw_rho_rad(mhalo, redz)[0]
+        return rs
+
 
 # =================================================================================================
 # ====                             Stellar-Mass Halo-Mass Relation                             ====
