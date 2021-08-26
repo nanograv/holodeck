@@ -63,7 +63,7 @@ _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 
 
 # =================================================================================================
-#   ====    API Classes and Functions    ====
+# ====    API Classes and Functions    ====
 # =================================================================================================
 
 
@@ -903,10 +903,12 @@ class Fixed_Time(_Hardening):
             norm = self._interp(points.T)
             bads = ~np.isfinite(norm)
             if np.any(bads):
-                msg = f"Normal interpolant failed on {utils.frac_str(bads, 4)} points, using backup interpolant"
+                msg = f"Normal interpolant failed on {utils.frac_str(bads, 4)} points.  Using backup interpolant"
                 log.info(msg)
                 bp = points.T[bads]
-                norm[bads] = self._interp_backup(bp.T)
+                # If scipy throws an error on the shape here, see: https://github.com/scipy/scipy/issues/4123
+                # or https://stackoverflow.com/a/26806707/230468
+                norm[bads] = self._interp_backup(bp)
                 bads = ~np.isfinite(norm)
                 if np.any(bads):
                     err = f"Backup interpolant failed on {utils.frac_str(bads, 4)} points!"
@@ -1058,7 +1060,7 @@ class Fixed_Time(_Hardening):
 
 
 # =================================================================================================
-#   ====    Internal/Utility Classes and Functions    ====
+# ====    Internal/Utility Classes and Functions    ====
 # =================================================================================================
 
 
