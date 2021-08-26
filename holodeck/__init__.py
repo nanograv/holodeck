@@ -8,7 +8,6 @@ import logging
 log = logging.getLogger('holodeck')
 log.setLevel(logging.WARNING)
 
-
 # --- Setup root package variables
 
 _PATH_PACKAGE = os.path.dirname(os.path.abspath(__file__))
