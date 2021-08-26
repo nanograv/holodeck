@@ -647,10 +647,21 @@ delta1 = -0.4695
 # For Illustris galaxy-galaxy merger rate
 # functions for Illustris, Table 1 of Rodriguez-Gomez et al. (2016), assuming z != 0.
 
-def A_z(z): return A0*(1+z)**eta
-def alpha(z): return alpha0*(1+z)**alpha1
-def beta(z): return beta0*(1+z)**beta1
-def delta(z): return delta0*(1+z)**delta1
+
+def A_z(z):
+    return A0*(1+z)**eta
+
+
+def alpha(z):
+    return alpha0*(1+z)**alpha1
+
+
+def beta(z):
+    return beta0*(1+z)**beta1
+
+
+def delta(z):
+    return delta0*(1+z)**delta1
 
 
 def MzMnow(mu, sigma):
