@@ -88,7 +88,7 @@ def plot_bin_pop(pop):
     data = [np.log10(dd) for dd in data]
     reflect = [None, [None, 0], None, [0, None]]
     labels = [r'M/M_\odot', 'q', r'a/\mathrm{{pc}}', '1+z']
-    labels = [r'${{\log_{{10}}}} \left({}\\right)$'.format(ll) for ll in labels]
+    labels = [r'${{\log_{{10}}}} \left({}\right)$'.format(ll) for ll in labels]
 
     if pop.eccen is not None:
         data.append(pop.eccen)
@@ -280,6 +280,7 @@ def _draw_plaw(ax, freqs, amp=1e-15, f0=1/YR, **kwargs):
     return ax.plot(freqs, plaw, **kwargs)
 
 
+'''
 def plot_evo(evo, freqs):
     fig, ax = plt.subplots(figsize=[10, 5])
     ax.set(xlabel='Obs Orb Freq [1/yr]', xscale='log', yscale='log')
@@ -318,4 +319,52 @@ def plot_evo(evo, freqs):
         labels.append(nn)
 
     ax.legend(handles, labels)
+    return fig
+'''
+
+
+def plot_evo(evo, freqs=None, sepa=None):
+    if (freqs is None) and (sepa is None):
+        utils.error("Either `freqs` or `sepa` must be provided!")
+
+    if freqs is not None:
+        data = evo.at('fobs', freqs)
+        xx = freqs * YR
+        xlabel = 'GW Frequency [1/yr]'
+    else:
+        data = evo.at('sepa', sepa)
+        xx = sepa / PC
+        xlabel = 'Binary Separation [pc]'
+
+    fig, ax = figax(xlabel=xlabel)
+
+    def _draw_vals_conf(ax, xx, vals, color=None, label=None):
+        if color is None:
+            color = ax._get_lines.get_next_color()
+        if label is not None:
+            ax.set_ylabel(label, color=color)
+            ax.tick_params(axis='y', which='both', colors=color)
+        # vals = np.percentile(vals, [25, 50, 75], axis=0) / units
+        vals = utils.quantiles(vals, [0.25, 0.50, 0.75], axis=0).T
+        h1 = ax.fill_between(xx, vals[0], vals[-1], alpha=0.25, color=color)
+        h2, = ax.plot(xx, vals[1], alpha=0.75, lw=2.0, color=color)
+        return (h1, h2)
+
+    # handles = []
+    # labels = []
+
+    name = 'Hardening Time [yr]'
+    vals = np.fabs(data['sepa'] / data['dadt']) / YR
+    _draw_vals_conf(ax, xx, vals, label=name)
+    # handles.append(hh)
+    # labels.append(name)
+
+    # name = 'eccen'
+    # tw = ax.twinx()
+    # hh, nn = _draw_vals_conf(tw, freqs*YR, name, 'green')
+    # if hh is not None:
+    #     handles.append(hh)
+    #     labels.append(nn)
+
+    # ax.legend(handles, labels)
     return fig
