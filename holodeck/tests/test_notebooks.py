@@ -34,6 +34,13 @@ def tb_semi_analytic_model():
         yield tb
 
 
+@pytest.fixture(scope='module')
+def tb_observations():
+    path = os.path.join(_PATH_NOTEBOOKS, "observations.ipynb")
+    with testbook(path, execute=True) as tb:
+        yield tb
+
+
 def test_discrete_illustris(tb_discrete_illustris):
     pass
 
@@ -43,4 +50,8 @@ def test_continuous_observational(tb_continuous_observational):
 
 
 def test_semi_analytic_model(tb_semi_analytic_model):
+    pass
+
+
+def test_observations(tb_observations):
     pass
