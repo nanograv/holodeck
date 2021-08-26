@@ -11,7 +11,6 @@ import copy
 import abc
 
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy as sp
 import h5py
 

@@ -22,7 +22,7 @@ import kalepy.plot
 
 import holodeck as holo
 import holodeck.sam
-from holodeck import cosmo, utils
+from holodeck import cosmo, utils, plot
 from holodeck.constants import MSOL, PC, YR, MPC, GYR
 
 # Silence annoying numpy errors
