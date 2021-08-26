@@ -131,7 +131,7 @@ class Evolution:
         # ---- Iterate through all integration steps
         size, nsteps = self.shape
         steps_list = range(1, nsteps)
-        for step in utils.tqdm(steps_list):
+        for step in utils.tqdm(steps_list, desc="evolving binaries"):
             rv = self._take_next_step(step)
             if rv is _EVO.END:
                 break
@@ -248,8 +248,6 @@ class Evolution:
         dtda = 1.0 / - self.dadt[:, (left, right)]   # convert dadt to positive
         sepa = self.sepa[:, (right, left)]   # sepa is decreasing, so switch left-right order
         dt = utils.trapz_loglog(dtda, sepa, axis=-1).squeeze()   # this should come out positive
-        log.warning(f" dt={utils.stats(dt)}")
-
         if np.any(dt < 0.0):
             utils.error(f"Negative time-steps found at step={step}!")
 
@@ -850,7 +848,7 @@ class Dynamical_Friction_NFW(_Hardening):
         return atten
 
 
-class Timed(_Hardening):
+class Fixed_Time(_Hardening):
 
     _NUM_POINTS = 1e4
     _NUM_PAD_FACTOR = 5.0
@@ -1011,7 +1009,7 @@ class Timed(_Hardening):
 
         num = int(np.ceil(size / chunk))
         sol = np.zeros_like(tau)
-        for ii in utils.tqdm(range(num)):
+        for ii in utils.tqdm(range(num), desc='calculating hardening normalization'):
             lo = ii * chunk
             hi = np.minimum((ii + 1) * chunk, size)
             cut = slice(lo, hi)
