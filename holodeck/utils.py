@@ -42,7 +42,7 @@ class _Modifier(abc.ABC):
 
 
 def error(msg, etype=ValueError):
-    log.error(msg)
+    log.exception(msg, exc_info=True)
     raise etype(msg)
 
 
