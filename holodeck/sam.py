@@ -7,7 +7,8 @@ https://ui.adsabs.harvard.edu/abs/2019MNRAS.488..401C/abstract
 
 To-Do
 -----
-
+* [ ] Check that _GW_ frequencies and _orbital_ frequencies are being used in the correct places.
+    Check `number_at_gw_fobs` and related methods.
 
 """
 import abc
@@ -19,8 +20,8 @@ import numpy as np
 
 import kalepy as kale
 
-from holodeck import cosmo, utils
-from holodeck.constants import GYR, SPLC, MSOL, MPC, YR
+from holodeck import cosmo, utils, log
+from holodeck.constants import GYR, SPLC, MSOL, MPC, YR, PC
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
@@ -129,15 +130,15 @@ class _Galaxy_Merger_Time(abc.ABC):
         new_age = age + tau0
 
         if np.isscalar(new_age):
-            if new_age < _AGE_UNIVERSE_GYR:
-                redz_prime = cosmo.tage_to_z(new_age * GYR)
+            if new_age < _AGE_UNIVERSE_GYR * GYR:
+                redz_prime = cosmo.tage_to_z(new_age)
             else:
                 redz_prime = -1
 
         else:
             redz_prime = -1.0 * np.ones_like(new_age)
-            idx = (new_age < _AGE_UNIVERSE_GYR)
-            redz_prime[idx] = cosmo.tage_to_z(new_age[idx] * GYR)
+            idx = (new_age < _AGE_UNIVERSE_GYR * GYR)
+            redz_prime[idx] = cosmo.tage_to_z(new_age[idx])
 
         return redz_prime
 
@@ -302,11 +303,18 @@ class Semi_Analytic_Model:
         self._mmbulge = mmbulge
 
         self._density = None
+        self._grid = None
         return
 
     @property
     def edges(self):
         return [self.mtot, self.mrat, self.redz]
+
+    @property
+    def grid(self):
+        if self._grid is None:
+            self._grid = np.meshgrid(*self.edges, indexing='ij')
+        return self._grid
 
     @property
     def shape(self):
@@ -423,6 +431,87 @@ class Semi_Analytic_Model:
         dl = dl[np.newaxis, np.newaxis, :, np.newaxis]
         dl[dl <= 0.0] = np.nan
         strain = utils.gw_strain_source(mchirp, dl, frst)
+        strain = np.nan_to_num(strain)
+
+        # (M, Q, Z) units: [1/s] i.e. number per second
+        number = dens * cosmo_fact
+        # (M, Q, Z, F) units: [] unitless, i.e. number
+        number = number[..., np.newaxis] * tau
+
+        return edges, number, strain
+
+    def number_from_hardening(self, hard, fobs=None, sepa=None):
+        """Convert from number-density to finite Number, per log-frequency interval
+
+        Arguments
+        ---------
+        fobs : observed frequency in [1/yr]
+        sepa : orbital separation in [pc]
+
+        d N / d ln f_r = (dn/dz) * (dz/dt) * (dt/d ln f_r) * (dVc/dz)
+                       = (dn/dz) * (f_r / [df_r/dt]) * 4 pi c D_c^2 (1+z) * dz
+
+        """
+        if (fobs is None) == (sepa is None):
+            utils.error("one (and only one) of `fobs` or `sepa` must be provided!")
+
+        if fobs is not None:
+            xsize = len(fobs)
+            edges = self.edges + [fobs, ]
+        else:
+            log.warning("`sepa` has been given, but dN/d ln(f_r) is still being returned!")
+            xsize = len(sepa)
+            edges = self.edges + [sepa, ]
+
+        # shape: (M, Q, Z)
+        dens = self.density   # dn/dz  units: [Mpc^-3]
+
+        # (Z,) comoving-distance in Mpc
+        dc = cosmo.comoving_distance(self.redz).to('Mpc').value
+
+        # [Mpc^3/s]
+        cosmo_fact = 4 * np.pi * (SPLC/MPC) * np.square(dc) * self._dz
+
+        # (M, Q)
+        mchirp = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
+        mchirp = utils.chirp_mass(*mchirp) * MSOL   # convert to [grams]
+        # (M, Q, 1, 1)
+        mchirp = mchirp[..., np.newaxis, np.newaxis]
+
+        mt, mr, rz = [gg.ravel() for gg in self.grid]
+        mt = mt * MSOL
+
+        if fobs is not None:
+            # Convert from obs-GW freq, to rest-frame orbital freq
+            fr = fobs[:, np.newaxis] * (1.0 + rz[np.newaxis, :]) / YR / 2.0
+            sa = utils.kepler_sepa_from_freq(mt[np.newaxis, :], fr)
+            # recall: these are negative (decreasing separation)
+            dadt = hard.dadt(mt[np.newaxis, :], mr[np.newaxis, :], sa)
+            # dfdt is positive (increasing frequency)
+            dfdt, fr = utils.dfdt_from_dadt(dadt, sa, freq_orb=fr)
+        else:
+            sa = sepa[:, np.newaxis] * PC
+            # recall: these are negative (decreasing separation)
+            dadt = hard.dadt(mt[np.newaxis, :], mr[np.newaxis, :], sa)
+            # dfdt is positive (increasing frequency)
+            dfdt, fr = utils.dfdt_from_dadt(dadt, sa, mtot=mt[np.newaxis, :])
+
+        tau = fr / dfdt
+        log.info(f"timescales for sampling: {utils.stats(tau)} [Gyr]")
+
+        # convert `tau` to the correct shape, note that moveaxis MUST happen _before_ reshape!
+        # (F, M*Q*Z) ==> (M*Q*Z, F)
+        tau = np.moveaxis(tau, 0, -1)
+        fr = np.moveaxis(fr, 0, -1)
+        # (M*Q*Z, F) ==> (M, Q, Z, F)
+        tau = tau.reshape(dens.shape + (xsize,))
+        fr = fr.reshape(dens.shape + (xsize,))
+
+        # luminosity distance in [cm]
+        dl = dc * (1.0 + self.redz) * MPC
+        dl = dl[np.newaxis, np.newaxis, :, np.newaxis]
+        dl[dl <= 0.0] = np.nan
+        strain = utils.gw_strain_source(mchirp, dl, fr*2.0)   # use GW frequency
         strain = np.nan_to_num(strain)
 
         # (M, Q, Z) units: [1/s] i.e. number per second
