@@ -849,56 +849,79 @@ class Dynamical_Friction_NFW(_Hardening):
 
 
 class Fixed_Time(_Hardening):
+    """
 
-    _NUM_POINTS = 1e4
-    _NUM_PAD_FACTOR = 5.0
+    To-Do
+    -----
+    * [ ] Handle `rchar` better with respect to interpolation.  Currently not an interpolation
+        variable, which restricts it's usage.
 
-    def __init__(self, time, rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5):
-        if not np.isscalar(rchar) and not callable(rchar):
-            err = f"Initialized `rchar` ({type(rchar)}) must be scalar or callable (`rchar(mt, mr)`)!"
-            log.error(err)
-            raise ValueError(err)
+    """
 
-        self._time = time
-        self._rchar_init = rchar
-        self._gamma_sc = gamma_sc
-        self._gamma_df = gamma_df
+    _INTERP_NUM_POINTS = 1e4             # number of random data points used to construct interpolant
+    _INTERP_THRESH_PAD_FACTOR = 5.0      #
+    _TIME_TOTAL_RMIN = 1.0e-5 * PC       # minimum radius [cm] used to calculate inspiral time
 
-        self._norm = None
-        self._rchar = None
-        self._interp = None
-        self._interp_backup = None
-        return
+    def __init__(self, pop, time, rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5):
+        """
 
-    def _init(self, mt, mr, sepa):
-        time = self._time
-        rchar_init = self._rchar_init
+        Arguments
+        ---------
+        pop : `_Population` instance
+        time : scalar, callable  or  array_like[scalar]
+            Total merger time of binaries, units of [sec], specifiable in the following ways:
+            *   scalar : uniform merger time for all binaries
+            *   callable : function `time(mtot, mrat, redz)` which returns the total merger time
+            *   array_like : (N,) matching the shape of `mtot` (etc) giving the merger time for
+                each binary
+        rchar : scalar  or  callable
+            Characteristic radius dividing two power-law regimes, in units of [cm]:
+            *   scalar : uniform radius for all binaries
+            *   callable : function `rchar(mtot, mrat, redz)` which returns the radius
+        gamma_sc : scalar
+            Power-law of hardening timescale in the stellar-scattering regime
+            (small separations: r < rchar)
+        gamma_df : scalar
+            Power-law of hardening timescale in the dynamical-friction regime
+            (large separations: r > rchar)
 
+        """
+        mtot, mrat = utils.mtmr_from_m1m2(pop.mass)
+        sepa = pop.sepa
+        redz = cosmo.a_to_z(pop.scafa)
+
+        # ---- Initialize / Sanitize arguments
+
+        # Ensure `time` is ndarray matching binary variables
         if np.isscalar(time):
-            time = time * np.ones_like(mt)
+            time = time * np.ones_like(mtot)
         elif callable(time):
-            time = time(mt, mr)
-        elif np.shape(time) != np.shape(mt):
-            err = f"Shape of initialized `time` ({np.shape(time)}) does not match `mt` ({np.shape(mt)})!"
-            log.error(err)
-            raise ValueError(err)
+            time = time(mtot, mrat, redz)
+        elif np.shape(time) != np.shape(mtot):
+            utils.error(f"Shape of `time` ({np.shape(time)}) does not match `mtot` ({np.shape(mtot)})!")
 
-        if callable(rchar_init):
-            rchar = rchar_init(mt, mr)
-        else:
-            rchar = rchar_init
+        # `rchar` must be a function of only mtot, mrat; or otherwise a fixed value
+        # This is because it is not being used as an interpolation variable, only an external parameter
+        # FIX: either an ndarray could be allowed when interpolation is not needed (i.e. small numbers of systems)
+        #      or `rchar` could be added as an explicit interpolation variable
+        if callable(rchar):
+            rchar = rchar(mtot, mrat, redz)
+        elif not np.isscalar(rchar):
+            utils.error("`rchar` must be a scalar or callable: (`rchar(mtot, mrat)`)!")
+
+        # ---- Calculate normalization parameter
 
         # If there are lots of points, construct and use an interpolant
-        if len(mt) > self._NUM_PAD_FACTOR * self._NUM_POINTS:
+        if len(mtot) > self._INTERP_THRESH_PAD_FACTOR * self._INTERP_NUM_POINTS:
             log.info("constructing hardening normalization interpolant")
             # both are callable as `interp(args)`, with `args` shaped (N, 4),
             # the 4 parameters are:      [log10(M/MSOL), log10(q), time/Gyr, log10(Rmax/PC)]
             # the interpolants return the log10 of the norm values
-            interp, backup = self._calculate_norm_interpolant(rchar_init, self._gamma_sc, self._gamma_df)
-            self._interp = interp
-            self._interp_backup = backup
+            interp, backup = self._calculate_norm_interpolant(rchar, self._gamma_sc, self._gamma_df)
+            # self._interp = interp
+            # self._interp_backup = backup
 
-            points = [np.log10(mt/MSOL), np.log10(mr), time/GYR, np.log10(sepa/PC)]
+            points = [np.log10(mtot/MSOL), np.log10(mrat), time/GYR, np.log10(sepa/PC)]
             points = np.array(points)
             norm = self._interp(points.T)
             bads = ~np.isfinite(norm)
@@ -911,16 +934,16 @@ class Fixed_Time(_Hardening):
                 norm[bads] = self._interp_backup(bp)
                 bads = ~np.isfinite(norm)
                 if np.any(bads):
-                    err = f"Backup interpolant failed on {utils.frac_str(bads, 4)} points!"
-                    log.error(err)
-                    raise ValueError(err)
+                    utils.error(f"Backup interpolant failed on {utils.frac_str(bads, 4)} points!")
 
             norm = 10.0 ** norm
 
         # For small numbers of points, calculate the normalization directly
         else:
-            norm = self._get_norm_chunk(time, mt, mr, rchar, self._gamma_sc, self._gamma_df, sepa)
+            norm = self._get_norm_chunk(time, mtot, mrat, rchar, gamma_sc, gamma_df, sepa)
 
+        self._gamma_sc = gamma_sc
+        self._gamma_df = gamma_df
         self._norm = norm
         self._rchar = rchar
         return
@@ -930,17 +953,14 @@ class Fixed_Time(_Hardening):
         sepa = evo.sepa[:, step]
         mt, mr = utils.mtmr_from_m1m2(mass)
 
-        if self._norm is None:
-            self._init(mt, mr, sepa)
-
         norm = self._norm
         rchar = self._rchar
 
-        dadt, dedt = self._dadt_dedt(sepa, norm, mt, mr, rchar, self._gamma_sc, self._gamma_df)
+        dadt, dedt = self._dadt_dedt(mt, mr, sepa, norm, rchar, self._gamma_sc, self._gamma_df)
         return dadt, dedt
 
     @classmethod
-    def _dadt_dedt(cls, sepa, norm, mt, mr, rchar, g1, g2):
+    def _dadt_dedt(cls, mt, mr, sepa, norm, rchar, g1, g2):
         m1, m2 = utils.m1m2_from_mtmr(mt, mr)
         dadt_gw = utils.gw_hardening_rate_dadt(m1, m2, sepa)
 
@@ -958,9 +978,8 @@ class Fixed_Time(_Hardening):
 
     @classmethod
     def _time_total(cls, norm, mt, mr, rchar, g1, g2, rmax, num=100):
-        rmin = 1.0e-5 * PC
         norm = np.atleast_1d(norm)
-        args = [norm, mt, mr, rchar, g1, g2, rmax, rmin]
+        args = [norm, mt, mr, rchar, g1, g2, rmax, cls._TIME_TOTAL_RMIN]
         args = np.broadcast_arrays(*args)
         norm, mt, mr, rchar, g1, g2, rmax, rmin = args
         if np.ndim(norm) != 1:
@@ -976,7 +995,7 @@ class Fixed_Time(_Hardening):
         args = [aa[:, np.newaxis] for aa in args]
         norm, mt, mr, rchar, g1, g2 = args
 
-        dadt, _ = cls._dadt_dedt(rads, norm, mt, mr, rchar, g1, g2)
+        dadt, _ = cls._dadt_dedt(mt, mr, rads, norm, rchar, g1, g2)
 
         tt = utils.trapz_loglog(- 1.0 / dadt, rads, axis=-1)
         tt = tt[:, -1]
@@ -1002,7 +1021,7 @@ class Fixed_Time(_Hardening):
             raise
         chunk = int(chunk)
         size = np.size(tau)
-        if size <= chunk:
+        if size <= chunk * cls._INTERP_THRESH_PAD_FACTOR:
             return cls._get_norm(tau, *args, guess=guess)
 
         args = [tau, *args]
@@ -1026,19 +1045,11 @@ class Fixed_Time(_Hardening):
         td = [0.0, 20.0]
         rm = [1e3, 1e5]
 
-        num_points = int(cls._NUM_POINTS)
+        num_points = int(cls._INTERP_NUM_POINTS)
         mt = 10.0 ** np.random.uniform(*np.log10(mt), num_points) * MSOL
         mr = 10.0 ** np.random.uniform(*np.log10(mr), mt.size)
         td = np.random.uniform(*td, mt.size+1)[1:] * GYR
         rm = 10.0 ** np.random.uniform(*np.log10(rm), mt.size) * PC
-        # rm = 1e4 * PC
-
-        if callable(rchar):
-            rchar = rchar(mt, mr)
-        elif not np.isscalar(rchar):
-            err = f"`rchar` ({type(rchar)}) must be scalar or callable!"
-            log.error(err)
-            raise ValueError(err)
 
         norm = cls._get_norm_chunk(td, mt, mr, rchar, gamma_one, gamma_two, rm)
 
@@ -1057,6 +1068,12 @@ class Fixed_Time(_Hardening):
         interp = sp.interpolate.LinearNDInterpolator(points, np.log10(norm))
         backup = sp.interpolate.NearestNDInterpolator(points, np.log10(norm))
         return interp, backup
+
+
+class Fixed_Time_SAM(Fixed_Time):
+
+    def __init__(self, sam, time, **kwargs):
+        pass
 
 
 # =================================================================================================
