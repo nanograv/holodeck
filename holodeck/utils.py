@@ -436,6 +436,16 @@ def _parse_log_norm_pars(vals, size, default=None):
 # =================================================================================================
 
 
+def dfdt_from_dadt(dadt, sepa, mtot=None, freq_orb=None):
+    if (mtot is None) and (freq_orb is None):
+        error("Either `mtot` or `freq_orb` must be provided!")
+    if freq_orb is None:
+        freq_orb = kepler_freq_from_sepa(mtot, sepa)
+
+    dfdt = - 1.5 * (freq_orb / sepa) * dadt
+    return dfdt, freq_orb
+
+
 def mtmr_from_m1m2(m1, m2=None):
     if m2 is not None:
         masses = np.stack([m1, m2], axis=-1)
@@ -490,17 +500,6 @@ def chirp_mass(m1, m2=None):
         m1, m2 = np.moveaxis(m1, -1, 0)
     mc = np.power(m1 * m2, 3.0/5.0)/np.power(m1 + m2, 1.0/5.0)
     return mc
-
-
-def dfdt_from_dadt(dadt, sepa, mtot=None, freq_orb=None):
-    if mtot is None and freq_orb is None:
-        raise ValueError("Either `mtot` or `freq_orb` must be provided!")
-    if freq_orb is None:
-        freq_orb = kepler_freq_from_sepa(mtot, sepa)
-
-    dfda = -(3.0/2.0) * (freq_orb / sepa)
-    dfdt = dfda * dadt
-    return dfdt
 
 
 def gw_char_strain(hs, dur_obs, freq_orb_obs, freq_orb_rst, dfdt):
