@@ -279,8 +279,9 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
         aa = self._malpha
         bb = self._zbeta
         gg = self._qgamma
-        rv = tau0 * np.power(mpri/bm0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
-        return rv
+        mtime = tau0 * np.power(mpri/bm0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
+        mtime = mtime * GYR
+        return mtime
 
 
 class _MMBulge_Relation(abc.ABC):
