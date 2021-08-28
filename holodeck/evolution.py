@@ -862,7 +862,16 @@ class Fixed_Time(_Hardening):
     _INTERP_THRESH_PAD_FACTOR = 5.0      #
     _TIME_TOTAL_RMIN = 1.0e-5 * PC       # minimum radius [cm] used to calculate inspiral time
 
-    def __init__(self, pop, time, rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5):
+    @classmethod
+    def from_pop(cls, pop, time, **kwargs):
+        return cls(time, *pop.mtmr, pop.redz, pop.sepa, **kwargs)
+
+    @classmethod
+    def from_sam(cls, sam, time, sepa_init=1e4*PC, **kwargs):
+        mtot, mrat, redz = [gg.ravel() for gg in sam.grid]
+        return cls(time, mtot, mrat, redz, sepa_init, **kwargs)
+
+    def __init__(self, time, mtot, mrat, redz, sepa, rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5):
         """
 
         Arguments
@@ -886,9 +895,9 @@ class Fixed_Time(_Hardening):
             (large separations: r > rchar)
 
         """
-        mtot, mrat = utils.mtmr_from_m1m2(pop.mass)
-        sepa = pop.sepa
-        redz = cosmo.a_to_z(pop.scafa)
+        # mtot, mrat = utils.mtmr_from_m1m2(pop.mass)
+        # sepa = pop.sepa
+        # redz = cosmo.a_to_z(pop.scafa)
 
         # ---- Initialize / Sanitize arguments
 
@@ -910,6 +919,9 @@ class Fixed_Time(_Hardening):
             utils.error("`rchar` must be a scalar or callable: (`rchar(mtot, mrat)`)!")
 
         # ---- Calculate normalization parameter
+        mtot, mrat, time, sepa = np.broadcast_arrays(mtot, mrat, time, sepa)
+        if mtot.ndim != 1:
+            utils.error(f"Error in input shapes (`mtot.shpae={np.shape(mtot)})")
 
         # If there are lots of points, construct and use an interpolant
         if len(mtot) > self._INTERP_THRESH_PAD_FACTOR * self._INTERP_NUM_POINTS:
@@ -917,13 +929,13 @@ class Fixed_Time(_Hardening):
             # both are callable as `interp(args)`, with `args` shaped (N, 4),
             # the 4 parameters are:      [log10(M/MSOL), log10(q), time/Gyr, log10(Rmax/PC)]
             # the interpolants return the log10 of the norm values
-            interp, backup = self._calculate_norm_interpolant(rchar, self._gamma_sc, self._gamma_df)
+            interp, backup = self._calculate_norm_interpolant(rchar, gamma_sc, gamma_df)
             # self._interp = interp
             # self._interp_backup = backup
 
             points = [np.log10(mtot/MSOL), np.log10(mrat), time/GYR, np.log10(sepa/PC)]
             points = np.array(points)
-            norm = self._interp(points.T)
+            norm = interp(points.T)
             bads = ~np.isfinite(norm)
             if np.any(bads):
                 msg = f"Normal interpolant failed on {utils.frac_str(bads, 4)} points.  Using backup interpolant"
@@ -931,7 +943,7 @@ class Fixed_Time(_Hardening):
                 bp = points.T[bads]
                 # If scipy throws an error on the shape here, see: https://github.com/scipy/scipy/issues/4123
                 # or https://stackoverflow.com/a/26806707/230468
-                norm[bads] = self._interp_backup(bp)
+                norm[bads] = backup(bp)
                 bads = ~np.isfinite(norm)
                 if np.any(bads):
                     utils.error(f"Backup interpolant failed on {utils.frac_str(bads, 4)} points!")
@@ -952,12 +964,12 @@ class Fixed_Time(_Hardening):
         mass = evo.mass[:, step, :]
         sepa = evo.sepa[:, step]
         mt, mr = utils.mtmr_from_m1m2(mass)
-
-        norm = self._norm
-        rchar = self._rchar
-
-        dadt, dedt = self._dadt_dedt(mt, mr, sepa, norm, rchar, self._gamma_sc, self._gamma_df)
+        dadt, dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_sc, self._gamma_df)
         return dadt, dedt
+
+    def dadt(self, mt, mr, sepa):
+        dadt, dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_sc, self._gamma_df)
+        return dadt
 
     @classmethod
     def _dadt_dedt(cls, mt, mr, sepa, norm, rchar, g1, g2):
