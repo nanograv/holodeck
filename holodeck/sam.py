@@ -125,7 +125,7 @@ class _Galaxy_Merger_Time(abc.ABC):
 
     def zprime(self, mtot, mrat, redz, **kwargs):
         tau0 = self(mtot, mrat, redz)
-        age = cosmo.age(redz).to('Gyr').value
+        age = cosmo.age(redz).to('s').value
         new_age = age + tau0
 
         if np.isscalar(new_age):
@@ -162,8 +162,17 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
 
         Arguments
         ---------
-        mtot : total mass
-            Literature equations use primary-mass, converts internally.
+        mtot : (N,) array_like[scalar]
+            Total mass of each binary, converted to primary-mass (used in literature equations).
+        mrat : (N,) array_like[scalar]
+            Mass ratio of each binary.
+        redz : (N,) array_like[scalar]
+            Redshifts of each binary.
+
+        Returns
+        -------
+        mtime : (N,) ndarray[float]
+            Merger time for each binary in [sec].
 
         """
         # convert to primary mass
@@ -173,8 +182,9 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
         aa = self._malpha
         bb = self._zbeta
         gg = self._qgamma
-        rv = tau0 * np.power(mpri/bm0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
-        return rv
+        mtime = tau0 * np.power(mpri/bm0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
+        mtime = mtime * GYR
+        return mtime
 
 
 class _MMBulge_Relation(abc.ABC):
@@ -337,7 +347,7 @@ class Semi_Analytic_Model:
             # ---- Get Galaxy Merger Rate  [Chen19] Eq.5
             # NOTE: there is a `1/log(10)` here in the formalism, but it cancels with another one below  {*1}
             dens[idx] = self._gsmf(mstar_pri, redz) * self._gpf(mstar_tot, mstar_rat, redz) * cosmo.dtdz(redz)
-            dens[idx] /= self._gmt(mstar_tot, mstar_rat, redz) * GYR * mstar_tot
+            dens[idx] /= self._gmt(mstar_tot, mstar_rat, redz) * mstar_tot
 
             # ---- Convert to MBH Binary density
 
@@ -397,8 +407,8 @@ class Semi_Analytic_Model:
             mstar = self.mass_stellar()[:, :, :, np.newaxis]
             ms_rat = mstar[1] / mstar[0]
             mstar = mstar.sum(axis=0)   # total mass
-            gmt = self._gmt(mstar, ms_rat, self.redz[np.newaxis, np.newaxis, :])  # [Gyr]
-            bads = (tau/GYR > gmt[..., np.newaxis])
+            gmt = self._gmt(mstar, ms_rat, self.redz[np.newaxis, np.newaxis, :])  # [sec]
+            bads = (tau > gmt[..., np.newaxis])
             tau[bads] = 0.0
             print(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
 
