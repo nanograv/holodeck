@@ -431,12 +431,12 @@ def m1m2_from_mtmr(mt, mr):
     return np.array([m1, m2])
 
 
-def kepler_freq_from_sep(mass, sep):
+def kepler_freq_from_sepa(mass, sep):
     freq = (1.0/(2.0*np.pi))*np.sqrt(NWTG*mass)/np.power(sep, 1.5)
     return freq
 
 
-def kepler_sep_from_freq(mass, freq):
+def kepler_sepa_from_freq(mass, freq):
     sep = np.power(NWTG*mass/np.square(2.0*np.pi*freq), 1.0/3.0)
     return sep
 
@@ -469,7 +469,7 @@ def dfdt_from_dadt(dadt, sepa, mtot=None, freq_orb=None):
     if mtot is None and freq_orb is None:
         raise ValueError("Either `mtot` or `freq_orb` must be provided!")
     if freq_orb is None:
-        freq_orb = kepler_freq_from_sep(mtot, sepa)
+        freq_orb = kepler_freq_from_sepa(mtot, sepa)
 
     dfda = -(3.0/2.0) * (freq_orb / sepa)
     dfdt = dfda * dadt
@@ -575,7 +575,7 @@ def gw_hardening_rate_dadt(m1, m2, sepa, eccen=None):
 def gw_hardening_rate_dfdt(m1, m2, freq, eccen=None):
     """GW Hardening rate in frequency (df/dt).
     """
-    sepa = kepler_sep_from_freq(m1+m2, freq)
+    sepa = kepler_sepa_from_freq(m1+m2, freq)
     dfdt = gw_hardening_rate_dadt(m1, m2, sepa, eccen=eccen)
     dfdt = dfdt_from_dadt(dfdt, sepa, mtot=m1+m2)
     return dfdt

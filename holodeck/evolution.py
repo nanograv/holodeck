@@ -329,7 +329,7 @@ class Evolution:
         if self._freq_orb_rest is None:
             self._check_evolved()
             mtot = self.mass.sum(axis=-1)
-            self._freq_orb_rest = utils.kepler_freq_from_sep(mtot, self.sepa)
+            self._freq_orb_rest = utils.kepler_freq_from_sepa(mtot, self.sepa)
         return self._freq_orb_rest
 
     @property
