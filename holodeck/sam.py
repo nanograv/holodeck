@@ -9,6 +9,7 @@ To-Do
 -----
 * [ ] Check that _GW_ frequencies and _orbital_ frequencies are being used in the correct places.
     Check `number_at_gw_fobs` and related methods.
+* [ ] Expand SAM mass-ratios to wider range, change to log-space.
 
 """
 import abc
@@ -440,6 +441,14 @@ class Semi_Analytic_Model:
 
     @property
     def density(self):
+        """Calculate the number-density of binaries in each bin, 'dn/dz' in units of [Mpc^-3].
+
+        Returns
+        -------
+        density : (M, Q, Z) ndarray of float
+            Number density of binaries, 'dn/dz', where 'n = n(M,q,z)'.  Units of [Mpc^-3].
+
+        """
         if self._density is None:
             dens = np.zeros(self.shape)
 
@@ -487,7 +496,7 @@ class Semi_Analytic_Model:
             # Eq.21, now [Mpc^-3], lose [1/gram] because now 1/dlog10(M) instead of 1/dM
             dens[idx] *= dqgal_dqbh * dmstar_dmbh * mterm
 
-            # multiply by bin sizes
+            # multiply by bin sizes to convert dn/dMdqdz ==> dn/dz
             dens *= self._dlog10m * self._dq
             self._density = dens
 
@@ -569,6 +578,9 @@ class Semi_Analytic_Model:
         d N / d ln f_r = (dn/dz) * (dz/dt) * (dt/d ln f_r) * (dVc/dz)
                        = (dn/dz) * (f_r / [df_r/dt]) * 4 pi c D_c^2 (1+z) * dz
 
+        d N / d ln a   = (dn/dz) * (dz/dt) * (dt/d ln a) * (dVc/dz)
+                       = (dn/dz) * (a / [da/dt]) * 4 pi c D_c^2 (1+z) * dz
+
         """
         if (fobs is None) == (sepa is None):
             utils.error("one (and only one) of `fobs` or `sepa` must be provided!")
@@ -577,7 +589,6 @@ class Semi_Analytic_Model:
             xsize = len(fobs)
             edges = self.edges + [fobs, ]
         else:
-            log.warning("`sepa` has been given, but dN/d ln(f_r) is still being returned!")
             xsize = len(sepa)
             edges = self.edges + [sepa, ]
 
@@ -607,15 +618,15 @@ class Semi_Analytic_Model:
             dadt = hard.dadt(mt[np.newaxis, :], mr[np.newaxis, :], sa)
             # dfdt is positive (increasing frequency)
             dfdt, fr = utils.dfdt_from_dadt(dadt, sa, freq_orb=fr)
+            tau = fr / dfdt
         else:
             sa = sepa[:, np.newaxis] * PC
             # recall: these are negative (decreasing separation)
             dadt = hard.dadt(mt[np.newaxis, :], mr[np.newaxis, :], sa)
-            # dfdt is positive (increasing frequency)
-            dfdt, fr = utils.dfdt_from_dadt(dadt, sa, mtot=mt[np.newaxis, :])
+            fr = utils.kepler_freq_from_sepa(mt[np.newaxis, :], sa)
+            tau = - sa / dadt
 
-        tau = fr / dfdt
-        log.info(f"timescales for sampling: {utils.stats(tau)} [Gyr]")
+        log.info(f"timescales for sampling: {utils.stats(tau/GYR)} [Gyr]")
 
         # convert `tau` to the correct shape, note that moveaxis MUST happen _before_ reshape!
         # (F, M*Q*Z) ==> (M*Q*Z, F)
@@ -697,6 +708,33 @@ def sample_sam(sam, fobs, sample_threshold=10.0, cut_below_mass=1e6*MSOL, limit_
     return vals, weights
 
 
+def sample_sam_with_hardening(sam, hard, fobs=None, sepa=None, sample_threshold=10.0, cut_below_mass=1e6):
+    """
+    fobs in units of [1/yr]
+    sepa in units of [pc]
+    """
+
+    # edges: Mtot [Msol], mrat (q), redz (z), {fobs (f) [1/yr] OR sepa (a) [pc]}
+    edges, number, _ = sam.number_from_hardening(hard, fobs=fobs, sepa=sepa)
+    log_edges = [np.log10(edges[0]), edges[1], edges[2], np.log10(edges[3])]
+
+    if cut_below_mass is not None:
+        m2 = edges[0][:, np.newaxis] * edges[1][np.newaxis, :]
+        bads = (m2 < cut_below_mass)
+        number[bads] = 0.0
+
+    vals, weights = kale.sample_outliers(log_edges, number, sample_threshold)
+    vals[0] = 10.0 ** vals[0]
+    vals[3] = 10.0 ** vals[3]
+
+    if cut_below_mass is not None:
+        bads = (vals[0] * vals[1] < cut_below_mass)
+        vals = vals.T[~bads].T
+        weights = weights[~bads]
+
+    return vals, weights
+
+
 def _gws_from_samples(vals, weights, fobs):
     """
 
@@ -735,7 +773,7 @@ def sampled_gws_from_sam(sam, fobs, **kwargs):
         Target frequencies of interest in units of [1/yr]
 
     """
-    vals, weights = sample_sam(sam, fobs, **kwargs)
+    vals, weights = sample_sam_at_gw_fobs(sam, fobs, **kwargs)
     gff, gwf, gwb = _gws_from_samples(vals, weights, fobs)
     return gff, gwf, gwb
 
