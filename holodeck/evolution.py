@@ -512,6 +512,12 @@ class Hard_GW(_Hardening):
 
         return dadt, dedt
 
+    @staticmethod
+    def dadt(mt, mr, sepa):
+        m1, m2 = utils.m1m2_from_mtmr(mt, mr)
+        dadt = utils.gw_hardening_rate_dadt(m1, m2, sepa, eccen=None)
+        return dadt
+
 
 class Sesana_Scattering(_Hardening):
     """Binary-Hardening Rates calculated based on the Sesana stellar-scattering model.
