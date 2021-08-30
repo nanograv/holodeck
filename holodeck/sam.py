@@ -12,15 +12,16 @@ To-Do
 * [ ] Expand SAM mass-ratios to wider range, change to log-space.
 
 """
+
 import abc
 import inspect
-# import logging
 
 import numba
 import numpy as np
 
 import kalepy as kale
 
+import holodeck as holo
 from holodeck import cosmo, utils, log
 from holodeck.constants import GYR, SPLC, MSOL, MPC
 
@@ -599,7 +600,7 @@ class Semi_Analytic_Model:
         dc = cosmo.comoving_distance(self.redz).to('Mpc').value
 
         # [Mpc^3/s]
-        cosmo_fact = 4 * np.pi * (SPLC/MPC) * np.square(dc) * self._dz
+        cosmo_fact = 4 * np.pi * (SPLC/MPC) * np.square(dc) * (1.0 + self.redz) * self._dz
 
         # (M, Q)
         mchirp = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
@@ -614,19 +615,44 @@ class Semi_Analytic_Model:
             # Convert from obs-GW freq, to rest-frame orbital freq
             fr = fobs[:, np.newaxis] * (1.0 + rz[np.newaxis, :]) / YR / 2.0
             sa = utils.kepler_sepa_from_freq(mt[np.newaxis, :], fr)
-            # recall: these are negative (decreasing separation)
-            dadt = hard.dadt(mt[np.newaxis, :], mr[np.newaxis, :], sa)
+        else:
+            sa = sepa[:, np.newaxis] * PC
+            # NOTE: `fr` is the _orbital_ frequency (not GW)
+            fr = utils.kepler_freq_from_sepa(mt[np.newaxis, :], sa)
+
+        # recall: these are negative (decreasing separation)
+        dadt = hard.dadt(mt[np.newaxis, :], mr[np.newaxis, :], sa)
+
+        if fobs is not None:
             # dfdt is positive (increasing frequency)
             dfdt, fr = utils.dfdt_from_dadt(dadt, sa, freq_orb=fr)
             tau = fr / dfdt
         else:
-            sa = sepa[:, np.newaxis] * PC
-            # recall: these are negative (decreasing separation)
-            dadt = hard.dadt(mt[np.newaxis, :], mr[np.newaxis, :], sa)
-            fr = utils.kepler_freq_from_sepa(mt[np.newaxis, :], sa)
             tau = - sa / dadt
 
-        log.info(f"timescales for sampling: {utils.stats(tau/GYR)} [Gyr]")
+        # ---------------------
+        if (limit_merger_time is True):
+            log.info("limiting tau to < galaxy merger time")
+            mstar = self.mass_stellar()[:, :, :, np.newaxis]
+            ms_rat = mstar[1] / mstar[0]
+            mstar = mstar.sum(axis=0)   # total mass
+            gmt = self._gmt(mstar, ms_rat, self.redz[np.newaxis, np.newaxis, :])  # [sec]
+            bads = (tau > gmt[..., np.newaxis])
+            tau[bads] = 0.0
+            log.info(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
+
+        elif (limit_merger_time in [None, False]):
+            pass
+
+        elif utils.isnumeric(limit_merger_time):
+            log.info(f"limiting tau to < {limit_merger_time:.2f} Gyr")
+            bads = (tau/GYR > limit_merger_time)
+            tau[bads] = 0.0
+            log.info(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
+
+        else:
+            err = f"`limit_merger_time` ({type(limit_merger_time)}) must be boolean or scalar!"
+            utils.error(err)
 
         # convert `tau` to the correct shape, note that moveaxis MUST happen _before_ reshape!
         # (F, M*Q*Z) ==> (M*Q*Z, F)
@@ -636,11 +662,11 @@ class Semi_Analytic_Model:
         tau = tau.reshape(dens.shape + (xsize,))
         fr = fr.reshape(dens.shape + (xsize,))
 
-        # luminosity distance in [cm]
-        dl = dc * (1.0 + self.redz) * MPC
-        dl = dl[np.newaxis, np.newaxis, :, np.newaxis]
-        dl[dl <= 0.0] = np.nan
-        strain = utils.gw_strain_source(mchirp, dl, fr*2.0)   # use GW frequency
+        dc[dc <= 0.0] = np.nan
+        dc = dc[np.newaxis, np.newaxis, :, np.newaxis]
+        # Note: `gw_strain_source` uses *orbital* frequency
+        # strain = utils.gw_strain_source(mchirp, dl, fr)
+        strain = utils.gw_strain_source(mchirp, dc * MPC, fr)
         strain = np.nan_to_num(strain)
 
         # (M, Q, Z) units: [1/s] i.e. number per second
@@ -650,14 +676,13 @@ class Semi_Analytic_Model:
 
         return edges, number, strain
 
-    def gwb(self, fobs, realize=True, **kwargs):
+    def gwb(self, fobs, hard=holo.evolution.Hard_GW, realize=False, **kwargs):
         """
         Arguments
         ---------
         fobs : units of [1/s]
 
         """
-        import numbers
 
         squeeze = False
         if np.isscalar(fobs):
@@ -665,16 +690,19 @@ class Semi_Analytic_Model:
             squeeze = True
 
         # `num` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
-        edges, num, hs = self.number_at_gw_fobs(fobs)
+        # `num` is dN/d ln f_r = dN/d ln f
+        edges, num, hs = self.number_from_hardening(hard, fobs=fobs)
 
         if realize is True:
             num = np.random.poisson(num)
-        elif isinstance(realize, numbers.Integral):
+        elif realize in [None, False]:
+            pass
+        elif utils.isinteger(realize):
             shape = num.shape + (realize,)
             num = np.random.poisson(num[..., np.newaxis], size=shape)
             hs = hs[..., np.newaxis]
-        elif realize not in [None, False]:
-            err = "`realize` ({}) must be one of [True, False, integer]!".format(realize)
+        else:
+            err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
             raise ValueError(err)
 
         hs = np.sqrt(np.sum(num*np.square(hs), axis=(0, 1, 2)))
@@ -764,7 +792,7 @@ def _gws_from_samples(vals, weights, fobs):
     return gff, gwf, gwb
 
 
-def sampled_gws_from_sam(sam, fobs, **kwargs):
+def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
     """
 
     Arguments
@@ -773,7 +801,7 @@ def sampled_gws_from_sam(sam, fobs, **kwargs):
         Target frequencies of interest in units of [1/yr]
 
     """
-    vals, weights = sample_sam_at_gw_fobs(sam, fobs, **kwargs)
+    vals, weights = sample_sam_with_hardening(sam, hard, fobs=fobs, **kwargs)
     gff, gwf, gwb = _gws_from_samples(vals, weights, fobs)
     return gff, gwf, gwb
 
