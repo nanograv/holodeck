@@ -157,7 +157,8 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
         gne[sel_n2 & sel_e0] = 1.0
 
     # Calculate required parameters for valid binaries (V,)
-    dlum = cosmo.z_to_dlum(redz)
+    # dlum = cosmo.z_to_dlum(redz)
+    dcom = cosmo.z_to_dcom(redz)
     zp1 = redz + 1
     frst_orb = fobs * zp1 / harms
     mchirp = data_harms['mass'][valid]
@@ -166,14 +167,17 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
     _tres = frst_orb / dfdt
 
     # Calculate strains from each source
-    hs2 = utils.gw_strain_source(mchirp, dlum, frst_orb)**2
+    # hs2 = utils.gw_strain_source(mchirp, dlum, frst_orb)**2
+    hs2 = utils.gw_strain_source(mchirp, dcom, frst_orb)**2
     # Calculate resampling factors
-    vfac = 4.0*np.pi*SPLC * dlum**2 / box_vol   # * thub
+    # vfac = 4.0*np.pi*SPLC * dlum**2 / box_vol   # * thub
+    vfac = 4.0*np.pi*SPLC * zp1 * dcom**2 / box_vol   # * thub
     tfac = _tres  # / thub
 
     # Calculate weightings
     #    Sesana+08, Eq.10
-    num_frac = vfac * tfac * zp1
+    # num_frac = vfac * tfac * zp1
+    num_frac = vfac * tfac
     num_pois = np.random.poisson(num_frac, (nreals, num_frac.size)).T
 
     # --- Calculate GW Signals
