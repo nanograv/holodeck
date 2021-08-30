@@ -3,12 +3,14 @@
 References:
 - Peters-1964 : [Peters 1964](https://ui.adsabs.harvard.edu/abs/1964PhRv..136.1224P/abstract)
 - EN07 : [Enoki & Nagashima 2007](https://ui.adsabs.harvard.edu/abs/2007PThPh.117..241E/abstract)
+- Enoki+2004 : [Enoki et al. 2004](https://ui.adsabs.harvard.edu/abs/2004ApJ...615...19E/abstract)
 - Sesana+2004 : [Sesana+2004](http://adsabs.harvard.edu/abs/2004ApJ...611..623S)
 
 """
 
-import copy
 import abc
+import copy
+import numbers
 
 import numpy as np
 import scipy as sp
@@ -160,6 +162,20 @@ def interp(xnew, xold, yold, left=np.nan, right=np.nan, xlog=True, ylog=True):
     if ylog:
         y1 = np.power(10.0, y1)
     return y1
+
+
+def isnumeric(val):
+    try:
+        float(str(val))
+    except ValueError:
+        return False
+
+    return True
+
+
+def isinteger(val):
+    rv = isnumeric(val) and isinstance(val, numbers.Integral)
+    return rv
 
 
 def log_normal_base_10(mu, sigma, size=None, shift=0.0):
@@ -580,10 +596,23 @@ def gw_hardening_rate_dfdt(m1, m2, freq, eccen=None):
     return dfdt
 
 
-def gw_hardening_timescale(mchirp, frst):
+def gw_hardening_timescale_freq(mchirp, frst):
     """tau = f_r / (df_r / dt)
 
-    e.g. Enoki & Nagashima 2007 Eq.2.9
+    e.g. [EN07] Eq.2.9
+
+    Arguments
+    ---------
+    mchirp : scalar  or  array_like of scalar
+        Chirp mass in [grams]
+    frst : scalar  or  array_like of scalar
+        Rest-frame orbital frequency
+
+    Returns
+    -------
+    tau : float  or  array_like of float
+        GW hardening timescale defined w.r.t. orbital frequency.
+
     """
     tau = (5.0 / 96.0) * np.power(NWTG*mchirp/SPLC**3, -5.0/3.0) * np.power(2*np.pi*frst, -8.0/3.0)
     return tau
@@ -597,6 +626,7 @@ def gw_lum_circ(mchirp, freq_orb_rest):
     return lgw_circ
 
 
+'''
 def gw_strain_source(mchirp, dlum, freq_orb_rest):
     """GW Strain from a single source in a circular orbit.
 
@@ -605,6 +635,18 @@ def gw_strain_source(mchirp, dlum, freq_orb_rest):
     """
     #
     hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_orb_rest, 2/3) / dlum
+    return hs
+'''
+
+
+def gw_strain_source(mchirp, dcom, freq_orb_rest):
+    """GW Strain from a single source in a circular orbit.
+
+    e.g. Sesana+2004 Eq.36
+    e.g. EN07 Eq.17
+    """
+    #
+    hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_orb_rest, 2/3) / dcom
     return hs
 
 
