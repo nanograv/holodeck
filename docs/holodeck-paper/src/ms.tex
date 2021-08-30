@@ -1,0 +1,263 @@
+% =================================================================================================
+% Holodeck Paper Manuscript
+% -------------------------
+%
+%
+%
+% =================================================================================================
+
+% general package imports and setup
+\input{packages}
+% definitions of custom commands
+\input{commands}
+% journal abbreviations for bibliography
+\input{abbrevs}
+
+
+% =================================================================================================
+% ====    Front Matter
+% =================================================================================================
+
+\newtotcounter{citnum} % From the package documentation
+\def\oldbibitem{} \let\oldbibitem=\bibitem
+\def\bibitem{\stepcounter{citnum}\oldbibitem}
+
+\newcommand{\orcidauthorA}{0000-0002-6625-6450} % For author A
+
+\title[Short Title]{Very long and verbose title}
+\author[NANOGrav]{the NANOGrav collaboration}
+% \author[L.Z.~Kelley et al.]{
+%     Luke Zoltan Kelley$^{1}$\thanks{E-mail:lzkelley@northwestern.edu}\orcidA{} \\
+%     $^{1}$ \begin{minipage}[t]{\linewidth} Center for Interdisciplinary Exploration and Research in Astrophysics (CIERA), and\\Department of Physics \& Astronomy, Northwestern University, Evanston, IL 60208
+%     \end{minipage}
+% }
+
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    abstract
+\end{abstract}
+
+\begin{keywords}
+    quasars: supermassive black holes
+\end{keywords}
+
+
+% =================================================================================================
+% ====    Section 1 - Introduction
+% =================================================================================================
+
+\section{Introduction}
+    \label{sec:intro}
+
+
+
+% =================================================================================================
+% ====    Section 2 - Methods
+% =================================================================================================
+
+\section{Methods}
+    \label{sec:meth}
+
+    Here, the GW strain from a circular binary is \citep[][Eq.~7]{Sesana+2008} (sky and polarization averaged),
+        \begin{equation}
+        \label{eq:source_strain}
+        h_s = \frac{8}{10^{1/2}} \frac{\left(G\mchirp\right)^{5/3}}{c^4 \, d_L}
+            \left(2 \pi f_r \right)^{2/3},
+        \end{equation}
+    for a luminosity distance $d_L$.
+
+    \subsection{Source Distributions and Gravitational Wave Calculations}
+
+        Define the (comoving-) number density of sources as, $n \equiv dN / dV_c$.
+
+        From \citet[][Eqs.~5/8]{Phinney-2001},
+        	\begin{align}
+        	h_c^2(f) = \int_0^\infty \!\! dz \; \frac{d^2 N}{dz \, d\ln f_r} \; h_s^2\lr{f_r}.
+        	\end{align}
+        From \citet[][Eq.~6]{Sesana+2008} we can write,
+        	\begin{align}
+        	\frac{d^2 N}{dz \, d\ln f_r} = \frac{d n_c}{dz} \frac{dz}{dt} \frac{dt}{d\ln f_r} \frac{d V_c}{dz}.
+        	\end{align}
+        From cosmography \citep[e.g.][]{Hogg-1999},
+        	\begin{align}
+        	\frac{dz}{dt} = H_0 \lr{1+z} E(z) \\
+        	\frac{d V_c}{dz} = 4\pi \frac{c}{H_0} \frac{d_c^2}{E(z)} \\
+          d_L = d_c \, (1+z)
+        	\end{align}
+        Putting this together we have,
+        	\begin{align}
+        	h_c^2(f) & = \int_0^\infty \!\! dz \; \frac{dn_c}{dz} \, h^2\lr{f_r} \, 4\pi c \, d_c^2 \lr{1+z} \, \frac{f_r}{df_r / dt}.
+        	\end{align}
+        % If this is being calculated from a finite volume (e.g.~simulation), then we can associate the comoving-number-density of sources at a given redshift with the number of binaries per-unit comoving volume, i.e.,
+        % 	\begin{align}
+        % 	\frac{dn_c}{dz} \, dz = N_\trt{fv}(z)/V_\trt{c,fv}.
+        % 	\end{align}
+
+
+    \subsection{Semi-Analytic Modeling}
+
+        Define the (comoving-) number density of sources as, $n \equiv dN / dV_c$, and the distribution function of sources as $f(M,a,z) = d^2 n(M,a,z) / dM da$.  Here $M$ is the total mass of each systems, $a$ is the binary separation, and $z$ is the redshift.  Note that binary frequency $f$ could be used almost interchangeably with $a$, and that both evolve as a function of time or equivalently redshift.  This formalism can easily be extended to include other parameters, such as mass-ratio and eccentricity ($q$ and $e$).  We can write the conservation equation for binaries as of function of redshift as,
+        \begin{equation}
+        \label{eq:conservation}
+        \diffp{f}{z} + \diffp{}{m} \lrs{f \diffp{m}{z}} + \diffp{}{a} \lrs{f \diffp{a}{z}} = S_f(m, a, z).
+        \end{equation}
+        Here $S_f$ is a source/sink function that can account for the creation or destruction of binaries.  Here we assume that all binary `formation' is encapsulated from binaries moving from one part of parameter space (i.e.~large separations and redshifts) to other parts of parameter space (i.e.~smaller separations and redshifts).  Thus we set $S_f = 0$.
+
+        We consider the standard \citep[e.g.~Sesana style; see][]{Chen+2019} semi-analytic model (SAM) formalism of MBH binary populations.  In this style of calculation, $f$ is determined in a region of parameter space that can be observed/estimated, and this is \textit{evolved} to find the distribution in a different region of parameter space that is of interest.  In practice, the observed parameter space is galaxies and galaxy mergers, and the parameter space of interest is close separated MBH binaries that could be GW detectable.  We will express the distribution function as a product of a mass-function, and a pair fraction:
+        \begin{equation}
+        \label{eq:dist_func}
+        f(M,a,z) = \Phi(M, z) \cdot F_a(M, a, z).
+        \end{equation}
+        In \citet{Chen+2019}, for example, the pair fraction is measured over some range of separations, and the separation-dependence is suppressed, i.e.~$f(M, z) = \Phi(M, z) \cdot F(M, z)$ s.t.~$F = \int_{a_0}^{a_1} F_a \, da$.  From $\eqref{eq:conservation}$, we use the chain rule to mix time and redshift evolution, and assume that the mass-change of binaries is negligible, i.e.~$\diffp{m}{t} = 0$, giving:
+        \begin{equation}
+        \diffp{f}{z} = - \diffp{t}{z} \diffp{}{a} \lrs{f \diffp{a}{t}}.
+        \end{equation}
+        Plugging-in \eqref{eq:dist_func}:
+        \begin{equation}
+        \diffp{f}{z} = - \diffp{t}{z} \Phi(M,z) \diffp{}{a} \lrs{F(M,a,z) \diffp{a}{t}}.
+        \end{equation}
+
+        The binary population is assumed to be changing only in separation and redshift, which are related by $\partial a / \partial z = (\partial a / \partial t) (\partial t / \partial z)$.  Because the overall number-density is conserved, we can take a finite step in separation and time/redshift, $a\rightarrow a'$ and $z\rightarrow z'$.  Here the time it takes for a binary to go from $a \rightarrow a'$ is $\tau(M,a,z|a')$ which leads to a redshift at the later time of $z' = z'(t + \tau)$.  The standard expression \citep[e.g.~][~Eq.~5]{Chen+2019}, requires making the approximation that,
+        \begin{equation}
+        \diffp{}{a} \lrs{F(M,a,z) \diffp{a}{t}} \approx \frac{F}{\Delta t} = \frac{F}{\tau(M,a,z|a')}.
+        \end{equation}
+        Thus giving,
+        \begin{equation}
+        \diffp{f(M,a',z')}{{z'}} = \diffp{n}{{\log_{10}\!M}{a'}{z'}} = - \diffp{t}{z} \frac{\Phi(M,z) \, F(M,a,z)}{\tau(M,a,z|a')}.
+        \end{equation}
+
+
+    % % Fig -
+    % \begin{figure}
+    %     \centering
+    %     \includegraphics[width=1\columnwidth]{{{example-image-c}}}
+    %     \caption{\textbf{header.} body.}
+    %     \label{fig:fig1}
+    % \end{figure}
+    %
+    %
+    % \begin{equation}\begin{split}
+    %     \label{eq:eq1}
+    %     2+2 & = 4 \\
+    %         & = 10 - 6
+    % \end{split}\end{equation}
+    %
+    % % Fig -
+    % \begin{figure*}
+	% 	\centering
+    %     \subfloat[first]{{
+    %         \includegraphics[width=1.75\columnwidth]{{{example-image-a}}}
+    %     }}
+	% 	\\
+    %     % \qquad
+    %     \subfloat[second]{{
+    %     	\includegraphics[width=1.75\columnwidth]{{{example-image-b}}}
+    %     }}
+    %     \caption{\textbf{Head.}  Body.}
+    %     \label{fig:fig2}
+    % \end{figure*}
+
+
+
+
+% =================================================================================================
+% ====    Section 3 - Results
+% =================================================================================================
+\section{Results}
+    \label{sec:res}
+
+    % Fig -
+    % \begin{figure*}
+    %     \centering
+    %     \includegraphics[width=1.5\columnwidth]{{{figs/det-nums_fedd-1.00_voff+3.00_dvel+2.00_tobs+0.70}}}
+    %     \caption{\textbf{Distributions of parameters for all binaries (black) and those with a detectable kinematic signature in the secondary AGN (colors).}  Less than $10^{-7}$ of primaries are observable, which are not shown.  Secondary AGN with observable velocity offsets ($\voff$) are shown in blue assuming a sensitivity of \mbox{$\voffsens = 10^3 \kmps$}.  Secondaries with observable changing velocities ($\dvel$) are shown in orange (solid) for a sensitivity $\dvelsens = 10^2 \kmps$, and observing baseline of \mbox{$\tobs = 5\, \yr$}.  Systems where both offsets and changes are detectable (orange, dotted) are mostly a uniform subset of the $\dvel$ sample, and are almost indistinguishable in the 2D contour plots.  An optical flux cutoff of \mbox{$6\E{-14} \mathrm{erg/s/cm}^2$} (AB Mag $\approx 21$) is also imposed, where all AGN are assumed to be accreting at an Eddington fraction of $0.1$.}
+    %     \label{fig:det_bins_num}
+    % \end{figure*}
+
+
+
+% =================================================================================================
+% ====    Section 4 - Conclusions
+% =================================================================================================
+\section{Discussion \& Conclusions}
+    \label{sec:disc}
+
+
+
+% =================================================================================================
+% ====    End Matter
+% =================================================================================================
+
+
+% ====    Acknowledgments
+
+\section*{Acknowledgments}
+	I am very thankful to.
+
+    This research made use of \astropy, a community-developed core Python package for Astronomy \citep{astropy2013}, in addition to \scipy~\citep{scipy}, \ipython~\citep{ipython}, \jupyter~notebook~\citep{jupyter}, \numpy~\citep{numpy2011} \& \sympy~\citep{sympy2017}.  All figures were generated using \matplotlib~\citep{matplotlib2007}.  Kernel density estimation was performed using the \kalepy{} package (\href{https://github.com/lzkelley/kalepy}{github.com/lzkelley/kalepy}) \citep{kalepy2020}.
+
+    The Illustris data is available online at \href{https://www.illustris-project.org/}{www.illustris-project.org} \citep{Nelson+2015}, and Illustris-TNG data at \href{https://www.tng-project.org/}{www.tng-project.org} \citep{Nelson+2019}.
+
+
+% ====    Bibliography
+
+\let\oldUrl\url
+\renewcommand{\url}[1]{\href{#1}{Link}}
+
+\quad{}
+\bibliographystyle{mnras}
+\bibliography{refs}
+
+\onecolumn
+\clearpage
+
+
+% ====    Appendices
+
+\appendix
+
+    \section{Additional Material}
+        \label{sec:app}
+
+        \noindent\begin{minipage}{\linewidth}
+
+            % Fig -
+            % \centering
+            % \includegraphics[width=0.55\columnwidth]{{{figs/doan+2019_jitter}}}
+            % \captionof{figure}{Distribution of velocity-offset variations (`jitters') from \citep{Doan+2019}, for the red and blue components of the observed BLs.  Measurements are shown as ticks at $y=0$, and KDE distributions are shown using a Scott's factor bandwidth, and Gaussian kernel.  The purple curve is the KDE distribution taking both red and blue data as independent.  The KDE $50\%$ (median) and $99\%$ (Gaussian standard deviation $\sigma \approx 2.3$) jitter for each component are shown with dashed vertical lines and corresponding labels.}
+            % \label{fig:jitter_doan2019}
+			%
+            % \setlength{\tabcolsep}{8pt}
+            % \begin{tabular}{p{1.5cm} c c c c c c c}
+            %      & & & $5\%$ & $25\%$ & $50\%$ & $75\%$ & $95\%$ \\ [0.5ex]
+            %     \hline
+            %     \multirow{4}{*}{All}  & \multirow{4}{*}{-}
+            %         & $M \; [M_\odot]$ & $3.4 \times10^{ 6 }$ & $7.2 \times10^{ 6 }$ & $1.8 \times10^{ 7 }$ & $6.0 \times10^{ 7 }$ & $4.1 \times10^{ 8 }$ \\
+            %         & & q & $2.9 \times10^{ -2 }$ & $1.7 \times10^{ -1 }$ & $4.0 \times10^{ -1 }$ & $6.8 \times10^{ -1 }$ & $9.3 \times10^{ -1 }$ \\
+            %         & & z & 0.24 & 0.41 & 0.53 & 0.62 & 0.69 \\
+            %         & & $p \; [\mathrm{yr}]$ & $1.4 \times10^{ 2 }$ & $1.5 \times10^{ 3 }$ & $9.6 \times10^{ 3 }$ & $4.0 \times10^{ 4 }$ & $2.0 \times10^{ 5 }$ \\
+            %         & & $a \; [\mathrm{pc}]$ & $2.1 \times10^{ -2 }$ & $1.3 \times10^{ -1 }$ & $4.9 \times10^{ -1 }$ & $1.3 \times10^{ 0 }$ & $4.1 \times10^{ 0 }$ \\
+            %         & & $a \; [r_g]$ & $1.2 \times10^{ 4 }$ & $1.4 \times10^{ 5 }$ & $4.5 \times10^{ 5 }$ & $1.2 \times10^{ 6 }$ & $4.1 \times10^{ 6 }$ \\
+            %     \hline
+            %     \multirow{4}{1.5cm}{Secondary\newline Offset\newline($\voff$)} & \multirow{4}{*}{$0.49\%$}
+            %         & $M \; [M_\odot]$ & $1.4 \times10^{ 8 }$ & $4.0 \times10^{ 8 }$ & $7.6 \times10^{ 8 }$ & $1.4 \times10^{ 9 }$ & $3.7 \times10^{ 9 }$ \\
+            %         & & q & $9.6 \times10^{ -4 }$ & $4.2 \times10^{ -3 }$ & $1.2 \times10^{ -2 }$ & $3.6 \times10^{ -2 }$ & $1.5 \times10^{ -1 }$ \\
+            %         & & z & 0.25 & 0.42 & 0.54 & 0.63 & 0.69 \\
+            %         & & $p \; [\mathrm{yr}]$ & $8.3 \times10^{ 2 }$ & $1.5 \times10^{ 3 }$ & $2.3 \times10^{ 3 }$ & $3.7 \times10^{ 3 }$ & $9.0 \times10^{ 3 }$ \\
+            %         & & $a \; [\mathrm{pc}]$ & 0.22 & 0.41 & 0.58 & 0.87 & 1.82 \\
+            %         & & $a \; [r_g]$ & $5.0 \times10^{ 3 }$ & $1.1 \times10^{ 4 }$ & $1.8 \times10^{ 4 }$ & $2.9 \times10^{ 4 }$ & $4.9 \times10^{ 4 }$ \\
+            % \end{tabular}
+            % \captionof{table}{\textbf{Parameters of detectable binary systems with redshift $z < 0.7$.}  The indicated quantiles are given for total mass ($M$), mass ratio ($q$), separation ($a$), and orbital period ($p$).  In only four binaries ($2\E{-8}$ of systems) is the primary detectable, and those have parameters: \mbox{$M\approx 2$--$5\E{9} \, \msol$},
+            % \hspace{0.5ex} \mbox{$q \approx 0.7$--$0.9$}, \hspace{0.5ex} \mbox{$z \approx 0.6$--$0.8$}, \hspace{0.5ex} \mbox{$a \approx 2.2$--$2.8 \, \pc$}.}
+            % \label{tab:obs_pars}
+
+        \end{minipage}
+
+    \twocolumn
+
+
+\end{document}
