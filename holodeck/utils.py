@@ -184,8 +184,12 @@ def log_normal_base_10(mu, sigma, size=None, shift=0.0):
     return dist
 
 
-def minmax(vals):
-    extr = np.array([np.min(vals), np.max(vals)])
+def minmax(vals, filter=False):
+    if filter:
+        vv = vals[np.isfinite(vals)]
+    else:
+        vv = vals
+    extr = np.array([np.min(vv), np.max(vv)])
     return extr
 
 
