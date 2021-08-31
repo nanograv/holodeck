@@ -743,7 +743,7 @@ def sample_sam_with_hardening(sam, hard, fobs=None, sepa=None, sample_threshold=
     """
 
     # edges: Mtot [Msol], mrat (q), redz (z), {fobs (f) [1/yr] OR sepa (a) [pc]}
-    edges, number, _ = sam.number_from_hardening(hard, fobs=fobs, sepa=sepa)
+    edges, number, _ = sam.number_from_hardening(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
     log_edges = [np.log10(edges[0]), edges[1], edges[2], np.log10(edges[3])]
 
     if cut_below_mass is not None:
