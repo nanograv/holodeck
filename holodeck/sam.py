@@ -528,14 +528,15 @@ class Semi_Analytic_Model:
         return hs
 
 
-def sample_sam_with_hardening(sam, hard, fobs=None, sepa=None, sample_threshold=10.0, cut_below_mass=1e6):
+def sample_sam_with_hardening(sam, hard, fobs=None, sepa=None,
+                              limit_merger_time=None, sample_threshold=10.0, cut_below_mass=1e6):
     """
     fobs in units of [1/yr]
     sepa in units of [pc]
     """
 
     # edges: Mtot [Msol], mrat (q), redz (z), {fobs (f) [1/yr] OR sepa (a) [pc]}
-    edges, number, _ = sam.number_from_hardening(hard, fobs=fobs, sepa=sepa)
+    edges, number, _ = sam.number_from_hardening(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
     log_edges = [np.log10(edges[0]), edges[1], edges[2], np.log10(edges[3])]
 
     if cut_below_mass is not None:
