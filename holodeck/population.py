@@ -34,7 +34,7 @@ class _Population_Discrete(abc.ABC):
 
         self.eccen = None   # eccentricities      (N,) [optional]
         self.weight = None  # weight of each binary as a sample  (N,) [optional]
-
+        
         self._size = None
         self._sample_volume = None
         return
