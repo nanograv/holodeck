@@ -111,7 +111,8 @@ import kalepy as kale
 
 import holodeck as holo
 from holodeck import utils, cosmo, log, _PATH_DATA
-from holodeck.constants import GYR, NWTG, PC, MSOL
+from holodeck.constants import GYR, NWTG, PC, MSOL, YR
+from holodeck import accretion
 
 _MAX_ECCEN_ONE_MINUS = 1.0e-6
 #: number of influence radii to set minimum radius for dens calculation
@@ -160,6 +161,10 @@ class Evolution:
     NOTE: whenever `frequencies` are used (rest-frame or observer-frame), they refer to **orbital**
     frequencies, not GW frequencies.  For circular binaries, GW-freq = 2 * orb-freq.
 
+    Additional Notes
+    ----------------
+    accmod: accretion model to use. current options: None (default), 'Basic', 'Proportional'
+
     """
 
     _EVO_PARS = ['mass', 'sepa', 'eccen', 'scafa', 'tlook', 'dadt', 'dedt']
@@ -167,7 +172,7 @@ class Evolution:
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
 
-    def __init__(self, pop, hard, nsteps: int = 100, mods=None, debug: bool = False):
+    def __init__(self, pop, hard, nsteps: int = 100, mods=None, debug: bool = False, accmod=None):
         """Initialize a new Evolution instance.
 
         Parameters
@@ -189,6 +194,7 @@ class Evolution:
         self._debug = debug                   #: debug flag for performing extra diagnostics and output
         self._nsteps = nsteps                 #: number of integration steps for each binary
         self._mods = mods                     #: modifiers to be applied after evolution is completed
+        self._accmod = accmod
 
         # Store hardening instances as a list
         if not np.iterable(hard):
@@ -754,7 +760,10 @@ class Evolution:
         tlook = cosmo.z_to_tlbk(redz)
         self.tlook[:, 0] = tlook
         # `pop.mass` has shape (N, 2), broadcast to (N, S, 2) for `S` steps
-        self.mass[:, :, :] = pop.mass[:, np.newaxis, :]
+        #self.mass[:, :, :] = pop.mass[:, np.newaxis, :]
+        self.mass[:, 0, :] = pop.mass
+        #HERE INITIAL MASSES ARE COPIED FOR EVERY STEP
+        self.mass[:, :, :] = self.mass[:, 0, np.newaxis, :]
 
         if self._debug:    # nocov
             for ii, hard in enumerate(self._hard):
@@ -941,6 +950,24 @@ class Evolution:
                     # Store individual hardening rates
                     if store_debug:
                         getattr(self, f"_dedt_{ii}")[:, step] = _ecc[...]
+
+            if self._accmod is not None:
+                #Get total accretion rates
+                acc = accretion.Accretion(self, step)
+                if self._accmod == 'Basic':
+                    self.mdot[:,step-1,:] = acc.basic_accretion()
+                if self._accmod == 'Proportional':
+                    self.mdot[:,step-1,:] = acc.proportional_accretion()
+                if self._accmod == 'Primary':
+                    self.mdot[:,step-1,:] = acc.primary_accretion()
+                if self._accmod == 'Secondary':
+                    self.mdot[:,step-1,:] = acc.secondary_accretion()
+                if self._accmod == 'Duffell':
+                    self.mdot[:,step-1,:] = acc.duffell_accretion()
+
+                self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:,step-1,0]
+                self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:,step-1,1]
+
 
         return dadt, dedt
 
