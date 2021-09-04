@@ -57,6 +57,7 @@ import scipy.interpolate   # noqa
 import holodeck
 from holodeck import utils, cosmo, log, _PATH_DATA
 from holodeck.constants import GYR, NWTG, PC, MSOL, YR
+from holodeck import accretion
 
 _DEF_TIME_DELAY = (5.0*GYR, 0.2)
 _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
@@ -72,6 +73,7 @@ class Evolution:
 
     Additional Notes
     ----------------
+    accmod: accretion model to use. current options: None (default), 'Basic', 'Proportional'
 
     """
 
@@ -80,11 +82,12 @@ class Evolution:
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
 
-    def __init__(self, pop, hard, nsteps=100, mods=None, debug=False):
+    def __init__(self, pop, hard, nsteps=100, mods=None, debug=False, accmod=None):
         self._pop = pop
         self._debug = debug
         self._nsteps = nsteps
         self._mods = mods
+        self._accmod = accmod
 
         if not np.iterable(hard):
             hard = [hard, ]
@@ -167,6 +170,7 @@ class Evolution:
         tlbk = cosmo.z_to_tlbk(redz)
         self.tlbk[:, 0] = tlbk
         self.mass[:, 0, :] = pop.mass
+        #HERE INITIAL MASSES ARE COPIED FOR EVERY STEP
         self.mass[:, :, :] = self.mass[:, 0, np.newaxis, :]
 
         # ---- Initialize hardening rate at first step
@@ -268,6 +272,23 @@ class Evolution:
             time = self.tlbk[:, (right, left)]   # tlbk is decreasing, so switch left-right order
             decc = utils.trapz_loglog(dedt, time, axis=-1).squeeze()
             self.eccen[:, right] = self.eccen[:, left] + decc
+
+        if self._accmod is not None:
+            #Get total accretion rates
+            acc = accretion.Accretion(self, step)
+            if self._accmod == 'Basic':
+                self.mdot[:,step-1,:] = acc.basic_accretion()
+            if self._accmod == 'Proportional':
+                self.mdot[:,step-1,:] = acc.proportional_accretion()
+            if self._accmod == 'Primary':
+                self.mdot[:,step-1,:] = acc.primary_accretion()
+            if self._accmod == 'Secondary':
+                self.mdot[:,step-1,:] = acc.secondary_accretion()
+            if self._accmod == 'Duffell':
+                self.mdot[:,step-1,:] = acc.duffell_accretion()
+
+            self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:,step-1,0]
+            self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:,step-1,1]
 
         return _EVO.CONT
 
