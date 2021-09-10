@@ -553,7 +553,7 @@ def sample_sam_with_hardening(sam, hard, fobs=None, sepa=None,
         vals = vals.T[~bads].T
         weights = weights[~bads]
 
-    return vals, weights
+    return vals, weights, number
 
 
 def _gws_from_samples(vals, weights, fobs):
