@@ -295,9 +295,9 @@ class Semi_Analytic_Model:
         self.mrat = np.linspace(*mrat)
         self.redz = np.linspace(*redz)
 
-        self._dlog10m = np.diff(np.log10(self.mtot))[0]
-        self._dq = np.diff(self.mrat)[0]
-        self._dz = np.diff(self.redz)[0]
+        # self._dlog10m = np.diff(np.log10(self.mtot))[0]
+        # self._dq = np.diff(self.mrat)[0]
+        # self._dz = np.diff(self.redz)[0]
 
         self._gsmf = gsmf
         self._gpf = gpf
@@ -332,12 +332,14 @@ class Semi_Analytic_Model:
 
     @property
     def density(self):
-        """Calculate the number-density of binaries in each bin, 'dn/dz' in units of [Mpc^-3].
+        """The number-density of binaries in each bin, 'd3n/[dz dlog10M dq]' in units of [Mpc^-3].
+
+        This is calculated once and cached.
 
         Returns
         -------
         density : (M, Q, Z) ndarray of float
-            Number density of binaries, 'dn/dz', where 'n = n(M,q,z)'.  Units of [Mpc^-3].
+            Number density of binaries, per unit redshift, mass-ratio, and log10 of mass.  Units of [Mpc^-3].
 
         """
         if self._density is None:
@@ -380,13 +382,13 @@ class Semi_Analytic_Model:
             dens[idx] *= dqgal_dqbh * dmstar_dmbh * mterm
 
             # multiply by bin sizes to convert dn/dMdqdz ==> dn/dz
-            dens *= self._dlog10m * self._dq
+            # dens *= self._dlog10m * self._dq
             self._density = dens
 
         return self._density
 
     def number_from_hardening(self, hard, fobs=None, sepa=None, limit_merger_time=None):
-        """Convert from number-density to finite Number, per log-frequency interval
+        """Convert from number-density to finite Number, per log-frequency interval, per unit bin-volume.
 
         Arguments
         ---------
@@ -411,13 +413,13 @@ class Semi_Analytic_Model:
             edges = self.edges + [sepa, ]
 
         # shape: (M, Q, Z)
-        dens = self.density   # dn/dz  units: [Mpc^-3]
+        dens = self.density   # d3n/[dz dlog10(M) dq]  units: [Mpc^-3]
 
         # (Z,) comoving-distance in Mpc
         dc = cosmo.comoving_distance(self.redz).to('Mpc').value
 
-        # [Mpc^3/s]
-        cosmo_fact = 4 * np.pi * (SPLC/MPC) * np.square(dc) * (1.0 + self.redz) * self._dz
+        # [Mpc^3/s] this is `(dVc/dz) * (dz/dt)`
+        cosmo_fact = 4 * np.pi * (SPLC/MPC) * np.square(dc) * (1.0 + self.redz)
 
         # (M, Q)
         mchirp = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
@@ -440,6 +442,7 @@ class Semi_Analytic_Model:
         # recall: these are negative (decreasing separation)
         dadt = hard.dadt(mt[np.newaxis, :], mr[np.newaxis, :], sa)
 
+        # Calculate `tau = dt/dlnf_r = f_r / (df_r/dt)`
         if fobs is not None:
             # dfdt is positive (increasing frequency)
             dfdt, fr = utils.dfdt_from_dadt(dadt, sa, freq_orb=fr)
