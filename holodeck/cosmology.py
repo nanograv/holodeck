@@ -262,6 +262,12 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
         """Differential lookback time of the Universe.
 
         From Hogg1999 Eq. 30
+
+        Returns
+        -------
+        retval : array_like of scalar, units of [sec]
+            dt/dz at the given redshifts
+
         """
         efac = self.efunc(zz)
         time_hub = self.hubble_time.to('s').value
