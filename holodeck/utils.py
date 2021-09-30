@@ -196,7 +196,7 @@ def print_stats(stack=True, print_func=print, **kwargs):
         import traceback
         traceback.print_stack()
     for kk, vv in kwargs.items():
-        print_func(f"{kk} = {np.shape(vv)=}, {stats(vv)=}")
+        print_func(f"{kk} = shape: {np.shape(vv)}, stats: {stats(vv)}")
     return
 
 
