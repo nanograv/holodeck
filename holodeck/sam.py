@@ -12,15 +12,15 @@ To-Do
 """
 import abc
 import inspect
-import logging
+# import logging
 
 import numba
 import numpy as np
 
 import kalepy as kale
 
-from holodeck import cosmo, utils
-from holodeck.constants import GYR, SPLC, MSOL, MPC, YR
+from holodeck import cosmo, utils, log
+from holodeck.constants import GYR, SPLC, MSOL, MPC
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
@@ -33,37 +33,83 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
 
     @abc.abstractmethod
     def __call__(self, mstar, redz):
+        """Return the number-density of galaxies at a given stellar mass, per log10 interval of stellar-mass.
+
+        i.e. Phi = dn / dlog10(M)
+
+        Arguments
+        ---------
+        mstar : scalar or ndarray
+            Galaxy stellar-mass in units of [grams]
+        redz : scalar or ndarray
+            Redshift.
+
+        Returns
+        -------
+        rv : scalar or ndarray
+            Number-density of galaxies in units of [Mpc^-3]
+
+        """
         return
 
 
 class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
     """Single Schechter Function - Galaxy Stellar Mass Function.
+
+    This is density per unit log10-interval of stellar mass, i.e. Phi = dn / dlog10(M)
+
+    See: [Chen19] Eq.9 and enclosing section
+
     """
 
-    def __init__(self, phi0=-2.77, phiz=-0.27, mref0=1.74e11, mrefz=0.0, alpha0=-1.24, alphaz=-0.03):
+    def __init__(self, phi0=-2.77, phiz=-0.27, mref0=1.74e11*MSOL, mrefz=0.0, alpha0=-1.24, alphaz=-0.03):
         self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]
         self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]
-        self._mref0 = mref0       # +11.24  +/- [-0.17, +0.20]
+        self._mref0 = mref0       # +11.24  +/- [-0.17, +0.20]  Msol
         self._mrefz = mrefz
         self._alpha0 = alpha0     # -1.24   +/- [-0.16, +0.16]
         self._alphaz = alphaz     # -0.03   +/- [-0.14, +0.16]
         return
 
     def __call__(self, mstar, redz):
-        phi = self.phi(redz)
-        mref = self.mref(redz)
-        alpha = self.alpha(redz)
+        """Return the number-density of galaxies at a given stellar mass.
+
+        See: [Chen19] Eq.8
+
+        Arguments
+        ---------
+        mstar : scalar or ndarray
+            Galaxy stellar-mass in units of [grams]
+        redz : scalar or ndarray
+            Redshift.
+
+        Returns
+        -------
+        rv : scalar or ndarray
+            Number-density of galaxies in units of [Mpc^-3]
+
+        """
+        phi = self._phi_func(redz)
+        mref = self._mref_func(redz)
+        alpha = self._alpha_func(redz)
         xx = mstar / mref
+        # [Chen19] Eq.8
         rv = np.log(10.0) * phi * np.power(xx, 1.0 + alpha) * np.exp(-xx)
         return rv
 
-    def phi(self, redz):
+    def _phi_func(self, redz):
+        """See: [Chen19] Eq.9
+        """
         return np.power(10.0, self._phi0 + self._phiz * redz)
 
-    def mref(self, redz):
+    def _mref_func(self, redz):
+        """See: [Chen19] Eq.10 - NOTE: added `redz` term
+        """
         return self._mref0 + self._mrefz * redz
 
-    def alpha(self, redz):
+    def _alpha_func(self, redz):
+        """See: [Chen19] Eq.11
+        """
         return self._alpha0 + self._alphaz * redz
 
 
@@ -75,12 +121,29 @@ class _Galaxy_Pair_Fraction(abc.ABC):
 
     @abc.abstractmethod
     def __call__(self, mtot, mrat, redz):
+        """Return the fraction of galaxies in pairs of the given parameters.
+
+        Arguments
+        ---------
+        mtot : scalar or ndarray,
+            Total-mass of combined system, units of [grams].
+        mrat : scalar or ndarray,
+            Mass-ratio of the system (m2/m1 <= 1.0), dimensionless.
+        redz : scalar or ndarray,
+            Redshift.
+
+        Returns
+        -------
+        rv : scalar or ndarray,
+            Galaxy pair fraction, in dimensionless units.
+
+        """
         return
 
 
 class GPF_Power_Law(_Galaxy_Pair_Fraction):
 
-    def __init__(self, frac_norm_allq=0.025, frac_norm=None, mref=1.0e11,
+    def __init__(self, frac_norm_allq=0.025, frac_norm=None, mref=1.0e11*MSOL,
                  malpha=0.0, zbeta=0.8, qgamma=0.0, obs_conv_qlo=0.25):
         # If the pair-fraction integrated over all mass-ratios is given (f0), convert to regular (f0-prime)
         if frac_norm is None:
@@ -98,10 +161,27 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
         self._zbeta = zbeta           #      0.8   b/t [+0.6 , +0.1 ]  [+0.0 , +2.0 ]  # noqa
         self._qgamma = qgamma         #      0.0   b/t [-0.2 , +0.2 ]  [-0.2 , +0.2 ]  # noqa
 
-        self._mref = mref   # NOTE: this is `a * M_0 = 1e11` in papers
+        self._mref = mref   # NOTE: this is `a * M_0 = 1e11 Msol` in papers
         return
 
     def __call__(self, mtot, mrat, redz):
+        """Return the fraction of galaxies in pairs of the given parameters.
+
+        Arguments
+        ---------
+        mtot : scalar or ndarray,
+            Total-mass of combined system, units of [grams].
+        mrat : scalar or ndarray,
+            Mass-ratio of the system (m2/m1 <= 1.0), dimensionless.
+        redz : scalar or ndarray,
+            Redshift.
+
+        Returns
+        -------
+        rv : scalar or ndarray,
+            Galaxy pair fraction, in dimensionless units.
+
+        """
         # convert from total-mass to primary-mass
         mpri = utils.m1m2_from_mtmr(mtot, mrat)[0]
         f0p = self._frac_norm
@@ -121,23 +201,40 @@ class _Galaxy_Merger_Time(abc.ABC):
 
     @abc.abstractmethod
     def __call__(self, mtot, mrat, redz):
+        """Return the galaxy merger time for the given parameters.
+
+        Arguments
+        ---------
+        mtot : scalar or ndarray,
+            Total-mass of combined system, units of [grams].
+        mrat : scalar or ndarray,
+            Mass-ratio of the system (m2/m1 <= 1.0), dimensionless.
+        redz : scalar or ndarray,
+            Redshift.
+
+        Returns
+        -------
+        rv : scalar or ndarray,
+            Galaxy merger time, in units of [sec].
+
+        """
         return
 
     def zprime(self, mtot, mrat, redz, **kwargs):
-        tau0 = self(mtot, mrat, redz)
-        age = cosmo.age(redz).to('Gyr').value
+        tau0 = self(mtot, mrat, redz)  # sec
+        age = cosmo.age(redz).to('s').value
         new_age = age + tau0
 
         if np.isscalar(new_age):
-            if new_age < _AGE_UNIVERSE_GYR:
-                redz_prime = cosmo.tage_to_z(new_age * GYR)
+            if new_age < _AGE_UNIVERSE_GYR * GYR:
+                redz_prime = cosmo.tage_to_z(new_age)
             else:
                 redz_prime = -1
 
         else:
             redz_prime = -1.0 * np.ones_like(new_age)
-            idx = (new_age < _AGE_UNIVERSE_GYR)
-            redz_prime[idx] = cosmo.tage_to_z(new_age[idx] * GYR)
+            idx = (new_age < _AGE_UNIVERSE_GYR * GYR)
+            redz_prime[idx] = cosmo.tage_to_z(new_age[idx])
 
         return redz_prime
 
@@ -146,11 +243,9 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
     """
     """
 
-    def __init__(
-        self, time_norm=0.55, mref=7.2e10, malpha=0.0, zbeta=-0.5, qgamma=0.0
-    ):
-        # tau0  [Gyr]
-        self._time_norm = time_norm   # +0.55  b/t [+0.1, +2.0]  [+0.1, +10.0]
+    def __init__(self, time_norm=0.55*GYR, mref=7.2e10*MSOL, malpha=0.0, zbeta=-0.5, qgamma=0.0):
+        # tau0  [sec]
+        self._time_norm = time_norm   # +0.55  b/t [+0.1, +2.0]  [+0.1, +10.0]  values for [Gyr]
         self._malpha = malpha         # +0.0   b/t [-0.2, +0.2]  [-0.2, +0.2 ]
         self._zbeta = zbeta           # -0.5   b/t [-2.0, +1.0]  [-3.0, +1.0 ]
         self._qgamma = qgamma         # +0.0   b/t [-0.2, +0.2]  [-0.2, +0.2 ]
@@ -160,18 +255,27 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
         return
 
     def __call__(self, mtot, mrat, redz):
-        """
+        """Return the galaxy merger time for the given parameters.
 
         Arguments
         ---------
-        mtot : total mass
-            Literature equations use primary-mass, converts internally.
+        mtot : scalar or ndarray,
+            Total-mass of combined system, units of [grams].
+        mrat : scalar or ndarray,
+            Mass-ratio of the system (m2/m1 <= 1.0), dimensionless.
+        redz : scalar or ndarray,
+            Redshift.
+
+        Returns
+        -------
+        rv : scalar or ndarray,
+            Galaxy merger time, in units of [sec].
 
         """
         # convert to primary mass
-        mpri = utils.m1m2_from_mtmr(mtot, mrat)[0]
-        tau0 = self._time_norm
-        bm0 = self._mref
+        mpri = utils.m1m2_from_mtmr(mtot, mrat)[0]   # [grams]
+        tau0 = self._time_norm                       # [sec]
+        bm0 = self._mref                             # [grams]
         aa = self._malpha
         bb = self._zbeta
         gg = self._qgamma
@@ -191,6 +295,10 @@ class _MMBulge_Relation(abc.ABC):
 
     @abc.abstractmethod
     def mbh_from_mbulge(self, mbulge):
+        """Convert from stellar bulge-mass to blackhole mass.
+
+        Units of [grams].
+        """
         return
 
     @abc.abstractmethod
@@ -224,11 +332,11 @@ class _MMBulge_Relation(abc.ABC):
 
 class MMBulge_Simple(_MMBulge_Relation):
 
-    def __init__(self, mass_norm=1.48e8, mref=1.0e11, malpha=1.01, bulge_mfrac=0.615):
-        self._mass_norm = mass_norm   # log10(M) = 8.17  +/-  [-0.32, +0.35]
-        self._malpha = malpha         # alpha    = 1.01  +/-  [-0.10, +0.08]
+    def __init__(self, mass_norm=1.48e8*MSOL, mref=1.0e11*MSOL, malpha=1.01, bulge_mfrac=0.615):
+        self._mass_norm = mass_norm   # log10(M/Msol) = 8.17  +/-  [-0.32, +0.35]
+        self._malpha = malpha         # alpha         = 1.01  +/-  [-0.10, +0.08]
 
-        self._mref = mref     # [Msol]
+        self._mref = mref             # [Msol]
         self._bulge_mfrac = bulge_mfrac
         return
 
@@ -236,10 +344,19 @@ class MMBulge_Simple(_MMBulge_Relation):
         return self._bulge_mfrac
 
     def mbh_from_mbulge(self, mbulge):
+        """Convert from stellar bulge-mass to blackhole mass.
+
+        Units of [grams].
+
+        """
         mbh = self._mass_norm * np.power(mbulge / self._mref, self._malpha)
         return mbh
 
     def mbulge_from_mbh(self, mbh):
+        """Convert from blackhole mass to stellar bulge-mass.
+
+        Units of [grams].
+        """
         mbulge = self._mref * np.power(mbh / self._mass_norm, 1/self._malpha)
         return mbulge
 
@@ -256,7 +373,7 @@ class MMBulge_Simple(_MMBulge_Relation):
 class Semi_Analytic_Model:
 
     def __init__(
-        self, mtot=[2.75e5, 1.0e11, 46], mrat=[0.02, 1.0, 50], redz=[0.0, 6.0, 61],
+        self, mtot=[2.75e5*MSOL, 1.0e11*MSOL, 46], mrat=[0.02, 1.0, 50], redz=[0.0, 6.0, 61],
         gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=MMBulge_Simple
     ):
 
@@ -333,24 +450,32 @@ class Semi_Analytic_Model:
             zprime = self._gmt.zprime(mstar_tot, mstar_rat, redz)
             # find valid entries (M, Q, Z)
             idx = (zprime > 0.0)
+            if ~np.any(idx):
+                utils.print_stats(stack=False, print_func=log.error,
+                                  mstar_tot=mstar_tot, mstar_rat=mstar_rat, redz=redz)
+                raise RuntimeError("No `zprime` values are greater than zero!")
+
             # these are now 1D arrays of the valid indices
             mstar_pri, mstar_rat, mstar_tot, redz = [ee[idx] for ee in [mstar_pri, mstar_rat, mstar_tot, redz]]
 
             # ---- Get Galaxy Merger Rate  [Chen19] Eq.5
             # NOTE: there is a `1/log(10)` here in the formalism, but it cancels with another one below  {*1}
+            # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]
             dens[idx] = self._gsmf(mstar_pri, redz) * self._gpf(mstar_tot, mstar_rat, redz) * cosmo.dtdz(redz)
-            dens[idx] /= self._gmt(mstar_tot, mstar_rat, redz) * GYR * mstar_tot
+            # `gmt` returns [sec]
+            dens[idx] /= self._gmt(mstar_tot, mstar_rat, redz) * mstar_tot
+            # now `dens` has units of [1/Mpc^3]
 
             # ---- Convert to MBH Binary density
 
             dqgal_dqbh = 1.0     # conversion from galaxy mrat to MBH mrat
             # convert from 1/dm to 1/dlog10(m)
             # NOTE: there is a `log(10)` in the formalism here, but it cancels with another one above  {*1}
-            mterm = self._mmbulge.mbh_from_mstar(mstar_tot)  # [Msol]
+            mterm = self._mmbulge.mbh_from_mstar(mstar_tot)  # [gram]
             # dMs/dMbh
             dmstar_dmbh = 1.0 / self._mmbulge.dmbh_dmstar(mstar_tot)   # [unitless]
 
-            # Eq.21, now [Mpc^-3], lose Msol^-1 because now 1/dlog10(M) instead of 1/dM
+            # Eq.21, now [Mpc^-3], lose [1/gram] because now 1/dlog10(M) instead of 1/dM
             dens[idx] *= dqgal_dqbh * dmstar_dmbh * mterm
 
             # multiply by bin sizes
@@ -364,7 +489,7 @@ class Semi_Analytic_Model:
 
         Arguments
         ---------
-        fobs : observed frequency in [1/yr]
+        fobs : observed frequency in [1/s]
 
         d N / d ln f_r = (dn/dz) * (dz/dt) * (dt/d ln f_r) * (dVc/dz)
                        = (dn/dz) * (f_r / [df_r/dt]) * 4 pi c D_c^2 (1+z) * dz
@@ -383,11 +508,11 @@ class Semi_Analytic_Model:
 
         # (M, Q)
         mchirp = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
-        mchirp = utils.chirp_mass(*mchirp) * MSOL   # convert to [grams]
+        mchirp = utils.chirp_mass(*mchirp)
         # (M, Q, 1, 1)
         mchirp = mchirp[..., np.newaxis, np.newaxis]
         # (Z, F) find rest-frame frequencies in Hz [1/sec]
-        frst = fobs[np.newaxis, :] * (1.0 + self.redz[:, np.newaxis]) / YR
+        frst = fobs[np.newaxis, :] * (1.0 + self.redz[:, np.newaxis])
         # (1, 1, Z, F)
         frst = frst[np.newaxis, np.newaxis, :, :]
         # (M, Q, Z, F)
@@ -395,23 +520,23 @@ class Semi_Analytic_Model:
 
         # ---------------------
         if (limit_merger_time is True):
-            logging.warning("limiting tau to < galaxy merger time")
+            log.warning("limiting tau to < galaxy merger time")
             mstar = self.mass_stellar()[:, :, :, np.newaxis]
             ms_rat = mstar[1] / mstar[0]
-            mstar = mstar.sum(axis=0)   # total mass
-            gmt = self._gmt(mstar, ms_rat, self.redz[np.newaxis, np.newaxis, :])  # [Gyr]
-            bads = (tau/GYR > gmt[..., np.newaxis])
+            mstar = mstar.sum(axis=0)   # total mass [gram]
+            gmt = self._gmt(mstar, ms_rat, self.redz[np.newaxis, np.newaxis, :])  # [sec]
+            bads = (tau > gmt[..., np.newaxis])
             tau[bads] = 0.0
-            print(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
+            log.info(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
 
         elif (limit_merger_time not in [None, False]):
-            logging.warning(f"limiting tau to < {limit_merger_time:.2f} Gyr")
-            bads = (tau/GYR > limit_merger_time)
+            log.warning(f"limiting tau to < {limit_merger_time/GYR:.2f} Gyr")
+            bads = (tau > limit_merger_time)
             tau[bads] = 0.0
-            print(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
+            log.info(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
 
         # luminosity distance in [cm]
-        dl = dc * (1.0 + self.redz) * MPC
+        dl = dc * (1.0 + self.redz) * MPC     # `dc` is in [Mpc]
         dl = dl[np.newaxis, np.newaxis, :, np.newaxis]
         dl[dl <= 0.0] = np.nan
         strain = utils.gw_strain_source(mchirp, dl, frst)
@@ -428,7 +553,7 @@ class Semi_Analytic_Model:
         """
         Arguments
         ---------
-        fobs : units of [1/yr]
+        fobs : units of [1/s]
 
         """
         import numbers
@@ -457,11 +582,11 @@ class Semi_Analytic_Model:
         return hs
 
 
-def sample_sam(sam, fobs, sample_threshold=10.0, cut_below_mass=1e6, limit_merger_time=2.0):
+def sample_sam(sam, fobs, sample_threshold=10.0, cut_below_mass=1e6*MSOL, limit_merger_time=2.0*GYR):
     """
-    fobs in units of [1/yr]
+    fobs in units of [1/sec]
     """
-    # edges: Mtot [Msol], mrat (q), redz (z), fobs (f) [1/yr]
+    # edges: Mtot [Msol], mrat (q), redz (z), fobs (f) [1/sec]
     edges, number, _ = sam.number_at_fobs(fobs, limit_merger_time=limit_merger_time)
     log_edges = [np.log10(edges[0]), edges[1], edges[2], np.log10(edges[3])]
 
@@ -483,16 +608,30 @@ def sample_sam(sam, fobs, sample_threshold=10.0, cut_below_mass=1e6, limit_merge
 
 
 def _gws_from_samples(vals, weights, fobs):
+    """
+
+    Arguments
+    ---------
+    vals : (4, N) ndarray of scalar,
+        Arrays of binary parameters in linear space.
+        * vals[0] : mtot [grams]
+        * vals[1] : mrat []
+        * vals[2] : redz []
+        * vals[3] : fobs [1/sec]
+    weights : (N,) array of scalar,
+    fobs : (F,) array of scalar,
+        Target observer-frame frequencies to calculate GWs at.  Units of [1/sec].
+
+    """
     mc = utils.chirp_mass(*utils.m1m2_from_mtmr(vals[0], vals[1]))
     dl = vals[2, :]
-    frst = (vals[3] / YR) * (1.0 + dl)
+    frst = vals[3] * (1.0 + dl)
     dl = cosmo.luminosity_distance(dl).cgs.value
-    hs = utils.gw_strain_source(mc * MSOL, dl, frst)
+    hs = utils.gw_strain_source(mc, dl, frst)
     fo = vals[-1]
     del vals
 
     gff, gwf, gwb = gws_from_sampled_strains(fobs, fo, hs, weights)
-    # gff = (10.0 ** gff)
 
     return gff, gwf, gwb
 
