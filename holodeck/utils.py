@@ -13,7 +13,7 @@ import numpy as np
 import scipy as sp
 import h5py
 
-from .constants import NWTG, SCHW, SPLC
+from .constants import NWTG, SCHW, SPLC, YR
 
 # e.g. Sesana+2004 Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
@@ -99,6 +99,12 @@ def minmax(vals):
 
 
 def stats(vals, percs=None):
+    try:
+        if len(vals) == 0:
+            raise TypeError
+    except TypeError:
+        raise ValueError(f"`vals` (shape={np.shape(vals)}) is not iterable!")
+
     if percs is None:
         percs = [sp.stats.norm.cdf(1), 0.95, 1.0]
         percs = np.array(percs)
@@ -110,7 +116,16 @@ def stats(vals, percs=None):
     return rv
 
 
-def nyquist_freqs(dur=15.0, cad=0.1, trim=None):
+def print_stats(stack=True, print_func=print, **kwargs):
+    if stack:
+        import traceback
+        traceback.print_stack()
+    for kk, vv in kwargs.items():
+        print_func(f"{kk} = {np.shape(vv)=}, {stats(vv)=}")
+    return
+
+
+def nyquist_freqs(dur=15.0*YR, cad=0.1*YR, trim=None):
     """Calculate Nyquist frequencies for the given timing parameters.
 
     Arguments
