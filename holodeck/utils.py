@@ -15,7 +15,7 @@ import scipy as sp
 import h5py
 
 from holodeck import log
-from holodeck.constants import NWTG, SCHW, SPLC
+from holodeck.constants import NWTG, SCHW, SPLC, YR
 
 # e.g. Sesana+2004 Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
@@ -173,7 +173,34 @@ def minmax(vals):
     return extr
 
 
-def nyquist_freqs(dur=15.0, cad=0.1, trim=None):
+def stats(vals, percs=None):
+    try:
+        if len(vals) == 0:
+            raise TypeError
+    except TypeError:
+        raise ValueError(f"`vals` (shape={np.shape(vals)}) is not iterable!")
+
+    if percs is None:
+        percs = [sp.stats.norm.cdf(1), 0.95, 1.0]
+        percs = np.array(percs)
+        percs = np.concatenate([1-percs[::-1], [0.5], percs])
+
+    stats = np.percentile(vals, percs*100)
+    rv = ["{:.2e}".format(ss) for ss in stats]
+    rv = ", ".join(rv)
+    return rv
+
+
+def print_stats(stack=True, print_func=print, **kwargs):
+    if stack:
+        import traceback
+        traceback.print_stack()
+    for kk, vv in kwargs.items():
+        print_func(f"{kk} = shape: {np.shape(vv)}, stats: {stats(vv)}")
+    return
+
+
+def nyquist_freqs(dur=15.0*YR, cad=0.1*YR, trim=None):
     """Calculate Nyquist frequencies for the given timing parameters.
 
     Arguments
