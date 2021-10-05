@@ -262,17 +262,17 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
 
         Arguments
         ---------
-        mtot : scalar or ndarray,
-            Total-mass of combined system, units of [grams].
-        mrat : scalar or ndarray,
-            Mass-ratio of the system (m2/m1 <= 1.0), dimensionless.
-        redz : scalar or ndarray,
-            Redshift.
+        mtot : (N,) array_like[scalar]
+            Total mass of each binary, converted to primary-mass (used in literature equations).
+        mrat : (N,) array_like[scalar]
+            Mass ratio of each binary.
+        redz : (N,) array_like[scalar]
+            Redshifts of each binary.
 
         Returns
         -------
-        rv : scalar or ndarray,
-            Galaxy merger time, in units of [sec].
+        mtime : (N,) ndarray[float]
+            Merger time for each binary in [sec].
 
         """
         # convert to primary mass
@@ -505,78 +505,14 @@ class Semi_Analytic_Model:
 
         return self._density
 
-    def number_at_gw_fobs(self, fobs, limit_merger_time=None):
-        """Convert from number-density to finite Number, per log-frequency interval
+    def number_from_hardening(self, hard, fobs=None, sepa=None, limit_merger_time=None):
+        """Convert from number-density to finite number, per unit bin-volume, per log-frequency interval.
+
+        The volume of each bin is dq dlog10(M) dz
 
         Arguments
         ---------
         fobs : observed frequency in [1/s]
-
-        d N / d ln f_r = (dn/dz) * (dz/dt) * (dt/d ln f_r) * (dVc/dz)
-                       = (dn/dz) * (f_r / [df_r/dt]) * 4 pi c D_c^2 (1+z) * dz
-
-        """
-        edges = self.edges + [fobs, ]
-
-        # shape: (M, Q, Z)
-        dens = self.density   # dn/dz  units: [Mpc^-3]
-
-        # (Z,) comoving-distance in Mpc
-        dc = cosmo.comoving_distance(self.redz).to('Mpc').value
-
-        # [Mpc^3/s]
-        cosmo_fact = 4 * np.pi * (SPLC/MPC) * np.square(dc) * self._dz
-
-        # (M, Q)
-        mchirp = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
-        mchirp = utils.chirp_mass(*mchirp)
-        # (M, Q, 1, 1)
-        mchirp = mchirp[..., np.newaxis, np.newaxis]
-        # (Z, F) find rest-frame frequencies in Hz [1/sec]
-        frst = fobs[np.newaxis, :] * (1.0 + self.redz[:, np.newaxis])
-        # (1, 1, Z, F)
-        frst = frst[np.newaxis, np.newaxis, :, :]
-        # (M, Q, Z, F)
-        tau = utils.gw_hardening_timescale(mchirp, frst)
-
-        # ---------------------
-        if (limit_merger_time is True):
-            log.warning("limiting tau to < galaxy merger time")
-            mstar = self.mass_stellar()[:, :, :, np.newaxis]
-            ms_rat = mstar[1] / mstar[0]
-            mstar = mstar.sum(axis=0)   # total mass [gram]
-            gmt = self._gmt(mstar, ms_rat, self.redz[np.newaxis, np.newaxis, :])  # [sec]
-            bads = (tau > gmt[..., np.newaxis])
-            tau[bads] = 0.0
-            log.info(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
-
-        elif (limit_merger_time not in [None, False]):
-            log.warning(f"limiting tau to < {limit_merger_time/GYR:.2f} Gyr")
-            bads = (tau > limit_merger_time)
-            tau[bads] = 0.0
-            log.info(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
-
-        # luminosity distance in [cm]
-        dl = dc * (1.0 + self.redz) * MPC     # `dc` is in [Mpc]
-        dl = dl[np.newaxis, np.newaxis, :, np.newaxis]
-        dl[dl <= 0.0] = np.nan
-        strain = utils.gw_strain_source(mchirp, dl, frst)
-        strain = np.nan_to_num(strain)
-
-        # (M, Q, Z) units: [1/s] i.e. number per second
-        number = dens * cosmo_fact
-        # (M, Q, Z, F) units: [] unitless, i.e. number
-        number = number[..., np.newaxis] * tau
-
-        return edges, number, strain
-
-    def number_from_hardening(self, hard, fobs=None, sepa=None):
-        """Convert from number-density to finite Number, per log-frequency interval
-
-        Arguments
-        ---------
-        fobs : observed frequency in [1/yr]
-        sepa : orbital separation in [pc]
 
         d N / d ln f_r = (dn/dz) * (dz/dt) * (dt/d ln f_r) * (dVc/dz)
                        = (dn/dz) * (f_r / [df_r/dt]) * 4 pi c D_c^2 (1+z) * dz
@@ -606,7 +542,7 @@ class Semi_Analytic_Model:
 
         # (M, Q)
         mchirp = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
-        mchirp = utils.chirp_mass(*mchirp) * MSOL   # convert to [grams]
+        mchirp = utils.chirp_mass(*mchirp)
         # (M, Q, 1, 1)
         mchirp = mchirp[..., np.newaxis, np.newaxis]
 
@@ -714,12 +650,15 @@ class Semi_Analytic_Model:
         return hs
 
 
-def sample_sam(sam, fobs, sample_threshold=10.0, cut_below_mass=1e6*MSOL, limit_merger_time=2.0*GYR):
+def sample_sam_with_hardening(sam, hard, fobs=None, sepa=None,
+                              limit_merger_time=None, sample_threshold=10.0, cut_below_mass=1e6):
     """
-    fobs in units of [1/sec]
+    fobs in units of [1/yr]
+    sepa in units of [pc]
     """
-    # edges: Mtot [gram], mrat (q), redz (z), fobs (f) [1/sec]
-    edges, number, _ = sam.number_at_gw_fobs(fobs, limit_merger_time=limit_merger_time)
+
+    # edges: Mtot [Msol], mrat (q), redz (z), {fobs (f) [1/yr] OR sepa (a) [pc]}
+    edges, number, _ = sam.number_from_hardening(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
     log_edges = [np.log10(edges[0]), edges[1], edges[2], np.log10(edges[3])]
 
     if cut_below_mass is not None:
@@ -736,7 +675,7 @@ def sample_sam(sam, fobs, sample_threshold=10.0, cut_below_mass=1e6*MSOL, limit_
         vals = vals.T[~bads].T
         weights = weights[~bads]
 
-    return vals, weights
+    return vals, weights, number
 
 
 def sample_sam_with_hardening(sam, hard, fobs=None, sepa=None, sample_threshold=10.0, cut_below_mass=1e6):
@@ -783,10 +722,10 @@ def _gws_from_samples(vals, weights, fobs):
 
     """
     mc = utils.chirp_mass(*utils.m1m2_from_mtmr(vals[0], vals[1]))
-    dl = vals[2, :]
+    rz = vals[2, :]
     frst = vals[3] * (1.0 + dl)
-    dl = cosmo.luminosity_distance(dl).cgs.value
-    hs = utils.gw_strain_source(mc, dl, frst)
+    dc = cosmo.comoving_distance(rz).cgs.value
+    hs = utils.gw_strain_source(mc, dc, frst)
     fo = vals[-1]
     del vals
 

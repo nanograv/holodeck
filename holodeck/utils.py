@@ -341,12 +341,12 @@ def stats(vals, percs=None, prec=2):
 
 
 def trapz_loglog(
-        yy: npt.ArrayLike,
-        xx: npt.ArrayLike,
-        bounds: Optional[Tuple[float, float]] = None,
-        axis: int = -1,
-        dlogx: Optional[float] = None,
-        lntol: float = 1e-2
+    yy: npt.ArrayLike,
+    xx: npt.ArrayLike,
+    bounds: Optional[Tuple[float, float]] = None,
+    axis: int = -1,
+    dlogx: Optional[float] = None,
+    lntol: float = 1e-2
     ) -> npt.ArrayLike:
     """Calculate integral, given `y = dA/dx` or `y = dA/dlogx` w/ trapezoid rule in log-log space.
 
@@ -738,7 +738,7 @@ def gw_strain_source(mchirp, dcom, freq_orb_rest):
     """GW Strain from a single source in a circular orbit.
 
     e.g. Sesana+2004 Eq.36
-    e.g. EN07 Eq.17
+    e.g. Enoki+2004 Eq.5
     """
     #
     hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_orb_rest, 2/3) / dcom
