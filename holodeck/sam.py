@@ -283,7 +283,7 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
         bb = self._zbeta
         gg = self._qgamma
         mtime = tau0 * np.power(mpri/bm0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
-        mtime = mtime * GYR
+        mtime = mtime
         return mtime
 
 
@@ -512,7 +512,19 @@ class Semi_Analytic_Model:
 
         Arguments
         ---------
-        fobs : observed frequency in [1/s]
+        hard :
+        fobs : observed frequency in [1/sec]
+        sepa : rest-frame separation in [cm]
+        limit_merger_time : None or scalar,
+            Maximum allowed merger time in [sec]
+
+        Returns
+        -------
+        number : (M, Q, Z, F) ndarray of scalar
+
+
+        Notes
+        -----
 
         d N / d ln f_r = (dn/dz) * (dz/dt) * (dt/d ln f_r) * (dVc/dz)
                        = (dn/dz) * (f_r / [df_r/dt]) * 4 pi c D_c^2 (1+z) * dz
@@ -534,7 +546,7 @@ class Semi_Analytic_Model:
         # shape: (M, Q, Z)
         dens = self.density   # d3n/[dz dlog10(M) dq]  units: [Mpc^-3]
 
-        # (Z,) comoving-distance in Mpc
+        # (Z,) comoving-distance in [Mpc]
         dc = cosmo.comoving_distance(self.redz).to('Mpc').value
 
         # [Mpc^3/s] this is `(dVc/dz) * (dz/dt)`
@@ -546,19 +558,20 @@ class Semi_Analytic_Model:
         # (M, Q, 1, 1)
         mchirp = mchirp[..., np.newaxis, np.newaxis]
 
+        # (M*Q*Z,)
         mt, mr, rz = [gg.ravel() for gg in self.grid]
-        mt = mt * MSOL
 
         if fobs is not None:
-            # Convert from obs-GW freq, to rest-frame orbital freq
-            fr = fobs[:, np.newaxis] * (1.0 + rz[np.newaxis, :]) / YR / 2.0
+            # Convert from obs-GW freq, to rest-frame _orbital_ freq
+            # (F, M*Q*Z)
+            fr = fobs[:, np.newaxis] * (1.0 + rz[np.newaxis, :]) / 2.0
             sa = utils.kepler_sepa_from_freq(mt[np.newaxis, :], fr)
         else:
-            sa = sepa[:, np.newaxis] * PC
-            # NOTE: `fr` is the _orbital_ frequency (not GW)
+            sa = sepa[:, np.newaxis]
+            # NOTE: `fr` is the _orbital_ frequency (not GW), and in rest-frame
             fr = utils.kepler_freq_from_sepa(mt[np.newaxis, :], sa)
 
-        # recall: these are negative (decreasing separation)
+        # recall: these are negative (decreasing separation)  [cm/sec]
         dadt = hard.dadt(mt[np.newaxis, :], mr[np.newaxis, :], sa)
 
         # Calculate `tau = dt/dlnf_r = f_r / (df_r/dt)`
@@ -574,7 +587,7 @@ class Semi_Analytic_Model:
             log.info("limiting tau to < galaxy merger time")
             mstar = self.mass_stellar()[:, :, :, np.newaxis]
             ms_rat = mstar[1] / mstar[0]
-            mstar = mstar.sum(axis=0)   # total mass
+            mstar = mstar.sum(axis=0)   # total mass [grams]
             gmt = self._gmt(mstar, ms_rat, self.redz[np.newaxis, np.newaxis, :])  # [sec]
             bads = (tau > gmt[..., np.newaxis])
             tau[bads] = 0.0
@@ -584,8 +597,8 @@ class Semi_Analytic_Model:
             pass
 
         elif utils.isnumeric(limit_merger_time):
-            log.info(f"limiting tau to < {limit_merger_time:.2f} Gyr")
-            bads = (tau/GYR > limit_merger_time)
+            log.info(f"limiting tau to < {limit_merger_time/GYR:.2f} Gyr")
+            bads = (tau > limit_merger_time)
             tau[bads] = 0.0
             log.info(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
 
@@ -602,16 +615,18 @@ class Semi_Analytic_Model:
         fr = fr.reshape(dens.shape + (xsize,))
 
         dc[dc <= 0.0] = np.nan
-        dc = dc[np.newaxis, np.newaxis, :, np.newaxis]
+        # convert [Mpc] ==> [cm]
+        dc = dc[np.newaxis, np.newaxis, :, np.newaxis] * MPC
+
         # Note: `gw_strain_source` uses *orbital* frequency
-        # strain = utils.gw_strain_source(mchirp, dl, fr)
-        strain = utils.gw_strain_source(mchirp, dc * MPC, fr)
+        strain = utils.gw_strain_source(mchirp, dc, fr)
         strain = np.nan_to_num(strain)
 
         # (M, Q, Z) units: [1/s] i.e. number per second
         number = dens * cosmo_fact
         # (M, Q, Z, F) units: [] unitless, i.e. number
         number = number[..., np.newaxis] * tau
+        # utils.print_stats(number=number, dens=dens, cosmo_fact=cosmo_fact, tau=tau)
 
         return edges, number, strain
 
