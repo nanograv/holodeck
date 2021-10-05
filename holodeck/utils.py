@@ -11,8 +11,10 @@ References:
 import abc
 import copy
 import numbers
+from typing import Sequence, Optional, Tuple
 
 import numpy as np
+import numpy.typing as npt
 import scipy as sp
 import h5py
 
@@ -338,7 +340,14 @@ def stats(vals, percs=None, prec=2):
     return rv
 
 
-def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
+def trapz_loglog(
+    yy: npt.ArrayLike,
+    xx: npt.ArrayLike,
+    bounds: Optional[Tuple[float, float]] = None,
+    axis: int = -1,
+    dlogx: Optional[float] = None,
+    lntol: float = 1e-2
+    ) -> npt.ArrayLike:
     """Calculate integral, given `y = dA/dx` or `y = dA/dlogx` w/ trapezoid rule in log-log space.
 
     We are calculating the integral `A` given sets of values for `y` and `x`.
@@ -348,6 +357,19 @@ def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
 
     For each interval (x[i+1], x[i]), calculate the integral assuming that y is of the form,
         `y = a * x^gamma`
+
+    Arguments
+    ---------
+    yy : ndarray
+    xx : (X,) array_like of scalar,
+    bounds : (2,) array_like of scalar,
+    axis : int,
+    dlogx : scalar or None,
+    lntol : scalar,
+
+    Returns
+    -------
+    integ
 
     Notes
     -----
@@ -381,7 +403,7 @@ def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
     # yy = np.ma.masked_values(yy, value=0.0, atol=0.0)
 
     if np.ndim(yy) != np.ndim(xx):
-        if np.ndim(yy) < np.ndim(xx):
+        if np.ndim(xx) != 1:
             raise ValueError("BAD SHAPES")
         cut = [slice(None)] + [np.newaxis for ii in range(np.ndim(yy)-1)]
         xx = xx[tuple(cut)]
@@ -403,7 +425,7 @@ def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
     xx = np.moveaxis(xx, 0, axis)
     yy = np.moveaxis(yy, 0, axis)
     # Integrate dA/dx   ::   A = (x1*y1 - x0*y0) / (gamma + 1)
-    if dlogx is None:
+    if ((dlogx is None) or (dlogx is False)):
         dz = np.diff(yy * xx, axis=axis)
         trapz = dz / (gamma + 1)
         # when the power-law is (near) '-1' then, `A = a * log(x1/x0)`
@@ -416,7 +438,12 @@ def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
         # when the power-law is (near) '-1' then, `A = a * log(x1/x0)`
         idx = np.isclose(gamma, 0.0, atol=lntol, rtol=lntol)
 
-    trapz[idx] = aa[idx] * delta_logx[idx]
+    if np.any(idx):
+        # if `xx.shape != yy.shape` then `delta_logx` should be shaped (N-1, 1, 1, 1...)
+        # broadcast `delta_logx` to the same shape as `idx` in this case
+        if np.shape(xx) != np.shape(yy):
+            delta_logx = delta_logx * np.ones_like(aa)
+        trapz[idx] = aa[idx] * delta_logx[idx]
 
     integ = np.log(log_base) * np.cumsum(trapz, axis=axis)
     if bounds is not None:
@@ -425,6 +452,41 @@ def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
         integ = hi - lo
 
     return integ
+
+
+def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1):
+    """Perform a cumulative integration along the given axis.
+
+    Arguments
+    ---------
+    yy : ArrayLike of scalar,
+        Input to be integrated.
+    xx : ArrayLike of scalar,
+        The sample points corresponding to the `yy` values.
+        This must be either be shaped as
+        * the same number of dimensions as `yy`, with the same length along the `axis` dimension, or
+        * 1D with length matching `yy[axis]`
+    axis : int,
+        The axis over which to integrate.
+
+    Returns
+    -------
+    ct : ndarray of scalar,
+        Cumulative trapezoid rule integration.
+
+    """
+    if np.ndim(xx) == 1:
+        pass
+    elif np.ndim(xx) == np.ndim(yy):
+        xx = xx[axis]
+    else:
+        error(f"Bad shape for `xx` (xx.shape={np.shape(xx)}, yy.shape={np.shape(yy)})!")
+    ct = np.moveaxis(yy, axis, 0)
+    ct = 0.5 * (ct[1:] + ct[:-1])
+    ct = np.moveaxis(ct, 0, -1)
+    ct = ct * np.diff(xx)
+    ct = np.moveaxis(ct, -1, axis)
+    return ct
 
 
 def _parse_log_norm_pars(vals, size, default=None):
