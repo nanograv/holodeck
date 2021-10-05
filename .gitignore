@@ -106,3 +106,4 @@ ENV/
 *profraw
 holodeck/tests/converted_notebooks
 ms.pdf
+holodeck.code-workspace

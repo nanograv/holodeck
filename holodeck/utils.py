@@ -341,12 +341,12 @@ def stats(vals, percs=None, prec=2):
 
 
 def trapz_loglog(
-    yy: npt.ArrayLike,
-    xx: npt.ArrayLike,
-    bounds: Optional[Tuple[float, float]] = None,
-    axis: int = -1,
-    dlogx: Optional[float] = None,
-    lntol: float = 1e-2
+        yy: npt.ArrayLike,
+        xx: npt.ArrayLike,
+        bounds: Optional[Tuple[float, float]] = None,
+        axis: int = -1,
+        dlogx: Optional[float] = None,
+        lntol: float = 1e-2
     ) -> npt.ArrayLike:
     """Calculate integral, given `y = dA/dx` or `y = dA/dlogx` w/ trapezoid rule in log-log space.
 
@@ -445,7 +445,8 @@ def trapz_loglog(
             delta_logx = delta_logx * np.ones_like(aa)
         trapz[idx] = aa[idx] * delta_logx[idx]
 
-    integ = np.log(log_base) * np.cumsum(trapz, axis=axis)
+    # integ = np.log(log_base) * np.cumsum(trapz, axis=axis)
+    integ = np.cumsum(trapz, axis=axis) / np.log(log_base)   # FIX: I think this is divided by base... 2021-10-05
     if bounds is not None:
         integ = np.moveaxis(integ, axis, 0)
         lo, hi = integ[ii-1, ...]
@@ -485,6 +486,7 @@ def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1):
     ct = 0.5 * (ct[1:] + ct[:-1])
     ct = np.moveaxis(ct, 0, -1)
     ct = ct * np.diff(xx)
+    ct = np.cumsum(ct, axis=-1)
     ct = np.moveaxis(ct, -1, axis)
     return ct
 
