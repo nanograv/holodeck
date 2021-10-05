@@ -388,7 +388,9 @@ class Semi_Analytic_Model:
         return self._density
 
     def number_from_hardening(self, hard, fobs=None, sepa=None, limit_merger_time=None):
-        """Convert from number-density to finite Number, per log-frequency interval, per unit bin-volume.
+        """Convert from number-density to finite number, per unit bin-volume, per log-frequency interval.
+
+        The volume of each bin is dq dlog10(M) dz
 
         Arguments
         ---------
