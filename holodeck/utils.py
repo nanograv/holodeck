@@ -346,7 +346,8 @@ def trapz_loglog(
     bounds: Optional[Tuple[float, float]] = None,
     axis: int = -1,
     dlogx: Optional[float] = None,
-    lntol: float = 1e-2
+    lntol: float = 1e-2,
+    cumsum: bool = True,
     ) -> npt.ArrayLike:
     """Calculate integral, given `y = dA/dx` or `y = dA/dlogx` w/ trapezoid rule in log-log space.
 
@@ -446,8 +447,13 @@ def trapz_loglog(
         trapz[idx] = aa[idx] * delta_logx[idx]
 
     # integ = np.log(log_base) * np.cumsum(trapz, axis=axis)
-    integ = np.cumsum(trapz, axis=axis) / np.log(log_base)   # FIX: I think this is divided by base... 2021-10-05
+    # integ = np.cumsum(trapz, axis=axis) / np.log(log_base)   # FIX: I think this is divided by base... 2021-10-05
+    integ = trapz / np.log(log_base)
+    if cumsum:
+        integ = np.cumsum(integ, axis=axis)
     if bounds is not None:
+        if not cumsum:
+            logging.warning(f"WARNING: bounds is not None, but cumsum is False!")
         integ = np.moveaxis(integ, axis, 0)
         lo, hi = integ[ii-1, ...]
         integ = hi - lo
@@ -455,7 +461,7 @@ def trapz_loglog(
     return integ
 
 
-def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1):
+def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = True):
     """Perform a cumulative integration along the given axis.
 
     Arguments
@@ -486,7 +492,8 @@ def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1):
     ct = 0.5 * (ct[1:] + ct[:-1])
     ct = np.moveaxis(ct, 0, -1)
     ct = ct * np.diff(xx)
-    ct = np.cumsum(ct, axis=-1)
+    if cumsum:
+        ct = np.cumsum(ct, axis=-1)
     ct = np.moveaxis(ct, -1, axis)
     return ct
 
@@ -552,12 +559,28 @@ def m1m2_from_mtmr(mt, mr):
     return np.array([m1, m2])
 
 
+def frst_from_fobs(fobs, redz):
+    """Calculate rest-frame frequency from observed frequency and redshift.
+    """
+    frst = fobs * (1.0 + redz)
+    return frst
+
+
+def fobs_from_frst(frst, redz):
+    """Calculate observed frequency from rest-frame frequency and redshift.
+    """
+    fobs = frst / (1.0 + redz)
+    return fobs
+
+
 def kepler_freq_from_sepa(mass, sep):
     freq = (1.0/(2.0*np.pi))*np.sqrt(NWTG*mass)/np.power(sep, 1.5)
     return freq
 
 
 def kepler_sepa_from_freq(mass, freq):
+    mass = np.asarray(mass)
+    freq = np.asarray(freq)
     sep = np.power(NWTG*mass/np.square(2.0*np.pi*freq), 1.0/3.0)
     return sep
 
