@@ -107,3 +107,4 @@ ENV/
 holodeck/tests/converted_notebooks
 ms.pdf
 holodeck.code-workspace
+docs/holodeck-paper/src/out
