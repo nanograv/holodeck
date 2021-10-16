@@ -23,7 +23,7 @@ import kalepy as kale
 
 import holodeck as holo
 from holodeck import cosmo, utils, log
-from holodeck.constants import GYR, SPLC, MSOL, MPC
+from holodeck.constants import GYR, SPLC, MSOL, MPC, YR
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
@@ -66,10 +66,10 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
     """
 
     def __init__(self, phi0=-2.77, phiz=-0.27, mref0=1.74e11*MSOL, mrefz=0.0, alpha0=-1.24, alphaz=-0.03):
-        self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]
-        self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]
+        self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]  [1/Mpc^3]
+        self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]  [1/Mpc^3]
         self._mref0 = mref0       # +11.24  +/- [-0.17, +0.20]  Msol
-        self._mrefz = mrefz
+        self._mrefz = mrefz       #  0.0                        Msol
         self._alpha0 = alpha0     # -1.24   +/- [-0.16, +0.16]
         self._alphaz = alphaz     # -0.03   +/- [-0.14, +0.16]
         return
@@ -335,6 +335,12 @@ class _MMBulge_Relation(abc.ABC):
 
 
 class MMBulge_Simple(_MMBulge_Relation):
+    """Mbh--MBulge relation as a simple power-law.
+
+    M_bh = M_0 * (M_bulge / M_ref)^alpha
+    M_bulge = f_bulge * M_star
+
+    """
 
     def __init__(self, mass_norm=1.48e8*MSOL, mref=1.0e11*MSOL, malpha=1.01, bulge_mfrac=0.615):
         self._mass_norm = mass_norm   # log10(M/Msol) = 8.17  +/-  [-0.32, +0.35]
@@ -433,12 +439,14 @@ class Semi_Analytic_Model:
         shape = [len(ee) for ee in self.edges]
         return tuple(shape)
 
+    '''
     def mass_stellar(self):
         # total-mass, mass-ratio ==> (M1, M2)
         masses = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
         # BH-masses to stellar-masses
         masses = self._mmbulge.mstar_from_mbh(masses)
         return masses
+    '''
 
     @property
     def density(self):
@@ -480,24 +488,25 @@ class Semi_Analytic_Model:
             mstar_pri, mstar_rat, mstar_tot, redz = [ee[idx] for ee in [mstar_pri, mstar_rat, mstar_tot, redz]]
 
             # ---- Get Galaxy Merger Rate  [Chen19] Eq.5
-            # NOTE: there is a `1/log(10)` here in the formalism, but it cancels with another one below  {*1}
             # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]
             dens[idx] = self._gsmf(mstar_pri, redz) * self._gpf(mstar_tot, mstar_rat, redz) * cosmo.dtdz(redz)
+            # convert from 1/dlog10(M_star-pri) to 1/dM_star-tot
+            dlogten_mstar_pri__dmstar_tot = 1.0 / (mstar_tot * np.log(10.0) * (1.0 + mstar_rat))
             # `gmt` returns [sec]
-            dens[idx] /= self._gmt(mstar_tot, mstar_rat, redz) * mstar_tot
-            # now `dens` has units of [1/Mpc^3]
+            dens[idx] *= dlogten_mstar_pri__dmstar_tot / self._gmt(mstar_tot, mstar_rat, redz)
+            # now `dens` is  ``dn_gal / [dMstar_tot dq_gal dz]``  with units of [Mpc^-3 gram^-1]
 
             # ---- Convert to MBH Binary density
 
+            # so far we have ``dn_gal / [dM_gal dq_gal dz]``
+            # dn / [dM dq dz] = (dn_gal / [dM_gal dq_gal dz]) * (dM_gal/dM_bh) * (dq_gal / dq_bh)
             dqgal_dqbh = 1.0     # conversion from galaxy mrat to MBH mrat
-            # convert from 1/dm to 1/dlog10(m)
-            # NOTE: there is a `log(10)` in the formalism here, but it cancels with another one above  {*1}
-            mterm = self._mmbulge.mbh_from_mstar(mstar_tot)  # [gram]
             # dMs/dMbh
             dmstar_dmbh = 1.0 / self._mmbulge.dmbh_dmstar(mstar_tot)   # [unitless]
+            mbh_tot = self._mmbulge.mbh_from_mstar(mstar_tot)  # [gram]
 
             # Eq.21, now [Mpc^-3], lose [1/gram] because now 1/dlog10(M) instead of 1/dM
-            dens[idx] *= dqgal_dqbh * dmstar_dmbh * mterm
+            dens[idx] *= dqgal_dqbh * dmstar_dmbh * mbh_tot * np.log(10.0)
 
             # multiply by bin sizes to convert dn/dMdqdz ==> dn/dz
             # dens *= self._dlog10m * self._dq
@@ -609,18 +618,19 @@ class Semi_Analytic_Model:
         # convert `tau` to the correct shape, note that moveaxis MUST happen _before_ reshape!
         # (F, M*Q*Z) ==> (M*Q*Z, F)
         tau = np.moveaxis(tau, 0, -1)
-        fr = np.moveaxis(fr, 0, -1)
+        # fr = np.moveaxis(fr, 0, -1)
         # (M*Q*Z, F) ==> (M, Q, Z, F)
         tau = tau.reshape(dens.shape + (xsize,))
-        fr = fr.reshape(dens.shape + (xsize,))
+        # fr = fr.reshape(dens.shape + (xsize,))
 
-        dc[dc <= 0.0] = np.nan
-        # convert [Mpc] ==> [cm]
-        dc = dc[np.newaxis, np.newaxis, :, np.newaxis] * MPC
+        # dc[dc <= 0.0] = np.nan
+        # # convert [Mpc] ==> [cm]
+        # dc = dc[np.newaxis, np.newaxis, :, np.newaxis] * MPC
 
         # Note: `gw_strain_source` uses *orbital* frequency
-        strain = utils.gw_strain_source(mchirp, dc, fr)
-        strain = np.nan_to_num(strain)
+        # strain = utils.gw_strain_source(mchirp, dc, fr)
+        # strain = np.nan_to_num(strain)
+        strain = None
 
         # (M, Q, Z) units: [1/s] i.e. number per second
         number = dens * cosmo_fact
@@ -644,8 +654,20 @@ class Semi_Analytic_Model:
             squeeze = True
 
         # `num` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
-        # `num` is dN/d ln f_r = dN/d ln f
         edges, num, hs = self.number_from_hardening(hard, fobs=fobs)
+
+        coms = self.grid
+        edge = num
+        cent = kale.utils.midpoints(edge, log=False, axis=None)
+        coms = [
+            (kale.utils.midpoints(edge * ll[..., np.newaxis], log=False, axis=None) / cent).flat
+            for ll in coms
+        ]
+        mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))
+        print(f"{mc.shape=} {utils.stats(mc)=}")
+
+
+        raise
 
         if realize is True:
             num = np.random.poisson(num)
@@ -665,34 +687,7 @@ class Semi_Analytic_Model:
         return hs
 
 
-def sample_sam_with_hardening(sam, hard, fobs=None, sepa=None,
-                              limit_merger_time=None, sample_threshold=10.0, cut_below_mass=1e6):
-    """
-    fobs in units of [1/yr]
-    sepa in units of [pc]
-    """
-
-    # edges: Mtot [Msol], mrat (q), redz (z), {fobs (f) [1/yr] OR sepa (a) [pc]}
-    edges, number, _ = sam.number_from_hardening(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
-    log_edges = [np.log10(edges[0]), edges[1], edges[2], np.log10(edges[3])]
-
-    if cut_below_mass is not None:
-        m2 = edges[0][:, np.newaxis] * edges[1][np.newaxis, :]
-        bads = (m2 < cut_below_mass)
-        number[bads] = 0.0
-
-    vals, weights = kale.sample_outliers(log_edges, number, sample_threshold)
-    vals[0] = 10.0 ** vals[0]
-    vals[3] = 10.0 ** vals[3]
-
-    if cut_below_mass is not None:
-        bads = (vals[0] * vals[1] < cut_below_mass)
-        vals = vals.T[~bads].T
-        weights = weights[~bads]
-
-    return vals, weights, number
-
-
+'''
 def sample_sam_with_hardening(sam, hard, fobs=None, sepa=None, sample_threshold=10.0, cut_below_mass=1e6):
     """
     fobs in units of [1/yr]
@@ -798,3 +793,4 @@ def gws_from_sampled_strains(freqs, fobs, hs, weights):
     gwback = np.sqrt(gwback)
 
     return gwf_freqs, gwfore, gwback
+'''
