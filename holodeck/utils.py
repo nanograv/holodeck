@@ -11,7 +11,7 @@ References:
 import abc
 import copy
 import numbers
-from typing import Sequence, Optional, Tuple
+from typing import Optional, Tuple  # , Sequence,
 
 import numpy as np
 import numpy.typing as npt
@@ -195,24 +195,6 @@ def minmax(vals, filter=False):
     return extr
 
 
-def stats(vals, percs=None):
-    try:
-        if len(vals) == 0:
-            raise TypeError
-    except TypeError:
-        raise ValueError(f"`vals` (shape={np.shape(vals)}) is not iterable!")
-
-    if percs is None:
-        percs = [sp.stats.norm.cdf(1), 0.95, 1.0]
-        percs = np.array(percs)
-        percs = np.concatenate([1-percs[::-1], [0.5], percs])
-
-    stats = np.percentile(vals, percs*100)
-    rv = ["{:.2e}".format(ss) for ss in stats]
-    rv = ", ".join(rv)
-    return rv
-
-
 def print_stats(stack=True, print_func=print, **kwargs):
     if stack:
         import traceback
@@ -328,6 +310,12 @@ def quantiles(values, percs=None, sigmas=None, weights=None, axis=None, values_s
 
 
 def stats(vals, percs=None, prec=2):
+    try:
+        if len(vals) == 0:
+            raise TypeError
+    except TypeError:
+        raise ValueError(f"`vals` (shape={np.shape(vals)}) is not iterable!")
+
     if percs is None:
         percs = [sp.stats.norm.cdf(1), 0.95, 1.0]
         percs = np.array(percs)
@@ -341,14 +329,14 @@ def stats(vals, percs=None, prec=2):
 
 
 def trapz_loglog(
-    yy: npt.ArrayLike,
-    xx: npt.ArrayLike,
-    bounds: Optional[Tuple[float, float]] = None,
-    axis: int = -1,
-    dlogx: Optional[float] = None,
-    lntol: float = 1e-2,
-    cumsum: bool = True,
-    ) -> npt.ArrayLike:
+        yy: npt.ArrayLike,
+        xx: npt.ArrayLike,
+        bounds: Optional[Tuple[float, float]] = None,
+        axis: int = -1,
+        dlogx: Optional[float] = None,
+        lntol: float = 1e-2,
+        cumsum: bool = True,
+) -> npt.ArrayLike:
     """Calculate integral, given `y = dA/dx` or `y = dA/dlogx` w/ trapezoid rule in log-log space.
 
     We are calculating the integral `A` given sets of values for `y` and `x`.
@@ -453,7 +441,7 @@ def trapz_loglog(
         integ = np.cumsum(integ, axis=axis)
     if bounds is not None:
         if not cumsum:
-            logging.warning(f"WARNING: bounds is not None, but cumsum is False!")
+            log.warning("WARNING: bounds is not None, but cumsum is False!")
         integ = np.moveaxis(integ, axis, 0)
         lo, hi = integ[ii-1, ...]
         integ = hi - lo
