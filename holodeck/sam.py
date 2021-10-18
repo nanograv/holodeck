@@ -16,14 +16,14 @@ To-Do
 import abc
 import inspect
 
-import numba
+# import numba
 import numpy as np
 
 import kalepy as kale
 
 import holodeck as holo
 from holodeck import cosmo, utils, log
-from holodeck.constants import GYR, SPLC, MSOL, MPC, YR
+from holodeck.constants import GYR, SPLC, MSOL, MPC
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
@@ -407,13 +407,10 @@ class Semi_Analytic_Model:
         elif not isinstance(mmbulge, _MMBulge_Relation):
             raise ValueError("`mmbulge` must be an instance or subclass of `_MMBulge_Relation`!")
 
+        # NOTE: the spacing (log vs lin) is important.  e.g. in integrating from differential-number to (total) number
         self.mtot = np.logspace(*np.log10(mtot[:2]), mtot[2])
         self.mrat = np.linspace(*mrat)
         self.redz = np.linspace(*redz)
-
-        # self._dlog10m = np.diff(np.log10(self.mtot))[0]
-        # self._dq = np.diff(self.mrat)[0]
-        # self._dz = np.diff(self.redz)[0]
 
         self._gsmf = gsmf
         self._gpf = gpf
@@ -439,14 +436,20 @@ class Semi_Analytic_Model:
         shape = [len(ee) for ee in self.edges]
         return tuple(shape)
 
-    '''
     def mass_stellar(self):
+        """Calculate stellar masses for each MBH based on the M-MBulge relation.
+
+        Returns
+        -------
+        masses : (N, 2) ndarray of scalar,
+            Galaxy total stellar masses for all MBH.  [:, 0] is primary, [:, 1] is secondary.
+
+        """
         # total-mass, mass-ratio ==> (M1, M2)
         masses = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
         # BH-masses to stellar-masses
         masses = self._mmbulge.mstar_from_mbh(masses)
         return masses
-    '''
 
     @property
     def density(self):
@@ -508,8 +511,6 @@ class Semi_Analytic_Model:
             # Eq.21, now [Mpc^-3], lose [1/gram] because now 1/dlog10(M) instead of 1/dM
             dens[idx] *= dqgal_dqbh * dmstar_dmbh * mbh_tot * np.log(10.0)
 
-            # multiply by bin sizes to convert dn/dMdqdz ==> dn/dz
-            # dens *= self._dlog10m * self._dq
             self._density = dens
 
         return self._density
@@ -618,27 +619,15 @@ class Semi_Analytic_Model:
         # convert `tau` to the correct shape, note that moveaxis MUST happen _before_ reshape!
         # (F, M*Q*Z) ==> (M*Q*Z, F)
         tau = np.moveaxis(tau, 0, -1)
-        # fr = np.moveaxis(fr, 0, -1)
         # (M*Q*Z, F) ==> (M, Q, Z, F)
         tau = tau.reshape(dens.shape + (xsize,))
-        # fr = fr.reshape(dens.shape + (xsize,))
-
-        # dc[dc <= 0.0] = np.nan
-        # # convert [Mpc] ==> [cm]
-        # dc = dc[np.newaxis, np.newaxis, :, np.newaxis] * MPC
-
-        # Note: `gw_strain_source` uses *orbital* frequency
-        # strain = utils.gw_strain_source(mchirp, dc, fr)
-        # strain = np.nan_to_num(strain)
-        strain = None
 
         # (M, Q, Z) units: [1/s] i.e. number per second
         number = dens * cosmo_fact
         # (M, Q, Z, F) units: [] unitless, i.e. number
         number = number[..., np.newaxis] * tau
-        # utils.print_stats(number=number, dens=dens, cosmo_fact=cosmo_fact, tau=tau)
 
-        return edges, number, strain
+        return edges, number
 
     def gwb(self, fobs, hard=holo.evolution.Hard_GW, realize=False, **kwargs):
         """
@@ -653,38 +642,73 @@ class Semi_Analytic_Model:
             fobs = np.atleast_1d(fobs)
             squeeze = True
 
-        # `num` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
-        edges, num, hs = self.number_from_hardening(hard, fobs=fobs)
+        # Get the differential-number of binaries for each bin
+        # `number` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
+        edges, dnum = self.number_from_hardening(hard, fobs=fobs)
 
+        # ---- integrate from differential-number to number per bin
+        number = _integrate_differential_number(edges, dnum)
+
+        # ---- find 'center-of-mass' of each bin (i.e. based on grid edges)
+        # (3, M, Q, Z)
         coms = self.grid
-        edge = num
-        cent = kale.utils.midpoints(edge, log=False, axis=None)
-        coms = [
-            (kale.utils.midpoints(edge * ll[..., np.newaxis], log=False, axis=None) / cent).flat
-            for ll in coms
-        ]
+        # ===> (3, M, Q, Z, 1)
+        coms = [cc[..., np.newaxis] for cc in coms]
+        # ===> (4, M, Q, Z, F)
+        coms = np.broadcast_arrays(*coms, fobs[np.newaxis, np.newaxis, np.newaxis, :])
+
+        # find weighted bin positions
+        edge = dnum
+        cent = kale.utils.midpoints(edge, log=False, axis=(0, 1, 2))
+        for ii, cc in enumerate(coms):
+            coms[ii] = kale.utils.midpoints(edge * cc, log=False, axis=(0, 1, 2)) / cent
+            # dont weight frequency (3th dimension)
+            if ii == 2:
+                break
+
+        # get the correct shape for frequencies
+        # NOTE: coms[:, :, :, i] == coms[0, 0, 0, i]  i.e. only last dimension varies
+        coms[-1] = coms[-1][1:, 1:, 1:, :]
+
+        # shape_grid = coms[0].shape
+        coms = [cc.flat for cc in coms]
+
+        # ---- calculate GW strain at bin centroids
         mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))
-        print(f"{mc.shape=} {utils.stats(mc)=}")
-
-
-        raise
+        dc = cosmo.comoving_distance(coms[2]).cgs.value
+        fr = utils.frst_from_fobs(coms[3][:], coms[2][:])
+        hs = utils.gw_strain_source(mc, dc, fr)
+        # (M*Q*Z*F,) ==> (M,Q,Z,F)
+        hs = hs.reshape(number.shape)
 
         if realize is True:
-            num = np.random.poisson(num)
+            number = np.random.poisson(number)
         elif realize in [None, False]:
             pass
         elif utils.isinteger(realize):
-            shape = num.shape + (realize,)
-            num = np.random.poisson(num[..., np.newaxis], size=shape)
+            shape = number.shape + (realize,)
+            number = np.random.poisson(number[..., np.newaxis], size=shape)
             hs = hs[..., np.newaxis]
         else:
             err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
             raise ValueError(err)
 
-        hs = np.sqrt(np.sum(num*np.square(hs), axis=(0, 1, 2)))
+        hs = np.sqrt(np.sum(number*np.square(hs), axis=(0, 1, 2)))
         if squeeze:
             hs = hs.squeeze()
         return hs
+
+
+def _integrate_differential_number(edges, dnum):
+    # ---- integrate from differential-number to number per bin
+    # integrate over dlog10(M)
+    number = holo.utils.trapz_loglog(dnum, edges[0], dlogx=10.0, axis=0, cumsum=False)
+    number = np.nan_to_num(number)
+    # integrate over mass-ratio
+    number = holo.utils.trapz(number, edges[1], axis=1, cumsum=False)
+    # integrate over redshift
+    number = holo.utils.trapz(number, edges[2], axis=2, cumsum=False)
+    return number
 
 
 '''
