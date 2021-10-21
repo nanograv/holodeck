@@ -105,3 +105,6 @@ ENV/
 # There are reports this comes from LLVM profiling, but also Xcode 9.
 *profraw
 holodeck/tests/converted_notebooks
+ms.pdf
+holodeck.code-workspace
+docs/holodeck-paper/src/out

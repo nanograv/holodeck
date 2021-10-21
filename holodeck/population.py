@@ -25,9 +25,9 @@ class _Population(abc.ABC):
 
     def _init(self):
         # Initial binary values (i.e. at time of formation)
-        self.scafa = None    # scale factor        (N,)
-        self.sepa = None    # binary separation a (N,)
         self.mass = None    # blackhole masses    (N, 2)
+        self.sepa = None    # binary separation a (N,)
+        self.scafa = None    # scale factor        (N,)
 
         self.eccen = None   # eccentricities      (N,) [optional]
         self.weight = None  # weight of each binary as a sample  (N,) [optional]
@@ -43,6 +43,14 @@ class _Population(abc.ABC):
     @property
     def size(self):
         return self._size
+
+    @property
+    def mtmr(self):
+        return utils.mtmr_from_m1m2(self.mass)
+
+    @property
+    def redz(self):
+        return cosmo.a_to_z(self.scafa)
 
     def modify(self, mods=None):
         # Sanitize
