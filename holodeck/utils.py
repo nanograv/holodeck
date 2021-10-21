@@ -394,7 +394,11 @@ def trapz_loglog(
     if np.ndim(yy) != np.ndim(xx):
         if np.ndim(xx) != 1:
             raise ValueError("BAD SHAPES")
-        cut = [slice(None)] + [np.newaxis for ii in range(np.ndim(yy)-1)]
+        # convert `xx` from shape (N,) to (1, ... N, ..., 1) where all
+        # dimensions besides `axis` have length one
+        # cut = [slice(None)] + [np.newaxis for ii in range(np.ndim(yy)-1)]
+        cut = [np.newaxis for ii in range(np.ndim(yy))]
+        cut[axis] = slice(None)
         xx = xx[tuple(cut)]
 
     log_base = np.e
