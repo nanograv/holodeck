@@ -11,7 +11,7 @@ To-Do
 -----
 *[ ]Check that _GW_ frequencies and _orbital_ frequencies are being used in the correct places.
     Check `number_at_gw_fobs` and related methods.
-*[ ]Expand SAM mass-ratios to wider range, change to log-space.
+*[ ]Change mass-ratios and redshifts (1+z) to log-space; expand q parameter range.
 *[ ]Incorporate arbitrary hardening mechanisms into SAM construction, sample self-consistently.
 *[ ]When using `sample_outliers` check whether the density (used for intrabin sampling) should be
     the log(dens) instead of just `dens`.
