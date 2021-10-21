@@ -1,6 +1,7 @@
 """
 
-References:
+References
+----------
 - Peters-1964 : [Peters 1964](https://ui.adsabs.harvard.edu/abs/1964PhRv..136.1224P/abstract)
 - EN07 : [Enoki & Nagashima 2007](https://ui.adsabs.harvard.edu/abs/2007PThPh.117..241E/abstract)
 - Enoki+2004 : [Enoki et al. 2004](https://ui.adsabs.harvard.edu/abs/2004ApJ...615...19E/abstract)
@@ -734,19 +735,6 @@ def gw_lum_circ(mchirp, freq_orb_rest):
     """
     lgw_circ = _GW_LUM_CONST * np.power(2.0*np.pi*freq_orb_rest*mchirp, 10.0/3.0)
     return lgw_circ
-
-
-'''
-def gw_strain_source(mchirp, dlum, freq_orb_rest):
-    """GW Strain from a single source in a circular orbit.
-
-    e.g. Sesana+2004 Eq.36
-    e.g. EN07 Eq.17
-    """
-    #
-    hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_orb_rest, 2/3) / dlum
-    return hs
-'''
 
 
 def gw_strain_source(mchirp, dcom, freq_orb_rest):

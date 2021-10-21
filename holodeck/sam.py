@@ -800,7 +800,6 @@ def _gws_from_samples(vals, weights, fobs):
     return gff, gwf, gwb
 
 
-'''
 def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
     """
 
@@ -810,10 +809,9 @@ def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
         Target frequencies of interest in units of [1/yr]
 
     """
-    vals, weights = sample_sam_with_hardening(sam, hard, fobs=fobs, **kwargs)
+    vals, weights, edges, dens = sample_sam_with_hardening(sam, hard, fobs=fobs, **kwargs)
     gff, gwf, gwb = _gws_from_samples(vals, weights, fobs)
     return gff, gwf, gwb
-'''
 
 
 @numba.njit
