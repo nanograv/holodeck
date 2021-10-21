@@ -1,16 +1,21 @@
 """
 
-References:
+References
+----------
 - Peters-1964 : [Peters 1964](https://ui.adsabs.harvard.edu/abs/1964PhRv..136.1224P/abstract)
 - EN07 : [Enoki & Nagashima 2007](https://ui.adsabs.harvard.edu/abs/2007PThPh.117..241E/abstract)
+- Enoki+2004 : [Enoki et al. 2004](https://ui.adsabs.harvard.edu/abs/2004ApJ...615...19E/abstract)
 - Sesana+2004 : [Sesana+2004](http://adsabs.harvard.edu/abs/2004ApJ...611..623S)
 
 """
 
-import copy
 import abc
+import copy
+import numbers
+from typing import Optional, Tuple  # , Sequence,
 
 import numpy as np
+import numpy.typing as npt
 import scipy as sp
 import h5py
 
@@ -42,7 +47,7 @@ class _Modifier(abc.ABC):
 
 
 def error(msg, etype=ValueError):
-    log.error(msg)
+    log.exception(msg, exc_info=True)
     raise etype(msg)
 
 
@@ -162,33 +167,33 @@ def interp(xnew, xold, yold, left=np.nan, right=np.nan, xlog=True, ylog=True):
     return y1
 
 
+def isnumeric(val):
+    try:
+        float(str(val))
+    except ValueError:
+        return False
+
+    return True
+
+
+def isinteger(val):
+    rv = isnumeric(val) and isinstance(val, numbers.Integral)
+    return rv
+
+
 def log_normal_base_10(mu, sigma, size=None, shift=0.0):
     _sigma = np.log(10**sigma)
     dist = np.random.lognormal(np.log(mu) + shift*np.log(10.0), _sigma, size)
     return dist
 
 
-def minmax(vals):
-    extr = np.array([np.min(vals), np.max(vals)])
+def minmax(vals, filter=False):
+    if filter:
+        vv = vals[np.isfinite(vals)]
+    else:
+        vv = vals
+    extr = np.array([np.min(vv), np.max(vv)])
     return extr
-
-
-def stats(vals, percs=None):
-    try:
-        if len(vals) == 0:
-            raise TypeError
-    except TypeError:
-        raise ValueError(f"`vals` (shape={np.shape(vals)}) is not iterable!")
-
-    if percs is None:
-        percs = [sp.stats.norm.cdf(1), 0.95, 1.0]
-        percs = np.array(percs)
-        percs = np.concatenate([1-percs[::-1], [0.5], percs])
-
-    stats = np.percentile(vals, percs*100)
-    rv = ["{:.2e}".format(ss) for ss in stats]
-    rv = ", ".join(rv)
-    return rv
 
 
 def print_stats(stack=True, print_func=print, **kwargs):
@@ -306,6 +311,12 @@ def quantiles(values, percs=None, sigmas=None, weights=None, axis=None, values_s
 
 
 def stats(vals, percs=None, prec=2):
+    try:
+        if len(vals) == 0:
+            raise TypeError
+    except TypeError:
+        raise ValueError(f"`vals` (shape={np.shape(vals)}) is not iterable!")
+
     if percs is None:
         percs = [sp.stats.norm.cdf(1), 0.95, 1.0]
         percs = np.array(percs)
@@ -318,7 +329,15 @@ def stats(vals, percs=None, prec=2):
     return rv
 
 
-def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
+def trapz_loglog(
+        yy: npt.ArrayLike,
+        xx: npt.ArrayLike,
+        bounds: Optional[Tuple[float, float]] = None,
+        axis: int = -1,
+        dlogx: Optional[float] = None,
+        lntol: float = 1e-2,
+        cumsum: bool = True,
+) -> npt.ArrayLike:
     """Calculate integral, given `y = dA/dx` or `y = dA/dlogx` w/ trapezoid rule in log-log space.
 
     We are calculating the integral `A` given sets of values for `y` and `x`.
@@ -328,6 +347,19 @@ def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
 
     For each interval (x[i+1], x[i]), calculate the integral assuming that y is of the form,
         `y = a * x^gamma`
+
+    Arguments
+    ---------
+    yy : ndarray
+    xx : (X,) array_like of scalar,
+    bounds : (2,) array_like of scalar,
+    axis : int,
+    dlogx : scalar or None,
+    lntol : scalar,
+
+    Returns
+    -------
+    integ
 
     Notes
     -----
@@ -361,9 +393,13 @@ def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
     # yy = np.ma.masked_values(yy, value=0.0, atol=0.0)
 
     if np.ndim(yy) != np.ndim(xx):
-        if np.ndim(yy) < np.ndim(xx):
+        if np.ndim(xx) != 1:
             raise ValueError("BAD SHAPES")
-        cut = [slice(None)] + [np.newaxis for ii in range(np.ndim(yy)-1)]
+        # convert `xx` from shape (N,) to (1, ... N, ..., 1) where all
+        # dimensions besides `axis` have length one
+        # cut = [slice(None)] + [np.newaxis for ii in range(np.ndim(yy)-1)]
+        cut = [np.newaxis for ii in range(np.ndim(yy))]
+        cut[axis] = slice(None)
         xx = xx[tuple(cut)]
 
     log_base = np.e
@@ -383,7 +419,7 @@ def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
     xx = np.moveaxis(xx, 0, axis)
     yy = np.moveaxis(yy, 0, axis)
     # Integrate dA/dx   ::   A = (x1*y1 - x0*y0) / (gamma + 1)
-    if dlogx is None:
+    if ((dlogx is None) or (dlogx is False)):
         dz = np.diff(yy * xx, axis=axis)
         trapz = dz / (gamma + 1)
         # when the power-law is (near) '-1' then, `A = a * log(x1/x0)`
@@ -396,15 +432,63 @@ def trapz_loglog(yy, xx, bounds=None, axis=-1, dlogx=None, lntol=1e-2):
         # when the power-law is (near) '-1' then, `A = a * log(x1/x0)`
         idx = np.isclose(gamma, 0.0, atol=lntol, rtol=lntol)
 
-    trapz[idx] = aa[idx] * delta_logx[idx]
+    if np.any(idx):
+        # if `xx.shape != yy.shape` then `delta_logx` should be shaped (N-1, 1, 1, 1...)
+        # broadcast `delta_logx` to the same shape as `idx` in this case
+        if np.shape(xx) != np.shape(yy):
+            delta_logx = delta_logx * np.ones_like(aa)
+        trapz[idx] = aa[idx] * delta_logx[idx]
 
-    integ = np.log(log_base) * np.cumsum(trapz, axis=axis)
+    # integ = np.log(log_base) * np.cumsum(trapz, axis=axis)
+    # integ = np.cumsum(trapz, axis=axis) / np.log(log_base)   # FIX: I think this is divided by base... 2021-10-05
+    integ = trapz / np.log(log_base)
+    if cumsum:
+        integ = np.cumsum(integ, axis=axis)
     if bounds is not None:
+        if not cumsum:
+            log.warning("WARNING: bounds is not None, but cumsum is False!")
         integ = np.moveaxis(integ, axis, 0)
         lo, hi = integ[ii-1, ...]
         integ = hi - lo
 
     return integ
+
+
+def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = True):
+    """Perform a cumulative integration along the given axis.
+
+    Arguments
+    ---------
+    yy : ArrayLike of scalar,
+        Input to be integrated.
+    xx : ArrayLike of scalar,
+        The sample points corresponding to the `yy` values.
+        This must be either be shaped as
+        * the same number of dimensions as `yy`, with the same length along the `axis` dimension, or
+        * 1D with length matching `yy[axis]`
+    axis : int,
+        The axis over which to integrate.
+
+    Returns
+    -------
+    ct : ndarray of scalar,
+        Cumulative trapezoid rule integration.
+
+    """
+    if np.ndim(xx) == 1:
+        pass
+    elif np.ndim(xx) == np.ndim(yy):
+        xx = xx[axis]
+    else:
+        error(f"Bad shape for `xx` (xx.shape={np.shape(xx)}, yy.shape={np.shape(yy)})!")
+    ct = np.moveaxis(yy, axis, 0)
+    ct = 0.5 * (ct[1:] + ct[:-1])
+    ct = np.moveaxis(ct, 0, -1)
+    ct = ct * np.diff(xx)
+    if cumsum:
+        ct = np.cumsum(ct, axis=-1)
+    ct = np.moveaxis(ct, -1, axis)
+    return ct
 
 
 def _parse_log_norm_pars(vals, size, default=None):
@@ -436,6 +520,16 @@ def _parse_log_norm_pars(vals, size, default=None):
 # =================================================================================================
 
 
+def dfdt_from_dadt(dadt, sepa, mtot=None, freq_orb=None):
+    if (mtot is None) and (freq_orb is None):
+        error("Either `mtot` or `freq_orb` must be provided!")
+    if freq_orb is None:
+        freq_orb = kepler_freq_from_sepa(mtot, sepa)
+
+    dfdt = - 1.5 * (freq_orb / sepa) * dadt
+    return dfdt, freq_orb
+
+
 def mtmr_from_m1m2(m1, m2=None):
     if m2 is not None:
         masses = np.stack([m1, m2], axis=-1)
@@ -458,12 +552,28 @@ def m1m2_from_mtmr(mt, mr):
     return np.array([m1, m2])
 
 
-def kepler_freq_from_sep(mass, sep):
+def frst_from_fobs(fobs, redz):
+    """Calculate rest-frame frequency from observed frequency and redshift.
+    """
+    frst = fobs * (1.0 + redz)
+    return frst
+
+
+def fobs_from_frst(frst, redz):
+    """Calculate observed frequency from rest-frame frequency and redshift.
+    """
+    fobs = frst / (1.0 + redz)
+    return fobs
+
+
+def kepler_freq_from_sepa(mass, sep):
     freq = (1.0/(2.0*np.pi))*np.sqrt(NWTG*mass)/np.power(sep, 1.5)
     return freq
 
 
-def kepler_sep_from_freq(mass, freq):
+def kepler_sepa_from_freq(mass, freq):
+    mass = np.asarray(mass)
+    freq = np.asarray(freq)
     sep = np.power(NWTG*mass/np.square(2.0*np.pi*freq), 1.0/3.0)
     return sep
 
@@ -490,17 +600,6 @@ def chirp_mass(m1, m2=None):
         m1, m2 = np.moveaxis(m1, -1, 0)
     mc = np.power(m1 * m2, 3.0/5.0)/np.power(m1 + m2, 1.0/5.0)
     return mc
-
-
-def dfdt_from_dadt(dadt, sepa, mtot=None, freq_orb=None):
-    if mtot is None and freq_orb is None:
-        raise ValueError("Either `mtot` or `freq_orb` must be provided!")
-    if freq_orb is None:
-        freq_orb = kepler_freq_from_sep(mtot, sepa)
-
-    dfda = -(3.0/2.0) * (freq_orb / sepa)
-    dfdt = dfda * dadt
-    return dfdt
 
 
 def gw_char_strain(hs, dur_obs, freq_orb_obs, freq_orb_rst, dfdt):
@@ -602,16 +701,29 @@ def gw_hardening_rate_dadt(m1, m2, sepa, eccen=None):
 def gw_hardening_rate_dfdt(m1, m2, freq, eccen=None):
     """GW Hardening rate in frequency (df/dt).
     """
-    sepa = kepler_sep_from_freq(m1+m2, freq)
+    sepa = kepler_sepa_from_freq(m1+m2, freq)
     dfdt = gw_hardening_rate_dadt(m1, m2, sepa, eccen=eccen)
     dfdt = dfdt_from_dadt(dfdt, sepa, mtot=m1+m2)
     return dfdt
 
 
-def gw_hardening_timescale(mchirp, frst):
+def gw_hardening_timescale_freq(mchirp, frst):
     """tau = f_r / (df_r / dt)
 
-    e.g. Enoki & Nagashima 2007 Eq.2.9
+    e.g. [EN07] Eq.2.9
+
+    Arguments
+    ---------
+    mchirp : scalar  or  array_like of scalar
+        Chirp mass in [grams]
+    frst : scalar  or  array_like of scalar
+        Rest-frame orbital frequency
+
+    Returns
+    -------
+    tau : float  or  array_like of float
+        GW hardening timescale defined w.r.t. orbital frequency.
+
     """
     tau = (5.0 / 96.0) * np.power(NWTG*mchirp/SPLC**3, -5.0/3.0) * np.power(2*np.pi*frst, -8.0/3.0)
     return tau
@@ -625,14 +737,14 @@ def gw_lum_circ(mchirp, freq_orb_rest):
     return lgw_circ
 
 
-def gw_strain_source(mchirp, dlum, freq_orb_rest):
+def gw_strain_source(mchirp, dcom, freq_orb_rest):
     """GW Strain from a single source in a circular orbit.
 
     e.g. Sesana+2004 Eq.36
-    e.g. EN07 Eq.17
+    e.g. Enoki+2004 Eq.5
     """
     #
-    hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_orb_rest, 2/3) / dlum
+    hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_orb_rest, 2/3) / dcom
     return hs
 
 

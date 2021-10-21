@@ -2,13 +2,43 @@
 """
 
 import numpy as np
-# import matplotlib as mpl
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 import kalepy as kale
 
-from holodeck import cosmo, utils, observations
+from holodeck import cosmo, utils, observations, log
 from holodeck.constants import MSOL, PC, YR
+
+
+class MidpointNormalize(mpl.colors.Normalize):
+    """
+    Normalise the colorbar so that diverging bars work there way either side from a prescribed midpoint value)
+
+    e.g. im=ax1.imshow(array, norm=MidpointNormalize(midpoint=0.,vmin=-100, vmax=100))
+    """
+
+    def __init__(self, vmin=None, vmax=None, midpoint=0.0, clip=False):
+        super().__init__(vmin, vmax, clip)
+        self.midpoint = midpoint
+        return
+
+    def __call__(self, value, clip=None):
+        x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+        return np.ma.masked_array(np.interp(value, x, y), np.isnan(value))
+
+
+class MidpointLogNormalize(mpl.colors.LogNorm):
+
+    def __init__(self, vmin=None, vmax=None, midpoint=0.0, clip=False):
+        super().__init__(vmin, vmax, clip)
+        self.midpoint = midpoint
+        return
+
+    def __call__(self, value, clip=None):
+        x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+        vals = utils.interp(value, x, y, xlog=True, ylog=False)
+        return np.ma.masked_array(vals, np.isnan(value))
 
 
 def figax(figsize=[12, 6], ncols=1, nrows=1, sharex=False, sharey=False, squeeze=True,
@@ -79,6 +109,136 @@ def figax(figsize=[12, 6], ncols=1, nrows=1, sharex=False, sharey=False, squeeze
             axes = axes[()]
 
     return fig, axes
+
+
+def smap(args=[0.0, 1.0], cmap=None, log=False, norm=None, midpoint=None,
+         under='0.8', over='0.8', left=None, right=None):
+    """Create a colormap from a scalar range to a set of colors.
+
+    Arguments
+    ---------
+    args : scalar or array_like of scalar
+        Range of valid scalar values to normalize with
+    cmap : None, str, or ``matplotlib.colors.Colormap`` object
+        Colormap to use.
+    log : bool
+        Logarithmic scaling
+    norm : None or `matplotlib.colors.Normalize`
+        Normalization to use.
+    under : str or `None`
+        Color specification for values below range.
+    over : str or `None`
+        Color specification for values above range.
+    left : float {0.0, 1.0} or `None`
+        Truncate the left edge of the colormap to this value.
+        If `None`, 0.0 used (if `right` is provided).
+    right : float {0.0, 1.0} or `None`
+        Truncate the right edge of the colormap to this value
+        If `None`, 1.0 used (if `left` is provided).
+
+    Returns
+    -------
+    smap : ``matplotlib.cm.ScalarMappable``
+        Scalar mappable object which contains the members:
+        `norm`, `cmap`, and the function `to_rgba`.
+
+    """
+    # _DEF_CMAP = 'viridis'
+    _DEF_CMAP = 'Spectral'
+
+    if cmap is None:
+        if midpoint is not None:
+            cmap = 'bwr'
+        else:
+            cmap = _DEF_CMAP
+
+    cmap = _get_cmap(cmap)
+
+    # Select a truncated subsection of the colormap
+    if (left is not None) or (right is not None):
+        if left is None:
+            left = 0.0
+        if right is None:
+            right = 1.0
+        cmap = _cut_cmap(cmap, left, right)
+
+    if under is not None:
+        cmap.set_under(under)
+    if over is not None:
+        cmap.set_over(over)
+
+    if norm is None:
+        norm = _get_norm(args, midpoint=midpoint, log=log)
+    else:
+        log = isinstance(norm, mpl.colors.LogNorm)
+
+    # Create scalar-mappable
+    smap = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
+    # Bug-Fix something something
+    smap._A = []
+    # Store type of mapping
+    smap.log = log
+
+    return smap
+
+
+def _get_norm(data, midpoint=None, log=False):
+    """
+    """
+    # Determine minimum and maximum
+    if np.size(data) == 1:
+        min = 0
+        max = np.int(data) - 1
+    elif np.size(data) == 2:
+        min, max = data
+    else:
+        try:
+            min, max = utils.minmax(data, filter=True)
+        except:
+            utils.error(f"Input `data` ({type(data)}) must be an integer, (2,) of scalar, or ndarray of scalar!")
+
+    # Create normalization
+    if log:
+        if midpoint is None:
+            norm = mpl.colors.LogNorm(vmin=min, vmax=max)
+        else:
+            norm = MidpointLogNormalize(vmin=min, vmax=max, midpoint=midpoint)
+    else:
+        if midpoint is None:
+            norm = mpl.colors.Normalize(vmin=min, vmax=max)
+        else:
+            norm = MidpointNormalize(vmin=min, vmax=max, midpoint=midpoint)
+
+    return norm
+
+
+def _cut_cmap(cmap, min=0.0, max=1.0, n=100):
+    """Select a truncated subset of the given colormap.
+
+    Code from: http://stackoverflow.com/a/18926541/230468
+    """
+    name = f"trunc({cmap.name},{min:.2f},{max:.2f})"
+    new_cmap = mpl.colors.LinearSegmentedColormap.from_list(name, cmap(np.linspace(min, max, n)))
+    return new_cmap
+
+
+def _get_cmap(cmap):
+    """Retrieve a colormap with the given name if it is not already a colormap.
+    """
+    if isinstance(cmap, mpl.colors.Colormap):
+        return cmap
+
+    try:
+        return mpl.cm.get_cmap(cmap)
+    except Exception as err:
+        log.error(f"Could not load colormap from `{cmap}` : {err}")
+        raise
+        raise ValueError("`cmap` '{}' is not a valid colormap or colormap name".format(cmap))
+
+
+# =================================================================================================
+# ====    Below Needs Review / Cleaning    ====
+# =================================================================================================
 
 
 def plot_bin_pop(pop):
