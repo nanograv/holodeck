@@ -1,22 +1,27 @@
-"""
+"""Holodeck - Semi Analytic Modeling submodule
 
-Chen, Sesana, Conselice 2019 = [Chen19]
-Constraining astrophysical observables of galaxy and supermassive black hole binary mergers using pulsar timing arrays
-https://ui.adsabs.harvard.edu/abs/2019MNRAS.488..401C/abstract
-
+References
+----------
+-   Chen, Sesana, Conselice 2019 = [Chen19]
+    https://ui.adsabs.harvard.edu/abs/2019MNRAS.488..401C/abstract
+    Constraining astrophysical observables of galaxy and supermassive black hole binary mergers
+        using pulsar timing arrays
 
 To-Do
 -----
-* [ ] Check that _GW_ frequencies and _orbital_ frequencies are being used in the correct places.
+*[ ]Check that _GW_ frequencies and _orbital_ frequencies are being used in the correct places.
     Check `number_at_gw_fobs` and related methods.
-* [ ] Expand SAM mass-ratios to wider range, change to log-space.
+*[ ]Expand SAM mass-ratios to wider range, change to log-space.
+*[ ]Incorporate arbitrary hardening mechanisms into SAM construction, sample self-consistently.
+*[ ]When using `sample_outliers` check whether the density (used for intrabin sampling) should be
+    the log(dens) instead of just `dens`.
 
 """
 
 import abc
 import inspect
 
-# import numba
+import numba
 import numpy as np
 
 import kalepy as kale
@@ -530,8 +535,10 @@ class Semi_Analytic_Model:
 
         Returns
         -------
+        edges : (4,) list of 1darrays of scalar
+            A list containing the edges along each dimension.
         number : (M, Q, Z, F) ndarray of scalar
-
+            Number density of binaries.
 
         Notes
         -----
@@ -629,11 +636,25 @@ class Semi_Analytic_Model:
 
         return edges, number
 
-    def gwb(self, fobs, hard=holo.evolution.Hard_GW, realize=False, **kwargs):
-        """
+    def gwb(self, fobs, hard=holo.evolution.Hard_GW, realize=False):
+        """Calculate the (smooth/semi-analytic) GWB at the given observed frequencies.
+
         Arguments
         ---------
-        fobs : units of [1/s]
+        fobs : (F,) array_like of scalar, [1/sec]
+            Observed GW frequencies.
+        hard : holodeck.evolution._Hardening class or instance
+            Hardening mechanism to apply over the range of `fobs`.
+        realize : bool or int,
+            Whether to construct a Poisson 'realization' (discretization) of the SAM distribution.
+            Realizations approximate the finite-source effects of a realistic population.
+
+        Returns
+        -------
+        hc : (F,[R,]) ndarray of scalar
+            Dimensionless, characteristic strain at each frequency.
+            If `realize` is an integer with value R, then R realizations of the GWB are returned,
+            such that `hc` has shape (F,R,).
 
         """
 
@@ -693,50 +714,62 @@ class Semi_Analytic_Model:
             err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
             raise ValueError(err)
 
-        hs = np.sqrt(np.sum(number*np.square(hs), axis=(0, 1, 2)))
+        hc = np.sqrt(np.sum(number*np.square(hs), axis=(0, 1, 2)))
         if squeeze:
-            hs = hs.squeeze()
-        return hs
+            hc = hc.squeeze()
+        return hc
 
 
-def _integrate_differential_number(edges, dnum):
+def _integrate_differential_number(edges, dnum, freq=False):
     # ---- integrate from differential-number to number per bin
     # integrate over dlog10(M)
-    number = holo.utils.trapz_loglog(dnum, edges[0], dlogx=10.0, axis=0, cumsum=False)
-    number = np.nan_to_num(number)
+    # number = holo.utils.trapz_loglog(dnum, edges[0], dlogx=10.0, axis=0, cumsum=False)
+    # number = np.nan_to_num(number)
+    number = holo.utils.trapz(dnum, np.log10(edges[0]), axis=0, cumsum=False)
     # integrate over mass-ratio
     number = holo.utils.trapz(number, edges[1], axis=1, cumsum=False)
     # integrate over redshift
     number = holo.utils.trapz(number, edges[2], axis=2, cumsum=False)
+    # integrate over frequency
+    if freq:
+        # number = holo.utils.trapz_loglog(number, edges[3], dlogx=np.e, axis=3, cumsum=False)
+        # number = np.nan_to_num(number)
+        number = holo.utils.trapz(number, np.log(edges[3]), axis=3, cumsum=False)
+
     return number
 
 
-'''
-def sample_sam_with_hardening(sam, hard, fobs=None, sepa=None, sample_threshold=10.0, cut_below_mass=1e6):
+def sample_sam_with_hardening(
+        sam, hard, fobs=None, sepa=None, sample_threshold=10.0, cut_below_mass=1e6, limit_merger_time=None):
     """
     fobs in units of [1/yr]
     sepa in units of [pc]
     """
 
     # edges: Mtot [Msol], mrat (q), redz (z), {fobs (f) [1/yr] OR sepa (a) [pc]}
-    edges, number, _ = sam.number_from_hardening(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
-    log_edges = [np.log10(edges[0]), edges[1], edges[2], np.log10(edges[3])]
+    edges, dnum = sam.number_from_hardening(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
+    log_edges = [np.log10(edges[0]), edges[1], edges[2], np.log(edges[3])]
 
     if cut_below_mass is not None:
         m2 = edges[0][:, np.newaxis] * edges[1][np.newaxis, :]
         bads = (m2 < cut_below_mass)
-        number[bads] = 0.0
+        dnum[bads] = 0.0
 
-    vals, weights = kale.sample_outliers(log_edges, number, sample_threshold)
+    # integrate each bin to convert from probability- density to mass
+    # NOTE: _integrate_differential_number() has log-vs-lin spacings hardcoded! use `edges` as is
+    mass = holo.sam._integrate_differential_number(edges, dnum, freq=True)
+    # sample binaries from distribution, using appropriate spacing as needed
+    # BUG: should the density used for proportional sampling `dnum` be log(density) ?!
+    vals, weights = kale.sample_outliers(log_edges, dnum, sample_threshold, mass=mass)
     vals[0] = 10.0 ** vals[0]
-    vals[3] = 10.0 ** vals[3]
+    vals[3] = np.e ** vals[3]
 
     if cut_below_mass is not None:
         bads = (vals[0] * vals[1] < cut_below_mass)
         vals = vals.T[~bads].T
         weights = weights[~bads]
 
-    return vals, weights, number
+    return vals, weights, edges, dnum
 
 
 def _gws_from_samples(vals, weights, fobs):
@@ -757,17 +790,17 @@ def _gws_from_samples(vals, weights, fobs):
     """
     mc = utils.chirp_mass(*utils.m1m2_from_mtmr(vals[0], vals[1]))
     rz = vals[2, :]
-    frst = vals[3] * (1.0 + dl)
+    frst = vals[3] * (1.0 + rz)
     dc = cosmo.comoving_distance(rz).cgs.value
     hs = utils.gw_strain_source(mc, dc, frst)
     fo = vals[-1]
-    del vals
 
     gff, gwf, gwb = gws_from_sampled_strains(fobs, fo, hs, weights)
 
     return gff, gwf, gwb
 
 
+'''
 def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
     """
 
@@ -780,27 +813,55 @@ def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
     vals, weights = sample_sam_with_hardening(sam, hard, fobs=fobs, **kwargs)
     gff, gwf, gwb = _gws_from_samples(vals, weights, fobs)
     return gff, gwf, gwb
+'''
 
 
 @numba.njit
 def gws_from_sampled_strains(freqs, fobs, hs, weights):
+    """Calculate GW background/foreground from sampled GW strains.
+
+    Arguments
+    ---------
+
+
+    Returns
+    -------
+    gwf_freqs : (F,) ndarray of scalar
+        GW frequency of foreground sources in each frequency bin.
+    gwfore : (F,) ndarray of scalar
+        Strain amplitude of foreground sources in each frequency bin.
+    gwback : (F,) ndarray of scalar
+        Strain amplitude of the background in each frequency bin.
+
+    """
+    # ---- Initialize
     num_samp = fobs.size
     num_freq = freqs.size - 1
     gwback = np.zeros(num_freq)
-    gwfore = np.zeros_like(gwback)
-    gwf_freqs = np.zeros_like(gwback)
+    gwfore = np.zeros(num_freq)
+    gwf_freqs = np.zeros(num_freq)
 
+    # ---- Sort input by frequency for faster iteration
     idx = np.argsort(fobs)
     weights = weights[idx]
     fobs = fobs[idx]
     hs = hs[idx]
 
+    # ---- Calculate GW background and foreground in each frequency bin
     ii = 0
+    lo = freqs[0]
     for ff in range(num_freq):
+        # upper-bound to this frequency bin
         hi = freqs[ff+1]
-        fmax = 0.0
+        # number of GW cycles (f/df), for conversion to characteristic strain
+        cycles = 0.5 * (hi + lo) / (hi - lo)
+        # amplitude and frequency of the loudest source in this bin
         hmax = 0.0
+        fmax = 0.0
+        # iterate over all sources with frequencies below this bin's limit (right edge)
         while (fobs[ii] < hi) and (ii < num_samp):
+            # Store the amplitude and frequency of loudest source
+            #    NOTE: loudest source could be a single-sample (weight==1) or from a weighted-bin (weight > 1)
             if hs[ii] > hmax:
                 hmax = hs[ii]
                 fmax = fobs[ii]
@@ -810,11 +871,13 @@ def gws_from_sampled_strains(freqs, fobs, hs, weights):
             gwback[ff] += h2temp
             ii += 1
 
-        gwfore[ff] = hmax
+        # Store foreground and convert to *characteristic* strain
+        gwfore[ff] = hmax * np.sqrt(cycles)   # hs ==> hc (not squared, so sqrt of cycles)
         gwf_freqs[ff] = fmax
         gwback[ff] -= hmax**2
+        # Convert to *characteristic* strain
+        gwback[ff] = gwback[ff] * cycles      # hs^2 ==> hc^2  (squared, so cycles^1)
+        lo = hi
 
     gwback = np.sqrt(gwback)
-
     return gwf_freqs, gwfore, gwback
-'''
