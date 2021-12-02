@@ -22,7 +22,7 @@ comm = MPI.COMM_WORLD
 PATH_OUTPUT = "./output"
 BEG = datetime.now()
 
-NUM_REALS = 30
+NUM_REALS = 300
 NUM_PARAMS = 10
 
 
