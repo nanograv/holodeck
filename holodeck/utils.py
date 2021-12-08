@@ -13,6 +13,7 @@ import abc
 import copy
 import numbers
 from typing import Optional, Tuple  # , Sequence,
+import os
 
 import numpy as np
 import numpy.typing as npt
@@ -100,6 +101,46 @@ def tqdm(*args, **kwargs):
         tqdm_method = tqdm.tqdm
 
     return tqdm_method(*args, **kwargs)
+
+
+def get_file_size(fnames, precision=1):
+    """Return a human-readable size of a file or set of files.
+
+    Arguments
+    ---------
+    fnames : str or list
+        Paths to target file(s)
+    precisions : int,
+        Sesired decimal precision of output
+
+    Returns
+    -------
+    byte_str : str
+        Human-readable size of file(s)
+
+    """
+    fnames = np.atleast_1d(fnames)
+
+    byte_size = 0.0
+    for fil in fnames:
+        byte_size += os.path.getsize(fil)
+
+    abbrevs = (
+        (1 << 50, 'PB'),
+        (1 << 40, 'TB'),
+        (1 << 30, 'GB'),
+        (1 << 20, 'MB'),
+        (1 << 10, 'KB'),
+        (1, 'bytes')
+    )
+
+    for factor, suffix in abbrevs:
+        if byte_size >= factor:
+            break
+
+    size = byte_size / factor
+    byte_str = f"{size:.{precision:}f} {suffix}"
+    return byte_str
 
 
 # =================================================================================================
