@@ -33,6 +33,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 mpl.rc('font', **{'family': 'serif', 'sans-serif': ['Times'], 'size': 15})
 mpl.rc('lines', solid_capstyle='round')
 mpl.rc('mathtext', fontset='cm')
+mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
 plt.rcParams.update({'grid.alpha': 0.5})
 
 log = holo.log
