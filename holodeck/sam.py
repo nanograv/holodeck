@@ -386,6 +386,15 @@ class MMBulge_Simple(_MMBulge_Relation):
 
 
 class Semi_Analytic_Model:
+    """Semi-Analytic Model of MBH Binary populations.
+
+    Based on four components:
+    * Galaxy Stellar-Mass Function (GSMF): the distribution of galaxy masses
+    * Galaxy Pair Fraction (GPF): the probability of galaxies having a companion
+    * Galaxy Merger Time (GMT): the expected galaxy-merger timescale for a pair of galaxies
+    * M-MBulge relation: relation between host-galaxy (bulge-mass) and MBH (mass) properties
+
+    """
 
     def __init__(
         self, mtot=[2.75e5*MSOL, 1.0e11*MSOL, 46], mrat=[0.02, 1.0, 50], redz=[0.0, 6.0, 61],
@@ -740,13 +749,33 @@ def _integrate_differential_number(edges, dnum, freq=False):
 
 
 def sample_sam_with_hardening(
-        sam, hard, fobs=None, sepa=None, sample_threshold=10.0, cut_below_mass=1e6, limit_merger_time=None):
-    """
+        sam, hard,
+        fobs=None, sepa=None, sample_threshold=10.0, cut_below_mass=1e6, limit_merger_time=None
+):
+    """Discretize Semi-Analytic Model into sampled binaries assuming the given binary hardening rate.
+
     fobs in units of [1/yr]
     sepa in units of [pc]
+
+    Returns
+    -------
+    vals : (4, S) ndarray of scalar
+        Parameters of sampled binaries.  Four parameters are:
+        * mtot : total mass of binary (m1+m2) in [grams]
+        * mrat : mass ratio of binary (m2/m1 <= 1)
+        * redz : redshift of binary
+        * fobs / sepa : observed-frequency (GW) [1/s] or binary separation [cm]
+    weights : (S,) ndarray of scalar
+        Weights of each sample point.
+    edges : (4,) of list of scalars
+        Edges of parameter-space grid for each of above parameters (mtot, mrat, redz, fobs)
+        The lengths of each list will be [(M,), (Q,), (Z,), (F,)]
+    dnum : (M, Q, Z, F) ndarray of scalar
+        Number-density of binaries over grid specified by `edges`.
+
     """
 
-    # edges: Mtot [Msol], mrat (q), redz (z), {fobs (f) [1/yr] OR sepa (a) [pc]}
+    # edges: Mtot [grams], mrat (q), redz (z), {fobs (f) [1/s] OR sepa (a) [cm]}
     edges, dnum = sam.number_from_hardening(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
     log_edges = [np.log10(edges[0]), edges[1], edges[2], np.log(edges[3])]
 
