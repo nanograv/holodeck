@@ -163,7 +163,15 @@ class Evolution:
 
     Additional Notes
     ----------------
-    accmod: accretion model to use. current options: None (default), 'Basic', 'Proportional'
+    acc: Instance of accretion class. This supplies the method by which total accretion
+         rates are divided into individual accretion rates for each BH.
+         By default, accretion rates are calculated at every step as a fraction of
+         the Eddington limit.
+         If acc contains a path to an accretion rate file which already stores
+         total accretion rates at every timestep, then we omit the step where we
+         calculate mdot_total as a fraction of the Eddington limit.
+         This gives the flexibility to include accretion rates motivated by e.g. Illustris
+         or other cosmological simulations.
 
     """
 
@@ -172,7 +180,7 @@ class Evolution:
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
 
-    def __init__(self, pop, hard, nsteps: int = 100, mods=None, debug: bool = False, accmod=None):
+    def __init__(self, pop, hard, nsteps: int = 100, mods=None, debug: bool = False, acc=None):
         """Initialize a new Evolution instance.
 
         Parameters
@@ -194,7 +202,7 @@ class Evolution:
         self._debug = debug                   #: debug flag for performing extra diagnostics and output
         self._nsteps = nsteps                 #: number of integration steps for each binary
         self._mods = mods                     #: modifiers to be applied after evolution is completed
-        self._accmod = accmod
+        self._acc = acc
 
         # Store hardening instances as a list
         if not np.iterable(hard):
@@ -951,19 +959,21 @@ class Evolution:
                     if store_debug:
                         getattr(self, f"_dedt_{ii}")[:, step] = _ecc[...]
 
-            if self._accmod is not None:
-                #Get total accretion rates
-                acc = accretion.Accretion(self, step)
-                if self._accmod == 'Basic':
-                    self.mdot[:,step-1,:] = acc.basic_accretion()
-                if self._accmod == 'Proportional':
-                    self.mdot[:,step-1,:] = acc.proportional_accretion()
-                if self._accmod == 'Primary':
-                    self.mdot[:,step-1,:] = acc.primary_accretion()
-                if self._accmod == 'Secondary':
-                    self.mdot[:,step-1,:] = acc.secondary_accretion()
-                if self._accmod == 'Duffell':
-                    self.mdot[:,step-1,:] = acc.duffell_accretion()
+            if self._acc is not None:
+                """ An instance of the accretion class has been supplied,
+                    and we will evolve the binary masses through accretion
+                    First, get total accretion rates """
+                if self._acc.mdot_ext is not None:
+                    """ accretion rates have been supplied externally """
+                    mdot_total = self._acc.mdot_ext[:,step-1]
+                else:
+                    """ Get accretion rates as a fraction (f_edd in self._acc) of the
+                        Eddington limit from current BH masses """
+                    total_bh_masses = np.sum(self.mass[:, step-1, :], axis=1)
+                    mdot_total = self._acc.mdot_eddington(total_bh_masses)
+
+                """ Calculate individual accretion rates """
+                self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_total, self, step)
 
                 self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:,step-1,0]
                 self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:,step-1,1]
