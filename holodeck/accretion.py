@@ -29,8 +29,37 @@ class Accretion:
     def pref_acc(self, mdot, evol, step):
         """ Choose one of the below models to calculate primary vs secondary accretion rates
             We also supply the instance of the evolution class here in case we need to access eccentricities """
-        # if self.accmod == 'Siwek22':
-        #
+        m1 = evol.mass[:, step-1, 0]
+        m2 = evol.mass[:, step-1, 1]
+
+        if self.accmod == 'Siwek22':
+            q_b = m2/m1
+            e_b = evol.eccen[:, step-1]
+            """ Now interpolate to get lambda at [q,e] """
+            def lambda_qe_interp_2d(fp="data/preferential_accretion/siwek+22/", es=[0.0,0.2,0.4,0.6,0.8]):
+                all_lambdas = []
+                for e in es:
+                    lambda_e = np.loadtxt(fp + 'lambda_e=%.2f.txt' %e)
+                    qs = lambda_e[:,0]
+                    lambdas = lambda_e[:,1]
+                    all_lambdas.append(lambdas)
+                """ True values of q, e """
+                x = qs
+                y = es
+                """ True values of q, e in a meshgrid """
+                X, Y = np.meshgrid(x, y)
+                Z = all_lambdas
+                """ Interpolation function in 2D grid, should extrapolate outside domain by default """
+                lamb_qe_interp = interpolate.interp2d(x, y, Z, kind='linear')
+                return(lamb_qe_interp)
+
+            lamb_interp = lambda_qe_interp_2d()
+            lamb_qe = lamb_interp(q_b, e_b)
+            mdot_1 = 1./(lamb_interp + 1.) * mdot
+            mdot_2 = lamb_interp/(lamb_interp + 1.) * mdot
+            mdot_arr = np.array([mdot_1, mdot_2]).T
+            return(mdot_arr)
+
 
         if self.accmod == 'Basic':
             mdot_1 = mdot_2 = 0.5*mdot
@@ -69,8 +98,6 @@ class Accretion:
         if self.accmod == 'Duffell':
             #Taken from Paul's paper: http://arxiv.org/abs/1911.05506
             f = lambda q: 1./(0.1 + 0.9*q)
-            m1 = self.m1
-            m2 = self.m2
             q = m2/m1
             mdot_1 = mdot/(1.+f(q))
             mdot_2 = f(q)*mdot_1
