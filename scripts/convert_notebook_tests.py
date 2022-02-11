@@ -9,15 +9,17 @@ import subprocess
 import logging
 
 TEST_NOTEBOOK_NAMES = [
-    'continuous_observational', 'discrete_illustris', 'observations', 'semi-analytic-model', 'utils'
+    'continuous_observational', 'discrete_illustris', 'observations', 'utils',
+    'sam/quickstart',
 ]
 
 REPLACEMENTS = [
     ["plt.show()", "plt.close('all')"]
 ]
 
-# Path of this file and the overall package (top-level) directory
+# Path of the holodeck package (top-level) directory
 PATH = os.path.dirname(os.path.abspath(__file__))
+PATH = os.path.realpath(os.path.join(PATH, os.path.pardir))
 # Path in the package in which the notebooks are stored
 PATH_NOTEBOOKS = os.path.join(PATH, 'notebooks')
 # Path in the package in which tests are stored
@@ -86,7 +88,9 @@ def convert_notebooks(notebook_names):
         src_nb = src + NOTEBOOK_SUFFIX
         src_py = src + PYTHON_SUFFIC
 
-        dst_py = TEST_PREFIX + nn + PYTHON_SUFFIC
+        # convert from name `nn` to basename only in case it includes a notebooks subdirectory
+        # e.g. "notebooks/sam/quickstart" ==> "tests/quickstart" instead of "tests/sam/quickstart"
+        dst_py = TEST_PREFIX + os.path.basename(nn) + PYTHON_SUFFIC
         dst_py = os.path.join(path_output, dst_py)
 
         logging.info("'{}'".format(src_nb))
@@ -97,8 +101,13 @@ def convert_notebooks(notebook_names):
         logging.info(str(args))
         # `capture_output` only works in python3.7; but should be the same as passing to PIPE
         # subprocess.run(args, timeout=500, check=True, capture_output=True)
-        subprocess.run(args, timeout=500, check=True,
-                       stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        try:
+            subprocess.run(args, timeout=500, check=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        except Exception as err:
+            logging.error(f"ERROR: failed running '{args}'")
+            logging.error(f"ERROR: {err}")
+            raise
+
         shutil.move(src_py, dst_py)
 
         import re
