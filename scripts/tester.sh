@@ -15,6 +15,13 @@ VERBOSE=false;
 DRY=false;
 BUILD=false;
 
+# ---------
+
+DIR_PACKAGE=$(dirname $(dirname $(realpath $0)) )
+PATH_CONVERTER=${DIR_PACKAGE}/${CONVERTER_NAME}
+echo "DIR_PACKAGE = ${DIR_PACKAGE}"
+echo "PATH_TESTS = ${PATH_TESTS}"
+
 # Display Help
 function help()
 {
@@ -54,19 +61,14 @@ done
 shift $((OPTIND -1))
 FILES="${@:1}";
 if [ -n "${FILES}" ]; then
-    # echo "FILES = ${FILES}";
     PATH_TESTS=${FILES};
 else
-    PATH_TESTS=${DIR_PACKAGE}/${TESTS_NAME};
+    PATH_TESTS="${DIR_PACKAGE}/${TESTS_NAME}";
 fi
 
 if ${VERBOSE}; then echo "==== holodeck tester.sh ===="; fi
 if ${DRY}; then echo "DRYRUN"; fi
 if ${VERBOSE}; then echo ""; fi
-
-DIR_PACKAGE=$(dirname $(dirname $(realpath $0)) )
-PATH_CONVERTER=${DIR_PACKAGE}/${CONVERTER_NAME}
-# PATH_TESTS=${DIR_PACKAGE}/${TESTS_NAME}
 
 # --- python convert_notebook_tests.py
 if ${BUILD}; then

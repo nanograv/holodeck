@@ -14,7 +14,7 @@ with open("README.md", "r") as handle:
 with open("requirements.txt", "r") as handle:
     requirements = handle.read()
 
-with open('zcode/VERSION') as handle:
+with open('holodeck/version.txt') as handle:
     version = handle.read().strip()
 
 setup(
