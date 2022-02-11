@@ -23,6 +23,9 @@
     - [ ] AGN/Quasar luminosity functions
     - [ ] constraints on kpc--Mpc scale galaxy and AGN mergers
     - [ ] constraints on sub-kpc separation binary AGN based on EM candidates (and upper-limits)
+* Gaussian Processes
+    - [ ] How significant are deviations in predicted spectra from Gaussians?  What produces those deviations, are they single (or single-like) sources, or are they actual "population" trends?  (Former is okay to ignore, latter is not!)
+    - [ ]
 
 ----
 
