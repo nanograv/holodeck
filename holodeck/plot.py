@@ -41,10 +41,67 @@ class MidpointLogNormalize(mpl.colors.LogNorm):
         return np.ma.masked_array(vals, np.isnan(value))
 
 
-def figax(figsize=[12, 6], ncols=1, nrows=1, sharex=False, sharey=False, squeeze=True,
+def figax(figsize=[10, 4], ncols=1, nrows=1, sharex=False, sharey=False, squeeze=True,
           scale=None, xscale='log', xlabel='', xlim=None, yscale='log', ylabel='', ylim=None,
           left=None, bottom=None, right=None, top=None, hspace=None, wspace=None,
           widths=None, heights=None, grid=True, **kwargs):
+    """Create matplotlib figure and axes instances.
+
+    Convenience function to create fig/axes using `plt.subplots`, and set default parameters.
+
+    Parameters
+    ----------
+    figsize : (2,) list, optional
+        Figure size in inches.
+    ncols : int, optional
+        Number of columns of axes.
+    nrows : int, optional
+        Number of rows of axes.
+    sharex : bool, optional
+        Share xaxes configuration between axes.
+    sharey : bool, optional
+        Share yaxes configuration between axes.
+    squeeze : bool, optional
+        Remove dimensions of length (1,) in the `axes` object.
+    scale : [type], optional
+        Axes scaling to be applied to all x/y axes ['log', 'lin'].
+    xscale : str, optional
+        Axes scaling for xaxes ['log', 'lin'].
+    xlabel : str, optional
+        Label for xaxes.
+    xlim : [type], optional
+        Limits for xaxes.
+    yscale : str, optional
+        Axes scaling for yaxes ['log', 'lin'].
+    ylabel : str, optional
+        Label for yaxes.
+    ylim : [type], optional
+        Limits for yaxes.
+    left : [type], optional
+        Left edge of axes space, set using `plt.subplots_adjust()`, as a fraction of figure.
+    bottom : [type], optional
+        Bottom edge of axes space, set using `plt.subplots_adjust()`, as a fraction of figure.
+    right : [type], optional
+        Right edge of axes space, set using `plt.subplots_adjust()`, as a fraction of figure.
+    top : [type], optional
+        Top edge of axes space, set using `plt.subplots_adjust()`, as a fraction of figure.
+    hspace : [type], optional
+        Height space between axes if multiple rows are being used.
+    wspace : [type], optional
+        Width space between axes if multiple columns are being used.
+    widths : [type], optional
+    heights : [type], optional
+    grid : bool, optional
+        Add grid lines to axes.
+
+    Returns
+    -------
+    fig : `matplotlib.figure.Figure`
+        New matplotlib figure instance containing axes.
+    axes : [ndarray] `matplotlib.axes.Axes`
+        New matplotlib axes, either a single instance or an ndarray of axes.
+
+    """
 
     if scale is not None:
         xscale = scale
@@ -356,17 +413,33 @@ def _twin_hz(ax, nano=True, fs=12):
 
 
 def plot_gwb(gwb, color=None, uniform=False, nreals=5):
-    fig, ax = plt.subplots(figsize=[10, 5])
-    ax.set(xscale='log', xlabel=r'frequency $[\mathrm{yr}^{-1}]$',
-           yscale='log', ylabel=r'characteristic strain $[\mathrm{h}_c]$')
-    ax.grid(True)
+    """Plot a GW background from the given `Grav_Waves` instance.
+
+    Plots samples, confidence intervals, power-law, and adds twin-Hz axis (x2).
+
+    Arguments
+    ---------
+    gwb : `gravwaves.Grav_Waves` (subclass) instance
+
+    Returns
+    -------
+    fig : `mpl.figure.Figure`
+        New matplotlib figure instance.
+
+    """
+
+    fig, ax = figax(
+        scale='log',
+        xlabel=r'frequency $[\mathrm{yr}^{-1}]$',
+        ylabel=r'characteristic strain $[\mathrm{h}_c]$'
+    )
 
     if uniform:
         color = ax._get_lines.get_next_color()
 
     _draw_gwb_sample(ax, gwb, color=color, num=nreals)
     _draw_gwb_conf(ax, gwb, color=color)
-    _draw_plaw(ax, gwb.freqs*YR, f0=1, color='k')
+    _draw_plaw(ax, gwb.freqs*YR, f0=1, color='0.5', lw=2.0, ls='--')
 
     _twin_hz(ax, nano=True, fs=12)
     return fig
