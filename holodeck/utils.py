@@ -13,7 +13,7 @@ import abc
 import copy
 import numbers
 import os
-from typing import Optional, Tuple, Union  # , Sequence,
+from typing import Optional, Tuple, Union, List  # , Sequence,
 
 import numpy as np
 import numpy.typing as npt
@@ -285,7 +285,7 @@ def isinteger(val) -> bool:
 
 
 def log_normal_base_10(
-    mu: float, sigma: float, size: Union[int, list[int]] = None, shift: float = 0.0,
+    mu: float, sigma: float, size: Union[int, List[int]] = None, shift: float = 0.0,
 ) -> npt.ArrayLike:
     """Draw from a log-normal distribution using base-10 standard-deviation.
 
