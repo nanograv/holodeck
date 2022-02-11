@@ -67,10 +67,6 @@ class GW_Discrete(Grav_Waves):
 
 class GW_Continuous(Grav_Waves):
 
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     return
-
     def emit(self, eccen=None, stats=False, progress=True, nloudest=5):
         freqs = self.freqs
         bin_evo = self._bin_evo
@@ -82,41 +78,29 @@ class GW_Continuous(Grav_Waves):
 
         # (N,) ==> (1, N)    for later conversion to (F, N)
         m1, m2 = [mm[np.newaxis, :] for mm in pop.mass.T]
+        mchirp = utils.chirp_mass(m1, m2)
 
         H0 = cosmo.H0*1e5 / MPC   # convert from [km/s/Mpc] to [1/s]
         redz = cosmo.a_to_z(pop.scafa)                     # (N,)
         redz = np.clip(redz, 0.1, None)
-        # print(f"redz={zmath.stats_str(redz)}")
         dlum = cosmo.luminosity_distance(redz).cgs.value
-        # print(f"dlum={zmath.stats_str(dlum)}")
         dzdt = H0 * cosmo.efunc(redz) * np.square(1.0 + redz)  # (N,)
-        # print(f"dzdt={zmath.stats_str(dzdt)}")
 
-        frest = freqs[:, np.newaxis] / (1.0 + redz[np.newaxis, :])  # (F, N)
-        # print(f"frest={zmath.stats_str(frest)}")
-        dtr_dlnfr = frest / utils.gw_hardening_rate_dfdt(m1, m2, frest)  # (F, N)
-        # print(f"dtr_dlnfr={zmath.stats_str(dtr_dlnfr)}")
-
-        mchirp = utils.chirp_mass(m1, m2)
-        # print(f"frest={zmath.stats_str(frest)}")
+        # ==> shape (F,N)
+        frest = freqs[:, np.newaxis] / (1.0 + redz[np.newaxis, :])
+        temp, _ = utils.gw_hardening_rate_dfdt(m1, m2, frest)
+        dtr_dlnfr = frest / temp
         # Calculate source-strain for each source (h;  NOT characteristic strain)
-        strain = utils.gw_strain_source(mchirp, dlum[np.newaxis, :], frest)  # (F, N)
-        # print(f"hs={zmath.stats_str(hs)}")
+        strain = utils.gw_strain_source(mchirp, dlum[np.newaxis, :], frest)
 
         time_fac = dzdt * dtr_dlnfr
-        # print(f"time_fac={zmath.stats_str(time_fac)}")
-        # Calculate characteristic-strain (squared)
+
+        # Convert to characteristic-strain (squared)
         strain = weight[np.newaxis, :] * time_fac * strain**2
-        # print(f"strain={zmath.stats_str(strain)}")
 
         dvol = dm * dq * dz
-        # dvol = 1.0
-        # print(f"{dvol=:.2e}")
-        # print(f"numbers = {zmath.stats_str(dvol*weight)}")
-        # print(f"number  = {np.sum(dvol*weight):.2e}")
-
-        strain = np.sqrt(np.sum(strain * dvol, axis=1))
-        # print(f"hc={zmath.stats_str(strain)}")
+        # Sum over all binaries, convert from hc^2 ==> hc
+        strain = np.sqrt(np.sum(strain * dvol, axis=-1))
         self.strain = strain
         return
 
@@ -163,7 +147,7 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
     frst_orb = fobs * zp1 / harms
     mchirp = data_harms['mass'][valid]
     mchirp = utils.chirp_mass(*mchirp.T)
-    dfdt = utils.dfdt_from_dadt(data_harms['dadt'][valid], data_harms['sepa'][valid], freq_orb=frst_orb)
+    dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], data_harms['sepa'][valid], freq_orb=frst_orb)
     _tres = frst_orb / dfdt
 
     # Calculate strains from each source

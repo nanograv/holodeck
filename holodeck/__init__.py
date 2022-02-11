@@ -1,6 +1,6 @@
 """
 holodeck
-Supermassive binary black hole simulator for pulsar timing array signals and galaxy population  statistics.
+Supermassive binary black hole simulator for pulsar timing array signals and galaxy population statistics.
 """
 
 import os
@@ -25,14 +25,14 @@ for cp in _check_paths:
 
 # ---- Load logger
 
-from . import log
+from . import log   # noqa
 log = log.get_logger(__name__, logging.DEBUG)
 
 
 # ---- Import submodules
 
 # Must load and initialize cosmology FIRST!
-from . import cosmology
+from . import cosmology   # noqa
 cosmo = cosmology.Cosmology()
 
 from . import constants  # noqa
@@ -51,11 +51,17 @@ from .utils import *  # noqa
 
 # ---- Handle versioneer
 
-from ._version import get_versions
-versions = get_versions()
-__version__ = versions['version']
-__git_revision__ = versions['full-revisionid']
-del get_versions, versions
+fname_version = os.path.join(_PATH_PACKAGE, 'version.txt')
+with open(fname_version) as inn:
+    version = inn.read().strip()
+
+__version__ = version
+
+# from ._version import get_versions  # noqa
+# versions = get_versions()
+# __version__ = versions['version']
+# __git_revision__ = versions['full-revisionid']
+# del get_versions, versions
 
 # Full cleanup
 del os, _check_paths, logging

@@ -12,8 +12,8 @@ References
 import abc
 import copy
 import numbers
-from typing import Optional, Tuple  # , Sequence,
 import os
+from typing import Optional, Tuple, Union  # , Sequence,
 
 import numpy as np
 import numpy.typing as npt
@@ -173,12 +173,22 @@ def expand_broadcastable(*args):
     return vals
 
 
-def frac_str(vals, prec=2):
-    """
+def frac_str(vals: npt.ArrayLike, prec: int = 2) -> str:
+    """Return a string with the fraction and decimal of non-zero elements of the given array.
+
+    e.g. [0, 1, 2, 0, 0] ==> "2/5 = 4.0e-1"
 
     Arguments
     ---------
-    vals : (N,) array of bool
+    vals : (N,) array_like,
+        Input array to find non-zero elements of.
+    prec : int
+        Decimal precision in scientific notation string.
+
+    Returns
+    -------
+    rv : str,
+        Fraction string.
 
     """
     num = np.count_nonzero(vals)
@@ -188,7 +198,35 @@ def frac_str(vals, prec=2):
     return rv
 
 
-def interp(xnew, xold, yold, left=np.nan, right=np.nan, xlog=True, ylog=True):
+def interp(
+    xnew: npt.ArrayLike, xold: npt.ArrayLike, yold: npt.ArrayLike,
+    left: float = np.nan, right: float = np.nan, xlog: bool = True, ylog: bool = True,
+) -> npt.ArrayLike:
+    """Linear interpolation of the given arguments in log/lin-log/lin space.
+
+    Parameters
+    ----------
+    xnew : npt.ArrayLike
+        New locations (independent variable) to interpolate to.
+    xold : npt.ArrayLike
+        Old locations of independent variable.
+    yold : npt.ArrayLike
+        Old locations of dependent variable.
+    left : float, optional
+        Fill value for locations below the domain `xold`.
+    right : float, optional
+        Fill value for locations above the domain `xold`.
+    xlog : bool, optional
+        Linear interpolation in the log of x values.
+    ylog : bool, optional
+        Linear interpolation in the log of y values.
+
+    Returns
+    -------
+    y1 : npt.ArrayLike
+        Interpolated output values of the dependent variable.
+
+    """
     x1 = np.asarray(xnew)
     x0 = np.asarray(xold)
     y0 = np.asarray(yold)
@@ -205,10 +243,23 @@ def interp(xnew, xold, yold, left=np.nan, right=np.nan, xlog=True, ylog=True):
     y1 = np.interp(x1, x0, y0, left=left, right=right)
     if ylog:
         y1 = np.power(10.0, y1)
+
     return y1
 
 
-def isnumeric(val):
+def isnumeric(val) -> bool:
+    """Test if the input value can successfully be cast to a float.
+
+    Parameters
+    ----------
+    val : [type]
+
+    Returns
+    -------
+    bool
+        True if the input value can be cast to a float.
+
+    """
     try:
         float(str(val))
     except ValueError:
@@ -217,18 +268,67 @@ def isnumeric(val):
     return True
 
 
-def isinteger(val):
+def isinteger(val) -> bool:
+    """Test if the input value is an integral (integer) number.
+
+    Parameters
+    ----------
+    val : [type]
+
+    Returns
+    -------
+    bool
+
+    """
     rv = isnumeric(val) and isinstance(val, numbers.Integral)
     return rv
 
 
-def log_normal_base_10(mu, sigma, size=None, shift=0.0):
-    _sigma = np.log(10**sigma)
+def log_normal_base_10(
+    mu: float, sigma: float, size: Union[int, list[int]] = None, shift: float = 0.0,
+) -> npt.ArrayLike:
+    """Draw from a log-normal distribution using base-10 standard-deviation.
+
+    i.e. the `sigma` argument is in "dex", or powers of ten.
+
+    Parameters
+    ----------
+    mu : float
+        Mean value of the distribution.
+    sigma : float
+        Standard deviation in dex (i.e. powers of ten).
+        `sigma=1.0` means a standard deviation of one order of magnitude around mu.
+    size : Union[int, list[int]], optional
+        Number of values to draw.  Either a single integer, or a tuple of integers describing a shape.
+    shift : float, optional
+
+    Returns
+    -------
+    dist : npt.ArrayLike
+        Resulting distribution values.
+
+    """
+    _sigma = np.log(10.0 ** sigma)
     dist = np.random.lognormal(np.log(mu) + shift*np.log(10.0), _sigma, size)
     return dist
 
 
-def minmax(vals, filter=False):
+def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
+    """Find the minimum and maximum values in the given array.
+
+    Parameters
+    ----------
+    vals : npt.ArrayLike
+        Input values in which to find extrema.
+    filter : bool, optional
+        Select only finite values from the input array.
+
+    Returns
+    -------
+    extr : (2,) np.ndarray
+        Minimum and maximum values.
+
+    """
     if filter:
         vv = vals[np.isfinite(vals)]
     else:
@@ -246,13 +346,17 @@ def print_stats(stack=True, print_func=print, **kwargs):
     return
 
 
-def nyquist_freqs(dur=15.0*YR, cad=0.1*YR, trim=None):
+def nyquist_freqs(
+    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
+) -> np.ndarray:
     """Calculate Nyquist frequencies for the given timing parameters.
 
     Arguments
     ---------
-    dur : scalar, duration of observations
-    cad : scalar, cadence of observations
+    dur : float,
+        Duration of observations
+    cad : float,
+        Cadence of observations
     trim : (2,) or None,
         Specification of minimum and maximum frequencies outside of which to remove values.
         `None` can be used in place of either boundary, e.g. [0.1, None] would mean removing
@@ -260,7 +364,8 @@ def nyquist_freqs(dur=15.0*YR, cad=0.1*YR, trim=None):
 
     Returns
     -------
-    freqs : array of scalar, Nyquist frequencies
+    freqs : ndarray,
+        Nyquist frequencies
 
     """
     fmin = 1.0 / dur
@@ -279,7 +384,14 @@ def nyquist_freqs(dur=15.0*YR, cad=0.1*YR, trim=None):
     return freqs
 
 
-def quantiles(values, percs=None, sigmas=None, weights=None, axis=None, values_sorted=False):
+def quantiles(
+    values: npt.ArrayLike,
+    percs: Optional[npt.ArrayLike] = None,
+    sigmas: Optional[npt.ArrayLike] = None,
+    weights: Optional[npt.ArrayLike] = None,
+    axis: Optional[int] = None,
+    values_sorted: bool = False,
+) -> np.ndarray:
     """Compute weighted percentiles.
 
     NOTE: if `values` is a masked array, then only unmasked values are used!
@@ -289,16 +401,19 @@ def quantiles(values, percs=None, sigmas=None, weights=None, axis=None, values_s
     values: (N,)
         input data
     percs: (M,) scalar [0.0, 1.0]
-        Desired percentiles of the data.
+        Desired quantiles of the data.
     weights: (N,) or `None`
-        Weighted for each input data point in `values`.
+        Weights for each input data point in `values`.
+    axis: int or `None`,
+        Axis over which to calculate quantiles.
     values_sorted: bool
         If True, then input values are assumed to already be sorted.
+        Otherwise they are sorted before calculating quantiles (for efficiency).
 
     Returns
     -------
     percs : (M,) float
-        Array of percentiles of the weighted input data.
+        Array of quantiles of the input data.
 
     """
     if not isinstance(values, np.ma.MaskedArray):
@@ -351,12 +466,33 @@ def quantiles(values, percs=None, sigmas=None, weights=None, axis=None, values_s
     return percs
 
 
-def stats(vals, percs=None, prec=2):
+def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int = 2) -> str:
+    """Return a string giving quantiles of the given input data.
+
+    Parameters
+    ----------
+    vals : npt.ArrayLike,
+        Input values to get quantiles of.
+    percs : npt.ArrayLike, optional
+        Quantiles to calculate.
+    prec : int, optional
+        Precision in scientific notation of output.
+
+    Returns
+    -------
+    rv : str
+        Quantiles of input formatted as a string of scientific notation values.
+
+    Raises
+    ------
+    TypeError: raised if input data is not iterable.
+
+    """
     try:
         if len(vals) == 0:
             raise TypeError
     except TypeError:
-        raise ValueError(f"`vals` (shape={np.shape(vals)}) is not iterable!")
+        raise TypeError(f"`vals` (shape={np.shape(vals)}) is not iterable!")
 
     if percs is None:
         percs = [sp.stats.norm.cdf(1), 0.95, 1.0]
@@ -562,6 +698,28 @@ def _parse_log_norm_pars(vals, size, default=None):
 
 
 def dfdt_from_dadt(dadt, sepa, mtot=None, freq_orb=None):
+    """Convert from hardening rate in separation to hardening rate in frequency.
+
+    Arguments
+    ---------
+    dadt : array_like
+        Hardening rate in terms of binary separation.
+    sepa : array_like
+        Binary separations.
+    mtot : None or array_like
+        Either `mtot` or `freq_orb` must be provided.
+    freq_orb : None or array_like
+        Either `mtot` or `freq_orb` must be provided.
+
+    Returns
+    -------
+    dfdt :
+        Hardening rate in terms of frequency.
+        NOTE: Has the opposite sign as `dadt`.
+    freq_orb :
+        Orbital frequency, in the rest-frame
+
+    """
     if (mtot is None) and (freq_orb is None):
         error("Either `mtot` or `freq_orb` must be provided!")
     if freq_orb is None:
@@ -739,13 +897,31 @@ def gw_hardening_rate_dadt(m1, m2, sepa, eccen=None):
     return dadt
 
 
-def gw_hardening_rate_dfdt(m1, m2, freq, eccen=None):
+def gw_hardening_rate_dfdt(m1, m2, freq_orb, eccen=None):
     """GW Hardening rate in frequency (df/dt).
+
+    Arguments
+    ---------
+    m1 : array_like
+        Mass of one component of each binary.
+    m2 : array_like
+        Mass of other component of each binary.
+    freq_orb : array_like
+        Rest frame orbital frequency of each binary.
+    eccen : array_like, optional
+        Eccentricity of each binary.
+
+    Returns
+    -------
+    dfdt : array_like,
+        Hardening rate in terms of frequency for each binary.
+
     """
-    sepa = kepler_sepa_from_freq(m1+m2, freq)
+    sepa = kepler_sepa_from_freq(m1+m2, freq_orb)
     dfdt = gw_hardening_rate_dadt(m1, m2, sepa, eccen=eccen)
-    dfdt = dfdt_from_dadt(dfdt, sepa, mtot=m1+m2)
-    return dfdt
+    # dfdt, _ = dfdt_from_dadt(dfdt, sepa, mtot=m1+m2)
+    dfdt, _ = dfdt_from_dadt(dfdt, sepa, freq_orb=freq_orb)
+    return dfdt, freq_orb
 
 
 def gw_hardening_timescale_freq(mchirp, frst):
