@@ -1,19 +1,12 @@
-"""
-holodeck
+"""holodeck
 
-Supermassive binary black hole simulator for pulsar timing array signals and galaxy population statistics.
+Massive black hole (MBH) binary simulator for pulsar timing array (and associated) signals.
 
 """
-import sys
+
 from setuptools import setup, find_packages
 
-import versioneer
-
-short_description = __doc__.split("\n")
-
-# from https://github.com/pytest-dev/pytest-runner#conditional-requirement
-needs_pytest = {'pytest', 'test', 'ptr'}.intersection(sys.argv)
-pytest_runner = ['pytest-runner'] if needs_pytest else []
+short_description = __doc__.strip()
 
 with open("README.md", "r") as handle:
     long_description = handle.read()
@@ -21,17 +14,17 @@ with open("README.md", "r") as handle:
 with open("requirements.txt", "r") as handle:
     requirements = handle.read()
 
+with open('zcode/VERSION') as handle:
+    version = handle.read().strip()
 
 setup(
-    # Self-descriptive entries which should always be present
     name='holodeck',
     author='NANOGrav',
     author_email='luke.kelley@nanograv.org',
-    description=short_description[0],
+    description=short_description,
     long_description=long_description,
     long_description_content_type="text/markdown",
-    version=versioneer.get_version(),
-    cmdclass=versioneer.get_cmdclass(),
+    version=version,
     license='MIT',
     url="https://github.com/NANOGrav/holodeck/",
 
@@ -48,14 +41,8 @@ setup(
     # Comment out this line to prevent the files from being packaged with your software
     include_package_data=True,
 
-    # Allows `setup.py test` to work correctly with pytest
-    setup_requires=[] + pytest_runner,
-
     # Additional entries you may want simply uncomment the lines you want and fill in the data
     # url='http://www.my_package.com',  # Website
-    python_requires=">=3.4",          # Python version restrictions
-
-    # Manual control if final package is compressible or not, set False to prevent the .egg from being made
-    # zip_safe=False,
+    python_requires=">=3.5",          # Python version restrictions
 
 )

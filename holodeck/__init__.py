@@ -51,11 +51,17 @@ from .utils import *  # noqa
 
 # ---- Handle versioneer
 
-from ._version import get_versions  # noqa
-versions = get_versions()
-__version__ = versions['version']
-__git_revision__ = versions['full-revisionid']
-del get_versions, versions
+fname_version = os.path.join(_PATH_PACKAGE, 'version.txt')
+with open(fname_version) as inn:
+    version = inn.read().strip()
+
+__version__ = version
+
+# from ._version import get_versions  # noqa
+# versions = get_versions()
+# __version__ = versions['version']
+# __git_revision__ = versions['full-revisionid']
+# del get_versions, versions
 
 # Full cleanup
 del os, _check_paths, logging
