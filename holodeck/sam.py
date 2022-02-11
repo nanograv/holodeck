@@ -750,7 +750,8 @@ def _integrate_differential_number(edges, dnum, freq=False):
 
 def sample_sam_with_hardening(
         sam, hard,
-        fobs=None, sepa=None, sample_threshold=10.0, cut_below_mass=1e6, limit_merger_time=None
+        fobs=None, sepa=None, sample_threshold=10.0, cut_below_mass=1e6, limit_merger_time=None,
+        **sample_kwargs
 ):
     """Discretize Semi-Analytic Model into sampled binaries assuming the given binary hardening rate.
 
@@ -789,7 +790,13 @@ def sample_sam_with_hardening(
     mass = holo.sam._integrate_differential_number(edges, dnum, freq=True)
     # sample binaries from distribution, using appropriate spacing as needed
     # BUG: should the density used for proportional sampling `dnum` be log(density) ?!
-    vals, weights = kale.sample_outliers(log_edges, dnum, sample_threshold, mass=mass)
+    if (sample_threshold is None) or (sample_threshold == 0.0):
+        log.warning(f"Sampling *all* binaries (~{mass.sum():.2e}).")
+        log.warning("Set `sample_threshold` to only sample outliers.")
+        vals = kale.sample_grid(log_edges, dnum, mass=mass, **sample_kwargs)
+        weights = np.ones(vals.shape[1])
+    else:
+        vals, weights = kale.sample_outliers(log_edges, dnum, sample_threshold, mass=mass, **sample_kwargs)
     vals[0] = 10.0 ** vals[0]
     vals[3] = np.e ** vals[3]
 
