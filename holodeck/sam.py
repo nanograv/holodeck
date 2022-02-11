@@ -701,12 +701,15 @@ class Semi_Analytic_Model:
         coms[-1] = coms[-1][1:, 1:, 1:, :]
 
         # shape_grid = coms[0].shape
-        coms = [cc.flat for cc in coms]
+        coms = [cc.flat[:] for cc in coms]   # use `[:]` to avoid issues with flatiter instance
 
         # ---- calculate GW strain at bin centroids
         mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))
+        print(f"shape coms[2] = {np.shape(coms[2])}", type(coms[2]))
         dc = cosmo.comoving_distance(coms[2]).cgs.value
-        fr = utils.frst_from_fobs(coms[3][:], coms[2][:])
+        fr = utils.frst_from_fobs(coms[3], coms[2])
+        # dc = cosmo.comoving_distance(coms[2][:]).cgs.value
+        # fr = utils.frst_from_fobs(coms[3][:], coms[2][:])
         hs = utils.gw_strain_source(mc, dc, fr)
         # (M*Q*Z*F,) ==> (M,Q,Z,F)
         hs = hs.reshape(number.shape)
