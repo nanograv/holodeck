@@ -58,7 +58,7 @@ jobs:
 
     - name: Run tests
       run: |
-         bash ./scripts/tester.sh
+         bash ./scripts/tester.sh -b -v
 #        python ./convert_notebook_tests.py
 #        bash ./tester.sh
 
