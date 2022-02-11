@@ -118,9 +118,18 @@ def convert_notebooks(notebook_names):
 
         with open(dst_py, 'r') as original:
             data = original.readlines()
+
+        last_blank = False
         with open(dst_py, 'w') as modified:
             first = True
             for ii, line in enumerate(data):
+                if len(line.strip()) == 0:
+                    if last_blank:
+                        continue
+                    last_blank = True
+                else:
+                    last_blank = False
+
                 for old, new in REPLACEMENTS:
                     line = line.replace(old, new)
 
@@ -131,17 +140,17 @@ def convert_notebooks(notebook_names):
                         first = False
 
                     if num > 0:
-                        evil = "\tglobals().update(locals())\n\n\n"
+                        evil = "    globals().update(locals())\n\n\n"
                         modified.write(evil)
 
-                    prep = f"def test_cell_{num}():\n\tprint(f'cell: {num}')"
+                    prep = f"def test_cell_{num}():\n    print(f'cell: {num}')"
                     modified.write(prep)
                     num += 1
                 elif first and (line.startswith('#') or len(line.strip()) == 0):
                     modified.write(line)
                     continue
 
-                modified.write("\t" + line)
+                modified.write("    " + line)
 
     return
 
