@@ -74,7 +74,7 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
         self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]  [1/Mpc^3]
         self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]  [1/Mpc^3]
         self._mref0 = mref0       # +11.24  +/- [-0.17, +0.20]  Msol
-        self._mrefz = mrefz       #  0.0                        Msol
+        self._mrefz = mrefz       #  0.0                        Msol    # noqa
         self._alpha0 = alpha0     # -1.24   +/- [-0.16, +0.16]
         self._alphaz = alphaz     # -0.03   +/- [-0.14, +0.16]
         return
