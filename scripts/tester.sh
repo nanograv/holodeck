@@ -19,8 +19,6 @@ BUILD=false;
 
 DIR_PACKAGE=$(dirname $(dirname $(realpath $0)) )
 PATH_CONVERTER=${DIR_PACKAGE}/${CONVERTER_NAME}
-echo "DIR_PACKAGE = ${DIR_PACKAGE}"
-echo "PATH_TESTS = ${PATH_TESTS}"
 
 # Display Help
 function help()
