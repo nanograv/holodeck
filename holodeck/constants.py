@@ -26,16 +26,6 @@ YR = ap.units.year.to(ap.units.s)
 EVOLT = ap.units.eV.to(ap.units.erg)            # Electronvolt in ergs
 JY = ap.units.jansky.to(ap.units.g/ap.units.s**2)  # Jansky in [erg/s/cm^2/Hz]
 
-# ---- Observd Cosmological Parameters
-# import astropy.cosmology
-# cosmo = astropy.cosmology.WMAP9
-# H0 = cosmo.H0.cgs.value                          # Hubble Constants at z=0.0
-# HPAR = cosmo.H0.value/100.0
-# OMEGA_M = cosmo.Om0
-# OMEGA_B = cosmo.Ob0
-# OMEGA_DM = cosmo.Odm0
-# RHO_CRIT = cosmo.critical_density0.cgs.value
-
 # Derived Constants
 # -----------------
 SCHW = 2*NWTG/(SPLC*SPLC)                        # Schwarzschild Constant (2*G/c^2)

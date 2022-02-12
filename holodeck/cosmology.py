@@ -31,7 +31,7 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
     Omega0 = 0.286
     OmegaBaryon = 0.0463
     HubbleParam = 0.693
-    H0 = HubbleParam * 100.0
+    _H0_sub = HubbleParam * 100.0  # NOTE: this *cannot* be `H0` or `_H0` --- conflicts with astropy internals
     SPLC = 29979245800.0
 
     # z=0.0 is added automatically
@@ -40,7 +40,7 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
 
     def __init__(self):
         # Initialize parent class
-        super().__init__(H0=self.H0, Om0=self.Omega0, Ob0=self.OmegaBaryon)
+        super().__init__(H0=self._H0_sub, Om0=self.Omega0, Ob0=self.OmegaBaryon)
 
         # Create grids for interpolations
         # -------------------------------
@@ -48,7 +48,7 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
         zgrid = self._init_interp_grid(self._Z_GRID, self._INTERP_POINTS)
         self._grid_z = zgrid
         self._sort_z = np.argsort(zgrid)
-        self._grid_a = self._z_to_a(zgrid)
+        self._grid_a = self.z_to_a(zgrid)
         self._sort_a = np.argsort(self._grid_a)
         # Calculate corresponding values in desired parameters
         #    Ages in seconds
@@ -110,20 +110,22 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
         return zgrid
 
     @staticmethod
-    def _a_to_z(sf):
+    def a_to_z(sf):
         """Convert from scale-factor to redshift.
         """
         sf = np.asarray(sf)
+        # NOTE: this does not check for `nan`
         if np.any((sf > 1.0) | (sf < 0.0)):
             raise ValueError("Scale-factor must be [0.0, 1.0]")
 
         return (1.0/sf) - 1.0
 
     @staticmethod
-    def _z_to_a(redz):
+    def z_to_a(redz):
         """Convert from redshift to scale-factor.
         """
         redz = np.asarray(redz)
+        # NOTE: this does not check for `nan`
         if np.any(redz < 0.0):
             raise ValueError("Redshift must be [0.0, +inf)")
 
@@ -254,4 +256,21 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
         # Using `astropy` this gives a `m * Mpc^2` object for some reason; simplify
         if not cgs:
             retval = retval.to('Mpc3')
+        return retval
+
+    def dtdz(self, zz):
+        """Differential lookback time of the Universe.
+
+        From Hogg1999 Eq. 30
+
+        Returns
+        -------
+        retval : array_like of scalar, units of [sec]
+            dt/dz at the given redshifts
+
+        """
+        efac = self.efunc(zz)
+        time_hub = self.hubble_time.to('s').value
+
+        retval = time_hub / (1.0 + zz) / efac
         return retval

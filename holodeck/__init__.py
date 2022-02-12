@@ -2,24 +2,31 @@
 holodeck
 Supermassive binary black hole simulator for pulsar timing array signals and galaxy population  statistics.
 """
+
 import os
 import logging
 
-log = logging.getLogger('holodeck')
 
-# --- Setup root package variables
+# ---- Setup root package variables
 
 _PATH_PACKAGE = os.path.dirname(os.path.abspath(__file__))
 _PATH_ROOT = os.path.join(_PATH_PACKAGE, os.path.pardir)
 _PATH_NOTEBOOKS = os.path.join(_PATH_ROOT, "notebooks", "")
 _PATH_DATA = os.path.join(_PATH_PACKAGE, "data", "")
 
-_check_paths = [_PATH_PACKAGE, _PATH_ROOT, _PATH_NOTEBOOKS, _PATH_DATA]
+# NOTE: can only search for paths within the package _*NOT the root directory*_
+_check_paths = [_PATH_PACKAGE, _PATH_ROOT, _PATH_DATA]
 for cp in _check_paths:
     cp = os.path.abspath(cp)
     if not os.path.isdir(cp):
         err = "ERROR: could not find directory '{}'!".format(cp)
         raise FileNotFoundError(err)
+
+
+# ---- Load logger
+
+from . import log
+log = log.get_logger(__name__, logging.DEBUG)
 
 
 # ---- Import submodules
@@ -40,6 +47,7 @@ from . import population  # noqa
 from .population import *  # noqa
 from . import utils     # noqa
 from .utils import *  # noqa
+
 
 # ---- Handle versioneer
 
