@@ -163,50 +163,6 @@ class Pop_Illustris(_Population):
         return
 
 
-'''
-def Pop_SAM(_Population):
-
-    def __init__(self, sam, sepa, **kwargs):
-        self._sam = sam
-        self._sepa_init = sepa
-        super().__init__(**kwargs)
-        return
-
-    def _init(self):
-        sam = self._sam
-        sepa = self._sepa_init
-'''
-
-
-'''
-class BP_Continuous(_Population):
-
-    def _init_from_file(self, fname):
-        data = np.load(fname)
-        mt = data['mtot'] * MSOL
-        mr = data['mrat']
-        sc = cosmo.z_to_a(data['redz'])
-        ww = data['pops'][..., 0]
-        self._mtot = mt
-        self._mrat = mr
-        self._redz = data['redz']
-
-        mt, mr, sc = [xx.flatten() for xx in np.meshgrid(mt, mr, sc, indexing='ij')]
-        self.mtot = mt
-        self.mrat = mr
-        self.scafa = sc
-        self.weight = ww.flatten()
-        self.sepa = 1e5 * PC * np.ones_like(mt)
-        self.mass = utils.m1m2_from_mtmr(self.mtot, self.mrat).T
-
-        return
-
-    def _update_derived(self):
-        self._size = self.mtot.size
-        return
-'''
-
-
 class Population_Modifier(utils._Modifier):
     pass
 
