@@ -29,6 +29,7 @@ import kalepy as kale
 import holodeck as holo
 from holodeck import cosmo, utils, log
 from holodeck.constants import GYR, SPLC, MSOL, MPC
+from holodeck import relations
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
@@ -305,7 +306,7 @@ class Semi_Analytic_Model:
 
     def __init__(
         self, mtot=[2.75e5*MSOL, 1.0e11*MSOL, 46], mrat=[0.02, 1.0, 50], redz=[0.0, 6.0, 61],
-        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=MMBulge_Simple
+        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_Standard
     ):
 
         if inspect.isclass(gsmf):
@@ -325,7 +326,7 @@ class Semi_Analytic_Model:
 
         if inspect.isclass(mmbulge):
             mmbulge = mmbulge()
-        elif not isinstance(mmbulge, _MMBulge_Relation):
+        elif not isinstance(mmbulge, relations._MMBulge_Relation):
             raise ValueError("`mmbulge` must be an instance or subclass of `_MMBulge_Relation`!")
 
         # NOTE: the spacing (log vs lin) is important.  e.g. in integrating from differential-number to (total) number
