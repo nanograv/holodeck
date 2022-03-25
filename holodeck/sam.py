@@ -306,7 +306,9 @@ class Semi_Analytic_Model:
 
     def __init__(
         self, mtot=[2.75e5*MSOL, 1.0e11*MSOL, 46], mrat=[0.02, 1.0, 50], redz=[0.0, 6.0, 61],
-        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_Standard
+        # self, mtot=[2.75e5*MSOL, 1.0e11*MSOL, 11], mrat=[0.02, 1.0, 10], redz=[0.0, 6.0, 9],
+        shape=None,
+        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM13
     ):
 
         if inspect.isclass(gsmf):
@@ -328,6 +330,14 @@ class Semi_Analytic_Model:
             mmbulge = mmbulge()
         elif not isinstance(mmbulge, relations._MMBulge_Relation):
             raise ValueError("`mmbulge` must be an instance or subclass of `_MMBulge_Relation`!")
+
+        if shape is not None:
+            if len(shape) == 3:
+                mtot[2] = shape[0]
+                mrat[2] = shape[1]
+                redz[2] = shape[2]
+            else:
+                raise
 
         # NOTE: the spacing (log vs lin) is important.  e.g. in integrating from differential-number to (total) number
         self.mtot = np.logspace(*np.log10(mtot[:2]), mtot[2])
@@ -607,17 +617,12 @@ class Semi_Analytic_Model:
         # get the correct shape for frequencies
         # NOTE: coms[:, :, :, i] == coms[0, 0, 0, i]  i.e. only last dimension varies
         coms[-1] = coms[-1][1:, 1:, 1:, :]
-
-        # shape_grid = coms[0].shape
         coms = [cc.flat[:] for cc in coms]   # use `[:]` to avoid issues with flatiter instance
 
         # ---- calculate GW strain at bin centroids
         mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))
-        print(f"shape coms[2] = {np.shape(coms[2])}", type(coms[2]))
         dc = cosmo.comoving_distance(coms[2]).cgs.value
         fr = utils.frst_from_fobs(coms[3], coms[2])
-        # dc = cosmo.comoving_distance(coms[2][:]).cgs.value
-        # fr = utils.frst_from_fobs(coms[3][:], coms[2][:])
         hs = utils.gw_strain_source(mc, dc, fr)
         # (M*Q*Z*F,) ==> (M,Q,Z,F)
         hs = hs.reshape(number.shape)

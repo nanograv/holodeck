@@ -101,12 +101,12 @@ class MMBulge_Standard(_MMBulge_Relation):
     """
     """
 
-    MASS_AMP = np.nan
-    MASS_REF = 1.0
-    MASS_PLAW = np.nan
-    SCATTER_DEX = np.nan
+    MASS_AMP = 3.0e8 * MSOL
+    MASS_PLAW = 1.0
+    MASS_REF = 1.0e11 * MSOL
+    SCATTER_DEX = 0.0
 
-    def __init__(self, mamp=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None, scatter=None):
+    def __init__(self, mamp=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None, scatter=False):
         if mamp is None:
             mamp = self.MASS_AMP
         if mplaw is None:
@@ -119,6 +119,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         if scatter is True:
             pass
         elif scatter is False:
+            log.debug(f"Setting ``scatter_dex=None`` in {self.__class__} (arg ``scatter={scatter}``)")
             scatter_dex = None
         else:
             utils.error("`scatter` must be either True or False!")
