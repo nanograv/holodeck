@@ -338,8 +338,8 @@ def plot_mbh_scaling_relations(pop, fname=None, color='r'):
     return fig
 
 
-def _draw_mm13_data(ax, fname):
-    data = observations.load_mcconnell_ma_2013(fname)
+def _draw_mm13_data(ax):
+    data = observations.load_mcconnell_ma_2013()
     data = {kk: data[kk] if kk == 'name' else np.log10(data[kk]) for kk in data.keys()}
     key = 'mbulge'
     mass = data['mass']

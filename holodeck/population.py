@@ -2,10 +2,12 @@
 """
 
 import abc
+import inspect
 import os
 
 import numpy as np
 
+import holodeck as holo
 from holodeck import utils, log, _PATH_DATA, cosmo
 from holodeck.constants import PC, MSOL
 
@@ -13,7 +15,7 @@ _DEF_ECCEN_DIST = (1.0, 0.2)
 _DEF_ILLUSTRIS_FNAME = "illustris-galaxy-mergers_L75n1820FP_gas-100_dm-100_star-100_bh-000.hdf5"
 
 
-class _Population(abc.ABC):
+class _Population_Discrete(abc.ABC):
 
     def __init__(self, *args, mods=None, check=True, **kwargs):
         self._check_flag = check
@@ -127,7 +129,7 @@ class _Population(abc.ABC):
         return
 
 
-class Pop_Illustris(_Population):
+class Pop_Illustris(_Population_Discrete):
 
     def __init__(self, fname=None, **kwargs):
         if fname is None:
@@ -290,169 +292,35 @@ class PM_Mass_Reset(Population_Modifier):
     """
     """
 
-    FITS = {}
-    NORM = {}
-    _VALID_RELATIONS = ['vdisp', 'mbulge']
+    def __init__(self, mmbulge, scatter=True):
+        # if `mmbulge` is a class (not an instance), then instantiate it
+        if inspect.isclass(mmbulge):
+            mmbulge = mmbulge()
+        elif not isinstance(mmbulge, holo.relations._MMBulge_Relation):
+            err = "`mmbulge` must be an instance or subclass of `holodeck.observations._Galaxy_Blackhole_Relation`!"
+            utils.error(err)
 
-    def __init__(self, relation, alpha=None, beta=None, eps=None, scatter=1.0):
-        relation = relation.strip().lower()
-
-        if relation not in self._VALID_RELATIONS:
-            err = f"`relation` {relation} must be one of '{self._VALID_RELATIONS}'!"
-            raise ValueError(err)
-
-        self.relation = relation
-        if scatter in [None, False]:
-            scatter = 0.0
-        elif scatter is True:
-            scatter = 1.0
-
-        self.scatter = scatter
-        fits = self.FITS[relation]
-        if alpha is None:
-            alpha = fits['alpha']
-        if beta is None:
-            beta = fits['beta']
-        if eps is None:
-            eps = fits['eps']
-
-        self.alpha = alpha
-        self.beta = beta
-        self.eps = eps
+        self.mmbulge = mmbulge
+        self._scatter = scatter
         return
 
     def modify(self, pop):
-        relation = self.relation
+        # relation = self.relation
+        relation = 'mbulge'    # TODO: this is hardcoded for now, should be upgraded
         vals = getattr(pop, relation, None)
         if vals is None:
             err = (
                 f"relation is set to '{relation}', "
-                f"but value is not set in population instance!"
+                f"but value is not set in population instance (class: {pop.__class__})!"
             )
-            raise ValueError(err)
+            utils.error(err)
 
-        shape = (pop.size, 2)
-        scatter = self.scatter
-        alpha = self.alpha
-        beta = self.beta
-        eps = self.eps
-
-        norm = self.NORM[relation]
-        x0 = norm['x']
-        y0 = norm['y']
-
-        params = [alpha, beta, [0.0, eps]]
-        for ii, vv in enumerate(params):
-            if (scatter > 0.0):
-                vv = np.random.normal(vv[0], vv[1]*scatter, size=shape)
-            else:
-                vv = vv[0]
-
-            params[ii] = vv
-
-        alpha, beta, eps = params
-        mass = alpha + beta * np.log10(vals/x0) + eps
-        mass = np.power(10.0, mass) * y0
+        scatter = self._scatter
         # Store old version
         pop._mass = pop.mass
-        pop.mass = mass
+        # if `scatter` is `True`, then it is set to the value in `mmbulge.SCATTER_DEX`
+        pop.mass = self.mmbulge.mbh_from_mbulge(vals, scatter)
         return
-
-
-class PM_MM13(PM_Mass_Reset):
-    """
-
-    [MM13] - McConnell+Ma-2013 :
-    - https://ui.adsabs.harvard.edu/abs/2013ApJ...764..184M/abstract
-
-    Scaling-relations are of the form,
-    `log_10(Mbh/Msol) = alpha + beta * log10(X) + eps`
-        where `X` is:
-        `sigma / (200 km/s)`
-        `L / (1e11 Lsol)`
-        `Mbulge / (1e11 Msol)`
-        and `eps` is an intrinsic scatter in Mbh
-
-    """
-
-    # 1211.2816 - Table 2
-    FITS = {
-        # "All galaxies", first row ("MPFITEXY")
-        'vdisp': {
-            'alpha': [8.32, 0.05],   # normalization
-            'beta': [5.64, 0.32],    # power-law index
-            'eps': 0.38,      # overall scatter
-            'norm': 200 * 1e5,       # units
-        },
-        # "Dynamical masses", first row ("MPFITEXY")
-        'mbulge': {
-            'alpha': [8.46, 0.08],
-            'beta': [1.05, 0.11],
-            'eps': 0.34,
-            'norm': 1e11 * MSOL,
-        }
-    }
-
-    NORM = {
-        'vdisp': {
-            'x': 200 * 1e5,   # velocity-dispersion units
-            'y': MSOL,        # MBH units
-        },
-
-        'mbulge': {
-            'x': 1e11 * MSOL,   # MBulge units
-            'y': MSOL,        # MBH units
-        },
-    }
-
-
-class PM_KH13(PM_Mass_Reset):
-    """
-
-    [KH13] - Kormendy+Ho-2013 : https://ui.adsabs.harvard.edu/abs/2013ARA%26A..51..511K/abstract
-    -
-
-    Scaling-relations are given in the form,
-    `Mbh/(1e9 Msol) = [alpha ± da] * (X)^[beta ± db] + eps`
-    and converted to
-    `Mbh/(1e9 Msol) = [delta ± dd] + [beta ± db] * log10(X) + eps`
-    s.t.  `delta = log10(alpha)`  and  `dd = (da/alpha) / ln(10)`
-
-        where `X` is:
-        `Mbulge / (1e11 Msol)`
-        `sigma / (200 km/s)`
-        and `eps` is an intrinsic scatter in Mbh
-
-    """
-
-    # 1304.7762
-    FITS = {
-        # Eq.12
-        'vdisp': {
-            'alpha': [-0.54, 0.07],  # normalization
-            'beta': [4.26, 0.44],    # power-law index
-            'eps': 0.30,             # overall scatter
-        },
-        # Eq.10
-        'mbulge': {
-            'alpha': [-0.3098, 0.05318],
-            'beta': [1.16, 0.08],
-            'eps': 0.29,
-        }
-    }
-
-    NORM = {
-        # Eq.12
-        'vdisp': {
-            'x': 200 * 1e5,     # velocity-dispersion units
-            'y': 1e9 * MSOL,    # MBH units
-        },
-        # Eq.10
-        'mbulge': {
-            'x': 1e11 * MSOL,   # MBulge units
-            'y': 1e9 * MSOL,    # MBH units
-        },
-    }
 
 
 def eccen_func(norm, std, size):

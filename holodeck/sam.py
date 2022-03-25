@@ -380,7 +380,7 @@ class Semi_Analytic_Model:
         # total-mass, mass-ratio ==> (M1, M2)
         masses = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
         # BH-masses to stellar-masses
-        masses = self._mmbulge.mstar_from_mbh(masses)
+        masses = self._mmbulge.mstar_from_mbh(masses, scatter=False)
         return masses
 
     @property
@@ -438,7 +438,7 @@ class Semi_Analytic_Model:
             dqgal_dqbh = 1.0     # conversion from galaxy mrat to MBH mrat
             # dMs/dMbh
             dmstar_dmbh = 1.0 / self._mmbulge.dmbh_dmstar(mstar_tot)   # [unitless]
-            mbh_tot = self._mmbulge.mbh_from_mstar(mstar_tot)  # [gram]
+            mbh_tot = self._mmbulge.mbh_from_mstar(mstar_tot, scatter=False)  # [gram]
 
             # Eq.21, now [Mpc^-3], lose [1/gram] because now 1/dlog10(M) instead of 1/dM
             dens[idx] *= dqgal_dqbh * dmstar_dmbh * mbh_tot * np.log(10.0)
