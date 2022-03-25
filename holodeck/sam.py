@@ -15,6 +15,8 @@ To-Do
 *[ ]Incorporate arbitrary hardening mechanisms into SAM construction, sample self-consistently.
 *[ ]When using `sample_outliers` check whether the density (used for intrabin sampling) should be
     the log(dens) instead of just `dens`.
+*[ ]Should there be an additional dimension of parameter space for galaxy properties?  This way
+    variance in scaling relations is incorporated directly before calculating realizations.
 
 """
 
