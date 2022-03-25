@@ -88,12 +88,12 @@ class _MMBulge_Relation(abc.ABC):
     def mstar_from_mbulge(self, mbulge):
         return mbulge / self.bulge_mass_frac(mbulge)
 
-    def mbh_from_mstar(self, mstar):
+    def mbh_from_mstar(self, mstar, scatter):
         mbulge = self.mbulge_from_mstar(mstar)
-        return self.mbh_from_mbulge(mbulge)
+        return self.mbh_from_mbulge(mbulge, scatter)
 
-    def mstar_from_mbh(self, mbh):
-        mbulge = self.mbulge_from_mbh(mbh)
+    def mstar_from_mbh(self, mbh, **kwargs):
+        mbulge = self.mbulge_from_mbh(mbh, **kwargs)
         return self.mstar_from_mbulge(mbulge)
 
 
@@ -106,7 +106,7 @@ class MMBulge_Standard(_MMBulge_Relation):
     MASS_REF = 1.0e11 * MSOL
     SCATTER_DEX = 0.0
 
-    def __init__(self, mamp=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None, scatter=False):
+    def __init__(self, mamp=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None):
         if mamp is None:
             mamp = self.MASS_AMP
         if mplaw is None:
@@ -115,14 +115,6 @@ class MMBulge_Standard(_MMBulge_Relation):
             mref = self.MASS_REF
         if scatter_dex is None:
             scatter_dex = self.SCATTER_DEX
-
-        if scatter is True:
-            pass
-        elif scatter is False:
-            log.debug(f"Setting ``scatter_dex=None`` in {self.__class__} (arg ``scatter={scatter}``)")
-            scatter_dex = None
-        else:
-            utils.error("`scatter` must be either True or False!")
 
         self._mamp = mamp   # Mass-Amplitude [grams]
         self._mplaw = mplaw   # Mass Power-law index
@@ -134,30 +126,35 @@ class MMBulge_Standard(_MMBulge_Relation):
     def bulge_mass_frac(self, mstar):
         return self._bulge_mfrac
 
-    def mbh_from_mbulge(self, mbulge, scatter_dex=None):
+    def mbh_from_mbulge(self, mbulge, scatter):
         """Convert from stellar bulge-mass to blackhole mass.
 
         Units of [grams].
         """
-        if scatter_dex is None:
+        if scatter:
             scatter_dex = self._scatter_dex
+        else:
+            scatter_dex = None
 
         mbh = _log10_relation(mbulge, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
 
-    def mbulge_from_mbh(self, mbh, scatter_dex=None):
+    def mbulge_from_mbh(self, mbh, scatter):
         """Convert from blackhole mass to stellar bulge-mass.
 
         Units of [grams].
         """
-        if scatter_dex is None:
+        if scatter:
             scatter_dex = self._scatter_dex
+        else:
+            scatter_dex = None
 
         mbulge = _log10_relation_reverse(mbh, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbulge
 
     def dmbh_dmbulge(self, mbulge):
-        dmdm = self.mbh_from_mbulge(mbulge, scatter_dex=False)
+        # NOTE: scatter should never be used in the differential relation
+        dmdm = self.mbh_from_mbulge(mbulge, scatter=False)
         dmdm = dmdm * self._mplaw / mbulge
         return dmdm
 
