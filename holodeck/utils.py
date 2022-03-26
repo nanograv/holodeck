@@ -18,6 +18,7 @@ from typing import Optional, Tuple, Union, List  # , Sequence,
 import numpy as np
 import numpy.typing as npt
 import scipy as sp
+import scipy.stats
 import h5py
 
 from holodeck import log
