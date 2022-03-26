@@ -164,9 +164,9 @@ class MMBulge_Standard(_MMBulge_Relation):
 
 
 class MMBulge_MM13(MMBulge_Standard):
-    """Mbh-MBulge Relation from McConnell & Ma 2013.
+    """Mbh-MBulge Relation from McConnell & Ma 2013
 
-    Values taken from [MM13] Table 2 ("Dynamical masses", first row, "MPFITEXY")
+    [MM13] Eq. 2, with values taken from Table 2 ("Dynamical masses", first row, "MPFITEXY")
     """
 
     MASS_AMP = MSOL * 10.0 ** 8.46    # 8.46 ± 0.08   in units of [Msol]
@@ -178,13 +178,13 @@ class MMBulge_MM13(MMBulge_Standard):
 class MMBulge_KH13(MMBulge_Standard):
     """Mbh-MBulge Relation from McConnell & Ma 2013.
 
-    Values taken from [KH13] Eq.10.
+    Values taken from [KH13] Eq.10 (pg. 61 of PDF, "571" of ARAA)
     """
 
     MASS_AMP = 0.49 * 1e9 * MSOL   # 0.49 + 0.06 - 0.05   in units of [Msol]
     MASS_REF = MSOL * 1e11            # 1e11 Msol
-    MASS_PLAW = 1.16                  # 1.16 ± 0.08
-    SCATTER_DEX = 0.29
+    MASS_PLAW = 1.17                  # 1.17 ± 0.08
+    SCATTER_DEX = 0.28
 
 
 def _add_scatter(vals, eps_dex):
