@@ -150,3 +150,33 @@ def test_kh13_basic():
     check_relation(kh13, mbh_from_mbulge_kh13)
     return
 
+
+def check_mass_reset(mmbulge_relation, truth_func):
+    pop = holo.Pop_Illustris()
+    mod_mm13 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=False)
+    mbulge = pop.mbulge
+    pop.modify(mod_mm13)
+    mass = pop.mass
+
+    truth = truth_func(mbulge)
+    print(f"Modified masses: {holo.utils.stats(mass/MSOL)}")
+    print(f"Expected masses: {holo.utils.stats(truth/MSOL)}")
+    assert np.allclose(mass, truth), "Modified masses do not match true values from M-Mbulge relation!"
+
+    return
+
+
+def test_mass_reset_mm13():
+    print("test_mass_reset_mm13")
+    mmbulge_relation = holo.relations.MMBulge_MM13()
+    truth_func = mbh_from_mbulge_mm13
+    check_mass_reset(mmbulge_relation, truth_func)
+    return
+
+
+def test_mass_reset_kh13():
+    print("test_mass_reset_kh13")
+    mmbulge_relation = holo.relations.MMBulge_KH13()
+    truth_func = mbh_from_mbulge_kh13
+    check_mass_reset(mmbulge_relation, truth_func)
+    return
