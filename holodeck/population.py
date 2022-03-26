@@ -1,4 +1,5 @@
-"""
+"""MBH Binary Populations and related tools.
+
 """
 
 import abc
@@ -289,15 +290,30 @@ class PM_Resample(Population_Modifier):
 
 
 class PM_Mass_Reset(Population_Modifier):
-    """
+    """Reset the masses of a target population based on a given M-Mbulge relation.
     """
 
     def __init__(self, mmbulge, scatter=True):
+        """
+
+        Parameters
+        ----------
+        mmbulge : class or instance of `holodeck.relations._MMBulge_Relation`
+            The Mbh-Mbulge scaling relationship with which to reset population masses.
+        scatter : bool, optional
+            Include random scatter when resetting masses.
+            The amount of scatter is specified in the `mmbulge.SCATTER_DEX` parameter.
+
+        """
         # if `mmbulge` is a class (not an instance), then instantiate it
         if inspect.isclass(mmbulge):
             mmbulge = mmbulge()
-        elif not isinstance(mmbulge, holo.relations._MMBulge_Relation):
-            err = "`mmbulge` must be an instance or subclass of `holodeck.observations._Galaxy_Blackhole_Relation`!"
+
+        if not isinstance(mmbulge, holo.relations._MMBulge_Relation):
+            err = (
+                f"`mmbulge` ({mmbulge.__class__}) must be an instance"
+                f" or subclass of `holodeck.relations._MMBulge_Relation`!"
+            )
             utils.error(err)
 
         self.mmbulge = mmbulge
