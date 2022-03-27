@@ -42,7 +42,7 @@ sqrt = np.sqrt
 _DEF_OBSERVATIONAL_FNAME = "observational_2mass_galaxy-catalog_extended.npz"
 
 
-class BP_Observational(holo.population._Population):
+class BP_Observational(holo.population._Population_Discrete):
 
     FREQ_MIN = 1e-9    # Hz, minimum of PTA band of interest
 
