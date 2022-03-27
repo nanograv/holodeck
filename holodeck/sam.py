@@ -29,6 +29,7 @@ import kalepy as kale
 import holodeck as holo
 from holodeck import cosmo, utils, log
 from holodeck.constants import GYR, SPLC, MSOL, MPC
+from holodeck import relations
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
@@ -292,99 +293,6 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
         return mtime
 
 
-class _MMBulge_Relation(abc.ABC):
-
-    @abc.abstractmethod
-    def __init__(self, *args, **kwargs):
-        return
-
-    @abc.abstractmethod
-    def bulge_mass_frac(self, mstar):
-        return
-
-    @abc.abstractmethod
-    def mbh_from_mbulge(self, mbulge):
-        """Convert from stellar bulge-mass to blackhole mass.
-
-        Units of [grams].
-        """
-        return
-
-    @abc.abstractmethod
-    def dmbh_dmbulge(self, mbulge):
-        return
-
-    @abc.abstractmethod
-    def dmbulge_dmstar(self, mstar):
-        return
-
-    def dmbh_dmstar(self, mstar):
-        mbulge = self.mbulge_from_mstar(mstar)
-        # (dmbh/dmstar) = (dmbh/dmbulge) * (dmbulge/dmstar)
-        dmdm = self.dmbh_dmbulge(mbulge) * self.dmbulge_dmstar(mstar)
-        return dmdm
-
-    def mbulge_from_mstar(self, mstar):
-        return self.bulge_mass_frac(mstar) * mstar
-
-    def mstar_from_mbulge(self, mbulge):
-        return mbulge / self.bulge_mass_frac(mbulge)
-
-    def mbh_from_mstar(self, mstar):
-        mbulge = self.mbulge_from_mstar(mstar)
-        return self.mbh_from_mbulge(mbulge)
-
-    def mstar_from_mbh(self, mbh):
-        mbulge = self.mbulge_from_mbh(mbh)
-        return self.mstar_from_mbulge(mbulge)
-
-
-class MMBulge_Simple(_MMBulge_Relation):
-    """Mbh--MBulge relation as a simple power-law.
-
-    M_bh = M_0 * (M_bulge / M_ref)^alpha
-    M_bulge = f_bulge * M_star
-
-    """
-
-    def __init__(self, mass_norm=1.48e8*MSOL, mref=1.0e11*MSOL, malpha=1.01, bulge_mfrac=0.615):
-        self._mass_norm = mass_norm   # log10(M/Msol) = 8.17  +/-  [-0.32, +0.35]
-        self._malpha = malpha         # alpha         = 1.01  +/-  [-0.10, +0.08]
-
-        self._mref = mref             # [Msol]
-        self._bulge_mfrac = bulge_mfrac
-        return
-
-    def bulge_mass_frac(self, mstar):
-        return self._bulge_mfrac
-
-    def mbh_from_mbulge(self, mbulge):
-        """Convert from stellar bulge-mass to blackhole mass.
-
-        Units of [grams].
-
-        """
-        mbh = self._mass_norm * np.power(mbulge / self._mref, self._malpha)
-        return mbh
-
-    def mbulge_from_mbh(self, mbh):
-        """Convert from blackhole mass to stellar bulge-mass.
-
-        Units of [grams].
-        """
-        mbulge = self._mref * np.power(mbh / self._mass_norm, 1/self._malpha)
-        return mbulge
-
-    def dmbh_dmbulge(self, mbulge):
-        dmdm = self.mbh_from_mbulge(mbulge)
-        dmdm = dmdm * self._malpha / mbulge
-        return dmdm
-
-    def dmbulge_dmstar(self, mstar):
-        # NOTE: this only works for a constant value, do *not* return `self.bulge_mass_frac()`
-        return self._bulge_mfrac
-
-
 class Semi_Analytic_Model:
     """Semi-Analytic Model of MBH Binary populations.
 
@@ -398,7 +306,9 @@ class Semi_Analytic_Model:
 
     def __init__(
         self, mtot=[2.75e5*MSOL, 1.0e11*MSOL, 46], mrat=[0.02, 1.0, 50], redz=[0.0, 6.0, 61],
-        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=MMBulge_Simple
+        # self, mtot=[2.75e5*MSOL, 1.0e11*MSOL, 11], mrat=[0.02, 1.0, 10], redz=[0.0, 6.0, 9],
+        shape=None,
+        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM13
     ):
 
         if inspect.isclass(gsmf):
@@ -418,8 +328,16 @@ class Semi_Analytic_Model:
 
         if inspect.isclass(mmbulge):
             mmbulge = mmbulge()
-        elif not isinstance(mmbulge, _MMBulge_Relation):
+        elif not isinstance(mmbulge, relations._MMBulge_Relation):
             raise ValueError("`mmbulge` must be an instance or subclass of `_MMBulge_Relation`!")
+
+        if shape is not None:
+            if len(shape) == 3:
+                mtot[2] = shape[0]
+                mrat[2] = shape[1]
+                redz[2] = shape[2]
+            else:
+                raise
 
         # NOTE: the spacing (log vs lin) is important.  e.g. in integrating from differential-number to (total) number
         self.mtot = np.logspace(*np.log10(mtot[:2]), mtot[2])
@@ -462,7 +380,7 @@ class Semi_Analytic_Model:
         # total-mass, mass-ratio ==> (M1, M2)
         masses = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
         # BH-masses to stellar-masses
-        masses = self._mmbulge.mstar_from_mbh(masses)
+        masses = self._mmbulge.mstar_from_mbh(masses, scatter=False)
         return masses
 
     @property
@@ -520,7 +438,7 @@ class Semi_Analytic_Model:
             dqgal_dqbh = 1.0     # conversion from galaxy mrat to MBH mrat
             # dMs/dMbh
             dmstar_dmbh = 1.0 / self._mmbulge.dmbh_dmstar(mstar_tot)   # [unitless]
-            mbh_tot = self._mmbulge.mbh_from_mstar(mstar_tot)  # [gram]
+            mbh_tot = self._mmbulge.mbh_from_mstar(mstar_tot, scatter=False)  # [gram]
 
             # Eq.21, now [Mpc^-3], lose [1/gram] because now 1/dlog10(M) instead of 1/dM
             dens[idx] *= dqgal_dqbh * dmstar_dmbh * mbh_tot * np.log(10.0)
@@ -699,17 +617,12 @@ class Semi_Analytic_Model:
         # get the correct shape for frequencies
         # NOTE: coms[:, :, :, i] == coms[0, 0, 0, i]  i.e. only last dimension varies
         coms[-1] = coms[-1][1:, 1:, 1:, :]
-
-        # shape_grid = coms[0].shape
         coms = [cc.flat[:] for cc in coms]   # use `[:]` to avoid issues with flatiter instance
 
         # ---- calculate GW strain at bin centroids
         mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))
-        print(f"shape coms[2] = {np.shape(coms[2])}", type(coms[2]))
         dc = cosmo.comoving_distance(coms[2]).cgs.value
         fr = utils.frst_from_fobs(coms[3], coms[2])
-        # dc = cosmo.comoving_distance(coms[2][:]).cgs.value
-        # fr = utils.frst_from_fobs(coms[3][:], coms[2][:])
         hs = utils.gw_strain_source(mc, dc, fr)
         # (M*Q*Z*F,) ==> (M,Q,Z,F)
         hs = hs.reshape(number.shape)

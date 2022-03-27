@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 #
 # `pyenv` can be installed with homebrew, e.g. `brew install pyenv`
 # NOTE: the versions of python (in `VERSIONS`) need to match those in the `tox.ini` file's `envlist` variable
@@ -13,5 +13,15 @@ for val in ${VERSIONS[@]}; do
    pyenv install -s $val
 done
 
-# pyenv local ${VERSIONS[@]}
+# versions=("${(@f)$(pyenv versions)}")
+# versions=("${versions[@]:1}")
+# echo ${versions}
+# clean=()
+# for val in ${versions[@]}; do
+#    val=${val// }
+#    clean+=($val)
+# done
+# echo $clean
+# pyenv local ${clean[@]}
+
 tox
