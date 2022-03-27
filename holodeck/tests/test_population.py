@@ -62,7 +62,7 @@ def test_mass_reset():
 
     SCATTER = 0.1
     TOL_STD = 1.5 * sp.stats.norm.ppf(1.0 - 1.0 / pop.mass.size)
-    print(f"{TOL_STD=}")
+    print(f"TOL={TOL_STD}")
     mmbulge_relation = holo.relations.MMBulge_MM13(scatter_dex=SCATTER)
     mod_mm13 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=True)
     pop.modify(mod_mm13)
@@ -71,7 +71,7 @@ def test_mass_reset():
     bb = np.log10(mass_scatter/MSOL)
     assert not np.all(mass_scatter == mass_aft), "Masses with scatter match without!"
     diff = (bb - aa)
-    print(f"SCATTER={SCATTER:.4f}, TOL={TOL_STD:.3f}, diff={holo.utils.stats(diff)=}")
+    print(f"SCATTER={SCATTER:.4f}, TOL={TOL_STD:.3f}, diff={holo.utils.stats(diff)}")
     mean_diff = np.mean(diff)
     assert mean_diff < SCATTER, f"Mean difference ({np.mean(diff)}) exceeds SCATTER ({SCATTER})!"
     print(f"diff/SCATTER={holo.utils.stats(diff/SCATTER)}")
