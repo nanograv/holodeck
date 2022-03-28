@@ -2,15 +2,12 @@
 """
 
 import numpy as np
-import tqdm
 
 from holodeck import utils, cosmo
 from holodeck.constants import SPLC, MPC, MSOL
 
-# import zcode.math as zmath    # FIX: REMOVE
 
-
-_CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'time', 'eccen']
+_CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen']
 
 
 class Grav_Waves:
@@ -52,7 +49,7 @@ class GW_Discrete(Grav_Waves):
         else:
             harm_range = [2]
 
-        for ii, fobs in tqdm.tqdm(enumerate(freqs), total=len(freqs)):
+        for ii, fobs in utils.tqdm(enumerate(freqs), total=len(freqs), desc='GW frequencies'):
             _fore, _back, _loud = _calc_mc_at_fobs(
                 fobs, harm_range, nreals, bin_evo, box_vol,
                 loudest=nloudest
@@ -70,56 +67,40 @@ class GW_Discrete(Grav_Waves):
 
 class GW_Continuous(Grav_Waves):
 
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     return
-
     def emit(self, eccen=None, stats=False, progress=True, nloudest=5):
         freqs = self.freqs
         bin_evo = self._bin_evo
-        bin_pop = bin_evo._bin_pop
-        weight = bin_pop.weight
-        dm = np.log10(bin_pop._mtot[1]/MSOL) - np.log10(bin_pop._mtot[0]/MSOL)
-        dq = bin_pop._mrat[1] - bin_pop._mrat[0]
-        dz = bin_pop._redz[1] - bin_pop._redz[0]
+        pop = bin_evo._pop
+        weight = pop.weight
+        dm = np.log10(pop._mtot[1]/MSOL) - np.log10(pop._mtot[0]/MSOL)
+        dq = pop._mrat[1] - pop._mrat[0]
+        dz = pop._redz[1] - pop._redz[0]
 
         # (N,) ==> (1, N)    for later conversion to (F, N)
-        m1, m2 = [mm[np.newaxis, :] for mm in bin_pop.mass.T]
+        m1, m2 = [mm[np.newaxis, :] for mm in pop.mass.T]
+        mchirp = utils.chirp_mass(m1, m2)
 
         H0 = cosmo.H0*1e5 / MPC   # convert from [km/s/Mpc] to [1/s]
-        redz = cosmo._a_to_z(bin_pop.time)                     # (N,)
+        redz = cosmo.a_to_z(pop.scafa)                     # (N,)
         redz = np.clip(redz, 0.1, None)
-        # print(f"redz={zmath.stats_str(redz)}")
         dlum = cosmo.luminosity_distance(redz).cgs.value
-        # print(f"dlum={zmath.stats_str(dlum)}")
         dzdt = H0 * cosmo.efunc(redz) * np.square(1.0 + redz)  # (N,)
-        # print(f"dzdt={zmath.stats_str(dzdt)}")
 
-        frest = freqs[:, np.newaxis] / (1.0 + redz[np.newaxis, :])  # (F, N)
-        # print(f"frest={zmath.stats_str(frest)}")
-        dtr_dlnfr = frest / utils.gw_hardening_rate_dfdt(m1, m2, frest)  # (F, N)
-        # print(f"dtr_dlnfr={zmath.stats_str(dtr_dlnfr)}")
-
-        mchirp = utils.chirp_mass(m1, m2)
-        # print(f"frest={zmath.stats_str(frest)}")
+        # ==> shape (F,N)
+        frest = freqs[:, np.newaxis] / (1.0 + redz[np.newaxis, :])
+        temp, _ = utils.gw_hardening_rate_dfdt(m1, m2, frest)
+        dtr_dlnfr = frest / temp
         # Calculate source-strain for each source (h;  NOT characteristic strain)
-        strain = utils.gw_strain_source(mchirp, dlum[np.newaxis, :], frest)  # (F, N)
-        # print(f"hs={zmath.stats_str(hs)}")
+        strain = utils.gw_strain_source(mchirp, dlum[np.newaxis, :], frest)
 
         time_fac = dzdt * dtr_dlnfr
-        # print(f"time_fac={zmath.stats_str(time_fac)}")
-        # Calculate characteristic-strain (squared)
+
+        # Convert to characteristic-strain (squared)
         strain = weight[np.newaxis, :] * time_fac * strain**2
-        # print(f"strain={zmath.stats_str(strain)}")
 
         dvol = dm * dq * dz
-        # dvol = 1.0
-        # print(f"{dvol=:.2e}")
-        # print(f"numbers = {zmath.stats_str(dvol*weight)}")
-        # print(f"number  = {np.sum(dvol*weight):.2e}")
-
-        strain = np.sqrt(np.sum(strain * dvol, axis=1))
-        # print(f"hc={zmath.stats_str(strain)}")
+        # Sum over all binaries, convert from hc^2 ==> hc
+        strain = np.sqrt(np.sum(strain * dvol, axis=-1))
         self.strain = strain
         return
 
@@ -134,8 +115,8 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
     data_harms = bin_evo.at('fobs', fobs / harm_range, pars=_CALC_MC_PARS)
 
     # Only examine binaries reaching the given locations before redshift zero (other redz=inifinite)
-    redz = data_harms['time']
-    redz = utils.a_to_z(redz)
+    redz = data_harms['scafa']
+    redz = cosmo.a_to_z(redz)
     valid = np.isfinite(redz) & (redz > 0.0)
 
     # Broadcast harmonics numbers to correct shape
@@ -160,25 +141,27 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
         gne[sel_n2 & sel_e0] = 1.0
 
     # Calculate required parameters for valid binaries (V,)
-    dlum = cosmo.z_to_dlum(redz)
+    # dlum = cosmo.z_to_dlum(redz)
+    dcom = cosmo.z_to_dcom(redz)
     zp1 = redz + 1
     frst_orb = fobs * zp1 / harms
     mchirp = data_harms['mass'][valid]
     mchirp = utils.chirp_mass(*mchirp.T)
-    # NOTE: `dadt` is stored as positive values
-    dfdt = utils.dfdt_from_dadt(
-        -data_harms['dadt'][valid], data_harms['sepa'][valid], freq_orb=frst_orb)
+    dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], data_harms['sepa'][valid], freq_orb=frst_orb)
     _tres = frst_orb / dfdt
 
     # Calculate strains from each source
-    hs2 = utils.gw_strain_source(mchirp, dlum, frst_orb)**2
+    # hs2 = utils.gw_strain_source(mchirp, dlum, frst_orb)**2
+    hs2 = utils.gw_strain_source(mchirp, dcom, frst_orb)**2
     # Calculate resampling factors
-    vfac = 4.0*np.pi*SPLC * dlum**2 / box_vol   # * thub
+    # vfac = 4.0*np.pi*SPLC * dlum**2 / box_vol   # * thub
+    vfac = 4.0*np.pi*SPLC * zp1 * dcom**2 / box_vol   # * thub
     tfac = _tres  # / thub
 
     # Calculate weightings
     #    Sesana+08, Eq.10
-    num_frac = vfac * tfac * zp1
+    # num_frac = vfac * tfac * zp1
+    num_frac = vfac * tfac
     num_pois = np.random.poisson(num_frac, (nreals, num_frac.size)).T
 
     # --- Calculate GW Signals

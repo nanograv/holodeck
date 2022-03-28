@@ -2,6 +2,3 @@
 kalepy
 pytest
 pytest-cov
-versioneer
-testbook
-ipykernel   # required for testbook to work properly
