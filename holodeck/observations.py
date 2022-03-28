@@ -7,11 +7,8 @@ To-Do
 import os
 
 import numpy as np
-# import scipy as sp
 
 import holodeck as holo
-# from holodeck import log, cosmo, utils
-# from holodeck.constants import MSOL, NWTG
 
 FNAME_MM13 = "mcconnell+ma-2013_1211.2816.txt"
 
