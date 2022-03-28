@@ -1,0 +1,361 @@
+\usepackage{xifthen}
+
+\newcommand{\tr}[1]{\textrm{#1}}
+\newcommand{\trt}[1]{\textrm{\tiny{#1}}}
+\newcommand{\trf}[1]{\textrm{\footnotesize{#1}}}
+
+\newcommand{\msol}{\tr{M}_{\odot}}
+\newcommand{\rsol}{\tr{R}_{\odot}}
+
+\newcommand{\mbh}{M_\bullet}
+\newcommand{\rbh}{R_\bullet}
+
+\newcommand{\mstar}{M_\star}
+\newcommand{\rstar}{R_\star}
+
+\newcommand{\hmn}{h_{\mu \nu}}
+\newcommand{\gmn}{g_{\mu \nu}}
+\newcommand{\emn}{\eta_{\mu \nu}}
+
+
+
+% \newcommand{\bigt}{\scalebox{1.2}{\ensuremath{\uptau}}}
+\newcommand{\bigt}{\ensuremath{\uptau}}
+
+% General Math Stuff
+\newcommand{\E}[1]{\times\nobreak10^{#1}}
+\newcommand{\ls}{\lesssim}
+\newcommand{\gs}{\gtrsim}
+\newcommand{\logten}[1]{\log_{10}\!\lr{#1}}
+
+% left-right parentheses
+% \newcommand{\lr}[1]{{\left(#1\right)}}
+\newcommand{\lr}[2][]{
+    \ifthenelse{\equal{#1}{}}{
+        % omitted
+        {\left(#2\right)}
+    }{
+        % given
+        {\left(#2\right)}^{#1}
+    }
+}
+
+% left-right square-bracket
+% \newcommand{\lrs}[1]{{\left[#1\right]}}
+\newcommand{\lrs}[2][]{
+    \ifthenelse{\equal{#1}{}}{
+        % omitted
+        {\left[#2\right]}
+    }{
+        % given
+        {\left[#2\right]}^{#1}
+    }
+}
+
+
+% left-right-tight (parenthesis
+\newcommand{\lrt}[1]{{\left(\!#1\!\right)}}
+
+% left-right-tight
+\newcommand{\lrst}[1]{{\left[\!#1\!\right]}}
+
+% optional first argument for exponent
+%    i.e. `\scale{A}{B} = (A/B)` or `\scale[2]{A}{B} = (A/B)^2`
+% \newcommand{\scale}[3][]{\lr{ \frac{#2}{#3} }^{#1}}
+% ----------
+% \newcommand{\scale}[3][]{
+%     \ifthenelse{\equal{#1}{}}{
+%         % omitted
+%         \lr{ \! \frac{#2}{#3} \!}
+%     }{
+%         % given
+%         {\lr{ \! \frac{#2}{#3} \!}\!}^{#1}
+%     }
+% }
+% -----------
+\newcommand{\scale}[3][]{
+    \ifthenelse{\equal{#1}{}}{
+        % omitted
+        \lr{ \frac{#2}{#3} }
+    }{
+        % given
+        {\lr[#1]{ \frac{#2}{#3} }}
+    }
+}
+
+\newcommand{\sinpar}[2][]{\sin^{#1}\!\lr{#2}}
+\newcommand{\cospar}[2][]{\cos^{#1}\!\lr{#2}}
+\newcommand{\blank}{\, ... \,}
+
+\newcommand{\lt}{<}
+\newcommand{\gt}{>}
+
+\newcommand{\volfactor}{\Lambda_{ij}}
+\newcommand{\poisson}{\mathcal{P}}
+
+\newcommand{\parkes}{Parkes}
+\newcommand{\nanograv}{NANOGrav}
+\newcommand{\nanogravplus}{NANOGrav+}
+\newcommand{\iprime}{IPTA$'$}
+\newcommand{\iptazero}{IPTA$_0$}
+\newcommand{\iprimeone}{IPTA$'_1$}
+\newcommand{\iprimerap}{IPTA$'_\mathrm{rap}$}
+
+\newcommand{\aul}{A_\trt{yr$^{-1}$,ul}}
+\newcommand{\hc}{h_\trt{c}}
+\newcommand{\hs}{h_\trt{s}}
+\newcommand{\hsc}{h_\trt{s,circ}}
+\newcommand{\hscirc}{h_\trt{s,circ}}
+\newcommand{\hcs}{h_\trt{c,s}}
+
+% \newcommand{\radius}{r}
+
+\newcommand{\mdot}{\dot{M}}
+\newcommand{\mdotedd}{\dot{M}_\trt{Edd}}
+\newcommand{\mdotill}{\dot{M}_\trt{ill}}
+\newcommand{\ledd}{L_\trt{Edd}}    % Eddington luminosity
+\newcommand{\lacc}{L_\trt{acc}}    % accretion luminosity
+\newcommand{\radeff}{\varepsilon_\trt{rad}}
+
+% \newcommand{\powerlaw}{PPL}
+\newcommand{\scalenoise}{\lambda_\tr{noise}}
+
+% == Logistical Commands ==
+\newcommand{\secref}[1]{\textsection\ref{#1}}
+\newcommand{\chref}[1]{Ch.~\ref{#1}}          % Reference a chapter
+\newcommand{\figref}[1]{Fig.~\ref{#1}}
+\newcommand{\refeq}[1]{{Eq.~\ref{#1}}}
+\newcommand{\tabref}[1]{{Table~\ref{#1}}}
+\newcommand{\needcite}{{\color{red}[???]}}
+\newcommand{\missing}{ {\color{red}??|??|??} }
+\newcommand{\result}[1]{ {\color{blue}#1} }
+\newcommand{\fiducial}[1]{ {\color{ForestGreen}#1} }
+\newcommand{\NOTE}[1]{\noindent\textbf{\color{red}!!#1!!}}
+\newcommand{\note}[1]{{\color{violet}#1}}
+\newcommand{\fnm}[1]{\footnotemark[#1]}
+\newcommand{\fnt}[2]{\footnotemark[#1]{#2}}
+\newcommand{\mc}[2]{\multicolumn{#1}{c}{#2}}
+\newcommand{\mr}[2]{\multirow{#1}{*}{#2}}
+\newcommand{\ccba}{\cellcolor{blue!20}}
+\newcommand{\ccbb}{\cellcolor{blue!30}}
+\newcommand{\ccbc}{\cellcolor{blue!40}}
+
+% == Terminology Shortcuts ==
+\newcommand{\mbhb}{MBHB}  % {MBH-Binaries}
+\newcommand{\heavy}{\textit{heavy}}  % 'Heavy' Binaries
+\newcommand{\major}{\textit{major}}  % 'Major-Mergers' Binaries
+\newcommand{\heavymajor}{\heavy~\&~\major}
+\newcommand{\heavydef}{{\textit{heavy} ($M > 10^{9} \, \msol$)}}  % 'Heavy' Binaries
+\newcommand{\majordef}{{\textit{major} ($\mu > 0.1$)}}  % 'Major-Mergers'
+
+% == Math Symbols ==
+\newcommand{\bmax}{b_\trt{max}}   % maximum impact parameter
+\newcommand{\vm}{v_\trt{M}}
+\newcommand{\vs}{v_\star}
+\newcommand{\vsound}{c_s}   % sound speed, speed of sound
+\newcommand{\hrad}{r_\trt{H}}      % hardening radius
+\newcommand{\dmdens}{\rho_\trt{DM}}
+\newcommand{\nfwrad}{r_\trt{NFW}}
+\newcommand{\nfwc}{c_\trt{NFW}}
+\newcommand{\mvir}{M_\trt{v}}
+\newcommand{\mrat}{\mu}    % Mass-Ratio
+\newcommand{\rvir}{R_\trt{v}}
+\newcommand{\rlc}{\mathcal{R}_{lc}}
+\newcommand{\rinfl}{\mathcal{R}_\trt{infl}}   % Radius of influence (for MBH)
+\newcommand{\risco}{\mathcal{R}_\trt{isco}}
+\newcommand{\rs}{R_\trt{s}}    % Stellar radius
+\newcommand{\rb}{R_\trt{b}}    % Bound radius
+\newcommand{\rh}{R_\trt{h}}    % Hard radius
+\newcommand{\mpro}{m_\trt{p}}    % Proton Mass
+\newcommand{\sigmat}{\sigma_\trt{T}}   % Thomson-Scattering Cross-Section
+% \newcommand{\trel}{\tau_\trt{rel}}
+% \newcommand{\torb}{\tau_\trt{orb}}
+% \newcommand{\tcross}{\tau_\trt{cross}}
+\newcommand{\trel}{\bigt_\trt{rel}}
+\newcommand{\torb}{\bigt_\trt{orb}}
+\newcommand{\tcross}{\bigt_\trt{cross}}
+\newcommand{\mce}{\mathcal{E}}
+\newcommand{\rhoc}{\rho_\trt{c}}
+\newcommand{\nfwdens}{\rho_{\trt{DM},0}}
+
+\newcommand{\pgw}{P_\trt{GW}}    % GW Period
+\newcommand{\pgwmax}{P_\trt{GW,max}}    % GW Period
+\newcommand{\tobs}{T_{\!\trt{obs}}}   % Observing Duration (Pulsar Time)
+\newcommand{\dtobs}{\Delta t_\trt{obs}}   % Observing Cadence / Period (Pulsar Time)
+
+
+\newcommand{\ms}{m_\star}
+\newcommand{\rstarhalfmass}{R_{\star,\trt{1/2}}}
+\newcommand{\omgw}{\Omega_\trt{GW}}   % ratio of GW energy density to critical density
+\newcommand{\rhogw}{\rho_\trt{GW}}    % density of GW
+\newcommand{\pyr}{\textrm{yr}^{-1}}
+\newcommand{\ayr}{A_{\trt{yr}^{-1}}}        % GWB amplitude normalization at 1/yr
+\newcommand{\atyr}{A_{{\scriptscriptstyle0.1} \trt{yr}^{-1}}}  % GWB amplitude normalization at 0.1/yr
+
+\newcommand{\hubdist}{D_\trt{H}}   % 'Hubble Distance' c/H_0
+\newcommand{\comdist}{d_\trt{c}}   % 'Comoving Distance'
+\newcommand{\lumdist}{d_\trt{L}}   % 'Comoving Distance'
+\newcommand{\astropy}{\texttt{Astropy}}
+\newcommand{\matplotlib}{\texttt{matplotlib}}
+\newcommand{\numpy}{\texttt{NumPy}}
+\newcommand{\scipy}{\texttt{SciPy}}
+\newcommand{\ipython}{\texttt{ipython}}
+\newcommand{\jupyter}{\texttt{jupyter}}
+\newcommand{\arepo}{{\texttt{Arepo}}}
+\newcommand{\sympy}{{\texttt{SymPy}}}
+% \newcommand{\kalepy}{{\texttt{kalepy}}}
+
+% \DeclareRobustCommand\kalepy{\texttt{
+%     % \scalebox{1.1}{%
+%     {\fontsize{10}{8} \selectfont
+%     k\kern-0em%
+%     % \raisebox{0ex}{\textcolor{blue}{$a$}}\kern-.14em%
+%     \raisebox{0ex}{$a$}\kern-.14em%
+%     \textcolor{black}{$l$}\kern-0.05em%
+%     e\kern+0.04em%
+%     }%
+%     p\kern-.05em%
+%     y%
+% }}
+
+\DeclareRobustCommand\kalepy{\texttt{
+    % \scalebox{1.1}{%
+    % {\fontsize{10}{8} \selectfont
+    k\kern+0.05em%
+    % \raisebox{0ex}{\textcolor{blue}{$a$}}\kern-.14em%
+    \raisebox{0ex}{$a$}\kern-.12em%
+    \textcolor{black}{$l$}\kern-0.0em%
+    e\kern+0.04em%
+    % }%
+    p\kern-.05em%
+    y%
+}}
+
+
+
+\newcommand{\pc}{\mathrm{pc}}
+\newcommand{\yr}{\mathrm{yr}}        % yr in math-mode
+
+\newcommand*\ave[1]{\overline{#1}}
+\newcommand\erfc[1]{\mathrm{erfc}\left(#1\right)}
+\newcommand\erfcinv[1]{\mathrm{erfc}^{-1}\left(#1\right)}
+
+% \newcommand{\SNR}{\tr{S}/\tr{N}}   % Signal-to-Noise Ratio SNR
+% \newcommand\snra{\mbox{$\mathcal{R}_A$}}
+% \newcommand\snrb{\mbox{$\mathcal{R}_B$}}
+% \newcommand\snrta{\mbox{$\mathcal{R}_A^T$}}
+% \newcommand\snrtb{\mbox{$\mathcal{R}_B^T$}}
+% \newcommand\pulsarsum{\sum_k \sum_{ij}}
+% \newcommand\Gij{\Gamma_{ij}}
+
+\newcommand{\rdf}{R_\trt{df}}
+\newcommand{\tdf}{\bigt_\trt{df}}
+\newcommand{\mtot}{M_\trt{tot}}
+
+\newcommand{\fcoal}{\mathcal{F}_\trt{coal}}
+\newcommand{\fstall}{\mathcal{F}_\trt{stall}}
+\newcommand{\frefill}{\mathcal{F}_\trt{refill}}
+\newcommand{\flcsix}{$\frefill = 0.6$}
+\newcommand{\flcten}{$\frefill = 1.0$}
+\newcommand{\lmdot}{\lambda_{\dot{M}}}   % pre-eddington mdot scaling
+\newcommand{\fedd}{f_\trt{Edd}}    % Mdot-eddington factor for limiting
+\newcommand{\rsg}{\mathcal{R}_\trt{SG}}
+\newcommand{\rsgmax}{\mathcal{R}_\trt{SG,Max}}
+\newcommand{\dfatten}{f_\trt{DF,LC}}
+\newcommand{\mchirp}{\mathcal{M}}     % Chirp-mass
+\newcommand{\mseed}{M_\trt{seed}}    % seed-mass BH
+\newcommand{\diffco}{\mathcal{D}_{v^2}}   % Diffusion coefficient
+\newcommand{\cosmocorr}{\Gamma_\trt{cos}}   % 'Cosmological Correction' factor
+\newcommand{\illlength}{L_\trt{ill}}  % 'Illustris Length' box-length
+\newcommand{\vollc}{V_\trt{c,lc}}  % comoving volume of the past light-cone
+\newcommand{\volcom}{V_\trt{c}}   % comoving volume
+\newcommand{\volill}{V_\trt{ill}}   % Illustris volume
+\newcommand{\illcosmo}{$H_0 = 70.4 \textrm{ km s}^{-1} \textrm{ Mpc}^{-1} \, (h = 0.704), \,
+\Omega_m = 0.2726, \, \Omega_\Lambda = 0.7274$}
+\newcommand{\tlb}{t_\trt{LB}}
+\newcommand{\thubble}{\bigt_\tr{Hubble}}
+\newcommand{\tfhard}{\bigt_\tr{h}^{f}}
+\newcommand{\thard}{\bigt_\tr{h}}
+\newcommand{\thardi}{\bigt_{\tr{h},i}}
+\newcommand{\thardij}{\bigt_{\tr{h},ij}}
+\newcommand{\thardgw}{\bigt_\tr{gw}}
+\newcommand{\thardvd}{\bigt_\tr{vd,1}}
+\newcommand{\tdyn}{\bigt_\trt{dyn}}
+\newcommand{\tgw}{\bigt_\tr{gw}}
+\newcommand{\tgwi}{\bigt_{\trt{gw},i}}
+\newcommand{\tvisc}{\bigt_v}
+\newcommand{\ttherm}{\bigt_\trt{therm}}
+\newcommand{\tviscone}{\bigt_\tr{v,1}}
+\newcommand{\tvisctwo}{\bigt_\tr{v,2}}
+\newcommand{\lgw}{L_\tr{GW}}
+\newcommand{\lgwc}{L_\tr{GW,circ}}
+\newcommand{\rgap}{\lambda_\trt{gap}}
+\newcommand{\rcrit}{\mathcal{R}_\trt{crit}}
+\newcommand{\rselfgrav}{\lambda_\trt{sg}}
+\newcommand{\fgw}{f_\tr{GW}}
+\newcommand{\fgwc}{f_\tr{GW,circ}}
+\newcommand{\qdisk}{q_B}
+\newcommand{\reg}[1]{\textit{Region-#1}}
+\newcommand{\egw}{\varepsilon_\trt{GW}}   % energy in GW
+\newcommand{\fluxlc}{F_\trt{lc}}
+\newcommand{\fluxflc}{F^\trt{full}_\trt{lc}}
+\newcommand{\fluxsslc}{F^\trt{eq}_\trt{lc}}
+\newcommand{\msp}{\,\,\,\,}
+\newcommand{\wnrms}{\sigma_\trt{WN}}   % White-Noise Sigma RMS
+\newcommand{\nrms}{\sigma_\trt{N}}
+\newcommand{\micros}{\mu \textrm{s}}
+\newcommand{\nanos}{\textrm{ns}}
+\newcommand{\rnamp}{A_\trt{RN}}
+\newcommand{\fyr}{{f_\trt{yr}}}
+\newcommand{\freqper}[1]{1/\left(#1 \, \yr\right)^{-1}}
+\newcommand{\scell}[1]{\begin{tabular}{@{}c@{}}#1\end{tabular}}
+\newcommand{\rnind}{{\protect\scalebox{1.1}{\ensuremath{\gamma{}}}_\trt{RN}}}
+\newcommand{\forefac}{\lambda_\textrm{fore}}
+\newcommand{\hcfore}{h_c^\textrm{fore}}
+\newcommand{\hcback}{h_c^\textrm{back}}
+\newcommand{\eccinit}{e_0}
+
+\newcommand{\tvar}{\bigt_\trt{var}}
+\newcommand{\zmax}{z_\trt{max}}
+\newcommand{\qcrit}{q_\trt{crit}}
+\newcommand{\qmin}{q_\trt{min}}
+\newcommand{\dl}{d_\trt{L}}   % luminosity distance
+\newcommand{\dc}{d_c}   % comoving distance
+
+\newcommand{\massfunc}{\psi_M}
+\newcommand{\mergrate}{\mathcal{R}_{gg}}
+\newcommand{\ndens}{\phi}
+\newcommand{\mdotrat}{\lambda}
+% \newcommand{\dfdop}{\delta F_\nu^\mathrm{d}}
+% \newcommand{\dfhyd}{\delta F_\nu^\mathrm{h}}
+% \newcommand{\dfsens}{\delta F_\trt{sens}}
+% \newcommand{\dffloor}{\delta F_\trt{floor}}
+% \newcommand{\fsens}{F_{\nu,\trt{sens}}}
+% \newcommand{\fsenslsst}{F_{\nu,\trt{sens}}^\trt{LSST}}
+% \newcommand{\fsenscrts}{F_{\nu,\trt{sens}}^\trt{CRTS}}
+
+\newcommand{\old}[1]{{\color{gray}#1}}
+\newcommand{\sfluxunits}{\textrm{ erg/s/Hz/cm}^2}
+\newcommand{\invmpccubed}{\textrm{Mpc}^{-3}}
+\newcommand{\invlogt}{\left(\log \, \torb\right)^{-1}}
+\newcommand{\invagn}{\textrm{AGN}^{-1}}
+\newcommand{\invarcsecsq}{\textrm{arcsec}^{-2}}
+% \newcommand{\arcsec}{\textrm{as}}
+\newcommand{\as}{\textrm{arcsec}}
+
+\newcommand{\fracobs}{f_\trt{obs}}
+\newcommand{\fracobsi}{f_{\trt{obs},i}}
+\newcommand{\feddsys}{f_\trt{Edd,sys}}
+\newcommand{\feddi}{f_{\trt{Edd},i}}
+\newcommand{\feddtwo}{f_{\trt{Edd},2}}
+
+% \defcitealias{BBR80}{Begelman1980}
+% \defcitealias{paper1}{KBH-16}
+
+\defcitealias{hkm09}{HKM09}
+\defcitealias{Begelman1980}{BBR80}
+\defcitealias{Rosado1503}{RSG15}
+\defcitealias{paper1}{Paper-1}
+\defcitealias{paper2}{Paper-2}
+\defcitealias{paper3}{Paper-3}
+\defcitealias{paper4}{Paper-4}

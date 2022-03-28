@@ -1,8 +1,11 @@
+include CHANGELOG.md
+include CONTRIBUTING.md
 include LICENSE
 include MANIFEST.in
-include CONTRIBUTING.md
-include CHANGELOG.md
-include versioneer.py
+include README.md
+include requirements-dev.txt
+include requirements.txt
+include tox.ini
 
 graft holodeck
 global-exclude *.py[cod] __pycache__ *.so

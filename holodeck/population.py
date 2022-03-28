@@ -1,40 +1,43 @@
-"""
+"""MBH Binary Populations and related tools.
+
 """
 
 import abc
+import inspect
+import os
 
 import numpy as np
 
-from holodeck import utils, log
+import holodeck as holo
+from holodeck import utils, log, _PATH_DATA, cosmo
 from holodeck.constants import PC, MSOL
 
 _DEF_ECCEN_DIST = (1.0, 0.2)
+_DEF_ILLUSTRIS_FNAME = "illustris-galaxy-mergers_L75n1820FP_gas-100_dm-100_star-100_bh-000.hdf5"
 
 
-class _Binary_Population(abc.ABC):
+class _Population_Discrete(abc.ABC):
 
-    def __init__(self, fname, *args, mods=None, check=True, **kwargs):
-        self._fname = fname
+    def __init__(self, *args, mods=None, check=True, **kwargs):
         self._check_flag = check
-
-        # Initial binary values (i.e. at time of formation)
-        self.time = None    # scale factor        (N,)
-        self.sepa = None    # binary separation a (N,)
-        self.mass = None    # blackhole masses    (N, 2)
-        self.eccen = None    # eccentricities      (N,) [optional]
-
-        self._size = None
-        self._sample_volume = None
-
         # Initialize the population
-        self._init_from_file(fname)
+        self._init()
         # Apply modifications (using `Modifer` instances), run `_finalize` and `_check()`
         self.modify(mods)
         return
 
-    @abc.abstractmethod
-    def _init_from_file(self, fname):
-        pass
+    def _init(self):
+        # Initial binary values (i.e. at time of formation)
+        self.mass = None    # blackhole masses    (N, 2)
+        self.sepa = None    # binary separation a (N,)
+        self.scafa = None    # scale factor        (N,)
+
+        self.eccen = None   # eccentricities      (N,) [optional]
+        self.weight = None  # weight of each binary as a sample  (N,) [optional]
+
+        self._size = None
+        self._sample_volume = None
+        return
 
     @abc.abstractmethod
     def _update_derived(self):
@@ -44,11 +47,19 @@ class _Binary_Population(abc.ABC):
     def size(self):
         return self._size
 
+    @property
+    def mtmr(self):
+        return utils.mtmr_from_m1m2(self.mass)
+
+    @property
+    def redz(self):
+        return cosmo.a_to_z(self.scafa)
+
     def modify(self, mods=None):
         # Sanitize
         if mods is None:
             mods = []
-        elif not isinstance(mods, list):
+        elif not np.iterable(mods):
             mods = [mods]
 
         # Run Modifiers
@@ -73,7 +84,7 @@ class _Binary_Population(abc.ABC):
     def _check(self):
         ErrorType = ValueError
         msg = "{}._check() Failed!  ".format(self.__class__.__name__)
-        array_names = ['time', 'sepa', 'mass', 'eccen']
+        array_names = ['scafa', 'sepa', 'mass', 'eccen']
         two_dim = ['mass']
         allow_none = ['eccen']
 
@@ -119,9 +130,20 @@ class _Binary_Population(abc.ABC):
         return
 
 
-class BP_Illustris(_Binary_Population):
+class Pop_Illustris(_Population_Discrete):
 
-    def _init_from_file(self, fname):
+    def __init__(self, fname=None, **kwargs):
+        if fname is None:
+            fname = _DEF_ILLUSTRIS_FNAME
+            fname = os.path.join(_PATH_DATA, fname)
+
+        self._fname = fname
+        super().__init__(**kwargs)
+        return
+
+    def _init(self):
+        super()._init()
+        fname = self._fname
         header, data = utils.load_hdf5(fname)
         self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3
 
@@ -136,38 +158,11 @@ class BP_Illustris(_Binary_Population):
         self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :]
         self.vdisp = data['SubhaloVelDisp']
         self.mass = data['SubhaloBHMass']
-        self.time = data['time']
+        self.scafa = data['time']
         return
 
     def _update_derived(self):
         self._size = self.sepa.size
-        return
-
-
-class BP_Continuous(_Binary_Population):
-
-    def _init_from_file(self, fname):
-        data = np.load(fname)
-        mt = data['mtot'] * MSOL
-        mr = data['mrat']
-        sc = utils.z_to_a(data['redz'])
-        ww = data['pops'][..., 0]
-        self._mtot = mt
-        self._mrat = mr
-        self._redz = data['redz']
-
-        mt, mr, sc = [xx.flatten() for xx in np.meshgrid(mt, mr, sc, indexing='ij')]
-        self.mtot = mt
-        self.mrat = mr
-        self.time = sc
-        self.weight = ww.flatten()
-        self.sepa = 1e5 * PC * np.ones_like(mt)
-        self.mass = utils.m1m2_from_mtmr(self.mtot, self.mrat).T
-
-        return
-
-    def _update_derived(self):
-        self._size = self.mtot.size
         return
 
 
@@ -214,13 +209,15 @@ class PM_Resample(Population_Modifier):
         old_data = [
             np.log10(mt / MSOL),
             np.log10(mr),
-            pop.time,      # resample linearly in scale-factor
+            # pop.scafa,      # resample linearly in scale-factor
+            cosmo.a_to_z(pop.scafa),
             np.log10(pop.sepa / PC)
         ]
         reflect = [
             None,
             [None, 0.0],
-            [0.0, 1.0],
+            # [0.0, 1.0],   # scafa
+            [0.0, None],   # redz
             None,
         ]
 
@@ -254,7 +251,8 @@ class PM_Resample(Population_Modifier):
         mr = 10**new_data[1]
 
         pop.mass = utils.m1m2_from_mtmr(mt, mr).T
-        pop.time = new_data[2]
+        # pop.scafa = new_data[2]
+        pop.scafa = cosmo.z_to_a(new_data[2])
         pop.sepa = PC * 10**new_data[3]
         pop.eccen = None if (eccen is None) else new_data[4]
 
@@ -292,172 +290,53 @@ class PM_Resample(Population_Modifier):
 
 
 class PM_Mass_Reset(Population_Modifier):
+    """Reset the masses of a target population based on a given M-Mbulge relation.
     """
-    """
 
-    FITS = {}
-    NORM = {}
-    _VALID_RELATIONS = ['vdisp', 'mbulge']
+    def __init__(self, mmbulge, scatter=True):
+        """
 
-    def __init__(self, relation, alpha=None, beta=None, eps=None, scatter=1.0):
-        relation = relation.strip().lower()
+        Parameters
+        ----------
+        mmbulge : class or instance of `holodeck.relations._MMBulge_Relation`
+            The Mbh-Mbulge scaling relationship with which to reset population masses.
+        scatter : bool, optional
+            Include random scatter when resetting masses.
+            The amount of scatter is specified in the `mmbulge.SCATTER_DEX` parameter.
 
-        if relation not in self._VALID_RELATIONS:
-            err = f"`relation` {relation} must be one of '{self._VALID_RELATIONS}'!"
-            raise ValueError(err)
+        """
+        # if `mmbulge` is a class (not an instance), then instantiate it
+        if inspect.isclass(mmbulge):
+            mmbulge = mmbulge()
 
-        self.relation = relation
-        if scatter in [None, False]:
-            scatter = 0.0
-        elif scatter is True:
-            scatter = 1.0
+        if not isinstance(mmbulge, holo.relations._MMBulge_Relation):
+            err = (
+                f"`mmbulge` ({mmbulge.__class__}) must be an instance"
+                f" or subclass of `holodeck.relations._MMBulge_Relation`!"
+            )
+            utils.error(err)
 
-        self.scatter = scatter
-        fits = self.FITS[relation]
-        if alpha is None:
-            alpha = fits['alpha']
-        if beta is None:
-            beta = fits['beta']
-        if eps is None:
-            eps = fits['eps']
-
-        self.alpha = alpha
-        self.beta = beta
-        self.eps = eps
+        self.mmbulge = mmbulge
+        self._scatter = scatter
         return
 
     def modify(self, pop):
-        relation = self.relation
+        # relation = self.relation
+        relation = 'mbulge'    # TODO: this is hardcoded for now, should be upgraded
         vals = getattr(pop, relation, None)
         if vals is None:
             err = (
                 f"relation is set to '{relation}', "
-                f"but value is not set in population instance!"
+                f"but value is not set in population instance (class: {pop.__class__})!"
             )
-            raise ValueError(err)
+            utils.error(err)
 
-        shape = (pop.size, 2)
-        scatter = self.scatter
-        alpha = self.alpha
-        beta = self.beta
-        eps = self.eps
-
-        norm = self.NORM[relation]
-        x0 = norm['x']
-        y0 = norm['y']
-
-        params = [alpha, beta, [0.0, eps]]
-        for ii, vv in enumerate(params):
-            if (scatter > 0.0):
-                vv = np.random.normal(vv[0], vv[1]*scatter, size=shape)
-            else:
-                vv = vv[0]
-
-            params[ii] = vv
-
-        alpha, beta, eps = params
-        mass = alpha + beta * np.log10(vals/x0) + eps
-        mass = np.power(10.0, mass) * y0
+        scatter = self._scatter
         # Store old version
         pop._mass = pop.mass
-        pop.mass = mass
+        # if `scatter` is `True`, then it is set to the value in `mmbulge.SCATTER_DEX`
+        pop.mass = self.mmbulge.mbh_from_mbulge(vals, scatter)
         return
-
-
-class PM_MM13(PM_Mass_Reset):
-    """
-
-    [MM13] - McConnell+Ma-2013 :
-    - https://ui.adsabs.harvard.edu/abs/2013ApJ...764..184M/abstract
-
-    Scaling-relations are of the form,
-    `log_10(Mbh/Msol) = alpha + beta * log10(X) + eps`
-        where `X` is:
-        `sigma / (200 km/s)`
-        `L / (1e11 Lsol)`
-        `Mbulge / (1e11 Msol)`
-        and `eps` is an intrinsic scatter in Mbh
-
-    """
-
-    # 1211.2816 - Table 2
-    FITS = {
-        # "All galaxies", first row ("MPFITEXY")
-        'vdisp': {
-            'alpha': [8.32, 0.05],   # normalization
-            'beta': [5.64, 0.32],    # power-law index
-            'eps': 0.38,      # overall scatter
-            'norm': 200 * 1e5,       # units
-        },
-        # "Dynamical masses", first row ("MPFITEXY")
-        'mbulge': {
-            'alpha': [8.46, 0.08],
-            'beta': [1.05, 0.11],
-            'eps': 0.34,
-            'norm': 1e11 * MSOL,
-        }
-    }
-
-    NORM = {
-        'vdisp': {
-            'x': 200 * 1e5,   # velocity-dispersion units
-            'y': MSOL,        # MBH units
-        },
-
-        'mbulge': {
-            'x': 1e11 * MSOL,   # MBulge units
-            'y': MSOL,        # MBH units
-        },
-    }
-
-
-class PM_KH13(PM_Mass_Reset):
-    """
-
-    [KH13] - Kormendy+Ho-2013 : https://ui.adsabs.harvard.edu/abs/2013ARA%26A..51..511K/abstract
-    -
-
-    Scaling-relations are given in the form,
-    `Mbh/(1e9 Msol) = [alpha ± da] * (X)^[beta ± db] + eps`
-    and converted to
-    `Mbh/(1e9 Msol) = [delta ± dd] + [beta ± db] * log10(X) + eps`
-    s.t.  `delta = log10(alpha)`  and  `dd = (da/alpha) / ln(10)`
-
-        where `X` is:
-        `Mbulge / (1e11 Msol)`
-        `sigma / (200 km/s)`
-        and `eps` is an intrinsic scatter in Mbh
-
-    """
-
-    # 1304.7762
-    FITS = {
-        # Eq.12
-        'vdisp': {
-            'alpha': [-0.54, 0.07],  # normalization
-            'beta': [4.26, 0.44],    # power-law index
-            'eps': 0.30,             # overall scatter
-        },
-        # Eq.10
-        'mbulge': {
-            'alpha': [-0.3098, 0.05318],
-            'beta': [1.16, 0.08],
-            'eps': 0.29,
-        }
-    }
-
-    NORM = {
-        # Eq.12
-        'vdisp': {
-            'x': 200 * 1e5,     # velocity-dispersion units
-            'y': 1e9 * MSOL,    # MBH units
-        },
-        # Eq.10
-        'mbulge': {
-            'x': 1e11 * MSOL,   # MBulge units
-            'y': 1e9 * MSOL,    # MBH units
-        },
-    }
 
 
 def eccen_func(norm, std, size):
