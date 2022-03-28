@@ -2,7 +2,6 @@
 
 ## Future (To-Do)
 * General
-    - [ ] combine galaxy-scaling relationship implementations in `holodeck.observations` and `holodeck.sam`.
     - [ ] Add fit/interpolated GW spectra from Chen19 into SAM modules.
 * Structures for comprehensive binary evolution / hardening modules
     - [ ] a class-based structure allowing for modular hardening processes to be added/removed/modified easily.
@@ -36,8 +35,25 @@
 
 ## Past
 
-### v0.1 - 2021/08/15
+### v0.2 - 2022/03/28
 
+* Binary Evolution (`evolution.py`)
+    - Now tracking hardening rates in evolution.
+    - Simple implementation of some binary hardening models, both physical and phenomenological (i.e. power-law like).
+    - Modules for Dynamical Friction, Stellar Scattering, and GW hardening.
+* Logistical and Internals
+    - Added submodule for logging (`log.py`)
+    - Added submodule for plotting (`plot.py`)
+    - Added submodule for observational data and relations (`observations.py`)
+    - New, and also improvements to old, notebooks for testing and demonstration purposes.  Addition of more unit tests and test scripts.
+    - Extensive additions to utility / mathematical / numerical functions (`utils.py`).
+* Populations
+    - Cleaned up of observationally-based populations (`pop_observational.py`)
+    - Unified implementation of MBH-galaxy relationships (`relations.py`)
+    - Significant cleanup and upgrades in Semi-Analytic Models based populations (`sam.py`)
+        - Developed methodology for sampling discrete binaries from continuous distributions (in coordination with `kalepy` modules)
+
+### v0.1 - 2021/08/15
 
 * Basic GW spectra can be generated using simple versions of population synthesis based on:
     - A finite, discrete population of binaries from the Illustris simulations
