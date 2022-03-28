@@ -47,6 +47,7 @@
     - Added submodule for observational data and relations (`observations.py`)
     - New, and also improvements to old, notebooks for testing and demonstration purposes.  Addition of more unit tests and test scripts.
     - Extensive additions to utility / mathematical / numerical functions (`utils.py`).
+    - Improved README.md, and started adding basics to holodeck paper manuscript.
 * Populations
     - Cleaned up of observationally-based populations (`pop_observational.py`)
     - Unified implementation of MBH-galaxy relationships (`relations.py`)
