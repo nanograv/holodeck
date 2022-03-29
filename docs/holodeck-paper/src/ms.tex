@@ -66,11 +66,12 @@
         Let $N(z)$ denote the number of binaries out to a redshift $z$, corresponding to a comoving volume $V_c$.
         We can calculate the characteristic strain from an ensemble of GW sources as \citep[][Eqs.~5/8]{Phinney-2001},
         	\begin{align}
-        	h_c^2(f) = \int_0^\infty \!\! dz \; \frac{d^2 N}{dz \, d\ln f_r} \; h_s^2\lr{f_r}.
+        	    h_c^2(f) = \int_0^\infty \!\! dz \; \frac{d^2 N}{dz \, d\ln f_r} \; h_s^2\lr{f_r}.
         	\end{align}
         In practice, the total number of sources in the Universe is calculated from the number-density, $n \equiv dN / dV_c$.  These can be related as \citep[][Eq.~6]{Sesana+2008},
         	\begin{align}
-        	\frac{d^2 N}{dz \, d\ln f_r} = \frac{d n_c}{dz} \frac{dz}{dt} \frac{dt}{d\ln f_r} \frac{d V_c}{dz}.
+                \label{eq:num_num_dens}
+            	\frac{d^2 N}{dz \, d\ln f_r} = \frac{d n_c}{dz} \frac{dz}{dt} \frac{dt}{d\ln f_r} \frac{d V_c}{dz}.
         	\end{align}
         Note that the total number of binaries in a given frequency interval depends not only on the number density, but also their rate of frequency-evolution.  The faster binaries evolve through a given frequency interval, the fewer binaries will occupy that interval on average.  This is typically described by the binary `hardening' timescale (with respect to frequency), given by the expression,
         \begin{equation}
@@ -78,51 +79,53 @@
         \end{equation}
         Plugging in the relevant cosmographic relationships (see \secref{sec:app_eqs}) we have,
         	\begin{align}
-        	h_c^2(f) & = \int_0^\infty \!\! dz \; \frac{dn_c}{dz} \, h^2\lr{f_r} \, 4\pi c \, d_c^2 \lr{1+z} \, \thardf.
+        	    h_c^2(f) & = \int_0^\infty \!\! dz \; \frac{dn_c}{dz} \, h^2\lr{f_r} \, 4\pi c \, d_c^2 \lr{1+z} \, \thardf.
         	\end{align}
         The challenge in modeling astrophysical sources of GWs is in calculating their number density.  Numerous approaches are possible, described in the following sections.
 
     \subsection{Semi-Analytic Modeling}
 
-        Define the distribution function of sources as $f(M,a,z) = d^2 n(M,a,z) / dM da$.  Here $M$ is the total mass of each systems, $a$ is the binary separation, and $z$ is the redshift.  Note that binary frequency $f_r$ could be used almost interchangeably with $a$, and that both evolve as a function of time or equivalently redshift.  This formalism can easily be extended to include other parameters, such as mass-ratio and eccentricity ($q$ and $e$).  We can write the conservation equation for binaries as of function of redshift as,
+        Define the distribution function of sources as $f(M,q,a,z) = d^3 n(M,q,a,z) / dM dq da$.  Here $M$ is the total mass of each systems, $a$ is the binary separation, and $z$ is the redshift.  Note that binary frequency $f_r$ could be used almost interchangeably with $a$, and that both evolve as a function of time or equivalently redshift.  This formalism can easily be extended to include other parameters, such as mass-ratio and eccentricity ($q$ and $e$).  We can write the conservation equation for binaries as of function of redshift as,
         \begin{equation}
             \label{eq:conservation}
-            \diffp{f}{z} + \diffp{}{m} \lrs{f \diffp{m}{z}} + \diffp{}{a} \lrs{f \diffp{a}{z}} = S_f(m, a, z).
+            \diffp{f}{z} +
+                \diffp{}{M} \lrs{f \diffp{M}{z}} +
+                \diffp{}{q} \lrs{f \diffp{q}{z}} +
+                \diffp{}{a} \lrs{f \diffp{a}{z}} = S_f(M, q, a, z).
         \end{equation}
-        Here $S_f$ is a source/sink function that can account for the creation or destruction of binaries.  Here we assume that all binary `formation' is encapsulated from binaries moving from one part of parameter space (i.e.~large separations and redshifts) to other parts of parameter space (i.e.~smaller separations and redshifts).  Thus we set $S_f = 0$.
+        Here $S_f$ is a source/sink function that can account for the creation or destruction of binaries.
 
-        We consider the standard \citep[e.g.~Sesana style; see][]{Chen+2019} semi-analytic model (SAM) formalism of MBH binary populations.  In this style of calculation, $f$ is determined in a region of parameter space that can be observed/estimated, and this is \textit{evolved} to find the distribution in a different region of parameter space that is of interest.  In practice, the observed parameter space is galaxies and galaxy mergers, and the parameter space of interest is close separated MBH binaries that could be GW detectable.  We will express the distribution function as a product of a mass-function, and a pair fraction:
+        We consider the standard \citep[e.g.~Sesana style; see][]{Chen+2019} semi-analytic model (SAM) formalism of MBH binary populations.  In this style of calculation, $f$ is determined in a region of parameter space that can be observed/estimated, and this is \textit{evolved} to find the distribution in a different region of parameter space that is of interest.  In practice, the observed parameter space is galaxies and galaxy mergers, and the parameter space of interest is close separated MBH binaries that could be GW detectable.  \note{Thus we assume that all binary `formation' is encapsulated from binaries moving from one part of parameter space (i.e.~large separations and redshifts) to other parts of parameter space (i.e.~smaller separations and redshifts), and we set $S_f = 0$.}
+
+        We will express the distribution function as a product of a mass function, and a pair fraction:
         \begin{equation}
             \label{eq:dist_func}
-            f(M,a,z) = \frac{\Phi(M, z)}{M \ln\!10} \cdot F_a(M, a, z),
+            f(M,q,a,z) = \frac{\Phi(M, z)}{M \ln\!10} \cdot F_a(M,q,a,z),
         \end{equation}
-        where the mass-function is, $\Phi(M, z) \equiv \diffp{n_g}{{\logten{M}}}$.
-        In \citet{Chen+2019}, for example, the pair fraction is measured over some range of separations, and the separation-dependence is suppressed, i.e.~$f(M, z) = \Phi(M, z) \cdot F(M, z)$ s.t.~$F = \int_{a_0}^{a_1} F_a \, da$.  From $\eqref{eq:conservation}$, we use the chain rule to mix time and redshift evolution, and assume that the mass-change of binaries is negligible, i.e.~$\diffp{m}{t} = 0$, giving:
+        where the mass function, $\Phi(M, q, z) \equiv \diffp{n_g}{{\logten{M}}}$, is calculated based on the number density of galaxies ($n_g$).  We assume that there is a one-to-one mapping from galaxy mass to MBH mass, such that the galaxy mass-function can still be used to uniquely define the mass distribution of MBHs.  Typically the MBH--galaxy relation is given in terms of an `$M_\trt{BH}$--$M_\trt{bulge}$' relation \citep[e.g.][]{McConnell+Ma-2013}, which is a observationally derived relation between the mass of MBHs and the mass of the stellar bulge component of their host galaxy.
+        In \citet{Chen+2019}, the pair fraction is measured over some range of separations, and the separation-dependence is suppressed, i.e.~$f(M,q,z) = \Phi(M, z) \cdot F(M, q, z)$ s.t.~$F = \int_{a_0}^{a_1} F_a \, da$.  From $\eqref{eq:conservation}$, we use the chain rule to mix time and redshift evolution, and assume that the mass-change of binaries is negligible, i.e.~$\diffp{m}{t} = 0$ and $\diffp{q}{t} = 0$, giving:
         \begin{equation}
             \diffp{f}{z} = - \diffp{t}{z} \diffp{}{a} \lrs{f \diffp{a}{t}}.
         \end{equation}
         Plugging-in \eqref{eq:dist_func}:
         \begin{equation}
-            \diffp{f}{z} = - \diffp{t}{z} \Phi(M,z) \diffp{}{a} \lrs{F(M,a,z) \diffp{a}{t}}.
+            \diffp{f}{z} = - \diffp{t}{z} \Phi(M,z) \diffp{}{a} \lrs{F(M,q,a,z) \diffp{a}{t}}.
         \end{equation}
 
-        The binary population is assumed to be changing only in separation and redshift, which are related by $\partial a / \partial z = (\partial a / \partial t) (\partial t / \partial z)$.  Because the overall number-density is conserved, we can take a finite step in separation and time/redshift, $a\rightarrow a'$ and $z\rightarrow z'$.  Here the time it takes for a binary to go from $a \rightarrow a'$ is $\tau(M,a,z|a')$ which leads to a redshift at the later time of $z' = z'(t + \tau)$.  The standard expression \citep[e.g.~][~Eq.~5]{Chen+2019}, requires making the approximation that,
+        The binary population is assumed to be changing only in separation and redshift, which are related by $\partial a / \partial z = (\partial a / \partial t) (\partial t / \partial z)$.  Because the overall number-density is conserved, we can take a finite step in separation and time/redshift, $a\rightarrow a'$ and $z\rightarrow z'$.  Here the time it takes for a binary to go from $a \rightarrow a'$ is $\tau(M,a,z|a')$, which leads to a redshift at the later time of $z' = z'(t + \tau)$.  The standard expression \citep[e.g.][~Eq.~5]{Chen+2019}, requires making the approximation that,
         \begin{equation}
-            \diffp{}{a} \lrs{F(M,a,z) \diffp{a}{t}} \approx \frac{F}{\Delta t} = \frac{F}{\tau(M,a,z|a')}.
+            \diffp{}{a} \lrs{F(M,q,a,z) \diffp{a}{t}} \approx \frac{F}{\tau(M,q,a,z|a')}.
         \end{equation}
         Thus giving,
         \begin{equation}
-            \diffp{f(M,a',z')}{{z'}} = \diffp{n}{{\log_{10}\!M}{a'}{z'}} = - \diffp{t}{z} \frac{\Phi(M,z) \, F(M,a,z)}{\tau(M,a,z|a')}.
+            \label{eq:cont_eq_result}
+            \diffp{f(M,q,a',z')}{{z'}} = \diffp{n}{{M}{q}{a'}{z'}} = - \diffp{t}{z} \frac{\Phi(M,z) \, F(M,a,z)}{\tau(M,a,z|a')}.
         \end{equation}
 
-        Utimately we are interested in a total number of binaries $N$ such that $dN \equiv n \, dV_c$ for a comoving volume $V_c(z)$.  To find the number of binaries, we use the chain rule to connect the time-evolution of the universe with the evolution of each binary over frequency,
-        \begin{equation}
-            \diffp{N}{{M}{q}{z}{\ln\!f_r}} = \diffp{n}{{M}{q}{z}} \diffp{z}{t} \diffp{t}{ {\ln\!f_r} } \diffp{V_c}{z}.
-        \end{equation}
-        Putting this together, we can finally write,
+        Combining \eqref{eq:cont_eq_result} with \eqref{eq:num_num_dens}, we can finally write,
         \begin{equation}
             \label{eq:sam_final}
-            \diffp{N}{{M}{q}{z}{\ln\!f_r}} = - \Phi(M,z) \, F(M,a,z) \frac{\thardf}{\tau(M,a,z|a')} \diffp{V_c}{z}.
+            \diffp{N}{{M}{q}{z}{\ln\!f_r}} = - \Phi(M,z) \, F(M,q,a,z) \frac{\thardf}{\tau(M,q,a,z|a')} \diffp{V_c}{z}.
         \end{equation}
 
     % % Fig -

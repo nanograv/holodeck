@@ -472,7 +472,7 @@ class Semi_Analytic_Model:
         Notes
         -----
 
-        d N / d ln f_r = (dn/dz) * (dz/dt) * (dt/d ln f_r) * (dVc/dz)
+        d N / d ln f_r = (dn/dz) * (dt/d ln f_r) * (dz/dt) * (dVc/dz)
                        = (dn/dz) * (f_r / [df_r/dt]) * 4 pi c D_c^2 (1+z) * dz
 
         d N / d ln a   = (dn/dz) * (dz/dt) * (dt/d ln a) * (dVc/dz)
@@ -696,6 +696,7 @@ def sample_sam_with_hardening(
 
     # edges: Mtot [grams], mrat (q), redz (z), {fobs (f) [1/s] OR sepa (a) [cm]}
     edges, dnum = sam.number_from_hardening(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
+
     log_edges = [np.log10(edges[0]), edges[1], edges[2], np.log(edges[3])]
 
     if cut_below_mass is not None:
@@ -706,8 +707,17 @@ def sample_sam_with_hardening(
     # integrate each bin to convert from probability- density to mass
     # NOTE: _integrate_differential_number() has log-vs-lin spacings hardcoded! use `edges` as is
     mass = holo.sam._integrate_differential_number(edges, dnum, freq=True)
+
+    # ====================================
+    log.warning("Storing values for now!")
+    sam._edges = edges
+    sam._dnum = dnum
+    sam._mass = mass
+    sam._log_edges = log_edges
+    # mass = None
+    # ====================================
+
     # sample binaries from distribution, using appropriate spacing as needed
-    # BUG: should the density used for proportional sampling `dnum` be log(density) ?!
     if (sample_threshold is None) or (sample_threshold == 0.0):
         log.warning(f"Sampling *all* binaries (~{mass.sum():.2e}).")
         log.warning("Set `sample_threshold` to only sample outliers.")
