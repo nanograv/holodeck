@@ -188,7 +188,7 @@ class Evolution:
         # Determine initial hardening rates
         dadt = np.zeros(size)
         if pop.eccen is not None:
-            dedt = np.zeros(self.shape)
+            dedt = np.zeros(size)
 
         # addional record-keeping / diagnostics for debugging
         if self._debug:
@@ -602,7 +602,7 @@ class Hard_GW(_Hardening):
         if eccen is None:
             dedt = None
         else:
-            dedt = utils.gw_dedt(m1, m2, evo.sepa, evo.eccen)
+            dedt = utils.gw_dedt(m1, m2, sepa, eccen)
 
         return dadt, dedt
 
