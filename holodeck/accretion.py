@@ -1,5 +1,6 @@
 """ MBHB ACCRETION MODELS TO EVOLVE INDIVIDUAL MBH MASSES USING ILLUSTRIS ACCRETION RATES """
 import numpy as np
+import os
 
 class Accretion:
     """
@@ -34,12 +35,16 @@ class Accretion:
 
         if self.accmod == 'Siwek22':
             q_b = m2/m1
-            e_b = evol.eccen[:, step-1]
+            #if evol has eccen, then do below, if not, set e_b = 0.
+            #e_b = evol.eccen[:, step-1]
+            e_b = 0.0
             """ Now interpolate to get lambda at [q,e] """
             def lambda_qe_interp_2d(fp="data/preferential_accretion/siwek+22/", es=[0.0,0.2,0.4,0.6,0.8]):
                 all_lambdas = []
                 for e in es:
-                    lambda_e = np.loadtxt(fp + 'lambda_e=%.2f.txt' %e)
+                    fname = 'preferential_accretion/siwek+22/lambda_e=%.2f.txt' %e
+                    fname = os.path.join(_PATH_DATA, fname)
+                    lambda_e = np.loadtxt(fname)
                     qs = lambda_e[:,0]
                     lambdas = lambda_e[:,1]
                     all_lambdas.append(lambdas)
@@ -55,6 +60,7 @@ class Accretion:
 
             lamb_interp = lambda_qe_interp_2d()
             lamb_qe = lamb_interp(q_b, e_b)
+            print("q = %.3f, e = %.3f, lamb_qe = %.3f" %(q_b, e_b, lamb_qe))
             mdot_1 = 1./(lamb_interp + 1.) * mdot
             mdot_2 = lamb_interp/(lamb_interp + 1.) * mdot
             mdot_arr = np.array([mdot_1, mdot_2]).T
