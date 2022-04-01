@@ -49,6 +49,12 @@
 % ====    Section 1 - Introduction
 % =================================================================================================
 
+\begin{itemize}
+    \item Change $f_r \rightarrow f$
+    \item holodeck uses $f_\trt{obs}$ as grid variable, not $f_r$, mesh this with the analytic formalism and description
+\end{itemize}
+
+
 \section{Introduction}
     \label{sec:intro}
 
@@ -68,12 +74,12 @@
         	\begin{align}
         	    h_c^2(f) = \int_0^\infty \!\! dz \; \frac{d^2 N}{dz \, d\ln f_r} \; h_s^2\lr{f_r}.
         	\end{align}
-        In practice, the total number of sources in the Universe is calculated from the number-density, $n \equiv dN / dV_c$.  These can be related as \citep[][Eq.~6]{Sesana+2008},
+        In practice, the total number of sources in the Universe is calculated from the number-density, $n \equiv dN / dV_c$, extrapolated into an observer's entire past light-cone.  These can be related as \citep[][Eq.~6]{Sesana+2008},
         	\begin{align}
                 \label{eq:num_num_dens}
             	\frac{d^2 N}{dz \, d\ln f_r} = \frac{d n_c}{dz} \frac{dz}{dt} \frac{dt}{d\ln f_r} \frac{d V_c}{dz}.
         	\end{align}
-        Note that the total number of binaries in a given frequency interval depends not only on the number density, but also their rate of frequency-evolution.  The faster binaries evolve through a given frequency interval, the fewer binaries will occupy that interval on average.  This is typically described by the binary `hardening' timescale (with respect to frequency), given by the expression,
+        Note that the total number of binaries in a given frequency interval depends not only on the number density, but also their rate of frequency-evolution.  The faster binaries evolve through a given frequency interval, the fewer binaries will occupy that interval on average.  This is typically described by the binary `hardening' timescale, given by the expression,
         \begin{equation}
             \thardf \equiv \diffp{t}{{\ln\!f_r}} = \frac{f_r}{\partial f_r / \partial t}.
         \end{equation}
@@ -127,6 +133,13 @@
             \label{eq:sam_final}
             \diffp{N}{{M}{q}{z}{\ln\!f_r}} = - \Phi(M,z) \, F(M,q,a,z) \frac{\thardf}{\tau(M,q,a,z|a')} \diffp{V_c}{z}.
         \end{equation}
+
+        From the SAM formalism, the number of binaries in each bin is calculated by `integrating' each finite element of \eqref{eq:sam_final}, i.e.,
+        \begin{equation}
+            \diffp{N_{ijk}(f_r)}{{\ln\!f_r}} \equiv \diffp{N(M_i, q_j, z_k, {f_r})}{{M}{q}{z}{\ln\!f_r}} \, \Delta M \,\Delta q \, \Delta z.
+        \end{equation}
+        The characteristic strain of the GWB can then be calculated
+
 
     % % Fig -
     % \begin{figure}
