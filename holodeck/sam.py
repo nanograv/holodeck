@@ -35,6 +35,8 @@ _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
 
 class _Galaxy_Stellar_Mass_Function(abc.ABC):
+    """Galaxy Stellar-Mass Function base-class.  Used to calculate number-density of galaxies.
+    """
 
     @abc.abstractmethod
     def __init__(self, *args, **kwargs):
@@ -123,6 +125,8 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
 
 
 class _Galaxy_Pair_Fraction(abc.ABC):
+    """Galaxy Pair Fraction base class, used to describe the fraction of galaxies in mergers/pairs.
+    """
 
     @abc.abstractmethod
     def __init__(self, *args, **kwargs):
@@ -151,6 +155,8 @@ class _Galaxy_Pair_Fraction(abc.ABC):
 
 
 class GPF_Power_Law(_Galaxy_Pair_Fraction):
+    """Galaxy Pair Fraction - Single Power-Law
+    """
 
     def __init__(self, frac_norm_allq=0.025, frac_norm=None, mref=1.0e11*MSOL,
                  malpha=0.0, zbeta=0.8, qgamma=0.0, obs_conv_qlo=0.25):
@@ -203,6 +209,8 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
 
 
 class _Galaxy_Merger_Time(abc.ABC):
+    """Galaxy Merger Time base class, used to model merger timescale of galaxy pairs.
+    """
 
     @abc.abstractmethod
     def __init__(self, *args, **kwargs):
@@ -230,6 +238,8 @@ class _Galaxy_Merger_Time(abc.ABC):
         return
 
     def zprime(self, mtot, mrat, redz, **kwargs):
+        """Return the redshift after merger (i.e. input `redz` delayed by merger time).
+        """
         tau0 = self(mtot, mrat, redz)  # sec
         age = cosmo.age(redz).to('s').value
         new_age = age + tau0
@@ -249,7 +259,7 @@ class _Galaxy_Merger_Time(abc.ABC):
 
 
 class GMT_Power_Law(_Galaxy_Merger_Time):
-    """
+    """Galaxy Merger Time - simple power law prescription
     """
 
     def __init__(self, time_norm=0.55*GYR, mref=7.2e10*MSOL, malpha=0.0, zbeta=-0.5, qgamma=0.0):
@@ -310,6 +320,20 @@ class Semi_Analytic_Model:
         shape=None,
         gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM13
     ):
+        """
+
+        Parameters
+        ----------
+        mtot : list, optional
+        mrat : list, optional
+        redz : list, optional
+        shape : _type_, optional
+        gsmf : _type_, optional
+        gpf : _type_, optional
+        gmt : _type_, optional
+        mmbulge : _type_, optional
+
+        """
 
         if inspect.isclass(gsmf):
             gsmf = gsmf()
@@ -331,6 +355,7 @@ class Semi_Analytic_Model:
         elif not isinstance(mmbulge, relations._MMBulge_Relation):
             raise ValueError("`mmbulge` must be an instance or subclass of `_MMBulge_Relation`!")
 
+        # Redefine shape of grid (i.e. number of bins in each parameter)
         if shape is not None:
             if len(shape) == 3:
                 mtot[2] = shape[0]
@@ -447,10 +472,11 @@ class Semi_Analytic_Model:
 
         return self._density
 
-    def number_from_hardening(self, hard, fobs=None, sepa=None, limit_merger_time=None):
-        """Convert from number-density to finite number, per unit bin-volume, per log-frequency interval.
+    def diff_num_from_hardening(self, hard, fobs=None, sepa=None, limit_merger_time=None):
+        """Calculate the number of binaries, per unit bin-volume, per log-frequency interval.
 
-        The volume of each bin is dq dlog10(M) dz
+        The value returned is `d^4 N / [dlog10(M) dq dz dln(X)]`
+        where X is either separation (a) or frequency (f_r).
 
         Arguments
         ---------
@@ -470,11 +496,11 @@ class Semi_Analytic_Model:
         Notes
         -----
 
-        d N / d ln f_r = (dn/dz) * (dz/dt) * (dt/d ln f_r) * (dVc/dz)
-                       = (dn/dz) * (f_r / [df_r/dt]) * 4 pi c D_c^2 (1+z) * dz
+        d^2 N / dz dln(f_r) = (dn/dz) * (dt/d ln f_r) * (dz/dt) * (dVc/dz)
+                            = (dn/dz) * (f_r / [df_r/dt]) * 4 pi c D_c^2 (1+z)
 
-        d N / d ln a   = (dn/dz) * (dz/dt) * (dt/d ln a) * (dVc/dz)
-                       = (dn/dz) * (a / [da/dt]) * 4 pi c D_c^2 (1+z) * dz
+        d^2 N / dz dln(a)   = (dn/dz) * (dz/dt) * (dt/d ln a) * (dVc/dz)
+                            = (dn/dz) * (a / [da/dt]) * 4 pi c D_c^2 (1+z)
 
         """
         if (fobs is None) == (sepa is None):
@@ -528,23 +554,23 @@ class Semi_Analytic_Model:
 
         # ---------------------
         if (limit_merger_time is True):
-            log.info("limiting tau to < galaxy merger time")
+            log.debug("limiting tau to < galaxy merger time")
             mstar = self.mass_stellar()[:, :, :, np.newaxis]
             ms_rat = mstar[1] / mstar[0]
             mstar = mstar.sum(axis=0)   # total mass [grams]
             gmt = self._gmt(mstar, ms_rat, self.redz[np.newaxis, np.newaxis, :])  # [sec]
             bads = (tau > gmt[..., np.newaxis])
             tau[bads] = 0.0
-            log.info(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
+            log.debug(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
 
         elif (limit_merger_time in [None, False]):
             pass
 
         elif utils.isnumeric(limit_merger_time):
-            log.info(f"limiting tau to < {limit_merger_time/GYR:.2f} Gyr")
+            log.debug(f"limiting tau to < {limit_merger_time/GYR:.2f} Gyr")
             bads = (tau > limit_merger_time)
             tau[bads] = 0.0
-            log.info(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
+            log.debug(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
 
         else:
             err = f"`limit_merger_time` ({type(limit_merger_time)}) must be boolean or scalar!"
@@ -590,43 +616,42 @@ class Semi_Analytic_Model:
             fobs = np.atleast_1d(fobs)
             squeeze = True
 
-        # Get the differential-number of binaries for each bin
-        # `number` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
-        edges, dnum = self.number_from_hardening(hard, fobs=fobs)
+        # ---- Get the differential-number of binaries for each bin
+        # this is  ``d^4 N / [dlog10(M) dq dz dln(f_r)]``
+        # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
+        edges, dnum = self.diff_num_from_hardening(hard, fobs=fobs)
 
-        # ---- integrate from differential-number to number per bin
-        number = _integrate_differential_number(edges, dnum)
+        # TODO: bin centroids should be different for each bin, not just each dimension
+
+        # "integrate" within each bin (i.e. multiply by bin volume)
+        # NOTE: `freq` should also be integrated to get proper poisson sampling!
+        #       after poisson calculation, need to convert back to dN/dlogf
+        #       to get proper characteristic strain measurement
+        number = _integrate_differential_number(edges, dnum, freq=True)
 
         # ---- find 'center-of-mass' of each bin (i.e. based on grid edges)
-        # (3, M, Q, Z)
+        # (3, M', Q', Z')
         coms = self.grid
-        # ===> (3, M, Q, Z, 1)
+        # ===> (3, M', Q', Z', 1)
         coms = [cc[..., np.newaxis] for cc in coms]
-        # ===> (4, M, Q, Z, F)
+        # ===> (4, M', Q', Z', F)
         coms = np.broadcast_arrays(*coms, fobs[np.newaxis, np.newaxis, np.newaxis, :])
 
-        # find weighted bin positions
-        edge = dnum
-        cent = kale.utils.midpoints(edge, log=False, axis=(0, 1, 2))
+        # ---- find weighted bin centers
+        # get unweighted centers
+        cent = kale.utils.midpoints(dnum, log=False, axis=(0, 1, 2, 3))
+        # get weighted centers for each dimension
         for ii, cc in enumerate(coms):
-            coms[ii] = kale.utils.midpoints(edge * cc, log=False, axis=(0, 1, 2)) / cent
-            # dont weight frequency (3th dimension)
-            if ii == 2:
-                break
-
-        # get the correct shape for frequencies
-        # NOTE: coms[:, :, :, i] == coms[0, 0, 0, i]  i.e. only last dimension varies
-        coms[-1] = coms[-1][1:, 1:, 1:, :]
-        coms = [cc.flat[:] for cc in coms]   # use `[:]` to avoid issues with flatiter instance
+            coms[ii] = kale.utils.midpoints(dnum * cc, log=False, axis=(0, 1, 2, 3)) / cent
 
         # ---- calculate GW strain at bin centroids
         mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))
         dc = cosmo.comoving_distance(coms[2]).cgs.value
         fr = utils.frst_from_fobs(coms[3], coms[2])
         hs = utils.gw_strain_source(mc, dc, fr)
-        # (M*Q*Z*F,) ==> (M,Q,Z,F)
-        hs = hs.reshape(number.shape)
 
+        dlogf = np.diff(np.log(fobs))
+        dlogf = dlogf[np.newaxis, np.newaxis, np.newaxis, :]
         if realize is True:
             number = np.random.poisson(number)
         elif realize in [None, False]:
@@ -635,30 +660,51 @@ class Semi_Analytic_Model:
             shape = number.shape + (realize,)
             number = np.random.poisson(number[..., np.newaxis], size=shape)
             hs = hs[..., np.newaxis]
+            dlogf = dlogf[..., np.newaxis]
         else:
             err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
             raise ValueError(err)
 
+        number = number / dlogf
+        # (M',Q',Z',F) ==> (F,)
         hc = np.sqrt(np.sum(number*np.square(hs), axis=(0, 1, 2)))
+
         if squeeze:
             hc = hc.squeeze()
         return hc
 
 
 def _integrate_differential_number(edges, dnum, freq=False):
+    """Integrate the differential number-density of binaries over the given grid (edges).
+
+    NOTE: the `edges` provided MUST all be in linear space, mass is converted to ``log10(M)``
+          and frequency is converted to ``ln(f)``.
+    NOTE: the density `dnum` MUST correspond to `dn/ [dlog10(M) dq dz dln(f)]`
+
+    Parameters
+    ----------
+    edges : _type_
+    dnum : _type_
+    freq : bool, optional
+        Whether or not to also integrate the frequency dimension.
+
+    Returns
+    -------
+    number : ndarray
+        Number of binaries in each bin of mass, mass-ratio, redshift, frequency.
+        NOTE: if `freq=False`, then `number` corresponds to `dN/dln(f)`, the number of binaries
+              per log-interval of frequency.
+
+    """
     # ---- integrate from differential-number to number per bin
     # integrate over dlog10(M)
-    # number = holo.utils.trapz_loglog(dnum, edges[0], dlogx=10.0, axis=0, cumsum=False)
-    # number = np.nan_to_num(number)
     number = holo.utils.trapz(dnum, np.log10(edges[0]), axis=0, cumsum=False)
     # integrate over mass-ratio
     number = holo.utils.trapz(number, edges[1], axis=1, cumsum=False)
     # integrate over redshift
     number = holo.utils.trapz(number, edges[2], axis=2, cumsum=False)
-    # integrate over frequency
+    # integrate over frequency (if desired)
     if freq:
-        # number = holo.utils.trapz_loglog(number, edges[3], dlogx=np.e, axis=3, cumsum=False)
-        # number = np.nan_to_num(number)
         number = holo.utils.trapz(number, np.log(edges[3]), axis=3, cumsum=False)
 
     return number
@@ -692,8 +738,10 @@ def sample_sam_with_hardening(
 
     """
 
+    # returns  dN/[dlog10(M) dq dz dln(f_r)]
     # edges: Mtot [grams], mrat (q), redz (z), {fobs (f) [1/s] OR sepa (a) [cm]}
-    edges, dnum = sam.number_from_hardening(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
+    edges, dnum = sam.diff_num_from_hardening(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
+
     log_edges = [np.log10(edges[0]), edges[1], edges[2], np.log(edges[3])]
 
     if cut_below_mass is not None:
@@ -703,7 +751,9 @@ def sample_sam_with_hardening(
 
     # integrate each bin to convert from probability- density to mass
     # NOTE: _integrate_differential_number() has log-vs-lin spacings hardcoded! use `edges` as is
-    mass = holo.sam._integrate_differential_number(edges, dnum, freq=True)
+    #       do not use `log_edges`
+    mass = _integrate_differential_number(edges, dnum, freq=True)
+
     # sample binaries from distribution, using appropriate spacing as needed
     # BUG: should the density used for proportional sampling `dnum` be log(density) ?!
     if (sample_threshold is None) or (sample_threshold == 0.0):
@@ -721,7 +771,7 @@ def sample_sam_with_hardening(
         vals = vals.T[~bads].T
         weights = weights[~bads]
 
-    return vals, weights, edges, dnum
+    return vals, weights, edges, dnum, mass
 
 
 def _gws_from_samples(vals, weights, fobs):
@@ -741,11 +791,11 @@ def _gws_from_samples(vals, weights, fobs):
 
     """
     mc = utils.chirp_mass(*utils.m1m2_from_mtmr(vals[0], vals[1]))
-    rz = vals[2, :]
-    frst = vals[3] * (1.0 + rz)
+    rz = vals[2]
+    fo = vals[3]
+    frst = utils.frst_from_fobs(fo, rz)
     dc = cosmo.comoving_distance(rz).cgs.value
     hs = utils.gw_strain_source(mc, dc, frst)
-    fo = vals[-1]
 
     gff, gwf, gwb = gws_from_sampled_strains(fobs, fo, hs, weights)
 
@@ -761,7 +811,7 @@ def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
         Target frequencies of interest in units of [1/yr]
 
     """
-    vals, weights, edges, dens = sample_sam_with_hardening(sam, hard, fobs=fobs, **kwargs)
+    vals, weights, edges, dens, mass = sample_sam_with_hardening(sam, hard, fobs=fobs, **kwargs)
     gff, gwf, gwb = _gws_from_samples(vals, weights, fobs)
     return gff, gwf, gwb
 
@@ -772,7 +822,12 @@ def gws_from_sampled_strains(freqs, fobs, hs, weights):
 
     Arguments
     ---------
-
+    freqs : (F,) array_like of scalar
+        Frequency bins.
+    fobs : (S,) array_like of scalar
+        Observed GW frequency of each binary sample.
+    hs : (S,)
+    weights : (S,)
 
     Returns
     -------
@@ -784,6 +839,7 @@ def gws_from_sampled_strains(freqs, fobs, hs, weights):
         Strain amplitude of the background in each frequency bin.
 
     """
+
     # ---- Initialize
     num_samp = fobs.size
     num_freq = freqs.size - 1
@@ -821,12 +877,12 @@ def gws_from_sampled_strains(freqs, fobs, hs, weights):
             gwback[ff] += h2temp
             ii += 1
 
-        # Store foreground and convert to *characteristic* strain
-        gwfore[ff] = hmax * np.sqrt(cycles)   # hs ==> hc (not squared, so sqrt of cycles)
+        # subtract foreground source from background
         gwf_freqs[ff] = fmax
         gwback[ff] -= hmax**2
         # Convert to *characteristic* strain
         gwback[ff] = gwback[ff] * cycles      # hs^2 ==> hc^2  (squared, so cycles^1)
+        gwfore[ff] = hmax * np.sqrt(cycles)   # hs ==> hc (not squared, so sqrt of cycles)
         lo = hi
 
     gwback = np.sqrt(gwback)
