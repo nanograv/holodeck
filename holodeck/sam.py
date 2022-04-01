@@ -611,10 +611,16 @@ class Semi_Analytic_Model:
 
         """
 
-        squeeze = False
-        if np.isscalar(fobs):
-            fobs = np.atleast_1d(fobs)
-            squeeze = True
+        # squeeze = False
+        squeeze = True
+        fobs = np.atleast_1d(fobs)
+        if np.isscalar(fobs) or np.size(fobs) == 1:
+            err = "single values of `fobs` are not allowed, can only calculated GWB within some bin of frequency!"
+            err += "  e.g. ``fobs = 1/YR; fobs = [0.9*fobs, 1.1*fobs]``"
+            utils.error(err)
+
+            # fobs = np.atleast_1d(fobs)
+            # squeeze = True
 
         # ---- Get the differential-number of binaries for each bin
         # this is  ``d^4 N / [dlog10(M) dq dz dln(f_r)]``
@@ -639,6 +645,7 @@ class Semi_Analytic_Model:
 
         # ---- find weighted bin centers
         # get unweighted centers
+        print(f"{dnum.shape=}")
         cent = kale.utils.midpoints(dnum, log=False, axis=(0, 1, 2, 3))
         # get weighted centers for each dimension
         for ii, cc in enumerate(coms):
