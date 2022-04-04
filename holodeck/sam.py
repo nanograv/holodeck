@@ -613,16 +613,12 @@ class Semi_Analytic_Model:
 
         """
 
-        # squeeze = False
         squeeze = True
         fobs = np.atleast_1d(fobs)
         if np.isscalar(fobs) or np.size(fobs) == 1:
             err = "single values of `fobs` are not allowed, can only calculated GWB within some bin of frequency!"
             err += "  e.g. ``fobs = 1/YR; fobs = [0.9*fobs, 1.1*fobs]``"
             utils.error(err)
-
-            # fobs = np.atleast_1d(fobs)
-            # squeeze = True
 
         # ---- Get the differential-number of binaries for each bin
         # this is  ``d^4 N / [dlog10(M) dq dz dln(f_r)]``
@@ -637,49 +633,11 @@ class Semi_Analytic_Model:
         #       to get proper characteristic strain measurement
         number = _integrate_differential_number(edges, dnum, freq=True)
 
-        # ---- find 'center-of-mass' of each bin (i.e. based on grid edges)
-        # (3, M', Q', Z')
-        coms = self.grid
-        # ===> (3, M', Q', Z', 1)
-        coms = [cc[..., np.newaxis] for cc in coms]
-        # ===> (4, M', Q', Z', F)
-        coms = np.broadcast_arrays(*coms, fobs[np.newaxis, np.newaxis, np.newaxis, :])
-
-        # ---- find weighted bin centers
-        # get unweighted centers
-        print(f"{dnum.shape=}")
-        cent = kale.utils.midpoints(dnum, log=False, axis=(0, 1, 2, 3))
-        # get weighted centers for each dimension
-        for ii, cc in enumerate(coms):
-            coms[ii] = kale.utils.midpoints(dnum * cc, log=False, axis=(0, 1, 2, 3)) / cent
-
-        # ---- calculate GW strain at bin centroids
-        mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))
-        dc = cosmo.comoving_distance(coms[2]).cgs.value
-        fr = utils.frst_from_fobs(coms[3], coms[2])
-        hs = utils.gw_strain_source(mc, dc, fr)
-
-        dlogf = np.diff(np.log(fobs))
-        dlogf = dlogf[np.newaxis, np.newaxis, np.newaxis, :]
-        if realize is True:
-            number = np.random.poisson(number)
-        elif realize in [None, False]:
-            pass
-        elif utils.isinteger(realize):
-            shape = number.shape + (realize,)
-            number = np.random.poisson(number[..., np.newaxis], size=shape)
-            hs = hs[..., np.newaxis]
-            dlogf = dlogf[..., np.newaxis]
-        else:
-            err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
-            raise ValueError(err)
-
-        number = number / dlogf
-        # (M',Q',Z',F) ==> (F,)
-        hc = np.sqrt(np.sum(number*np.square(hs), axis=(0, 1, 2)))
-
+        # ---- Get the GWB spectrum from number of binaries over grid
+        hc = _gws_from_number_grid(fobs, self.grid, dnum, number, realize)
         if squeeze:
             hc = hc.squeeze()
+
         return hc
 
 
@@ -895,3 +853,65 @@ def gws_from_sampled_strains(freqs, fobs, hs, weights):
 
     gwback = np.sqrt(gwback)
     return gwf_freqs, gwfore, gwback
+
+
+def _gws_from_number_grid(fobs, grid, dnum, number, realize):
+    """Calculate GWs based on a grid of number-of-binaries.
+
+    The input number of binaries is `N` s.t.
+        ``N = (d^4 N / [dlog10(M) dq dz dlogf] ) * dlog10(M) dq dz dlogf``
+    The number `N` is evaluated on a 4d grid, specified by `edges`, i.e.
+        ``N = N(M, q, z, f_r)``
+    NOTE: that `number` must also summed/integrated over dlogf.  To calculate characteristic strain,
+    this function divides again by the dlogf term.
+
+    Parameters
+    ----------
+    fobs : _type_
+    edges : _type_
+    dnum : _type_
+    number : _type_
+
+    """
+
+    # ---- find 'center-of-mass' of each bin (i.e. based on grid edges)
+    # (3, M', Q', Z')
+    # coms = self.grid
+    # ===> (3, M', Q', Z', 1)
+    coms = [cc[..., np.newaxis] for cc in grid]
+    # ===> (4, M', Q', Z', F)
+    coms = np.broadcast_arrays(*coms, fobs[np.newaxis, np.newaxis, np.newaxis, :])
+
+    # ---- find weighted bin centers
+    # get unweighted centers
+    cent = kale.utils.midpoints(dnum, log=False, axis=(0, 1, 2, 3))
+    # get weighted centers for each dimension
+    for ii, cc in enumerate(coms):
+        coms[ii] = kale.utils.midpoints(dnum * cc, log=False, axis=(0, 1, 2, 3)) / cent
+
+    # ---- calculate GW strain at bin centroids
+    mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))
+    dc = cosmo.comoving_distance(coms[2]).cgs.value
+    fr = utils.frst_from_fobs(coms[3], coms[2])
+    hs = utils.gw_strain_source(mc, dc, fr)
+
+    dlogf = np.diff(np.log(fobs))
+    dlogf = dlogf[np.newaxis, np.newaxis, np.newaxis, :]
+    if realize is True:
+        number = np.random.poisson(number)
+    elif realize in [None, False]:
+        pass
+    elif utils.isinteger(realize):
+        shape = number.shape + (realize,)
+        number = np.random.poisson(number[..., np.newaxis], size=shape)
+        hs = hs[..., np.newaxis]
+        dlogf = dlogf[..., np.newaxis]
+    else:
+        err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
+        raise ValueError(err)
+
+    number = number / dlogf
+    # (M',Q',Z',F) ==> (F,)
+    hc = np.sqrt(np.sum(number*np.square(hs), axis=(0, 1, 2)))
+
+    return hc
