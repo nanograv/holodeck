@@ -31,7 +31,8 @@ def mbh_from_mbulge_mm13(mbulge):
         yy = yy * Y0   # add units
         return yy
 
-    mbh = func(mbulge)
+    mbh = func(mbulge['mbulge'])
+    print(f"KGDEBUG: {mbulge} {mbh}")
     return mbh
 
 
@@ -47,7 +48,7 @@ def mbh_from_mbulge_kh13(mbulge):
         yy = AMP * np.power(xx/X0, PLAW)
         return yy
 
-    mbh = func_kh13(mbulge)
+    mbh = func_kh13(mbulge['mbulge'])
     return mbh
 
 
@@ -55,8 +56,8 @@ def check_relation(mmbulge_relation, truth_func):
     print(f"check_relation() : testing '{mmbulge_relation.__class__}' against '{truth_func}'")
 
     # mbulge ==> mbh
-    mbulge = np.logspace(8, 13, 11) * MSOL
-    vals = mmbulge_relation.mbh_from_mbulge(mbulge, scatter=False)
+    mbulge = {'mbulge':np.logspace(8, 13, 11) * MSOL}
+    vals = mmbulge_relation.mbh_from_host(mbulge, scatter=False)
     truth = truth_func(mbulge)
 
     print(f"mbulge [grams] = {mbulge}")
@@ -68,7 +69,7 @@ def check_relation(mmbulge_relation, truth_func):
     check_mbulge = mmbulge_relation.mbulge_from_mbh(vals, scatter=False)
     print(f"mbulge    = {mbulge}")
     print(f"check rev = {check_mbulge}")
-    assert np.allclose(mbulge, check_mbulge)
+    assert np.allclose(mbulge['mbulge'], check_mbulge)
 
     return
 
@@ -87,9 +88,9 @@ def check_scatter_per_dex(mmbulge_relation, scatter_dex):
     mbulge_log10 = np.log10(mbulge)
 
     # convert from mbulge to MBH including scatter, using uniform input values
-    vals = mmbulge_relation.mbh_from_mbulge(xx, scatter=True)
+    vals = mmbulge_relation.mbh_from_host({'mbulge':xx}, scatter=True)
     # without scatter, get the expected (central) value of MBH mass
-    cent = mmbulge_relation.mbh_from_mbulge(10.0**mbulge_log10, scatter=False)
+    cent = mmbulge_relation.mbh_from_host({'mbulge':10.0**mbulge_log10}, scatter=False)
     cent = np.log10(cent)
     vals = np.log10(vals)
 
@@ -154,7 +155,7 @@ def test_kh13_basic():
 def check_mass_reset(mmbulge_relation, truth_func):
     pop = holo.Pop_Illustris()
     mod_mm13 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=False)
-    mbulge = pop.mbulge
+    mbulge = {'mbulge':pop.mbulge}
     pop.modify(mod_mm13)
     mass = pop.mass
 
