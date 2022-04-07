@@ -32,7 +32,6 @@ def mbh_from_mbulge_mm13(mbulge):
         return yy
 
     mbh = func(mbulge['mbulge'])
-    print(f"KGDEBUG: {mbulge} {mbh}")
     return mbh
 
 
