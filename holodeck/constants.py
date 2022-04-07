@@ -25,6 +25,7 @@ ARCSEC = ap.units.arcsec.cgs.scale              # arcsecond in radians
 YR = ap.units.year.to(ap.units.s)
 EVOLT = ap.units.eV.to(ap.units.erg)            # Electronvolt in ergs
 JY = ap.units.jansky.to(ap.units.g/ap.units.s**2)  # Jansky in [erg/s/cm^2/Hz]
+KMPERSEC = (ap.units.km / ap.units.s).to(ap.units.cm/ap.units.s) # km/s
 
 # Derived Constants
 # -----------------

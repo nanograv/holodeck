@@ -290,52 +290,55 @@ class PM_Resample(Population_Modifier):
 
 
 class PM_Mass_Reset(Population_Modifier):
-    """Reset the masses of a target population based on a given M-Mbulge relation.
+    """Reset the masses of a target population based on a given M-Host relation.
     """
 
-    def __init__(self, mmbulge, scatter=True):
+    def __init__(self, mhost, scatter=True):
         """
 
         Parameters
         ----------
-        mmbulge : class or instance of `holodeck.relations._MMBulge_Relation`
-            The Mbh-Mbulge scaling relationship with which to reset population masses.
+        mhost : class or instance of `holodeck.relations._MHost_Relation`
+            The Mbh-MHost scaling relationship with which to reset population masses.
         scatter : bool, optional
             Include random scatter when resetting masses.
-            The amount of scatter is specified in the `mmbulge.SCATTER_DEX` parameter.
+            The amount of scatter is specified in the `mhost.SCATTER_DEX` parameter.
 
         """
-        # if `mmbulge` is a class (not an instance), then instantiate it
-        if inspect.isclass(mmbulge):
-            mmbulge = mmbulge()
+        # if `mhost` is a class (not an instance), then instantiate it
+        if inspect.isclass(mhost):
+            mhost = mhost()
 
-        if not isinstance(mmbulge, holo.relations._MMBulge_Relation):
+        if not isinstance(mhost, holo.relations._MHost_Relation):
             err = (
-                f"`mmbulge` ({mmbulge.__class__}) must be an instance"
-                f" or subclass of `holodeck.relations._MMBulge_Relation`!"
+                f"`mhost` ({mhost.__class__}) must be an instance"
+                f" or subclass of `holodeck.relations._MHost_Relation`!"
             )
             utils.error(err)
 
-        self.mmbulge = mmbulge
+        self.mhost = mhost
         self._scatter = scatter
         return
 
     def modify(self, pop):
         # relation = self.relation
-        relation = 'mbulge'    # TODO: this is hardcoded for now, should be upgraded
-        vals = getattr(pop, relation, None)
-        if vals is None:
-            err = (
-                f"relation is set to '{relation}', "
-                f"but value is not set in population instance (class: {pop.__class__})!"
-            )
-            utils.error(err)
-
+        host = {}
+        for requirement in self.mhost.requirements():
+            vals = getattr(pop, requirement, None)
+            if vals is None:
+                err = (
+                    f"population modifier requires '{requirement}', "
+                    f"but value is not set in population instance (class: {pop.__class__})!"
+                )
+                utils.error(err)
+            if requirement == 'redz':
+                vals = vals[:, np.newaxis] # need to duplicate values for proper broadcasting in calculation
+            host[requirement] = vals
         scatter = self._scatter
         # Store old version
         pop._mass = pop.mass
-        # if `scatter` is `True`, then it is set to the value in `mmbulge.SCATTER_DEX`
-        pop.mass = self.mmbulge.mbh_from_mbulge(vals, scatter)
+        # if `scatter` is `True`, then it is set to the value in `mhost.SCATTER_DEX`
+        pop.mass = self.mhost.mbh_from_host(host, scatter)
         return
 
 
