@@ -98,7 +98,7 @@ class _MMBulge_Relation(_MHost_Relation):
 
     def mbh_from_mstar(self, mstar, scatter):
         mbulge = self.mbulge_from_mstar(mstar)
-        return self.mbh_from_mbulge(mbulge, scatter)
+        return self.mbh_from_host({'mbulge':mbulge}, scatter)
 
     def mstar_from_mbh(self, mbh, **kwargs):
         mbulge = self.mbulge_from_mbh(mbh, **kwargs)
@@ -162,7 +162,7 @@ class MMBulge_Standard(_MMBulge_Relation):
 
     def dmbh_dmbulge(self, mbulge):
         # NOTE: scatter should never be used in the differential relation
-        dmdm = self.mbh_from_mbulge(mbulge, scatter=False)
+        dmdm = self.mbh_from_host({'mbulge':mbulge}, scatter=False)
         dmdm = dmdm * self._mplaw / mbulge
         return dmdm
 
