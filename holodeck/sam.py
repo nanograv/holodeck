@@ -355,6 +355,11 @@ class Semi_Analytic_Model:
         elif not isinstance(mmbulge, relations._MMBulge_Relation):
             raise ValueError("`mmbulge` must be an instance or subclass of `_MMBulge_Relation`!")
 
+        # NOTE: Create a copy of input args to make sure they aren't overwritten (in-place)
+        mtot = [mt for mt in mtot]
+        mrat = [mt for mt in mrat]
+        redz = [mt for mt in redz]
+
         # Redefine shape of grid (i.e. number of bins in each parameter)
         if shape is not None:
             if len(shape) == 3:
