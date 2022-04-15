@@ -363,7 +363,7 @@ class MSigma_Standard(_MSigma_Relation):
         return
 
     def mbh_from_host(self, host, scatter):
-        """Convert from stellar bulge-mass to blackhole mass.
+        """Convert from stellar velocity dispersion to blackhole mass.
 
         Units of [grams].
         """
