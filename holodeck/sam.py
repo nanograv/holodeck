@@ -33,6 +33,9 @@ from holodeck import relations
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
+REDZ_SCALE_LOG = True
+REDZ_SAMPLE_VOLUME = True
+
 
 class _Galaxy_Stellar_Mass_Function(abc.ABC):
     """Galaxy Stellar-Mass Function base-class.  Used to calculate number-density of galaxies.
@@ -378,7 +381,14 @@ class Semi_Analytic_Model:
         # NOTE: the spacing (log vs lin) is important.  e.g. in integrating from differential-number to (total) number
         self.mtot = np.logspace(*np.log10(mtot[:2]), mtot[2])
         self.mrat = np.linspace(*mrat)
-        self.redz = np.linspace(*redz)
+
+        if REDZ_SCALE_LOG:
+            if redz[0] <= 0.0:
+                err = f"With `REDZ_SCALE_LOG={REDZ_SCALE_LOG}` redshift lower bound must be non-zero ({redz})!"
+                utils.error(err)
+            self.redz = np.logspace(*np.log10(redz[:2]), redz[2])
+        else:
+            self.redz = np.linspace(*redz)
 
         self._gsmf = gsmf
         self._gpf = gpf
@@ -680,7 +690,8 @@ def _integrate_differential_number(edges, dnum, freq=False):
     # integrate over mass-ratio
     number = holo.utils.trapz(number, edges[1], axis=1, cumsum=False)
     # integrate over redshift
-    number = holo.utils.trapz(number, edges[2], axis=2, cumsum=False)
+    redz_edges = edges[2]
+    number = holo.utils.trapz(number, redz_edges, axis=2, cumsum=False)
     # integrate over frequency (if desired)
     if freq:
         number = holo.utils.trapz(number, np.log(edges[3]), axis=3, cumsum=False)
@@ -723,8 +734,8 @@ def sample_sam_with_hardening(
     # edges: Mtot [grams], mrat (q), redz (z), {fobs (f) [1/s] OR sepa (a) [cm]}
     edges, dnum = sam.diff_num_from_hardening(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
 
-    # log_edges = [np.log10(edges[0]), edges[1], edges[2], np.log(edges[3])]
-    use_edges = [np.log10(edges[0]), edges[1], edges[2], np.log(edges[3])]
+    edges_integrate = [np.copy(ee) for ee in edges]
+    edges_sample = [np.log10(edges[0]), edges[1], edges[2], np.log(edges[3])]
 
     if cut_below_mass is not None:
         m2 = edges[0][:, np.newaxis] * edges[1][np.newaxis, :]
@@ -737,25 +748,51 @@ def sample_sam_with_hardening(
         )
         log.warning(msg)
 
-    # integrate each bin to convert from probability- density to mass
-    # NOTE: _integrate_differential_number() has log-vs-lin spacings hardcoded! use `edges` as is
-    #       do not use `log_edges`
-    mass = _integrate_differential_number(edges, dnum, freq=True)
+    # Sample redshift by first converting to comoving volume, sampling, then convert back
+    if REDZ_SAMPLE_VOLUME:
+        redz = edges[2]
+        volume = cosmo.comoving_volume(redz).to('Mpc3').value
 
-    # sample binaries from distribution, using appropriate spacing as needed
-    # BUG: should the density used for proportional sampling `dnum` be log(density) ?!
+        # convert from dN/dz to dN/dVc, dN/dVc = (dN/dz) * (dz/dVc) = (dN/dz) / (dVc/dz)
+        dvcdz = cosmo.dVcdz(redz, cgs=False).value
+        dnum = dnum / dvcdz[np.newaxis, np.newaxis, :, np.newaxis]
+
+        # change variable from redshift to comoving-volume, both sampling and integration
+        edges_sample[2] = volume
+        edges_integrate[2] = volume
+    else:
+        msg = (
+            "Sampling redshifts directly, instead of via comoving-volume.  This is less accurate!"
+        )
+        log.warning(msg)
+
+    # Find the 'mass' (total number of binaries in each bin) by multiplying each bin by its volume
+    # NOTE: this needs to be done manually, instead of within kalepy, because of log-spacings
+    mass = _integrate_differential_number(edges_integrate, dnum, freq=True)
+
+    # ---- sample binaries from distribution
     if (sample_threshold is None) or (sample_threshold == 0.0):
-        log.warning(f"Sampling *all* binaries (~{mass.sum():.2e}).")
-        log.warning("Set `sample_threshold` to only sample outliers.")
-        vals = kale.sample_grid(use_edges, dnum, mass=mass, **sample_kwargs)
-        weights = np.ones(vals.shape[1])
+        msg = (
+            f"Sampling *all* binaries (~{mass.sum():.2e}).  "
+            "Set `sample_threshold` to only sample outliers."
+        )
+        log.warning(msg)
+        vals = kale.sample_grid(edges_sample, dnum, mass=mass, **sample_kwargs)
+        weights = np.ones(vals.shape[1], dtype=int)
     else:
         vals, weights = kale.sample_outliers(
-            use_edges, dnum, sample_threshold, mass=mass, **sample_kwargs
+            edges_sample, dnum, sample_threshold, mass=mass, **sample_kwargs
         )
+
     vals[0] = 10.0 ** vals[0]
     vals[3] = np.e ** vals[3]
 
+    # If we sampled in comoving-volume, instead of redshift, convert back to redshift
+    if REDZ_SAMPLE_VOLUME:
+        vals[2] = np.power(vals[2] / (4.0*np.pi/3.0), 1.0/3.0)
+        vals[2] = cosmo.dcom_to_z(vals[2] * MPC)
+
+    # Remove low-mass systems after sampling also
     if cut_below_mass is not None:
         bads = (vals[0] * vals[1] < cut_below_mass)
         vals = vals.T[~bads].T
