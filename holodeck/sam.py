@@ -33,6 +33,9 @@ from holodeck import relations
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
+REDZ_SCALE_LOG = True
+REDZ_SAMPLE_VOLUME = True
+
 
 class _Galaxy_Stellar_Mass_Function(abc.ABC):
     """Galaxy Stellar-Mass Function base-class.  Used to calculate number-density of galaxies.
@@ -315,7 +318,7 @@ class Semi_Analytic_Model:
     """
 
     def __init__(
-        self, mtot=[2.75e5*MSOL, 1.0e11*MSOL, 46], mrat=[0.02, 1.0, 50], redz=[0.0, 6.0, 61],
+        self, mtot=[2.75e5*MSOL, 1.0e11*MSOL, 46], mrat=[0.02, 1.0, 50], redz=[0.01, 6.0, 61],
         # self, mtot=[2.75e5*MSOL, 1.0e11*MSOL, 11], mrat=[0.02, 1.0, 10], redz=[0.0, 6.0, 9],
         shape=None,
         gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM13
@@ -355,19 +358,37 @@ class Semi_Analytic_Model:
         elif not isinstance(mmbulge, relations._MMBulge_Relation):
             raise ValueError("`mmbulge` must be an instance or subclass of `_MMBulge_Relation`!")
 
+        # NOTE: Create a copy of input args to make sure they aren't overwritten (in-place)
+        mtot = [mt for mt in mtot]
+        mrat = [mt for mt in mrat]
+        redz = [mt for mt in redz]
+
         # Redefine shape of grid (i.e. number of bins in each parameter)
         if shape is not None:
             if len(shape) == 3:
-                mtot[2] = shape[0]
-                mrat[2] = shape[1]
-                redz[2] = shape[2]
+                # mtot
+                if shape[0] is not None:
+                    mtot[2] = shape[0]
+                # mrat
+                if shape[1] is not None:
+                    mrat[2] = shape[1]
+                # redz
+                if shape[2] is not None:
+                    redz[2] = shape[2]
             else:
                 raise
 
         # NOTE: the spacing (log vs lin) is important.  e.g. in integrating from differential-number to (total) number
         self.mtot = np.logspace(*np.log10(mtot[:2]), mtot[2])
         self.mrat = np.linspace(*mrat)
-        self.redz = np.linspace(*redz)
+
+        if REDZ_SCALE_LOG:
+            if redz[0] <= 0.0:
+                err = f"With `REDZ_SCALE_LOG={REDZ_SCALE_LOG}` redshift lower bound must be non-zero ({redz})!"
+                utils.error(err)
+            self.redz = np.logspace(*np.log10(redz[:2]), redz[2])
+        else:
+            self.redz = np.linspace(*redz)
 
         self._gsmf = gsmf
         self._gpf = gpf
@@ -424,13 +445,13 @@ class Semi_Analytic_Model:
             dens = np.zeros(self.shape)
 
             # ---- convert from MBH ===> mstar
+
             # `mstar_tot` starts as the secondary mass, sorry
             mstar_pri, mstar_tot = self.mass_stellar()
             # q = m2 / m1
             mstar_rat = mstar_tot / mstar_pri
-            # convert `mstar_tot` into total mass: M = m1 + m2
+            # M = m1 + m2
             mstar_tot = mstar_pri + mstar_tot
-
             redz = self.redz[np.newaxis, np.newaxis, :]
             args = [mstar_pri[..., np.newaxis], mstar_rat[..., np.newaxis], mstar_tot[..., np.newaxis], redz]
             # Convert to shape (M, Q, Z)
@@ -460,23 +481,25 @@ class Semi_Analytic_Model:
 
             # so far we have ``dn_gal / [dM_gal dq_gal dz]``
             # dn / [dM dq dz] = (dn_gal / [dM_gal dq_gal dz]) * (dM_gal/dM_bh) * (dq_gal / dq_bh)
-            dqgal_dqbh = 1.0     # conversion from galaxy mrat to MBH mrat
-            # dMs/dMbh
+            # dq_gal / dq_bh - convert from galaxy mrat to MBH mrat
+            dqgal_dqbh = 1.0
+            # dMs/dMbh - convert from stellar mass to BH mass
             dmstar_dmbh = 1.0 / self._mmbulge.dmbh_dmstar(mstar_tot)   # [unitless]
             mbh_tot = self._mmbulge.mbh_from_mstar(mstar_tot, scatter=False)  # [gram]
-
-            # Eq.21, now [Mpc^-3], lose [1/gram] because now 1/dlog10(M) instead of 1/dM
-            dens[idx] *= dqgal_dqbh * dmstar_dmbh * mbh_tot * np.log(10.0)
+            # Eq.21, now [gram^-1 Mpc^-3]
+            dens[idx] *= dqgal_dqbh * dmstar_dmbh
+            # Convert from 1/dM to 1/dlog10(M), units are now [Mpc^-3] {lose [1/gram] because now 1/dlog10(M)}
+            dens[idx] *= mbh_tot * np.log(10.0)
 
             self._density = dens
 
         return self._density
 
     def diff_num_from_hardening(self, hard, fobs=None, sepa=None, limit_merger_time=None):
-        """Calculate the number of binaries, per unit bin-volume, per log-frequency interval.
+        """Calculate the differential number of binaries (per bin-volume, per log-freq interval).
 
-        The value returned is `d^4 N / [dlog10(M) dq dz dln(X)]`
-        where X is either separation (a) or frequency (f_r).
+        The value returned is `d^4 N / [dlog10(M) dq dz dln(X)]`, where X is either
+        separation (a) or frequency (f_r), depending on whether `sepa` or `fobs` is passed in.
 
         Arguments
         ---------
@@ -490,8 +513,8 @@ class Semi_Analytic_Model:
         -------
         edges : (4,) list of 1darrays of scalar
             A list containing the edges along each dimension.
-        number : (M, Q, Z, F) ndarray of scalar
-            Number density of binaries.
+        dnum : (M, Q, Z, F) ndarray of scalar
+            Differential number of binaries.
 
         Notes
         -----
@@ -583,11 +606,11 @@ class Semi_Analytic_Model:
         tau = tau.reshape(dens.shape + (xsize,))
 
         # (M, Q, Z) units: [1/s] i.e. number per second
-        number = dens * cosmo_fact
+        dnum = dens * cosmo_fact
         # (M, Q, Z, F) units: [] unitless, i.e. number
-        number = number[..., np.newaxis] * tau
+        dnum = dnum[..., np.newaxis] * tau
 
-        return edges, number
+        return edges, dnum
 
     def gwb(self, fobs, hard=holo.evolution.Hard_GW, realize=False):
         """Calculate the (smooth/semi-analytic) GWB at the given observed frequencies.
@@ -667,7 +690,8 @@ def _integrate_differential_number(edges, dnum, freq=False):
     # integrate over mass-ratio
     number = holo.utils.trapz(number, edges[1], axis=1, cumsum=False)
     # integrate over redshift
-    number = holo.utils.trapz(number, edges[2], axis=2, cumsum=False)
+    redz_edges = edges[2]
+    number = holo.utils.trapz(number, redz_edges, axis=2, cumsum=False)
     # integrate over frequency (if desired)
     if freq:
         number = holo.utils.trapz(number, np.log(edges[3]), axis=3, cumsum=False)
@@ -677,7 +701,7 @@ def _integrate_differential_number(edges, dnum, freq=False):
 
 def sample_sam_with_hardening(
         sam, hard,
-        fobs=None, sepa=None, sample_threshold=10.0, cut_below_mass=1e6, limit_merger_time=None,
+        fobs=None, sepa=None, sample_threshold=10.0, cut_below_mass=None, limit_merger_time=None,
         **sample_kwargs
 ):
     """Discretize Semi-Analytic Model into sampled binaries assuming the given binary hardening rate.
@@ -703,34 +727,72 @@ def sample_sam_with_hardening(
 
     """
 
+    if sample_threshold < 1.0:
+        log.warning("`sample_threshold={sample_threshold}`, values less than unity can lead to surprising behavior!")
+
     # returns  dN/[dlog10(M) dq dz dln(f_r)]
     # edges: Mtot [grams], mrat (q), redz (z), {fobs (f) [1/s] OR sepa (a) [cm]}
     edges, dnum = sam.diff_num_from_hardening(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
 
-    log_edges = [np.log10(edges[0]), edges[1], edges[2], np.log(edges[3])]
+    edges_integrate = [np.copy(ee) for ee in edges]
+    edges_sample = [np.log10(edges[0]), edges[1], edges[2], np.log(edges[3])]
 
     if cut_below_mass is not None:
         m2 = edges[0][:, np.newaxis] * edges[1][np.newaxis, :]
         bads = (m2 < cut_below_mass)
         dnum[bads] = 0.0
+        num_bad = np.count_nonzero(bads)
+        msg = (
+            f"Cutting out systems with secondary below {cut_below_mass/MSOL:.2e} Msol;"
+            f" {num_bad:.2e}/{bads.size:.2e} = {num_bad/bads.size:.4f}"
+        )
+        log.warning(msg)
 
-    # integrate each bin to convert from probability- density to mass
-    # NOTE: _integrate_differential_number() has log-vs-lin spacings hardcoded! use `edges` as is
-    #       do not use `log_edges`
-    mass = _integrate_differential_number(edges, dnum, freq=True)
+    # Sample redshift by first converting to comoving volume, sampling, then convert back
+    if REDZ_SAMPLE_VOLUME:
+        redz = edges[2]
+        volume = cosmo.comoving_volume(redz).to('Mpc3').value
 
-    # sample binaries from distribution, using appropriate spacing as needed
-    # BUG: should the density used for proportional sampling `dnum` be log(density) ?!
-    if (sample_threshold is None) or (sample_threshold == 0.0):
-        log.warning(f"Sampling *all* binaries (~{mass.sum():.2e}).")
-        log.warning("Set `sample_threshold` to only sample outliers.")
-        vals = kale.sample_grid(log_edges, dnum, mass=mass, **sample_kwargs)
-        weights = np.ones(vals.shape[1])
+        # convert from dN/dz to dN/dVc, dN/dVc = (dN/dz) * (dz/dVc) = (dN/dz) / (dVc/dz)
+        dvcdz = cosmo.dVcdz(redz, cgs=False).value
+        dnum = dnum / dvcdz[np.newaxis, np.newaxis, :, np.newaxis]
+
+        # change variable from redshift to comoving-volume, both sampling and integration
+        edges_sample[2] = volume
+        edges_integrate[2] = volume
     else:
-        vals, weights = kale.sample_outliers(log_edges, dnum, sample_threshold, mass=mass, **sample_kwargs)
+        msg = (
+            "Sampling redshifts directly, instead of via comoving-volume.  This is less accurate!"
+        )
+        log.warning(msg)
+
+    # Find the 'mass' (total number of binaries in each bin) by multiplying each bin by its volume
+    # NOTE: this needs to be done manually, instead of within kalepy, because of log-spacings
+    mass = _integrate_differential_number(edges_integrate, dnum, freq=True)
+
+    # ---- sample binaries from distribution
+    if (sample_threshold is None) or (sample_threshold == 0.0):
+        msg = (
+            f"Sampling *all* binaries (~{mass.sum():.2e}).  "
+            "Set `sample_threshold` to only sample outliers."
+        )
+        log.warning(msg)
+        vals = kale.sample_grid(edges_sample, dnum, mass=mass, **sample_kwargs)
+        weights = np.ones(vals.shape[1], dtype=int)
+    else:
+        vals, weights = kale.sample_outliers(
+            edges_sample, dnum, sample_threshold, mass=mass, **sample_kwargs
+        )
+
     vals[0] = 10.0 ** vals[0]
     vals[3] = np.e ** vals[3]
 
+    # If we sampled in comoving-volume, instead of redshift, convert back to redshift
+    if REDZ_SAMPLE_VOLUME:
+        vals[2] = np.power(vals[2] / (4.0*np.pi/3.0), 1.0/3.0)
+        vals[2] = cosmo.dcom_to_z(vals[2] * MPC)
+
+    # Remove low-mass systems after sampling also
     if cut_below_mass is not None:
         bads = (vals[0] * vals[1] < cut_below_mass)
         vals = vals.T[~bads].T
@@ -739,13 +801,27 @@ def sample_sam_with_hardening(
     return vals, weights, edges, dnum, mass
 
 
+def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
+    """
+
+    Arguments
+    ---------
+    fobs : (F,) array_like of scalar,
+        Target frequencies of interest in units of [1/yr]
+
+    """
+    vals, weights, edges, dens, mass = sample_sam_with_hardening(sam, hard, fobs=fobs, **kwargs)
+    gff, gwf, gwb = _gws_from_samples(vals, weights, fobs)
+    return gff, gwf, gwb
+
+
 def _gws_from_samples(vals, weights, fobs):
     """
 
     Arguments
     ---------
     vals : (4, N) ndarray of scalar,
-        Arrays of binary parameters in linear space.
+        Arrays of binary parameters.
         * vals[0] : mtot [grams]
         * vals[1] : mrat []
         * vals[2] : redz []
@@ -767,32 +843,22 @@ def _gws_from_samples(vals, weights, fobs):
     return gff, gwf, gwb
 
 
-def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
-    """
-
-    Arguments
-    ---------
-    fobs : (F,) array_like of scalar,
-        Target frequencies of interest in units of [1/yr]
-
-    """
-    vals, weights, edges, dens, mass = sample_sam_with_hardening(sam, hard, fobs=fobs, **kwargs)
-    gff, gwf, gwb = _gws_from_samples(vals, weights, fobs)
-    return gff, gwf, gwb
-
-
 @numba.njit
-def gws_from_sampled_strains(freqs, fobs, hs, weights):
+def gws_from_sampled_strains(fobs, fo, hs, weights):
     """Calculate GW background/foreground from sampled GW strains.
 
     Arguments
     ---------
-    freqs : (F,) array_like of scalar
+    fobs : (F,) array_like of scalar
         Frequency bins.
-    fobs : (S,) array_like of scalar
+    fo : (S,) array_like of scalar
         Observed GW frequency of each binary sample.
-    hs : (S,)
-    weights : (S,)
+    hs : (S,) array_like of scalar
+        GW source strain (*not characteristic strain*) of each binary sample.
+    weights : (S,) array_like of int
+        Weighting factor for each binary
+        NOTE: the GW calculation is ill-defined if weights have fractional values
+              (i.e. float values, instead of integral values; but the type itself doesn't matter)
 
     Returns
     -------
@@ -806,40 +872,43 @@ def gws_from_sampled_strains(freqs, fobs, hs, weights):
     """
 
     # ---- Initialize
-    num_samp = fobs.size
-    num_freq = freqs.size - 1
-    gwback = np.zeros(num_freq)
-    gwfore = np.zeros(num_freq)
-    gwf_freqs = np.zeros(num_freq)
+    num_samp = fo.size                 # number of binaries/samples
+    num_freq = fobs.size - 1           # number of frequency bins (edges - 1)
+    gwback = np.zeros(num_freq)        # store GWB characteristic strain
+    gwfore = np.zeros(num_freq)        # store loudest binary characteristic strain, for each bin
+    gwf_freqs = np.zeros(num_freq)     # store frequency of loudest binary, for each bin
 
     # ---- Sort input by frequency for faster iteration
-    idx = np.argsort(fobs)
-    weights = weights[idx]
-    fobs = fobs[idx]
-    hs = hs[idx]
+    idx = np.argsort(fo)
+    fo = np.copy(fo)[idx]
+    hs = np.copy(hs)[idx]
+    weights = np.copy(weights)[idx]
 
     # ---- Calculate GW background and foreground in each frequency bin
     ii = 0
-    lo = freqs[0]
+    lo = fobs[ii]
     for ff in range(num_freq):
         # upper-bound to this frequency bin
-        hi = freqs[ff+1]
+        hi = fobs[ff+1]
         # number of GW cycles (f/df), for conversion to characteristic strain
         cycles = 0.5 * (hi + lo) / (hi - lo)
         # amplitude and frequency of the loudest source in this bin
         hmax = 0.0
         fmax = 0.0
         # iterate over all sources with frequencies below this bin's limit (right edge)
-        while (fobs[ii] < hi) and (ii < num_samp):
+        while (fo[ii] < hi) and (ii < num_samp):
             # Store the amplitude and frequency of loudest source
             #    NOTE: loudest source could be a single-sample (weight==1) or from a weighted-bin (weight > 1)
-            if hs[ii] > hmax:
+            #          the max
+            if (weights[ii] >= 1) and (hs[ii] > hmax):
                 hmax = hs[ii]
-                fmax = fobs[ii]
-            h2temp = hs[ii] ** 2
-            if weights[ii] > 1.0:
-                h2temp *= np.random.poisson(weights[ii])
+                fmax = fo[ii]
+            # if (weights[ii] > 1.0) and poisson:
+            #     h2temp *= np.random.poisson(weights[ii])
+            h2temp = weights[ii] * (hs[ii] ** 2)
             gwback[ff] += h2temp
+
+            # increment binary/sample index
             ii += 1
 
         # subtract foreground source from background
@@ -861,8 +930,8 @@ def _gws_from_number_grid(fobs, grid, dnum, number, realize):
         ``N = (d^4 N / [dlog10(M) dq dz dlogf] ) * dlog10(M) dq dz dlogf``
     The number `N` is evaluated on a 4d grid, specified by `edges`, i.e.
         ``N = N(M, q, z, f_r)``
-    NOTE: that `number` must also summed/integrated over dlogf.  To calculate characteristic strain,
-    this function divides again by the dlogf term.
+    NOTE: the provided `number` must also summed/integrated over dlogf.
+    To calculate characteristic strain, this function divides again by the dlogf term.
 
     Parameters
     ----------
@@ -910,6 +979,7 @@ def _gws_from_number_grid(fobs, grid, dnum, number, realize):
         raise ValueError(err)
 
     number = number / dlogf
+    hs = np.nan_to_num(hs)
     # (M',Q',Z',F) ==> (F,)
     hc = np.sqrt(np.sum(number*np.square(hs), axis=(0, 1, 2)))
 
