@@ -65,7 +65,7 @@ class _MHost_Relation(abc.ABC):
     @abc.abstractmethod
     def requirements(self):
         return
-    
+
 
 class _MMBulge_Relation(_MHost_Relation):
 
@@ -98,7 +98,7 @@ class _MMBulge_Relation(_MHost_Relation):
 
     def mbh_from_mstar(self, mstar, scatter):
         mbulge = self.mbulge_from_mstar(mstar)
-        return self.mbh_from_host({'mbulge':mbulge}, scatter)
+        return self.mbh_from_host({'mbulge': mbulge}, scatter)
 
     def mstar_from_mbh(self, mbh, **kwargs):
         mbulge = self.mbulge_from_mbh(mbh, **kwargs)
@@ -162,21 +162,23 @@ class MMBulge_Standard(_MMBulge_Relation):
 
     def dmbh_dmbulge(self, mbulge):
         # NOTE: scatter should never be used in the differential relation
-        dmdm = self.mbh_from_host({'mbulge':mbulge}, scatter=False)
+        dmdm = self.mbh_from_host({'mbulge': mbulge}, scatter=False)
         dmdm = dmdm * self._mplaw / mbulge
         return dmdm
 
     def dmbulge_dmstar(self, mstar):
         # NOTE: this only works for a constant value, do *not* return `self.bulge_mass_frac()`
         return self._bulge_mfrac
-        
+
     def requirements(self):
         return ['mbulge']
 
+
 class MMBulge_Redshift(_MMBulge_Relation):
     """
-    Provides black hole mass as a function of galaxy bulge mass and redshift with a 
-    normalization that depends on redshift. zplaw=0 (default) is identical to MMBulge_Standard. mamp = mamp0 * (1 + z)**zplaw
+    Provides black hole mass as a function of galaxy bulge mass and redshift with a
+    normalization that depends on redshift. zplaw=0 (default) is identical to MMBulge_Standard.
+    mamp = mamp0 * (1 + z)**zplaw
     """
 
     MASS_AMP = 3.0e8 * MSOL
@@ -217,7 +219,7 @@ class MMBulge_Redshift(_MMBulge_Relation):
             scatter_dex = self._scatter_dex
         else:
             scatter_dex = None
-        
+
         zmamp = self._mamp * (1.0 + host['redz'])**self._zplaw
         mbh = _log10_relation(host['mbulge'], zmamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
@@ -245,13 +247,15 @@ class MMBulge_Redshift(_MMBulge_Relation):
     def dmbulge_dmstar(self, mstar):
         # NOTE: this only works for a constant value, do *not* return `self.bulge_mass_frac()`
         return self._bulge_mfrac
-        
+
     def requirements(self):
         return ['mbulge', 'redz']
 
+
 class MMBulge_Strawman(_MMBulge_Relation):
     """
-    Provides a broken M_BH--M_bulge relation to test error checking. Do not use this for any purpose other than error testing.
+    Provides a broken M_BH--M_bulge relation to test error checking.
+    Do not use this for any purpose other than error testing.
     """
 
     MASS_AMP = 3.0e8 * MSOL
@@ -293,7 +297,7 @@ class MMBulge_Strawman(_MMBulge_Relation):
             scatter_dex = self._scatter_dex
         else:
             scatter_dex = None
-        
+
         zmamp = self._mamp * (1.0 + host['redz'])**self._zplaw
         mbh = _log10_relation(host['mbulge'], zmamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
@@ -321,7 +325,7 @@ class MMBulge_Strawman(_MMBulge_Relation):
     def dmbulge_dmstar(self, mstar):
         # NOTE: this only works for a constant value, do *not* return `self.bulge_mass_frac()`
         return self._bulge_mfrac
-        
+
     def requirements(self):
         return ['mbulge', 'redz', 'fairydust', 'Santa Claus']
 
@@ -334,7 +338,6 @@ class _MSigma_Relation(_MHost_Relation):
         return
 
     # ---- Internal Methods ----
-
 
 
 class MSigma_Standard(_MSigma_Relation):
@@ -374,14 +377,13 @@ class MSigma_Standard(_MSigma_Relation):
 
         mbh = _log10_relation(host['vdisp'], self._mamp, self._mplaw, scatter_dex, x0=self._sigmaref)
         return mbh
-        
-    def dmbh_dsigma(self, sigma): # Is this needed? I don't know
+
+    # Is this needed? I don't know
+    def dmbh_dsigma(self, sigma):
         return None
 
     def requirements(self):
         return ['vdisp']
-
-
 
 
 class MMBulge_MM13(MMBulge_Standard):
@@ -394,6 +396,7 @@ class MMBulge_MM13(MMBulge_Standard):
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.05                  # 1.05 ± 0.11
     SCATTER_DEX = 0.34
+
 
 class MSigma_MM13(MSigma_Standard):
     """Mbh-Sigma Relation from McConnell & Ma 2013
@@ -419,6 +422,7 @@ class MMBulge_MM13_ZEvolution(MMBulge_Redshift):
     SCATTER_DEX = 0.34
     Z_PLAW = 0.0
 
+
 class MMBulge_KH13(MMBulge_Standard):
     """Mbh-MBulge Relation from Kormendy & Ho 2013.
 
@@ -429,6 +433,7 @@ class MMBulge_KH13(MMBulge_Standard):
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.17                  # 1.17 ± 0.08
     SCATTER_DEX = 0.28
+
 
 class MSigma_KH13(MSigma_Standard):
     """Mbh-Sigma Relation from Kormendy & Ho 2013
