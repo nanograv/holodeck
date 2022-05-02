@@ -11,10 +11,7 @@ To-Do
 -----
 *[ ]Check that _GW_ frequencies and _orbital_ frequencies are being used in the correct places.
     Check `number_at_gw_fobs` and related methods.
-*[ ]Change mass-ratios and redshifts (1+z) to log-space; expand q parameter range.
 *[ ]Incorporate arbitrary hardening mechanisms into SAM construction, sample self-consistently.
-*[ ]When using `sample_outliers` check whether the density (used for intrabin sampling) should be
-    the log(dens) instead of just `dens`.
 
 """
 
@@ -365,18 +362,22 @@ class Semi_Analytic_Model:
 
         # Redefine shape of grid (i.e. number of bins in each parameter)
         if shape is not None:
-            if len(shape) == 3:
-                # mtot
-                if shape[0] is not None:
-                    mtot[2] = shape[0]
-                # mrat
-                if shape[1] is not None:
-                    mrat[2] = shape[1]
-                # redz
-                if shape[2] is not None:
-                    redz[2] = shape[2]
-            else:
-                raise
+            if np.isscalar(shape):
+                shape = [shape+ii for ii in range(3)]
+
+            shape = np.asarray(shape)
+            if not kale.utils.isinteger(shape) or (shape.size != 3) or np.any(shape <= 1):
+                raise ValueError(f"`shape` ({shape}) must be an integer, or (3,) iterable of integers, larger than 1!")
+
+            # mtot
+            if shape[0] is not None:
+                mtot[2] = shape[0]
+            # mrat
+            if shape[1] is not None:
+                mrat[2] = shape[1]
+            # redz
+            if shape[2] is not None:
+                redz[2] = shape[2]
 
         # NOTE: the spacing (log vs lin) is important.  e.g. in integrating from differential-number to (total) number
         self.mtot = np.logspace(*np.log10(mtot[:2]), mtot[2])
@@ -727,8 +728,11 @@ def sample_sam_with_hardening(
 
     """
 
-    if sample_threshold < 1.0:
-        log.warning("`sample_threshold={sample_threshold}`, values less than unity can lead to surprising behavior!")
+    if (sample_threshold < 1.0) and (sample_threshold > 0.0):
+        msg = (
+            f"`sample_threshold={sample_threshold}` values less than unity can lead to surprising behavior!"
+        )
+        log.warning(msg)
 
     # returns  dN/[dlog10(M) dq dz dln(f_r)]
     # edges: Mtot [grams], mrat (q), redz (z), {fobs (f) [1/s] OR sepa (a) [cm]}
@@ -956,6 +960,10 @@ def _gws_from_number_grid(fobs, grid, dnum, number, realize):
     # get weighted centers for each dimension
     for ii, cc in enumerate(coms):
         coms[ii] = kale.utils.midpoints(dnum * cc, log=False, axis=(0, 1, 2, 3)) / cent
+
+    # print(f"{utils.stats(number)=}")
+    # print(f"{utils.stats(dnum)=}")
+    # print(f"{utils.stats(coms)=}")
 
     # ---- calculate GW strain at bin centroids
     mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))
