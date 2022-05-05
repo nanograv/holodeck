@@ -93,54 +93,51 @@ class _MHost_Relation(abc.ABC):
         return
 
 
+# -----------------------------------------
+# ----     M – Mbulge Relationships    ----
+# -----------------------------------------
+
+
 class _MMBulge_Relation(_MHost_Relation):
 
     _PROPERTIES = ['mbulge']
 
+    def mbulge_from_mstar(self, mstar):
+        return self.bulge_mass_frac(mstar) * mstar
+
     # ---- Abstract Methods : must be overridden in subclasses  ----
+
+    @abc.abstractmethod
+    def dmstar_dmbh(self, pop):
+        return
+
     @abc.abstractmethod
     def bulge_mass_frac(self, mstar):
         return
 
     @abc.abstractmethod
-    def dmbh_dmbulge(self, mbulge):
+    def mbh_from_host(self, host):
         return
 
     @abc.abstractmethod
-    def dmbulge_dmstar(self, mstar):
-        return
-
-    # ---- Internal Methods ----
-
-    def dmbh_dmstar(self, mstar):
-        mbulge = self.mbulge_from_mstar(mstar)
-        # (dmbh/dmstar) = (dmbh/dmbulge) * (dmbulge/dmstar)
-        dmdm = self.dmbh_dmbulge(mbulge) * self.dmbulge_dmstar(mstar)
-        return dmdm
-
-    def mbulge_from_mstar(self, mstar):
-        return self.bulge_mass_frac(mstar) * mstar
-
     def mstar_from_mbulge(self, mbulge):
-        return mbulge / self.bulge_mass_frac(mbulge)
-
-    def mbh_from_mstar(self, mstar, scatter):
-        mbulge = self.mbulge_from_mstar(mstar)
-        return self.mbh_from_host({'mbulge': mbulge}, scatter)
-
-    def mstar_from_mbh(self, mbh, **kwargs):
-        mbulge = self.mbulge_from_mbh(mbh, **kwargs)
-        return self.mstar_from_mbulge(mbulge)
+        return
 
 
 class MMBulge_Standard(_MMBulge_Relation):
     """
+
+    * Single power-law relationship between BH mass and Stellar-bulge mass.
+        .. math::  Mbh = M0 * (M_bulge/Mref)^plaw * 10^Normal(0, eps)
+    * Constant bulge mass-fraction relative to total stellar mass.
+        .. math::  M_bulge = f_bulge * M_star
+
     """
 
     MASS_AMP = 3.0e8 * MSOL
     MASS_PLAW = 1.0
     MASS_REF = 1.0e11 * MSOL
-    SCATTER_DEX = 0.0
+    SCATTER_DEX = 0.3
 
     def __init__(self, mamp=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None):
         if mamp is None:
@@ -167,14 +164,16 @@ class MMBulge_Standard(_MMBulge_Relation):
 
         Units of [grams].
         """
-        if scatter:
-            scatter_dex = self._scatter_dex
-        else:
-            scatter_dex = None
-
         host = self.get_host_properties(pop)
         mbulge = host['mbulge']
+        return self.mbh_from_mbulge(mbulge, scatter=scatter)
 
+    def mbh_from_mbulge(self, mbulge, scatter):
+        """Convert from stellar bulge-mass to blackhole mass.
+
+        Units of [grams].
+        """
+        scatter_dex = self._scatter_dex if scatter else None
         mbh = _log10_relation(mbulge, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
 
@@ -183,30 +182,73 @@ class MMBulge_Standard(_MMBulge_Relation):
 
         Units of [grams].
         """
-        if scatter:
-            scatter_dex = self._scatter_dex
-        else:
-            scatter_dex = None
-
+        scatter_dex = self._scatter_dex if scatter else None
         mbulge = _log10_relation_reverse(mbh, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbulge
 
-    def dmbh_dmbulge(self, mbulge):
-        # NOTE: scatter should never be used in the differential relation
-        dmdm = self.mbh_from_host({'mbulge': mbulge}, scatter=False)
-        dmdm = dmdm * self._mplaw / mbulge
-        return dmdm
+    def mstar_from_mbulge(self, mbulge):
+        return mbulge / self._bulge_mfrac
 
-    def dmbulge_dmstar(self, mstar):
-        # NOTE: this only works for a constant value, do *not* return `self.bulge_mass_frac()`
-        return self._bulge_mfrac
+    def mbh_from_mstar(self, mstar, scatter):
+        mbulge = self.mbulge_from_mstar(mstar)
+        return self.mbh_from_mbulge(mbulge, scatter)
+
+    def mstar_from_mbh(self, mbh, scatter):
+        mbulge = self.mbulge_from_mbh(mbh, scatter)
+        return self.mstar_from_mbulge(mbulge)
+
+    def dmstar_dmbh(self, mstar):
+        """Calculate the partial derivative of stellar mass versus BH mass `d M_star / d M_bh`
+
+        .. math::
+
+            d M_star / d M_bh  =  [d M_star / d M_bulge] * [d M_bulge / d M_bh]
+                               =  [1/f_bulge] * [M_bulge / (plaw * M_bh)]
+
+        """
+        plaw = self._mplaw
+        fbulge = self._bulge_mfrac
+        mbulge = mstar * fbulge
+        mbh = self.mbh_from_mbulge(mbulge, scatter=False)
+        deriv = mbulge / (fbulge * plaw * mbh)
+        return deriv
 
 
-class MMBulge_Redshift(_MMBulge_Relation):
+class MMBulge_KH13(MMBulge_Standard):
+    """Mbh-MBulge Relation from Kormendy & Ho 2013.
+
+    Values taken from [KH13] Eq.10 (pg. 61 of PDF, "571" of ARAA)
+    """
+
+    MASS_AMP = 0.49 * 1e9 * MSOL   # 0.49 + 0.06 - 0.05   in units of [Msol]
+    MASS_REF = MSOL * 1e11            # 1e11 Msol
+    MASS_PLAW = 1.17                  # 1.17 ± 0.08
+    SCATTER_DEX = 0.28
+
+
+class MMBulge_MM13(MMBulge_Standard):
+    """Mbh-MBulge Relation from McConnell & Ma 2013
+
+    [MM13] Eq. 2, with values taken from Table 2 ("Dynamical masses", first row, "MPFITEXY")
+    """
+
+    MASS_AMP = MSOL * 10.0 ** 8.46    # 8.46 ± 0.08   in units of [Msol]
+    MASS_REF = MSOL * 1e11            # 1e11 Msol
+    MASS_PLAW = 1.05                  # 1.05 ± 0.11
+    SCATTER_DEX = 0.34
+
+
+# ----     M – Mbulge & Redshift Relationships    ----
+
+
+class MMBulge_Redshift(MMBulge_Standard):
     """
     Provides black hole mass as a function of galaxy bulge mass and redshift with a normalization
     that depends on redshift. zplaw=0 (default) is identical to MMBulge_Standard.
     mamp = mamp0 * (1 + z)**zplaw
+
+    TODO: make sure the all of the inherited methods from `MMBulge_Standard` are appropriate for
+          redshift dependencies!!  In particular, check `dmstar_dmbh`
 
     """
 
@@ -238,26 +280,21 @@ class MMBulge_Redshift(_MMBulge_Relation):
         self._zplaw = zplaw
         return
 
-    def bulge_mass_frac(self, mstar):
-        return self._bulge_mfrac
-
     def mbh_from_host(self, pop, scatter):
-        """Convert from stellar bulge-mass to blackhole mass.
-
-        Units of [grams].
-        """
-        if scatter:
-            scatter_dex = self._scatter_dex
-        else:
-            scatter_dex = None
-
         host = self.get_host_properties(pop, copy=False)
         mbulge = host['mbulge']    # shape (N, 2)
         redz = host['redz']        # shape (N,)
+        return self.mbh_from_mbulge(mbulge, redz, scatter=scatter)
+
+    def mbh_from_mbulge(self, mbulge, redz, scatter):
+        """Convert from stellar bulge-mass and redshift ==> blackhole mass.
+
+        Units of [grams].
+        """
+        scatter_dex = self._scatter_dex if scatter else None
         # Broadcast `redz` to match shape of `mbulge`, if needed
         # NOTE: this will work for (N,) ==> (N,)    or   (N,) ==> (N,X)
         redz = np.broadcast_to(redz, mbulge.T.shape).T
-
         zmamp = self._mamp * (1.0 + redz)**self._zplaw
         mbh = _log10_relation(mbulge, zmamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
@@ -267,103 +304,52 @@ class MMBulge_Redshift(_MMBulge_Relation):
 
         Units of [grams].
         """
-        if scatter:
-            scatter_dex = self._scatter_dex
-        else:
-            scatter_dex = None
-
+        scatter_dex = self._scatter_dex if scatter else None
         zmamp = self._mamp * (1.0 + redz)**self._zplaw
         mbulge = _log10_relation_reverse(mbh, zmamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbulge
 
-    def dmbh_dmbulge(self, mbulge):
-        # NOTE: scatter should never be used in the differential relation
-        dmdm = self.mbh_from_mbulge(mbulge, scatter=False)
-        dmdm = dmdm * self._mplaw / mbulge
-        return dmdm
+    def mbh_from_mstar(self, mstar, redz, scatter):
+        mbulge = self.mbulge_from_mstar(mstar)
+        return self.mbh_from_mbulge(mbulge, redz, scatter)
 
-    def dmbulge_dmstar(self, mstar):
-        # NOTE: this only works for a constant value, do *not* return `self.bulge_mass_frac()`
-        return self._bulge_mfrac
+    def mstar_from_mbh(self, mbh, redz, scatter):
+        mbulge = self.mbulge_from_mbh(mbh, redz, scatter)
+        return self.mstar_from_mbulge(mbulge)
+
+    def dmstar_dmbh(self, mstar, redz):
+        """Calculate the partial derivative of stellar mass versus BH mass `d M_star / d M_bh`
+
+        .. math::
+
+            d M_star / d M_bh  =  [d M_star / d M_bulge] * [d M_bulge / d M_bh]
+                               =  [1/f_bulge] * [M_bulge / (plaw * M_bh)]
+
+        """
+        plaw = self._mplaw
+        fbulge = self._bulge_mfrac
+        mbulge = mstar * fbulge
+        mbh = self.mbh_from_mbulge(mbulge, redz, scatter=False)
+        deriv = mbulge / (fbulge * plaw * mbh)
+        return deriv
 
 
-class MMBulge_Strawman(_MMBulge_Relation):
+class MMBulge_Redshift_MM13(MMBulge_Redshift):
+    """Mbh-MBulge Relation from McConnell & Ma 2013 for z=0 plus redshift evolution of the normalization
+
+    [MM13] Eq. 2, with values taken from Table 2 ("Dynamical masses", first row, "MPFITEXY")
     """
-    Provides a broken M_BH--M_bulge relation to test error checking.
-    Do not use this for any purpose other than error testing.
 
-    """
-
-    MASS_AMP = 3.0e8 * MSOL
-    MASS_PLAW = 1.0
-    MASS_REF = 1.0e11 * MSOL
-    SCATTER_DEX = 0.0
+    MASS_AMP = MSOL * 10.0 ** 8.46    # 8.46 ± 0.08   in units of [Msol]
+    MASS_REF = MSOL * 1e11            # 1e11 Msol
+    MASS_PLAW = 1.05                  # 1.05 ± 0.11
+    SCATTER_DEX = 0.34
     Z_PLAW = 0.0
 
-    def __init__(self, mamp=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None, zplaw=None):
-        if mamp is None:
-            mamp = self.MASS_AMP
-        if mplaw is None:
-            mplaw = self.MASS_PLAW
-        if mref is None:
-            mref = self.MASS_REF
-        if scatter_dex is None:
-            scatter_dex = self.SCATTER_DEX
-        if zplaw is None:
-            zplaw = self.Z_PLAW
 
-        self._mamp = mamp   # Mass-Amplitude [grams]
-        self._mplaw = mplaw   # Mass Power-law index
-        self._mref = mref   # Reference Mass (argument normalization)
-        self._bulge_mfrac = bulge_mfrac
-        self._scatter_dex = scatter_dex
-        self._zplaw = zplaw
-        print(f"WARNING: Using MMBulge_Strawman(). This should only be used for testing purposes.")
-        return
-
-    def bulge_mass_frac(self, mstar):
-        return self._bulge_mfrac
-
-    def mbh_from_host(self, host, scatter):
-        """Convert from stellar bulge-mass to blackhole mass.
-
-        Units of [grams].
-        """
-        if scatter:
-            scatter_dex = self._scatter_dex
-        else:
-            scatter_dex = None
-
-        zmamp = self._mamp * (1.0 + host['redz'])**self._zplaw
-        mbh = _log10_relation(host['mbulge'], zmamp, self._mplaw, scatter_dex, x0=self._mref)
-        return mbh
-
-    def mbulge_from_mbh(self, mbh, redz, scatter):
-        """Convert from blackhole mass to stellar bulge-mass.
-
-        Units of [grams].
-        """
-        if scatter:
-            scatter_dex = self._scatter_dex
-        else:
-            scatter_dex = None
-
-        zmamp = self._mamp * (1.0 + redz)**self._zplaw
-        mbulge = _log10_relation_reverse(mbh, zmamp, self._mplaw, scatter_dex, x0=self._mref)
-        return mbulge
-
-    def dmbh_dmbulge(self, mbulge):
-        # NOTE: scatter should never be used in the differential relation
-        dmdm = self.mbh_from_mbulge(mbulge, scatter=False)
-        dmdm = dmdm * self._mplaw / mbulge
-        return dmdm
-
-    def dmbulge_dmstar(self, mstar):
-        # NOTE: this only works for a constant value, do *not* return `self.bulge_mass_frac()`
-        return self._bulge_mfrac
-
-    def requirements(self):
-        return ['mbulge', 'redz', 'fairydust', 'Santa Claus']
+# ----------------------------------------
+# ----     M – Sigma Relationships    ----
+# ----------------------------------------
 
 
 class _MSigma_Relation(_MHost_Relation):
@@ -421,18 +407,6 @@ class MSigma_Standard(_MSigma_Relation):
         return None
 
 
-class MMBulge_MM13(MMBulge_Standard):
-    """Mbh-MBulge Relation from McConnell & Ma 2013
-
-    [MM13] Eq. 2, with values taken from Table 2 ("Dynamical masses", first row, "MPFITEXY")
-    """
-
-    MASS_AMP = MSOL * 10.0 ** 8.46    # 8.46 ± 0.08   in units of [Msol]
-    MASS_REF = MSOL * 1e11            # 1e11 Msol
-    MASS_PLAW = 1.05                  # 1.05 ± 0.11
-    SCATTER_DEX = 0.34
-
-
 class MSigma_MM13(MSigma_Standard):
     """Mbh-Sigma Relation from McConnell & Ma 2013
 
@@ -443,31 +417,6 @@ class MSigma_MM13(MSigma_Standard):
     SIGMA_REF = KMPERSEC * 200.0      # 200 km/s
     MASS_PLAW = 5.64                  # 5.64 ± 0.32
     SCATTER_DEX = 0.38
-
-
-class MMBulge_MM13_ZEvolution(MMBulge_Redshift):
-    """Mbh-MBulge Relation from McConnell & Ma 2013 for z=0 plus redshift evolution of the normalization
-
-    [MM13] Eq. 2, with values taken from Table 2 ("Dynamical masses", first row, "MPFITEXY")
-    """
-
-    MASS_AMP = MSOL * 10.0 ** 8.46    # 8.46 ± 0.08   in units of [Msol]
-    MASS_REF = MSOL * 1e11            # 1e11 Msol
-    MASS_PLAW = 1.05                  # 1.05 ± 0.11
-    SCATTER_DEX = 0.34
-    Z_PLAW = 0.0
-
-
-class MMBulge_KH13(MMBulge_Standard):
-    """Mbh-MBulge Relation from Kormendy & Ho 2013.
-
-    Values taken from [KH13] Eq.10 (pg. 61 of PDF, "571" of ARAA)
-    """
-
-    MASS_AMP = 0.49 * 1e9 * MSOL   # 0.49 + 0.06 - 0.05   in units of [Msol]
-    MASS_REF = MSOL * 1e11            # 1e11 Msol
-    MASS_PLAW = 1.17                  # 1.17 ± 0.08
-    SCATTER_DEX = 0.28
 
 
 class MSigma_KH13(MSigma_Standard):
@@ -549,6 +498,86 @@ def _log10_relation_reverse(yy, amp, plaw, eps_dex, x0=1.0):
     xx = x0 * np.power(10.0, xx)
     return xx
 
+
+'''
+class MMBulge_Strawman(_MMBulge_Relation):
+    """
+    Provides a broken M_BH--M_bulge relation to test error checking.
+    Do not use this for any purpose other than error testing.
+
+    """
+
+    MASS_AMP = 3.0e8 * MSOL
+    MASS_PLAW = 1.0
+    MASS_REF = 1.0e11 * MSOL
+    SCATTER_DEX = 0.0
+    Z_PLAW = 0.0
+
+    def __init__(self, mamp=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None, zplaw=None):
+        if mamp is None:
+            mamp = self.MASS_AMP
+        if mplaw is None:
+            mplaw = self.MASS_PLAW
+        if mref is None:
+            mref = self.MASS_REF
+        if scatter_dex is None:
+            scatter_dex = self.SCATTER_DEX
+        if zplaw is None:
+            zplaw = self.Z_PLAW
+
+        self._mamp = mamp   # Mass-Amplitude [grams]
+        self._mplaw = mplaw   # Mass Power-law index
+        self._mref = mref   # Reference Mass (argument normalization)
+        self._bulge_mfrac = bulge_mfrac
+        self._scatter_dex = scatter_dex
+        self._zplaw = zplaw
+        print(f"WARNING: Using MMBulge_Strawman(). This should only be used for testing purposes.")
+        return
+
+    def bulge_mass_frac(self, mstar):
+        return self._bulge_mfrac
+
+    def mbh_from_host(self, host, scatter):
+        """Convert from stellar bulge-mass to blackhole mass.
+
+        Units of [grams].
+        """
+        if scatter:
+            scatter_dex = self._scatter_dex
+        else:
+            scatter_dex = None
+
+        zmamp = self._mamp * (1.0 + host['redz'])**self._zplaw
+        mbh = _log10_relation(host['mbulge'], zmamp, self._mplaw, scatter_dex, x0=self._mref)
+        return mbh
+
+    def mbulge_from_mbh(self, mbh, redz, scatter):
+        """Convert from blackhole mass to stellar bulge-mass.
+
+        Units of [grams].
+        """
+        if scatter:
+            scatter_dex = self._scatter_dex
+        else:
+            scatter_dex = None
+
+        zmamp = self._mamp * (1.0 + redz)**self._zplaw
+        mbulge = _log10_relation_reverse(mbh, zmamp, self._mplaw, scatter_dex, x0=self._mref)
+        return mbulge
+
+    def dmbh_dmbulge(self, mbulge):
+        # NOTE: scatter should never be used in the differential relation
+        dmdm = self.mbh_from_mbulge(mbulge, scatter=False)
+        dmdm = dmdm * self._mplaw / mbulge
+        return dmdm
+
+    def dmbulge_dmstar(self, mstar):
+        # NOTE: this only works for a constant value, do *not* return `self.bulge_mass_frac()`
+        return self._bulge_mfrac
+
+    def requirements(self):
+        return ['mbulge', 'redz', 'fairydust', 'Santa Claus']
+'''
 
 # =================================================================================================
 # ====                              Density Profiles & Relations                               ====
