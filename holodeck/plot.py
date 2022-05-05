@@ -288,11 +288,10 @@ def _get_cmap(cmap):
         return cmap
 
     try:
-        return mpl.cm.get_cmap(cmap)
+        return mpl.cm.get_cmap(cmap).copy()
     except Exception as err:
         log.error(f"Could not load colormap from `{cmap}` : {err}")
         raise
-        raise ValueError("`cmap` '{}' is not a valid colormap or colormap name".format(cmap))
 
 
 # =================================================================================================
