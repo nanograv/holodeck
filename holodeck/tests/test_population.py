@@ -50,7 +50,8 @@ def test_mass_reset():
     mod_mm13 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=False)
 
     mass_bef = pop.mass
-    host = {'mbulge':pop.mbulge}
+    # host = {'mbulge': pop.mbulge}
+    host = pop
 
     pop.modify(mod_mm13)
     mass_aft = pop.mass
