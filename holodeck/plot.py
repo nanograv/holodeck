@@ -233,6 +233,8 @@ def smap(args=[0.0, 1.0], cmap=None, log=False, norm=None, midpoint=None,
     smap = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
     # Bug-Fix something something
     smap._A = []
+    # Allow `smap` to be used to construct colorbars
+    smap.set_array([])
     # Store type of mapping
     smap.log = log
 
