@@ -39,14 +39,44 @@ import abc
 import numpy as np
 import scipy as sp
 
-# import kalepy as kale
-
-# import holodeck as holo
 from holodeck import cosmo, utils, log
 from holodeck.constants import MSOL, NWTG, KMPERSEC
 
 
 class _MHost_Relation(abc.ABC):
+
+    _PROPERTIES = []
+
+    def get_host_properties(self, pop, copy=True):
+        """Get the host properties specified in the `_PROPERTIES` list of variable names.
+
+        NOTE: if the `copy` flag is False, then values are returned by reference and the original
+        values may be modified accidentally.  Use `copy=True` to avoid modifying values in place.
+        Use `copy=False` carefully, when trying to avoid unnecessary memory duplication.
+
+        Parameters
+        ----------
+        pop : `holodeck.population.Population` instance
+            Binary population including necessary host properties.
+        copy : bool, optional
+            Copy the `pop` data into new arrays instead of returning references to original values.
+
+        Returns
+        -------
+        vals : dict
+            Values loaded from `pop`.  Names/keys correspond to `_PROPERTIES` strings.
+
+        """
+        func = np.copy if copy else (lambda xx: xx)
+        try:
+            vals = {var: func(getattr(pop, var)) for var in self._PROPERTIES}
+        except Exception as err:
+            msg = f"{self.__class__} failed to load properties from {pop}: {self._PROPERTIES}"
+            log.error(msg)
+            log.error(str(err))
+            raise err
+
+        return vals
 
     # ---- Abstract Methods : must be overridden in subclasses  ----
 
@@ -62,12 +92,10 @@ class _MHost_Relation(abc.ABC):
         """
         return
 
-    @abc.abstractmethod
-    def requirements(self):
-        return
-    
 
 class _MMBulge_Relation(_MHost_Relation):
+
+    _PROPERTIES = ['mbulge']
 
     # ---- Abstract Methods : must be overridden in subclasses  ----
     @abc.abstractmethod
@@ -98,7 +126,7 @@ class _MMBulge_Relation(_MHost_Relation):
 
     def mbh_from_mstar(self, mstar, scatter):
         mbulge = self.mbulge_from_mstar(mstar)
-        return self.mbh_from_host({'mbulge':mbulge}, scatter)
+        return self.mbh_from_host({'mbulge': mbulge}, scatter)
 
     def mstar_from_mbh(self, mbh, **kwargs):
         mbulge = self.mbulge_from_mbh(mbh, **kwargs)
@@ -134,7 +162,7 @@ class MMBulge_Standard(_MMBulge_Relation):
     def bulge_mass_frac(self, mstar):
         return self._bulge_mfrac
 
-    def mbh_from_host(self, host, scatter):
+    def mbh_from_host(self, pop, scatter):
         """Convert from stellar bulge-mass to blackhole mass.
 
         Units of [grams].
@@ -144,7 +172,10 @@ class MMBulge_Standard(_MMBulge_Relation):
         else:
             scatter_dex = None
 
-        mbh = _log10_relation(host['mbulge'], self._mamp, self._mplaw, scatter_dex, x0=self._mref)
+        host = self.get_host_properties(pop)
+        mbulge = host['mbulge']
+
+        mbh = _log10_relation(mbulge, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
 
     def mbulge_from_mbh(self, mbh, scatter):
@@ -162,21 +193,21 @@ class MMBulge_Standard(_MMBulge_Relation):
 
     def dmbh_dmbulge(self, mbulge):
         # NOTE: scatter should never be used in the differential relation
-        dmdm = self.mbh_from_host({'mbulge':mbulge}, scatter=False)
+        dmdm = self.mbh_from_host({'mbulge': mbulge}, scatter=False)
         dmdm = dmdm * self._mplaw / mbulge
         return dmdm
 
     def dmbulge_dmstar(self, mstar):
         # NOTE: this only works for a constant value, do *not* return `self.bulge_mass_frac()`
         return self._bulge_mfrac
-        
-    def requirements(self):
-        return ['mbulge']
+
 
 class MMBulge_Redshift(_MMBulge_Relation):
     """
-    Provides black hole mass as a function of galaxy bulge mass and redshift with a 
-    normalization that depends on redshift. zplaw=0 (default) is identical to MMBulge_Standard. mamp = mamp0 * (1 + z)**zplaw
+    Provides black hole mass as a function of galaxy bulge mass and redshift with a normalization
+    that depends on redshift. zplaw=0 (default) is identical to MMBulge_Standard.
+    mamp = mamp0 * (1 + z)**zplaw
+
     """
 
     MASS_AMP = 3.0e8 * MSOL
@@ -184,6 +215,8 @@ class MMBulge_Redshift(_MMBulge_Relation):
     MASS_REF = 1.0e11 * MSOL
     SCATTER_DEX = 0.0
     Z_PLAW = 0.0
+
+    _PROPERTIES = ['mbulge', 'redz']
 
     def __init__(self, mamp=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None, zplaw=None):
         if mamp is None:
@@ -208,7 +241,7 @@ class MMBulge_Redshift(_MMBulge_Relation):
     def bulge_mass_frac(self, mstar):
         return self._bulge_mfrac
 
-    def mbh_from_host(self, host, scatter):
+    def mbh_from_host(self, pop, scatter):
         """Convert from stellar bulge-mass to blackhole mass.
 
         Units of [grams].
@@ -217,9 +250,16 @@ class MMBulge_Redshift(_MMBulge_Relation):
             scatter_dex = self._scatter_dex
         else:
             scatter_dex = None
-        
-        zmamp = self._mamp * (1.0 + host['redz'])**self._zplaw
-        mbh = _log10_relation(host['mbulge'], zmamp, self._mplaw, scatter_dex, x0=self._mref)
+
+        host = self.get_host_properties(pop, copy=False)
+        mbulge = host['mbulge']    # shape (N, 2)
+        redz = host['redz']        # shape (N,)
+        # Broadcast `redz` to match shape of `mbulge`, if needed
+        # NOTE: this will work for (N,) ==> (N,)    or   (N,) ==> (N,X)
+        redz = np.broadcast_to(redz, mbulge.T.shape).T
+
+        zmamp = self._mamp * (1.0 + redz)**self._zplaw
+        mbh = _log10_relation(mbulge, zmamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
 
     def mbulge_from_mbh(self, mbh, redz, scatter):
@@ -245,13 +285,13 @@ class MMBulge_Redshift(_MMBulge_Relation):
     def dmbulge_dmstar(self, mstar):
         # NOTE: this only works for a constant value, do *not* return `self.bulge_mass_frac()`
         return self._bulge_mfrac
-        
-    def requirements(self):
-        return ['mbulge', 'redz']
+
 
 class MMBulge_Strawman(_MMBulge_Relation):
     """
-    Provides a broken M_BH--M_bulge relation to test error checking. Do not use this for any purpose other than error testing.
+    Provides a broken M_BH--M_bulge relation to test error checking.
+    Do not use this for any purpose other than error testing.
+
     """
 
     MASS_AMP = 3.0e8 * MSOL
@@ -293,7 +333,7 @@ class MMBulge_Strawman(_MMBulge_Relation):
             scatter_dex = self._scatter_dex
         else:
             scatter_dex = None
-        
+
         zmamp = self._mamp * (1.0 + host['redz'])**self._zplaw
         mbh = _log10_relation(host['mbulge'], zmamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
@@ -321,12 +361,14 @@ class MMBulge_Strawman(_MMBulge_Relation):
     def dmbulge_dmstar(self, mstar):
         # NOTE: this only works for a constant value, do *not* return `self.bulge_mass_frac()`
         return self._bulge_mfrac
-        
+
     def requirements(self):
         return ['mbulge', 'redz', 'fairydust', 'Santa Claus']
 
 
 class _MSigma_Relation(_MHost_Relation):
+
+    _PROPERTIES = ['vdisp']
 
     # ---- Abstract Methods : must be overridden in subclasses  ----
     @abc.abstractmethod
@@ -334,7 +376,6 @@ class _MSigma_Relation(_MHost_Relation):
         return
 
     # ---- Internal Methods ----
-
 
 
 class MSigma_Standard(_MSigma_Relation):
@@ -374,14 +415,10 @@ class MSigma_Standard(_MSigma_Relation):
 
         mbh = _log10_relation(host['vdisp'], self._mamp, self._mplaw, scatter_dex, x0=self._sigmaref)
         return mbh
-        
-    def dmbh_dsigma(self, sigma): # Is this needed? I don't know
+
+    def dmbh_dsigma(self, sigma):
+        # Is this needed? I don't know
         return None
-
-    def requirements(self):
-        return ['vdisp']
-
-
 
 
 class MMBulge_MM13(MMBulge_Standard):
@@ -394,6 +431,7 @@ class MMBulge_MM13(MMBulge_Standard):
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.05                  # 1.05 ± 0.11
     SCATTER_DEX = 0.34
+
 
 class MSigma_MM13(MSigma_Standard):
     """Mbh-Sigma Relation from McConnell & Ma 2013
@@ -419,6 +457,7 @@ class MMBulge_MM13_ZEvolution(MMBulge_Redshift):
     SCATTER_DEX = 0.34
     Z_PLAW = 0.0
 
+
 class MMBulge_KH13(MMBulge_Standard):
     """Mbh-MBulge Relation from Kormendy & Ho 2013.
 
@@ -429,6 +468,7 @@ class MMBulge_KH13(MMBulge_Standard):
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.17                  # 1.17 ± 0.08
     SCATTER_DEX = 0.28
+
 
 class MSigma_KH13(MSigma_Standard):
     """Mbh-Sigma Relation from Kormendy & Ho 2013
