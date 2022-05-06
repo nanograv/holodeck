@@ -186,6 +186,8 @@ class PM_Eccentricity(Population_Modifier):
 
 class PM_Resample(Population_Modifier):
 
+    # Additional variables to be resampled
+    # NOTE: mtot, mrat, redz, sepa, eccen (if not None) are all resampled automatically
     _DEF_ADDITIONAL_KEYS = ['vdisp', 'mbulge']
 
     def __init__(self, resample=10.0, plot=False, additional_keys=True):
@@ -204,31 +206,37 @@ class PM_Resample(Population_Modifier):
     def modify(self, pop):
         import kalepy as kale
 
+        # ---- Package data for resampling
+
+        # Store basic quantities
         mt, mr = utils.mtmr_from_m1m2(pop.mass)
         labels = ['mtot', 'mrat', 'redz', 'sepa']
         old_data = [
             np.log10(mt / MSOL),
             np.log10(mr),
-            # pop.scafa,      # resample linearly in scale-factor
-            cosmo.a_to_z(pop.scafa),
+            # pop.redz,            # linear redshift
+            np.log10(pop.redz),    # log redshift
             np.log10(pop.sepa / PC)
         ]
         reflect = [
             None,
             [None, 0.0],
-            # [0.0, 1.0],   # scafa
-            [0.0, None],   # redz
+            # [0.0, None],   # linear redz
+            None,            # log redz
             None,
         ]
 
+        # Add eccentricity if it's defined (not `None`)
         eccen = pop.eccen
         if eccen is not None:
             labels.append('eccen')
             old_data.append(eccen)
             reflect.append([0.0, 1.0])
 
+        # Add optional variables specified in `_additional_keys` (by default, from `_DEF_ADDITIONAL_KEYS`)
         opt_idx = []
         for ii, opt in enumerate(self._additional_keys):
+            # Load value
             vals = getattr(pop, opt, None)
             if vals is not None:
                 idx = len(labels) + ii
@@ -249,13 +257,15 @@ class PM_Resample(Population_Modifier):
 
         mt = MSOL * 10**new_data[0]
         mr = 10**new_data[1]
-
         pop.mass = utils.m1m2_from_mtmr(mt, mr).T
-        # pop.scafa = new_data[2]
-        pop.scafa = cosmo.z_to_a(new_data[2])
+        # stored variable is scale-factor `scafa` (redz is calculated from that), convert from redz
+        redz = new_data[2]            # linear red
+        redz = 10.0 ** new_data[2]    # log redz
+        pop.scafa = cosmo.z_to_a(redz)
         pop.sepa = PC * 10**new_data[3]
         pop.eccen = None if (eccen is None) else new_data[4]
 
+        # store 'additional' parameters
         for opt, idx in zip(self._additional_keys, opt_idx):
             if idx is None:
                 continue
@@ -265,8 +275,10 @@ class PM_Resample(Population_Modifier):
                 temp[:, kk] = np.power(10.0, new_data[idx+kk])
             setattr(pop, opt, temp)
 
+        # increase size of sample volume to account for resampling factor
         pop._sample_volume *= resample
 
+        # store data for plotting
         if self._plot:
             self._labels = labels
             self._old_data = old_data
@@ -322,23 +334,26 @@ class PM_Mass_Reset(Population_Modifier):
 
     def modify(self, pop):
         # relation = self.relation
-        host = {}
-        for requirement in self.mhost.requirements():
-            vals = getattr(pop, requirement, None)
-            if vals is None:
-                err = (
-                    f"population modifier requires '{requirement}', "
-                    f"but value is not set in population instance (class: {pop.__class__})!"
-                )
-                utils.error(err)
-            if requirement == 'redz':
-                vals = vals[:, np.newaxis] # need to duplicate values for proper broadcasting in calculation
-            host[requirement] = vals
+        # host = {}
+        # for requirement in self.mhost.requirements():
+        #     vals = getattr(pop, requirement, None)
+        #     if vals is None:
+        #         err = (
+        #             f"population modifier requires '{requirement}', "
+        #             f"but value is not set in population instance (class: {pop.__class__})!"
+        #         )
+        #         utils.error(err)
+        #     if requirement == 'redz':
+        #         vals = vals[:, np.newaxis] # need to duplicate values for proper broadcasting in calculation
+        #     host[requirement] = vals
+
         scatter = self._scatter
         # Store old version
         pop._mass = pop.mass
         # if `scatter` is `True`, then it is set to the value in `mhost.SCATTER_DEX`
-        pop.mass = self.mhost.mbh_from_host(host, scatter)
+        # pop.mass = self.mhost.mbh_from_host(host, scatter)
+
+        pop.mass = self.mhost.mbh_from_host(pop, scatter)
         return
 
 
