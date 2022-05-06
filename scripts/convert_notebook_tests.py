@@ -10,9 +10,10 @@ import subprocess
 import logging
 
 TEST_NOTEBOOK_NAMES = [
-    'continuous_observational', 'discrete_illustris',
-    # 'observations',
+    # 'continuous_observational',
+    'discrete_illustris',
     'relations',
+    'host-relations',
     'utils',
     'sam/quickstart',
 ]
