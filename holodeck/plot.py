@@ -294,6 +294,36 @@ def _get_cmap(cmap):
         raise
 
 
+def _get_hist_steps(xx, yy):
+    """Convert from
+
+    Parameters
+    ----------
+    xx : array_like
+        Independence variable representing bin-edges.  Size (N,)
+    yy : array_like
+        Dependence variable representing histogram amplitudes.  Size (N-1,)
+
+    Returns
+    -------
+    aa : array (N,)
+        x-values
+    bb : array (N,)
+        y-values
+
+    """
+    size = len(xx) - 1
+    if size != len(yy):
+        err = f"Length of `xx` ({len(xx)}) should be length of `yy` ({len(yy)}) + 1!"
+        utils.error(err)
+
+    aa = [[xx[ii], xx[ii+1]] for ii in range(xx.size-1)]
+    bb = [[yy[ii], yy[ii]] for ii in range(xx.size-1)]
+    aa = np.array(aa).flatten()
+    bb = np.array(bb).flatten()
+    return aa, bb
+
+
 # =================================================================================================
 # ====    Below Needs Review / Cleaning    ====
 # =================================================================================================
