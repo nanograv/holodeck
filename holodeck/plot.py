@@ -233,6 +233,8 @@ def smap(args=[0.0, 1.0], cmap=None, log=False, norm=None, midpoint=None,
     smap = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
     # Bug-Fix something something
     smap._A = []
+    # Allow `smap` to be used to construct colorbars
+    smap.set_array([])
     # Store type of mapping
     smap.log = log
 
@@ -286,11 +288,10 @@ def _get_cmap(cmap):
         return cmap
 
     try:
-        return mpl.cm.get_cmap(cmap)
+        return mpl.cm.get_cmap(cmap).copy()
     except Exception as err:
         log.error(f"Could not load colormap from `{cmap}` : {err}")
         raise
-        raise ValueError("`cmap` '{}' is not a valid colormap or colormap name".format(cmap))
 
 
 def _get_hist_steps(xx, yy):
