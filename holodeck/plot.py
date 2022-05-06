@@ -427,7 +427,7 @@ def _draw_pop_masses(ax, pop, color='r', nplot=3e3):
     return handles, names
 
 
-def _twin_hz(ax, nano=True, fs=12):
+def _twin_hz(ax, nano=True, fs=12, **kw):
     tw = ax.twiny()
     xlim = np.array(ax.get_xlim()) / YR
     if nano:
@@ -438,7 +438,7 @@ def _twin_hz(ax, nano=True, fs=12):
 
     label = fr"frequency $[\mathrm{{{label}}}]$"
     tw.set(xlim=xlim, xscale='log')
-    tw.set_xlabel(label, fontsize=fs)
+    tw.set_xlabel(label, fontsize=fs, **kw)
     return
 
 
