@@ -481,10 +481,10 @@ class Semi_Analytic_Model:
 
             # so far we have ``dn_gal / [dM_gal dq_gal dz]``
             # dn / [dM dq dz] = (dn_gal / [dM_gal dq_gal dz]) * (dM_gal/dM_bh) * (dq_gal / dq_bh)
-            # dq_gal / dq_bh - convert from galaxy mrat to MBH mrat
-            dqgal_dqbh = 1.0
-            # dMs/dMbh - convert from stellar mass to BH mass
-            dmstar_dmbh = 1.0 / self._mmbulge.dmbh_dmstar(mstar_tot)   # [unitless]
+            dqgal_dqbh = 1.0     # conversion from galaxy mrat to MBH mrat
+            # dMs/dMbh
+            # dmstar_dmbh = 1.0 / self._mmbulge.dmbh_dmstar(mstar_tot)   # [unitless]
+            dmstar_dmbh = self._mmbulge.dmstar_dmbh(mstar_tot)   # [unitless]
             mbh_tot = self._mmbulge.mbh_from_mstar(mstar_tot, scatter=False)  # [gram]
             # Eq.21, now [gram^-1 Mpc^-3]
             dens[idx] *= dqgal_dqbh * dmstar_dmbh
