@@ -389,17 +389,18 @@ class MSigma_Standard(_MSigma_Relation):
         self._scatter_dex = scatter_dex
         return
 
-    def mbh_from_host(self, host, scatter):
+    def mbh_from_host(self, pop, scatter):
+        host = self.get_host_properties(pop, copy=False)
+        vdisp = host['vdisp']    # shape (N, 2)
+        return self.mbh_from_vdisp(vdisp, scatter=scatter)
+
+    def mbh_from_vdisp(self, vdisp, scatter):
         """Convert from stellar velocity dispersion to blackhole mass.
 
         Units of [grams].
         """
-        if scatter:
-            scatter_dex = self._scatter_dex
-        else:
-            scatter_dex = None
-
-        mbh = _log10_relation(host['vdisp'], self._mamp, self._mplaw, scatter_dex, x0=self._sigmaref)
+        scatter_dex = self._scatter_dex if scatter else None
+        mbh = _log10_relation(vdisp, self._mamp, self._mplaw, scatter_dex, x0=self._sigmaref)
         return mbh
 
     def dmbh_dsigma(self, sigma):
