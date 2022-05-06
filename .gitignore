@@ -111,3 +111,4 @@ docs/holodeck-paper/src/out
 .vscode/
 output/*
 *.png
+*.pdf
