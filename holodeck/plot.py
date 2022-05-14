@@ -27,6 +27,11 @@ class MidpointNormalize(mpl.colors.Normalize):
         x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
         return np.ma.masked_array(np.interp(value, x, y), np.isnan(value))
 
+    def inverse(self, value):
+        # x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+        y, x = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+        return np.ma.masked_array(np.interp(value, x, y), np.isnan(value))
+
 
 class MidpointLogNormalize(mpl.colors.LogNorm):
 
@@ -38,7 +43,14 @@ class MidpointLogNormalize(mpl.colors.LogNorm):
     def __call__(self, value, clip=None):
         x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
         vals = utils.interp(value, x, y, xlog=True, ylog=False)
-        return np.ma.masked_array(vals, np.isnan(value))
+        # return np.ma.masked_array(vals, np.isnan(value))
+        return vals
+
+    def inverse(self, value):
+        y, x = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+        vals = utils.interp(value, x, y, xlog=False, ylog=True)
+        # return np.ma.masked_array(vals, np.isnan(value))
+        return vals
 
 
 def figax(figsize=[10, 4], ncols=1, nrows=1, sharex=False, sharey=False, squeeze=True,
@@ -232,7 +244,7 @@ def smap(args=[0.0, 1.0], cmap=None, log=False, norm=None, midpoint=None,
     # Create scalar-mappable
     smap = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
     # Bug-Fix something something
-    smap._A = []
+    # smap._A = []
     # Store type of mapping
     smap.log = log
 
@@ -250,9 +262,11 @@ def _get_norm(data, midpoint=None, log=False):
         min, max = data
     else:
         try:
-            min, max = utils.minmax(data, filter=True)
+            min, max = utils.minmax(data, filter=log)
         except:
             utils.error(f"Input `data` ({type(data)}) must be an integer, (2,) of scalar, or ndarray of scalar!")
+
+    # print(f"{min=}, {max=}")
 
     # Create normalization
     if log:
@@ -264,7 +278,9 @@ def _get_norm(data, midpoint=None, log=False):
         if midpoint is None:
             norm = mpl.colors.Normalize(vmin=min, vmax=max)
         else:
+            # norm = MidpointNormalize(vmin=min, vmax=max, midpoint=midpoint)
             norm = MidpointNormalize(vmin=min, vmax=max, midpoint=midpoint)
+            # norm = mpl.colors.TwoSlopeNorm(vmin=min, vcenter=midpoint, vmax=max)
 
     return norm
 
