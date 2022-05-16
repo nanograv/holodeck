@@ -6,12 +6,14 @@ To-Do
 
 
 """
-# This code is reproduced and modified from the original repository https://github.com/morgan-nanez/nanohertz_GWs that is based
+# This code is reproduced and modified from the original repository
+# https://github.com/morgan-nanez/nanohertz_GWs that is based
 # on results from Mingarelli et al. (2017) (https://zenodo.org/badge/latestdoi/90664185)
 # Related paper : https://www.nature.com/articles/s41550-017-0299-6
 
-# # Computing probabilistic numbers of PTA binaries from MASSIVE and 2MASS, and making realizations of GW skies with ILLUSTRIS merger model
-# ### Chiara Mingarelli, mingarelli@mpifr-bonn.mpg.de
+# Computing probabilistic numbers of PTA binaries from MASSIVE and 2MASS, and making realizations of GW skies with
+# ILLUSTRIS merger model
+# Chiara Mingarelli, mingarelli@mpifr-bonn.mpg.de
 
 from __future__ import division
 import numpy as np
@@ -40,7 +42,7 @@ sqrt = np.sqrt
 _DEF_OBSERVATIONAL_FNAME = "observational_2mass_galaxy-catalog_extended.npz"
 
 
-class BP_Observational(holo.population._Population):
+class BP_Observational(holo.population._Population_Discrete):
 
     FREQ_MIN = 1e-9    # Hz, minimum of PTA band of interest
 
@@ -157,7 +159,8 @@ def single_realization(k_mag, f_min=1e-9):
 
     # prob of binary being in PTA band
     for zz in range(gal_no):
-        p_i_vec[zz], z_loop[zz], T_zLoop[zz], mergRate_loop[zz], t2c_loop[zz], r_inf_loop[zz], friction_t_loop[zz], hardening_t_loop[zz] = i_prob_Illustris(m_bulge[zz], tot_mass[zz], q_choice[zz], f_min)
+        p_i_vec[zz], z_loop[zz], T_zLoop[zz], mergRate_loop[zz], t2c_loop[zz], r_inf_loop[zz], \
+            friction_t_loop[zz], hardening_t_loop[zz] = i_prob_Illustris(m_bulge[zz], tot_mass[zz], q_choice[zz], f_min)
 
     # number of stalled binaries
     binaries = dict(prob=p_i_vec, redz=z_loop, mtot=tot_mass, mrat=q_choice)
@@ -268,14 +271,12 @@ def quasar_formation_rate(log_mass, z, log_formation_rate_normalization=-3.830,
     log_normalization = log_formation_rate_normalization + z_term
 
     # Hopkins et al. (2007) eq. 19
-    high_mass_slope = (2 * high_mass_slope_normalization
-                       / ((10 ** (xi * high_mass_slope_k_1))
-                          + (10 ** (xi * high_mass_slope_k_2))))
+    high_mass_slope = (
+        2 * high_mass_slope_normalization / ((10 ** (xi * high_mass_slope_k_1)) + (10 ** (xi * high_mass_slope_k_2)))
+    )
 
     # Hopkins et al. (2007) eq. 9
-    log_mass_break = (log_mass_break_normalization
-                      + (log_mass_break_k_1 * xi)
-                      + (log_mass_break_k_2 * (xi ** 2)))
+    log_mass_break = (log_mass_break_normalization + (log_mass_break_k_1 * xi) + (log_mass_break_k_2 * (xi ** 2)))
 
     # no sense computing this more than once
     log_mass_ratio = log_mass - log_mass_break
@@ -283,14 +284,13 @@ def quasar_formation_rate(log_mass, z, log_formation_rate_normalization=-3.830,
     # log form of denominator in Hopkins et al. (2007) eq. 24
     low_mass_contribution = 10 ** (log_mass_ratio * low_mass_slope)
     high_mass_contribution = 10 ** (log_mass_ratio * high_mass_slope)
-    log_mass_distribution = np.log10(low_mass_contribution
-                                     + high_mass_contribution)
+    log_mass_distribution = np.log10(low_mass_contribution + high_mass_contribution)
 
     # convert from rate to differential redshift density (d/dt to d/dz)
-    dtdz = 1 / (Planck15.H0 * (1 + z)
-                * np.sqrt(Planck15.Om0 * ((1 + z) ** 3)
-                          + Planck15.Ok0 * ((1 + z) ** 2)
-                          + Planck15.Ode0)).to(u.Gyr ** -1).value
+    dtdz = (
+        Planck15.H0 * (1 + z) * np.sqrt(Planck15.Om0 * ((1 + z) ** 3) + Planck15.Ok0 * ((1 + z) ** 2) + Planck15.Ode0)
+    )
+    dtdz = 1 / dtdz.to(u.Gyr ** -1).value
 
     return (10 ** (log_normalization - log_mass_distribution)) * dtdz
 
@@ -386,7 +386,7 @@ def i_prob_Illustris(Mstar, Mtot, q, min_freq):
     # also, if timescale > 12.25 Gyrs (z=4), no merging SMBHs
     # also limit of validity for Rodriguez-Gomez + fit in Table 1.
     if timescale > 12.25:
-        return 0, 'nan', timescale*1e9, 'nan', 'nan',  r_inf_here, friction_t, hardening_t
+        return 0, 'nan', timescale*1e9, 'nan', 'nan', r_inf_here, friction_t, hardening_t
     else:
         z = z_at_value(Planck15.age, (13.79-timescale) * u.Gyr)  # redshift of progenitor galaxies
         # print "redshift is ", z
