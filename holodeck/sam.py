@@ -531,7 +531,8 @@ class Semi_Analytic_Model:
             utils.error("one (and only one) of `fobs` or `sepa` must be provided!")
 
         if fobs is not None:
-            xsize = len(fobs)
+            fobs = np.asarray(fobs)
+            xsize = fobs.size
             edges = self.edges + [fobs, ]
         else:
             xsize = len(sepa)
@@ -643,7 +644,7 @@ class Semi_Analytic_Model:
             utils.error(err)
 
         # ---- Get the differential-number of binaries for each bin
-        # this is  ``d^4 N / [dlog10(M) dq dz dln(f_r)]``
+        # this is  ``d^4 n / [dlog10(M) dq dz dln(f_r)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
         edges, dnum = self.diff_num_from_hardening(hard, fobs=fobs)
 
@@ -819,6 +820,18 @@ def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
     return gff, gwf, gwb
 
 
+def _strains_from_samples(vals, redz=True):
+    mc = utils.chirp_mass(*utils.m1m2_from_mtmr(vals[0], vals[1]))
+
+    rz = vals[2]
+    dc = cosmo.comoving_distance(rz).cgs.value
+
+    fo = vals[3]
+    frst = utils.frst_from_fobs(fo, rz)
+    hs = utils.gw_strain_source(mc, dc, frst)
+    return hs, fo
+
+
 def _gws_from_samples(vals, weights, fobs):
     """
 
@@ -835,15 +848,8 @@ def _gws_from_samples(vals, weights, fobs):
         Target observer-frame frequencies to calculate GWs at.  Units of [1/sec].
 
     """
-    mc = utils.chirp_mass(*utils.m1m2_from_mtmr(vals[0], vals[1]))
-    rz = vals[2]
-    fo = vals[3]
-    frst = utils.frst_from_fobs(fo, rz)
-    dc = cosmo.comoving_distance(rz).cgs.value
-    hs = utils.gw_strain_source(mc, dc, frst)
-
+    hs, fo = _strains_from_samples(vals)
     gff, gwf, gwb = gws_from_sampled_strains(fobs, fo, hs, weights)
-
     return gff, gwf, gwb
 
 
@@ -960,10 +966,6 @@ def _gws_from_number_grid(fobs, grid, dnum, number, realize):
     # get weighted centers for each dimension
     for ii, cc in enumerate(coms):
         coms[ii] = kale.utils.midpoints(dnum * cc, log=False, axis=(0, 1, 2, 3)) / cent
-
-    # print(f"{utils.stats(number)=}")
-    # print(f"{utils.stats(dnum)=}")
-    # print(f"{utils.stats(coms)=}")
 
     # ---- calculate GW strain at bin centroids
     mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))
