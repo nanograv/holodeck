@@ -127,11 +127,11 @@ def get_file_size(fnames, precision=1):
         byte_size += os.path.getsize(fil)
 
     abbrevs = (
-        (1 << 50, 'PB'),
-        (1 << 40, 'TB'),
-        (1 << 30, 'GB'),
-        (1 << 20, 'MB'),
-        (1 << 10, 'KB'),
+        (1 << 50, 'PiB'),
+        (1 << 40, 'TiB'),
+        (1 << 30, 'GiB'),
+        (1 << 20, 'MiB'),
+        (1 << 10, 'KiB'),
         (1, 'bytes')
     )
 
@@ -165,7 +165,8 @@ def broadcastable(*args):
 
 def expand_broadcastable(*args):
     try:
-        shape = np.shape(np.product(args, axis=0))
+        vals = np.array(args, dtype=object)    # avoid VisibleDeprecationWarning from ragged array creation
+        shape = np.shape(np.product(vals, axis=0))
     except ValueError:
         shapes = [np.shape(aa) for aa in args]
         raise ValueError("Argument arrays are not broadcastable!  shapes={}".format(shapes))

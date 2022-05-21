@@ -1,25 +1,30 @@
 %reload_ext autoreload
 %autoreload 2
-from importlib import reload
 
-import os
-import sys
+# Builtin packages
+from importlib import reload
 import logging
+import os
+from pathlib import Path
+import sys
 import warnings
-import numpy as np
+
+# standard secondary packages
 import astropy as ap
-import scipy as sp
-import scipy.stats
+import h5py
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-
-import h5py
+import numpy as np
+import scipy as sp
+import scipy.stats
 import tqdm.notebook as tqdm
 
+# development packages
 import kalepy as kale
 import kalepy.utils
 import kalepy.plot
 
+# --- Holodeck ----
 import holodeck as holo
 import holodeck.sam
 from holodeck import cosmo, utils, plot
@@ -36,5 +41,6 @@ mpl.rc('mathtext', fontset='cm')
 mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
 plt.rcParams.update({'grid.alpha': 0.5})
 
+# Load log and set logging level
 log = holo.log
 log.setLevel(logging.INFO)
