@@ -11,10 +11,7 @@ To-Do
 -----
 *[ ]Check that _GW_ frequencies and _orbital_ frequencies are being used in the correct places.
     Check `number_at_gw_fobs` and related methods.
-*[ ]Change mass-ratios and redshifts (1+z) to log-space; expand q parameter range.
 *[ ]Incorporate arbitrary hardening mechanisms into SAM construction, sample self-consistently.
-*[ ]When using `sample_outliers` check whether the density (used for intrabin sampling) should be
-    the log(dens) instead of just `dens`.
 
 """
 
@@ -365,18 +362,22 @@ class Semi_Analytic_Model:
 
         # Redefine shape of grid (i.e. number of bins in each parameter)
         if shape is not None:
-            if len(shape) == 3:
-                # mtot
-                if shape[0] is not None:
-                    mtot[2] = shape[0]
-                # mrat
-                if shape[1] is not None:
-                    mrat[2] = shape[1]
-                # redz
-                if shape[2] is not None:
-                    redz[2] = shape[2]
-            else:
-                raise
+            if np.isscalar(shape):
+                shape = [shape+ii for ii in range(3)]
+
+            shape = np.asarray(shape)
+            if not kale.utils.isinteger(shape) or (shape.size != 3) or np.any(shape <= 1):
+                raise ValueError(f"`shape` ({shape}) must be an integer, or (3,) iterable of integers, larger than 1!")
+
+            # mtot
+            if shape[0] is not None:
+                mtot[2] = shape[0]
+            # mrat
+            if shape[1] is not None:
+                mrat[2] = shape[1]
+            # redz
+            if shape[2] is not None:
+                redz[2] = shape[2]
 
         # NOTE: the spacing (log vs lin) is important.  e.g. in integrating from differential-number to (total) number
         self.mtot = np.logspace(*np.log10(mtot[:2]), mtot[2])
@@ -530,7 +531,8 @@ class Semi_Analytic_Model:
             utils.error("one (and only one) of `fobs` or `sepa` must be provided!")
 
         if fobs is not None:
-            xsize = len(fobs)
+            fobs = np.asarray(fobs)
+            xsize = fobs.size
             edges = self.edges + [fobs, ]
         else:
             xsize = len(sepa)
@@ -642,7 +644,7 @@ class Semi_Analytic_Model:
             utils.error(err)
 
         # ---- Get the differential-number of binaries for each bin
-        # this is  ``d^4 N / [dlog10(M) dq dz dln(f_r)]``
+        # this is  ``d^4 n / [dlog10(M) dq dz dln(f_r)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
         edges, dnum = self.diff_num_from_hardening(hard, fobs=fobs)
 
@@ -727,8 +729,11 @@ def sample_sam_with_hardening(
 
     """
 
-    if sample_threshold < 1.0:
-        log.warning("`sample_threshold={sample_threshold}`, values less than unity can lead to surprising behavior!")
+    if (sample_threshold < 1.0) and (sample_threshold > 0.0):
+        msg = (
+            f"`sample_threshold={sample_threshold}` values less than unity can lead to surprising behavior!"
+        )
+        log.warning(msg)
 
     # returns  dN/[dlog10(M) dq dz dln(f_r)]
     # edges: Mtot [grams], mrat (q), redz (z), {fobs (f) [1/s] OR sepa (a) [cm]}
@@ -815,6 +820,18 @@ def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
     return gff, gwf, gwb
 
 
+def _strains_from_samples(vals, redz=True):
+    mc = utils.chirp_mass(*utils.m1m2_from_mtmr(vals[0], vals[1]))
+
+    rz = vals[2]
+    dc = cosmo.comoving_distance(rz).cgs.value
+
+    fo = vals[3]
+    frst = utils.frst_from_fobs(fo, rz)
+    hs = utils.gw_strain_source(mc, dc, frst)
+    return hs, fo
+
+
 def _gws_from_samples(vals, weights, fobs):
     """
 
@@ -831,15 +848,8 @@ def _gws_from_samples(vals, weights, fobs):
         Target observer-frame frequencies to calculate GWs at.  Units of [1/sec].
 
     """
-    mc = utils.chirp_mass(*utils.m1m2_from_mtmr(vals[0], vals[1]))
-    rz = vals[2]
-    fo = vals[3]
-    frst = utils.frst_from_fobs(fo, rz)
-    dc = cosmo.comoving_distance(rz).cgs.value
-    hs = utils.gw_strain_source(mc, dc, frst)
-
+    hs, fo = _strains_from_samples(vals)
     gff, gwf, gwb = gws_from_sampled_strains(fobs, fo, hs, weights)
-
     return gff, gwf, gwb
 
 
