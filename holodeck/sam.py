@@ -821,6 +821,20 @@ def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
 
 
 def _strains_from_samples(vals, redz=True):
+    """
+
+    NOTE: this assumes that vales[3] is the observer-frame GW frequency.
+
+    Parameters
+    ----------
+    vals : _type_
+    redz : bool, optional
+
+    Returns
+    -------
+    _type_
+    """
+
     mc = utils.chirp_mass(*utils.m1m2_from_mtmr(vals[0], vals[1]))
 
     rz = vals[2]
@@ -828,7 +842,8 @@ def _strains_from_samples(vals, redz=True):
 
     fo = vals[3]
     frst = utils.frst_from_fobs(fo, rz)
-    hs = utils.gw_strain_source(mc, dc, frst)
+    # convert from GW frequency to orbital (divide by 2.0)
+    hs = utils.gw_strain_source(mc, dc, frst/2.0)
     return hs, fo
 
 
@@ -971,7 +986,8 @@ def _gws_from_number_grid(fobs, grid, dnum, number, realize):
     mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))
     dc = cosmo.comoving_distance(coms[2]).cgs.value
     fr = utils.frst_from_fobs(coms[3], coms[2])
-    hs = utils.gw_strain_source(mc, dc, fr)
+    # convert from GW frequency to orbital frequency (divide by 2.0)
+    hs = utils.gw_strain_source(mc, dc, fr/2.0)
 
     dlogf = np.diff(np.log(fobs))
     dlogf = dlogf[np.newaxis, np.newaxis, np.newaxis, :]
