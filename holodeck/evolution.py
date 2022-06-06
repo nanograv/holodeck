@@ -237,13 +237,19 @@ class Evolution:
 
         # ---- Get hardening rates for each hardening model
         for ii, hard in enumerate(self._hard):
+            print("hard =", hard)
             _ar, _er = hard.dadt_dedt(self, right)
+            print("_ar = ", _ar)
             if debug:
                 log.debug(f"hard={hard} : dadt = {utils.stats(_ar)}")
                 # Store individual hardening rates
                 getattr(self, f"_dadt_{ii}")[:, right] = _ar[...]
                 # Raise error on invalid entries
                 if not np.all(np.isfinite(_ar)) or np.any(_ar > 0.0):
+                    ind_zero = _ar > 0.0
+                    print("dadt greater than zero: ", _ar[ind_zero])
+                    ind_infinite = ~np.isfinite(_ar)
+                    print("dadt not finite: ", _ar[ind_infinite])
                     utils.error(f"invalid `dadt` for hard={hard}!")
 
             dadt_r[:] += _ar
@@ -804,9 +810,19 @@ class Dynamical_Friction_NFW(_Hardening):
             log.debug(f"\t{utils.stats(prev*YR/PC)} ==> {utils.stats(dadt*YR/PC)}")
             del prev
 
+        if np.isnan(dadt).any():
+            print("line 814, nans in dadt")
+
         if attenuate:
+            print("attenuating")
             atten = self._attenuation_bbr80(sepa, mass, mstar)
             dadt = dadt / atten
+            print("any nans in atten:", atten[np.isnan(atten)])
+            if np.isnan(dadt).any():
+                print("line 822, nans in dadt")
+
+        if np.isnan(dadt).any():
+            print("line 825, nans in dadt")
 
         return dadt, dedt
 
@@ -875,6 +891,17 @@ class Dynamical_Friction_NFW(_Hardening):
         atten = np.maximum(atten_hard, atten_lc)
         # Make sure that attenuation is always >= 1.0 (i.e. this never _increases_ the hardening rate)
         atten = np.maximum(atten, 1.0)
+
+        if np.isnan(atten).any():
+            ind_nans = np.isnan(atten)
+            print("m1[ind_nans]", m1[ind_nans])
+            print("m2[ind_nans]", m2[ind_nans])
+            print("sepa[ind_nans]", sepa[ind_nans])
+            print("rlc[ind_nans]", rlc[ind_nans])
+            print("rbnd[ind_nans]", rbnd[ind_nans])
+            print("atten_lc[ind_nans]", atten_lc[ind_nans])
+            print("atten_hard[ind_nans]", atten_hard[ind_nans])
+            print("cut[ind_nans]", cut[ind_nans])
 
         return atten
 
@@ -1348,6 +1375,11 @@ def _radius_influence_dehnen(mbh, mstar, gamma=1.0):
     rchar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
     rinfl = np.power(2*mbh/mstar, 1.0/(gamma - 3.0))
     rinfl = rchar / (rinfl - 1.0)
+    if np.any(rinfl<0):
+        inds = rinfl<0
+        print("(2*mbh/mstar)[inds]",(2*mbh/mstar)[inds] )
+        print("line 1380, rinfl[inds] = ", rinfl[inds])
+        print("rchar[inds] = ", rchar[inds])
     return rinfl
 
 
@@ -1380,4 +1412,13 @@ def _radius_loss_cone_bbr80_dehnen(mbh, mstar, gamma=1.0):
     rbnd = _radius_influence_dehnen(mbh, mstar, gamma=gamma)
     rstar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
     rlc = np.power(mass_of_a_star / mbh, 0.25) * np.power(rbnd/rstar, 2.25) * rstar
+    if np.isnan(rlc).any():
+        ind_nans = np.isnan(rlc)
+        print("rbnd[ind_nans]", rbnd[ind_nans])
+        print("rstar[ind_nans]", rstar[ind_nans])
+        print("mbh[ind_nans]", mbh[ind_nans])
+        print("np.power(mass_of_a_star / mbh, 0.25)[ind_nans]",np.power(mass_of_a_star / mbh, 0.25)[ind_nans])
+        print("np.power(rbnd/rstar, 2.25)[ind_nans]", np.power(rbnd/rstar, 2.25)[ind_nans])
+        print("rlc[ind_nans]", rlc[ind_nans])
+        exit()
     return rlc
