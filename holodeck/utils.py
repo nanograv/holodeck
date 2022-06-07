@@ -569,14 +569,11 @@ def trapz_loglog(
         ii = np.array([ii[0], ii[1]+1])
         assert np.alltrue(xx[ii] == bounds), "FAILED!"
 
-    # yy = np.ma.masked_values(yy, value=0.0, atol=0.0)
-
     if np.ndim(yy) != np.ndim(xx):
         if np.ndim(xx) != 1:
             raise ValueError("BAD SHAPES")
         # convert `xx` from shape (N,) to (1, ... N, ..., 1) where all
         # dimensions besides `axis` have length one
-        # cut = [slice(None)] + [np.newaxis for ii in range(np.ndim(yy)-1)]
         cut = [np.newaxis for ii in range(np.ndim(yy))]
         cut[axis] = slice(None)
         xx = xx[tuple(cut)]
@@ -618,8 +615,6 @@ def trapz_loglog(
             delta_logx = delta_logx * np.ones_like(aa)
         trapz[idx] = aa[idx] * delta_logx[idx]
 
-    # integ = np.log(log_base) * np.cumsum(trapz, axis=axis)
-    # integ = np.cumsum(trapz, axis=axis) / np.log(log_base)   # FIX: I think this is divided by base... 2021-10-05
     integ = trapz / np.log(log_base)
     if cumsum:
         integ = np.cumsum(integ, axis=axis)
