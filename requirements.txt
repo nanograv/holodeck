@@ -1,8 +1,8 @@
-numpy
-matplotlib
-h5py
-scipy
 astropy
-tqdm
+h5py
 ipywidgets   # required for tqdm to work (at the moment, looks like a bug)
 kalepy
+matplotlib
+numpy
+scipy
+tqdm
