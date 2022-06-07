@@ -134,7 +134,7 @@ if __name__ == "__main__":
     header = f"holodeck :: {__file__}"
     print(header)
     print("=" * len(header) + "\n")
-    print(f"{args=}")
+    print(f"args={args}")
 
     main()
 

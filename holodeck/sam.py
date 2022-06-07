@@ -983,7 +983,7 @@ def _gws_from_number_grid_centroids(edges, dnum, number, realize, integrate=True
     # # get weighted centers for each dimension
     # for ii, cc in enumerate(coms):
     #     coms[ii] = kale.utils.midpoints(dnum * cc, log=False, axis=(0, 1, 2, 3)) / cent
-    print(f"{kale.utils.jshape(edges)=}, {dnum.shape=}")
+    # print(f"{kale.utils.jshape(edges)=}, {dnum.shape=}")
     coms = kale.utils.centroids(edges, dnum)
 
     # ---- calculate GW strain at bin centroids

@@ -531,7 +531,7 @@ class Evolution:
             prev_sum = weights.sum()
             weights /= DOWN
             next_sum = weights.sum()
-            log.warning(f"DOWNSAMPLING ARTIFICIALLY!!  {DOWN=:g} :: {prev_sum:.4e}==>{next_sum:.4e}")
+            log.warning(f"DOWNSAMPLING ARTIFICIALLY!!  DOWN={DOWN:g} :: {prev_sum:.4e}==>{next_sum:.4e}")
 
         # vals = [mt, mr, redz, fo]
         # TODO/FIX: Consider sampling in comoving-volume instead of redz (like in sam.py)
