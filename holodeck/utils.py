@@ -144,6 +144,23 @@ def get_file_size(fnames, precision=1):
     return byte_str
 
 
+def _get_subclass_instance(value, default, superclass):
+    import inspect
+
+    if value is None:
+        value = default
+
+    if inspect.isclass(value):
+        value = value()
+
+    if not isinstance(value, superclass):
+        err = f"argument ({value}) must be an instance or subclass of `{superclass}`!"
+        log.error(err)
+        raise ValueError(err)
+
+    return value
+
+
 # =================================================================================================
 # ====    Mathematical & Numerical    ====
 # =================================================================================================
