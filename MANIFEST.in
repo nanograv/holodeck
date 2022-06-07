@@ -8,4 +8,3 @@ include requirements.txt
 include tox.ini
 
 graft holodeck
-global-exclude *.py[cod] __pycache__ *.so
