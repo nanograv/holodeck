@@ -45,7 +45,7 @@ References
 
 import abc
 import enum
-import inspect
+# import inspect
 import json
 import os
 import warnings
@@ -295,7 +295,7 @@ class Evolution:
                 First, get total accretion rates """
             if self._acc.mdot_ext is not None:
                 """ accretion rates have been supplied externally """
-                mdot_total = self._acc.mdot_ext[:,step-1]
+                mdot_total = self._acc.mdot_ext[:, step-1]
             else:
                 """ Get accretion rates as a fraction (f_edd in self._acc) of the
                     Eddington limit from current BH masses """
@@ -631,20 +631,19 @@ class Sesana_Scattering(_Hardening):
     gamma_dehnen : scalar  or  (N,) array-like of scalar
         Dehnen stellar-density profile inner power-law slope.
         Fiducial Dehnen inner density profile slope gamma=1.0 is used in [Chen17].
-    gbh : _Galaxy_Blackhole_Relation class/instance  or  `None`
-        Galaxy-Blackhole Relation used for calculating stellar parameters.
-        If `None` the default is loaded.
+    # hostbh : _MHost_Relation class/instance  or  `None`
+    #     Galaxy-Blackhole Relation used for calculating stellar parameters.
+    #     If `None` the default is loaded.
 
     Additional Notes
     ----------------
 
     """
 
-    def __init__(self, gamma_dehnen=1.0, gbh=None):
-        gbh = _get_galaxy_blackhole_relation(gbh)
-        self._gbh = gbh
+    def __init__(self, gamma_dehnen=1.0, mmbulge=None, msigma=None):
+        self._mmbulge = holo.relations.get_mmbulge_relation(mmbulge)
+        self._msigma = holo.relations.get_msigma_relation(msigma)
         self._gamma_dehnen = gamma_dehnen
-
         self._shm06 = _SHM06()
         return
 
@@ -693,8 +692,8 @@ class Sesana_Scattering(_Hardening):
 
         """
         mtot, mrat = utils.mtmr_from_m1m2(mass)
-        vdisp = self._gbh.vdisp_from_mbh(mtot)
-        mbulge = self._gbh.mbulge_from_mbh(mtot)
+        vdisp = self._msigma.vdisp_from_mbh(mtot, False)
+        mbulge = self._mmbulge.mbulge_from_mbh(mtot, False)
         dens = _density_at_influence_radius_dehnen(mtot, mbulge, self._gamma_dehnen)
 
         rhard = _Quinlan96.radius_hardening(mass[:, 1], vdisp)
@@ -718,10 +717,10 @@ class Dynamical_Friction_NFW(_Hardening):
     """Dynamical Friction (DF) hardening module assuming an NFW dark-matter density profile.
 
     This class calculates densities and orbital velocities based on a NFW profile with parameters based on those of
-    each MBH binary.  The `holodeck.observations.NFW` class is used for profile calculations, and the halo parameters
+    each MBH binary.  The `holodeck.relations.NFW` class is used for profile calculations, and the halo parameters
     are calculated from Stellar-mass--Halo-mass relations (see 'arguments' below).  The 'effective-mass' of the
     inspiralling secondary is modeled as a power-law decreasing from the sum of secondary MBH and its stellar-bulge
-    (calculated using the `gbh` - Galaxy-Blackhole relation), down to just the bare secondary MBH after 10 dynamical
+    (calculated using the `hostbh` - Galaxy-Blackhole relation), down to just the bare secondary MBH after 10 dynamical
     times.  This is to model tidal-stripping of the secondary host galaxy.
 
     Attenuation of the DF hardening rate is typically also included, to account for the inefficiency of DF once the
@@ -733,9 +732,9 @@ class Dynamical_Friction_NFW(_Hardening):
 
     Arguments
     ---------
-    gbh : class, instance or None
-        Galaxy-blackhole relation (_Galaxy_Blackhole_Relation subclass)
-        If `None` the default is loaded.
+    # hostbh : class, instance or None
+    #     Galaxy-blackhole relation (_Galaxy_Blackhole_Relation subclass)
+    #     If `None` the default is loaded.
     smhm : class, instance or None
         Stellar-mass--halo-mass relation (_StellarMass_HaloMass subclass)
         If `None` the default is loaded.
@@ -749,7 +748,7 @@ class Dynamical_Friction_NFW(_Hardening):
         Determines how the binding radius (of MBH pair) is calculated, which is used for attenuation.
         NOTE: this is only used if `attenuate==True`
         If True:  calculate R_bound using an assumed stellar density profile.
-        If False: calculate R_bound using a velocity dispersion (constant in radius, from `gbh` instance).
+        If False: calculate R_bound using a velocity dispersion (constant in radius, from `hostbh` instance).
 
     Additional Notes
     ----------------
@@ -758,16 +757,15 @@ class Dynamical_Friction_NFW(_Hardening):
 
     """
 
-    def __init__(self, gbh=None, smhm=None, coulomb=10.0, attenuate=True, rbound_from_density=True):
-        gbh = _get_galaxy_blackhole_relation(gbh)
-        smhm = _get_stellar_mass_halo_mass_relation(smhm)
-        self._gbh = gbh
-        self._smhm = smhm
+    def __init__(self, mmbulge=None, msigma=None, smhm=None, coulomb=10.0, attenuate=True, rbound_from_density=True):
+        self._mmbulge = holo.relations.get_mmbulge_relation(mmbulge)
+        self._msigma = holo.relations.get_msigma_relation(msigma)
+        self._smhm = holo.relations.get_stellar_mass_halo_mass_relation(smhm)
         self._coulomb = coulomb
         self._attenuate = attenuate
         self._rbound_from_density = rbound_from_density
 
-        self._NFW = holo.observations.NFW
+        self._NFW = holo.relations.NFW
         self._time_dynamical = None
         return
 
@@ -847,12 +845,12 @@ class Dynamical_Friction_NFW(_Hardening):
 
         # ---- Get Host DM-Halo mass
         # use "bulge-mass" as a proxy for total stellar mass
-        mstar = self._gbh.mbulge_from_mbh(mass[:, 0])   # use primary-bh's mass (index 0)
+        mstar = self._mmbulge.mbulge_from_mbh(mass[:, 0], False)   # use primary-bh's mass (index 0)
         mhalo = self._smhm.halo_mass(mstar, redz, clip=True)
 
         # ---- Get effective mass of inspiraling secondary
-        m2 = mass[:, 1]
-        mstar_sec = self._gbh.mbulge_from_mbh(m2)
+        m2 = mass[:, 1].copy()
+        mstar_sec = self._mmbulge.mbulge_from_mbh(m2, False)
         if self._time_dynamical is None:
             self._time_dynamical = self._NFW.time_dynamical(sepa, mhalo, redz) * 10
 
@@ -883,7 +881,6 @@ class Dynamical_Friction_NFW(_Hardening):
             print("line 814, nans in dadt")
 
         if attenuate:
-            print("attenuating")
             atten = self._attenuation_bbr80(sepa, mass, mstar)
             dadt = dadt / atten
             print("any nans in atten:", atten[np.isnan(atten)])
@@ -937,7 +934,7 @@ class Dynamical_Friction_NFW(_Hardening):
             rbnd = _radius_influence_dehnen(mbh, mstar)
         # Calculate R_bound based on uniform velocity dispersion (MBH scaling relation)
         else:
-            vdisp = self._gbh.vdisp_from_mbh(m1)   # use primary-bh's mass (index 0)
+            vdisp = self._msigma.vdisp_from_mbh(m1, False)   # use primary-bh's mass (index 0)
             rbnd = NWTG * mbh / vdisp**2
 
         # Number of stars in the stellar bulge/core
@@ -1429,34 +1426,6 @@ class _SHM06:
         self._H_a0 = sp.interpolate.interp1d(h_mass_ratios, h_a0, kind='linear', fill_value='extrapolate')
         self._H_g = sp.interpolate.interp1d(h_mass_ratios, h_g, kind='linear', fill_value='extrapolate')
         return
-
-
-def _get_galaxy_blackhole_relation(gbh=None):
-    if gbh is None:
-        gbh = holo.observations.Kormendy_Ho_2013
-
-    if inspect.isclass(gbh):
-        gbh = gbh()
-    elif not isinstance(gbh, holo.observations._Galaxy_Blackhole_Relation):
-        err = "`gbh` must be an instance or subclass of `holodeck.observations._Galaxy_Blackhole_Relation`!"
-        log.error(err)
-        raise ValueError(err)
-
-    return gbh
-
-
-def _get_stellar_mass_halo_mass_relation(smhm=None):
-    if smhm is None:
-        smhm = holo.observations.Behroozi_2013
-
-    if inspect.isclass(smhm):
-        smhm = smhm()
-    elif not isinstance(smhm, holo.observations._StellarMass_HaloMass):
-        err = "`smhm` must be an instance or subclass of `holodeck.observations._StellarMass_HaloMass`!"
-        log.error(err)
-        raise ValueError(err)
-
-    return smhm
 
 
 def _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma=1.0):
