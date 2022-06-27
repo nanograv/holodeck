@@ -1,12 +1,18 @@
 """
+
+
+mpirun -n 14 --use-hwthread-cpus python ./scripts/gen_lib_sams.py output/test_2022-06-27
+
+
 """
 
+import argparse
 import os
-from datetime import datetime
-# import glob
 import logging
-# import sys
+import sys
 import warnings
+from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 # import h5py
@@ -14,64 +20,159 @@ from mpi4py import MPI
 
 import holodeck as holo
 import holodeck.sam
-from holodeck.constants import YR, MSOL, GYR
-from holodeck import log
+import holodeck.logger
+from holodeck.constants import YR, MSOL, GYR  # noqa
+
+
+class Parameter_Space:
+
+    def __init__(
+        self,
+        gsmf_phi0=[-3.35, -2.23, 7],
+        # gsmf_alpha0=[-1.56, -0.92, 5],
+        mmb_amp=[0.39e9, 0.61e9, 11], mmb_plaw=[1.01, 1.33, 13]
+    ):
+
+        self.gsmf_phi0 = np.linspace(*gsmf_phi0)
+        # self.gsmf_alpha0 = np.linspace(*gsmf_alpha0)
+        self.mmb_amp = np.linspace(*mmb_amp)
+        self.mmb_plaw = np.linspace(*mmb_plaw)
+        pars = [
+            self.gsmf_phi0,
+            # self.gsmf_alpha0,
+            self.mmb_amp,
+            self.mmb_plaw
+        ]
+        self.names = [
+            'gsmf_phi0',
+            # 'gsmf_alpha0',
+            'mmb_amp',
+            'mmb_plaw'
+        ]
+        self.params = np.meshgrid(*pars, indexing='ij')
+        self.shape = self.params[0].shape
+        self.size = np.product(self.shape)
+        self.params = np.moveaxis(self.params, 0, -1)
+
+        pass
+
+    def number_to_index(self, num):
+        idx = np.unravel_index(num, self.shape)
+        return idx
+
+    def index_to_number(self, idx):
+        num = np.ravel_multi_index(idx, self.shape)
+        return num
+
+    def param_dict_for_number(self, num):
+        idx = self.number_to_index(num)
+        pars = self.params[idx]
+        rv = {nn: pp for nn, pp in zip(self.names, pars)}
+        return rv
+
+    def params_for_number(self, num):
+        idx = self.number_to_index(num)
+        pars = self.params[idx]
+        return pars
+
+    def sam_for_number(self, num):
+        params = self.params_for_number(num)
+
+        gsmf_phi0, mmb_amp, mmb_plaw = params
+
+        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gpf = holo.sam.GPF_Power_Law()
+        gmt = holo.sam.GMT_Power_Law()
+        mmbulge = holo.relations.MMBulge_KH13(mamp=mmb_amp*MSOL, mplaw=mmb_plaw)
+
+        sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge)
+        return sam
+
 
 comm = MPI.COMM_WORLD
 
-PATH_OUTPUT = "./output"
 BEG = datetime.now()
 
-NUM_REALS = 300
-NUM_PARAMS = 10
+# DEBUG = False
 
+# ---- Fail on warnings
+# # err = 'ignore'
+# err = 'raise'
+# np.seterr(divide=err, invalid=err, over=err)
+# warn_err = 'error'
+# # warnings.filterwarnings(warn_err, category=UserWarning)
+# warnings.filterwarnings(warn_err)
 
-def run_sam(param, real, path_output):
-    beg = datetime.now()
+# ---- Setup ArgParse
 
-    fname = f"sam_output_p{param:03d}_r{real:03d}.npz"
-    fname = os.path.join(path_output, fname)
-    if os.path.exists(fname):
-        log.warning(f"File {fname} already exists.")
-        return
+parser = argparse.ArgumentParser()
+parser.add_argument('output', metavar='output', type=str,
+                    help='output path [created if doesnt exist')
 
-    fobs = holo.utils.nyquist_freqs(20.0*YR, 0.1*YR)
+# parser.add_argument('-r', '--reals', action='store', dest='reals', type=int,
+#                     help='number of realizations', default=10)
+# parser.add_argument('-s', '--shape', action='store', dest='shape', type=int,
+#                     help='shape of SAM grid', default=50)
+# parser.add_argument('-t', '--threshold', action='store', dest='threshold', type=float,
+#                     help='sample threshold', default=100.0)
+# parser.add_argument('-d', '--dur', action='store', dest='dur', type=float,
+#                     help='PTA observing duration [yrs]', default=20.0)
+# parser.add_argument('-c', '--cad', action='store', dest='cad', type=float,
+#                     help='PTA observing cadence [yrs]', default=0.1)
+# parser.add_argument('-d', '--debug', action='store_true', default=False, dest='debug',
+#                     help='run in DEBUG mode')
+parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
+                    help='verbose output [INFO]')
+# parser.add_argument('--version', action='version', version='%(prog)s 1.0')
 
-    mmbulge_mass_norm = np.logspace(7, 9, NUM_PARAMS) * MSOL
-    mmbulge_mass_norm = mmbulge_mass_norm[param]
-    log.info(f"{comm.rank=} {param=} {real=} {mmbulge_mass_norm=:.4e} [g] = {mmbulge_mass_norm/MSOL=:.4e}")
+args = parser.parse_args()
+args.NUM_REALS = 30
+args.PTA_DUR = 15.0 * YR
+args.PTA_CAD = 0.1 * YR
 
-    gsmf = holo.sam.GSMF_Schechter()        # Galaxy Stellar-Mass Function (GSMF)
-    gpf = holo.sam.GPF_Power_Law()          # Galaxy Pair Fraction         (GPF)
-    gmt = holo.sam.GMT_Power_Law()          # Galaxy Merger Time           (GMT)
-    mmbulge = holo.sam.MMBulge_Simple(mmbulge_mass_norm)     # M-MBulge Relation            (MMB)
+log_lvl = holo.logger.INFO if args.verbose else holo.logger.WARNING
 
-    sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge)
-    gff, gwf, gwb = holo.sam.sampled_gws_from_sam(
-        sam, fobs, sample_threshold=10.0,
-        cut_below_mass=1e7*MSOL, limit_merger_time=4*GYR
-    )
+BEG = comm.bcast(BEG, root=0)
 
-    np.savez(fname, fobs=fobs, gff=gff, gwb=gwb, gwf=gwf, mmbulge_norm=mmbulge_mass_norm)
-    log.warning(f"Saved to {fname} after {(datetime.now()-beg)} (start: {BEG})")
-    return
+this_fname = os.path.abspath(__file__)
+head = f"holodeck :: {this_fname} : {str(BEG)} - rank: {comm.rank}/{comm.size}"
+head = "\n" + head + "\n" + "=" * len(head) + "\n"
+if comm.rank == 0:
+    print(head)
+
+log_name = f"holodeck__gen_lib_sams_{BEG.strftime('%Y%m%d-%H%M%S')}"
+if comm.rank > 0:
+    log_name = f"_{log_name}_r{comm.rank}"
+
+PATH_OUTPUT = Path(args.output).resolve()
+if not PATH_OUTPUT.is_absolute:
+    PATH_OUTPUT = Path('.').resolve() / PATH_OUTPUT
+    PATH_OUTPUT = PATH_OUTPUT.resolve()
+
+if comm.rank == 0:
+    PATH_OUTPUT.mkdir(parents=True, exist_ok=True)
+
+comm.barrier()
+
+fname = f"{PATH_OUTPUT.joinpath(log_name)}.log"
+LOG = holo.logger.get_logger(name=log_name, tostr=log_lvl, tofile=fname)
+LOG.info(head)
+LOG.info(f"Output path: {PATH_OUTPUT}")
+LOG.info(f"        log: {fname}")
+
+SPACE = Parameter_Space() if comm.rank == 0 else None
+SPACE = comm.bcast(SPACE, root=0)
+
+# ------------------------------------------------------------------------------
+# ----    Methods
+# ------------------------------------------------------------------------------
 
 
 def main():
-
     bnum = 0
-
-    # Print header (filename etc)
-    beg = datetime.now()
-    if comm.rank == 0:
-        this_fname = os.path.abspath(__file__)
-        head = f"{this_fname} : {str(beg)} - rank: {comm.rank}/{comm.size}"
-        print("\n" + head + "\n" + "=" * len(head) + "\n")
-
-    path_output = os.path.join(os.path.abspath(PATH_OUTPUT), '')
-    if comm.rank == 0:
-        if not os.path.exists(path_output):
-            os.mkdir(path_output)
+    LOG.info(f"{SPACE=}, {id(SPACE)=}")
+    npars = SPACE.size
+    nreals = args.NUM_REALS
 
     # # -- Load Parameters from Input File
     # params = None
@@ -97,26 +198,29 @@ def main():
 
     # Distribute all parameters to all processes
     # params = comm.bcast(params, root=0)
-    bnum = _barrier(bnum, verbose=True)
+    bnum = _barrier(bnum)
 
     # Split and distribute index numbers to all processes
     if comm.rank == 0:
-        indices = range(NUM_PARAMS*NUM_REALS)
+        # indices = range(npars*nreals)
+        indices = range(npars)
         indices = np.random.permutation(indices)
         indices = np.array_split(indices, comm.size)
+        num_ind_per_proc = [len(ii) for ii in indices]
+        # LOG.info(f"{npars=}, {nreals=}, total={npars*nreals} || ave runs per core = {np.mean(num_ind_per_proc)}")
+        LOG.info(f"{npars=}, {nreals=} || ave runs per core = {np.mean(num_ind_per_proc)}")
     else:
         indices = None
     indices = comm.scatter(indices, root=0)
-    bnum = _barrier(bnum, verbose=True)
+    bnum = _barrier(bnum)
     # prog_flag = (comm.rank == 0)
+    iterator = holo.utils.tqdm(indices) if comm.rank == 0 else np.atleast_1d(indices)
 
-    for ind in np.atleast_1d(indices):
-        # pars = params[ind]
-        # pars = ind
+    for ind in iterator:
         # Convert from 1D index into 2D (param, real) specification
-        param, real = np.unravel_index(ind, (NUM_PARAMS, NUM_REALS))
-
-        print(f"rank:{comm.rank} index:{ind} => {param=} {real=}")
+        # param, real = np.unravel_index(ind, (npars, nreals))
+        # LOG.info(f"rank:{comm.rank} index:{ind} => {param=} {real=}")
+        param = ind
 
         # # - Check if all output files already exist, if so skip
         # key = pipeline(progress=prog_flag, key_only=True, **pars)
@@ -132,7 +236,7 @@ def main():
         #     continue
 
         try:
-            run_sam(param, real, path_output)
+            run_sam(param, None, PATH_OUTPUT)
         except Exception as err:
             logging.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{ind}")
             logging.warning(err)
@@ -141,22 +245,50 @@ def main():
             print("\n\n")
 
     end = datetime.now()
-    print(f"\t{comm.rank} done at {str(end)} after {str(end-beg)} = {(end-beg).total_seconds()}")
-    bnum = _barrier(bnum, verbose=True)
+    print(f"\t{comm.rank} done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}")
+    bnum = _barrier(bnum)
     if comm.rank == 0:
         end = datetime.now()
-        tail = f"Done at {str(end)} after {str(end-beg)} = {(end-beg).total_seconds()}"
+        tail = f"Done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}"
         print("\n" + "=" * len(tail) + "\n" + tail + "\n")
 
     return
 
 
-def _barrier(bnum, verbose=True):
-    if comm.rank == 0:
-        print(f"barrier {bnum}")
-        bnum += 1
+def run_sam(pnum, real, path_output):
 
+    iterator = range(args.NUM_REALS)
+    if comm.rank == 0:
+        iterator = holo.utils.tqdm(iterator, leave=False)
+
+    for real in iterator:
+
+        fname = f"lib_sams__p{pnum:06d}_r{real:03d}.npz"
+        fname = os.path.join(path_output, fname)
+        if os.path.exists(fname):
+            LOG.warning(f"File {fname} already exists.")
+            continue
+
+        fobs = holo.utils.nyquist_freqs(args.PTA_DUR, args.PTA_CAD)
+
+        sam = SPACE.sam_for_number(pnum)
+
+        gff, gwf, gwb = holo.sam.sampled_gws_from_sam(
+            sam, fobs, sample_threshold=10.0,
+            # cut_below_mass=1e7*MSOL, limit_merger_time=4*GYR
+        )
+
+        legend = SPACE.param_dict_for_number(pnum)
+        np.savez(fname, fobs=fobs, gff=gff, gwb=gwb, gwf=gwf, pnum=pnum, real=real, **legend)
+        LOG.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
+
+    return
+
+
+def _barrier(bnum):
+    LOG.debug(f"barrier {bnum}")
     comm.barrier()
+    bnum += 1
     return bnum
 
 
@@ -164,12 +296,5 @@ if __name__ == "__main__":
     np.seterr(divide='ignore', invalid='ignore', over='ignore')
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    # args = sys.argv[1:]
-    # if len(args) != 2:
-    #     print("Incorrect usage!")
-    #     comm.Abort(2)
-
-    # output_path = sys.argv[3]
-
-    # print(f"rank {comm.rank} : args = '{args}'")
     main()
+    sys.exit(0)
