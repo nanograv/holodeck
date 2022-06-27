@@ -4,6 +4,7 @@
 # import inspect
 import logging
 import sys
+from logging import DEBUG, INFO, WARNING, ERROR  # noqa
 
 
 def get_logger(name='holodeck', level_stream=logging.WARNING, tostr=sys.stdout, tofile=None, level_file=logging.DEBUG):
