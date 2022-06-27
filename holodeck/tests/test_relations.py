@@ -9,6 +9,7 @@ import scipy.stats
 
 import holodeck as holo
 import holodeck.relations
+import holodeck.population
 from holodeck.constants import MSOL
 
 
@@ -157,7 +158,7 @@ def test_kh13_basic():
 
 
 def check_mass_reset(mmbulge_relation, truth_func):
-    pop = holo.Pop_Illustris()
+    pop = holo.population.Pop_Illustris()
     mod_mm13 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=False)
     pop.modify(mod_mm13)
     mass = pop.mass

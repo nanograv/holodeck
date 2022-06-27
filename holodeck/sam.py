@@ -11,10 +11,7 @@ To-Do
 -----
 *[ ]Check that _GW_ frequencies and _orbital_ frequencies are being used in the correct places.
     Check `number_at_gw_fobs` and related methods.
-*[ ]Change mass-ratios and redshifts (1+z) to log-space; expand q parameter range.
 *[ ]Incorporate arbitrary hardening mechanisms into SAM construction, sample self-consistently.
-*[ ]When using `sample_outliers` check whether the density (used for intrabin sampling) should be
-    the log(dens) instead of just `dens`.
 
 """
 
@@ -365,18 +362,22 @@ class Semi_Analytic_Model:
 
         # Redefine shape of grid (i.e. number of bins in each parameter)
         if shape is not None:
-            if len(shape) == 3:
-                # mtot
-                if shape[0] is not None:
-                    mtot[2] = shape[0]
-                # mrat
-                if shape[1] is not None:
-                    mrat[2] = shape[1]
-                # redz
-                if shape[2] is not None:
-                    redz[2] = shape[2]
-            else:
-                raise
+            if np.isscalar(shape):
+                shape = [shape+ii for ii in range(3)]
+
+            shape = np.asarray(shape)
+            if not kale.utils.isinteger(shape) or (shape.size != 3) or np.any(shape <= 1):
+                raise ValueError(f"`shape` ({shape}) must be an integer, or (3,) iterable of integers, larger than 1!")
+
+            # mtot
+            if shape[0] is not None:
+                mtot[2] = shape[0]
+            # mrat
+            if shape[1] is not None:
+                mrat[2] = shape[1]
+            # redz
+            if shape[2] is not None:
+                redz[2] = shape[2]
 
         # NOTE: the spacing (log vs lin) is important.  e.g. in integrating from differential-number to (total) number
         self.mtot = np.logspace(*np.log10(mtot[:2]), mtot[2])
@@ -530,7 +531,8 @@ class Semi_Analytic_Model:
             utils.error("one (and only one) of `fobs` or `sepa` must be provided!")
 
         if fobs is not None:
-            xsize = len(fobs)
+            fobs = np.asarray(fobs)
+            xsize = fobs.size
             edges = self.edges + [fobs, ]
         else:
             xsize = len(sepa)
@@ -642,11 +644,9 @@ class Semi_Analytic_Model:
             utils.error(err)
 
         # ---- Get the differential-number of binaries for each bin
-        # this is  ``d^4 N / [dlog10(M) dq dz dln(f_r)]``
+        # this is  ``d^4 n / [dlog10(M) dq dz dln(f_r)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
         edges, dnum = self.diff_num_from_hardening(hard, fobs=fobs)
-
-        # TODO: bin centroids should be different for each bin, not just each dimension
 
         # "integrate" within each bin (i.e. multiply by bin volume)
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
@@ -655,7 +655,7 @@ class Semi_Analytic_Model:
         number = _integrate_differential_number(edges, dnum, freq=True)
 
         # ---- Get the GWB spectrum from number of binaries over grid
-        hc = _gws_from_number_grid(fobs, self.grid, dnum, number, realize)
+        hc = _gws_from_number_grid_integrated(edges, dnum, number, realize)
         if squeeze:
             hc = hc.squeeze()
 
@@ -690,8 +690,7 @@ def _integrate_differential_number(edges, dnum, freq=False):
     # integrate over mass-ratio
     number = holo.utils.trapz(number, edges[1], axis=1, cumsum=False)
     # integrate over redshift
-    redz_edges = edges[2]
-    number = holo.utils.trapz(number, redz_edges, axis=2, cumsum=False)
+    number = holo.utils.trapz(number, edges[2], axis=2, cumsum=False)
     # integrate over frequency (if desired)
     if freq:
         number = holo.utils.trapz(number, np.log(edges[3]), axis=3, cumsum=False)
@@ -727,8 +726,11 @@ def sample_sam_with_hardening(
 
     """
 
-    if sample_threshold < 1.0:
-        log.warning("`sample_threshold={sample_threshold}`, values less than unity can lead to surprising behavior!")
+    if (sample_threshold < 1.0) and (sample_threshold > 0.0):
+        msg = (
+            f"`sample_threshold={sample_threshold}` values less than unity can lead to surprising behavior!"
+        )
+        log.warning(msg)
 
     # returns  dN/[dlog10(M) dq dz dln(f_r)]
     # edges: Mtot [grams], mrat (q), redz (z), {fobs (f) [1/s] OR sepa (a) [cm]}
@@ -815,6 +817,33 @@ def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
     return gff, gwf, gwb
 
 
+def _strains_from_samples(vals, redz=True):
+    """
+
+    NOTE: this assumes that vales[3] is the observer-frame GW frequency.
+
+    Parameters
+    ----------
+    vals : _type_
+    redz : bool, optional
+
+    Returns
+    -------
+    _type_
+    """
+
+    mc = utils.chirp_mass(*utils.m1m2_from_mtmr(vals[0], vals[1]))
+
+    rz = vals[2]
+    dc = cosmo.comoving_distance(rz).cgs.value
+
+    fo = vals[3]
+    frst = utils.frst_from_fobs(fo, rz)
+    # convert from GW frequency to orbital (divide by 2.0)
+    hs = utils.gw_strain_source(mc, dc, frst/2.0)
+    return hs, fo
+
+
 def _gws_from_samples(vals, weights, fobs):
     """
 
@@ -831,15 +860,8 @@ def _gws_from_samples(vals, weights, fobs):
         Target observer-frame frequencies to calculate GWs at.  Units of [1/sec].
 
     """
-    mc = utils.chirp_mass(*utils.m1m2_from_mtmr(vals[0], vals[1]))
-    rz = vals[2]
-    fo = vals[3]
-    frst = utils.frst_from_fobs(fo, rz)
-    dc = cosmo.comoving_distance(rz).cgs.value
-    hs = utils.gw_strain_source(mc, dc, frst)
-
+    hs, fo = _strains_from_samples(vals)
     gff, gwf, gwb = gws_from_sampled_strains(fobs, fo, hs, weights)
-
     return gff, gwf, gwb
 
 
@@ -891,7 +913,9 @@ def gws_from_sampled_strains(fobs, fo, hs, weights):
         # upper-bound to this frequency bin
         hi = fobs[ff+1]
         # number of GW cycles (f/df), for conversion to characteristic strain
-        cycles = 0.5 * (hi + lo) / (hi - lo)
+        # cycles = 0.5 * (hi + lo) / (hi - lo)
+        # cycles = 1.0 / np.diff(np.log([lo, hi]))
+        cycles = 1.0 / (np.log(hi) - np.log(lo))
         # amplitude and frequency of the loudest source in this bin
         hmax = 0.0
         fmax = 0.0
@@ -923,8 +947,11 @@ def gws_from_sampled_strains(fobs, fo, hs, weights):
     return gwf_freqs, gwfore, gwback
 
 
-def _gws_from_number_grid(fobs, grid, dnum, number, realize):
+def _gws_from_number_grid_centroids(edges, dnum, number, realize, integrate=True):
     """Calculate GWs based on a grid of number-of-binaries.
+
+    NOTE: `_gws_from_number_grid_integrated()` should be more accurate, but this method better
+          matches GWB from sampled (kale.sample_) populations!!
 
     The input number of binaries is `N` s.t.
         ``N = (d^4 N / [dlog10(M) dq dz dlogf] ) * dlog10(M) dq dz dlogf``
@@ -942,28 +969,31 @@ def _gws_from_number_grid(fobs, grid, dnum, number, realize):
 
     """
 
-    # ---- find 'center-of-mass' of each bin (i.e. based on grid edges)
-    # (3, M', Q', Z')
-    # coms = self.grid
-    # ===> (3, M', Q', Z', 1)
-    coms = [cc[..., np.newaxis] for cc in grid]
-    # ===> (4, M', Q', Z', F)
-    coms = np.broadcast_arrays(*coms, fobs[np.newaxis, np.newaxis, np.newaxis, :])
+    # # ---- find 'center-of-mass' of each bin (i.e. based on grid edges)
+    # # (3, M', Q', Z')
+    # # coms = self.grid
+    # # ===> (3, M', Q', Z', 1)
+    # coms = [cc[..., np.newaxis] for cc in grid]
+    # # ===> (4, M', Q', Z', F)
+    # coms = np.broadcast_arrays(*coms, fobs[np.newaxis, np.newaxis, np.newaxis, :])
 
-    # ---- find weighted bin centers
-    # get unweighted centers
-    cent = kale.utils.midpoints(dnum, log=False, axis=(0, 1, 2, 3))
-    # get weighted centers for each dimension
-    for ii, cc in enumerate(coms):
-        coms[ii] = kale.utils.midpoints(dnum * cc, log=False, axis=(0, 1, 2, 3)) / cent
+    # # ---- find weighted bin centers
+    # # get unweighted centers
+    # cent = kale.utils.midpoints(dnum, log=False, axis=(0, 1, 2, 3))
+    # # get weighted centers for each dimension
+    # for ii, cc in enumerate(coms):
+    #     coms[ii] = kale.utils.midpoints(dnum * cc, log=False, axis=(0, 1, 2, 3)) / cent
+    # print(f"{kale.utils.jshape(edges)=}, {dnum.shape=}")
+    coms = kale.utils.centroids(edges, dnum)
 
     # ---- calculate GW strain at bin centroids
     mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))
     dc = cosmo.comoving_distance(coms[2]).cgs.value
     fr = utils.frst_from_fobs(coms[3], coms[2])
-    hs = utils.gw_strain_source(mc, dc, fr)
+    # convert from GW frequency to orbital frequency (divide by 2.0)
+    hs = utils.gw_strain_source(mc, dc, fr/2.0)
 
-    dlogf = np.diff(np.log(fobs))
+    dlogf = np.diff(np.log(edges[-1]))
     dlogf = dlogf[np.newaxis, np.newaxis, np.newaxis, :]
     if realize is True:
         number = np.random.poisson(number)
@@ -980,7 +1010,44 @@ def _gws_from_number_grid(fobs, grid, dnum, number, realize):
 
     number = number / dlogf
     hs = np.nan_to_num(hs)
+    hc = number * np.square(hs)
     # (M',Q',Z',F) ==> (F,)
-    hc = np.sqrt(np.sum(number*np.square(hs), axis=(0, 1, 2)))
+    if integrate:
+        hc = np.sqrt(np.sum(hc, axis=(0, 1, 2)))
+
+    return hc
+
+
+def _gws_from_number_grid_integrated(edges, dnum, number, realize, integrate=True):
+
+    grid = np.meshgrid(*edges, indexing='ij')
+
+    # ---- calculate GW strain at bin centroids
+    mc = utils.chirp_mass(*utils.m1m2_from_mtmr(grid[0], grid[1]))
+    dc = cosmo.comoving_distance(grid[2]).cgs.value
+    fr = utils.frst_from_fobs(grid[3], grid[2])
+    # convert from GW frequency to orbital frequency (divide by 2.0)
+    hs = utils.gw_strain_source(mc, dc, fr/2.0)
+
+    integrand = dnum * (hs ** 2)
+    # hc = _integrate_differential_number(edges, integrand, freq=False)
+    hc = _integrate_differential_number(edges, integrand, freq=True)
+    hc = hc / np.diff(np.log(edges[-1]))[np.newaxis, np.newaxis, np.newaxis, :]
+
+    if realize is True:
+        number = np.random.poisson(number) / number
+    elif realize in [None, False]:
+        pass
+    elif utils.isinteger(realize):
+        shape = number.shape + (realize,)
+        number = np.random.poisson(number[..., np.newaxis], size=shape) / number[..., np.newaxis]
+        hc = hc[..., np.newaxis] * np.nan_to_num(number)
+    else:
+        err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
+        raise ValueError(err)
+
+    # (M',Q',Z',F) ==> (F,)
+    if integrate:
+        hc = np.sqrt(np.sum(hc, axis=(0, 1, 2)))
 
     return hc

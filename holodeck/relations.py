@@ -347,6 +347,10 @@ class MMBulge_Redshift_MM13(MMBulge_Redshift):
     Z_PLAW = 0.0
 
 
+def get_mmbulge_relation(mmbulge=None):
+    return utils._get_subclass_instance(mmbulge, MMBulge_MM13, _MMBulge_Relation)
+
+
 # ----------------------------------------
 # ----     M – Sigma Relationships    ----
 # ----------------------------------------
@@ -403,6 +407,13 @@ class MSigma_Standard(_MSigma_Relation):
         mbh = _log10_relation(vdisp, self._mamp, self._mplaw, scatter_dex, x0=self._sigmaref)
         return mbh
 
+    def vdisp_from_mbh(self, mbh, scatter):
+        """
+        """
+        scatter_dex = self._scatter_dex if scatter else None
+        vdisp = _log10_relation_reverse(mbh, self._mamp, self._mplaw, scatter_dex, x0=self._sigmaref)
+        return vdisp
+
     def dmbh_dsigma(self, sigma):
         # Is this needed? I don't know
         return None
@@ -430,6 +441,10 @@ class MSigma_KH13(MSigma_Standard):
     SIGMA_REF = KMPERSEC * 200.0      # 200 km/s
     MASS_PLAW = 4.26                  # 4.26 ± 0.44
     SCATTER_DEX = 0.30
+
+
+def get_msigma_relation(msigma=None):
+    return utils._get_subclass_instance(msigma, MSigma_MM13, _MSigma_Relation)
 
 
 def _add_scatter(vals, eps_dex):
@@ -974,3 +989,7 @@ class Behroozi_2013(_StellarMass_HaloMass_Redshift):
         mstar = np.log10(eps*m1/MSOL) + self._f_func(np.log10(mhalo/m1), redz) - self._f0
         mstar = np.power(10.0, mstar) * MSOL
         return mstar
+
+
+def get_stellar_mass_halo_mass_relation(smhm=None):
+    return utils._get_subclass_instance(smhm, Behroozi_2013, _StellarMass_HaloMass)

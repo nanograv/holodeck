@@ -54,9 +54,11 @@ import numpy as np
 import scipy as sp
 import scipy.interpolate   # noqa
 
-import holodeck
+import kalepy as kale
+
+import holodeck as holo
 from holodeck import utils, cosmo, log, _PATH_DATA
-from holodeck.constants import GYR, NWTG, PC, MSOL, YR
+from holodeck.constants import GYR, NWTG, PC, MSOL, YR, SPLC
 
 _DEF_TIME_DELAY = (5.0*GYR, 0.2)
 _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
@@ -425,7 +427,11 @@ class Evolution:
         xvals = [np.take_along_axis(_xvals, cc, axis=-1) for cc in cut]
         # Find how far to interpolate between values (in log-space)
         #     (N, T)
-        frac = (tt[np.newaxis, :] - xvals[1]) / np.subtract(*xvals)
+        temp = np.subtract(*xvals)
+        numer = tt[np.newaxis, :] - xvals[1]
+        frac = np.zeros_like(numer)
+        idx = (temp != 0.0)
+        frac[idx] = numer[idx] / temp[idx]
 
         vals = dict()
         # Interpolate each target parameter
@@ -483,6 +489,63 @@ class Evolution:
             #     raise ValueError("Non-finite values after exponentiation of '{}'".format(pp))
 
         return vals
+
+    def sample_full_population(self, freqs, DOWN=None):
+        PARAMS = ['mass', 'sepa', 'dadt', 'scafa']
+        fobs = kale.utils.spacing(freqs, scale='log', dex=10, log_stretch=0.1)
+        log.info(f"Converted input freqs ({kale.utils.stats_str(freqs)}) ==> {kale.utils.stats_str(fobs)}")
+        data_fobs = self.at('fobs', fobs, pars=PARAMS)
+
+        # Only examine binaries reaching the given locations before redshift zero (other redz=infinite)
+        redz = data_fobs['scafa']
+        redz = cosmo.a_to_z(redz)
+        valid = np.isfinite(redz) & (redz > 0.0)
+        # nvalid = np.count_nonzero(valid)
+        # print(f"Valid indices: {nvalid}/{valid.size}={nvalid/valid.size:.4e}")
+
+        frst = utils.frst_from_fobs(fobs[np.newaxis, :], redz)
+        dcom = cosmo.z_to_dcom(redz)
+
+        # `mass` has shape (Binaries, Frequencies, 2)
+        #    convert to (2, B, F), then separate into m1, m2 each with shape (B, F)
+        m1, m2 = np.moveaxis(data_fobs['mass'], -1, 0)
+        # mchirp = utils.chirp_mass(m1, m2)
+        dfdt, _ = utils.dfdt_from_dadt(data_fobs['dadt'], data_fobs['sepa'], freq_orb=frst)
+        _tres = frst / dfdt
+
+        vfac = 4.0*np.pi*SPLC * (redz+1.0) * dcom**2 / self._sample_volume   # * thub
+        tfac = _tres  # / thub
+
+        # ---- Get the "Lambda"/Poisson weighting factor ----
+        # Calculate weightings
+        #    Sesana+08, Eq.10
+        lambda_factor = vfac * tfac
+        # print(f"`lambda_factor` = {lambda_factor.shape}, {utils.stats(lambda_factor)}")
+
+        mt, mr = utils.mtmr_from_m1m2(m1[valid], m2[valid])
+        fo = (fobs[np.newaxis, :] * np.ones_like(redz))[valid]
+        redz = redz[valid]
+        weights = lambda_factor[valid]
+
+        if DOWN is not None:
+            prev_sum = weights.sum()
+            weights /= DOWN
+            next_sum = weights.sum()
+            log.warning(f"DOWNSAMPLING ARTIFICIALLY!!  DOWN={DOWN:g} :: {prev_sum:.4e}==>{next_sum:.4e}")
+
+        # vals = [mt, mr, redz, fo]
+        # TODO/FIX: Consider sampling in comoving-volume instead of redz (like in sam.py)
+        #           can also return dcom instead of redz for easier strain calculation
+        vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo)]
+        nsamp = np.random.poisson(weights.sum())
+        reflect = [None, [None, 0.0], None, np.log10([0.95*fobs[0], fobs[-1]*1.05])]
+        # print(f"{nsamp=:.4e}, {np.shape(vals)=}")
+        samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
+        # print(f"{samples.shape=}")
+
+        samples = np.asarray([10.0 ** ss for ss in samples])
+        # hs, fo = holo.sam._strains_from_samples(samples)
+        return samples
 
 
 class _Hardening(abc.ABC):
@@ -667,7 +730,7 @@ class Dynamical_Friction_NFW(_Hardening):
         self._attenuate = attenuate
         self._rbound_from_density = rbound_from_density
 
-        self._NFW = holodeck.observations.NFW
+        self._NFW = holo.observations.NFW
         self._time_dynamical = None
         return
 
@@ -1312,11 +1375,11 @@ class _SHM06:
 
 def _get_galaxy_blackhole_relation(gbh=None):
     if gbh is None:
-        gbh = holodeck.observations.Kormendy_Ho_2013
+        gbh = holo.observations.Kormendy_Ho_2013
 
     if inspect.isclass(gbh):
         gbh = gbh()
-    elif not isinstance(gbh, holodeck.observations._Galaxy_Blackhole_Relation):
+    elif not isinstance(gbh, holo.observations._Galaxy_Blackhole_Relation):
         err = "`gbh` must be an instance or subclass of `holodeck.observations._Galaxy_Blackhole_Relation`!"
         log.error(err)
         raise ValueError(err)
@@ -1326,11 +1389,11 @@ def _get_galaxy_blackhole_relation(gbh=None):
 
 def _get_stellar_mass_halo_mass_relation(smhm=None):
     if smhm is None:
-        smhm = holodeck.observations.Behroozi_2013
+        smhm = holo.observations.Behroozi_2013
 
     if inspect.isclass(smhm):
         smhm = smhm()
-    elif not isinstance(smhm, holodeck.observations._StellarMass_HaloMass):
+    elif not isinstance(smhm, holo.observations._StellarMass_HaloMass):
         err = "`smhm` must be an instance or subclass of `holodeck.observations._StellarMass_HaloMass`!"
         log.error(err)
         raise ValueError(err)

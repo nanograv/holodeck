@@ -127,11 +127,11 @@ def get_file_size(fnames, precision=1):
         byte_size += os.path.getsize(fil)
 
     abbrevs = (
-        (1 << 50, 'PB'),
-        (1 << 40, 'TB'),
-        (1 << 30, 'GB'),
-        (1 << 20, 'MB'),
-        (1 << 10, 'KB'),
+        (1 << 50, 'PiB'),
+        (1 << 40, 'TiB'),
+        (1 << 30, 'GiB'),
+        (1 << 20, 'MiB'),
+        (1 << 10, 'KiB'),
         (1, 'bytes')
     )
 
@@ -142,6 +142,23 @@ def get_file_size(fnames, precision=1):
     size = byte_size / factor
     byte_str = f"{size:.{precision:}f} {suffix}"
     return byte_str
+
+
+def _get_subclass_instance(value, default, superclass):
+    import inspect
+
+    if value is None:
+        value = default
+
+    if inspect.isclass(value):
+        value = value()
+
+    if not isinstance(value, superclass):
+        err = f"argument ({value}) must be an instance or subclass of `{superclass}`!"
+        log.error(err)
+        raise ValueError(err)
+
+    return value
 
 
 # =================================================================================================
@@ -165,7 +182,8 @@ def broadcastable(*args):
 
 def expand_broadcastable(*args):
     try:
-        shape = np.shape(np.product(args, axis=0))
+        vals = np.array(args, dtype=object)    # avoid VisibleDeprecationWarning from ragged array creation
+        shape = np.shape(np.product(vals, axis=0))
     except ValueError:
         shapes = [np.shape(aa) for aa in args]
         raise ValueError("Argument arrays are not broadcastable!  shapes={}".format(shapes))
@@ -568,14 +586,11 @@ def trapz_loglog(
         ii = np.array([ii[0], ii[1]+1])
         assert np.alltrue(xx[ii] == bounds), "FAILED!"
 
-    # yy = np.ma.masked_values(yy, value=0.0, atol=0.0)
-
     if np.ndim(yy) != np.ndim(xx):
         if np.ndim(xx) != 1:
             raise ValueError("BAD SHAPES")
         # convert `xx` from shape (N,) to (1, ... N, ..., 1) where all
         # dimensions besides `axis` have length one
-        # cut = [slice(None)] + [np.newaxis for ii in range(np.ndim(yy)-1)]
         cut = [np.newaxis for ii in range(np.ndim(yy))]
         cut[axis] = slice(None)
         xx = xx[tuple(cut)]
@@ -617,8 +632,6 @@ def trapz_loglog(
             delta_logx = delta_logx * np.ones_like(aa)
         trapz[idx] = aa[idx] * delta_logx[idx]
 
-    # integ = np.log(log_base) * np.cumsum(trapz, axis=axis)
-    # integ = np.cumsum(trapz, axis=axis) / np.log(log_base)   # FIX: I think this is divided by base... 2021-10-05
     integ = trapz / np.log(log_base)
     if cumsum:
         integ = np.cumsum(integ, axis=axis)

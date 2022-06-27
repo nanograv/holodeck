@@ -20,7 +20,7 @@ from holodeck.constants import MSOL, PC
 
 def test_pop_illustris_basic():
     print("test_pop_illustris_basic()")
-    pop = holo.Pop_Illustris()
+    pop = holo.population.Pop_Illustris()
 
     keys = ['mbulge', 'vdisp', 'mass', 'scafa', 'sepa', 'redz']
     ranges = [[1e7, 1e13], [10, 600], [1e5, 3e10], [0.0, 1.0], [1e3, 3e5], [0.0, 10.0]]
@@ -45,7 +45,7 @@ def test_pop_illustris_basic():
 
 def test_mass_reset():
     print("test_mass_reset()")
-    pop = holo.Pop_Illustris()
+    pop = holo.population.Pop_Illustris()
     mmbulge_relation = holo.relations.MMBulge_MM13()
     mod_mm13 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=False)
 
