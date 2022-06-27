@@ -187,11 +187,9 @@ def main():
 
 
 if __name__ == "__main__":
-    header = "holodeck :: pop_sam"
+    header = f"holodeck :: {__file__}"
     print(header)
     print("=" * len(header) + "\n")
     print(f"args={args}")
 
     main()
-
-    pass

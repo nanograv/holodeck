@@ -29,8 +29,8 @@ for cp in _check_paths:
 
 # ---- Load logger
 
-from . import log   # noqa
-log = log.get_logger(__name__, logging.DEBUG)
+from . import logger   # noqa
+log = logger.get_logger(__name__, logging.DEBUG)
 
 
 # ---- Import submodules
