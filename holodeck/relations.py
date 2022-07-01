@@ -346,6 +346,19 @@ class MMBulge_Redshift_MM13(MMBulge_Redshift):
     Z_PLAW = 0.0
 
 
+class MMBulge_Redshift_KH13(MMBulge_Redshift):
+    """Mbh-MBulge Relation from Kormendy & Ho 2013, w/ optional redshift evolution of normalization.
+
+    Values taken from [KH13] Eq.10 (pg. 61 of PDF, "571" of ARAA)
+    """
+
+    MASS_AMP = 0.49 * 1e9 * MSOL   # 0.49 + 0.06 - 0.05   in units of [Msol]
+    MASS_REF = MSOL * 1e11            # 1e11 Msol
+    MASS_PLAW = 1.17                  # 1.17 ± 0.08
+    SCATTER_DEX = 0.28
+    Z_PLAW = 0.0
+
+
 def get_mmbulge_relation(mmbulge=None):
     return utils._get_subclass_instance(mmbulge, MMBulge_MM13, _MMBulge_Relation)
 
@@ -363,8 +376,6 @@ class _MSigma_Relation(_MHost_Relation):
     @abc.abstractmethod
     def dmbh_dsigma(self, sigma):
         return
-
-    # ---- Internal Methods ----
 
 
 class MSigma_Standard(_MSigma_Relation):
