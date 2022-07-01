@@ -130,7 +130,6 @@ args.NUM_REALS = 30
 args.PTA_DUR = 15.0 * YR
 args.PTA_CAD = 0.1 * YR
 
-log_lvl = holo.logger.INFO if args.verbose else holo.logger.WARNING
 
 BEG = comm.bcast(BEG, root=0)
 
@@ -154,8 +153,12 @@ if comm.rank == 0:
 
 comm.barrier()
 
+# ---- Setup Logger ----
+
 fname = f"{PATH_OUTPUT.joinpath(log_name)}.log"
-LOG = holo.logger.get_logger(name=log_name, tostr=log_lvl, tofile=fname)
+log_lvl = holo.logger.INFO if args.verbose else holo.logger.WARNING
+tostr = sys.stdout if comm.rank == 0 else None
+LOG = holo.logger.get_logger(name=log_name, level_stream=log_lvl, tofile=fname, tostr=tostr)
 LOG.info(head)
 LOG.info(f"Output path: {PATH_OUTPUT}")
 LOG.info(f"        log: {fname}")
