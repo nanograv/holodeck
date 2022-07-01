@@ -47,7 +47,7 @@ def get_logger(name='holodeck', level_stream=logging.WARNING, tostr=sys.stdout, 
 
     # Log to file
     # -----------
-    if tofile is not None:
+    if tofile not in [None, False]:
         format_date = '%Y/%m/%d %H:%M:%S'
         format_file = "%(asctime)s %(levelname)8.8s [%(filename)20.20s:%(funcName)-20.20s]%(message)s"
         file_formatter = logging.Formatter(format_file, format_date)
@@ -59,7 +59,7 @@ def get_logger(name='holodeck', level_stream=logging.WARNING, tostr=sys.stdout, 
         logger.filename = tofile
 
     # ---- log To stdout
-    if tostr is not None:
+    if tostr not in [None, False]:
         format_date = '%H:%M:%S'
 
         format_stream = "%(asctime)s %(levelname)s : %(message)s [%(filename)s:%(funcName)s]"
