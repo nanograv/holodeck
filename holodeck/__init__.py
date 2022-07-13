@@ -13,6 +13,7 @@ _PATH_PACKAGE = os.path.dirname(os.path.abspath(__file__))
 _PATH_ROOT = os.path.join(_PATH_PACKAGE, os.path.pardir)
 _PATH_NOTEBOOKS = os.path.join(_PATH_ROOT, "notebooks", "")
 _PATH_DATA = os.path.join(_PATH_PACKAGE, "data", "")
+_PATH_OUTPUT = os.path.join(_PATH_ROOT, "output", "")
 
 # NOTE: can only search for paths within the package _*NOT the root directory*_
 _check_paths = [_PATH_PACKAGE, _PATH_ROOT, _PATH_DATA]
