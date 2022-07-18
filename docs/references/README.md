@@ -1,4 +1,5 @@
 # References README
+- [McConnell+Ma-2013 - Revisiting the Scaling Relations of Black Hole Masses and Host Galaxy Properties](https://ui.adsabs.harvard.edu/abs/2013ApJ...764..184M/abstract)
 
 ## Gravitational Waves
 - Sesana+2004 - Low-Frequency Gravitational Radiation from Coalescing Massive Black Hole Binaries in Hierarchical Cosmologies - https://ui.adsabs.harvard.edu/abs/2004ApJ...611..623S/abstract

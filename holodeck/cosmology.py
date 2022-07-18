@@ -1,4 +1,9 @@
-"""
+"""Cosmology related code.
+
+[WMAP9] = Hinshaw et al. 2013 (1212.5226)
+    Nine-year Wilkinson Microwave Anisotropy Probe (WMAP) Observations: Cosmological Parameter Results
+    https://ui.adsabs.harvard.edu/abs/2013ApJS..208...19H/abstract
+
 """
 
 import astropy as ap
@@ -27,10 +32,10 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
 
     """
 
-    # These are WMAP9 parameters
-    Omega0 = 0.286
-    OmegaBaryon = 0.0463
-    HubbleParam = 0.693
+    # These are WMAP9 parameters, see [WMAP9], Table 3, WMAP+BAO+H0
+    Omega0 = 0.2880
+    OmegaBaryon = 0.0472
+    HubbleParam = 0.6933
     _H0_sub = HubbleParam * 100.0  # NOTE: this *cannot* be `H0` or `_H0` --- conflicts with astropy internals
     SPLC = 29979245800.0
 
