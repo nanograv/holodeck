@@ -9,9 +9,14 @@ References
 
 To-Do
 -----
-* Check that *GW* frequencies and *orbital* frequencies are being used in the correct places.
-  Check `number_at_gw_fobs` and related methods.
-* Incorporate arbitrary hardening mechanisms into SAM construction, sample self-consistently.
+*[ ]Check that _GW_ frequencies and _orbital_ frequencies are being used in the correct places.
+    Check `number_at_gw_fobs` and related methods.
+*[ ]Change mass-ratios and redshifts (1+z) to log-space; expand q parameter range.
+*[ ]Incorporate arbitrary hardening mechanisms into SAM construction, sample self-consistently.
+*[ ]When using `sample_outliers` check whether the density (used for intrabin sampling) should be
+    the log(dens) instead of just `dens`.
+*[ ]Should there be an additional dimension of parameter space for galaxy properties?  This way
+    variance in scaling relations is incorporated directly before calculating realizations.
 
 """
 
