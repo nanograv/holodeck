@@ -44,7 +44,9 @@ master_doc = 'index'
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 # NOTE: `numpy` is actually needed, otherwise things break
-autodoc_mock_imports = ['pytest', 'kalepy']
+autodoc_mock_imports = [
+    # 'pytest', 'kalepy', 'astropy', 'h5py', 'kalepy', 'matplotlib', 'scipy', 'tqdm',
+]
 
 html_theme = 'sphinx_rtd_theme'
 
