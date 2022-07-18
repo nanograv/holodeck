@@ -11,16 +11,16 @@ def get_logger(name='holodeck', level_stream=logging.WARNING, tostr=sys.stdout, 
 
     If logging to output stream (stdout) is enabled, an `_Indent_Formatter` object is used.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     name : str,
         Handle for this logger, must be distinct for a distinct logger.
+    level_stream : int,
+        Logging level for stream.
     tostr : bool,
         Log to stdout stream.
     tofile : str or `None`,
         Filename to log to (turned off if `None`).
-    level_stream : int,
-        Logging level for stream.
     level_file : int,
         Logging level for file.
 

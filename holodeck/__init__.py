@@ -3,6 +3,10 @@ holodeck
 Supermassive binary black hole simulator for pulsar timing array signals and galaxy population statistics.
 """
 
+__author__ = "NANOGrav"
+__copyright__ = "Copyright (c) 2022 NANOGrav"
+__license__ = "MIT"
+
 import os
 import logging
 

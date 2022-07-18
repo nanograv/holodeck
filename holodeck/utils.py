@@ -107,8 +107,8 @@ def tqdm(*args, **kwargs):
 def get_file_size(fnames, precision=1):
     """Return a human-readable size of a file or set of files.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     fnames : str or list
         Paths to target file(s)
     precisions : int,
@@ -197,8 +197,8 @@ def frac_str(vals: npt.ArrayLike, prec: int = 2) -> str:
 
     e.g. [0, 1, 2, 0, 0] ==> "2/5 = 4.0e-1"
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     vals : (N,) array_like,
         Input array to find non-zero elements of.
     prec : int
@@ -370,8 +370,8 @@ def nyquist_freqs(
 ) -> np.ndarray:
     """Calculate Nyquist frequencies for the given timing parameters.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     dur : float,
         Duration of observations
     cad : float,
@@ -415,12 +415,12 @@ def quantiles(
 
     NOTE: if `values` is a masked array, then only unmasked values are used!
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     values: (N,)
         input data
-    percs: (M,) scalar [0.0, 1.0]
-        Desired quantiles of the data.
+    percs: (M,) scalar
+        Desired quantiles of the data.  Within range of [0.0, 1.0].
     weights: (N,) or `None`
         Weights for each input data point in `values`.
     axis: int or `None`,
@@ -544,8 +544,8 @@ def trapz_loglog(
     For each interval (x[i+1], x[i]), calculate the integral assuming that y is of the form,
         `y = a * x^gamma`
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     yy : ndarray
     xx : (X,) array_like of scalar,
     bounds : (2,) array_like of scalar,
@@ -648,8 +648,8 @@ def trapz_loglog(
 def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = True):
     """Perform a cumulative integration along the given axis.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     yy : ArrayLike of scalar,
         Input to be integrated.
     xx : ArrayLike of scalar,
@@ -714,8 +714,8 @@ def _parse_log_norm_pars(vals, size, default=None):
 def dfdt_from_dadt(dadt, sepa, mtot=None, freq_orb=None):
     """Convert from hardening rate in separation to hardening rate in frequency.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     dadt : array_like
         Hardening rate in terms of binary separation.
     sepa : array_like
@@ -819,8 +819,8 @@ def gw_char_strain(hs, dur_obs, freq_orb_obs, freq_orb_rst, dfdt):
     """
     See, e.g., Sesana+2004, Eq.35
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     hs : array_like scalar
         Strain amplitude (e.g. `gw_strain()`, sky- and polarization- averaged)
     dur_obs : array_like scalar
@@ -914,8 +914,8 @@ def gw_hardening_rate_dadt(m1, m2, sepa, eccen=None):
 def gw_hardening_rate_dfdt(m1, m2, freq_orb, eccen=None):
     """GW Hardening rate in frequency (df/dt).
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     m1 : array_like
         Mass of one component of each binary.
     m2 : array_like
@@ -939,12 +939,12 @@ def gw_hardening_rate_dfdt(m1, m2, freq_orb, eccen=None):
 
 
 def gw_hardening_timescale_freq(mchirp, frst):
-    """tau = f_r / (df_r / dt)
+    """GW Hardening timescale in terms of frequency (not separation).
 
-    e.g. [EN07] Eq.2.9
+    ``tau = f_r / (df_r / dt)``, e.g. [EN07] Eq.2.9
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     mchirp : scalar  or  array_like of scalar
         Chirp mass in [grams]
     frst : scalar  or  array_like of scalar

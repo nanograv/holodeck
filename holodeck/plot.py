@@ -184,8 +184,8 @@ def smap(args=[0.0, 1.0], cmap=None, log=False, norm=None, midpoint=None,
          under='0.8', over='0.8', left=None, right=None):
     """Create a colormap from a scalar range to a set of colors.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     args : scalar or array_like of scalar
         Range of valid scalar values to normalize with
     cmap : None, str, or ``matplotlib.colors.Colormap`` object
@@ -464,8 +464,8 @@ def plot_gwb(gwb, color=None, uniform=False, nreals=5):
 
     Plots samples, confidence intervals, power-law, and adds twin-Hz axis (x2).
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     gwb : `gravwaves.Grav_Waves` (subclass) instance
 
     Returns
