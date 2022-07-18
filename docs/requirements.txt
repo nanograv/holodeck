@@ -1,0 +1,6 @@
+ipykernel
+nbsphinx
+numpy
+numpydoc
+astropy
+# kalepy
