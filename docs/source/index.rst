@@ -2,15 +2,20 @@
 holodeck
 ========
 
+|rtd||actions|
+
+.. |rtd| image:: https://readthedocs.org/projects/kalepy/badge/?version=latest
+.. |actions| image:: https://github.com/nanograv/holodeck/actions?query=workflow%3ACI
+
 *Massive Black-Hole Binary Population Synthesis.*
 
 `holodeck on github <https://github.com/nanograv/holodeck>`_
 
-|rtd|
-
-.. |rtd| image:: https://readthedocs.org/projects/kalepy/badge/?version=latest
+This package, which is actively under development, is aimed at providing a comprehensive framework for MBH binary population synthesis.  The framework includes modules to perform pop synth using a variety of methodologies to get a handle on both statistical and systematic uncertainties.  Currently, binary populations can be synthesis based on: cosmological hydrodynamic simulations (Illustris), semi-analytic/semi-empirical models (SAMs), and observational catalogs of local galaxies and/or quasars.
 
 .. contents:: :local:
+
+
 
 Installation
 ============
@@ -20,15 +25,24 @@ Installation
 .. code-block:: bash
 
     git clone https://github.com/nanograv/holodeck.git
-    pip install -e holodeck
+    pip install -e holodeck -r holodeck/requirements-dev.txt
+
+The `pip install -e` command builds the package in 'editable' mode, so that changes to the source code are reflected in the package when it's imported from external python code.  The `-r holodeck/requirements-dev.txt` install not only the standard package requirements, but also the 'development' requirements.
+
+Currently tests are run on python versions 3.8, 3.9, 3.10.  Ensure that you are using version >= 3.8
+
+To uninstall the package, you can run `pip uninstall holodeck`.
+
 
 
 Quick Start
 ===========
 
-| Basic examples are shown below.
+| Some basic examples are shown below.
 | A more extended guide can be found in <getting_started>
 | `The README file on github also includes installation and quick-start examples. <https://github.com/nanograv/holodeck/blob/master/README.md>`_
+| There are a large number of demonstration/testing notebooks included in the `notebooks/` directory, which is also a great place to get started.
+
 
 
 Documentation
@@ -48,12 +62,33 @@ A number of examples are included in `the package notebooks <https://github.com/
 Development & Contributions
 ===========================
 
+This project is being led by the `NANOGrav <http://nanograv.org/>`_ Astrophysics Working Group.
+
+Details on contributions and the mandatory code of conduct can be found in `CONTRIBUTING.md <https://raw.githubusercontent.com/nanograv/holodeck/docs/CONTRIBUTING.md>`_.
+
+To-do items and changes to the API should be included in the `CHANGELOG.md <https://raw.githubusercontent.com/nanograv/holodeck/docs/CHANGELOG.md>`_.
+
+Contributions are not only welcome but encouraged, anywhere from new modules/customizations to bug-fixes to improved documentation and usage examples.  The git workflow is based around a `main` branch which is intended to be (relatively) stable and operational, and an actively developed `dev` branch.  New development should be performed in "feature" branches (made off of the `dev` branch), and then incorporated via pull-request (back into the `dev` branch).
+
+**Formatting**:
+New code should generally abide by PEP8 formatting, with `numpy` style docstrings.  Exceptions are:
+* lines may be broken at either 100 or 120 columns
+
 Test Suite
 ----------
+
+(Unit)tests should be developed in two ways: for simple functions/behaviors, standard unit-tests can be placed in the `holodeck/tests/` directory.  More complex functionality should be tested in notebooks (in `notebooks/`) where they can also be used as demonstrations/tutorials for that behavior.  The python script `scripts/convert_notebook_tests.py` converts target notebooks into python scripts in the `holodeck/tests/` directory, which can then be run by `pytest`.  The script `scripts/tester.sh` will run the conversion script and then run `pytest`.
+
+**Before submitting a pull request, run `scripts/tester.sh -bv` to run the builtin tests.**
+For more comprehensive testing (e.g. against numerous python versions, and building from the sdist package), you can use the python `tox` package: simply run `tox` in the root directory and it will use the configuration specified in `tox.ini`.  The scripy `scripts/run_tox.sh` is also provided to setup and execute tox tests and required environments.
 
 
 Attribution & Referencing
 =========================
+
+Copyright (c) 2022, NANOGrav.
+
+The `holodeck` package uses an `MIT license <https://raw.githubusercontent.com/nanograv/holodeck/docs/LICENSE>`_.
 
 A NANOGrav paper on `holodeck` is currently in preparation.
 
