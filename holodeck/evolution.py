@@ -3,43 +3,55 @@ Holodeck - evolution submodule.
 
 To-Do
 -----
-*   General
-    -   [ ] evolution modifiers should act at each step, instead of after all steps?  This would be
-        a way to implement a changing accretion rate, for example; or to set a max/min hardening
-        rate.
-    -   [ ] re-implement "magic" hardening models that coalesce in zero change-of-redshift or fixed
-        amounts of time.
-*   Dynamical_Friction_NFW
-    -   [ ] Allow stellar-density profiles to also be specified (instead of using a hard-coded
-        Dehnen profile)
-    -   [ ] Generalize calculation of stellar characteristic radius.  Make self-consistent with
-        stellar-profile, and user-specifiable.
-*   Sesana_Scattering
-    -   [ ] Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
-        and flexible.  Currently hard-coded to Dehnen profile estimate.
-*   _SHM06
-    -   [ ] Interpolants of hardening parameters return 2D arrays which we then take the diagonal
-        of, but there should be a better way of doing this.
+
+* General
+
+  * evolution modifiers should act at each step, instead of after all steps?  This would be
+    a way to implement a changing accretion rate, for example; or to set a max/min hardening rate.
+  * re-implement "magic" hardening models that coalesce in zero change-of-redshift or fixed
+    amounts of time.
+
+* Dynamical_Friction_NFW
+
+  * Allow stellar-density profiles to also be specified (instead of using a hard-coded
+    Dehnen profile)
+  * Generalize calculation of stellar characteristic radius.  Make self-consistent with
+    stellar-profile, and user-specifiable.
+
+* Sesana_Scattering
+
+  * Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
+    and flexible.  Currently hard-coded to Dehnen profile estimate.
+
+* _SHM06
+
+  * Interpolants of hardening parameters return 2D arrays which we then take the diagonal
+    of, but there should be a better way of doing this.
+
+* Fixed_Time
+
+  * Handle `rchar` better with respect to interpolation.  Currently not an interpolation
+    variable, which restricts it's usage.
 
 References
 ----------
-*   [Quinlan96] :: Quinlan 1996
-    The dynamical evolution of massive black hole binaries I. Hardening in a fixed stellar background
-    https://ui.adsabs.harvard.edu/abs/1996NewA....1...35Q/abstract
-*   [SHM06] :: Sesana, Haardt & Madau et al. 2006
-    Interaction of Massive Black Hole Binaries with Their Stellar Environment. I. Ejection of Hypervelocity Stars
-    https://ui.adsabs.harvard.edu/abs/2006ApJ...651..392S/abstract
-*   [Sesana10] :: Sesana 2010
-    Self Consistent Model for the Evolution of Eccentric Massive Black Hole Binaries in Stellar Environments:
-    Implications for Gravitational Wave Observations
-    https://ui.adsabs.harvard.edu/abs/2010ApJ...719..851S/abstract
-*   [Kelley17] : Kelley, Blecha & Hernquist 2017
-    Massive black hole binary mergers in dynamical galactic environments
-    https://ui.adsabs.harvard.edu/abs/2017MNRAS.464.3131K/abstract
-*   [Chen17] : Chen, Sesana, & Del Pozzo 2017
-    Efficient computation of the gravitational wave spectrum emitted by eccentric massive
-    black hole binaries in stellar environments
-    https://ui.adsabs.harvard.edu/abs/2017MNRAS.470.1738C/abstract
+* [Quinlan96] :: Quinlan 1996
+  The dynamical evolution of massive black hole binaries I. Hardening in a fixed stellar background
+  https://ui.adsabs.harvard.edu/abs/1996NewA....1...35Q/abstract
+* [SHM06] :: Sesana, Haardt & Madau et al. 2006
+  Interaction of Massive Black Hole Binaries with Their Stellar Environment. I. Ejection of Hypervelocity Stars
+  https://ui.adsabs.harvard.edu/abs/2006ApJ...651..392S/abstract
+* [Sesana10] :: Sesana 2010
+  Self Consistent Model for the Evolution of Eccentric Massive Black Hole Binaries in Stellar Environments:
+  Implications for Gravitational Wave Observations
+  https://ui.adsabs.harvard.edu/abs/2010ApJ...719..851S/abstract
+* [Kelley17] : Kelley, Blecha & Hernquist 2017
+  Massive black hole binary mergers in dynamical galactic environments
+  https://ui.adsabs.harvard.edu/abs/2017MNRAS.464.3131K/abstract
+* [Chen17] : Chen, Sesana, & Del Pozzo 2017
+  Efficient computation of the gravitational wave spectrum emitted by eccentric massive
+  black hole binaries in stellar environments
+  https://ui.adsabs.harvard.edu/abs/2017MNRAS.470.1738C/abstract
 
 """
 
@@ -71,9 +83,6 @@ _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 
 class Evolution:
     """
-
-    Additional Notes
-    ----------------
 
     """
 
@@ -210,8 +219,8 @@ class Evolution:
     def _take_next_step(self, step):
         """Integrate the binary population forward (to smaller separations) by one step.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         step : int
             The destination integration step number, i.e. `step=1` means integrate from 0 to 1.
 
@@ -349,8 +358,8 @@ class Evolution:
     def at(self, xpar, targets, pars=None, coal=False, lin_interp=None):
         """Interpolate evolution to the given observed, orbital frequency.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         xpar : str, one of ['fobs', 'sepa']
             String specifying the variable to interpolate to.
         targets : array of scalar
@@ -358,6 +367,8 @@ class Evolution:
             `sepa` : units of cm
             `fobs` : units of 1/s [Hz]
 
+        Notes
+        -----
         Out of bounds values are set to `np.nan`.
         Interpolation is 1st-order in log-log space.
 
@@ -589,17 +600,14 @@ class Sesana_Scattering(_Hardening):
     `_SHM06` class.  Scattering is assumed to only be effective once the binary is bound.  An
     exponential cutoff is imposed at larger radii.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     gamma_dehnen : scalar  or  (N,) array-like of scalar
         Dehnen stellar-density profile inner power-law slope.
         Fiducial Dehnen inner density profile slope gamma=1.0 is used in [Chen17].
     gbh : _Galaxy_Blackhole_Relation class/instance  or  `None`
         Galaxy-Blackhole Relation used for calculating stellar parameters.
         If `None` the default is loaded.
-
-    Additional Notes
-    ----------------
 
     """
 
@@ -614,8 +622,8 @@ class Sesana_Scattering(_Hardening):
     def dadt_dedt(self, evo, step):
         """Stellar scattering hardening rate.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         evo : `Evolution` instance
         step : int
             Integration step at which to calculate hardening rates.
@@ -637,8 +645,8 @@ class Sesana_Scattering(_Hardening):
     def _dadt_dedt(self, mass, sepa, eccen):
         """Stellar scattering hardening rate calculated from physical quantities.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mass : (N,2) array-like of scalar
             Masses of each MBH component (0-primary, 1-secondary) in units of [gram].
         sepa : (N,) array-like of scalar
@@ -694,8 +702,8 @@ class Dynamical_Friction_NFW(_Hardening):
 
     This module does not evolve eccentricity.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     gbh : class, instance or None
         Galaxy-blackhole relation (_Galaxy_Blackhole_Relation subclass)
         If `None` the default is loaded.
@@ -714,8 +722,8 @@ class Dynamical_Friction_NFW(_Hardening):
         If True:  calculate R_bound using an assumed stellar density profile.
         If False: calculate R_bound using a velocity dispersion (constant in radius, from `gbh` instance).
 
-    Additional Notes
-    ----------------
+    Notes
+    -----
     *   The hardening rate (da/dt) is not allowed to be larger than the orbital/virial velocity of the halo
         (as a function of radius).
 
@@ -737,8 +745,8 @@ class Dynamical_Friction_NFW(_Hardening):
     def _dvdt(self, mass_sec_eff, dens, velo):
         """Chandrasekhar dynamical friction formalism providing a deceleration (dv/dt).
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mass_sec_eff : (N,) array-like of scalar
             Effective mass (i.e. the mass that should be used in this equation) of the inspiraling
             secondary component in units of [gram].
@@ -759,8 +767,8 @@ class Dynamical_Friction_NFW(_Hardening):
     def dadt_dedt(self, evo, step):
         """Calculate DF hardening rate given `Evolution` instance, and an integration `step`.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         evo : `Evolution` instance
         step : int,
             Integration step at which to calculate hardening rates.
@@ -788,8 +796,8 @@ class Dynamical_Friction_NFW(_Hardening):
     def _dadt_dedt(self, mass, sepa, redz, dt, attenuate=None):
         """Calculate DF hardening rate given physical quantities.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mass : (N, 2) array-like of scalar,
             Masses of both MBHs (0-primary, 1-secondary) in units of [grams].
         sepa : (N,) array-like of scalar,
@@ -859,8 +867,8 @@ class Dynamical_Friction_NFW(_Hardening):
 
         The attenuation factor is defined as >= 1.0, with 1.0 meaning no attenuation.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         sepa : (N,) array-like of scalar,
             Binary separations in units of [cm].
         m1m2 : (N, 2) array-like of scalar,
@@ -919,12 +927,6 @@ class Dynamical_Friction_NFW(_Hardening):
 
 class Fixed_Time(_Hardening):
     """
-
-    To-Do
-    -----
-    * [ ] Handle `rchar` better with respect to interpolation.  Currently not an interpolation
-        variable, which restricts it's usage.
-
     """
 
     _INTERP_NUM_POINTS = 1e4             # number of random data points used to construct interpolant
@@ -943,8 +945,8 @@ class Fixed_Time(_Hardening):
     def __init__(self, time, mtot, mrat, redz, sepa, rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5):
         """
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         pop : `_Population` instance
         time : scalar, callable  or  array_like[scalar]
             Total merger time of binaries, units of [sec], specifiable in the following ways:
@@ -1181,8 +1183,8 @@ class _Quinlan96:
 
         [Sesana10] Eq.8
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         sepa : (N,) array-like of scalar
             Binary separation in units of [cm].
         rho : (N,) array-like of scalar
@@ -1207,8 +1209,8 @@ class _Quinlan96:
 
         [Sesana10] Eq.9
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         sepa : (N,) array-like of scalar
             Binary separation in units of [cm].
         rho : (N,) array-like of scalar
@@ -1268,8 +1270,8 @@ class _SHM06:
     def H(self, mrat, sepa_rhard):
         """Hardening rate efficiency parameter.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mrat : (N,) array-like of scalar
             Binary mass-ratio (q = M2/M1 <= 1.0).
         sepa_rhard : (N,) array-like of scalar
@@ -1289,8 +1291,8 @@ class _SHM06:
     def K(self, mrat, sepa_rhard, ecc):
         """Eccentricity hardening rate efficiency parameter.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mrat : (N,) array-like of scalar
             Binary mass-ratio (q = M2/M1 <= 1.0).
         sepa_rhard : (N,) array-like of scalar

@@ -2,16 +2,16 @@
 
 References
 ----------
--   Chen, Sesana, Conselice 2019 = [Chen19]
-    https://ui.adsabs.harvard.edu/abs/2019MNRAS.488..401C/abstract
-    Constraining astrophysical observables of galaxy and supermassive black hole binary mergers
-        using pulsar timing arrays
+* Chen, Sesana, Conselice 2019 = [Chen19]
+  Constraining astrophysical observables of galaxy and supermassive black hole binary mergers
+  using pulsar timing arrays
+  https://ui.adsabs.harvard.edu/abs/2019MNRAS.488..401C/abstract
 
 To-Do
 -----
-*[ ]Check that _GW_ frequencies and _orbital_ frequencies are being used in the correct places.
-    Check `number_at_gw_fobs` and related methods.
-*[ ]Incorporate arbitrary hardening mechanisms into SAM construction, sample self-consistently.
+* Check that *GW* frequencies and *orbital* frequencies are being used in the correct places.
+  Check `number_at_gw_fobs` and related methods.
+* Incorporate arbitrary hardening mechanisms into SAM construction, sample self-consistently.
 
 """
 
@@ -48,8 +48,8 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
 
         i.e. Phi = dn / dlog10(M)
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mstar : scalar or ndarray
             Galaxy stellar-mass in units of [grams]
         redz : scalar or ndarray
@@ -87,8 +87,8 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
 
         See: [Chen19] Eq.8
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mstar : scalar or ndarray
             Galaxy stellar-mass in units of [grams]
         redz : scalar or ndarray
@@ -136,8 +136,8 @@ class _Galaxy_Pair_Fraction(abc.ABC):
     def __call__(self, mtot, mrat, redz):
         """Return the fraction of galaxies in pairs of the given parameters.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mtot : scalar or ndarray,
             Total-mass of combined system, units of [grams].
         mrat : scalar or ndarray,
@@ -182,8 +182,8 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
     def __call__(self, mtot, mrat, redz):
         """Return the fraction of galaxies in pairs of the given parameters.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mtot : scalar or ndarray,
             Total-mass of combined system, units of [grams].
         mrat : scalar or ndarray,
@@ -220,8 +220,8 @@ class _Galaxy_Merger_Time(abc.ABC):
     def __call__(self, mtot, mrat, redz):
         """Return the galaxy merger time for the given parameters.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mtot : scalar or ndarray,
             Total-mass of combined system, units of [grams].
         mrat : scalar or ndarray,
@@ -276,8 +276,8 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
     def __call__(self, mtot, mrat, redz):
         """Return the galaxy merger time for the given parameters.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mtot : (N,) array_like[scalar]
             Total mass of each binary, converted to primary-mass (used in literature equations).
         mrat : (N,) array_like[scalar]
@@ -502,9 +502,9 @@ class Semi_Analytic_Model:
         The value returned is `d^4 N / [dlog10(M) dq dz dln(X)]`, where X is either
         separation (a) or frequency (f_r), depending on whether `sepa` or `fobs` is passed in.
 
-        Arguments
-        ---------
-        hard :
+        Parameters
+        ----------
+        hard : instance
         fobs : observed frequency in [1/sec]
         sepa : rest-frame separation in [cm]
         limit_merger_time : None or scalar,
@@ -617,8 +617,8 @@ class Semi_Analytic_Model:
     def gwb(self, fobs, hard=holo.evolution.Hard_GW, realize=False):
         """Calculate the (smooth/semi-analytic) GWB at the given observed frequencies.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         fobs : (F,) array_like of scalar, [1/sec]
             Observed GW frequencies.
         hard : holodeck.evolution._Hardening class or instance
@@ -806,8 +806,8 @@ def sample_sam_with_hardening(
 def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
     """
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     fobs : (F,) array_like of scalar,
         Target frequencies of interest in units of [1/yr]
 
@@ -847,8 +847,8 @@ def _strains_from_samples(vals, redz=True):
 def _gws_from_samples(vals, weights, fobs):
     """
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     vals : (4, N) ndarray of scalar,
         Arrays of binary parameters.
         * vals[0] : mtot [grams]
@@ -869,8 +869,8 @@ def _gws_from_samples(vals, weights, fobs):
 def gws_from_sampled_strains(fobs, fo, hs, weights):
     """Calculate GW background/foreground from sampled GW strains.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     fobs : (F,) array_like of scalar
         Frequency bins.
     fo : (S,) array_like of scalar
@@ -878,9 +878,9 @@ def gws_from_sampled_strains(fobs, fo, hs, weights):
     hs : (S,) array_like of scalar
         GW source strain (*not characteristic strain*) of each binary sample.
     weights : (S,) array_like of int
-        Weighting factor for each binary
+        Weighting factor for each binary.
         NOTE: the GW calculation is ill-defined if weights have fractional values
-              (i.e. float values, instead of integral values; but the type itself doesn't matter)
+        (i.e. float values, instead of integral values; but the type itself doesn't matter)
 
     Returns
     -------

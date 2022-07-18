@@ -18,8 +18,8 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
     given a derived quantitiy (i.e. to come from d_L to redshift), the numerical grid can then be
     inverted and interpolated to find the corresponding redshift.
 
-    API Methods
-    -----------
+    Methods
+    -------
     -   tage_to_z                      -   Convert from universe-age to redshift.
     -   dcom_to_z                      -   Convert from comoving-dist to redshift.
     -   dlum_to_z                      -   Convert from luminosity-dist to redshift.
@@ -73,8 +73,8 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
     def _init_interp_grid(z_pnts, num_pnts):
         """Create a grid in redshift for interpolation.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         z_pnts : (N,) array_like of scalar
             Monotonically decreasing redshift values greater than zero.  Inbetween each pair of
             values, `num_pnts` points are evenly added in log-space.  Also, `num_pnts` are added

@@ -2,35 +2,33 @@
 
 References
 ----------
--   Kormendy+Ho-2013 (1304.7762) = [KH13]
-    Coevolution (Or Not) of Supermassive Black Holes and Host Galaxies
-    https://ui.adsabs.harvard.edu/abs/2013ARA%26A..51..511K/abstract
+* Kormendy+Ho-2013 (1304.7762) = [KH13]
+  Coevolution (Or Not) of Supermassive Black Holes and Host Galaxies
+  https://ui.adsabs.harvard.edu/abs/2013ARA%26A..51..511K/abstract
 
--   McConnell+Ma-2013 (1211.2816) = [MM13]
-    Revisiting the Scaling Relations of Black Hole Masses and Host Galaxy Properties
-    https://ui.adsabs.harvard.edu/abs/2013ApJ...764..184M/abstract
+* McConnell+Ma-2013 (1211.2816) = [MM13]
+  Revisiting the Scaling Relations of Black Hole Masses and Host Galaxy Properties
+  https://ui.adsabs.harvard.edu/abs/2013ApJ...764..184M/abstract
 
 * [NFW-97] : Navarro, Frenk & White 1997
-    A Universal Density Profile from Hierarchical Clustering
-    https://ui.adsabs.harvard.edu/abs/1997ApJ...490..493N/abstract
+  A Universal Density Profile from Hierarchical Clustering
+  https://ui.adsabs.harvard.edu/abs/1997ApJ...490..493N/abstract
 
 * [Guo-2010] : Guo, White, Li & Boylan-Kolchin 2010
-    How do galaxies populate dark matter haloes?
-    https://ui.adsabs.harvard.edu/abs/2010MNRAS.404.1111G/abstract
+  How do galaxies populate dark matter haloes?
+  https://ui.adsabs.harvard.edu/abs/2010MNRAS.404.1111G/abstract
 
 * [Behroozi+2013] : Behroozi, Wechsler & Conroy 2013
-    The Average Star Formation Histories of Galaxies in Dark Matter Halos from z = 0-8
-    https://ui.adsabs.harvard.edu/abs/2013ApJ...770...57B/abstract
+  The Average Star Formation Histories of Galaxies in Dark Matter Halos from z = 0-8
+  https://ui.adsabs.harvard.edu/abs/2013ApJ...770...57B/abstract
 
 * [Klypin+2016] : Klypin et al. 2016
-    MultiDark simulations: the story of dark matter halo concentrations and density profiles
-    https://ui.adsabs.harvard.edu/abs/2016MNRAS.457.4340K/abstract
-
+  MultiDark simulations: the story of dark matter halo concentrations and density profiles
+  https://ui.adsabs.harvard.edu/abs/2016MNRAS.457.4340K/abstract
 
 To-Do
 -----
-*[ ]Pass concentration-relation (or other method to calculate) to NFW classes on instantiation
-*[ ]
+* Pass concentration-relation (or other method to calculate) to NFW classes on instantiation
 
 """
 
@@ -125,12 +123,12 @@ class _MMBulge_Relation(_MHost_Relation):
 
 
 class MMBulge_Standard(_MMBulge_Relation):
-    """
+    """Base class for simple Mbh-Mbulge relation as a single power-law.
 
     * Single power-law relationship between BH mass and Stellar-bulge mass.
-        .. math::  Mbh = M0 * (M_bulge/Mref)^plaw * 10^Normal(0, eps)
+      .. math::  Mbh = M0 * (M_bulge/Mref)^plaw * 10^Normal(0, eps)
     * Constant bulge mass-fraction relative to total stellar mass.
-        .. math::  M_bulge = f_bulge * M_star
+      .. math::  M_bulge = f_bulge * M_star
 
     """
 
@@ -242,7 +240,8 @@ class MMBulge_MM13(MMBulge_Standard):
 
 
 class MMBulge_Redshift(MMBulge_Standard):
-    """
+    """Mbh-Mbulge relation with an additional redshift power-law dependence.
+
     Provides black hole mass as a function of galaxy bulge mass and redshift with a normalization
     that depends on redshift. zplaw=0 (default) is identical to MMBulge_Standard.
     mamp = mamp0 * (1 + z)**zplaw
@@ -471,8 +470,8 @@ def _log10_relation(xx, amp, plaw, eps_dex, x0=1.0):
 
     y = amp * (xx/x0)^plaw * 10^Normal(0, e)
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     xx : scalar or array_like,
         Input arguments for scaling relationship.
     amp : scalar or array_like,
@@ -871,7 +870,8 @@ class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
 
 
 class Guo_2010(_StellarMass_HaloMass):
-    """
+    """Stellar-Mass - Halo-Mass relation from Guo et al. 2010.
+
     Guo+2010 : Eq.3
     https://ui.adsabs.harvard.edu/abs/2010MNRAS.404.1111G/abstract
     """
@@ -892,7 +892,8 @@ class Guo_2010(_StellarMass_HaloMass):
 
 
 class Behroozi_2013(_StellarMass_HaloMass_Redshift):
-    """
+    """Redshift-dependent Stellar-Mass - Halo-Mass relation based on Behroozi+2013.
+
     [Behroozi+2013] best fit values are at the beginning of Section 5 (pg.9), uncertainties are 1-sigma
     """
 
