@@ -87,11 +87,12 @@ class GW_Continuous(Grav_Waves):
         dzdt = H0 * cosmo.efunc(redz) * np.square(1.0 + redz)  # (N,)
 
         # ==> shape (F,N)
-        frest = freqs[:, np.newaxis] / (1.0 + redz[np.newaxis, :])
+        frest = freqs[:, np.newaxis] / (1.0 + redz[np.newaxis, :])   # rest-frame GW frequency
         temp, _ = utils.gw_hardening_rate_dfdt(m1, m2, frest)
         dtr_dlnfr = frest / temp
         # Calculate source-strain for each source (h;  NOT characteristic strain)
-        strain = utils.gw_strain_source(mchirp, dlum[np.newaxis, :], frest)
+        #     convert from rest-frame GW frequency to orbital frequency (divide by 2)
+        strain = utils.gw_strain_source(mchirp, dlum[np.newaxis, :], frest/2.0)
 
         time_fac = dzdt * dtr_dlnfr
 

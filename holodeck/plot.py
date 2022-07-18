@@ -27,6 +27,11 @@ class MidpointNormalize(mpl.colors.Normalize):
         x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
         return np.ma.masked_array(np.interp(value, x, y), np.isnan(value))
 
+    def inverse(self, value):
+        # x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+        y, x = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+        return np.ma.masked_array(np.interp(value, x, y), np.isnan(value))
+
 
 class MidpointLogNormalize(mpl.colors.LogNorm):
 
@@ -38,7 +43,14 @@ class MidpointLogNormalize(mpl.colors.LogNorm):
     def __call__(self, value, clip=None):
         x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
         vals = utils.interp(value, x, y, xlog=True, ylog=False)
-        return np.ma.masked_array(vals, np.isnan(value))
+        # return np.ma.masked_array(vals, np.isnan(value))
+        return vals
+
+    def inverse(self, value):
+        y, x = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+        vals = utils.interp(value, x, y, xlog=False, ylog=True)
+        # return np.ma.masked_array(vals, np.isnan(value))
+        return vals
 
 
 def figax(figsize=[10, 4], ncols=1, nrows=1, sharex=False, sharey=False, squeeze=True,
@@ -172,8 +184,8 @@ def smap(args=[0.0, 1.0], cmap=None, log=False, norm=None, midpoint=None,
          under='0.8', over='0.8', left=None, right=None):
     """Create a colormap from a scalar range to a set of colors.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     args : scalar or array_like of scalar
         Range of valid scalar values to normalize with
     cmap : None, str, or ``matplotlib.colors.Colormap`` object
@@ -233,6 +245,8 @@ def smap(args=[0.0, 1.0], cmap=None, log=False, norm=None, midpoint=None,
     smap = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
     # Bug-Fix something something
     smap._A = []
+    # Allow `smap` to be used to construct colorbars
+    smap.set_array([])
     # Store type of mapping
     smap.log = log
 
@@ -250,9 +264,11 @@ def _get_norm(data, midpoint=None, log=False):
         min, max = data
     else:
         try:
-            min, max = utils.minmax(data, filter=True)
+            min, max = utils.minmax(data, filter=log)
         except:
             utils.error(f"Input `data` ({type(data)}) must be an integer, (2,) of scalar, or ndarray of scalar!")
+
+    # print(f"{min=}, {max=}")
 
     # Create normalization
     if log:
@@ -264,7 +280,9 @@ def _get_norm(data, midpoint=None, log=False):
         if midpoint is None:
             norm = mpl.colors.Normalize(vmin=min, vmax=max)
         else:
+            # norm = MidpointNormalize(vmin=min, vmax=max, midpoint=midpoint)
             norm = MidpointNormalize(vmin=min, vmax=max, midpoint=midpoint)
+            # norm = mpl.colors.TwoSlopeNorm(vmin=min, vcenter=midpoint, vmax=max)
 
     return norm
 
@@ -286,11 +304,40 @@ def _get_cmap(cmap):
         return cmap
 
     try:
-        return mpl.cm.get_cmap(cmap)
+        return mpl.cm.get_cmap(cmap).copy()
     except Exception as err:
         log.error(f"Could not load colormap from `{cmap}` : {err}")
         raise
-        raise ValueError("`cmap` '{}' is not a valid colormap or colormap name".format(cmap))
+
+
+def _get_hist_steps(xx, yy):
+    """Convert from
+
+    Parameters
+    ----------
+    xx : array_like
+        Independence variable representing bin-edges.  Size (N,)
+    yy : array_like
+        Dependence variable representing histogram amplitudes.  Size (N-1,)
+
+    Returns
+    -------
+    aa : array (N,)
+        x-values
+    bb : array (N,)
+        y-values
+
+    """
+    size = len(xx) - 1
+    if size != len(yy):
+        err = f"Length of `xx` ({len(xx)}) should be length of `yy` ({len(yy)}) + 1!"
+        utils.error(err)
+
+    aa = [[xx[ii], xx[ii+1]] for ii in range(xx.size-1)]
+    bb = [[yy[ii], yy[ii]] for ii in range(xx.size-1)]
+    aa = np.array(aa).flatten()
+    bb = np.array(bb).flatten()
+    return aa, bb
 
 
 # =================================================================================================
@@ -397,7 +444,7 @@ def _draw_pop_masses(ax, pop, color='r', nplot=3e3):
     return handles, names
 
 
-def _twin_hz(ax, nano=True, fs=12):
+def _twin_hz(ax, nano=True, fs=12, **kw):
     tw = ax.twiny()
     xlim = np.array(ax.get_xlim()) / YR
     if nano:
@@ -408,7 +455,7 @@ def _twin_hz(ax, nano=True, fs=12):
 
     label = fr"frequency $[\mathrm{{{label}}}]$"
     tw.set(xlim=xlim, xscale='log')
-    tw.set_xlabel(label, fontsize=fs)
+    tw.set_xlabel(label, fontsize=fs, **kw)
     return
 
 
@@ -417,8 +464,8 @@ def plot_gwb(gwb, color=None, uniform=False, nreals=5):
 
     Plots samples, confidence intervals, power-law, and adds twin-Hz axis (x2).
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     gwb : `gravwaves.Grav_Waves` (subclass) instance
 
     Returns

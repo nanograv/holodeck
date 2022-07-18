@@ -3,10 +3,12 @@
 
 # You can set these variables from the command line.
 SPHINXOPTS    =
+# SPHINXOPTS    = -W --keep-going -n      # FAIL on errors, but finish build attempt; be nit-picky
+# SPHINXOPTS    = -W --keep-going      # FAIL on errors, but finish build attempt
 SPHINXBUILD   = sphinx-build
 SPHINXPROJ    = holodeck
-SOURCEDIR     = .
-BUILDDIR      = _build
+SOURCEDIR     = source
+BUILDDIR      = build
 
 # Put it first so that "make" without argument is like "make help".
 help:

@@ -25,6 +25,9 @@
 * Gaussian Processes
     - [ ] How significant are deviations in predicted spectra from Gaussians?  What produces those deviations, are they single (or single-like) sources, or are they actual "population" trends?  (Former is okay to ignore, latter is not!)
     - [ ]
+* Testing
+  * Add sphinx docs build to github action for testing
+
 
 ----
 

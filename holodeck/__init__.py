@@ -3,6 +3,10 @@ holodeck
 Supermassive binary black hole simulator for pulsar timing array signals and galaxy population statistics.
 """
 
+__author__ = "NANOGrav"
+__copyright__ = "Copyright (c) 2022 NANOGrav"
+__license__ = "MIT"
+
 import os
 import logging
 
@@ -35,33 +39,34 @@ log = log.get_logger(__name__, logging.DEBUG)
 from . import cosmology   # noqa
 cosmo = cosmology.Cosmology()
 
-from . import constants  # noqa
-# from .constants import *  # noqa
-from . import evolution  # noqa
-from .evolution import *  # noqa
-from . import gravwaves  # noqa
-from .gravwaves import *  # noqa
-from . import observations # noqa
-from .observations import *  # noqa
+from . import constants   # noqa
+from . import evolution   # noqa
+from . import relations   # noqa
 from . import population  # noqa
-from .population import *  # noqa
-from . import utils     # noqa
-from .utils import *  # noqa
+from . import utils       # noqa
+from . import sam         # noqa
+
+# from . import constants  # noqa
+# from .constants import *  # noqa
+# from . import evolution  # noqa
+# from .evolution import *  # noqa
+# from . import gravwaves  # noqa
+# from .gravwaves import *  # noqa
+# from . import observations # noqa
+# from .observations import *  # noqa
+# from . import population  # noqa
+# from .population import *  # noqa
+# from . import utils     # noqa
+# from .utils import *  # noqa
 
 
-# ---- Handle versioneer
+# ---- Handle version
 
 fname_version = os.path.join(_PATH_PACKAGE, 'version.txt')
 with open(fname_version) as inn:
     version = inn.read().strip()
 
 __version__ = version
-
-# from ._version import get_versions  # noqa
-# versions = get_versions()
-# __version__ = versions['version']
-# __git_revision__ = versions['full-revisionid']
-# del get_versions, versions
 
 # Full cleanup
 del os, _check_paths, logging

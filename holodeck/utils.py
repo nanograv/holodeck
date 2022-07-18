@@ -107,8 +107,8 @@ def tqdm(*args, **kwargs):
 def get_file_size(fnames, precision=1):
     """Return a human-readable size of a file or set of files.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     fnames : str or list
         Paths to target file(s)
     precisions : int,
@@ -127,11 +127,11 @@ def get_file_size(fnames, precision=1):
         byte_size += os.path.getsize(fil)
 
     abbrevs = (
-        (1 << 50, 'PB'),
-        (1 << 40, 'TB'),
-        (1 << 30, 'GB'),
-        (1 << 20, 'MB'),
-        (1 << 10, 'KB'),
+        (1 << 50, 'PiB'),
+        (1 << 40, 'TiB'),
+        (1 << 30, 'GiB'),
+        (1 << 20, 'MiB'),
+        (1 << 10, 'KiB'),
         (1, 'bytes')
     )
 
@@ -142,6 +142,23 @@ def get_file_size(fnames, precision=1):
     size = byte_size / factor
     byte_str = f"{size:.{precision:}f} {suffix}"
     return byte_str
+
+
+def _get_subclass_instance(value, default, superclass):
+    import inspect
+
+    if value is None:
+        value = default
+
+    if inspect.isclass(value):
+        value = value()
+
+    if not isinstance(value, superclass):
+        err = f"argument ({value}) must be an instance or subclass of `{superclass}`!"
+        log.error(err)
+        raise ValueError(err)
+
+    return value
 
 
 # =================================================================================================
@@ -165,7 +182,8 @@ def broadcastable(*args):
 
 def expand_broadcastable(*args):
     try:
-        shape = np.shape(np.product(args, axis=0))
+        vals = np.array(args, dtype=object)    # avoid VisibleDeprecationWarning from ragged array creation
+        shape = np.shape(np.product(vals, axis=0))
     except ValueError:
         shapes = [np.shape(aa) for aa in args]
         raise ValueError("Argument arrays are not broadcastable!  shapes={}".format(shapes))
@@ -179,8 +197,8 @@ def frac_str(vals: npt.ArrayLike, prec: int = 2) -> str:
 
     e.g. [0, 1, 2, 0, 0] ==> "2/5 = 4.0e-1"
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     vals : (N,) array_like,
         Input array to find non-zero elements of.
     prec : int
@@ -352,8 +370,8 @@ def nyquist_freqs(
 ) -> np.ndarray:
     """Calculate Nyquist frequencies for the given timing parameters.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     dur : float,
         Duration of observations
     cad : float,
@@ -397,12 +415,12 @@ def quantiles(
 
     NOTE: if `values` is a masked array, then only unmasked values are used!
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     values: (N,)
         input data
-    percs: (M,) scalar [0.0, 1.0]
-        Desired quantiles of the data.
+    percs: (M,) scalar
+        Desired quantiles of the data.  Within range of [0.0, 1.0].
     weights: (N,) or `None`
         Weights for each input data point in `values`.
     axis: int or `None`,
@@ -526,8 +544,8 @@ def trapz_loglog(
     For each interval (x[i+1], x[i]), calculate the integral assuming that y is of the form,
         `y = a * x^gamma`
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     yy : ndarray
     xx : (X,) array_like of scalar,
     bounds : (2,) array_like of scalar,
@@ -568,14 +586,11 @@ def trapz_loglog(
         ii = np.array([ii[0], ii[1]+1])
         assert np.alltrue(xx[ii] == bounds), "FAILED!"
 
-    # yy = np.ma.masked_values(yy, value=0.0, atol=0.0)
-
     if np.ndim(yy) != np.ndim(xx):
         if np.ndim(xx) != 1:
             raise ValueError("BAD SHAPES")
         # convert `xx` from shape (N,) to (1, ... N, ..., 1) where all
         # dimensions besides `axis` have length one
-        # cut = [slice(None)] + [np.newaxis for ii in range(np.ndim(yy)-1)]
         cut = [np.newaxis for ii in range(np.ndim(yy))]
         cut[axis] = slice(None)
         xx = xx[tuple(cut)]
@@ -617,8 +632,6 @@ def trapz_loglog(
             delta_logx = delta_logx * np.ones_like(aa)
         trapz[idx] = aa[idx] * delta_logx[idx]
 
-    # integ = np.log(log_base) * np.cumsum(trapz, axis=axis)
-    # integ = np.cumsum(trapz, axis=axis) / np.log(log_base)   # FIX: I think this is divided by base... 2021-10-05
     integ = trapz / np.log(log_base)
     if cumsum:
         integ = np.cumsum(integ, axis=axis)
@@ -635,8 +648,8 @@ def trapz_loglog(
 def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = True):
     """Perform a cumulative integration along the given axis.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     yy : ArrayLike of scalar,
         Input to be integrated.
     xx : ArrayLike of scalar,
@@ -701,8 +714,8 @@ def _parse_log_norm_pars(vals, size, default=None):
 def dfdt_from_dadt(dadt, sepa, mtot=None, freq_orb=None):
     """Convert from hardening rate in separation to hardening rate in frequency.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     dadt : array_like
         Hardening rate in terms of binary separation.
     sepa : array_like
@@ -806,8 +819,8 @@ def gw_char_strain(hs, dur_obs, freq_orb_obs, freq_orb_rst, dfdt):
     """
     See, e.g., Sesana+2004, Eq.35
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     hs : array_like scalar
         Strain amplitude (e.g. `gw_strain()`, sky- and polarization- averaged)
     dur_obs : array_like scalar
@@ -901,8 +914,8 @@ def gw_hardening_rate_dadt(m1, m2, sepa, eccen=None):
 def gw_hardening_rate_dfdt(m1, m2, freq_orb, eccen=None):
     """GW Hardening rate in frequency (df/dt).
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     m1 : array_like
         Mass of one component of each binary.
     m2 : array_like
@@ -926,12 +939,12 @@ def gw_hardening_rate_dfdt(m1, m2, freq_orb, eccen=None):
 
 
 def gw_hardening_timescale_freq(mchirp, frst):
-    """tau = f_r / (df_r / dt)
+    """GW Hardening timescale in terms of frequency (not separation).
 
-    e.g. [EN07] Eq.2.9
+    ``tau = f_r / (df_r / dt)``, e.g. [EN07] Eq.2.9
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     mchirp : scalar  or  array_like of scalar
         Chirp mass in [grams]
     frst : scalar  or  array_like of scalar

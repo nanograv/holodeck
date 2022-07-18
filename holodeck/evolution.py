@@ -3,43 +3,55 @@ Holodeck - evolution submodule.
 
 To-Do
 -----
-*   General
-    -   [ ] evolution modifiers should act at each step, instead of after all steps?  This would be
-        a way to implement a changing accretion rate, for example; or to set a max/min hardening
-        rate.
-    -   [ ] re-implement "magic" hardening models that coalesce in zero change-of-redshift or fixed
-        amounts of time.
-*   Dynamical_Friction_NFW
-    -   [ ] Allow stellar-density profiles to also be specified (instead of using a hard-coded
-        Dehnen profile)
-    -   [ ] Generalize calculation of stellar characteristic radius.  Make self-consistent with
-        stellar-profile, and user-specifiable.
-*   Sesana_Scattering
-    -   [ ] Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
-        and flexible.  Currently hard-coded to Dehnen profile estimate.
-*   _SHM06
-    -   [ ] Interpolants of hardening parameters return 2D arrays which we then take the diagonal
-        of, but there should be a better way of doing this.
+
+* General
+
+  * evolution modifiers should act at each step, instead of after all steps?  This would be
+    a way to implement a changing accretion rate, for example; or to set a max/min hardening rate.
+  * re-implement "magic" hardening models that coalesce in zero change-of-redshift or fixed
+    amounts of time.
+
+* Dynamical_Friction_NFW
+
+  * Allow stellar-density profiles to also be specified (instead of using a hard-coded
+    Dehnen profile)
+  * Generalize calculation of stellar characteristic radius.  Make self-consistent with
+    stellar-profile, and user-specifiable.
+
+* Sesana_Scattering
+
+  * Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
+    and flexible.  Currently hard-coded to Dehnen profile estimate.
+
+* _SHM06
+
+  * Interpolants of hardening parameters return 2D arrays which we then take the diagonal
+    of, but there should be a better way of doing this.
+
+* Fixed_Time
+
+  * Handle `rchar` better with respect to interpolation.  Currently not an interpolation
+    variable, which restricts it's usage.
 
 References
 ----------
-*   [Quinlan96] :: Quinlan 1996
-    The dynamical evolution of massive black hole binaries I. Hardening in a fixed stellar background
-    https://ui.adsabs.harvard.edu/abs/1996NewA....1...35Q/abstract
-*   [SHM06] :: Sesana, Haardt & Madau et al. 2006
-    Interaction of Massive Black Hole Binaries with Their Stellar Environment. I. Ejection of Hypervelocity Stars
-    https://ui.adsabs.harvard.edu/abs/2006ApJ...651..392S/abstract
-*   [Sesana10] :: Sesana 2010
-    Self Consistent Model for the Evolution of Eccentric Massive Black Hole Binaries in Stellar Environments:
-    Implications for Gravitational Wave Observations
-    https://ui.adsabs.harvard.edu/abs/2010ApJ...719..851S/abstract
-*   [Kelley17] : Kelley, Blecha & Hernquist 2017
-    Massive black hole binary mergers in dynamical galactic environments
-    https://ui.adsabs.harvard.edu/abs/2017MNRAS.464.3131K/abstract
-*   [Chen17] : Chen, Sesana, & Del Pozzo 2017
-    Efficient computation of the gravitational wave spectrum emitted by eccentric massive
-    black hole binaries in stellar environments
-    https://ui.adsabs.harvard.edu/abs/2017MNRAS.470.1738C/abstract
+* [Quinlan96] :: Quinlan 1996
+  The dynamical evolution of massive black hole binaries I. Hardening in a fixed stellar background
+  https://ui.adsabs.harvard.edu/abs/1996NewA....1...35Q/abstract
+* [SHM06] :: Sesana, Haardt & Madau et al. 2006
+  Interaction of Massive Black Hole Binaries with Their Stellar Environment. I. Ejection of Hypervelocity Stars
+  https://ui.adsabs.harvard.edu/abs/2006ApJ...651..392S/abstract
+* [Sesana10] :: Sesana 2010
+  Self Consistent Model for the Evolution of Eccentric Massive Black Hole Binaries in Stellar Environments:
+  Implications for Gravitational Wave Observations
+  https://ui.adsabs.harvard.edu/abs/2010ApJ...719..851S/abstract
+* [Kelley17] : Kelley, Blecha & Hernquist 2017
+  Massive black hole binary mergers in dynamical galactic environments
+  https://ui.adsabs.harvard.edu/abs/2017MNRAS.464.3131K/abstract
+* [Chen17] : Chen, Sesana, & Del Pozzo 2017
+  Efficient computation of the gravitational wave spectrum emitted by eccentric massive
+  black hole binaries in stellar environments
+  https://ui.adsabs.harvard.edu/abs/2017MNRAS.470.1738C/abstract
 
 """
 
@@ -54,9 +66,11 @@ import numpy as np
 import scipy as sp
 import scipy.interpolate   # noqa
 
-import holodeck
+import kalepy as kale
+
+import holodeck as holo
 from holodeck import utils, cosmo, log, _PATH_DATA
-from holodeck.constants import GYR, NWTG, PC, MSOL, YR
+from holodeck.constants import GYR, NWTG, PC, MSOL, YR, SPLC
 
 _DEF_TIME_DELAY = (5.0*GYR, 0.2)
 _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
@@ -69,9 +83,6 @@ _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 
 class Evolution:
     """
-
-    Additional Notes
-    ----------------
 
     """
 
@@ -208,8 +219,8 @@ class Evolution:
     def _take_next_step(self, step):
         """Integrate the binary population forward (to smaller separations) by one step.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         step : int
             The destination integration step number, i.e. `step=1` means integrate from 0 to 1.
 
@@ -347,8 +358,8 @@ class Evolution:
     def at(self, xpar, targets, pars=None, coal=False, lin_interp=None):
         """Interpolate evolution to the given observed, orbital frequency.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         xpar : str, one of ['fobs', 'sepa']
             String specifying the variable to interpolate to.
         targets : array of scalar
@@ -356,6 +367,8 @@ class Evolution:
             `sepa` : units of cm
             `fobs` : units of 1/s [Hz]
 
+        Notes
+        -----
         Out of bounds values are set to `np.nan`.
         Interpolation is 1st-order in log-log space.
 
@@ -425,7 +438,11 @@ class Evolution:
         xvals = [np.take_along_axis(_xvals, cc, axis=-1) for cc in cut]
         # Find how far to interpolate between values (in log-space)
         #     (N, T)
-        frac = (tt[np.newaxis, :] - xvals[1]) / np.subtract(*xvals)
+        temp = np.subtract(*xvals)
+        numer = tt[np.newaxis, :] - xvals[1]
+        frac = np.zeros_like(numer)
+        idx = (temp != 0.0)
+        frac[idx] = numer[idx] / temp[idx]
 
         vals = dict()
         # Interpolate each target parameter
@@ -484,6 +501,63 @@ class Evolution:
 
         return vals
 
+    def sample_full_population(self, freqs, DOWN=None):
+        PARAMS = ['mass', 'sepa', 'dadt', 'scafa']
+        fobs = kale.utils.spacing(freqs, scale='log', dex=10, log_stretch=0.1)
+        log.info(f"Converted input freqs ({kale.utils.stats_str(freqs)}) ==> {kale.utils.stats_str(fobs)}")
+        data_fobs = self.at('fobs', fobs, pars=PARAMS)
+
+        # Only examine binaries reaching the given locations before redshift zero (other redz=infinite)
+        redz = data_fobs['scafa']
+        redz = cosmo.a_to_z(redz)
+        valid = np.isfinite(redz) & (redz > 0.0)
+        # nvalid = np.count_nonzero(valid)
+        # print(f"Valid indices: {nvalid}/{valid.size}={nvalid/valid.size:.4e}")
+
+        frst = utils.frst_from_fobs(fobs[np.newaxis, :], redz)
+        dcom = cosmo.z_to_dcom(redz)
+
+        # `mass` has shape (Binaries, Frequencies, 2)
+        #    convert to (2, B, F), then separate into m1, m2 each with shape (B, F)
+        m1, m2 = np.moveaxis(data_fobs['mass'], -1, 0)
+        # mchirp = utils.chirp_mass(m1, m2)
+        dfdt, _ = utils.dfdt_from_dadt(data_fobs['dadt'], data_fobs['sepa'], freq_orb=frst)
+        _tres = frst / dfdt
+
+        vfac = 4.0*np.pi*SPLC * (redz+1.0) * dcom**2 / self._sample_volume   # * thub
+        tfac = _tres  # / thub
+
+        # ---- Get the "Lambda"/Poisson weighting factor ----
+        # Calculate weightings
+        #    Sesana+08, Eq.10
+        lambda_factor = vfac * tfac
+        # print(f"`lambda_factor` = {lambda_factor.shape}, {utils.stats(lambda_factor)}")
+
+        mt, mr = utils.mtmr_from_m1m2(m1[valid], m2[valid])
+        fo = (fobs[np.newaxis, :] * np.ones_like(redz))[valid]
+        redz = redz[valid]
+        weights = lambda_factor[valid]
+
+        if DOWN is not None:
+            prev_sum = weights.sum()
+            weights /= DOWN
+            next_sum = weights.sum()
+            log.warning(f"DOWNSAMPLING ARTIFICIALLY!!  DOWN={DOWN:g} :: {prev_sum:.4e}==>{next_sum:.4e}")
+
+        # vals = [mt, mr, redz, fo]
+        # TODO/FIX: Consider sampling in comoving-volume instead of redz (like in sam.py)
+        #           can also return dcom instead of redz for easier strain calculation
+        vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo)]
+        nsamp = np.random.poisson(weights.sum())
+        reflect = [None, [None, 0.0], None, np.log10([0.95*fobs[0], fobs[-1]*1.05])]
+        # print(f"{nsamp=:.4e}, {np.shape(vals)=}")
+        samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
+        # print(f"{samples.shape=}")
+
+        samples = np.asarray([10.0 ** ss for ss in samples])
+        # hs, fo = holo.sam._strains_from_samples(samples)
+        return samples
+
 
 class _Hardening(abc.ABC):
     """Abstract class for binary-hardening models.  Subclasses must define `dadt_dedt(evo, step, ...)` method.
@@ -526,17 +600,14 @@ class Sesana_Scattering(_Hardening):
     `_SHM06` class.  Scattering is assumed to only be effective once the binary is bound.  An
     exponential cutoff is imposed at larger radii.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     gamma_dehnen : scalar  or  (N,) array-like of scalar
         Dehnen stellar-density profile inner power-law slope.
         Fiducial Dehnen inner density profile slope gamma=1.0 is used in [Chen17].
     gbh : _Galaxy_Blackhole_Relation class/instance  or  `None`
         Galaxy-Blackhole Relation used for calculating stellar parameters.
         If `None` the default is loaded.
-
-    Additional Notes
-    ----------------
 
     """
 
@@ -551,8 +622,8 @@ class Sesana_Scattering(_Hardening):
     def dadt_dedt(self, evo, step):
         """Stellar scattering hardening rate.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         evo : `Evolution` instance
         step : int
             Integration step at which to calculate hardening rates.
@@ -574,8 +645,8 @@ class Sesana_Scattering(_Hardening):
     def _dadt_dedt(self, mass, sepa, eccen):
         """Stellar scattering hardening rate calculated from physical quantities.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mass : (N,2) array-like of scalar
             Masses of each MBH component (0-primary, 1-secondary) in units of [gram].
         sepa : (N,) array-like of scalar
@@ -631,8 +702,8 @@ class Dynamical_Friction_NFW(_Hardening):
 
     This module does not evolve eccentricity.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     gbh : class, instance or None
         Galaxy-blackhole relation (_Galaxy_Blackhole_Relation subclass)
         If `None` the default is loaded.
@@ -651,8 +722,8 @@ class Dynamical_Friction_NFW(_Hardening):
         If True:  calculate R_bound using an assumed stellar density profile.
         If False: calculate R_bound using a velocity dispersion (constant in radius, from `gbh` instance).
 
-    Additional Notes
-    ----------------
+    Notes
+    -----
     *   The hardening rate (da/dt) is not allowed to be larger than the orbital/virial velocity of the halo
         (as a function of radius).
 
@@ -667,15 +738,15 @@ class Dynamical_Friction_NFW(_Hardening):
         self._attenuate = attenuate
         self._rbound_from_density = rbound_from_density
 
-        self._NFW = holodeck.observations.NFW
+        self._NFW = holo.observations.NFW
         self._time_dynamical = None
         return
 
     def _dvdt(self, mass_sec_eff, dens, velo):
         """Chandrasekhar dynamical friction formalism providing a deceleration (dv/dt).
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mass_sec_eff : (N,) array-like of scalar
             Effective mass (i.e. the mass that should be used in this equation) of the inspiraling
             secondary component in units of [gram].
@@ -696,8 +767,8 @@ class Dynamical_Friction_NFW(_Hardening):
     def dadt_dedt(self, evo, step):
         """Calculate DF hardening rate given `Evolution` instance, and an integration `step`.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         evo : `Evolution` instance
         step : int,
             Integration step at which to calculate hardening rates.
@@ -725,8 +796,8 @@ class Dynamical_Friction_NFW(_Hardening):
     def _dadt_dedt(self, mass, sepa, redz, dt, attenuate=None):
         """Calculate DF hardening rate given physical quantities.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mass : (N, 2) array-like of scalar,
             Masses of both MBHs (0-primary, 1-secondary) in units of [grams].
         sepa : (N,) array-like of scalar,
@@ -796,8 +867,8 @@ class Dynamical_Friction_NFW(_Hardening):
 
         The attenuation factor is defined as >= 1.0, with 1.0 meaning no attenuation.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         sepa : (N,) array-like of scalar,
             Binary separations in units of [cm].
         m1m2 : (N, 2) array-like of scalar,
@@ -856,12 +927,6 @@ class Dynamical_Friction_NFW(_Hardening):
 
 class Fixed_Time(_Hardening):
     """
-
-    To-Do
-    -----
-    * [ ] Handle `rchar` better with respect to interpolation.  Currently not an interpolation
-        variable, which restricts it's usage.
-
     """
 
     _INTERP_NUM_POINTS = 1e4             # number of random data points used to construct interpolant
@@ -880,8 +945,8 @@ class Fixed_Time(_Hardening):
     def __init__(self, time, mtot, mrat, redz, sepa, rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5):
         """
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         pop : `_Population` instance
         time : scalar, callable  or  array_like[scalar]
             Total merger time of binaries, units of [sec], specifiable in the following ways:
@@ -1118,8 +1183,8 @@ class _Quinlan96:
 
         [Sesana10] Eq.8
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         sepa : (N,) array-like of scalar
             Binary separation in units of [cm].
         rho : (N,) array-like of scalar
@@ -1144,8 +1209,8 @@ class _Quinlan96:
 
         [Sesana10] Eq.9
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         sepa : (N,) array-like of scalar
             Binary separation in units of [cm].
         rho : (N,) array-like of scalar
@@ -1205,8 +1270,8 @@ class _SHM06:
     def H(self, mrat, sepa_rhard):
         """Hardening rate efficiency parameter.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mrat : (N,) array-like of scalar
             Binary mass-ratio (q = M2/M1 <= 1.0).
         sepa_rhard : (N,) array-like of scalar
@@ -1226,8 +1291,8 @@ class _SHM06:
     def K(self, mrat, sepa_rhard, ecc):
         """Eccentricity hardening rate efficiency parameter.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mrat : (N,) array-like of scalar
             Binary mass-ratio (q = M2/M1 <= 1.0).
         sepa_rhard : (N,) array-like of scalar
@@ -1312,11 +1377,11 @@ class _SHM06:
 
 def _get_galaxy_blackhole_relation(gbh=None):
     if gbh is None:
-        gbh = holodeck.observations.Kormendy_Ho_2013
+        gbh = holo.observations.Kormendy_Ho_2013
 
     if inspect.isclass(gbh):
         gbh = gbh()
-    elif not isinstance(gbh, holodeck.observations._Galaxy_Blackhole_Relation):
+    elif not isinstance(gbh, holo.observations._Galaxy_Blackhole_Relation):
         err = "`gbh` must be an instance or subclass of `holodeck.observations._Galaxy_Blackhole_Relation`!"
         log.error(err)
         raise ValueError(err)
@@ -1326,11 +1391,11 @@ def _get_galaxy_blackhole_relation(gbh=None):
 
 def _get_stellar_mass_halo_mass_relation(smhm=None):
     if smhm is None:
-        smhm = holodeck.observations.Behroozi_2013
+        smhm = holo.observations.Behroozi_2013
 
     if inspect.isclass(smhm):
         smhm = smhm()
-    elif not isinstance(smhm, holodeck.observations._StellarMass_HaloMass):
+    elif not isinstance(smhm, holo.observations._StellarMass_HaloMass):
         err = "`smhm` must be an instance or subclass of `holodeck.observations._StellarMass_HaloMass`!"
         log.error(err)
         raise ValueError(err)
