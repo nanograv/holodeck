@@ -1,11 +1,13 @@
 name: docs
 channels:
+  - conda-forge
+  - defaults
 dependencies:
-    # Base depends
-  - python
+  - python=3.9
   - pip
-
-
-  # Pip-only installs
-  - pip:
-
+  - ipykernel
+  - numpydoc
+  - numpy
+  # - nbsphinx
+  # pip:
+  #   - kalepy
