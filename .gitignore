@@ -114,3 +114,4 @@ output/*
 *.pdf
 analysis
 docs/source/apidoc_modules
+hostfile
