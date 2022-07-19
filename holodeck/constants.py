@@ -21,15 +21,15 @@ LSOL = ap.constants.L_sun.cgs.value
 RSOL = ap.constants.R_sun.cgs.value
 PC = ap.constants.pc.cgs.value
 AU = ap.constants.au.cgs.value
-ARCSEC = ap.units.arcsec.cgs.scale              # arcsecond in radians
+ARCSEC = ap.units.arcsec.cgs.scale                                 # arcsecond in radians
 YR = ap.units.year.to(ap.units.s)
-EVOLT = ap.units.eV.to(ap.units.erg)            # Electronvolt in ergs
-JY = ap.units.jansky.to(ap.units.g/ap.units.s**2)  # Jansky in [erg/s/cm^2/Hz]
+EVOLT = ap.units.eV.to(ap.units.erg)                               # Electronvolt in ergs
+JY = ap.units.jansky.to(ap.units.g/ap.units.s**2)                  # Jansky in [erg/s/cm^2/Hz]
+KMPERSEC = (ap.units.km / ap.units.s).to(ap.units.cm/ap.units.s)   # km/s
 
 # Derived Constants
 # -----------------
 SCHW = 2*NWTG/(SPLC*SPLC)                        # Schwarzschild Constant (2*G/c^2)
-# HTAU = 1.0/H0                                    # Hubble Time - 1/H0 [sec]
 EDDT = 4.0*np.pi*NWTG*SPLC*MPRT/SIGMA_T          # Eddington Luminosity factor [erg/s/g]
 
 # Electron-Scattering Opacity ($\kappa_{es} = n_e \sigma_T / \rho = \mu_e \sigma_T / m_p$)

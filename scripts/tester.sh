@@ -10,6 +10,7 @@ set -e    # exit on error
 
 CONVERTER_NAME="scripts/convert_notebook_tests.py"
 TESTS_NAME="holodeck/tests/"
+NOTEBOOK_TESTS_NAME="holodeck/tests/converted_notebooks/"
 PYTEST_ARGS=("-v" "--cov=holodeck" "--cov-report=html" "--color=yes")
 VERBOSE=false;
 DRY=false;
@@ -31,13 +32,16 @@ function help()
     echo "h     (help)    print this Help."
     echo "v     (verbose) verbose output."
     echo "d     (dryrun)  print commands without running them."
+    echo "l     (list)    list collected tests without running them."
     echo "b     (build)   rebuild notebook tests."
+    echo "s     (skip)    skip    notebook tests."
+    echo "x     (exit)    exit on first failure."
     echo
 }
 
 
 # process command-line arguments
-while getopts ":hvdb" option; do
+while getopts ":hvdbslx" option; do
     case $option in
         h) # ---- display Help
             help;
@@ -47,10 +51,16 @@ while getopts ":hvdb" option; do
         d) # ---- dryrun
             DRY=true;
             VERBOSE=true;;
-        b) # ---- build
+        l) # ---- list
+            PYTEST_ARGS+=("--collect-only");;
+        b) # ---- build (notebook tests)
             BUILD=true;;
+        s) # ---- skip (notebook tests)
+            PYTEST_ARGS+=("--ignore=${NOTEBOOK_TESTS_NAME}");;
+        x) # ---- exit (on first failure)
+            PYTEST_ARGS+=("-x");;
         \?) # Invalid option
-            echo "Error: unrecognized option"
+            echo "Error: unrecognized option: '${option}'"
             exit 2;;
     esac
 done

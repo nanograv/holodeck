@@ -3,26 +3,23 @@
 [//]: # (Badges)
 [![GitHub Actions Build Status](https://github.com/nanograv/holodeck/workflows/CI/badge.svg)](https://github.com/nanograv/holodeck/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/nanograv/holodeck/branch/master/graph/badge.svg)](https://codecov.io/gh/nanograv/holodeck/branch/master)
+[![Documentation Status](https://readthedocs.org/projects/holodeck-gw/badge/?version=main)](https://holodeck-gw.readthedocs.io/en/main/?badge=main)
 
 Massive black hole (MBH) binary simulator for pulsar timing array (and associated) signals.
 
-This project is being led by the [NANOGrav](http://nanograv.org/) Astrophysics Working Group.  This package, which is actively under development, is aimed at providing a comprehensive framework for MBH binary population synthesis.  The framework includes modules to perform pop synth using a variety of methodologies to get a handle on both statistical and systematic uncertainties.  Currently, binary populations can be synthesis based on: cosmological hydrodynamic simulations (Illustris), semi-analytic/semi-empirical models (SAMs), and observational catalogs of local galaxies and/or quasars.
+This package, which is actively under development, is aimed at providing a comprehensive framework for MBH binary population synthesis.  The framework includes modules to perform pop synth using a variety of methodologies to get a handle on both statistical and systematic uncertainties.  Currently, binary populations can be synthesis based on: cosmological hydrodynamic simulations (Illustris), semi-analytic/semi-empirical models (SAMs), and observational catalogs of local galaxies and/or quasars.
 
 ## Installation
 
-The `holodeck` framework is currently under substantial, active development.  It will not available on `pypi` (`pip`) or via `conda` install until it has stabilized.  In general all of the depedencies are listed in the `requirements.txt` file and will be installed automatically.  One exception is the [`kalepy` package](https://github.com/lzkelley/kalepy), which is also being actively developed and modified - and thus cloning/installing `kalepy` manually may be preferable.
+The `holodeck` framework is currently under substantial, active development.  It will not available on `pypi` (`pip`) or via `conda` install until it has stabilized.  Currently `holodeck` requires `python >= 3.8`, and tests are run on versions `3.8`, `3.9`, `3.10`.
 
 The recommended installation for active development is to:
 
-**Install `kalepy`**:
-
-1) Clone the holodeck repository: `git clone https://github.com/lzkelley/kalepy.git`
-2) Perform an 'editable' local installation: `cd kalepy; pip install -e .`
-
-**Install `holodeck`**:
-
 1) Clone the holodeck repository: `git clone https://github.com/nanograv/holodeck.git`
-2) Perform an 'editable' local installation: `cd holodeck; pip install -e .`
+2) Perform an 'editable' local installation: `cd holodeck; pip install -e . -r requirements-dev.txt`
+
+The 'editable' installation allows the code base to be modified, and have those changes take effect when using the `holodeck` module without having to rebuild/reinstall it.
+
 
 ## Quickstart
 
@@ -30,9 +27,11 @@ The best way to get started is using the demonstration/testing notebooks include
 
 ## Documentation
 
-The primary sources of documentation for `holodeck` are this `README.md` file, the notebooks included in the `notebooks/` directory, and docstrings included in the source code directly.  Eventually comprehensive readthedocs documentation will also be available, in addition to the methods paper(s).
+The primary sources of documentation for `holodeck` are this `README.md` file, the notebooks included in the `notebooks/` directory, and docstrings included in the source code directly.  [`readthedocs` documentation](https://readthedocs.org/projects/holodeck-gw) are being written and improved, and a methods paper is in preparation.
 
 ## Contributing
+
+This project is being led by the [NANOGrav](http://nanograv.org/) Astrophysics Working Group.
 
 Details on contributions and the mandatory code of conduct can be found in the [CONTRIBUTING.md](./CONTRIBUTING.md) file.
 
@@ -46,16 +45,22 @@ Contributions are not only welcome but encouraged, anywhere from new modules/cus
 For more comprehensive testing (e.g. against numerous python versions, and building from the sdist package), you can use the python `tox` package: simply run `tox` in the root directory and it will use the configuration specified in `tox.ini`.  The scripy `scripts/run_tox.sh` is also provided to setup and execute tox tests and required environments.
 
 **Formatting**:
-New code should generally abide by PEP8 formatting, with `numpy` style docstrings.  Exceptions are:
-* lines may be broken at either 100 or 120 columns
+New code should generally abide by PEP8 formatting, with `numpy style docstrings <https://numpydoc.readthedocs.io/en/latest/format.html>`_.  Exceptions are:
+
+   * lines may be broken at either 100 or 120 columns
+
+
 
 ## Copyright
 
 Copyright (c) 2022, NANOGrav
 
+The `holodeck` package uses an [MIT license](./LICENSE).
+
+
 ## Attribution
 
-## Acknowledgements
+A NANOGrav paper on `holodeck` is currently in preparation.
 
-Project template based on the
-[Computational Molecular Science Python Cookiecutter](https://github.com/molssi/cookiecutter-cms) version 1.5.
+
+## Acknowledgements
