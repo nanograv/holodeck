@@ -10,15 +10,9 @@ on:
       - "main"
       - "dev"
 
-  #schedule:
-    # Nightly tests run on master by default:
-    #   Scheduled workflows run on the latest commit on the default or base branch.
-    #   (from https://help.github.com/en/actions/reference/events-that-trigger-workflows#scheduled-events-schedule)
-  #  - cron: "0 0 * * *"
-
 jobs:
   test:
-    name: Test on ${{ matrix.os }}, Python ${{ matrix.python-version }}
+    name: Test Python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -50,7 +44,7 @@ jobs:
         python -c "import setuptools; print(f'setuptools {setuptools.__version__}')"
         python -m pip freeze
 
-    - name: Run tox
+    - name: Run pytest with tox
       # Run tox using the version of Python in `PATH`
       run: tox -e py
 
