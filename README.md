@@ -11,19 +11,17 @@ This package, which is actively under development, is aimed at providing a compr
 
 ## Installation
 
-The `holodeck` framework is currently under substantial, active development.  It will not available on `pypi` (`pip`) or via `conda` install until it has stabilized.  In general all of the depedencies are listed in the `requirements.txt` file and will be installed automatically.  One exception is the [`kalepy` package](https://github.com/lzkelley/kalepy), which is also being actively developed and modified - and thus cloning/installing `kalepy` manually may be preferable.
+The `holodeck` framework is currently under substantial, active development.  It will not available on `pypi` (`pip`) or via `conda` install until it has stabilized.  In general all of the depedencies are listed in the `requirements.txt` file and will be installed automatically.
 
 The recommended installation for active development is to:
 
-**Install `kalepy`**:
-
-1) Clone the holodeck repository: `git clone https://github.com/lzkelley/kalepy.git`
-2) Perform an 'editable' local installation: `cd kalepy; pip install -e .`
-
-**Install `holodeck`**:
-
 1) Clone the holodeck repository: `git clone https://github.com/nanograv/holodeck.git`
-2) Perform an 'editable' local installation: `cd holodeck; pip install -e .`
+2) Perform an 'editable' local installation: `cd holodeck; pip install -e . -r requirements-dev.txt`
+
+The 'editable' installation allows the code base to be modified, and have those changes take effect when using the `holodeck` module without having to rebuild/reinstall it.
+
+The package can be uninstalled with the command `pip uninstall holodeck`.
+
 
 ## Quickstart
 
@@ -31,7 +29,7 @@ The best way to get started is using the demonstration/testing notebooks include
 
 ## Documentation
 
-The primary sources of documentation for `holodeck` are this `README.md` file, the notebooks included in the `notebooks/` directory, and docstrings included in the source code directly.  Eventually comprehensive readthedocs documentation will also be available, in addition to the methods paper(s).
+The primary sources of documentation for `holodeck` are this `README.md` file, the notebooks included in the `notebooks/` directory, and docstrings included in the source code directly.  [`readthedocs` documentation](https://readthedocs.org/projects/holodeck-gw) are being written and improved, and a methods paper is in preparation.
 
 ## Contributing
 
