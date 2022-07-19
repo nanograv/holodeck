@@ -3,7 +3,7 @@
 [//]: # (Badges)
 [![GitHub Actions Build Status](https://github.com/nanograv/holodeck/workflows/CI/badge.svg)](https://github.com/nanograv/holodeck/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/nanograv/holodeck/branch/master/graph/badge.svg)](https://codecov.io/gh/nanograv/holodeck/branch/master)
-[![Documentation Status](https://readthedocs.org/projects/holodeck-gw/badge/?version=latest)](https://holodeck-gw.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/holodeck-gw/badge/?version=main)](https://holodeck-gw.readthedocs.io/en/main/?badge=main)
 
 Massive black hole (MBH) binary simulator for pulsar timing array (and associated) signals.
 
@@ -11,7 +11,7 @@ This package, which is actively under development, is aimed at providing a compr
 
 ## Installation
 
-The `holodeck` framework is currently under substantial, active development.  It will not available on `pypi` (`pip`) or via `conda` install until it has stabilized.  In general all of the depedencies are listed in the `requirements.txt` file and will be installed automatically.
+The `holodeck` framework is currently under substantial, active development.  It will not available on `pypi` (`pip`) or via `conda` install until it has stabilized.  Currently `holodeck` requires `python >= 3.8`, and tests are run on versions `3.8`, `3.9`, `3.10`.
 
 The recommended installation for active development is to:
 
@@ -19,8 +19,6 @@ The recommended installation for active development is to:
 2) Perform an 'editable' local installation: `cd holodeck; pip install -e . -r requirements-dev.txt`
 
 The 'editable' installation allows the code base to be modified, and have those changes take effect when using the `holodeck` module without having to rebuild/reinstall it.
-
-The package can be uninstalled with the command `pip uninstall holodeck`.
 
 
 ## Quickstart

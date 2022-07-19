@@ -20,7 +20,7 @@ This package, which is actively under development, is aimed at providing a compr
 Installation
 ============
 
-`holodeck` is currently not available on pypi (`pip`).  Please build directly from source:
+The `holodeck` framework is currently under substantial, active development.  It will not available on `pypi` (`pip`) or via `conda` install until it has stabilized.  Currently `holodeck` requires `python >= 3.8` (See `Python Versions`_ below), and tests are run on versions `3.8`, `3.9`, `3.10`.  To build directly from source:
 
 .. code-block:: bash
 
@@ -33,6 +33,18 @@ Currently tests are run on python versions 3.8, 3.9, 3.10.  Ensure that you are 
 
 To uninstall the package, you can run `pip uninstall holodeck`.
 
+Python Versions
+---------------
+
+If you do not currently use one of these python versions, it is strongly recommended to use `anaconda <https://www.anaconda.com/products/distribution>`_ which makes managing/using multiple python versions very easy.  `anaconda` is available through most OS package managers, for example `homebrew` on macos.  With `anaconda` installed, you can create a new conda environment:
+
+.. code-block:: bash
+
+   conda create -n py39_holodeck python=3.9     # create a new environment named `py39_holodeck` with python version 3.9
+   conda activate py39_holodeck                 # activate the new conda environment
+   pip install -e . -r requirements-dev.txt     # install holodeck from within the holodeck top-level directory
+
+All conda environments currently active on your system can be listed with `conda info -e`.  To deactivate an environment, use the command `conda deactivate`.
 
 
 Quick Start
@@ -70,9 +82,10 @@ To-do items and changes to the API should be included in the `CHANGELOG.md <http
 
 Contributions are not only welcome but encouraged, anywhere from new modules/customizations to bug-fixes to improved documentation and usage examples.  The git workflow is based around a `main` branch which is intended to be (relatively) stable and operational, and an actively developed `dev` branch.  New development should be performed in "feature" branches (made off of the `dev` branch), and then incorporated via pull-request (back into the `dev` branch).
 
-**Formatting**:
-New code should generally abide by PEP8 formatting, with `numpy` style docstrings.  Exceptions are:
+**Formatting**. New code should generally abide by PEP8 formatting, with `numpy` style docstrings.  Exceptions are:
+
 * lines may be broken at either 100 or 120 columns
+
 
 Test Suite
 ----------
