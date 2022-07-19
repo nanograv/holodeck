@@ -110,3 +110,8 @@ holodeck.code-workspace
 docs/holodeck-paper/src/out
 .vscode/
 output/*
+*.png
+*.pdf
+analysis
+docs/source/apidoc_modules
+hostfile

@@ -1,0 +1,67 @@
+% general package imports and setup
+\input{packages}
+% definitions of custom commands
+\input{commands}
+% journal abbreviations for bibliography
+\input{abbrevs}
+
+% =================================================================================================
+% ====    Front Matter
+% =================================================================================================
+
+
+\begin{document}
+
+% \maketitle
+
+
+\input{sam_text}
+
+
+% ====    Bibliography
+
+\let\oldUrl\url
+\renewcommand{\url}[1]{\href{#1}{Link}}
+
+\quad{}
+\bibliographystyle{mnras}
+\bibliography{refs}
+
+\onecolumn
+\clearpage
+
+
+% ====    Appendices
+
+\appendix
+
+    \section{Additional Equations}
+        \label{sec:app_eqs}
+        A binary is described by its total mass $M$, mass ratio $q \equiv m_2 / m_1$ (s.t.~$q\leq1$), (proper) semi-major axis $a$, and rest-frame orbital frequency $f_r$.  The characteristic gravitational wave mass is the chirp mass, $\mchirp \equiv M \, q^{3/5} \, \lr[-6/5]{1+q}$.
+
+        The GW strain from a circular binary is \citep[][Eq.~7; sky and polarization averaged]{Sesana+2008},
+            \begin{equation}
+            \label{eq:source_strain}
+            h_s = \frac{8}{10^{1/2}} \frac{\left(G\mchirp\right)^{5/3}}{c^4 \, d_L}
+                \left(2 \pi f_r \right)^{2/3},
+            \end{equation}
+        for a luminosity distance $d_L$.  Recall that the luminosity distance and comoving distance are related as $d_L = d_c \, (1+z)$, that the comoving volume of the Universe is given by \citep{Hogg-1999},
+        \begin{equation}
+            \frac{d V_c}{dz} = 4\pi \frac{c}{H_0} \frac{d_c^2}{E(z)},
+        \end{equation}
+        and that redshift can be related to time (or age of the universe) as,
+        \begin{align}
+            \frac{dz}{dt} = H_0 \lr{1+z} E(z).
+        \end{align}
+        The evolution of the Hubble parameter over redshift can be calculated from the matter-energy constituents of the universe as,
+        \begin{align}
+            H(z) & = H_0(z) E(z), \\
+            E(z) & \equiv \lrs[1/2]{\Omega_R \lr[4]{1+z} + \Omega_m \lr[3]{1+z} + \Omega_k \lr[2]{1+z} + \Omega_\Lambda}.
+        \end{align}
+        The $\Omega$ terms are the usual redshift-zero fractions of the critical density for radiation, non-relativistic matter, curvature, and dark energy.  We adopt the results of WMAP9 \citep{Hinshaw+2013} for our fiducial cosmology, assuming zero curvature: $H_0 = 69.33 \textrm{ km/s/Mpc}$, $\Omega_m = 0.2880$, $\Omega_\Lambda = 0.7120$.
+
+
+    \twocolumn
+
+
+\end{document}

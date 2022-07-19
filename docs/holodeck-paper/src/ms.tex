@@ -13,8 +13,6 @@
 % journal abbreviations for bibliography
 \input{abbrevs}
 
-\newcommand{\thardf}{\tau_f}
-
 % =================================================================================================
 % ====    Front Matter
 % =================================================================================================
@@ -51,6 +49,12 @@
 % ====    Section 1 - Introduction
 % =================================================================================================
 
+\begin{itemize}
+    \item Change $f_r \rightarrow f$
+    \item holodeck uses $f_\trt{obs}$ as grid variable, not $f_r$, mesh this with the analytic formalism and description
+\end{itemize}
+
+
 \section{Introduction}
     \label{sec:intro}
 
@@ -63,87 +67,7 @@
 \section{Methods}
     \label{sec:meth}
 
-    Here, the GW strain from a circular binary is \citep[][Eq.~7]{Sesana+2008} (sky and polarization averaged),
-        \begin{equation}
-        \label{eq:source_strain}
-        h_s = \frac{8}{10^{1/2}} \frac{\left(G\mchirp\right)^{5/3}}{c^4 \, d_L}
-            \left(2 \pi f_r \right)^{2/3},
-        \end{equation}
-    for a luminosity distance $d_L$.
-
-    \subsection{Source Distributions and Gravitational Wave Calculations}
-
-        Define the (comoving-) number density of sources as, $n \equiv dN / dV_c$.
-
-        From \citet[][Eqs.~5/8]{Phinney-2001},
-        	\begin{align}
-        	h_c^2(f) = \int_0^\infty \!\! dz \; \frac{d^2 N}{dz \, d\ln f_r} \; h_s^2\lr{f_r}.
-        	\end{align}
-        From \citet[][Eq.~6]{Sesana+2008} we can write,
-        	\begin{align}
-        	\frac{d^2 N}{dz \, d\ln f_r} = \frac{d n_c}{dz} \frac{dz}{dt} \frac{dt}{d\ln f_r} \frac{d V_c}{dz}.
-        	\end{align}
-        The binary hardening timescale is given by the expression,
-        \begin{equation}
-            \thardf \equiv \diffp{t}{{\ln\!f_r}} = \frac{f_r}{\partial f_r / \partial t}
-        \end{equation}
-        From cosmography \citep[e.g.][]{Hogg-1999},
-        	\begin{align}
-        	\frac{dz}{dt} = H_0 \lr{1+z} E(z) \\
-        	\frac{d V_c}{dz} = 4\pi \frac{c}{H_0} \frac{d_c^2}{E(z)} \\
-          d_L = d_c \, (1+z)
-        	\end{align}
-        Putting this together we have,
-        	\begin{align}
-        	h_c^2(f) & = \int_0^\infty \!\! dz \; \frac{dn_c}{dz} \, h^2\lr{f_r} \, 4\pi c \, d_c^2 \lr{1+z} \, \thardf.
-        	\end{align}
-        % If this is being calculated from a finite volume (e.g.~simulation), then we can associate the comoving-number-density of sources at a given redshift with the number of binaries per-unit comoving volume, i.e.,
-        % 	\begin{align}
-        % 	\frac{dn_c}{dz} \, dz = N_\trt{fv}(z)/V_\trt{c,fv}.
-        % 	\end{align}
-
-
-    \subsection{Semi-Analytic Modeling}
-
-        Define the (comoving-) number density of sources as, $n \equiv dN / dV_c$, and the distribution function of sources as $f(M,a,z) = d^2 n(M,a,z) / dM da$.  Here $M$ is the total mass of each systems, $a$ is the binary separation, and $z$ is the redshift.  Note that binary frequency $f$ could be used almost interchangeably with $a$, and that both evolve as a function of time or equivalently redshift.  This formalism can easily be extended to include other parameters, such as mass-ratio and eccentricity ($q$ and $e$).  We can write the conservation equation for binaries as of function of redshift as,
-        \begin{equation}
-            \label{eq:conservation}
-            \diffp{f}{z} + \diffp{}{m} \lrs{f \diffp{m}{z}} + \diffp{}{a} \lrs{f \diffp{a}{z}} = S_f(m, a, z).
-        \end{equation}
-        Here $S_f$ is a source/sink function that can account for the creation or destruction of binaries.  Here we assume that all binary `formation' is encapsulated from binaries moving from one part of parameter space (i.e.~large separations and redshifts) to other parts of parameter space (i.e.~smaller separations and redshifts).  Thus we set $S_f = 0$.
-
-        We consider the standard \citep[e.g.~Sesana style; see][]{Chen+2019} semi-analytic model (SAM) formalism of MBH binary populations.  In this style of calculation, $f$ is determined in a region of parameter space that can be observed/estimated, and this is \textit{evolved} to find the distribution in a different region of parameter space that is of interest.  In practice, the observed parameter space is galaxies and galaxy mergers, and the parameter space of interest is close separated MBH binaries that could be GW detectable.  We will express the distribution function as a product of a mass-function, and a pair fraction:
-        \begin{equation}
-            \label{eq:dist_func}
-            f(M,a,z) = \frac{\Phi(M, z)}{M \ln\!10} \cdot F_a(M, a, z),
-        \end{equation}
-        where the mass-function is, $\Phi(M, z) \equiv \diffp{n_g}{{\logten{M}}}$.
-        In \citet{Chen+2019}, for example, the pair fraction is measured over some range of separations, and the separation-dependence is suppressed, i.e.~$f(M, z) = \Phi(M, z) \cdot F(M, z)$ s.t.~$F = \int_{a_0}^{a_1} F_a \, da$.  From $\eqref{eq:conservation}$, we use the chain rule to mix time and redshift evolution, and assume that the mass-change of binaries is negligible, i.e.~$\diffp{m}{t} = 0$, giving:
-        \begin{equation}
-            \diffp{f}{z} = - \diffp{t}{z} \diffp{}{a} \lrs{f \diffp{a}{t}}.
-        \end{equation}
-        Plugging-in \eqref{eq:dist_func}:
-        \begin{equation}
-            \diffp{f}{z} = - \diffp{t}{z} \Phi(M,z) \diffp{}{a} \lrs{F(M,a,z) \diffp{a}{t}}.
-        \end{equation}
-
-        The binary population is assumed to be changing only in separation and redshift, which are related by $\partial a / \partial z = (\partial a / \partial t) (\partial t / \partial z)$.  Because the overall number-density is conserved, we can take a finite step in separation and time/redshift, $a\rightarrow a'$ and $z\rightarrow z'$.  Here the time it takes for a binary to go from $a \rightarrow a'$ is $\tau(M,a,z|a')$ which leads to a redshift at the later time of $z' = z'(t + \tau)$.  The standard expression \citep[e.g.~][~Eq.~5]{Chen+2019}, requires making the approximation that,
-        \begin{equation}
-            \diffp{}{a} \lrs{F(M,a,z) \diffp{a}{t}} \approx \frac{F}{\Delta t} = \frac{F}{\tau(M,a,z|a')}.
-        \end{equation}
-        Thus giving,
-        \begin{equation}
-            \diffp{f(M,a',z')}{{z'}} = \diffp{n}{{\log_{10}\!M}{a'}{z'}} = - \diffp{t}{z} \frac{\Phi(M,z) \, F(M,a,z)}{\tau(M,a,z|a')}.
-        \end{equation}
-
-        Utimately we are interested in a total number of binaries $N$ such that $dN \equiv n \, dV_c$ for a comoving volume $V_c(z)$.  To find the number of binaries, we use the chain rule to connect the time-evolution of the universe with the evolution of each binary over frequency,
-        \begin{equation}
-            \diffp{N}{{M}{q}{z}{\ln\!f_r}} = \diffp{n}{{M}{q}{z}} \diffp{z}{t} \diffp{t}{ {\ln\!f_r} } \diffp{V_c}{z}.
-        \end{equation}
-        Putting this together, we can finally write,
-        \begin{equation}
-            \diffp{N}{{M}{q}{z}{\ln\!f_r}} = - \Phi(M,z) \, F(M,a,z) \frac{\thardf}{\tau(M,a,z|a')} \diffp{V_c}{z}.
-        \end{equation}
+    \input{sam_text}
 
     % % Fig -
     % \begin{figure}
@@ -176,7 +100,17 @@
     % \end{figure*}
 
 
+\section{Implementation}
+    \label{sec:imp}
 
+    The \holodeck{} framework is written primarily in \python{} using a class-based structure for modularity and extensibility.
+
+    \subsection{Semi-Analytic Models}
+        \label{sec:imp_sam}
+
+        The core of the semi-analytic modeling framework in \holodeck{} is implementing \eqref{eq:sam_final}.  There are classes for each of the key components: The galaxy stellar-mass function (GSMF, $\Phi$), the galaxy pair fraction \(F\), the merger timescale ($\tau$), and additional a scaling relation for mapping host galaxies via to MBH properties --- typically via an \mmbulge{} relation.  Each component class is implemented generically via basic API methods (e.g.~a GSMF that returns the number density of galaxies at a given stellar-mass and redshift), and can be subclassed to provide a particular implementation (e.g.~an analytic Schechter-function GSMF).  The number (or number density) of binaries is specified over a grid of parameters, typically in a four dimensional space of total mass ($M$), mass ratio ($q$), redshift ($z$), and binary rest-frame orbital frequency ($f_r$).
+
+        The semi-analytic model formalism defines a continuous distribution of MBH binaries.  For many calculations, the discrete nature of MBHB sources is important, not only for examining individual continuous wave sources but also because of the important effects of discrete sources on the shape of the GWB due to the non-linear scaling of GW strain \citep{Sesana+2008}.  Additional, a component of the uncertainty in expected GW signals is due to `cosmic variance', which can be treated as Poisson noise when creating multiple samples (or `realizations') of our binary populations.  To handle discretization and resampling we use the \texttt{kalepy} package \citep{kalepy2021}, in particular, a method of outlier sampling to capture regions of parameter space where finite number effects are important.  The \holodeck{} semi-analytic models specify the number (or number-density) of binaries over a grid, i.e.~$N_{ijkl}$.  By definition, grid cells which have an expected total number of binaries $\gg 1$ will not produce appreciable finite-number effects, so instead they are given a weighting based on a Poisson distribution centered around their expectation value, i.e.~$\mathcal{P}(N_{ijkl})$.  Grid cells with expected numbers of order unity or less do produce important finite-number effects, and thus are directly resampled
 
 % =================================================================================================
 % ====    Section 3 - Results
@@ -212,7 +146,7 @@
 \section*{Acknowledgments}
 	I am very thankful to.
 
-    This research made use of \astropy, a community-developed core Python package for Astronomy \citep{astropy2013}, in addition to \scipy~\citep{scipy}, \ipython~\citep{ipython}, \jupyter~notebook~\citep{jupyter}, \numpy~\citep{numpy2011} \& \sympy~\citep{sympy2017}.  All figures were generated using \matplotlib~\citep{matplotlib2007}.  Kernel density estimation was performed using the \kalepy{} package (\href{https://github.com/lzkelley/kalepy}{github.com/lzkelley/kalepy}) \citep{kalepy2020}.
+    This research made use of \texttt{astropy}, a community-developed core Python package for Astronomy \citep{astropy2013}, in addition to \texttt{Scipy}~\citep{scipy}, \texttt{ipython}~\citep{ipython}, \texttt{jupyter}~notebook~\citep{jupyter}, \texttt{Numpy}~\citep{numpy2011} \& \texttt{SymPy}~\citep{sympy2017}.  All figures were generated using \texttt{matplotlib}~\citep{matplotlib2007}.  Kernel density estimation was performed using the \texttt{kalepy}{} package (\href{https://github.com/lzkelley/kalepy}{github.com/lzkelley/kalepy}) \citep{kalepy2020}.
 
     The Illustris data is available online at \href{https://www.illustris-project.org/}{www.illustris-project.org} \citep{Nelson+2015}, and Illustris-TNG data at \href{https://www.tng-project.org/}{www.tng-project.org} \citep{Nelson+2019}.
 
@@ -233,6 +167,31 @@
 % ====    Appendices
 
 \appendix
+
+    \section{Additional Equations}
+        \label{sec:app_eqs}
+        A binary is described by its total mass $M$, mass ratio $q \equiv m_2 / m_1$ (s.t.~$q\leq1$), (proper) semi-major axis $a$, and rest-frame orbital frequency $f_r$.  The characteristic gravitational wave mass is the chirp mass, $\mchirp \equiv M \, q^{3/5} \, \lr[-6/5]{1+q}$.
+
+        The GW strain from a circular binary is \citep[][Eq.~7; sky and polarization averaged]{Sesana+2008},
+            \begin{equation}
+            \label{eq:source_strain}
+            h_s = \frac{8}{10^{1/2}} \frac{\left(G\mchirp\right)^{5/3}}{c^4 \, d_L}
+                \left(2 \pi f_r \right)^{2/3},
+            \end{equation}
+        for a luminosity distance $d_L$.  Recall that the luminosity distance and comoving distance are related as $d_L = d_c \, (1+z)$, that the comoving volume of the Universe is given by \citep{Hogg-1999},
+        \begin{equation}
+            \frac{d V_c}{dz} = 4\pi \frac{c}{H_0} \frac{d_c^2}{E(z)},
+        \end{equation}
+        and that redshift can be related to time (or age of the universe) as,
+        \begin{align}
+            \frac{dz}{dt} = H_0 \lr{1+z} E(z).
+        \end{align}
+        The evolution of the Hubble parameter over redshift can be calculated from the matter-energy constituents of the universe as,
+        \begin{align}
+            H(z) & = H_0(z) E(z), \\
+            E(z) & \equiv \lrs[1/2]{\Omega_R \lr[4]{1+z} + \Omega_m \lr[3]{1+z} + \Omega_k \lr[2]{1+z} + \Omega_\Lambda}.
+        \end{align}
+        The $\Omega$ terms are the usual redshift-zero fractions of the critical density for radiation, non-relativistic matter, curvature, and dark energy.  We adopt the results of WMAP9 \citep{Hinshaw+2013} for our fiducial cosmology, assuming zero curvature: $H_0 = 69.33 \textrm{ km/s/Mpc}$, $\Omega_m = 0.2880$, $\Omega_\Lambda = 0.7120$.
 
     \section{Additional Material}
         \label{sec:app}

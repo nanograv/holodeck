@@ -20,7 +20,7 @@ from holodeck.constants import MSOL, PC
 
 def test_pop_illustris_basic():
     print("test_pop_illustris_basic()")
-    pop = holo.Pop_Illustris()
+    pop = holo.population.Pop_Illustris()
 
     keys = ['mbulge', 'vdisp', 'mass', 'scafa', 'sepa', 'redz']
     ranges = [[1e7, 1e13], [10, 600], [1e5, 3e10], [0.0, 1.0], [1e3, 3e5], [0.0, 10.0]]
@@ -45,19 +45,20 @@ def test_pop_illustris_basic():
 
 def test_mass_reset():
     print("test_mass_reset()")
-    pop = holo.Pop_Illustris()
+    pop = holo.population.Pop_Illustris()
     mmbulge_relation = holo.relations.MMBulge_MM13()
     mod_mm13 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=False)
 
     mass_bef = pop.mass
-    mbulge = pop.mbulge
+    # host = {'mbulge': pop.mbulge}
+    host = pop
 
     pop.modify(mod_mm13)
     mass_aft = pop.mass
 
     assert not np.all(mass_bef == mass_aft), "Masses are unchanged after modification!"
     assert np.all((1e4 < mass_aft/MSOL) & (mass_aft/MSOL < 1e11)), "Modified masses outside of expectations!"
-    check = mmbulge_relation.mbh_from_mbulge(mbulge, False)
+    check = mmbulge_relation.mbh_from_host(host, False)
     assert np.all(check == mass_aft), "Modified masses do not match mmbulge_relation values!"
 
     SCATTER = 0.1
