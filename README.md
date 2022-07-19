@@ -49,7 +49,8 @@ New code should generally abide by PEP8 formatting, with `numpy style docstrings
 
    * lines may be broken at either 100 or 120 columns
 
-
+**Notebooks**:
+Please strip all notebook outputs before commiting notebook changes.  The `[nbstripout](https://github.com/kynan/nbstripout)` package is an excellent option to automatically strip all notebook output only in git commits (i.e. it doesn't change your notebooks in-place).  You can also use `nbconvert` to strip output in place: `jupyter nbconvert --clear-output --inplace <NOTEBOOK-NAME>.ipynb`.
 
 ## Copyright
 
