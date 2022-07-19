@@ -82,9 +82,24 @@ To-do items and changes to the API should be included in the `CHANGELOG.md <http
 
 Contributions are not only welcome but encouraged, anywhere from new modules/customizations to bug-fixes to improved documentation and usage examples.  The git workflow is based around a `main` branch which is intended to be (relatively) stable and operational, and an actively developed `dev` branch.  New development should be performed in "feature" branches (made off of the `dev` branch), and then incorporated via pull-request (back into the `dev` branch).
 
-**Formatting**. New code should generally abide by PEP8 formatting, with `numpy` style docstrings.  Exceptions are:
+Formatting
+----------
+
+New code should generally abide by PEP8 formatting, with `numpy` style docstrings.  Exceptions are:
 
 * lines may be broken at either 100 or 120 columns
+
+Notebooks
+---------
+
+Please strip all notebook outputs before commiting notebook changes.  The `[nbstripout](https://github.com/kynan/nbstripout)` package is an excellent option to automatically strip all notebook output only in git commits (i.e. it doesn't change your notebooks in-place).  You can also use `nbconvert` to strip output in place: `jupyter nbconvert --clear-output --inplace <NOTEBOOK-NAME>.ipynb`.
+
+To install `nbstripout` for the `holodeck` git package, make sure you're in the `holodeck` root directory and run:
+
+.. code-block:: bash
+
+  pip install --upgrade nbstripout    # install nbstripout
+  nbstripout --install                # install git hook in current repo only
 
 
 Test Suite
