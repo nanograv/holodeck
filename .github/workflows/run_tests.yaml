@@ -54,6 +54,10 @@ jobs:
       # Run tox using the version of Python in `PATH`
       run: tox -e py
 
+    - name: lint with flake8 on py39
+        if:  ${{ !startsWith(matrix.python-version, '3.9') }}
+        run: tox -e flake8
+
     # - name: Run tests
     #   run: |
     #      python ./convert_notebook_tests.py
