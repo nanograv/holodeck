@@ -51,8 +51,8 @@ Quick Start
 ===========
 
 | Some basic examples are shown below.
-| A more extended guide can be found in :doc:`Getting Started <getting_started>` :doc:`getting_started`
-| `The README file on github also includes installation and quick-start examples. <https://github.com/nanograv/holodeck/blob/master/README.md>`_
+| A more extended guide can be found in :doc:`Getting Started <getting_started>`.
+| `The README file on github also includes installation and quick-start examples. <https://github.com/nanograv/holodeck/blob/master/README.md>`_.
 | There are a large number of demonstration/testing notebooks included in the `notebooks/` directory, which is also a great place to get started.
 
 
