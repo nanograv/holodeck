@@ -135,14 +135,15 @@ class Evolution:
     def shape(self):
         return self._shape
 
-    def evolve(self):
+    def evolve(self, progress=True):
         # ---- Initialize Integration Step Zero
         self._init_step_zero()
 
         # ---- Iterate through all integration steps
         size, nsteps = self.shape
         steps_list = range(1, nsteps)
-        for step in utils.tqdm(steps_list, desc="evolving binaries"):
+        steps_list = utils.tqdm(steps_list, desc="evolving binaries") if progress else steps_list
+        for step in steps_list:
             rv = self._take_next_step(step)
             if rv is _EVO.END:
                 break
@@ -942,7 +943,7 @@ class Fixed_Time(_Hardening):
         mtot, mrat, redz = [gg.ravel() for gg in sam.grid]
         return cls(time, mtot, mrat, redz, sepa_init, **kwargs)
 
-    def __init__(self, time, mtot, mrat, redz, sepa, rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5):
+    def __init__(self, time, mtot, mrat, redz, sepa, rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5, progress=True):
         """
 
         Parameters
@@ -966,6 +967,8 @@ class Fixed_Time(_Hardening):
             (large separations: r > rchar)
 
         """
+        self._progress = progress
+
         # mtot, mrat = utils.mtmr_from_m1m2(pop.mass)
         # sepa = pop.sepa
         # redz = cosmo.a_to_z(pop.scafa)
@@ -1023,7 +1026,7 @@ class Fixed_Time(_Hardening):
 
         # For small numbers of points, calculate the normalization directly
         else:
-            norm = self._get_norm_chunk(time, mtot, mrat, rchar, gamma_sc, gamma_df, sepa)
+            norm = self._get_norm_chunk(time, mtot, mrat, rchar, gamma_sc, gamma_df, sepa, progress=progress)
 
         self._gamma_sc = gamma_sc
         self._gamma_df = gamma_df
@@ -1099,7 +1102,7 @@ class Fixed_Time(_Hardening):
         return rv
 
     @classmethod
-    def _get_norm_chunk(cls, tau, *args, guess=1e0, chunk=1e3):
+    def _get_norm_chunk(cls, tau, *args, guess=1e0, chunk=1e3, progress=True):
         if np.ndim(tau) != 1:
             raise
         chunk = int(chunk)
@@ -1113,7 +1116,9 @@ class Fixed_Time(_Hardening):
 
         num = int(np.ceil(size / chunk))
         sol = np.zeros_like(tau)
-        for ii in utils.tqdm(range(num), desc='calculating hardening normalization'):
+        step_iter = range(num)
+        step_iter = utils.tqdm(step_iter, desc='calculating hardening normalization') if progress else step_iter
+        for ii in step_iter:
             lo = ii * chunk
             hi = np.minimum((ii + 1) * chunk, size)
             cut = slice(lo, hi)

@@ -49,7 +49,9 @@ class GW_Discrete(Grav_Waves):
         else:
             harm_range = [2]
 
-        for ii, fobs in utils.tqdm(enumerate(freqs), total=len(freqs), desc='GW frequencies'):
+        freq_iter = enumerate(freqs)
+        freq_iter = utils.tqdm(freq_iter, total=len(freqs), desc='GW frequencies') if progress else freq_iter
+        for ii, fobs in freq_iter:
             _fore, _back, _loud = _calc_mc_at_fobs(
                 fobs, harm_range, nreals, bin_evo, box_vol,
                 loudest=nloudest
