@@ -366,7 +366,9 @@ def plot_bin_pop(pop):
 
 
 def plot_mbh_scaling_relations(pop, fname=None, color='r'):
+    units = "$[\log_{10}(M/M_\odot)]$"
     fig, ax = plt.subplots(figsize=[8, 5])
+    ax.set(xlabel=f'Stellar Mass {units}', ylabel=f'BH Mass {units}')
 
     #   ====    Plot McConnell+Ma-2013 Data    ====
     handles = []
@@ -603,7 +605,7 @@ def plot_evo(evo, freqs):
 '''
 
 
-def plot_evo(evo, freqs=None, sepa=None):
+def plot_evo(evo, freqs=None, sepa=None, ax=None):
     if (freqs is None) and (sepa is None):
         utils.error("Either `freqs` or `sepa` must be provided!")
 
@@ -616,7 +618,10 @@ def plot_evo(evo, freqs=None, sepa=None):
         xx = sepa / PC
         xlabel = 'Binary Separation [pc]'
 
-    fig, ax = figax(xlabel=xlabel)
+    if ax is None:
+        fig, ax = figax(xlabel=xlabel)
+    else:
+        fig = ax.get_figure()
 
     def _draw_vals_conf(ax, xx, vals, color=None, label=None):
         if color is None:
