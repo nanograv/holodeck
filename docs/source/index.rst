@@ -2,7 +2,7 @@
 holodeck
 ========
 
-|rtd||actions|
+|rtd| |actions|
 
 .. |rtd| image:: https://readthedocs.org/projects/kalepy/badge/?version=latest
 .. |actions| image:: https://github.com/nanograv/holodeck/actions?query=workflow%3ACI
