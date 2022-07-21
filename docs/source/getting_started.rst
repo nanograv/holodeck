@@ -54,3 +54,21 @@ To account for cosmic variance and the discreteness of binary sources, we can in
            \Lambda \equiv & \frac{4\pi \, c \, d_c^2 \cdot \left(1 + z\right)}{V_\textrm{sim}} \; \tau_f.
 
 The observed GW frequencies :math:`f` are arbitrarily chosen.  Typically, for pulsar timing arrays, these are chosen based on Nyquist sampling for a given observational duration :math:`T \sim 15 \, \textrm{yr}` and cadence :math:`\Delta t \sim 2 \, \textrm{week}`, such that :math:`f = \left[1/T, 2/T, 3/T, \, \ldots \, , 1/\left(2 \Delta t\right)\right]`.
+
+
+GW Detection with Pulsar Timing Arrays
+======================================
+
+
+Methods for Simulating MBH Binary Populations
+=============================================
+Hydrodynamic simulations, semi-analytic / semi-empirical models, observational catalogs.  Similarities and differences.
+
+
+Binary Evolution/Hardening Models
+=================================
+Prescriptions for modeling binary evolution on less-than about kpc scales, with interactions between binaries are their galactic environments.
+
+
+Observational Constraints on MBH and MBH-Binary Populations
+===========================================================
