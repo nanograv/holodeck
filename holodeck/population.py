@@ -17,6 +17,8 @@ _DEF_ILLUSTRIS_FNAME = "illustris-galaxy-mergers_L75n1820FP_gas-100_dm-100_star-
 
 
 class _Population_Discrete(abc.ABC):
+    """Base class for representing discrete binaries, e.g. from cosmo hydrodynamic simulations.
+    """
 
     def __init__(self, *args, mods=None, check=True, **kwargs):
         self._check_flag = check
