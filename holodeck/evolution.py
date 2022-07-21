@@ -1,57 +1,34 @@
-"""
-Holodeck - evolution submodule.
+"""Module for binary evolution from time of formation/galaxy-merger until BH coalescence.
 
 To-Do
 -----
-
 * General
-
   * evolution modifiers should act at each step, instead of after all steps?  This would be
     a way to implement a changing accretion rate, for example; or to set a max/min hardening rate.
   * re-implement "magic" hardening models that coalesce in zero change-of-redshift or fixed
     amounts of time.
-
 * Dynamical_Friction_NFW
-
   * Allow stellar-density profiles to also be specified (instead of using a hard-coded
     Dehnen profile)
   * Generalize calculation of stellar characteristic radius.  Make self-consistent with
     stellar-profile, and user-specifiable.
-
 * Sesana_Scattering
-
   * Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
     and flexible.  Currently hard-coded to Dehnen profile estimate.
-
 * _SHM06
-
   * Interpolants of hardening parameters return 2D arrays which we then take the diagonal
     of, but there should be a better way of doing this.
-
 * Fixed_Time
-
   * Handle `rchar` better with respect to interpolation.  Currently not an interpolation
     variable, which restricts it's usage.
 
 References
 ----------
-* [Quinlan96] :: Quinlan 1996
-  The dynamical evolution of massive black hole binaries I. Hardening in a fixed stellar background
-  https://ui.adsabs.harvard.edu/abs/1996NewA....1...35Q/abstract
-* [SHM06] :: Sesana, Haardt & Madau et al. 2006
-  Interaction of Massive Black Hole Binaries with Their Stellar Environment. I. Ejection of Hypervelocity Stars
-  https://ui.adsabs.harvard.edu/abs/2006ApJ...651..392S/abstract
-* [Sesana10] :: Sesana 2010
-  Self Consistent Model for the Evolution of Eccentric Massive Black Hole Binaries in Stellar Environments:
-  Implications for Gravitational Wave Observations
-  https://ui.adsabs.harvard.edu/abs/2010ApJ...719..851S/abstract
-* [Kelley17] : Kelley, Blecha & Hernquist 2017
-  Massive black hole binary mergers in dynamical galactic environments
-  https://ui.adsabs.harvard.edu/abs/2017MNRAS.464.3131K/abstract
-* [Chen17] : Chen, Sesana, & Del Pozzo 2017
-  Efficient computation of the gravitational wave spectrum emitted by eccentric massive
-  black hole binaries in stellar environments
-  https://ui.adsabs.harvard.edu/abs/2017MNRAS.470.1738C/abstract
+* [Quinlan96]_ Quinlan 1996
+* [SHM06]_ Sesana, Haardt & Madau et al. 2006
+* [Sesana10]_ Sesana 2010
+* [Kelley17]_ Kelley, Blecha & Hernquist 2017
+* [Chen17]_ Chen, Sesana, & Del Pozzo 2017
 
 """
 
@@ -82,8 +59,7 @@ _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 
 
 class Evolution:
-    """
-
+    """Base class use to evolve discrete binary populations forward in time.
     """
 
     _EVO_PARS = ['mass', 'sepa', 'eccen', 'scafa', 'tlbk', 'dadt', 'dedt']
@@ -92,6 +68,23 @@ class Evolution:
     _STORE_FROM_POP = ['_sample_volume']
 
     def __init__(self, pop, hard, nsteps=100, mods=None, debug=False):
+        """Initialize a new Evolution instance.
+
+        Parameters
+        ----------
+        pop : `population._Population_Discrete` instance,
+            Binary population with initial parameters of the binary from which to start evolution.
+        hard : `_Hardening` instance, or list
+            Model for binary hardening used to evolve population's separation over time.
+        nsteps : int,
+            Number of steps between initial separations and coalescence for all binaries.
+        mods : None, or list of modifiers
+            NOTE: not fully implemented!
+        debug : bool,
+            Include verbose/debugging output information.
+
+        """
+        # --- Store basic parameters to instance
         self._pop = pop
         self._debug = debug
         self._nsteps = nsteps
@@ -101,30 +94,35 @@ class Evolution:
             hard = [hard, ]
         self._hard = hard
 
+        # Store additional parameters
         for par in self._STORE_FROM_POP:
             setattr(self, par, getattr(pop, par))
 
         size = pop.size
         shape = (size, nsteps)
-
         self._shape = shape
-        self.scafa = np.zeros(shape)
-        self.tlbk = np.zeros(shape)
-        self.sepa = np.zeros(shape)
-        self.mass = np.zeros(shape + (2,))
-        self.mdot = np.zeros(shape + (2,))
+
+        # ---- Initialize empty arrays for tracking binary evolution
+        self.scafa = np.zeros(shape)           #: scale-factor of the universe, set to 1.0 after z=0
+        self.tlbk = np.zeros(shape)            #: lookback time, negative after redshift zero [sec]
+        self.sepa = np.zeros(shape)            #: semi-major axis (separation) [cm]
+        self.mass = np.zeros(shape + (2,))     #: mass of BHs, 0-primary, 1-secondary, [g]
+        self.mdot = np.zeros(shape + (2,))     #: accretion rate onto each component of binary [g/s]
+        self.dadt = np.zeros(shape)            #: hardening rate in separation [cm/s]
 
         if pop.eccen is not None:
-            self.eccen = np.zeros(shape)
-            self.dedt = np.zeros(shape)
+            eccen = np.zeros(shape)
+            dedt = np.zeros(shape)
         else:
-            self.eccen = None
-            self.dedt = None
+            eccen = None
+            dedt = None
 
-        self.dadt = np.zeros(shape)
+        self.eccen = eccen                     #: eccentricity, `None` if not being evolved []
+        self.dedt = dedt                       #: eccen evolution, `None` if not evolved [1/s]
+
         self._dadt_0 = None   # this is a placeholder for initializing debug output
 
-        # Derived parameters
+        # Derived and internal parameters
         self._freq_orb_rest = None
         self._evolved = False
         self._coal = None
@@ -133,9 +131,19 @@ class Evolution:
 
     @property
     def shape(self):
+        """The number of binaries and number of steps (N, S).
+        """
         return self._shape
 
     def evolve(self, progress=True):
+        """Evolve binary population from initial separation until coalescence in discrete steps.
+
+        Parameters
+        ----------
+        progress : bool,
+            Show progress-bar using `tqdm` package.
+
+        """
         # ---- Initialize Integration Step Zero
         self._init_step_zero()
 
@@ -156,11 +164,15 @@ class Evolution:
 
     @property
     def coal(self):
+        """Indices of binaries that coalesce before redshift zero.
+        """
         if self._coal is None:
             self._coal = (self.redz[:, -1] > 0.0)
         return self._coal
 
     def _init_step_zero(self):
+        """Set the initial conditions of the binaries at step zero.
+        """
         pop = self._pop
         size, nsteps = self.shape
 
@@ -170,7 +182,7 @@ class Evolution:
         rad_isco = utils.rad_isco(*pop.mass.T)
         # (2, N)
         sepa = np.log10([pop.sepa, rad_isco])
-        # Get log-space range of separations for each of N ==> (N, nsteps)
+        # Get log-space range of separations for each of N ==> (N, S), for S steps
         sepa = np.apply_along_axis(lambda xx: np.logspace(*xx, nsteps), 0, sepa).T
         self.sepa[:, :] = sepa
 
@@ -183,7 +195,7 @@ class Evolution:
 
         # ---- Initialize hardening rate at first step
 
-        # Determine initial hardening rates
+        # these are just for the first step
         dadt = np.zeros(size)
         if pop.eccen is not None:
             dedt = np.zeros(self.shape)
@@ -284,6 +296,8 @@ class Evolution:
         return _EVO.CONT
 
     def _check(self):
+        """Perform basic diagnostics on parameter validity after evolution.
+        """
         _check_var_names = ['sepa', 'scafa', 'mass', 'tlbk', 'dadt']
         _check_var_names_eccen = ['eccen', 'dedt']
 
@@ -304,16 +318,19 @@ class Evolution:
         return
 
     def _finalize(self):
+        """Perform any actions after completing all of the integration steps.
+        """
+        # Set a flag to record that evolution has been completed
         self._evolved = True
-
+        # Apply any modifiers
         self.modify()
-
         # Run diagnostics
         self._check()
-
         return
 
     def modify(self, mods=None):
+        """Apply and modifiers after evolution has been completed.
+        """
         self._check_evolved()
 
         if mods is None:
@@ -334,10 +351,14 @@ class Evolution:
         return
 
     def _update_derived(self):
+        """Update any derived quantities after modifiers are applied.
+        """
         pass
 
     @property
     def freq_orb_rest(self):
+        """Rest-frame orbital frequency. [1/s]
+        """
         if self._freq_orb_rest is None:
             self._check_evolved()
             mtot = self.mass.sum(axis=-1)
@@ -346,14 +367,17 @@ class Evolution:
 
     @property
     def freq_orb_obs(self):
+        """Observer-frame orbital frequency. [1/s]
+        """
         redz = cosmo.a_to_z(self.scafa)
         fobs = self.freq_orb_rest / (1.0 + redz)
         return fobs
 
     def _check_evolved(self):
+        """Raise an error if this instance has not yet been evolved.
+        """
         if self._evolved is not True:
             raise RuntimeError("This instance has not been evolved yet!")
-
         return
 
     def at(self, xpar, targets, pars=None, coal=False, lin_interp=None):
@@ -361,12 +385,26 @@ class Evolution:
 
         Parameters
         ----------
-        xpar : str, one of ['fobs', 'sepa']
+        xpar : str, in ['fobs', 'sepa']
             String specifying the variable to interpolate to.
-        targets : array of scalar
+        targets : float or array_like,
             Locations to interpolate to.
             `sepa` : units of cm
             `fobs` : units of 1/s [Hz]
+        pars : None or (list of str)
+            Parameters that should be interpolated.
+            If `None`, defaults to `self._EVO_PARS` attribute.
+        coal : bool,
+            Only return evolution values for binaries coalescing before redshift zero.
+        lin_interp : None or bool,
+
+        Returns
+        -------
+        vals : dict,
+            Dictionary of arrays for each interpolated parameter.
+            The returned shape is (N, T), where `T` is the number of target locations to interpolate
+            to, and `N` is the total number of binaries (``coal=False``) or the number of binaries
+            coalescing before redshift zero (``coal=True``).
 
         Notes
         -----
@@ -503,6 +541,25 @@ class Evolution:
         return vals
 
     def sample_full_population(self, freqs, DOWN=None):
+        """Construct a full universe of binaries based on resampling this population.
+
+        !**WARNING**!
+        NOTE: This function should be cleaned up / improved for public use.
+
+        Parameters
+        ----------
+        freqs : array_like,
+            Target observer-frame frequencies at which to sample population.
+        DOWN : None or float,
+            Factor by which to downsample the resulting population.
+            For example, `10.0` will produce 10x fewer output binaries.
+
+        Returns
+        -------
+        samples
+
+
+        """
         PARAMS = ['mass', 'sepa', 'dadt', 'scafa']
         fobs = kale.utils.spacing(freqs, scale='log', dex=10, log_stretch=0.1)
         log.info(f"Converted input freqs ({kale.utils.stats_str(freqs)}) ==> {kale.utils.stats_str(fobs)}")
@@ -597,7 +654,7 @@ class Hard_GW(_Hardening):
 class Sesana_Scattering(_Hardening):
     """Binary-Hardening Rates calculated based on the Sesana stellar-scattering model.
 
-    This module uses the stellar-scattering rate constants from the fits in [SHM06] using the
+    This module uses the stellar-scattering rate constants from the fits in [SHM06]_ using the
     `_SHM06` class.  Scattering is assumed to only be effective once the binary is bound.  An
     exponential cutoff is imposed at larger radii.
 
@@ -605,7 +662,7 @@ class Sesana_Scattering(_Hardening):
     ----------
     gamma_dehnen : scalar  or  (N,) array-like of scalar
         Dehnen stellar-density profile inner power-law slope.
-        Fiducial Dehnen inner density profile slope gamma=1.0 is used in [Chen17].
+        Fiducial Dehnen inner density profile slope gamma=1.0 is used in [Chen17]_.
     gbh : _Galaxy_Blackhole_Relation class/instance  or  `None`
         Galaxy-Blackhole Relation used for calculating stellar parameters.
         If `None` the default is loaded.
@@ -697,9 +754,9 @@ class Dynamical_Friction_NFW(_Hardening):
     times.  This is to model tidal-stripping of the secondary host galaxy.
 
     Attenuation of the DF hardening rate is typically also included, to account for the inefficiency of DF once the
-    binary enters the hardened regime.  This is calculated using the prescription from [BBR1980].  The different
+    binary enters the hardened regime.  This is calculated using the prescription from [BBR1980]_.  The different
     characteristic radii, needed for the attenuation calculation, currently use a fixed Dehnen stellar-density profile
-    as in [Chen17], and a fixed scaling relationship to find the characteristic stellar-radius.
+    as in [Chen17]_, and a fixed scaling relationship to find the characteristic stellar-radius.
 
     This module does not evolve eccentricity.
 
@@ -858,7 +915,7 @@ class Dynamical_Friction_NFW(_Hardening):
         return dadt, dedt
 
     def _attenuation_bbr80(self, sepa, m1m2, mstar):
-        """Calculate attentuation factor following [BBR1980] prescription.
+        """Calculate attentuation factor following [BBR1980]_ prescription.
 
         Characteristic radii are currently calculated using hard-coded Dehnen stellar-density profiles, and a fixed
         scaling-relationship between stellar-mass and stellar characteristic radius.
@@ -1176,7 +1233,7 @@ class _EVO(enum.Enum):
 
 
 class _Quinlan96:
-    """Hardening rates from stellar scattering parametrized as in [Quinlan96].
+    """Hardening rates from stellar scattering parametrized as in [Quinlan96]_.
 
     Fits from scattering experiments must be provided as `hparam` and `kparam`.
 
@@ -1186,7 +1243,7 @@ class _Quinlan96:
     def dadt(sepa, rho, sigma, hparam):
         """Binary hardening rate from stellar scattering.
 
-        [Sesana10] Eq.8
+        [Sesana10]_ Eq.8
 
         Parameters
         ----------
@@ -1246,7 +1303,7 @@ class _Quinlan96:
 
 
 class _SHM06:
-    """Fits to stellar-scattering hardening rates from [SHM06], based on the [Quinlan96] formalism.
+    """Fits to stellar-scattering hardening rates from [SHM06]_, based on the [Quinlan96]_ formalism.
 
     Parameters describe the efficiency of hardening as a function of mass-ratio (`mrat`) and separation (`sepa`).
 
@@ -1417,7 +1474,7 @@ def _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma=1.0):
 
 def _radius_influence_dehnen(mbh, mstar, gamma=1.0):
     """
-    [Chen17] Eq.25
+    [Chen17]_ Eq.25
     """
     rchar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
     rinfl = np.power(2*mbh/mstar, 1.0/(gamma - 3.0))
@@ -1427,7 +1484,7 @@ def _radius_influence_dehnen(mbh, mstar, gamma=1.0):
 
 def _density_at_influence_radius_dehnen(mbh, mstar, gamma=1.0):
     """
-    [Chen17] Eq.26
+    [Chen17]_ Eq.26
     """
     # [Chen17] Eq.27 - from [Dabringhausen+2008]
     rchar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
@@ -1438,7 +1495,7 @@ def _density_at_influence_radius_dehnen(mbh, mstar, gamma=1.0):
 
 def _radius_hard_bbr80_dehnen(mbh, mstar, gamma=1.0):
     """
-    [Kelley17] paragraph below Eq.8 - from [BBR80]
+    [Kelley17]_ paragraph below Eq.8 - from [BBR80]
     """
     rbnd = _radius_influence_dehnen(mbh, mstar, gamma=gamma)
     rstar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
@@ -1448,7 +1505,7 @@ def _radius_hard_bbr80_dehnen(mbh, mstar, gamma=1.0):
 
 def _radius_loss_cone_bbr80_dehnen(mbh, mstar, gamma=1.0):
     """
-    [Kelley17] Eq.9 - from [BBR80]
+    [Kelley17]_ Eq.9 - from [BBR80]
     """
     mass_of_a_star = 0.6 * MSOL
     rbnd = _radius_influence_dehnen(mbh, mstar, gamma=gamma)
