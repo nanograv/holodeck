@@ -33,6 +33,7 @@ extensions = [
     # 'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
     'numpydoc',     # allow numpy/google style docstrings
+    # 'sphinxcontrib.bibtex',  # allow bibtex-like citation management
 ]
 
 autosummary_generate = True
@@ -60,6 +61,8 @@ nitpick_ignore = [
 intersphinx_mapping = {
     'numpy': ('https://numpy.org/doc/stable/', None),
 }
+
+# bibtex_bibfiles = ['refs.bib']
 
 numpydoc_show_class_members = False
 
