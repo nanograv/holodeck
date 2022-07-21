@@ -3,4 +3,5 @@ nbsphinx
 numpy
 numpydoc
 astropy
+# sphinxcontrib-bibtex
 # kalepy
