@@ -6,13 +6,13 @@ initialized with WMAP9 parameters from [WMAP9]_.
 
 References
 ----------
-.. [Hogg1999] Hogg 1999 (astro-ph/9905116).
-    Distance measures in cosmology .
-    https://ui.adsabs.harvard.edu/abs/1999astro.ph..5116H
+* [Hogg1999]_ Hogg 1999 (astro-ph/9905116).
+  Distance measures in cosmology.
+  https://ui.adsabs.harvard.edu/abs/1999astro.ph..5116H
 
-.. [WMAP9] Hinshaw et al. 2013 (1212.5226).
-    Nine-year Wilkinson Microwave Anisotropy Probe (WMAP) Observations: Cosmological Parameter Results.
-    https://ui.adsabs.harvard.edu/abs/2013ApJS..208...19H/abstract
+* [WMAP9]_ Hinshaw et al. 2013 (1212.5226).
+  Nine-year Wilkinson Microwave Anisotropy Probe (WMAP) Observations: Cosmological Parameter Results.
+  https://ui.adsabs.harvard.edu/abs/2013ApJS..208...19H/abstract
 
 """
 
