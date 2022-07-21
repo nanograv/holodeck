@@ -2,6 +2,12 @@
 
 Massive Black-Hole Binary Population Synthesis for Gravitational Wave Calculations ≋●≋●≋
 
+This package is aimed at providing a comprehensive framework for MBH binary population synthesis.
+The framework includes modules to perform pop synth using a variety of methodologies to get a handle
+on both statistical and systematic uncertainties.  Currently, binary populations can be synthesis
+based on: cosmological hydrodynamic simulations (Illustris), semi-analytic/semi-empirical models,
+and observational catalogs of local galaxies and/or quasars.
+
 """
 
 __author__ = "NANOGrav"
@@ -48,20 +54,6 @@ from . import population  # noqa
 from . import utils       # noqa
 from . import sam         # noqa
 
-# from . import constants  # noqa
-# from .constants import *  # noqa
-# from . import evolution  # noqa
-# from .evolution import *  # noqa
-# from . import gravwaves  # noqa
-# from .gravwaves import *  # noqa
-# from . import observations # noqa
-# from .observations import *  # noqa
-# from . import population  # noqa
-# from .population import *  # noqa
-# from . import utils     # noqa
-# from .utils import *  # noqa
-
-
 # ---- Handle version
 
 fname_version = os.path.join(_PATH_PACKAGE, 'version.txt')
@@ -70,5 +62,5 @@ with open(fname_version) as inn:
 
 __version__ = version
 
-# Full cleanup
-del os, _check_paths, logging
+# cleanup module namespace
+del os, logging, _check_paths
