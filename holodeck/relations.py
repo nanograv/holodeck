@@ -702,6 +702,7 @@ class NFW(_Density_Profile):
     @classmethod
     def density(cls, rads, mhalo, redz):
         """NFW DM Density profile.
+
         [NFW-97]
         """
         rho_s, rs = cls._nfw_rho_rad(mhalo, redz)
