@@ -1,7 +1,17 @@
 """Cosmology related code.
 
-[WMAP9] = Hinshaw et al. 2013 (1212.5226)
-    Nine-year Wilkinson Microwave Anisotropy Probe (WMAP) Observations: Cosmological Parameter Results
+This file primarily provides the `Cosmology` class, which extends the functionality of astropy's
+`FlatLambdaCDM` class to include additional utility functions.  The `Cosmology` class here is
+initialized with WMAP9 parameters from [WMAP9]_.
+
+References
+----------
+.. [Hogg1999] Hogg 1999 (astro-ph/9905116).
+    Distance measures in cosmology .
+    https://ui.adsabs.harvard.edu/abs/1999astro.ph..5116H
+
+.. [WMAP9] Hinshaw et al. 2013 (1212.5226).
+    Nine-year Wilkinson Microwave Anisotropy Probe (WMAP) Observations: Cosmological Parameter Results.
     https://ui.adsabs.harvard.edu/abs/2013ApJS..208...19H/abstract
 
 """
@@ -11,11 +21,13 @@ import astropy.cosmology  # noqa
 import scipy as sp
 import numpy as np
 
+from . constants import SPLC
+
 
 class Cosmology(ap.cosmology.FlatLambdaCDM):
     """Class for calculating (and inverting) cosmological distance measures.
 
-    Based on the `Astropy.cosmology` methods and classes.
+    Based on the `astropy.cosmology.Cosmology` methods and classes.
 
     The base class provides methods to convert from redshift to desired cosmological parameters,
     e.g. `luminosity_distance(z)`.  These methods are used to construct a numerical grid of values
@@ -23,23 +35,15 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
     given a derived quantitiy (i.e. to come from d_L to redshift), the numerical grid can then be
     inverted and interpolated to find the corresponding redshift.
 
-    Methods
-    -------
-    -   tage_to_z                      -   Convert from universe-age to redshift.
-    -   dcom_to_z                      -   Convert from comoving-dist to redshift.
-    -   dlum_to_z                      -   Convert from luminosity-dist to redshift.
-    -   get_grid                       -   Retrieve the underlying interpolation grid.
-
     """
 
     # These are WMAP9 parameters, see [WMAP9], Table 3, WMAP+BAO+H0
-    Omega0 = 0.2880
-    OmegaBaryon = 0.0472
-    HubbleParam = 0.6933
+    Omega0 = 0.2880                #: Matter density parameter
+    OmegaBaryon = 0.0472           #: Baryon density parameter
+    HubbleParam = 0.6933           #: Hubble Parameter as H0/[100 km/s/Mpc], i.e. 0.69 instead of 69
     _H0_sub = HubbleParam * 100.0  # NOTE: this *cannot* be `H0` or `_H0` --- conflicts with astropy internals
-    SPLC = 29979245800.0
 
-    # z=0.0 is added automatically
+    # NOTE: z=0.0 is added automatically
     _Z_GRID = [1e4, 100.0, 10.0, 4.0, 2.0, 1.0, 0.5, 0.1, 0.01]
     _INTERP_POINTS = 20
 
@@ -49,7 +53,7 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
 
         # Create grids for interpolations
         # -------------------------------
-        #    Create a grid in redshift
+        #    Create a grid in redshift at which functions will be evaluated
         zgrid = self._init_interp_grid(self._Z_GRID, self._INTERP_POINTS)
         self._grid_z = zgrid
         self._sort_z = np.argsort(zgrid)
@@ -64,14 +68,15 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
         #    Comoving distances in centimeters
         self._grid_dcom = self.comoving_distance(zgrid).cgs.value
         self._sort_dcom = np.argsort(self._grid_dcom)
-        #    Comoving distances in centimeters
+        #    Luminosity distances in centimeters
         self._grid_dlum = self.luminosity_distance(zgrid).cgs.value
         self._sort_dlum = np.argsort(self._grid_dlum)
         return
 
     def __str__(self):
-        rstr = "cosmopy.cosmology.Cosmology :: H0 = {}, Om0 = {}, Ob0 = {}".format(
-            self.H0, self.Omega0, self.OmegaBaryon)
+        """Return a string description of this
+        """
+        rstr = f"{__class__} :: H0 = {self._H0_sub}, Om0 = {self.Omega0}, Ob0 = {self.OmegaBaryon}"
         return rstr
 
     @staticmethod
@@ -117,6 +122,19 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
     @staticmethod
     def a_to_z(sf):
         """Convert from scale-factor to redshift.
+
+        :math:`z = (1/a) - 1`
+
+        Parameters
+        ----------
+        sf : array_like
+            Scale-factor (:math:`a`) of the universe.
+
+        Returns
+        -------
+        float or array
+            Redshift at the input scale-factors.
+
         """
         sf = np.asarray(sf)
         # NOTE: this does not check for `nan`
@@ -128,6 +146,19 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
     @staticmethod
     def z_to_a(redz):
         """Convert from redshift to scale-factor.
+
+        :math:`a = 1.0 / (1 + z)`
+
+        Parameters
+        ----------
+        redz : array_like
+            Redshift(s) (:math:`z`) of the universe.
+
+        Returns
+        -------
+        float or array
+            Scale factor(s) at the inpur redshift(s).
+
         """
         redz = np.asarray(redz)
         # NOTE: this does not check for `nan`
@@ -138,6 +169,8 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
 
     @staticmethod
     def _interp(vals, xx, yy, inds=None):
+        """Interpolate to the target locations.
+        """
         if inds is None:
             inds = np.argsort(xx)
         # PchipInterpolate guarantees monotonicity with higher order
@@ -151,19 +184,19 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
         return zz
 
     def tage_to_a(self, age):
-        """Convert from age of the universe [seconds] to redshift.
+        """Convert from age of the universe [seconds] to scale factor.
         """
         aa = self._interp(age, self._grid_age, self._grid_a, self._sort_age)
         return aa
 
     def z_to_tage(self, redz):
-        """Convert from age of the universe [seconds] to redshift.
+        """Get the age of the universe [seconds] at the given redshift(s).
         """
         tage = self._interp(redz, self._grid_z, self._grid_age, self._sort_z)
         return tage
 
     def a_to_tage(self, sca):
-        """Convert from age of the universe [seconds] to redshift.
+        """Get the age of the universe [seconds] at the given scale factor(s).
         """
         tage = self._interp(sca, self._grid_a, self._grid_age, self._sort_a)
         return tage
@@ -175,31 +208,31 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
         return zz
 
     def z_to_tlbk(self, redz):
-        """Convert from redshift to lookback time [seconds].
+        """Get the lookback time [seconds] at the given redshift(s).
         """
         zz = self._interp(redz, self._grid_z, self._grid_lbk, self._sort_z)
         return zz
 
     def dcom_to_z(self, dc):
-        """Convert from comoving-distance [cm] to redshift.
+        """Convert from comoving distance [cm] to redshift.
         """
         zz = self._interp(dc, self._grid_dcom, self._grid_z, self._sort_dcom)
         return zz
 
     def dlum_to_z(self, dl):
-        """Convert from luminosity-distance [cm] to redshift.
+        """Convert from luminosity distance [cm] to redshift.
         """
         zz = self._interp(dl, self._grid_dlum, self._grid_z, self._sort_dlum)
         return zz
 
     def z_to_dcom(self, zz):
-        """Convert from comoving-distance [cm] to redshift.
+        """Get the comoving distance [cm] at the given redshift(s).
         """
         dc = self._interp(zz, self._grid_z, self._grid_dcom, self._sort_z)
         return dc
 
     def z_to_dlum(self, zz):
-        """Convert from luminosity-distance [cm] to redshift.
+        """Get the luminosity distance [cm] at the given redshift(s).
         """
         dl = self._interp(zz, self._grid_z, self._grid_dlum, self._sort_z)
         return dl
@@ -218,8 +251,7 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
             The units used for each cosmological parameter in the grid.
 
         """
-        _var_keys = [
-            "_grid_z", "_grid_a", "_grid_dcom", "_grid_dlum", "_grid_lbk", "_grid_age"]
+        _var_keys = ["_grid_z", "_grid_a", "_grid_dcom", "_grid_dlum", "_grid_lbk", "_grid_age"]
         _var_names = ["z", "a", "dc", "dl", "tl", "ta"]
         _var_types = [None, None, ['cm', 'Mpc'], ['cm', 'Mpc'], ['s', 'Gyr'], ['s', 'Gyr']]
 
@@ -246,32 +278,48 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
     def dVcdz(self, zz, cgs=True):
         """Differential comoving volume of the universe.
 
-        From Hogg1999 Eq. 28
+        From [Hogg1999]_ Eq. 28.
+
+        Parameters
+        ----------
+        zz : array_like
+            Target redshifts (:math:`z`).
+        cgs : bool
+            True: Return float(s) with the answer in CGS units [cm^3].
+            False: Return them as astropy `Quantity` object, defaulting to [Mpc^3].
+
+        Returns
+        -------
+        retval : float or array, [cm^3] or [Mpc^3]
+            Differential volume of the universe at the given redshift(s).
+            For the returned units, see `cgs` argument.
+
         """
         # This is 4*pi*D_h
         efac = self.efunc(zz)
         if cgs:
-            retval = (4.0*np.pi*self.SPLC/self.H(0.0).cgs.value)
+            retval = (4.0*np.pi*SPLC/self.H(0.0).cgs.value)
             com_dist = self.comoving_distance(zz).cgs.value
         else:
             retval = (4.0*np.pi*ap.constants.c/self.H(0.0)).decompose()
             com_dist = self.comoving_distance(zz)
 
         retval = retval * np.square(com_dist) / efac
-        # Using `astropy` this gives a `m * Mpc^2` object for some reason; simplify
+        # Force `astropy` to simplify units, otherwise it gives `m * Mpc^2` units
         if not cgs:
             retval = retval.to('Mpc3')
+
         return retval
 
     def dtdz(self, zz):
         """Differential lookback time of the Universe.
 
-        From Hogg1999 Eq. 30
+        From [Hogg1999]_ Eq. 30
 
         Returns
         -------
-        retval : array_like of scalar, units of [sec]
-            dt/dz at the given redshifts
+        retval : float or array, units of [sec]
+            dt/dz at the given redshift(s).
 
         """
         efac = self.efunc(zz)
