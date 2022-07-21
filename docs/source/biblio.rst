@@ -36,5 +36,24 @@ These are provided here for easy copy-and-paste usage in other files.
     Nine-year Wilkinson Microwave Anisotropy Probe (WMAP) Observations: Cosmological Parameter Results.
     https://ui.adsabs.harvard.edu/abs/2013ApJS..208...19H/abstract
 
+.. [Quinlan96] Quinlan 1996
+    The dynamical evolution of massive black hole binaries I. Hardening in a fixed stellar background
+    https://ui.adsabs.harvard.edu/abs/1996NewA....1...35Q/abstract
 
+.. [SHM06] Sesana, Haardt & Madau et al. 2006
+    Interaction of Massive Black Hole Binaries with Their Stellar Environment. I. Ejection of Hypervelocity Stars
+    https://ui.adsabs.harvard.edu/abs/2006ApJ...651..392S/abstract
 
+.. [Sesana10] Sesana 2010
+    Self Consistent Model for the Evolution of Eccentric Massive Black Hole Binaries in Stellar Environments:
+    Implications for Gravitational Wave Observations
+    https://ui.adsabs.harvard.edu/abs/2010ApJ...719..851S/abstract
+
+.. [Kelley17] Kelley, Blecha & Hernquist 2017
+    Massive black hole binary mergers in dynamical galactic environments
+    https://ui.adsabs.harvard.edu/abs/2017MNRAS.464.3131K/abstract
+
+.. [Chen17] Chen, Sesana, & Del Pozzo 2017
+    Efficient computation of the gravitational wave spectrum emitted by eccentric massive
+    black hole binaries in stellar environments
+    https://ui.adsabs.harvard.edu/abs/2017MNRAS.470.1738C/abstract
