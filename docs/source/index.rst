@@ -7,7 +7,7 @@ holodeck
 .. |rtd| image:: https://readthedocs.org/projects/kalepy/badge/?version=latest
 .. |actions| image:: https://github.com/nanograv/holodeck/actions?query=workflow%3ACI
 
-*Massive Black-Hole Binary Population Synthesis.*
+*Massive Black-Hole Binary Population Synthesis for Gravitational Wave Calculations ≋●≋●≋*
 
 `holodeck on github <https://github.com/nanograv/holodeck>`_
 
