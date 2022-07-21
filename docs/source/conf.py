@@ -91,6 +91,7 @@ numpydoc_validation_checks = {
     "RT02",   # The first line of the Returns section should contain only the type, unless multiple values are being returned
     "RT04",   # Return value description should start with a capital letter
     "RT05",   # Return value description should finish with ".
+    "SS02",   # Summary does not start with a capital letter
     "SS03",   # Summary does not end with a period
     "SS05",   # Summary must start with infinitive verb, not third person (e.g. use "Generate" instead of "Generates")
 }
