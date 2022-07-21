@@ -1,6 +1,7 @@
-"""
-holodeck
-Supermassive binary black hole simulator for pulsar timing array signals and galaxy population statistics.
+"""holodeck
+
+Massive Black-Hole Binary Population Synthesis for Gravitational Wave Calculations ≋●≋●≋
+
 """
 
 __author__ = "NANOGrav"
@@ -31,14 +32,14 @@ for cp in _check_paths:
 # ---- Load logger
 
 from . import logger   # noqa
-log = logger.get_logger(__name__, logging.DEBUG)
+log = logger.get_logger(__name__, logging.DEBUG)       #: global root logger from `holodeck.logger`
 
 
 # ---- Import submodules
 
-# Must load and initialize cosmology FIRST!
+# NOTE: Must load and initialize cosmology before importing other submodules!
 from . import cosmology   # noqa
-cosmo = cosmology.Cosmology()
+cosmo = cosmology.Cosmology()              #: global cosmology instance for cosmolical calculations
 
 from . import constants   # noqa
 from . import evolution   # noqa
