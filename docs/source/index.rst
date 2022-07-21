@@ -16,6 +16,30 @@ This package, which is actively under development, is aimed at providing a compr
 .. contents:: :local:
 
 
+Contents of Documentation
+=========================
+
+| A guide can be found in :doc:`Getting Started <getting_started>`.
+| `The README file on github also includes installation and quick-start examples. <https://github.com/nanograv/holodeck/blob/master/README.md>`_.
+| There are a large number of demonstration/testing notebooks included in `the package notebooks <https://github.com/nanograv/holodeck/tree/master/notebooks>`_.
+
+.. toctree::
+   :maxdepth: 1
+
+   Getting Started Guide <getting_started>
+
+   Calculating Gravitational Waves <calc_gws>
+
+   Definitions and Abbreviations <defs_abbrevs>
+
+   Annotated Bibliography <biblio>
+
+   Full Package Documentation <apidoc_modules/holodeck>
+
+   Modules list <apidoc_modules/modules>
+
+
+
 
 Installation
 ============
@@ -45,30 +69,6 @@ If you do not currently use one of these python versions, it is strongly recomme
    pip install -e . -r requirements-dev.txt     # install holodeck from within the holodeck top-level directory
 
 All conda environments currently active on your system can be listed with `conda info -e`.  To deactivate an environment, use the command `conda deactivate`.
-
-
-Quick Start
-===========
-
-| Some basic examples are shown below.
-| A more extended guide can be found in :doc:`Getting Started <getting_started>`.
-| `The README file on github also includes installation and quick-start examples. <https://github.com/nanograv/holodeck/blob/master/README.md>`_.
-| There are a large number of demonstration/testing notebooks included in the `notebooks/` directory, which is also a great place to get started.
-
-
-
-Documentation
-=============
-
-A number of examples are included in `the package notebooks <https://github.com/nanograv/holodeck/tree/master/notebooks>`_, and the `readme file <https://github.com/nanograv/holodeck/blob/master/README.md>`_.
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
-   Getting Started Guide <getting_started>
-   Full Package Documentation <apidoc_modules/holodeck>
-   Modules list <apidoc_modules/modules>
 
 
 Development & Contributions

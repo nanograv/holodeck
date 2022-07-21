@@ -1,0 +1,33 @@
+=============================
+Definitions and Abbreviations
+=============================
+
+.. contents:: :local:
+
+Abbreviations
+=============
+
+* **AGN**: Active Galactic Nucleus, an accreting massive black hole that produced observable EM emission (radio, optical, X-ray, etc).  Generally used synonymously with "Quasar" which is traditionally a very bright AGN, produced by an MBH accreting at a very high rate.
+* **BH**: Black Hole
+* **CBD**: Circum-Binary Disk, an accretion disk surrounding both components of a binary system.
+* **CW**: Continuous Wave, as in Continuous Wave GW source
+* **DF**: Dynamical Friction, the drag force experienced by a massive object moving in a gravitating background.
+* **GW/GWB**: Gravitational Waves / Gravitational Wave Background
+* **ISCO**: Inner-most Stable Circular Orbit, the radius or location within which no object can maintain a stable orbit around a black hole.  The radius is dependent on the spin of the black hole, but equal to 3 times the Schwarzschild radius for a non-spinning ($a=0$) black hole.
+* **LISA**: Laser Interferometer Space Antenna, future space-based GW detector
+* **MBH**: Massive Black-Hole, usually treated interchangeably with SMBH (super-massive black-hole)
+* **MBHB**: Massive Black-Hole Binary
+* **PTA**: Pulsar Timing Array
+
+
+Symbols
+=======
+* :math:`a`:
+  * (1) binary orbital semi-major axis (i.e. separation).
+  * (2) the scale-factor of the universe at a given redshift, :math:`a = 1 / (1+z)$`.
+* :math:`d_c`: Comoving Distance, the distance to a location in the Universe that, for zero relative velocity, remains invariant as a function of redshift.  Related to luminosity distance as, :math:`d_c = d_L / (1+z)`.
+* :math:`d_L`: Luminosity Distance, the effective distance to a source in the Universe determining its EM brightness or GW amplitude.  Related to comoving distance as, :math:`d_L = d_c \, (1+z)`.
+* :math:`\mathcal{M}``: Chirp-mass
+* :math:`M`: Mass, or total-mass (:math:`M=m_1 + M_2``) in the context of a binary.
+* :math:`q`: Mass-ratio of a binary, defined to be less-than or equal to unity, :math:`q\equiv m_2/m_1`, where the more massive primary is $m_1$.
+* :math:`z`: (Cosmological) redshift, a proxy for the distance to a source/location in the Universe, and also a proxy for the age of the Universe at that time.  Related to the scale-factor as :math:`z = (1/a) - 1`.
