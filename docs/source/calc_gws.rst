@@ -148,7 +148,5 @@ observational duration :math:`T \sim 15 \, \textrm{yr}` and cadence
 References
 ==========
 
-See `full annotated bibliography here <biblio>`_.
-
-.. [Hogg1999] Hogg 1999.
-.. [Sesana2008] Sesana+2008.
+* [Hogg1999]_ Hogg 1999.
+* [Sesana2008]_ Sesana, Veccio, & Colacino 2008.
