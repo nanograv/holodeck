@@ -141,9 +141,9 @@ Indices and tables
 ==================
 ..    :template: custom-module-template.rst
 
-.. .. autosummary::
-..    :toctree: _autosummary
-..    :recursive:
+.. autosummary::
+   :toctree: _autosummary
+   :recursive:
 
 ..    holodeck
 
