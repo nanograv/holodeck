@@ -78,7 +78,7 @@ class Evolution:
             Model for binary hardening used to evolve population's separation over time.
         nsteps : int,
             Number of steps between initial separations and coalescence for all binaries.
-        mods : None, or list of modifiers
+        mods : None, or list of `utils._Modifier` subclasses,
             NOTE: not fully implemented!
         debug : bool,
             Include verbose/debugging output information.

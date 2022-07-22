@@ -1,16 +1,17 @@
-"""
+"""Utility functions and tools.
 
 References
 ----------
-- Peters-1964 : [Peters 1964](https://ui.adsabs.harvard.edu/abs/1964PhRv..136.1224P/abstract)
-- EN07 : [Enoki & Nagashima 2007](https://ui.adsabs.harvard.edu/abs/2007PThPh.117..241E/abstract)
-- Enoki+2004 : [Enoki et al. 2004](https://ui.adsabs.harvard.edu/abs/2004ApJ...615...19E/abstract)
-- Sesana+2004 : [Sesana+2004](http://adsabs.harvard.edu/abs/2004ApJ...611..623S)
+* [Peters1964]_ Peters 1964
+* [Enoki2004]_ Enoki, Inoue, Nagashima, & Sugiyama 2004
+* [Sesana2004]_ Sesana, Haardt, Madau, & Volonteri 2004
+* [EN07]_ Enoki & Nagashima 2007
 
 """
 
 import abc
 import copy
+from multiprocessing.sharedctypes import Value
 import numbers
 import os
 from typing import Optional, Tuple, Union, List  # , Sequence,
@@ -24,15 +25,17 @@ import h5py
 from holodeck import log
 from holodeck.constants import NWTG, SCHW, SPLC, YR
 
-# e.g. Sesana+2004 Eq.36
+# e.g. [Sesana2004]_ Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
 _GW_DADT_SEP_CONST = - 64 * np.power(NWTG, 3) / 5 / np.power(SPLC, 5)
 _GW_DEDT_ECC_CONST = - 304 * np.power(NWTG, 3) / 15 / np.power(SPLC, 5)
-# EN07, Eq.2.2
+# [EN07]_, Eq.2.2
 _GW_LUM_CONST = (32.0 / 5.0) * np.power(NWTG, 7.0/3.0) * np.power(SPLC, -5.0)
 
 
 class _Modifier(abc.ABC):
+    """Base class for all types of post-processing modifiers.
+    """
 
     def __call__(self, base):
         self.modify(base)
@@ -48,12 +51,9 @@ class _Modifier(abc.ABC):
 # =================================================================================================
 
 
-def error(msg, etype=ValueError):
-    log.exception(msg, exc_info=True)
-    raise etype(msg)
-
-
 def load_hdf5(fname, keys=None):
+    """Load data and header information from HDF5 files into dictionaries.
+    """
     squeeze = False
     if (keys is not None) and np.isscalar(keys):
         keys = [keys]
@@ -94,6 +94,8 @@ def python_environment():
 
 
 def tqdm(*args, **kwargs):
+    """Construct a progress bar appropriately based on the current environment (script vs. notebook)
+    """
     if python_environment().lower().startswith('jupyter'):
         import tqdm.notebook
         tqdm_method = tqdm.notebook.tqdm
@@ -145,6 +147,13 @@ def get_file_size(fnames, precision=1):
 
 
 def _get_subclass_instance(value, default, superclass):
+    """Convert the given `value` into a subclass instance.
+
+    `None` ==> instance from `default` class
+    Class ==> instance from that class
+    instance ==> check that this is an instance of a subclass of `superclass`, error if not
+
+    """
     import inspect
 
     if value is None:
@@ -181,6 +190,11 @@ def broadcastable(*args):
 
 
 def expand_broadcastable(*args):
+    """Broadcast a set of arguments into the same shape.
+
+    NOTE/BUG: Is this redundant to `numpy.broadcast_arrays()` ??
+
+    """
     try:
         vals = np.array(args, dtype=object)    # avoid VisibleDeprecationWarning from ragged array creation
         shape = np.shape(np.product(vals, axis=0))
@@ -671,7 +685,9 @@ def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = T
     elif np.ndim(xx) == np.ndim(yy):
         xx = xx[axis]
     else:
-        error(f"Bad shape for `xx` (xx.shape={np.shape(xx)}, yy.shape={np.shape(yy)})!")
+        err = f"Bad shape for `xx` (xx.shape={np.shape(xx)}, yy.shape={np.shape(yy)})!"
+        log.error(err)
+        raise ValueError(err)
     ct = np.moveaxis(yy, axis, 0)
     ct = 0.5 * (ct[1:] + ct[:-1])
     ct = np.moveaxis(ct, 0, -1)
@@ -735,7 +751,9 @@ def dfdt_from_dadt(dadt, sepa, mtot=None, freq_orb=None):
 
     """
     if (mtot is None) and (freq_orb is None):
-        error("Either `mtot` or `freq_orb` must be provided!")
+        err = "Either `mtot` or `freq_orb` must be provided!"
+        log.error(err)
+        raise ValueError(err)
     if freq_orb is None:
         freq_orb = kepler_freq_from_sepa(mtot, sepa)
 
@@ -744,6 +762,11 @@ def dfdt_from_dadt(dadt, sepa, mtot=None, freq_orb=None):
 
 
 def mtmr_from_m1m2(m1, m2=None):
+    """Convert from primary and secondary masses into total-mass and mass-ratio.
+
+    NOTE: it doesn't matter if `m1` or `m2` is the primary or secondary.
+
+    """
     if m2 is not None:
         masses = np.stack([m1, m2], axis=-1)
     else:
@@ -798,6 +821,8 @@ def rad_isco(m1, m2, factor=3.0):
 
 
 def schwarzschild_radius(mass):
+    """Return the Schwarschild radius [cm] for the given mass [grams].
+    """
     rs = SCHW * mass
     return rs
 
@@ -808,6 +833,8 @@ def schwarzschild_radius(mass):
 
 
 def chirp_mass(m1, m2=None):
+    """Calculate the chirp-mass.
+    """
     # (N, 2)  ==>  (N,), (N,)
     if m2 is None:
         m1, m2 = np.moveaxis(m1, -1, 0)
@@ -961,7 +988,8 @@ def gw_hardening_timescale_freq(mchirp, frst):
 
 
 def gw_lum_circ(mchirp, freq_orb_rest):
-    """
+    """Calculate the GW luminosity of a circular binary.
+
     EN07: Eq. 2.2
     """
     lgw_circ = _GW_LUM_CONST * np.power(2.0*np.pi*freq_orb_rest*mchirp, 10.0/3.0)
