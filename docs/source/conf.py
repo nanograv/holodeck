@@ -72,26 +72,33 @@ numpydoc_show_class_members = False
 # Report warnings for all checks *except* those listed
 numpydoc_validation_checks = {
     "all",
-    "GL08",   # The object does not have a docstring
+    # "GL08",   # The object does not have a docstring
     "ES01",   # No extended summary found
     "PR01",   # Parameters { ... } not documented
     "PR02",   # Unknown parameters { ... }
     "PR07",   # Parameter has no description
     "PR10",   # Parameter "___" requires a space before the colon separating the parameter name and type
-    "RT01",   # No Returns section found
+    # "RT01",   # No Returns section found
     "RT03",   # Return value has no description
-    "SS01",   # No summary found (a short summary in a single line should be present at the beginning of the docstring)
+    # "SS01",   # No summary found (a short summary in a single line should be present
+              # at the beginning of the docstring)
 
     "SA01",   # See Also section not found
     "EX01",   # No examples section found
 
-    "GL01",   # Docstring text (summary) should start in the line immediately after the opening quotes (not in the same line, or leaving a blank line in between)
-    "GL02",   # Closing quotes should be placed in the line after the last text in the docstring (do not close the quotes in the same line as the text, or leave a blank line between the last text and the quotes)
-    "GL03",   # Double line break found; please use only one blank line to separate sections or paragraphs, and do not leave blank lines at the end of docstrings
+    "GL01",   # Docstring text (summary) should start in the line immediately after the opening
+              # quotes (not in the same line, or leaving a blank line in between)
+    "GL02",   # Closing quotes should be placed in the line after the last text in the docstring
+              # (do not close the quotes in the same line as the text, or leave a blank line
+              # between the last text and the quotes)
+    "GL03",   # Double line break found; please use only one blank line to separate sections or
+              # paragraphs, and do not leave blank lines at the end of docstrings
     "PR05",   # Parameter "___" type should not finish with "."
     "PR08",   # Parameter "weights" description should start with a capital letter
     "PR09",   # Parameter "___" description should finish with "."
-    "RT02",   # The first line of the Returns section should contain only the type, unless multiple values are being returned
+    "RT02",   # The first line of the Returns section should contain only the type,
+              # unless multiple values are being returned
+
     "RT04",   # Return value description should start with a capital letter
     "RT05",   # Return value description should finish with ".
     "SS02",   # Summary does not start with a capital letter
