@@ -110,7 +110,7 @@ Test Suite
 The full test suite can be run on all supported python versions using `tox`.  In the base package directory, simply run `$ tox` and it will use `conda` to create evironments and run tests on all supported python versions.
 
 **Before submitting a pull request, run `scripts/tester.sh -bv` to run the builtin tests.**
-For more comprehensive testing (e.g. against numerous python versions, and building from the sdist package), you can use the python `tox` package: simply run `tox` in the root directory and it will use the configuration specified in `tox.ini`.  The scripy `scripts/run_tox.sh` is also provided to setup and execute tox tests and required environments.
+For more comprehensive testing (e.g. against numerous python versions, and building from the sdist package), you can use the python `tox` package: simply run `tox` in the root directory and it will use the configuration specified in `tox.ini`.  The script `scripts/run_tox.sh` is also provided to setup and execute tox tests and required environments.
 
 
 Attribution & Referencing

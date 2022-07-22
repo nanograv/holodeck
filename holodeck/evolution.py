@@ -3,29 +3,30 @@
 To-Do
 -----
 * General
-  * evolution modifiers should act at each step, instead of after all steps?  This would be
-    a way to implement a changing accretion rate, for example; or to set a max/min hardening rate.
-  * re-implement "magic" hardening models that coalesce in zero change-of-redshift or fixed
-    amounts of time.
+    * evolution modifiers should act at each step, instead of after all steps?  This would be
+      a way to implement a changing accretion rate, for example; or to set a max/min hardening rate.
+    * re-implement "magic" hardening models that coalesce in zero change-of-redshift or fixed
+      amounts of time.
 * Dynamical_Friction_NFW
-  * Allow stellar-density profiles to also be specified (instead of using a hard-coded
-    Dehnen profile)
-  * Generalize calculation of stellar characteristic radius.  Make self-consistent with
-    stellar-profile, and user-specifiable.
+    * Allow stellar-density profiles to also be specified (instead of using a hard-coded
+      Dehnen profile)
+    * Generalize calculation of stellar characteristic radius.  Make self-consistent with
+      stellar-profile, and user-specifiable.
 * Sesana_Scattering
-  * Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
-    and flexible.  Currently hard-coded to Dehnen profile estimate.
+    * Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
+      and flexible.  Currently hard-coded to Dehnen profile estimate.
 * _SHM06
-  * Interpolants of hardening parameters return 2D arrays which we then take the diagonal
-    of, but there should be a better way of doing this.
+    * Interpolants of hardening parameters return 2D arrays which we then take the diagonal
+      of, but there should be a better way of doing this.
 * Fixed_Time
-  * Handle `rchar` better with respect to interpolation.  Currently not an interpolation
-    variable, which restricts it's usage.
+    * Handle `rchar` better with respect to interpolation.  Currently not an interpolation
+      variable, which restricts it's usage.
 
 References
 ----------
 * [Quinlan96]_ Quinlan 1996
 * [SHM06]_ Sesana, Haardt & Madau et al. 2006
+* [BBR80]_ Begelman, Blandford & Rees 1980
 * [Sesana10]_ Sesana 2010
 * [Kelley17]_ Kelley, Blecha & Hernquist 2017
 * [Chen17]_ Chen, Sesana, & Del Pozzo 2017
@@ -754,7 +755,7 @@ class Dynamical_Friction_NFW(_Hardening):
     times.  This is to model tidal-stripping of the secondary host galaxy.
 
     Attenuation of the DF hardening rate is typically also included, to account for the inefficiency of DF once the
-    binary enters the hardened regime.  This is calculated using the prescription from [BBR1980]_.  The different
+    binary enters the hardened regime.  This is calculated using the prescription from [BBR80]_.  The different
     characteristic radii, needed for the attenuation calculation, currently use a fixed Dehnen stellar-density profile
     as in [Chen17]_, and a fixed scaling relationship to find the characteristic stellar-radius.
 
@@ -915,7 +916,7 @@ class Dynamical_Friction_NFW(_Hardening):
         return dadt, dedt
 
     def _attenuation_bbr80(self, sepa, m1m2, mstar):
-        """Calculate attentuation factor following [BBR1980]_ prescription.
+        """Calculate attentuation factor following [BBR80]_ prescription.
 
         Characteristic radii are currently calculated using hard-coded Dehnen stellar-density profiles, and a fixed
         scaling-relationship between stellar-mass and stellar characteristic radius.
@@ -1495,7 +1496,7 @@ def _density_at_influence_radius_dehnen(mbh, mstar, gamma=1.0):
 
 def _radius_hard_bbr80_dehnen(mbh, mstar, gamma=1.0):
     """
-    [Kelley17]_ paragraph below Eq.8 - from [BBR80]
+    [Kelley17]_ paragraph below Eq.8 - from [BBR80]_
     """
     rbnd = _radius_influence_dehnen(mbh, mstar, gamma=gamma)
     rstar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
