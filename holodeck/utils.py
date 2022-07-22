@@ -265,23 +265,6 @@ def eccen_func(norm: float, std: float, size: int) -> np.ndarray:
     return eccen
 
 
-def expand_broadcastable(*args):
-    """Broadcast a set of arguments into the same shape.
-
-    NOTE/BUG: Is this redundant to `numpy.broadcast_arrays()` ??
-
-    """
-    try:
-        vals = np.array(args, dtype=object)    # avoid VisibleDeprecationWarning from ragged array creation
-        shape = np.shape(np.product(vals, axis=0))
-    except ValueError:
-        shapes = [np.shape(aa) for aa in args]
-        raise ValueError("Argument arrays are not broadcastable!  shapes={}".format(shapes))
-
-    vals = [aa * np.ones(shape) for aa in args]
-    return vals
-
-
 def frac_str(vals: npt.ArrayLike, prec: int = 2) -> str:
     """Return a string with the fraction and decimal of non-zero elements of the given array.
 
