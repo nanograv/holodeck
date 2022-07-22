@@ -2,6 +2,10 @@
 Annotated Bibliography
 ======================
 
+* **Begelman, Blandford & Rees 1980**, [BBR1980]_ - `Massive black hole binaries in active galactic nuclei <https://ui.adsabs.harvard.edu/abs/1980Natur.287..307B/abstract>`_
+    * The definitive early discussion of massive black-hole binary evolution, outlining the different stages of environmental interaction (dynamical friction, stellar scattering, etc) and mentioning the possibility of stalling in the parsec regime.
+    * Includes simplistic, but useful prescriptions for calculating timescales for each regime of evolution.
+
 * **Hogg 1999**, [Hogg1999]_ - `Distance measures in cosmology <https://ui.adsabs.harvard.edu/abs/1999astro.ph..5116H>`_.
   * This is the go-to reference/cheat-sheet for basic cosmological calculations such as distances (comoving, luminosity), volume of the universe, lookback times, etc.
 
@@ -18,6 +22,10 @@ Annotated Bibliography
 References
 ==========
 These are provided here for easy copy-and-paste usage in other files.
+
+.. [BBR1980] Begelman, Blandford & Rees 1980.  Nature, 287, 5780.
+    Massive black hole binaries in active galactic nuclei.
+    https://ui.adsabs.harvard.edu/abs/1980Natur.287..307B/abstract
 
 .. [Hogg1999] Hogg 1999.  arXiv. (astro-ph/9905116).
     Distance measures in cosmology.
