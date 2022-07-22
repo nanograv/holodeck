@@ -461,7 +461,7 @@ class Semi_Analytic_Model:
             redz = self.redz[np.newaxis, np.newaxis, :]
             args = [mstar_pri[..., np.newaxis], mstar_rat[..., np.newaxis], mstar_tot[..., np.newaxis], redz]
             # Convert to shape (M, Q, Z)
-            mstar_pri, mstar_rat, mstar_tot, redz = utils.expand_broadcastable(*args)
+            mstar_pri, mstar_rat, mstar_tot, redz = np.broadcast_arrays(*args)
 
             zprime = self._gmt.zprime(mstar_tot, mstar_rat, redz)
             # find valid entries (M, Q, Z)
