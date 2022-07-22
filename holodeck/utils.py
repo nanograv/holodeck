@@ -188,6 +188,34 @@ def broadcastable(*args):
     return outs
 
 
+def eccen_func(norm: float, std: float, size: int) -> np.ndarray:
+    """Draw random values between [0.0, 1.0] with a given center and width.
+
+    This function is a bit contrived, but the `norm` defines the center-point of the distribution,
+    and the `std` parameter determines the width of the distribution.  In all cases the resulting
+    values are only between [0.0, 1.0].  This function is typically used to draw initial random
+    eccentricities.
+
+    Parameters
+    ----------
+    norm : float,
+        Specification of the center-point of the distribution.
+    std : float,
+        Specification of the width of the distribution.
+    size : int,
+        Number of samples to draw.
+
+    Returns
+    -------
+    eccen : ndarray,
+        Values between [0.0, 1.0] with shape given by the `size` parameter.
+
+    """
+    eccen = log_normal_base_10(1.0/norm, std, size=size)
+    eccen = 1.0 / (eccen + 1.0)
+    return eccen
+
+
 def expand_broadcastable(*args):
     """Broadcast a set of arguments into the same shape.
 
