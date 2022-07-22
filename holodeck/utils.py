@@ -237,20 +237,6 @@ def _get_subclass_instance(value, default, superclass):
 # =================================================================================================
 
 
-def broadcastable(*args):
-    """Expand N, 1D arrays be able to be broadcasted into N, ND arrays.
-
-    e.g. from arrays of len `3`,`4`,`2`, returns arrays with shapes: `3,1,1`, `1,4,1` and `1,1,2`.
-    """
-    ndim = len(args)
-    assert np.all([1 == np.ndim(aa) for aa in args]), "Each array in `args` must be 1D!"
-
-    cut_ref = [slice(None)] + [np.newaxis for ii in range(ndim-1)]
-    cuts = [np.roll(cut_ref, ii).tolist() for ii in range(ndim)]
-    outs = [aa[tuple(cc)] for aa, cc in zip(args, cuts)]
-    return outs
-
-
 def eccen_func(norm: float, std: float, size: int) -> np.ndarray:
     """Draw random values between [0.0, 1.0] with a given center and width.
 
