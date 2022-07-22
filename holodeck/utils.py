@@ -34,6 +34,12 @@ _GW_LUM_CONST = (32.0 / 5.0) * np.power(NWTG, 7.0/3.0) * np.power(SPLC, -5.0)
 
 class _Modifier(abc.ABC):
     """Base class for all types of post-processing modifiers.
+
+    Notes
+    -----
+    * Must be subclassed for use.
+    * ``__call__(base)`` ==> ``modify(base)``
+
     """
 
     def __call__(self, base):
@@ -52,6 +58,23 @@ class _Modifier(abc.ABC):
 
 def load_hdf5(fname, keys=None):
     """Load data and header information from HDF5 files into dictionaries.
+
+    Parameters
+    ----------
+    fname : str
+        Filename to load (must be an `hdf5` file).
+    keys : None or (list of str)
+        Specific keys to load from the top-level of the HDF5 file.
+        `None`: load all top-level keys.
+
+    Returns
+    -------
+    header : dict,
+        All entries from `hdf5.File.attrs`, typically used for meta-data.
+    data : dict,
+        All top level datasets from the hdf5 file,
+        specifically everything returned from `hdf5.File.keys()`.
+
     """
     squeeze = False
     if (keys is not None) and np.isscalar(keys):
@@ -79,11 +102,17 @@ def load_hdf5(fname, keys=None):
 
 def python_environment():
     """Tries to determine the current python environment, one of: 'jupyter', 'ipython', 'terminal'.
+
+    Returns
+    -------
+    str
+        Description of the current python environment, one of ['jupter', 'ipython', 'terminal'].
+
     """
     try:
-        # NOTE: `get_ipython` should not be explicitly imported from anything
+        # NOTE: `get_ipython` should *not* be explicitly imported from anything
+        #       it will be defined if this is called from a jupyter or ipython environment
         ipy_str = str(type(get_ipython())).lower()  # noqa
-        # print("ipy_str = '{}'".format(ipy_str))
         if 'zmqshell' in ipy_str:
             return 'jupyter'
         if 'terminal' in ipy_str:
@@ -91,9 +120,21 @@ def python_environment():
     except:
         return 'terminal'
 
+    raise RuntimeError(f"unexpected result from `get_ipython()`: '{ipy_str}'!")
+
 
 def tqdm(*args, **kwargs):
     """Construct a progress bar appropriately based on the current environment (script vs. notebook)
+
+    Parameters
+    ----------
+    *args, **kwargs : All arguments are passed directory to the `tqdm` constructor.
+
+    Returns
+    -------
+    `tqdm.tqdm_gui`
+        Decorated iterator that shows a progress bar.
+
     """
     if python_environment().lower().startswith('jupyter'):
         import tqdm.notebook
@@ -152,15 +193,37 @@ def _get_subclass_instance(value, default, superclass):
     Class ==> instance from that class
     instance ==> check that this is an instance of a subclass of `superclass`, error if not
 
+    Parameters
+    ----------
+    value : object,
+        Object to convert into a class instance.
+    default : class,
+        Default class constructor to use if `value` is None.
+    superclass : class,
+        Super/parent class to compare against the class instance from `value` or `default`.
+        If the class instance is not a subclass of `superclass`, a ValueError is raised.
+
+    Returns
+    -------
+    value : object,
+        Class instance that is a subclass of `superclass`.
+
+    Raises
+    ------
+    ValueError : if the class instance is not a subclass of `superclass`.
+
     """
     import inspect
 
+    # Set `value` to `default` if it is `None`
     if value is None:
         value = default
 
+    # If `value` is a class (constructor), then construct an instance from it
     if inspect.isclass(value):
         value = value()
 
+    # Raise an error if `value` is not a subclass of `superclass`
     if not isinstance(value, superclass):
         err = f"argument ({value}) must be an instance or subclass of `{superclass}`!"
         log.error(err)
