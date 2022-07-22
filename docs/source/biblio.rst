@@ -2,7 +2,7 @@
 Annotated Bibliography
 ======================
 
-* **Begelman, Blandford & Rees 1980**, [BBR1980]_ - `Massive black hole binaries in active galactic nuclei <https://ui.adsabs.harvard.edu/abs/1980Natur.287..307B/abstract>`_
+* **Begelman, Blandford & Rees 1980**, [BBR80]_ - `Massive black hole binaries in active galactic nuclei <https://ui.adsabs.harvard.edu/abs/1980Natur.287..307B/abstract>`_
     * The definitive early discussion of massive black-hole binary evolution, outlining the different stages of environmental interaction (dynamical friction, stellar scattering, etc) and mentioning the possibility of stalling in the parsec regime.
     * Includes simplistic, but useful prescriptions for calculating timescales for each regime of evolution.
 
@@ -23,7 +23,7 @@ References
 ==========
 These are provided here for easy copy-and-paste usage in other files.
 
-.. [BBR1980] Begelman, Blandford & Rees 1980.  Nature, 287, 5780.
+.. [BBR80] Begelman, Blandford & Rees 1980.  Nature, 287, 5780.
     Massive black hole binaries in active galactic nuclei.
     https://ui.adsabs.harvard.edu/abs/1980Natur.287..307B/abstract
 
