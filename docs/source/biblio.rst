@@ -57,3 +57,19 @@ These are provided here for easy copy-and-paste usage in other files.
     Efficient computation of the gravitational wave spectrum emitted by eccentric massive
     black hole binaries in stellar environments
     https://ui.adsabs.harvard.edu/abs/2017MNRAS.470.1738C/abstract
+
+.. [Peters1964] Peters 1964.  PR, 136, 4B.
+    Gravitational Radiation and the Motion of Two Point Masses
+    https://ui.adsabs.harvard.edu/abs/1964PhRv..136.1224P/abstract
+
+.. [EN07] Enoki & Nagashima 2007.  PTP, 117, 2.  astro-ph/0609377.
+    The Effect of Orbital Eccentricity on Gravitational Wave Background Radiation from Supermassive Black Hole Binaries
+    https://ui.adsabs.harvard.edu/abs/2007PThPh.117..241E/abstract
+
+.. [Enoki2004] Enoki, Inoue, Nagashima, & Sugiyama 2004.  ApJ, 615, 1.  astro-ph/0404389.
+    Gravitational Waves from Supermassive Black Hole Coalescence in a Hierarchical Galaxy Formation Model
+    https://ui.adsabs.harvard.edu/abs/2004ApJ...615...19E/abstract
+
+.. [Sesana2004] Sesana, Haardt, Madau, & Volonteri 2004.  ApJ, 611, 2.  astro-ph/0401543.
+    Low-Frequency Gravitational Radiation from Coalescing Massive Black Hole Binaries in Hierarchical Cosmologies
+    http://adsabs.harvard.edu/abs/2004ApJ...611..623S
