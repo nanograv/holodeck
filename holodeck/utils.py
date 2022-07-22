@@ -339,12 +339,13 @@ def interp(
     return y1
 
 
-def isnumeric(val) -> bool:
+def isnumeric(val: object) -> bool:
     """Test if the input value can successfully be cast to a float.
 
     Parameters
     ----------
-    val : [type]
+    val : object
+        Value to test.
 
     Returns
     -------
@@ -353,23 +354,25 @@ def isnumeric(val) -> bool:
 
     """
     try:
-        float(str(val))
+        float(str(val))   # ! FIX: Why does this need to cast to `str` first?
     except ValueError:
         return False
 
     return True
 
 
-def isinteger(val) -> bool:
+def isinteger(val: object) -> bool:
     """Test if the input value is an integral (integer) number.
 
     Parameters
     ----------
-    val : [type]
+    val : object
+        Value to test.
 
     Returns
     -------
     bool
+        True if the input value is an integer number.
 
     """
     rv = isnumeric(val) and isinstance(val, numbers.Integral)
@@ -430,6 +433,18 @@ def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
 
 
 def print_stats(stack=True, print_func=print, **kwargs):
+    """Print out basic properties and statistics on the input key-value array_like values.
+
+    Parameters
+    ----------
+    stack : bool,
+        Whether or not to print a backtrace to stdout.
+    print_func : callable,
+        Function to use for returning/printing output.
+    kwargs : dict,
+        Key-value pairs where values are array_like for the shape/stats to be printed.
+
+    """
     if stack:
         import traceback
         traceback.print_stack()
@@ -758,11 +773,27 @@ def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = T
 
 
 def _parse_log_norm_pars(vals, size, default=None):
-    """
-    vals:
-        ()   ==> (N,)
-        (2,) ==> (N,) log_normal(vals)
-        (N,) ==> (N,)
+    """Parse/Sanitize the parameters for a log-normal distribution.
+
+    ()   ==> (N,)
+    (2,) ==> (N,) log_normal(vals)
+    (N,) ==> (N,)
+
+    BUG: this function should probably be deprecated / removed !
+
+    Parameters
+    ----------
+    vals : object,
+        Input, can be a single value, (2,) array_like, of array_like of size `size`.
+        scalar : this value is broadcast to an ndarray of size `size`
+        (2,) array_like : these two arguments are passed to `log_normal_base_10` and `size` samples
+                          are drawn
+        (N,) array_like : if `N` matches `size`, these values are returned.
+
+    Returns
+    -------
+    vals : ndarray
+        Returned values.
 
     """
     if (vals is None):
@@ -825,6 +856,19 @@ def mtmr_from_m1m2(m1, m2=None):
 
     NOTE: it doesn't matter if `m1` or `m2` is the primary or secondary.
 
+    Parameters
+    ----------
+    m1 : array_like,
+        Mass.  If this is a single value, or a 1D array, it denotes the mass of one component of
+        a binary.  It can also be shaped, (N,2) where the two elements are the two component masses.
+    m2 : None or array_like,
+        If array_like, it must match the shape of `m1`, and corresponds to the companion mass.
+
+    Returns
+    -------
+    (2,N) ndarray
+        Total mass and mass-ratio.  If the input values are floats, this is just shaped (2,).
+
     """
     if m2 is not None:
         masses = np.stack([m1, m2], axis=-1)
@@ -839,6 +883,21 @@ def mtmr_from_m1m2(m1, m2=None):
 
 def m1m2_from_mtmr(mt, mr):
     """Convert from total-mass and mass-ratio to individual masses.
+
+    Parameters
+    ----------
+    mt : array_like
+        Total mass of the binary.
+    mr : array_like
+        Mass ratio of the binary.
+
+    Returns
+    -------
+    (2,N) ndarray
+        Primary and secondary masses respectively.
+        0-primary (more massive component),
+        1-secondary (less massive component)
+
     """
     mt = np.asarray(mt)
     mr = np.asarray(mr)
@@ -849,6 +908,19 @@ def m1m2_from_mtmr(mt, mr):
 
 def frst_from_fobs(fobs, redz):
     """Calculate rest-frame frequency from observed frequency and redshift.
+
+    Parameters
+    ----------
+    fobs : array_like
+        Observer-frame frequencies.
+    redz : array_like
+        Redshifts.
+
+    Returns
+    -------
+    fobs : array_like
+        Rest-frame frequencies.
+
     """
     frst = fobs * (1.0 + redz)
     return frst
@@ -856,21 +928,64 @@ def frst_from_fobs(fobs, redz):
 
 def fobs_from_frst(frst, redz):
     """Calculate observed frequency from rest-frame frequency and redshift.
+
+    Parameters
+    ----------
+    frst : array_like
+        Rest-frame frequencies.
+    redz : array_like
+        Redshifts.
+
+    Returns
+    -------
+    fobs : array_like
+        Observer-frame frequencies.
+
     """
     fobs = frst / (1.0 + redz)
     return fobs
 
 
-def kepler_freq_from_sepa(mass, sep):
-    freq = (1.0/(2.0*np.pi))*np.sqrt(NWTG*mass)/np.power(sep, 1.5)
+def kepler_freq_from_sepa(mass, sepa):
+    """Calculate binary orbital frequency using Kepler's law.
+
+    Parameters
+    ----------
+    mass : array_like
+        Binary total mass [grams].
+    sepa : array_like
+        Binary semi-major axis or separation [cm].
+
+    Returns
+    -------
+    freq : array_like
+        Binary orbital frequency [1/s].
+
+    """
+    freq = (1.0/(2.0*np.pi))*np.sqrt(NWTG*mass)/np.power(sepa, 1.5)
     return freq
 
 
 def kepler_sepa_from_freq(mass, freq):
+    """Calculate binary separation using Kepler's law.
+
+    Parameters
+    ----------
+    mass : array_like
+        Binary total mass [grams]
+    freq : array_like
+        Binary orbital frequency [1/s].
+
+    Returns
+    -------
+    sepa : array_like
+        Binary semi-major axis (i.e. separation) [cm].
+
+    """
     mass = np.asarray(mass)
     freq = np.asarray(freq)
-    sep = np.power(NWTG*mass/np.square(2.0*np.pi*freq), 1.0/3.0)
-    return sep
+    sepa = np.power(NWTG*mass/np.square(2.0*np.pi*freq), 1.0/3.0)
+    return sepa
 
 
 def rad_isco(m1, m2, factor=3.0):
