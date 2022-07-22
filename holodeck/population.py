@@ -169,35 +169,88 @@ class Pop_Illustris(_Population_Discrete):
 
 
 class Population_Modifier(utils._Modifier):
+    """Base class for constructing Modifiers that are applied to `_Discrete_Population` instances.
+    """
     pass
 
 
 class PM_Eccentricity(Population_Modifier):
+    """Population Modifier to implement eccentricity in the binary population.
+    """
 
     def __init__(self, eccen_dist=_DEF_ECCEN_DIST):
+        """Initialize eccentricity modifier.
+
+        Parameters
+        ----------
+        eccen_dist : (2,) array_like of float
+            Parametrization of the center and width of the desired eccentricity distribution.
+            Passed as the 0th and 1th arguments to the `holodeck.utils.eccen_func` function.
+
+        """
         self.eccen_dist = eccen_dist
         return
 
     def modify(self, pop):
         eccen_dist = self.eccen_dist
         size = pop.size
-        eccen = eccen_func(*eccen_dist, size)
+        # Draw eccentricities from the `eccen_func` defined to be [0.0, 1.0]
+        eccen = utils.eccen_func(*eccen_dist, size)
         pop.eccen = eccen
         return
 
 
 class PM_Resample(Population_Modifier):
+    """Population Modifier to resample a population instance to a new number of binaries.
+
+    Uses `kalepy` kernel density estimation (KDE) to resample the original population into a new
+    one, changing the total number of binaries by some factor (usually increasing the population).
+
+    Notes
+    -----
+    **Resampled Parameters**: By default, four or five parameters are resampled:
+    1) `mtot`: total mass; 2) `mrat`: mass ratio; 3) `redz`: redshift; and 4) `sepa`: separation;
+    and if the `eccen` attrbute of the population is not `None`, then it is also resampled.
+    Additional parameters can be specified using the `_DEF_ADDITIONAL_KEYS` attribute which is a
+    list of str giving the parameter names, which must then be accessible attributes of the
+    population instance being resampled.
+    **Sample Volume**: `_Discrete_Population` instances refer to some finite (comoving) volume of
+    the Universe, which is given in the population's `_sample_volume` attribute.  When resampling
+    is performed, this volume is also multiplied by the same resampling factor.  For example, if
+    the population is resampled 10x (i.e. ``resample==10.0``), then the `_sample_volume` attribute
+    is also multiplied by 10x.
+
+    """
 
     # Additional variables to be resampled
     # NOTE: mtot, mrat, redz, sepa, eccen (if not None) are all resampled automatically
     _DEF_ADDITIONAL_KEYS = ['vdisp', 'mbulge']
 
     def __init__(self, resample=10.0, plot=False, additional_keys=True):
+        """Initialize `PM_Resample` instance.
+
+        Parameters
+        ----------
+        resample : float,
+            Factor by which to resample the population.  For example, if ``resample==10.0``, the new
+            population will have 10x more elements than the initial population.
+        plot : bool,
+            If `True`, store old properties and some additional parameters for plotting comparisons
+            of the old and new population.
+        additional_keys : bool, or list of strings
+            Whether or not to resample additional attributes of the population.
+            `True`: the parameters in `_DEF_ADDITIONAL_KEYS` are also resampled.
+            `False` or `None`: no additional parameters are resampled.
+            `list[str]`: the provided additional parameters are resampled, which must be attributes
+                of the population instance being resampled.
+
+        """
         self.resample = resample
         self._plot = plot
-        self._old_data = None
-        self._new_data = None
+        self._old_data = None      #: Version of the previous population stored for plotting purposes
+        self._new_data = None      #: Version of the updated population stored for plotting purposes
 
+        # Set which additional attributes will be resampled
         if additional_keys is True:
             additional_keys = self._DEF_ADDITIONAL_KEYS
         elif additional_keys in [False, None]:
@@ -220,6 +273,7 @@ class PM_Resample(Population_Modifier):
             np.log10(pop.redz),    # log redshift
             np.log10(pop.sepa / PC)
         ]
+        # set KDE reflection properties
         reflect = [
             None,
             [None, 0.0],
@@ -254,9 +308,12 @@ class PM_Resample(Population_Modifier):
         old_size = pop.size
         new_size = old_size * resample
 
+        # construct a `kalepy` Kernel Density Estimator instance
         kde = kale.KDE(old_data, reflect=reflect, bw_rescale=0.25)
+        # resample the population data
         new_data = kde.resample(new_size)
 
+        # Convert back to desired quantities
         mt = MSOL * 10**new_data[0]
         mr = 10**new_data[1]
         pop.mass = utils.m1m2_from_mtmr(mt, mr).T
@@ -289,6 +346,16 @@ class PM_Resample(Population_Modifier):
         return
 
     def plot(self):
+        """Plot a comparison of the old and new data, before and after resampling.
+
+        A `kalepy.Corner` plot is generated.
+
+        Returns
+        -------
+        `mpl.figure.Figure` instance,
+            The figure object containing the plot.
+
+        """
         import kalepy as kale
         dold = self._old_data
         dnew = self._new_data
@@ -308,7 +375,7 @@ class PM_Mass_Reset(Population_Modifier):
     """
 
     def __init__(self, mhost, scatter=True):
-        """
+        """Initialize the modifier.
 
         Parameters
         ----------
@@ -319,19 +386,12 @@ class PM_Mass_Reset(Population_Modifier):
             The amount of scatter is specified in the `mhost.SCATTER_DEX` parameter.
 
         """
-        # if `mhost` is a class (not an instance), then instantiate it
-        if inspect.isclass(mhost):
-            mhost = mhost()
-
-        if not isinstance(mhost, holo.relations._MHost_Relation):
-            err = (
-                f"`mhost` ({mhost.__class__}) must be an instance"
-                f" or subclass of `holodeck.relations._MHost_Relation`!"
-            )
-            utils.error(err)
-
-        self.mhost = mhost
-        self._scatter = scatter
+        # if `mhost` is a class (not an instance), then instantiate it; make sure its a subclass
+        # of `_MHost_Relation`
+        mhost = utils._get_subclass_instance(mhost, None, holo.relations._MHost_Relation)
+        # store attributes
+        self.mhost = mhost         #: Scaling relationship between host and MBH (`holo.relations._MHost_relation`)
+        self._scatter = scatter    #: Bool determining whether resampled masses should include statistical scatter
         return
 
     def modify(self, pop):
@@ -357,9 +417,3 @@ class PM_Mass_Reset(Population_Modifier):
 
         pop.mass = self.mhost.mbh_from_host(pop, scatter)
         return
-
-
-def eccen_func(norm, std, size):
-    eccen = utils.log_normal_base_10(1.0/norm, std, size=size)
-    eccen = 1.0 / (eccen + 1.0)
-    return eccen

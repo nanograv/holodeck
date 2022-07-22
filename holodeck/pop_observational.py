@@ -2,7 +2,7 @@
 
 To-Do
 -----
-* [ ] Use only `cosmo` (instead of other astropy.cosmology utils e.g. `Planck15`)
+* Use only `cosmo` (instead of other astropy.cosmology utils e.g. `Planck15`)
 
 """
 # This code is reproduced and modified from the original repository
