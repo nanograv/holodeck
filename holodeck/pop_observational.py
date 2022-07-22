@@ -430,7 +430,7 @@ def Mk2mStar(mag):
 
 
 def Mbh2Mbulge(Mbulge):
-    """M_BH-M_bulge.
+    """M_BH - M_bulge relationship.
 
     Bulge mass to black hole mass (note that M_bulge = Mstar; assume these are the same)
     McConnell and Ma (2013) relation below Figure 3
