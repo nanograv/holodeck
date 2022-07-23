@@ -990,12 +990,42 @@ def kepler_sepa_from_freq(mass, freq):
 
 def rad_isco(m1, m2, factor=3.0):
     """Inner-most Stable Circular Orbit, radius at which binaries 'merge'.
+
+    ENH: allow single (total) mass argument.
+    ENH: add function to calculate factor as a function of BH spin.
+
+    Parameters
+    ----------
+    m1 : array_like,
+        Mass of first (either) component of binary [grams].
+    m2 : array_like,
+        Mass of second (other) component of binary [grams].
+    factor : float,
+        Factor by which to multiple the Schwarzschild radius to define the ISCO.
+        3.0 for a non-spinning black-hole.
+
+    Returns
+    -------
+    rs : array_like,
+        Radius of the inner-most stable circular orbit [cm].
+
     """
     return factor * schwarzschild_radius(m1+m2)
 
 
 def schwarzschild_radius(mass):
     """Return the Schwarschild radius [cm] for the given mass [grams].
+
+    Parameters
+    ----------
+    m1 : array_like
+        Mass [grams]
+
+    Returns
+    -------
+    rs : array_like,
+        Schwzrschild radius for this mass.
+
     """
     rs = SCHW * mass
     return rs
@@ -1007,7 +1037,23 @@ def schwarzschild_radius(mass):
 
 
 def chirp_mass(m1, m2=None):
-    """Calculate the chirp-mass.
+    """Calculate the chirp-mass of a binary.
+
+    Parameters
+    ----------
+    m1 : array_like,
+        Mass [grams]
+        This can either be the mass of the primary component, if scalar or 1D array_like,
+        or the mass of both components, if 2D array_like, shaped (N, 2).
+    m2 : None or array_like,
+        Mass [grams] of the other component of the binary.  If given, the shape must be
+        broadcastable against `m1`.
+
+    Returns
+    -------
+    mc : array_like,
+        Chirp mass [grams] of the binary.
+
     """
     # (N, 2)  ==>  (N,), (N,)
     if m2 is None:
@@ -1017,15 +1063,28 @@ def chirp_mass(m1, m2=None):
 
 
 def gw_char_strain(hs, dur_obs, freq_orb_obs, freq_orb_rst, dfdt):
-    """
+    """GW Characteristic Strain.
+
     See, e.g., Sesana+2004, Eq.35
+    NOTE: make sure this is the correct definition of "characteristic" strain for your application!
 
     Parameters
     ----------
-    hs : array_like scalar
-        Strain amplitude (e.g. `gw_strain()`, sky- and polarization- averaged)
-    dur_obs : array_like scalar
-        Duration of observations, in the observer frame
+    hs : array_like,
+        Strain amplitude (e.g. `gw_strain()`, sky- and polarization- averaged) of the source.
+    dur_obs : array_like,
+        Duration of observations, in the observer frame.
+    freq_orb_obs : array_like,
+        Observer-frame orbital frequency.
+    freq_orb_rst : array_like,
+        Rest-frame orbital frequency.
+    dfdt : array_like,
+        Rate of frequency evolution of the binary, in the rest-frame.
+
+    Returns
+    -------
+    hc : array_like,
+        Characteristic strain of the binary.
 
     """
 
@@ -1036,12 +1095,30 @@ def gw_char_strain(hs, dur_obs, freq_orb_obs, freq_orb_rst, dfdt):
 
 
 def gw_dedt(m1, m2, sepa, eccen):
-    """GW Eccentricity Evolution rate (de/dt).
+    """GW Eccentricity Evolution rate (de/dt) due to GW emission.
 
-    returned value is negative.
+    NOTE: returned value is negative.
 
     See Peters 1964, Eq. 5.8
     http://adsabs.harvard.edu/abs/1964PhRv..136.1224P
+
+    Parameters
+    ----------
+    m1 : array_like,
+        Mass of one component of the binary [grams].
+    m2 : array_like,
+        Mass of other component of the binary [grams].
+    sepa : array_like,
+        Binary semi-major axis (i.e. separation) [cm].
+    eccen : array_like,
+        Binary orbital eccentricity.
+
+    Returns
+    -------
+    dedt : array_like
+        Rate of eccentricity change of the binary.
+        NOTE: returned value is negative or zero.
+
     """
     cc = _GW_DEDT_ECC_CONST
     e2 = eccen**2
@@ -1051,12 +1128,28 @@ def gw_dedt(m1, m2, sepa, eccen):
 
 
 def gw_dade(m1, m2, sepa, eccen):
-    """GW Eccentricity Evolution rate (de/dt).
+    """Rate of semi-major axis evolution versus eccentricity, due to GW emission (da/de).
 
-    returned value is positive (e and a go in same direction).
+    NOTE: returned value is positive (e and a go in same direction).
+    See [Peters1964]_, Eq. 5.7
 
-    See Peters 1964, Eq. 5.7
-    http://adsabs.harvard.edu/abs/1964PhRv..136.1224P
+    Parameters
+    ----------
+    m1 : array_like
+        Mass of one component of the binary [grams].
+    m2 : array_like
+        Mass of other component of the binary [grams].
+    sepa : array_like
+        Binary semi-major axis (separation) [grams].
+    eccen : array_like
+        Binary eccentricity [grams].
+
+    Returns
+    -------
+    dade : array_like
+        Rate of change of semi-major axis versus eccentricity [cm].
+        NOTE: returned value is positive.
+
     """
     e2 = eccen**2
     num = (1 + (73.0/24.0)*e2 + (37.0/96.0)*e2*e2)
@@ -1066,13 +1159,25 @@ def gw_dade(m1, m2, sepa, eccen):
 
 
 def gw_freq_dist_func(nn, ee=0.0):
-    """Frequency Distribution Function.
+    """GW frequency distribution function.
 
-    See [Enoki & Nagashima 2007](astro-ph/0609377) Eq. 2.4.
-    This function gives g(n,e)
+    See [EN07]_ Eq. 2.4; this function gives g(n,e).
 
-    FIX: use recursion relation when possible,
-        J_{n-1}(x) + J_{n+1}(x) = (2n/x) J_n(x)
+    BUG: use recursion relation when possible,
+         J_{n-1}(x) + J_{n+1}(x) = (2n/x) J_n(x)
+
+    Parameters
+    ----------
+    nn : int,
+        Number of frequency harmonic to calculate.
+    ee : array_like,
+        Binary eccentricity.
+
+    Returns
+    -------
+    gg : array_like,
+        GW Frequency distribution function g(n,e).
+
     """
     import scipy as sp
     import scipy.special  # noqa
@@ -1099,10 +1204,26 @@ def gw_freq_dist_func(nn, ee=0.0):
 def gw_hardening_rate_dadt(m1, m2, sepa, eccen=None):
     """GW Hardening rate in separation (da/dt).
 
-    returned value is negative.
+    NOTE: returned value is negative.
 
-    See Peters 1964, Eq. 5.6
-    http://adsabs.harvard.edu/abs/1964PhRv..136.1224P
+    See [Peters1964]_, Eq. 5.6
+
+    Parameters
+    ----------
+    m1 : array_like,
+        Mass of one component of the binary [grams].
+    m2 : array_like,
+        Mass of other component of the binary [grams].
+    sepa : array_like,
+        Binary semi-major axis (i.e. separation) [cm].
+    eccen : None or array_like,
+        Binary orbital eccentricity.  Treated as zero if `None`.
+
+    Returns
+    -------
+    dadt : array_like,
+        Binary hardening rate [cm/s] due to GW emission.
+
     """
     cc = _GW_DADT_SEP_CONST
     dadt = cc * m1 * m2 * (m1 + m2) / np.power(sepa, 3)
@@ -1118,18 +1239,18 @@ def gw_hardening_rate_dfdt(m1, m2, freq_orb, eccen=None):
     Parameters
     ----------
     m1 : array_like
-        Mass of one component of each binary.
+        Mass of one component of each binary [grams].
     m2 : array_like
-        Mass of other component of each binary.
+        Mass of other component of each binary [grams].
     freq_orb : array_like
-        Rest frame orbital frequency of each binary.
+        Rest frame orbital frequency of each binary [1/s].
     eccen : array_like, optional
         Eccentricity of each binary.
 
     Returns
     -------
     dfdt : array_like,
-        Hardening rate in terms of frequency for each binary.
+        Hardening rate in terms of frequency for each binary [1/s^2].
 
     """
     sepa = kepler_sepa_from_freq(m1+m2, freq_orb)
@@ -1142,19 +1263,19 @@ def gw_hardening_rate_dfdt(m1, m2, freq_orb, eccen=None):
 def gw_hardening_timescale_freq(mchirp, frst):
     """GW Hardening timescale in terms of frequency (not separation).
 
-    ``tau = f_r / (df_r / dt)``, e.g. [EN07] Eq.2.9
+    ``tau = f_r / (df_r / dt)``, e.g. [EN07]_ Eq.2.9
 
     Parameters
     ----------
-    mchirp : scalar  or  array_like of scalar
+    mchirp : array_like,
         Chirp mass in [grams]
-    frst : scalar  or  array_like of scalar
-        Rest-frame orbital frequency
+    frst : array_like,
+        Rest-frame orbital frequency [1/s].
 
     Returns
     -------
-    tau : float  or  array_like of float
-        GW hardening timescale defined w.r.t. orbital frequency.
+    tau : array_like,
+        GW hardening timescale defined w.r.t. orbital frequency [sec].
 
     """
     tau = (5.0 / 96.0) * np.power(NWTG*mchirp/SPLC**3, -5.0/3.0) * np.power(2*np.pi*frst, -8.0/3.0)
@@ -1164,7 +1285,20 @@ def gw_hardening_timescale_freq(mchirp, frst):
 def gw_lum_circ(mchirp, freq_orb_rest):
     """Calculate the GW luminosity of a circular binary.
 
-    EN07: Eq. 2.2
+    [EN07]_ Eq. 2.2
+
+    Parameters
+    ----------
+    mchirp : array_like,
+        Binary chirp mass [grams].
+    freq_orb_rest : array_like,
+        Rest-frame binary orbital frequency [1/s].
+
+    Returns
+    -------
+    lgw_circ : array_like,
+        GW Luminosity [erg/s].
+
     """
     lgw_circ = _GW_LUM_CONST * np.power(2.0*np.pi*freq_orb_rest*mchirp, 10.0/3.0)
     return lgw_circ
@@ -1173,10 +1307,23 @@ def gw_lum_circ(mchirp, freq_orb_rest):
 def gw_strain_source(mchirp, dcom, freq_orb_rest):
     """GW Strain from a single source in a circular orbit.
 
-    e.g. Sesana+2004 Eq.36
-    e.g. Enoki+2004 Eq.5
+    See: [Sesana2004]_ Eq.36 or [Enoki2004]_ Eq.5.
+
+    Parameters
+    ----------
+    mchirp : array_like,
+        Binary chirp mass [grams].
+    dcom : array_like,
+        Comoving distance to source [cm].
+    freq_orb_rest : array_like,
+        Rest-frame binary orbital frequency [1/s].
+
+    Returns
+    -------
+    hs : array_like,
+        GW Strain (*not* characteristic strain).
+
     """
-    #
     hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_orb_rest, 2/3) / dcom
     return hs
 
@@ -1184,29 +1331,69 @@ def gw_strain_source(mchirp, dcom, freq_orb_rest):
 def sep_to_merge_in_time(m1, m2, time):
     """The initial separation required to merge within the given time.
 
-    See: [Peters 1964].
+    See: [Peters1964]_
+
+    Parameters
+    ----------
+    m1 : array_like,
+        Mass of one component of the binary [grams].
+    m2 : array_like,
+        Mass of other component of the binary [grams].
+    time : array_like,
+        The duration of time of interest [sec].
+
+    Returns
+    -------
+    array_like
+        Initial binary separation [cm].
+
     """
     GW_CONST = 64*np.power(NWTG, 3.0)/(5.0*np.power(SPLC, 5.0))
     a1 = rad_isco(m1, m2)
     return np.power(GW_CONST*m1*m2*(m1+m2)*time - np.power(a1, 4.0), 1./4.)
 
 
-def time_to_merge_at_sep(m1, m2, sep):
+def time_to_merge_at_sep(m1, m2, sepa):
     """The time required to merge starting from the given initial separation.
 
-    See: [Peters 1964].
+    See: [Peters1964]_.
+
+    Parameters
+    ----------
+    m1 : array_like,
+        Mass of one component of the binary [grams].
+    m2 : array_like,
+        Mass of other component of the binary [grams].
+    sepa : array_like,
+        Binary semi-major axis (i.e. separation) [cm].
+
+    Returns
+    -------
+    array_like
+        Duration of time for binary to coalesce [sec].
+
     """
     GW_CONST = 64*np.power(NWTG, 3.0)/(5.0*np.power(SPLC, 5.0))
     a1 = rad_isco(m1, m2)
-    delta_sep = np.power(sep, 4.0) - np.power(a1, 4.0)
+    delta_sep = np.power(sepa, 4.0) - np.power(a1, 4.0)
     return delta_sep/(GW_CONST*m1*m2*(m1+m2))
 
 
 def _gw_ecc_func(eccen):
     """GW Hardening rate eccentricitiy dependence F(e).
 
-    See Peters 1964, Eq. 5.6
-    EN07: Eq. 2.3
+    See [Peters1964]_ Eq. 5.6, or [EN07]_ Eq. 2.3
+
+    Parameters
+    ----------
+    eccen : array_like,
+        Binary orbital eccentricity [].
+
+    Returns
+    -------
+    fe : array_like
+        Eccentricity-dependence term of GW emission [].
+
     """
     e2 = eccen*eccen
     num = 1 + (73/24)*e2 + (37/96)*e2*e2
