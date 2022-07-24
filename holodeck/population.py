@@ -21,6 +21,21 @@ class _Population_Discrete(abc.ABC):
     """
 
     def __init__(self, *args, mods=None, check=True, **kwargs):
+        """Initialize discrete population.
+
+        Typically the initializer will be overridden, calling `super().__init__()`.
+        Runs the `self._init()` method, and the `self.modify()` method.
+
+        Arguments
+        ---------
+        args : additional arguments
+        mods : None or (list of `utils._Modifiers`),
+            Population modifiers to apply to this population.
+        check : bool,
+            Perform diagnostic checks.
+        kwargs : dict, additional keyword-arguments
+
+        """
         self._check_flag = check
         # Initialize the population
         self._init()
@@ -29,35 +44,74 @@ class _Population_Discrete(abc.ABC):
         return
 
     def _init(self):
+        """Initialize basic binary parameters.
+
+        This function should typically be overridden in subclasses.
+
+        """
         # Initial binary values (i.e. at time of formation)
-        self.mass = None    # blackhole masses    (N, 2)
-        self.sepa = None    # binary separation a (N,)
-        self.scafa = None    # scale factor        (N,)
+        self.mass = None    #: blackhole masses    (N, 2)
+        self.sepa = None    #: binary separation `a` (N,)
+        self.scafa = None   #: scale factor of the universe (N,)
 
-        self.eccen = None   # eccentricities      (N,) [optional]
-        self.weight = None  # weight of each binary as a sample  (N,) [optional]
+        self.eccen = None   #: binary eccentricities      (N,) [optional]
+        self.weight = None  #: weight of each binary as a sample point  (N,) [optional]
 
-        self._size = None
-        self._sample_volume = None
+        self._size = None   #: number of binaries
+        self._sample_volume = None    #: comoving volume containing the binary population [cm^3]
         return
 
     @abc.abstractmethod
     def _update_derived(self):
+        """Set or reset any derived quantities.
+        """
         pass
 
     @property
     def size(self):
+        """Number of binaries in descrete population.
+
+        Returns
+        -------
+        int
+            Number of binaries.
+
+        """
         return self._size
 
     @property
     def mtmr(self):
+        """Total mass and mass-ratio of each binary.
+
+        Returns
+        -------
+        ndarray (2, N)
+            The total-mass (0) and mass-ratio (1) of each binary.
+
+        """
         return utils.mtmr_from_m1m2(self.mass)
 
     @property
     def redz(self):
+        """Redshift at formation of each binary.
+
+        Returns
+        -------
+        ndarray (N,)
+            Redshift.
+
+        """
         return cosmo.a_to_z(self.scafa)
 
     def modify(self, mods=None):
+        """Apply any population modifiers to this population.
+
+        Parameters
+        ----------
+        mods : None or (list of `Population_Modifer`)
+            Population modifiers to apply to this population.
+
+        """
         # Sanitize
         if mods is None:
             mods = []
@@ -81,9 +135,13 @@ class _Population_Discrete(abc.ABC):
         return
 
     def _finalize(self):
+        """Method called after all population modifers have been applied, in the `modify()` method.
+        """
         pass
 
     def _check(self):
+        """Perform diagnostic/sanity checks on the binary population.
+        """
         ErrorType = ValueError
         msg = "{}._check() Failed!  ".format(self.__class__.__name__)
         array_names = ['scafa', 'sepa', 'mass', 'eccen']
@@ -133,38 +191,72 @@ class _Population_Discrete(abc.ABC):
 
 
 class Pop_Illustris(_Population_Discrete):
+    """Discrete population derived from the Illustris cosmological hydrodynamic simulations.
+
+    Takes as input a data file that includes BH and subhalo data for BH and/or galaxy mergers.
+
+    NOTES
+    -----
+    * Parameters required in input hdf5 file:
+        * `box_volume_mpc`:
+        * `part_names`:
+        * `time`:
+        * `SubhaloHalfmassRadType`:
+        * `SubhaloMassInRadType`:
+        * `SubhaloVelDisp`:
+        * `SubhaloBHMass`:
+
+    """
 
     def __init__(self, fname=None, **kwargs):
+        """Initialize a binary population using data in the given filename.
+
+        Parameters
+        ----------
+        fname : None or str,
+            Filename for input data.
+            * `None`: default value `_DEF_ILLUSTRIS_FNAME` is used.
+        kwargs : dict,
+            Additional keyword-arguments passed to `super().__init__`.
+
+        """
         if fname is None:
             fname = _DEF_ILLUSTRIS_FNAME
             fname = os.path.join(_PATH_DATA, fname)
 
-        self._fname = fname
+        self._fname = fname             #: Filename for binary data
         super().__init__(**kwargs)
         return
 
     def _init(self):
+        """Set the population parameters using an input simulation file.
+        """
         super()._init()
         fname = self._fname
         header, data = utils.load_hdf5(fname)
-        self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3
+        self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3   #: comoving-volume of sim [cm^3]
 
         # Select the stellar radius
         part_names = header['part_names'].tolist()
-        gal_rads = data['SubhaloHalfmassRadType']
         st_idx = part_names.index('star')
+        gal_rads = data['SubhaloHalfmassRadType']
         gal_rads = gal_rads[:, st_idx, :]
         # Set initial separation to sum of stellar half-mass radii
-        self.sepa = np.sum(gal_rads, axis=-1)
-
-        self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :]
-        self.vdisp = data['SubhaloVelDisp']
-        self.mass = data['SubhaloBHMass']
-        self.scafa = data['time']
+        self.sepa = np.sum(gal_rads, axis=-1)       #: Initial binary separation [cm]
+        # Get the stellar mass, and take that as bulge mass
+        self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :]   #: Stellar mass / stellar-bulge mass [grams]
+        self.vdisp = data['SubhaloVelDisp']    #: Velocity dispersion of galaxy [?cm/s?]
+        self.mass = data['SubhaloBHMass']      #: BH Mass in subhalo [grams]
+        self.scafa = data['time']              #: scale-factor at time of 'merger' event in sim []
         return
 
     def _update_derived(self):
-        self._size = self.sepa.size
+        """Reset any derived quantities.
+
+        This is called after modifiers are applied, which may change class attributes.
+
+        """
+        self._size = self.sepa.size            #: Number of binaries
         return
 
 
@@ -188,10 +280,20 @@ class PM_Eccentricity(Population_Modifier):
             Passed as the 0th and 1th arguments to the `holodeck.utils.eccen_func` function.
 
         """
-        self.eccen_dist = eccen_dist
+        self.eccen_dist = eccen_dist        #: Two parameter specification for eccentricity distribution
         return
 
     def modify(self, pop):
+        """Add eccentricity to the given population.
+
+        Passes the `self.eccen_dist` attribute to the `holodeck.utils.eccen_func` function.
+
+        Parameters
+        ----------
+        pop : instance of `_Population_Discrete` or subclass,
+            Binary population to be modified.
+
+        """
         eccen_dist = self.eccen_dist
         size = pop.size
         # Draw eccentricities from the `eccen_func` defined to be [0.0, 1.0]
@@ -255,10 +357,18 @@ class PM_Resample(Population_Modifier):
             additional_keys = self._DEF_ADDITIONAL_KEYS
         elif additional_keys in [False, None]:
             additional_keys = []
-        self._additional_keys = additional_keys
+        self._additional_keys = additional_keys   #: Additional parameter names to be resampled
         return
 
     def modify(self, pop):
+        """Resample the binaries from the given population to achieve a new number of binaries.
+
+        Parameters
+        ----------
+        pop : instance of `_Population_Discrete` or subclass,
+            Binary population to be modified.
+
+        """
         import kalepy as kale
 
         # ---- Package data for resampling
@@ -395,25 +505,17 @@ class PM_Mass_Reset(Population_Modifier):
         return
 
     def modify(self, pop):
-        # relation = self.relation
-        # host = {}
-        # for requirement in self.mhost.requirements():
-        #     vals = getattr(pop, requirement, None)
-        #     if vals is None:
-        #         err = (
-        #             f"population modifier requires '{requirement}', "
-        #             f"but value is not set in population instance (class: {pop.__class__})!"
-        #         )
-        #         utils.error(err)
-        #     if requirement == 'redz':
-        #         vals = vals[:, np.newaxis] # need to duplicate values for proper broadcasting in calculation
-        #     host[requirement] = vals
+        """Reset the BH masses of the given population.
 
+        Parameters
+        ----------
+        pop : instance of `_Population_Discrete` or subclass,
+            Binary population to be modified.
+
+        """
         scatter = self._scatter
         # Store old version
         pop._mass = pop.mass
         # if `scatter` is `True`, then it is set to the value in `mhost.SCATTER_DEX`
-        # pop.mass = self.mhost.mbh_from_host(host, scatter)
-
         pop.mass = self.mhost.mbh_from_host(pop, scatter)
         return
