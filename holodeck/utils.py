@@ -215,8 +215,8 @@ def _get_subclass_instance(value, default, superclass):
     """
     import inspect
 
-    # Set `value` to `default` if it is `None`
-    if value is None:
+    # Set `value` to a default, if needed and it is given
+    if (value is None) and (default is not None):
         value = default
 
     # If `value` is a class (constructor), then construct an instance from it
