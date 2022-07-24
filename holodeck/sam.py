@@ -21,7 +21,6 @@ To-Do
 """
 
 import abc
-import inspect
 
 import numba
 import numpy as np
@@ -321,7 +320,6 @@ class Semi_Analytic_Model:
 
     def __init__(
         self, mtot=[2.75e5*MSOL, 1.0e11*MSOL, 46], mrat=[0.02, 1.0, 50], redz=[0.01, 6.0, 61],
-        # self, mtot=[2.75e5*MSOL, 1.0e11*MSOL, 11], mrat=[0.02, 1.0, 10], redz=[0.0, 6.0, 9],
         shape=None,
         gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM13
     ):
@@ -340,25 +338,11 @@ class Semi_Analytic_Model:
 
         """
 
-        if inspect.isclass(gsmf):
-            gsmf = gsmf()
-        elif not isinstance(gsmf, _Galaxy_Stellar_Mass_Function):
-            raise ValueError("`gsmf` must be an instance or subclass of `_Galaxy_Stellar_Mass_Function`!")
-
-        if inspect.isclass(gpf):
-            gpf = gpf()
-        elif not isinstance(gpf, _Galaxy_Pair_Fraction):
-            raise ValueError("`gpf` must be an instance or subclass of `_Galaxy_Pair_Fraction`!")
-
-        if inspect.isclass(gmt):
-            gmt = gmt()
-        elif not isinstance(gmt, _Galaxy_Merger_Time):
-            raise ValueError("`gmt` must be an instance or subclass of `_Galaxy_Merger_Time`!")
-
-        if inspect.isclass(mmbulge):
-            mmbulge = mmbulge()
-        elif not isinstance(mmbulge, relations._MMBulge_Relation):
-            raise ValueError("`mmbulge` must be an instance or subclass of `_MMBulge_Relation`!")
+        # Sanitize input classes/instances
+        utils._get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
+        utils._get_subclass_instance(gpf, None, _Galaxy_Pair_Fraction)
+        utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
+        utils._get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
 
         # NOTE: Create a copy of input args to make sure they aren't overwritten (in-place)
         mtot = [mt for mt in mtot]
@@ -396,27 +380,33 @@ class Semi_Analytic_Model:
         else:
             self.redz = np.linspace(*redz)
 
-        self._gsmf = gsmf
-        self._gpf = gpf
-        self._gmt = gmt
-        self._mmbulge = mmbulge
+        self._gsmf = gsmf             #: Galaxy Stellar-Mass Function (`_Galaxy_Stellar_Mass_Function` instance)
+        self._gpf = gpf               #: Galaxy Pair Fraction (`_Galaxy_Pair_Fraction` instance)
+        self._gmt = gmt               #: Galaxy Merger Time (`_Galaxy_Merger_Time` instance)
+        self._mmbulge = mmbulge       #: Mbh-Mbulge relation (`relations._MMBulge_Relation` instance)
 
-        self._density = None
-        self._grid = None
+        self._density = None          #: Binary comoving number-density
+        self._grid = None             #: Domain of population: total-mass, mass-ratio, and redshift
         return
 
     @property
     def edges(self):
+        """The grid edges defining the domain (list of: [`mtot`, `mrat`, `redz`])
+        """
         return [self.mtot, self.mrat, self.redz]
 
     @property
     def grid(self):
+        """Grid of parameter space over which binary population is defined, ndarray (3, M, Q, Z).
+        """
         if self._grid is None:
             self._grid = np.meshgrid(*self.edges, indexing='ij')
         return self._grid
 
     @property
     def shape(self):
+        """Shape of the parameter space domain (number of edges in each dimension), (3,) tuple
+        """
         shape = [len(ee) for ee in self.edges]
         return tuple(shape)
 
@@ -426,7 +416,7 @@ class Semi_Analytic_Model:
         Returns
         -------
         masses : (N, 2) ndarray of scalar,
-            Galaxy total stellar masses for all MBH.  [:, 0] is primary, [:, 1] is secondary.
+            Galaxy total stellar masses for all MBH. [:, 0] is primary, [:, 1] is secondary [grams].
 
         """
         # total-mass, mass-ratio ==> (M1, M2)
@@ -809,12 +799,31 @@ def sample_sam_with_hardening(
 
 
 def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
-    """
+    """Sample the given binary population between the target frequencies, and calculate GW signals.
+
+    NOTE: the input `fobs` are interpretted as bin edges, and GW signals are calculate within the
+    corresponding bins.
 
     Parameters
     ----------
-    fobs : (F,) array_like of scalar,
-        Target frequencies of interest in units of [1/yr]
+    sam : `Semi_Analytic_Model` instance,
+        Binary population to sample.
+    fobs : (F+1,) array_like,
+        Target frequencies of interest in units of [?1/yr?]
+    hard : `evolution._Hardening` instance,
+        Binary hardening model used to calculate binary residence time at each frequency.
+    kwargs : dict,
+        Additional keyword-arguments passed to `sample_sam_with_hardening()`
+
+    Returns
+    -------
+    gff : (F,) ndarry,
+        Frequencies of the loudest binary in each bin [?? 1/s ??].
+    gwf : (F,) ndarry,
+        GW Foreground: the characteristic strain of the loudest binary in each frequency bin.
+    gwb : (F,) ndarry,
+        GW Background: the characteristic strain of the GWB in each frequency bin.
+        Does not include the strain from the loudest binary in each bin (`gwf`).
 
     """
     vals, weights, edges, dens, mass = sample_sam_with_hardening(sam, hard, fobs=fobs, **kwargs)
@@ -822,19 +831,27 @@ def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
     return gff, gwf, gwb
 
 
-def _strains_from_samples(vals, redz=True):
-    """
+def _strains_from_samples(vals):
+    """From a sampled binary population, calculate the GW strains.
 
     NOTE: this assumes that vales[3] is the observer-frame GW frequency.
 
     Parameters
     ----------
-    vals : _type_
-    redz : bool, optional
+    vals : (4,) array_like of array_like,
+        Each element of `vals` is an array of binary parameters, the elements must be:
+        * 0) total binary mass [grams]
+        * 1) binary mass-ratio [],
+        * 2) redshift at this frequency [],
+        * 3) observer-frame binary GW frequency [1/sec].
 
     Returns
     -------
-    _type_
+    hs : (N,) ndarray,
+        Source strains (i.e. not characteristic strains) of each binary.
+    fo : (N,) ndarray,
+        Observer-frame frequencies of each sampled binary.
+
     """
 
     mc = utils.chirp_mass(*utils.m1m2_from_mtmr(vals[0], vals[1]))
@@ -850,7 +867,7 @@ def _strains_from_samples(vals, redz=True):
 
 
 def _gws_from_samples(vals, weights, fobs):
-    """
+    """Calculate GW signals at the given frequencies, from weighted samples of a binary population.
 
     Parameters
     ----------
@@ -863,6 +880,16 @@ def _gws_from_samples(vals, weights, fobs):
     weights : (N,) array of scalar,
     fobs : (F,) array of scalar,
         Target observer-frame frequencies to calculate GWs at.  Units of [1/sec].
+
+    Returns
+    -------
+    gff : (F,) ndarry,
+        Frequencies of the loudest binary in each bin [?? 1/s ??].
+    gwf : (F,) ndarry,
+        GW Foreground: the characteristic strain of the loudest binary in each frequency bin.
+    gwb : (F,) ndarry,
+        GW Background: the characteristic strain of the GWB in each frequency bin.
+        Does not include the strain from the loudest binary in each bin (`gwf`).
 
     """
     hs, fo = _strains_from_samples(vals)
@@ -952,7 +979,7 @@ def gws_from_sampled_strains(fobs, fo, hs, weights):
     return gwf_freqs, gwfore, gwback
 
 
-def _gws_from_number_grid_centroids(edges, dnum, number, realize, integrate=True):
+def _gws_from_number_grid_centroids(edges, dnum, number, realize):
     """Calculate GWs based on a grid of number-of-binaries.
 
     NOTE: `_gws_from_number_grid_integrated()` should be more accurate, but this method better
@@ -967,10 +994,22 @@ def _gws_from_number_grid_centroids(edges, dnum, number, realize, integrate=True
 
     Parameters
     ----------
-    fobs : _type_
-    edges : _type_
-    dnum : _type_
-    number : _type_
+    edges : (4,) array_like of array_like,
+        The edges of each dimension of the parameter spaceeee.
+    dnum : (M, Q, Z, F) ndarray,
+        Differential comoving number-density of binaries in each bin.
+    number : (M, Q, Z, F) ndarray,
+        Volumetric comoving number-density of binaries in each bin.
+    realize : bool or int,
+        Whether or not to calculate one or multiple realizations of the population.
+        BUG: explain more.
+
+    Returns
+    -------
+    hc : (M',Q',Z',F) ndarray,
+        Total characteristic GW strain from each bin of parameter space.
+        NOTE: to get total strain from all bins, must sum in quarature!
+              e.g. ``gwb = np.sqrt(np.square(hc).sum())``
 
     """
 
@@ -1016,9 +1055,10 @@ def _gws_from_number_grid_centroids(edges, dnum, number, realize, integrate=True
     number = number / dlogf
     hs = np.nan_to_num(hs)
     hc = number * np.square(hs)
-    # (M',Q',Z',F) ==> (F,)
-    if integrate:
-        hc = np.sqrt(np.sum(hc, axis=(0, 1, 2)))
+    # # (M',Q',Z',F) ==> (F,)
+    # if integrate:
+    #     hc = np.sqrt(np.sum(hc, axis=(0, 1, 2)))
+    hc = np.sqrt(hc)
 
     return hc
 
