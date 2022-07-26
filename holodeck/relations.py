@@ -1,34 +1,17 @@
 """Holodeck - Scaling Relations
 
-References
-----------
-* Kormendy+Ho-2013 (1304.7762) = [KH13]
-  Coevolution (Or Not) of Supermassive Black Holes and Host Galaxies
-  https://ui.adsabs.harvard.edu/abs/2013ARA%26A..51..511K/abstract
-
-* McConnell+Ma-2013 (1211.2816) = [MM13]
-  Revisiting the Scaling Relations of Black Hole Masses and Host Galaxy Properties
-  https://ui.adsabs.harvard.edu/abs/2013ApJ...764..184M/abstract
-
-* [NFW-97] : Navarro, Frenk & White 1997
-  A Universal Density Profile from Hierarchical Clustering
-  https://ui.adsabs.harvard.edu/abs/1997ApJ...490..493N/abstract
-
-* [Guo-2010] : Guo, White, Li & Boylan-Kolchin 2010
-  How do galaxies populate dark matter haloes?
-  https://ui.adsabs.harvard.edu/abs/2010MNRAS.404.1111G/abstract
-
-* [Behroozi+2013] : Behroozi, Wechsler & Conroy 2013
-  The Average Star Formation Histories of Galaxies in Dark Matter Halos from z = 0-8
-  https://ui.adsabs.harvard.edu/abs/2013ApJ...770...57B/abstract
-
-* [Klypin+2016] : Klypin et al. 2016
-  MultiDark simulations: the story of dark matter halo concentrations and density profiles
-  https://ui.adsabs.harvard.edu/abs/2016MNRAS.457.4340K/abstract
-
 To-Do
 -----
 * Pass concentration-relation (or other method to calculate) to NFW classes on instantiation
+
+References
+----------
+* [Behroozi2013]_ : Behroozi, Wechsler & Conroy 2013.
+* [Guo2010]_ Guo, White, Li & Boylan-Kolchin 2010.
+* [Klypin2016]_ Klypin et al. 2016.
+* [KH13]_ Kormendy & Ho 2013.
+* [MM13]_ McConnell & Ma 2013.
+* [NFW97]_ Navarro, Frenk & White 1997.
 
 """
 

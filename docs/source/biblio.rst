@@ -23,52 +23,23 @@ References
 ==========
 These are provided here for easy copy-and-paste usage in other files.
 
+.. [Behroozi2013] : Behroozi, Wechsler & Conroy 2013.  ApJ, 770, 1.
+    The Average Star Formation Histories of Galaxies in Dark Matter Halos from z = 0-8
+    https://ui.adsabs.harvard.edu/abs/2013ApJ...770...57B/abstract
+
 .. [BBR80] Begelman, Blandford & Rees 1980.  Nature, 287, 5780.
     Massive black hole binaries in active galactic nuclei.
     https://ui.adsabs.harvard.edu/abs/1980Natur.287..307B/abstract
 
-.. [Hogg1999] Hogg 1999.  arXiv. (astro-ph/9905116).
-    Distance measures in cosmology.
-    https://ui.adsabs.harvard.edu/abs/1999astro.ph..5116H
-
-.. [Phinney2001] Phinney 2001.  arXiv. (astro-ph/0108028).
-    A Practical Theorem on Gravitational Wave Backgrounds.
-    https://ui.adsabs.harvard.edu/abs/2001astro.ph..8028P/abstract
-
-.. [Sesana2008] Sesana, Vecchio, Colacino 2008.  MNRAS, 390, 1. (0804.4476).
-    The stochastic gravitational-wave background from massive black hole binary systems:
-    implications for observations with Pulsar Timing Arrays.
-    https://ui.adsabs.harvard.edu/abs/2008MNRAS.390..192S/abstract
-
-.. [WMAP9]  Hinshaw, Larson, Komatsu et al. 2013. ApJS, 208, 2. (1212.5226).
-    Nine-year Wilkinson Microwave Anisotropy Probe (WMAP) Observations: Cosmological Parameter Results.
-    https://ui.adsabs.harvard.edu/abs/2013ApJS..208...19H/abstract
-
-.. [Quinlan96] Quinlan 1996
-    The dynamical evolution of massive black hole binaries I. Hardening in a fixed stellar background
-    https://ui.adsabs.harvard.edu/abs/1996NewA....1...35Q/abstract
-
-.. [SHM06] Sesana, Haardt & Madau et al. 2006
-    Interaction of Massive Black Hole Binaries with Their Stellar Environment. I. Ejection of Hypervelocity Stars
-    https://ui.adsabs.harvard.edu/abs/2006ApJ...651..392S/abstract
-
-.. [Sesana10] Sesana 2010
-    Self Consistent Model for the Evolution of Eccentric Massive Black Hole Binaries in Stellar Environments:
-    Implications for Gravitational Wave Observations
-    https://ui.adsabs.harvard.edu/abs/2010ApJ...719..851S/abstract
-
-.. [Kelley17] Kelley, Blecha & Hernquist 2017
-    Massive black hole binary mergers in dynamical galactic environments
-    https://ui.adsabs.harvard.edu/abs/2017MNRAS.464.3131K/abstract
-
-.. [Chen17] Chen, Sesana, & Del Pozzo 2017
+.. [Chen2017] Chen, Sesana, & Del Pozzo 2017
     Efficient computation of the gravitational wave spectrum emitted by eccentric massive
     black hole binaries in stellar environments
     https://ui.adsabs.harvard.edu/abs/2017MNRAS.470.1738C/abstract
 
-.. [Peters1964] Peters 1964.  PR, 136, 4B.
-    Gravitational Radiation and the Motion of Two Point Masses
-    https://ui.adsabs.harvard.edu/abs/1964PhRv..136.1224P/abstract
+.. [Chen2019] Chen, Sesana, Conselice 2019.  MNRAS, 488, 1.
+    Constraining astrophysical observables of galaxy and supermassive black hole binary mergers
+    using pulsar timing arrays
+    https://ui.adsabs.harvard.edu/abs/2019MNRAS.488..401C/abstract
 
 .. [EN07] Enoki & Nagashima 2007.  PTP, 117, 2.  astro-ph/0609377.
     The Effect of Orbital Eccentricity on Gravitational Wave Background Radiation from Supermassive Black Hole Binaries
@@ -78,6 +49,64 @@ These are provided here for easy copy-and-paste usage in other files.
     Gravitational Waves from Supermassive Black Hole Coalescence in a Hierarchical Galaxy Formation Model
     https://ui.adsabs.harvard.edu/abs/2004ApJ...615...19E/abstract
 
+.. [Guo2010] : Guo, White, Li & Boylan-Kolchin 2010.  MNRAS, 404, 3.
+    How do galaxies populate dark matter haloes?
+    https://ui.adsabs.harvard.edu/abs/2010MNRAS.404.1111G/abstract
+
+.. [WMAP9] Hinshaw, Larson, Komatsu et al. 2013. ApJS, 208, 2. (1212.5226).
+    Nine-year Wilkinson Microwave Anisotropy Probe (WMAP) Observations: Cosmological Parameter Results.
+    https://ui.adsabs.harvard.edu/abs/2013ApJS..208...19H/abstract
+
+.. [Hogg1999] Hogg 1999.  arXiv. (astro-ph/9905116).
+    Distance measures in cosmology.
+    https://ui.adsabs.harvard.edu/abs/1999astro.ph..5116H
+
+.. [Kelley17] Kelley, Blecha & Hernquist 2017
+    Massive black hole binary mergers in dynamical galactic environments
+    https://ui.adsabs.harvard.edu/abs/2017MNRAS.464.3131K/abstract
+
+.. [Klypin2016] : Klypin, Yepes, Gottlöber, et al. 2016.  MNRAS, 457, 4.
+    MultiDark simulations: the story of dark matter halo concentrations and density profiles
+    https://ui.adsabs.harvard.edu/abs/2016MNRAS.457.4340K/abstract
+
+.. [KH13] Kormendy & Ho 2013. ARAA, 51, 1.
+    Coevolution (Or Not) of Supermassive Black Holes and Host Galaxies
+    https://ui.adsabs.harvard.edu/abs/2013ARA%26A..51..511K/abstract
+
+.. [MM13] McConnell & Ma 2013.  ApJ, 764, 2.
+    Revisiting the Scaling Relations of Black Hole Masses and Host Galaxy Properties
+    https://ui.adsabs.harvard.edu/abs/2013ApJ...764..184M/abstract
+
+.. [NFW97] : Navarro, Frenk & White 1997.  ApJ, 490, 2.
+    A Universal Density Profile from Hierarchical Clustering
+    https://ui.adsabs.harvard.edu/abs/1997ApJ...490..493N/abstract
+
+.. [Peters1964] Peters 1964.  PR, 136, 4B.
+    Gravitational Radiation and the Motion of Two Point Masses
+    https://ui.adsabs.harvard.edu/abs/1964PhRv..136.1224P/abstract
+
+.. [Phinney2001] Phinney 2001.  arXiv. (astro-ph/0108028).
+    A Practical Theorem on Gravitational Wave Backgrounds.
+    https://ui.adsabs.harvard.edu/abs/2001astro.ph..8028P/abstract
+
+.. [Quinlan96] Quinlan 1996
+    The dynamical evolution of massive black hole binaries I. Hardening in a fixed stellar background
+    https://ui.adsabs.harvard.edu/abs/1996NewA....1...35Q/abstract
+
 .. [Sesana2004] Sesana, Haardt, Madau, & Volonteri 2004.  ApJ, 611, 2.  astro-ph/0401543.
     Low-Frequency Gravitational Radiation from Coalescing Massive Black Hole Binaries in Hierarchical Cosmologies
     http://adsabs.harvard.edu/abs/2004ApJ...611..623S
+
+.. [Sesana2006] Sesana, Haardt & Madau et al. 2006
+    Interaction of Massive Black Hole Binaries with Their Stellar Environment. I. Ejection of Hypervelocity Stars
+    https://ui.adsabs.harvard.edu/abs/2006ApJ...651..392S/abstract
+
+.. [Sesana2008] Sesana, Vecchio, Colacino 2008.  MNRAS, 390, 1. (0804.4476).
+    The stochastic gravitational-wave background from massive black hole binary systems:
+    implications for observations with Pulsar Timing Arrays.
+    https://ui.adsabs.harvard.edu/abs/2008MNRAS.390..192S/abstract
+
+.. [Sesana2010] Sesana 2010
+    Self Consistent Model for the Evolution of Eccentric Massive Black Hole Binaries in Stellar Environments:
+    Implications for Gravitational Wave Observations
+    https://ui.adsabs.harvard.edu/abs/2010ApJ...719..851S/abstract
