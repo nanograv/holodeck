@@ -194,7 +194,7 @@ class Pop_Illustris(_Population_Discrete):
 
     Takes as input a data file that includes BH and subhalo data for BH and/or galaxy mergers.
 
-    NOTES
+    Notes
     -----
     * Parameters required in input hdf5 file:
         * `box_volume_mpc`:
