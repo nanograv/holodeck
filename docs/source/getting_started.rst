@@ -18,8 +18,11 @@ The Getting Started Guide
    Annotated Bibliography <biblio>
 
 
-Calculating Gravitational Waves
-===============================
+Gravitational Waves (GWs)
+=========================
+
+Calculating GW Signatures
+-------------------------
 
 For more details, see the document :doc:`Getting Started: Calculating Gravitational Waves <calc_gws>`.
 
@@ -56,13 +59,34 @@ To account for cosmic variance and the discreteness of binary sources, we can in
 The observed GW frequencies :math:`f` are arbitrarily chosen.  Typically, for pulsar timing arrays, these are chosen based on Nyquist sampling for a given observational duration :math:`T \sim 15 \, \textrm{yr}` and cadence :math:`\Delta t \sim 2 \, \textrm{week}`, such that :math:`f = \left[1/T, 2/T, 3/T, \, \ldots \, , 1/\left(2 \Delta t\right)\right]`.
 
 
-GW Detection with Pulsar Timing Arrays
-======================================
+GW Detection with Pulsar Timing Arrays (PTAs)
+---------------------------------------------
+Pulsars are rapidly spinning neutron stars which produce beams of radio emission that periodically intersect the observer's line of sight.  Millisecond pulsars, in particular, often maintain incredibly precise periodicities with precision down to the order of 1s to 100s of nanoseconds.  The presence of GWs induce variations to the times of arrival (TOAs) measured by observatories on Earth.
+
+Many noise sources (e.g. due to the neutron star, the source of radio emission, or the radio observatory) can also produce TOA variations.  Unlike noise sources, GWs are believed to produce a very unique spatial correlation pattern in the TOA variations across the sky.  In particular, the angular correlation function of TOA variations between pairs of pulsars produces a pseudo-quadrupolar pattern as a function of angular separation which is believed to be a 'smoking gun' signatures of GWs (i.e. a signature that is not produced by any noise source).  The identification of this angular correlation function can thus be used to detect gravitational waves.
+
+The frequency range that PTAs are sensitive to is determined primarily by the ability to reconstruct periodic signals from the time-series data of pulsar TOAs.  The lowest sensitive frequency is determined by the Nyquist frequency, i.e. the inverse of the total observing duration.  High-precision TOA measurements have been performed for about two decades, meaning that PTAs are starting to probe frequencies as low as nanohertz (nHz).  The highest sensitive frequency is determined by the typically interval between observations, which tends to be on the order of a few weeks, or hundreds of nanohertz.
+
+While there have been a large number of proposed sources of GWs in the nanohertz regime, the best studied sources are binaries of supermassive black holes, with total masses :math:`M \gtrsim 10^8 \, M_\odot`.
 
 
 Methods for Simulating MBH Binary Populations
 =============================================
-Hydrodynamic simulations, semi-analytic / semi-empirical models, observational catalogs.  Similarities and differences.
+Simulations of MBH Binary (MBHB) populations require three components:
+1) Origins: the events which produce encounters between pairs (or more) of MBHs, which are typically galaxy-galaxy mergers (which occur on large scales of :math:`\mathrm{kpc} - \mathrm{Mpc}`);
+2) Populations: the properties of the MBHs (and often their host galaxies) involved in the encounter events (at least a redshift and pair of masses); and
+3) Evolution: the process by which the two (or more) MBHs are able to reach the small binary separations at which detectable GWs are produced.
+
+(1) and (2) can be produced in a variety of ways, and in numerous combinations of components from cosmological simulations or electromagnetic observations.  **Cosmological hydrodynamic simulations** strive to model the fundamental processes underlying galaxy and star formation to produce populations of galaxies, including galaxy mergers, and often massive black holes.  **Semi-analytic models (SAMs)** use relatively simple analytic prescriptions for propterties of galaxy and MBHs, typically calibrated to observations, to produce initial populations of binary MBHs.  **Semi-empirical models (SEMs)** are similar to SAMs, but rely more strongly on observational relationships, and are typically much more complex/comprehensive, often including models for not only galaxy populations but even the internal structure of galaxies and their co-evolution with MBHs.  In this way, SEMs are somewhere in-between SAMs and hydrodynamic simulations, but rely heavily on observations of populations of galaxies and MBHs/AGNs.  Observations can also be used to construct binary population more directly, e.g. by starting from **observational catalogs** of AGN or quasars, and somehow prescribing the occurrence rate of binaries.  These observational catalogs will typically use components of SAMs, SEMs to hydrodynamic simulations to complement the directly observed properties.
+
+Semi-Analytic Models
+--------------------
+
+Theory
+^^^^^^
+
+Implementation
+^^^^^^^^^^^^^^
 
 
 Binary Evolution/Hardening Models

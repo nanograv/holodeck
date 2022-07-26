@@ -12,12 +12,17 @@ Abbreviations
 * **CBD**: Circum-Binary Disk, an accretion disk surrounding both components of a binary system.
 * **CW**: Continuous Wave, as in Continuous Wave GW source
 * **DF**: Dynamical Friction, the drag force experienced by a massive object moving in a gravitating background.
+* **EM**: Electromagnetic, traditional radiation produced by moving charges (from the radio to optical to gamma-ray).
+* **GR**: General relativity.
 * **GW/GWB**: Gravitational Waves / Gravitational Wave Background
 * **ISCO**: Inner-most Stable Circular Orbit, the radius or location within which no object can maintain a stable orbit around a black hole.  The radius is dependent on the spin of the black hole, but equal to 3 times the Schwarzschild radius for a non-spinning ($a=0$) black hole.
 * **LISA**: Laser Interferometer Space Antenna, future space-based GW detector
-* **MBH**: Massive Black-Hole, usually treated interchangeably with SMBH (super-massive black-hole)
-* **MBHB**: Massive Black-Hole Binary
-* **PTA**: Pulsar Timing Array
+* **MBH**: Massive Black-Hole, usually treated interchangeably with 'SMBH' (super-massive black-hole)
+* **MBHB**: Massive Black-Hole Binary, also referred to as BSMBH, SMBHB, ...
+* **PTA**: Pulsar Timing Array.
+* **SAM**: Semi-Analytic Models.  (Grey area relative to SEMs).
+* **SEM**: Semi-Empirical Models.  (Grey area relative to SAMs).
+* **TOA**: Time of Arrival, the specific measured time at which a pulsar's radio bursts are measured by the observer.
 
 
 Symbols
