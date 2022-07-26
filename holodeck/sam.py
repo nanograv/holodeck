@@ -1,12 +1,5 @@
 """Holodeck - Semi Analytic Modeling submodule
 
-References
-----------
-* Chen, Sesana, Conselice 2019 = [Chen19]
-  Constraining astrophysical observables of galaxy and supermassive black hole binary mergers
-  using pulsar timing arrays
-  https://ui.adsabs.harvard.edu/abs/2019MNRAS.488..401C/abstract
-
 To-Do
 -----
 * Check that _GW_ frequencies and _orbital_ frequencies are being used in the correct places.
@@ -17,6 +10,10 @@ To-Do
   the log(dens) instead of just `dens`.
 * Should there be an additional dimension of parameter space for galaxy properties?  This way
   variance in scaling relations is incorporated directly before calculating realizations.
+
+References
+----------
+* [Chen2019]_ Chen, Sesana, Conselice 2019
 
 """
 
