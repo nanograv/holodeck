@@ -24,12 +24,12 @@ To-Do
 
 References
 ----------
-* [Quinlan96]_ Quinlan 1996
-* [SHM06]_ Sesana, Haardt & Madau et al. 2006
-* [BBR80]_ Begelman, Blandford & Rees 1980
-* [Sesana10]_ Sesana 2010
-* [Kelley17]_ Kelley, Blecha & Hernquist 2017
-* [Chen17]_ Chen, Sesana, & Del Pozzo 2017
+* [Quinlan96]_ Quinlan 1996.
+* [Sesana2006]_ Sesana, Haardt & Madau et al. 2006.
+* [BBR80]_ Begelman, Blandford & Rees 1980.
+* [Sesana2010]_ Sesana 2010.
+* [Kelley17]_ Kelley, Blecha & Hernquist 2017.
+* [Chen2017]_ Chen, Sesana, & Del Pozzo 2017.
 
 """
 
@@ -655,7 +655,7 @@ class Hard_GW(_Hardening):
 class Sesana_Scattering(_Hardening):
     """Binary-Hardening Rates calculated based on the Sesana stellar-scattering model.
 
-    This module uses the stellar-scattering rate constants from the fits in [SHM06]_ using the
+    This module uses the stellar-scattering rate constants from the fits in [Sesana2006]_ using the
     `_SHM06` class.  Scattering is assumed to only be effective once the binary is bound.  An
     exponential cutoff is imposed at larger radii.
 
@@ -757,7 +757,7 @@ class Dynamical_Friction_NFW(_Hardening):
     Attenuation of the DF hardening rate is typically also included, to account for the inefficiency of DF once the
     binary enters the hardened regime.  This is calculated using the prescription from [BBR80]_.  The different
     characteristic radii, needed for the attenuation calculation, currently use a fixed Dehnen stellar-density profile
-    as in [Chen17]_, and a fixed scaling relationship to find the characteristic stellar-radius.
+    as in [Chen2017]_, and a fixed scaling relationship to find the characteristic stellar-radius.
 
     This module does not evolve eccentricity.
 
@@ -1467,7 +1467,9 @@ def _get_stellar_mass_halo_mass_relation(smhm=None):
 
 
 def _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma=1.0):
-    # [Chen17] Eq.27 - from [Dabringhausen+2008]
+    """
+    [Chen2017]_ Eq.27 - from [Dabringhausen+2008]
+    """
     rchar = 239 * PC * (np.power(2.0, 1.0/(3.0 - gamma)) - 1.0)
     rchar *= np.power(mstar / (1e9*MSOL), 0.596)
     return rchar
@@ -1475,7 +1477,7 @@ def _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma=1.0):
 
 def _radius_influence_dehnen(mbh, mstar, gamma=1.0):
     """
-    [Chen17]_ Eq.25
+    [Chen2017]_ Eq.25
     """
     rchar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
     rinfl = np.power(2*mbh/mstar, 1.0/(gamma - 3.0))
