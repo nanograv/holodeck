@@ -1,8 +1,30 @@
 """Empirical and phenomenological scaling relationships.
 
+This module defines numerous classes and accessor methods to implement scaling relationships between
+different empirical quantities, for example BH-Galaxy relations, or Stellar-Mass vs Halo-Mass
+relations.  `abc` base classes are used to implement generic functionality, and define APIs while
+subclasses are left to perform specific implementations.  In general most classes implement both
+the forward and reverse versions of relationships (e.g. stellar-mass to halo-mass, and also
+halo-mass to stellar-mass).  Reverse relationships are often interpolated over a grid.
+
+Most of the relationships currently implemented are among three groups (and corresponding base
+classes):
+
+* **BH-Host Relations** (`_Host_Relation`): These produce mappings between host galaxy properties
+  (e.g. bulge mass) and the properties of their black holes (i.e. BH mass).
+    * **Mbh-Mbulge relations** ("M-Mbulge"; `_MMBulge_Relation`): mapping from host galaxy stellar
+      bulge mass to black-hole mass.
+    * **Mbh-Sigma relations** ("M-Sigma"; `_MSigma_Relation`): mapping from host galaxy velocity
+      dispersion (sigma) to black-hole mass.
+* **Density Profiles** (`_Density_Profile`): matter density as a function of spherical radius.
+* **Stellar-Mass vs. Halo-Mass Relations** (`_StellarMass_HaloMass`): mapping from halo-mass to
+  stellar-mass.
+
 To-Do
 -----
 * Pass concentration-relation (or other method to calculate) to NFW classes on instantiation
+* For redshift-dependent extensions to relations, use multiple-inheritance instead of repeating
+  attributes.
 
 References
 ----------
