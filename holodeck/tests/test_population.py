@@ -46,14 +46,14 @@ def test_pop_illustris_basic():
 def test_mass_reset():
     print("test_mass_reset()")
     pop = holo.population.Pop_Illustris()
-    mmbulge_relation = holo.relations.MMBulge_MM13()
-    mod_mm13 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=False)
+    mmbulge_relation = holo.relations.MMBulge_MM2013()
+    mod_MM2013 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=False)
 
     mass_bef = pop.mass
     # host = {'mbulge': pop.mbulge}
     host = pop
 
-    pop.modify(mod_mm13)
+    pop.modify(mod_MM2013)
     mass_aft = pop.mass
 
     assert not np.all(mass_bef == mass_aft), "Masses are unchanged after modification!"
@@ -64,9 +64,9 @@ def test_mass_reset():
     SCATTER = 0.1
     TOL_STD = 1.5 * sp.stats.norm.ppf(1.0 - 1.0 / pop.mass.size)
     print(f"TOL={TOL_STD}")
-    mmbulge_relation = holo.relations.MMBulge_MM13(scatter_dex=SCATTER)
-    mod_mm13 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=True)
-    pop.modify(mod_mm13)
+    mmbulge_relation = holo.relations.MMBulge_MM2013(scatter_dex=SCATTER)
+    mod_MM2013 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=True)
+    pop.modify(mod_MM2013)
     mass_scatter = pop.mass
     aa = np.log10(mass_aft/MSOL)
     bb = np.log10(mass_scatter/MSOL)

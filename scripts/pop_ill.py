@@ -46,7 +46,7 @@ parser.add_argument('-v', '--verbose', action='store_true', default=False, dest=
                     help='verbose output [INFO]')
 
 parser.add_argument('-m', '--mamp', action='store', dest='mamp', type=float,
-                    help='M-MBulge ampliture [Msol] (MM13: 2.884e8)', default=7e8)
+                    help='M-MBulge ampliture [Msol] (MM2013: 2.884e8)', default=7e8)
 
 args = parser.parse_args()
 
@@ -70,9 +70,9 @@ def main():
     pop.modify(mod_resamp)
 
     # default mamp is  10.0 ** 8.46 = 2.884e8
-    mmbulge = holo.relations.MMBulge_MM13(mamp=args.mamp*MSOL)
-    mod_mm13 = holo.population.PM_Mass_Reset(mmbulge, scatter=True)
-    pop.modify(mod_mm13)
+    mmbulge = holo.relations.MMBulge_MM2013(mamp=args.mamp*MSOL)
+    mod_MM2013 = holo.population.PM_Mass_Reset(mmbulge, scatter=True)
+    pop.modify(mod_MM2013)
 
     fixed = holo.evolution.Fixed_Time.from_pop(pop, 2.0 * GYR)
     evo = holo.evolution.Evolution(pop, fixed)

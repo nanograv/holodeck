@@ -374,7 +374,7 @@ def plot_mbh_scaling_relations(pop, fname=None, color='r'):
     handles = []
     names = []
     if fname is not None:
-        hh = _draw_mm13_data(ax, fname)
+        hh = _draw_MM2013_data(ax, fname)
         handles.append(hh)
         names.append('McConnell+Ma')
 
@@ -387,7 +387,7 @@ def plot_mbh_scaling_relations(pop, fname=None, color='r'):
     return fig
 
 
-def _draw_mm13_data(ax):
+def _draw_MM2013_data(ax):
     data = observations.load_mcconnell_ma_2013()
     data = {kk: data[kk] if kk == 'name' else np.log10(data[kk]) for kk in data.keys()}
     key = 'mbulge'

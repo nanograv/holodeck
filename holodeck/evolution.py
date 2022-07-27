@@ -26,9 +26,9 @@ References
 ----------
 * [Quinlan96]_ Quinlan 1996.
 * [Sesana2006]_ Sesana, Haardt & Madau et al. 2006.
-* [BBR80]_ Begelman, Blandford & Rees 1980.
+* [BBR1980]_ Begelman, Blandford & Rees 1980.
 * [Sesana2010]_ Sesana 2010.
-* [Kelley17]_ Kelley, Blecha & Hernquist 2017.
+* [Kelley2017]_ Kelley, Blecha & Hernquist 2017.
 * [Chen2017]_ Chen, Sesana, & Del Pozzo 2017.
 
 """
@@ -663,7 +663,7 @@ class Sesana_Scattering(_Hardening):
     ----------
     gamma_dehnen : scalar  or  (N,) array-like of scalar
         Dehnen stellar-density profile inner power-law slope.
-        Fiducial Dehnen inner density profile slope gamma=1.0 is used in [Chen17]_.
+        Fiducial Dehnen inner density profile slope gamma=1.0 is used in [Chen2017]_.
     gbh : _Galaxy_Blackhole_Relation class/instance  or  `None`
         Galaxy-Blackhole Relation used for calculating stellar parameters.
         If `None` the default is loaded.
@@ -755,7 +755,7 @@ class Dynamical_Friction_NFW(_Hardening):
     times.  This is to model tidal-stripping of the secondary host galaxy.
 
     Attenuation of the DF hardening rate is typically also included, to account for the inefficiency of DF once the
-    binary enters the hardened regime.  This is calculated using the prescription from [BBR80]_.  The different
+    binary enters the hardened regime.  This is calculated using the prescription from [BBR1980]_.  The different
     characteristic radii, needed for the attenuation calculation, currently use a fixed Dehnen stellar-density profile
     as in [Chen2017]_, and a fixed scaling relationship to find the characteristic stellar-radius.
 
@@ -886,7 +886,7 @@ class Dynamical_Friction_NFW(_Hardening):
         if self._time_dynamical is None:
             self._time_dynamical = self._NFW.time_dynamical(sepa, mhalo, redz) * 10
 
-        # model tidal-stripping of secondary's bulge (see: [Kelley17] Eq.6)
+        # model tidal-stripping of secondary's bulge (see: [Kelley2017] Eq.6)
         pow = np.clip(1.0 - dt / self._time_dynamical, 0.0, 1.0)
         meff = m2 * np.power((m2 + mstar_sec)/m2, pow)
 
@@ -910,13 +910,13 @@ class Dynamical_Friction_NFW(_Hardening):
             del prev
 
         if attenuate:
-            atten = self._attenuation_bbr80(sepa, mass, mstar)
+            atten = self._attenuation_BBR1980(sepa, mass, mstar)
             dadt = dadt / atten
 
         return dadt, dedt
 
-    def _attenuation_bbr80(self, sepa, m1m2, mstar):
-        """Calculate attentuation factor following [BBR80]_ prescription.
+    def _attenuation_BBR1980(self, sepa, m1m2, mstar):
+        """Calculate attentuation factor following [BBR1980]_ prescription.
 
         Characteristic radii are currently calculated using hard-coded Dehnen stellar-density profiles, and a fixed
         scaling-relationship between stellar-mass and stellar characteristic radius.
@@ -948,9 +948,9 @@ class Dynamical_Friction_NFW(_Hardening):
         # characteristic stellar radius in [cm]
         rstar = _radius_stellar_characteristic_dabringhausen_2008(mstar)
         # characteristic hardening-radius in [cm]
-        rhard = _radius_hard_bbr80_dehnen(mbh, mstar)
+        rhard = _radius_hard_BBR1980_dehnen(mbh, mstar)
         # characteristic loss-cone-radius in [cm]
-        rlc = _radius_loss_cone_bbr80_dehnen(mbh, mstar)
+        rlc = _radius_loss_cone_BBR1980_dehnen(mbh, mstar)
 
         # Calculate R_bound based on stellar density profile (mass enclosed)
         if self._rbound_from_density:
@@ -963,14 +963,14 @@ class Dynamical_Friction_NFW(_Hardening):
         # Number of stars in the stellar bulge/core
         nstar = mstar / (0.6 * MSOL)
         # --- Attenuation for separations less than the hardening radius
-        # [BBR80] Eq.3
+        # [BBR1980] Eq.3
         atten_hard = np.maximum((rhard/sepa) * np.log(nstar), np.square(mbh/mstar) * nstar)
         # use an exponential turn-on at larger radii
         cut = np.exp(-sepa/rhard)
         atten_hard *= cut
 
         # --- Attenuation for separations less than the loss-cone Radius
-        # [BBR80] Eq.2
+        # [BBR1980] Eq.2
         atten_lc = np.power(m2/m1, 1.75) * nstar * np.power(rbnd/rstar, 6.75) * (rlc / sepa)
         atten_lc = np.maximum(atten_lc, 1.0)
         # use an exponential turn-on at larger radii
@@ -1487,18 +1487,18 @@ def _radius_influence_dehnen(mbh, mstar, gamma=1.0):
 
 def _density_at_influence_radius_dehnen(mbh, mstar, gamma=1.0):
     """
-    [Chen17]_ Eq.26
+    [Chen2017]_ Eq.26
     """
-    # [Chen17] Eq.27 - from [Dabringhausen+2008]
+    # [Chen2017] Eq.27 - from [Dabringhausen+2008]
     rchar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
     dens = mstar * (3.0 - gamma) / np.power(rchar, 3.0) / (4.0 * np.pi)
     dens *= np.power(2*mbh / mstar, gamma / (gamma - 3.0))
     return dens
 
 
-def _radius_hard_bbr80_dehnen(mbh, mstar, gamma=1.0):
+def _radius_hard_BBR1980_dehnen(mbh, mstar, gamma=1.0):
     """
-    [Kelley17]_ paragraph below Eq.8 - from [BBR80]_
+    [Kelley2017]_ paragraph below Eq.8 - from [BBR1980]_
     """
     rbnd = _radius_influence_dehnen(mbh, mstar, gamma=gamma)
     rstar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
@@ -1506,9 +1506,9 @@ def _radius_hard_bbr80_dehnen(mbh, mstar, gamma=1.0):
     return rhard
 
 
-def _radius_loss_cone_bbr80_dehnen(mbh, mstar, gamma=1.0):
+def _radius_loss_cone_BBR1980_dehnen(mbh, mstar, gamma=1.0):
     """
-    [Kelley17]_ Eq.9 - from [BBR80]
+    [Kelley2017]_ Eq.9 - from [BBR1980]
     """
     mass_of_a_star = 0.6 * MSOL
     rbnd = _radius_influence_dehnen(mbh, mstar, gamma=gamma)
