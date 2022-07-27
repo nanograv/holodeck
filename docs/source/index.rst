@@ -141,6 +141,12 @@ Indices and tables
 ==================
 ..    :template: custom-module-template.rst
 
+.. automodule:: holodeck
+    :members:
+    :undoc-members:
+    :private-members:
+    :special-members:
+
 .. autosummary::
    :toctree: _autosummary
    :recursive:

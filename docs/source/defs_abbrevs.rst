@@ -28,8 +28,9 @@ Abbreviations
 Symbols
 =======
 * :math:`a`:
-  * (1) binary orbital semi-major axis (i.e. separation).
-  * (2) the scale-factor of the universe at a given redshift, :math:`a = 1 / (1+z)$`.
+    * (1) binary orbital semi-major axis (i.e. separation).
+    * (2) the scale-factor of the universe at a given redshift, :math:`a = 1 / (1+z)`.
+
 * :math:`d_c`: Comoving Distance, the distance to a location in the Universe that, for zero relative velocity, remains invariant as a function of redshift.  Related to luminosity distance as, :math:`d_c = d_L / (1+z)`.
 * :math:`d_L`: Luminosity Distance, the effective distance to a source in the Universe determining its EM brightness or GW amplitude.  Related to comoving distance as, :math:`d_L = d_c \, (1+z)`.
 * :math:`\mathcal{M}``: Chirp-mass
