@@ -134,7 +134,7 @@ Thus giving,
 Combining :math:numref:`eq:cont_eq_result` with :math:numref:`num_num_dens`, we can finally write,
 
 .. math::
-   \frac{\partial N}{\partial M \partial q \partial z \partial \ln\!f_r} = \frac{\Phi(M,z) \, P(M,q,z)}{T(M,q,a,z|a')} \, \thardf \, \frac{\partial V_c}{\partial z}.
+   \frac{\partial N}{\partial M \partial q \partial z \partial \ln\!f_r} = \frac{\Phi(M,z) \, P(M,q,z)}{T(M,q,a,z|a')} \, \tau_f \, \frac{\partial V_c}{\partial z}.
    :name: eq:sam_final
 
 
