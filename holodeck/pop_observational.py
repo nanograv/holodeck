@@ -437,7 +437,7 @@ def Mbh2Mbulge(Mbulge):
     Includes scatter in the relation, epsilon = 0.34
     Answer in solar masses.
     """
-    # MM13
+    # MM2013
     exponent = 8.46+1.05*log10(Mbulge/1e11)
     ans_w_scatter = np.random.normal(exponent, 0.34)
     return 10**ans_w_scatter

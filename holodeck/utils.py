@@ -5,7 +5,7 @@ References
 * [Peters1964]_ Peters 1964
 * [Enoki2004]_ Enoki, Inoue, Nagashima, & Sugiyama 2004
 * [Sesana2004]_ Sesana, Haardt, Madau, & Volonteri 2004
-* [EN07]_ Enoki & Nagashima 2007
+* [EN2007]_ Enoki & Nagashima 2007
 
 """
 
@@ -28,7 +28,7 @@ from holodeck.constants import NWTG, SCHW, SPLC, YR
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
 _GW_DADT_SEP_CONST = - 64 * np.power(NWTG, 3) / 5 / np.power(SPLC, 5)
 _GW_DEDT_ECC_CONST = - 304 * np.power(NWTG, 3) / 15 / np.power(SPLC, 5)
-# [EN07]_, Eq.2.2
+# [EN2007]_, Eq.2.2
 _GW_LUM_CONST = (32.0 / 5.0) * np.power(NWTG, 7.0/3.0) * np.power(SPLC, -5.0)
 
 
@@ -1161,7 +1161,7 @@ def gw_dade(m1, m2, sepa, eccen):
 def gw_freq_dist_func(nn, ee=0.0):
     """GW frequency distribution function.
 
-    See [EN07]_ Eq. 2.4; this function gives g(n,e).
+    See [EN2007]_ Eq. 2.4; this function gives g(n,e).
 
     BUG: use recursion relation when possible,
          J_{n-1}(x) + J_{n+1}(x) = (2n/x) J_n(x)
@@ -1263,7 +1263,7 @@ def gw_hardening_rate_dfdt(m1, m2, freq_orb, eccen=None):
 def gw_hardening_timescale_freq(mchirp, frst):
     """GW Hardening timescale in terms of frequency (not separation).
 
-    ``tau = f_r / (df_r / dt)``, e.g. [EN07]_ Eq.2.9
+    ``tau = f_r / (df_r / dt)``, e.g. [EN2007]_ Eq.2.9
 
     Parameters
     ----------
@@ -1285,7 +1285,7 @@ def gw_hardening_timescale_freq(mchirp, frst):
 def gw_lum_circ(mchirp, freq_orb_rest):
     """Calculate the GW luminosity of a circular binary.
 
-    [EN07]_ Eq. 2.2
+    [EN2007]_ Eq. 2.2
 
     Parameters
     ----------
@@ -1382,7 +1382,7 @@ def time_to_merge_at_sep(m1, m2, sepa):
 def _gw_ecc_func(eccen):
     """GW Hardening rate eccentricitiy dependence F(e).
 
-    See [Peters1964]_ Eq. 5.6, or [EN07]_ Eq. 2.3
+    See [Peters1964]_ Eq. 5.6, or [EN2007]_ Eq. 2.3
 
     Parameters
     ----------

@@ -70,7 +70,7 @@ class _Host_Relation(abc.ABC):
         return
 
     @abc.abstractmethod
-    def mbh_from_host(self, pop) -> ArrayLike[float]:
+    def mbh_from_host(self, pop) -> ArrayLike:
         """Convert from abstract host galaxy properties to blackhole mass.
 
         The `pop` instance must contain the attributes required for this class's scaling relations.
@@ -83,11 +83,11 @@ class _Host_Relation(abc.ABC):
 
         Returns
         -------
-        mbh : ArrayLike[float]
+        mbh : ArrayLike
             Black hole mass.  [grams]
 
         """
-        return
+        pass
 
 
 # -----------------------------------------
@@ -156,10 +156,6 @@ class _MMBulge_Relation(_Host_Relation):
         return
 
     @abc.abstractmethod
-    def mbh_from_host(self, host):
-        return
-
-    @abc.abstractmethod
     def mstar_from_mbulge(self, mbulge):
         """Convert from stellar-bulge mass to total stellar-mass.
 
@@ -177,7 +173,7 @@ class _MMBulge_Relation(_Host_Relation):
         return
 
     @abc.abstractmethod
-    def mbh_from_mbulge(self, *args, **kwargs) -> ArrayLike[float]:
+    def mbh_from_mbulge(self, *args, **kwargs) -> ArrayLike:
         """Convert from stellar-bulge mass to black-hole mass.
 
         Returns
@@ -188,7 +184,7 @@ class _MMBulge_Relation(_Host_Relation):
         """
         return
 
-    def mbulge_from_mbh(self, *args, **kwargs) -> ArrayLike[float]:
+    def mbulge_from_mbh(self, *args, **kwargs) -> ArrayLike:
         """Convert from black-hole mass to stellar-bulge mass.
 
         Returns
@@ -237,7 +233,7 @@ class MMBulge_Standard(_MMBulge_Relation):
     def bulge_mass_frac(self, mstar):
         return self._bulge_mfrac
 
-    def mbh_from_host(self, pop, scatter):
+    def mbh_from_host(self, pop, scatter) -> ArrayLike:
         host = self.get_host_properties(pop)
         mbulge = host['mbulge']
         return self.mbh_from_mbulge(mbulge, scatter=scatter)
@@ -368,10 +364,10 @@ class MMBulge_Standard(_MMBulge_Relation):
         return deriv
 
 
-class MMBulge_KH13(MMBulge_Standard):
+class MMBulge_KH2013(MMBulge_Standard):
     """Mbh-MBulge Relation, single power-law, from Kormendy & Ho 2013.
 
-    Values taken from [KH13]_ Eq.10.
+    Values taken from [KH2013]_ Eq.10.
 
     """
     MASS_AMP = 0.49 * 1e9 * MSOL      # 0.49 + 0.06 - 0.05   in units of [Msol]
@@ -380,10 +376,10 @@ class MMBulge_KH13(MMBulge_Standard):
     SCATTER_DEX = 0.28                # scatter stdev in dex
 
 
-class MMBulge_MM13(MMBulge_Standard):
+class MMBulge_MM2013(MMBulge_Standard):
     """Mbh-MBulge Relation from McConnell & Ma 2013
 
-    [MM13]_ Eq. 2, with values taken from Table 2 ("Dynamical masses", first row, "MPFITEXY")
+    [MM2013]_ Eq. 2, with values taken from Table 2 ("Dynamical masses", first row, "MPFITEXY")
 
     """
     MASS_AMP = MSOL * 10.0 ** 8.46    # 8.46 ± 0.08   in units of [Msol]
@@ -473,12 +469,12 @@ class MMBulge_Redshift(MMBulge_Standard):
         return deriv
 
 
-class MMBulge_Redshift_MM13(MMBulge_Redshift):
+class MMBulge_Redshift_MM2013(MMBulge_Redshift):
     """Mbh-MBulge Relation from McConnell & Ma 2013 for z=0 plus redshift evolution of the normalization
 
     BUG/FIX: use multiple-inheritance for this
 
-    [MM13]_ Eq. 2, with values taken from Table 2 ("Dynamical masses", first row, "MPFITEXY")
+    [MM2013]_ Eq. 2, with values taken from Table 2 ("Dynamical masses", first row, "MPFITEXY")
 
     """
     MASS_AMP = MSOL * 10.0 ** 8.46    # 8.46 ± 0.08   in units of [Msol]
@@ -488,12 +484,12 @@ class MMBulge_Redshift_MM13(MMBulge_Redshift):
     Z_PLAW = 0.0
 
 
-class MMBulge_Redshift_KH13(MMBulge_Redshift):
+class MMBulge_Redshift_KH2013(MMBulge_Redshift):
     """Mbh-MBulge Relation from Kormendy & Ho 2013, w/ optional redshift evolution of normalization.
 
     BUG/FIX: use multiple-inheritance for this
 
-    Values taken from [KH13] Eq.10 (pg. 61 of PDF, "571" of ARAA)
+    Values taken from [KH2013] Eq.10 (pg. 61 of PDF, "571" of ARAA)
     """
     MASS_AMP = 0.49 * 1e9 * MSOL   # 0.49 + 0.06 - 0.05   in units of [Msol]
     MASS_REF = MSOL * 1e11            # 1e11 Msol
@@ -517,7 +513,7 @@ def get_mmbulge_relation(mmbulge: Union[_MMBulge_Relation, Type[_MMBulge_Relatio
         Instance of an Mbh-Mbulge relationship.
 
     """
-    return utils._get_subclass_instance(mmbulge, MMBulge_KH13, _MMBulge_Relation)
+    return utils._get_subclass_instance(mmbulge, MMBulge_KH2013, _MMBulge_Relation)
 
 
 # ----------------------------------------
@@ -620,10 +616,10 @@ class MSigma_Standard(_MSigma_Relation):
     #     return None
 
 
-class MSigma_MM13(MSigma_Standard):
+class MSigma_MM2013(MSigma_Standard):
     """Mbh-Sigma Relation from McConnell & Ma 2013.
 
-    [MM13]_ Eq. 2, with values taken from Table 2 ("M-sigma all galaxies", first row, "MPFITEXY")
+    [MM2013]_ Eq. 2, with values taken from Table 2 ("M-sigma all galaxies", first row, "MPFITEXY")
     """
 
     MASS_AMP = MSOL * 10.0 ** 8.32    # 8.32 ± 0.05   in units of [Msol]
@@ -632,10 +628,10 @@ class MSigma_MM13(MSigma_Standard):
     SCATTER_DEX = 0.38
 
 
-class MSigma_KH13(MSigma_Standard):
+class MSigma_KH2013(MSigma_Standard):
     """Mbh-Sigma Relation from Kormendy & Ho 2013.
 
-    [KH13]_ Eq. 10, (pg. 65 of PDF, "575" of ARAA)
+    [KH2013]_ Eq. 10, (pg. 65 of PDF, "575" of ARAA)
     """
 
     MASS_AMP = MSOL * 10.0 ** 8.46    # 8.46 ± 0.07   in units of [Msol]
@@ -659,23 +655,23 @@ def get_msigma_relation(msigma: Union[_MSigma_Relation, Type[_MSigma_Relation]] 
         Instance of an Mbh-sigma relationship.
 
     """
-    return utils._get_subclass_instance(msigma, MSigma_KH13, _MSigma_Relation)
+    return utils._get_subclass_instance(msigma, MSigma_KH2013, _MSigma_Relation)
 
 
-def _add_scatter(vals: ArrayLike[float], eps: ArrayLike[float]) -> ArrayLike[float]:
+def _add_scatter(vals: ArrayLike, eps: ArrayLike) -> ArrayLike:
     """Add scatter to the input values with a given standard deviation.
 
     Parameters
     ----------
-    vals : ArrayLike[float]
+    vals : ArrayLike
         Values that scatter should be added to.
-    eps : ArrayLike[float]
+    eps : ArrayLike
         Standard deviation of the scatter that should be added.
         This must either be a single `float` value, or an ArrayLike broadcastable against `vals`.
 
     Returns
     -------
-    vals : ArrayLike[float]
+    vals : ArrayLike
         Values with added scatter.
 
     """
@@ -821,19 +817,19 @@ class Klypin_2016:
         return yy
 
     @classmethod
-    def concentration(cls, mhalo: ArrayLike[float], redz: ArrayLike[float]) -> ArrayLike[float]:
+    def concentration(cls, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
         """Return the halo concentration for the given halo mass and redshift.
 
         Parameters
         ----------
-        mhalo : ArrayLike[float]
+        mhalo : ArrayLike
             Halo mass.  [grams]
-        redz : ArrayLike[float]
+        redz : ArrayLike
             Redshift.
 
         Returns
         -------
-        conc : ArrayLike[float]
+        conc : ArrayLike
             Halo concentration parameters.  []
 
         """
@@ -851,17 +847,17 @@ class _Density_Profile(abc.ABC):
     """
 
     @abc.abstractmethod
-    def density(self, rads: ArrayLike[float], *args, **kwargs) -> ArrayLike[float]:
+    def density(self, rads: ArrayLike, *args, **kwargs) -> ArrayLike:
         """Return the density at the given radii.
 
         Parameters
         ----------
-        rads : ArrayLike[float]
+        rads : ArrayLike
             Desired radial distances.  [cm]
 
         Returns
         -------
-        density : ArrayLike[float]
+        density : ArrayLike
             Densities at the given radii.  [g/cm^3]
 
         """
@@ -872,12 +868,12 @@ class _Density_Profile(abc.ABC):
 
         Parameters
         ----------
-        rads : ArrayLike[float]
+        rads : ArrayLike
             Desired radial distances.  [cm]
 
         Returns
         -------
-        tden : ArrayLike[float]
+        tden : ArrayLike
             Dynamical times at the given radii.  [sec]
 
         """
@@ -890,12 +886,12 @@ class _Density_Profile(abc.ABC):
 
         Parameters
         ----------
-        rads : ArrayLike[float]
+        rads : ArrayLike
             Desired radial distances.  [cm]
 
         Returns
         -------
-        mass : ArrayLike[float]
+        mass : ArrayLike
             Enclosed masses at the given radii.  [gram]
 
         """
@@ -918,12 +914,12 @@ class _Density_Profile(abc.ABC):
 
         Parameters
         ----------
-        rads : ArrayLike[float]
+        rads : ArrayLike
             Desired radial distances.  [cm]
 
         Returns
         -------
-        velo : ArrayLike[float]
+        velo : ArrayLike
             Velocities at the given radii.  [cm/s]
 
         """
@@ -938,21 +934,21 @@ class NFW(_Density_Profile):
     """
 
     @classmethod
-    def density(cls, rads: ArrayLike[float], mhalo: ArrayLike[float], redz: ArrayLike[float]) -> ArrayLike[float]:
+    def density(cls, rads: ArrayLike, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
         """NFW DM Density profile.
 
         Parameters
         ----------
-        rads : ArrayLike[float]
+        rads : ArrayLike
             Target radial distances.  [cm]
-        mhalo : ArrayLike[float]
+        mhalo : ArrayLike
             Halo mass.  [grams]
-        redz : ArrayLike[float]
+        redz : ArrayLike
             Redshift.    []
 
         Returns
         -------
-        dens : ArrayLike[float]
+        dens : ArrayLike
             Densities at the given radii.  [g/cm^3]
 
         """
@@ -963,21 +959,21 @@ class NFW(_Density_Profile):
         return dens
 
     @classmethod
-    def mass(cls, rads: ArrayLike[float], mhalo: ArrayLike[float], redz: ArrayLike[float]) -> ArrayLike[float]:
+    def mass(cls, rads: ArrayLike, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
         """DM mass enclosed at the given radii from an NFW profile.
 
         Parameters
         ----------
-        rads : ArrayLike[float]
+        rads : ArrayLike
             Target radial distances.  [cm]
-        mhalo : ArrayLike[float]
+        mhalo : ArrayLike
             Halo mass.  [gram]
-        redz : ArrayLike[float]
+        redz : ArrayLike
             Redshift.    []
 
         Returns
         -------
-        mass : ArrayLike[float]
+        mass : ArrayLike
             Mass enclosed within the given radii.  [gram]
 
         """
@@ -1006,16 +1002,16 @@ class NFW(_Density_Profile):
 
         Parameters
         ----------
-        mhalo : ArrayLike[float]
+        mhalo : ArrayLike
             Halo mass.  [grams]
-        redz : ArrayLike[float]
+        redz : ArrayLike
             Redshift.
 
         Returns
         -------
-        rho_s : ArrayLike[float]
+        rho_s : ArrayLike
             DM halo characteristic density.   [g/cm^3]
-        rs : ArrayLike[float]
+        rs : ArrayLike
             Scale radius of the DM halo.  [cm]
 
         """
@@ -1032,19 +1028,19 @@ class NFW(_Density_Profile):
         return rho_s, rs
 
     @classmethod
-    def radius_scale(cls, mhalo: ArrayLike[float], redz: ArrayLike[float]) -> ArrayLike[float]:
+    def radius_scale(cls, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
         """Return the DM-halo scale radius.
 
         Parameters
         ----------
-        mhalo : ArrayLike[float]
+        mhalo : ArrayLike
             Halo mass.  [grams]
-        redz : ArrayLike[float]
+        redz : ArrayLike
             Redshift.
 
         Returns
         -------
-        rs : ArrayLike[float]
+        rs : ArrayLike
             Scale radius of the DM halo.  [cm]
 
         """
@@ -1052,19 +1048,19 @@ class NFW(_Density_Profile):
         return rs
 
     @classmethod
-    def density_characteristic(cls, mhalo: ArrayLike[float], redz: ArrayLike[float]) -> ArrayLike[float]:
+    def density_characteristic(cls, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
         """Return the DM halo parameters for characteristic density.
 
         Parameters
         ----------
-        mhalo : ArrayLike[float]
+        mhalo : ArrayLike
             Halo mass.  [grams]
-        redz : ArrayLike[float]
+        redz : ArrayLike
             Redshift.
 
         Returns
         -------
-        rho_s : ArrayLike[float]
+        rho_s : ArrayLike
             DM halo characteristic density.   [g/cm^3]
 
         """
@@ -1097,33 +1093,33 @@ class _StellarMass_HaloMass(abc.ABC):
         return
 
     @abc.abstractmethod
-    def stellar_mass(self, mhalo: ArrayLike[float]) -> ArrayLike[float]:
+    def stellar_mass(self, mhalo: ArrayLike) -> ArrayLike:
         """Calculate the stellar-mass for the given halo mass.
 
         Parameters
         ----------
-        mhalo : ArrayLike[float]
+        mhalo : ArrayLike
             Halo mass.  [gram]
 
         Returns
         -------
-        mstar : ArrayLike[float]
+        mstar : ArrayLike
             Stellar mass.  [gram]
 
         """
         return
 
-    def halo_mass(self, mstar: ArrayLike[float]) -> ArrayLike[float]:
+    def halo_mass(self, mstar: ArrayLike) -> ArrayLike:
         """Calculate the stellar-mass for the given halo mass.
 
         Parameters
         ----------
-        mstar : ArrayLike[float]
+        mstar : ArrayLike
             Stellar mass.  [gram]
 
         Returns
         -------
-        mhalo : ArrayLike[float]
+        mhalo : ArrayLike
             Halo mass.  [gram]
 
         """
@@ -1196,32 +1192,32 @@ class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
         return
 
     @abc.abstractmethod
-    def stellar_mass(self, mhalo: ArrayLike[float], redz: ArrayLike[float]) -> ArrayLike[float]:
+    def stellar_mass(self, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
         """Calculate the stellar-mass for the given halo mass and redshift.
 
         Parameters
         ----------
-        mhalo : ArrayLike[float]
+        mhalo : ArrayLike
             Halo mass.  [gram]
-        redz : ArrayLike[float]
+        redz : ArrayLike
             Redshift.
 
         Returns
         -------
-        mstar : ArrayLike[float]
+        mstar : ArrayLike
             Stellar mass.  [gram]
 
         """
         return
 
-    def halo_mass(self, mstar: ArrayLike[float], redz: ArrayLike[float], clip: bool = False) -> ArrayLike[float]:
+    def halo_mass(self, mstar: ArrayLike, redz: ArrayLike, clip: bool = False) -> ArrayLike:
         """Calculate the halo-mass for the given stellar mass and redshift.
 
         Parameters
         ----------
-        mstar : ArrayLike[float]
+        mstar : ArrayLike
             Stellar mass.  [gram]
-        redz : ArrayLike[float]
+        redz : ArrayLike
             Redshift.
         clip : bool
             Whether or not to clip the input `mstar` values to the extrema of the predefined grid
@@ -1230,7 +1226,7 @@ class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
 
         Returns
         -------
-        mhalo : ArrayLike[float]
+        mhalo : ArrayLike
             Halo mass.  [gram]
 
         """
