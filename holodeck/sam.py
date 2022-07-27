@@ -658,7 +658,7 @@ def _integrate_differential_number(edges, dnum, freq=False):
     """Integrate the differential number-density of binaries over the given grid (edges).
 
     NOTE: the `edges` provided MUST all be in linear space, mass is converted to ``log10(M)``
-          and frequency is converted to ``ln(f)``.
+    and frequency is converted to ``ln(f)``.
     NOTE: the density `dnum` MUST correspond to `dn/ [dlog10(M) dq dz dln(f)]`
 
     Parameters
@@ -673,7 +673,7 @@ def _integrate_differential_number(edges, dnum, freq=False):
     number : ndarray
         Number of binaries in each bin of mass, mass-ratio, redshift, frequency.
         NOTE: if `freq=False`, then `number` corresponds to `dN/dln(f)`, the number of binaries
-              per log-interval of frequency.
+        per log-interval of frequency.
 
     """
     # ---- integrate from differential-number to number per bin
@@ -980,12 +980,10 @@ def _gws_from_number_grid_centroids(edges, dnum, number, realize):
     """Calculate GWs based on a grid of number-of-binaries.
 
     NOTE: `_gws_from_number_grid_integrated()` should be more accurate, but this method better
-          matches GWB from sampled (kale.sample_) populations!!
+    matches GWB from sampled (`kale.sample_`) populations!!
 
-    The input number of binaries is `N` s.t.
-        ``N = (d^4 N / [dlog10(M) dq dz dlogf] ) * dlog10(M) dq dz dlogf``
-    The number `N` is evaluated on a 4d grid, specified by `edges`, i.e.
-        ``N = N(M, q, z, f_r)``
+    The input number of binaries is `N` s.t. $$N = (d^4 N / [dlog10(M) dq dz dlogf] ) * dlog10(M) dq dz dlogf$$
+    The number `N` is evaluated on a 4d grid, specified by `edges`, i.e. $$N = N(M, q, z, f_r)$$
     NOTE: the provided `number` must also summed/integrated over dlogf.
     To calculate characteristic strain, this function divides again by the dlogf term.
 
@@ -1006,7 +1004,7 @@ def _gws_from_number_grid_centroids(edges, dnum, number, realize):
     hc : (M',Q',Z',F) ndarray,
         Total characteristic GW strain from each bin of parameter space.
         NOTE: to get total strain from all bins, must sum in quarature!
-              e.g. ``gwb = np.sqrt(np.square(hc).sum())``
+        e.g. ``gwb = np.sqrt(np.square(hc).sum())``
 
     """
 

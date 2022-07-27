@@ -30,6 +30,7 @@ extensions = [
     'sphinx.ext.extlinks',
     'sphinx.ext.intersphinx',
     'sphinx.ext.mathjax',
+    'sphinx_math_dollar',    # enable dollar-signs to write latex math
     # 'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
     'numpydoc',     # allow numpy/google style docstrings
@@ -49,6 +50,10 @@ autodoc_mock_imports = [
     # 'pytest', 'kalepy', 'astropy', 'h5py', 'kalepy', 'matplotlib', 'scipy', 'tqdm',
 ]
 
+# The reST default role (used for this markup: `text`) to use for all documents.
+# Setting ``default_role = 'literal'`` means that `text` will appear as literal code
+default_role = 'literal'
+
 html_theme = 'sphinx_rtd_theme'
 
 nitpick_ignore = [
@@ -58,11 +63,23 @@ nitpick_ignore = [
 
 # ---- Extensions ------------------------------------------------------------
 
+mathjax3_config = {
+    "tex": {
+        "inlineMath": [['\\(', '\\)']],
+        "displayMath": [["\\[", "\\]"]],
+    }
+}
+
 intersphinx_mapping = {
     'numpy': ('https://numpy.org/doc/stable/', None),
 }
 
 # bibtex_bibfiles = ['refs.bib']
+
+# alphabetical (value 'alphabetical'), by member type (value 'groupwise') or
+# by source order (value 'bysource'). The default is alphabetical.
+autodoc_member_order = 'bysource'
+autodoc_default_options = {"members": True, "undoc-members": True, "private-members": True}
 
 numpydoc_show_class_members = False
 

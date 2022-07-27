@@ -12,10 +12,12 @@ classes):
 
 * **BH-Host Relations** (`_Host_Relation`): These produce mappings between host galaxy properties
   (e.g. bulge mass) and the properties of their black holes (i.e. BH mass).
-    * **Mbh-Mbulge relations** ("M-Mbulge"; `_MMBulge_Relation`): mapping from host galaxy stellar
-      bulge mass to black-hole mass.
-    * **Mbh-Sigma relations** ("M-Sigma"; `_MSigma_Relation`): mapping from host galaxy velocity
-      dispersion (sigma) to black-hole mass.
+
+  * **Mbh-Mbulge relations** ("M-Mbulge"; `_MMBulge_Relation`): mapping from host galaxy stellar
+    bulge mass to black-hole mass.
+  * **Mbh-Sigma relations** ("M-Sigma"; `_MSigma_Relation`): mapping from host galaxy velocity
+    dispersion (sigma) to black-hole mass.
+
 * **Density Profiles** (`_Density_Profile`): matter density as a function of spherical radius.
 * **Stellar-Mass vs. Halo-Mass Relations** (`_StellarMass_HaloMass`): mapping from halo-mass to
   stellar-mass.

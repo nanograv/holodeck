@@ -24,7 +24,7 @@ To-Do
 
 References
 ----------
-* [Quinlan96]_ Quinlan 1996.
+* [Quinlan1996]_ Quinlan 1996.
 * [Sesana2006]_ Sesana, Haardt & Madau et al. 2006.
 * [BBR1980]_ Begelman, Blandford & Rees 1980.
 * [Sesana2010]_ Sesana 2010.
@@ -727,9 +727,9 @@ class Sesana_Scattering(_Hardening):
         mbulge = self._gbh.mbulge_from_mbh(mtot)
         dens = _density_at_influence_radius_dehnen(mtot, mbulge, self._gamma_dehnen)
 
-        rhard = _Quinlan96.radius_hardening(mass[:, 1], vdisp)
+        rhard = _Quinlan1996.radius_hardening(mass[:, 1], vdisp)
         hh = self._shm06.H(mrat, sepa/rhard)
-        dadt = _Quinlan96.dadt(sepa, dens, vdisp, hh)
+        dadt = _Quinlan1996.dadt(sepa, dens, vdisp, hh)
 
         rbnd = _radius_influence_dehnen(mtot, mbulge)
         atten = np.exp(-sepa / rbnd)
@@ -737,7 +737,7 @@ class Sesana_Scattering(_Hardening):
 
         if eccen is not None:
             kk = self._shm06.K(mrat, sepa/rhard, eccen)
-            dedt = _Quinlan96.dedt(sepa, dens, vdisp, hh, kk)
+            dedt = _Quinlan1996.dedt(sepa, dens, vdisp, hh, kk)
         else:
             dedt = None
 
@@ -1233,8 +1233,8 @@ class _EVO(enum.Enum):
     END = -1
 
 
-class _Quinlan96:
-    """Hardening rates from stellar scattering parametrized as in [Quinlan96]_.
+class _Quinlan1996:
+    """Hardening rates from stellar scattering parametrized as in [Quinlan1996]_.
 
     Fits from scattering experiments must be provided as `hparam` and `kparam`.
 
@@ -1244,7 +1244,7 @@ class _Quinlan96:
     def dadt(sepa, rho, sigma, hparam):
         """Binary hardening rate from stellar scattering.
 
-        [Sesana10]_ Eq.8
+        [Sesana2010]_ Eq.8
 
         Parameters
         ----------
@@ -1270,7 +1270,7 @@ class _Quinlan96:
     def dedt(sepa, rho, sigma, hparam, kparam):
         """Binary rate-of-change of eccentricity from stellar scattering.
 
-        [Sesana10] Eq.9
+        [Sesana2010]_ Eq.9
 
         Parameters
         ----------
@@ -1297,22 +1297,22 @@ class _Quinlan96:
     @staticmethod
     def radius_hardening(msec, sigma):
         """
-        [Sesana10] Eq. 10
+        [Sesana2010]_ Eq. 10
         """
         rv = NWTG * msec / (4 * sigma**2)
         return rv
 
 
 class _SHM06:
-    """Fits to stellar-scattering hardening rates from [SHM06]_, based on the [Quinlan96]_ formalism.
+    """Fits to stellar-scattering hardening rates from [Sesana2006]_, based on the [Quinlan1996]_ formalism.
 
     Parameters describe the efficiency of hardening as a function of mass-ratio (`mrat`) and separation (`sepa`).
 
     """
 
     def __init__(self):
-        self._bound_H = [0.0, 40.0]    # See [SHM06] Fig.3
-        self._bound_K = [0.0, 0.4]     # See [SHM06] Fig.4
+        self._bound_H = [0.0, 40.0]    # See [Sesana2006]_ Fig.3
+        self._bound_K = [0.0, 0.4]     # See [Sesana2006]_ Fig.4
 
         # Get the data filename
         fname = os.path.join(_PATH_DATA, _SCATTERING_DATA_FILENAME)

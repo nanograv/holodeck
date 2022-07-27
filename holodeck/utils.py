@@ -775,20 +775,20 @@ def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = T
 def _parse_log_norm_pars(vals, size, default=None):
     """Parse/Sanitize the parameters for a log-normal distribution.
 
-    ()   ==> (N,)
-    (2,) ==> (N,) log_normal(vals)
-    (N,) ==> (N,)
+    * ()   ==> (N,)
+    * (2,) ==> (N,) log_normal(vals)
+    * (N,) ==> (N,)
 
     BUG: this function should probably be deprecated / removed !
 
     Parameters
     ----------
     vals : object,
-        Input, can be a single value, (2,) array_like, of array_like of size `size`.
-        scalar : this value is broadcast to an ndarray of size `size`
-        (2,) array_like : these two arguments are passed to `log_normal_base_10` and `size` samples
-                          are drawn
-        (N,) array_like : if `N` matches `size`, these values are returned.
+        Input can be a single value, (2,) array_like, of array_like of size `size`:
+            * scalar : this value is broadcast to an ndarray of size `size`
+            * (2,) array_like : these two arguments are passed to `log_normal_base_10` and `size` samples
+              are drawn
+            * (N,) array_like : if `N` matches `size`, these values are returned.
 
     Returns
     -------

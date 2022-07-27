@@ -6,7 +6,6 @@ whenever possible.  Constants and units should only be added when they are frequ
 
 Notes
 -----
-Units:
 * [cm] = centimeter
 * [g] = gram
 * [s] = second

@@ -3,5 +3,6 @@ nbsphinx
 numpy
 numpydoc
 astropy
+sphinx-math-dollar
 # sphinxcontrib-bibtex
 # kalepy
