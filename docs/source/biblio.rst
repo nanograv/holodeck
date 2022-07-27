@@ -2,7 +2,7 @@
 Annotated Bibliography
 ======================
 
-* **Begelman, Blandford & Rees 1980**, [BBR80]_ - `Massive black hole binaries in active galactic nuclei <https://ui.adsabs.harvard.edu/abs/1980Natur.287..307B/abstract>`_
+* **Begelman, Blandford & Rees 1980**, [BBR1980]_ - `Massive black hole binaries in active galactic nuclei <https://ui.adsabs.harvard.edu/abs/1980Natur.287..307B/abstract>`_
     * The definitive early discussion of massive black-hole binary evolution, outlining the different stages of environmental interaction (dynamical friction, stellar scattering, etc) and mentioning the possibility of stalling in the parsec regime.
     * Includes simplistic, but useful prescriptions for calculating timescales for each regime of evolution.
 
@@ -27,7 +27,7 @@ These are provided here for easy copy-and-paste usage in other files.
     The Average Star Formation Histories of Galaxies in Dark Matter Halos from z = 0-8
     https://ui.adsabs.harvard.edu/abs/2013ApJ...770...57B/abstract
 
-.. [BBR80] Begelman, Blandford & Rees 1980.  Nature, 287, 5780.
+.. [BBR1980] Begelman, Blandford & Rees 1980.  Nature, 287, 5780.
     Massive black hole binaries in active galactic nuclei.
     https://ui.adsabs.harvard.edu/abs/1980Natur.287..307B/abstract
 
@@ -41,7 +41,7 @@ These are provided here for easy copy-and-paste usage in other files.
     using pulsar timing arrays
     https://ui.adsabs.harvard.edu/abs/2019MNRAS.488..401C/abstract
 
-.. [EN07] Enoki & Nagashima 2007.  PTP, 117, 2.  astro-ph/0609377.
+.. [EN2007] Enoki & Nagashima 2007.  PTP, 117, 2.  astro-ph/0609377.
     The Effect of Orbital Eccentricity on Gravitational Wave Background Radiation from Supermassive Black Hole Binaries
     https://ui.adsabs.harvard.edu/abs/2007PThPh.117..241E/abstract
 
@@ -61,7 +61,7 @@ These are provided here for easy copy-and-paste usage in other files.
     Distance measures in cosmology.
     https://ui.adsabs.harvard.edu/abs/1999astro.ph..5116H
 
-.. [Kelley17] Kelley, Blecha & Hernquist 2017
+.. [Kelley2017] Kelley, Blecha & Hernquist 2017
     Massive black hole binary mergers in dynamical galactic environments
     https://ui.adsabs.harvard.edu/abs/2017MNRAS.464.3131K/abstract
 
@@ -69,15 +69,15 @@ These are provided here for easy copy-and-paste usage in other files.
     MultiDark simulations: the story of dark matter halo concentrations and density profiles
     https://ui.adsabs.harvard.edu/abs/2016MNRAS.457.4340K/abstract
 
-.. [KH13] Kormendy & Ho 2013. ARAA, 51, 1.
+.. [KH2013] Kormendy & Ho 2013. ARAA, 51, 1.
     Coevolution (Or Not) of Supermassive Black Holes and Host Galaxies
     https://ui.adsabs.harvard.edu/abs/2013ARA%26A..51..511K/abstract
 
-.. [MM13] McConnell & Ma 2013.  ApJ, 764, 2.
+.. [MM2013] McConnell & Ma 2013.  ApJ, 764, 2.
     Revisiting the Scaling Relations of Black Hole Masses and Host Galaxy Properties
     https://ui.adsabs.harvard.edu/abs/2013ApJ...764..184M/abstract
 
-.. [NFW97] : Navarro, Frenk & White 1997.  ApJ, 490, 2.
+.. [NFW1997] : Navarro, Frenk & White 1997.  ApJ, 490, 2.
     A Universal Density Profile from Hierarchical Clustering
     https://ui.adsabs.harvard.edu/abs/1997ApJ...490..493N/abstract
 
