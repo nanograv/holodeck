@@ -1,5 +1,8 @@
 """Observational Data
 
+This module provides interfaces to access observational data and constraints, primarily for use
+in calibration and diagnostics of models.
+
 To-Do
 -----
 

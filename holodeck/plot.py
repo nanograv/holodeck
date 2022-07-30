@@ -1,4 +1,7 @@
 """Plotting module.
+
+Provides convenience methods for generating standard plots and components using `matplotlib`.
+
 """
 
 import numpy as np
@@ -59,7 +62,8 @@ def figax(figsize=[10, 4], ncols=1, nrows=1, sharex=False, sharey=False, squeeze
           widths=None, heights=None, grid=True, **kwargs):
     """Create matplotlib figure and axes instances.
 
-    Convenience function to create fig/axes using `plt.subplots`, and set default parameters.
+    Convenience function to create fig/axes using `plt.subplots`, and quickly modify standard
+    parameters.
 
     Parameters
     ----------
@@ -76,7 +80,7 @@ def figax(figsize=[10, 4], ncols=1, nrows=1, sharex=False, sharey=False, squeeze
     squeeze : bool, optional
         Remove dimensions of length (1,) in the `axes` object.
     scale : [type], optional
-        Axes scaling to be applied to all x/y axes ['log', 'lin'].
+        Axes scaling to be applied to all x/y axes.  One of ['log', 'lin'].
     xscale : str, optional
         Axes scaling for xaxes ['log', 'lin'].
     xlabel : str, optional

@@ -1,16 +1,18 @@
-"""
+"""Logging module.
+
+This module produces a `logging.Logger` instance that can log both to stdout (i.e. using print) and
+also to an output file.  This is especially useful for long or parallelized calculations where
+more significant diagnostic outputs are required for debugging and/or record-keeping.
+
 """
 
-# import inspect
 import logging
+from logging import DEBUG, INFO, WARNING, ERROR  # noqa import these for easier access internally
 import sys
-from logging import DEBUG, INFO, WARNING, ERROR  # noqa
 
 
 def get_logger(name='holodeck', level_stream=logging.WARNING, tostr=sys.stdout, tofile=None, level_file=logging.DEBUG):
     """Create a standard logger object which logs to file and or stdout stream.
-
-    If logging to output stream (stdout) is enabled, an `_Indent_Formatter` object is used.
 
     Parameters
     ----------
@@ -42,11 +44,10 @@ def get_logger(name='holodeck', level_stream=logging.WARNING, tostr=sys.stdout, 
     logger.propagate = 0
 
     # Logger object must be at minimum level
-    # logger.setLevel(int(np.min([level_file, level_stream])))
+    # logger.setLevel(int(np.min([level_file, level_stream])))   # BUG: this was causing issues!
     logger.setLevel(logging.DEBUG)
 
-    # Log to file
-    # -----------
+    # ---- Log to file
     if tofile not in [None, False]:
         format_date = '%Y/%m/%d %H:%M:%S'
         format_file = "%(asctime)s %(levelname)8.8s [%(filename)20.20s:%(funcName)-20.20s]%(message)s"
@@ -58,7 +59,7 @@ def get_logger(name='holodeck', level_stream=logging.WARNING, tostr=sys.stdout, 
         # Store output filename to `logger` object
         logger.filename = tofile
 
-    # ---- log To stdout
+    # ---- Log To stdout
     if tostr not in [None, False]:
         format_date = '%H:%M:%S'
 
