@@ -1,4 +1,4 @@
-"""Cosmology related code.
+"""Cosmological calculations and methods.
 
 This file primarily provides the `Cosmology` class, which extends the functionality of astropy's
 `FlatLambdaCDM` class to include additional utility functions.  The `Cosmology` class here is
@@ -6,13 +6,8 @@ initialized with WMAP9 parameters from [WMAP9]_.
 
 References
 ----------
-* [Hogg1999]_ Hogg 1999 (astro-ph/9905116).
-  Distance measures in cosmology.
-  https://ui.adsabs.harvard.edu/abs/1999astro.ph..5116H
-
-* [WMAP9]_ Hinshaw et al. 2013 (1212.5226).
-  Nine-year Wilkinson Microwave Anisotropy Probe (WMAP) Observations: Cosmological Parameter Results.
-  https://ui.adsabs.harvard.edu/abs/2013ApJS..208...19H/abstract
+* [Hogg1999]_ Hogg 1999.
+* [WMAP9]_ Hinshaw et al. 2013.
 
 """
 
@@ -30,10 +25,9 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
     Based on the `astropy.cosmology.Cosmology` methods and classes.
 
     The base class provides methods to convert from redshift to desired cosmological parameters,
-    e.g. `luminosity_distance(z)`.  These methods are used to construct a numerical grid of values
-    as a function of redshift.  To calculate the redshift (and other cosmological parameters) when
-    given a derived quantitiy (i.e. to come from d_L to redshift), the numerical grid can then be
-    inverted and interpolated to find the corresponding redshift.
+    e.g. `luminosity_distance(z)`.  These methods are also used to construct a numerical grid of
+    values as a function of redshift.  This numerical grid is then used to interpolate backwards
+    from cosmological parameters (e.g. distance measures) back to redshift.
 
     """
 
@@ -177,6 +171,44 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
         arrs = sp.interpolate.PchipInterpolator(xx[inds], yy[inds], extrapolate=False)(vals)
         return arrs
 
+    def _get_grid(self):
+        """Return an array of the grid of interpolation points for each cosmological parameter.
+
+        Returns
+        -------
+        grid : (N,M,) of scalar
+            Grid of `N` values for each of `M` cosmological parameters.
+            For example, the redshift values are `grid[:, 0]`.
+        names : (M,) str
+            The names of each cosmological parameter in the grid.
+        units : (M,) str
+            The units used for each cosmological parameter in the grid.
+
+        """
+        _var_keys = ["_grid_z", "_grid_a", "_grid_dcom", "_grid_dlum", "_grid_lbk", "_grid_age"]
+        _var_names = ["z", "a", "dc", "dl", "tl", "ta"]
+        _var_types = [None, None, ['cm', 'Mpc'], ['cm', 'Mpc'], ['s', 'Gyr'], ['s', 'Gyr']]
+
+        ngrid = self._grid_z.size
+        npars = len(_var_keys)
+        grid = np.zeros((ngrid, npars))
+        names = []
+        units = []
+        for ii, (vk, un) in enumerate(zip(_var_keys, _var_types)):
+            vals = getattr(self, vk)
+            nam = _var_names[ii]
+            # Convert units if desired
+            if un is not None:
+                vals = ap.units.Quantity(vals, unit=un[0]).to(un[1]).value
+                # nam += '[' + un[1] + ']'
+                units.append(un[1])
+            else:
+                units.append('-')
+            grid[:, ii] = vals
+            names.append(nam)
+
+        return grid, names, units
+
     def tage_to_z(self, age):
         """Convert from age of the universe [seconds] to redshift.
         """
@@ -236,44 +268,6 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
         """
         dl = self._interp(zz, self._grid_z, self._grid_dlum, self._sort_z)
         return dl
-
-    def get_grid(self):
-        """Return an array of the grid of interpolation points for each cosmological parameter.
-
-        Returns
-        -------
-        grid : (N,M,) of scalar
-            Grid of `N` values for each of `M` cosmological parameters.
-            For example, the redshift values are `grid[:, 0]`.
-        names : (M,) str
-            The names of each cosmological parameter in the grid.
-        units : (M,) str
-            The units used for each cosmological parameter in the grid.
-
-        """
-        _var_keys = ["_grid_z", "_grid_a", "_grid_dcom", "_grid_dlum", "_grid_lbk", "_grid_age"]
-        _var_names = ["z", "a", "dc", "dl", "tl", "ta"]
-        _var_types = [None, None, ['cm', 'Mpc'], ['cm', 'Mpc'], ['s', 'Gyr'], ['s', 'Gyr']]
-
-        ngrid = self._grid_z.size
-        npars = len(_var_keys)
-        grid = np.zeros((ngrid, npars))
-        names = []
-        units = []
-        for ii, (vk, un) in enumerate(zip(_var_keys, _var_types)):
-            vals = getattr(self, vk)
-            nam = _var_names[ii]
-            # Convert units if desired
-            if un is not None:
-                vals = ap.units.Quantity(vals, unit=un[0]).to(un[1]).value
-                # nam += '[' + un[1] + ']'
-                units.append(un[1])
-            else:
-                units.append('-')
-            grid[:, ii] = vals
-            names.append(nam)
-
-        return grid, names, units
 
     def dVcdz(self, zz, cgs=True):
         """Differential comoving volume of the universe.
