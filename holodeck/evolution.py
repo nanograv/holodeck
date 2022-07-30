@@ -50,7 +50,7 @@ import holodeck as holo
 from holodeck import utils, cosmo, log, _PATH_DATA
 from holodeck.constants import GYR, NWTG, PC, MSOL, YR, SPLC
 
-_DEF_TIME_DELAY = (5.0*GYR, 0.2)
+_DEF_TIME_DELAY = (5.0*GYR, 0.2)   #: default delay-time parameters, (mean, stdev)
 _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 
 

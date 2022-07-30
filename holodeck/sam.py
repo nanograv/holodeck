@@ -1,4 +1,29 @@
-"""Holodeck - Semi Analytic Modeling submodule
+"""Semi Analytic Modeling (SAM) submodule.
+
+The core element of the SAM module is the `Semi_Analytic_Model` class.  This class requires four
+components as arguments:
+
+(1) Galaxy Stellar Mass Function (GSMF): gives the comoving number-density of galaxies as a function
+    of stellar mass.  This is implemented as subclasses of the `_Galaxy_Stellar_Mass_Function`
+    base class.
+(2) Galaxy Pair Fraction (GPF): gives the fraction of galaxies that are in a 'pair' with a given
+    mass ratio (and typically a function of redshift and primary-galaxy mass).  Implemented as
+    subclasses of the `_Galaxy_Pair_Fraction` subclass.
+(3) Galaxy Merger Time (GMT): gives the characteristic time duration for galaxy 'mergers' to occur.
+    Implemented as subclasses of the `_Galaxy_Merger_Time` subclass.
+(4) M_bh - M_bulge Relation (mmbulge): gives MBH properties for a given galaxy stellar-bulge mass.
+    Implemented as subcalsses of the `holodeck.relations._MMBulge_Relation` subclass.
+
+The `Semi_Analytic_Model` class defines a grid in parameter space of total MBH mass ($M=M_1 + M_2$),
+MBH mass ratio ($q \\equiv M_1/M_2$), redshift ($z$), and at times binary separation
+(semi-major axis $a$) or binary rest-frame frequency ($f_r$).  Over this grid, the distribution of
+comoving number-density of MBH binaries in the Universe is calculated.  Methods are also provided
+that interface with the `kalepy` package to draw 'samples' (discretized binaries) from the
+distribution, and to calculate GW signatures.
+
+The step of going from a number-density of binaries in $(M, q, z)$ space, to also the distribution
+in $a$ or $f$ is subtle, as it requires modeling the binary evolution (i.e. hardening rate).
+
 
 To-Do
 -----
@@ -10,10 +35,12 @@ To-Do
   the log(dens) instead of just `dens`.
 * Should there be an additional dimension of parameter space for galaxy properties?  This way
   variance in scaling relations is incorporated directly before calculating realizations.
+* Allow SAM class to take M-sigma in addition to M-Mbulge.
+* Should GW calculations be moved to the `gravwaves.py` module?
 
 References
 ----------
-* [Chen2019]_ Chen, Sesana, Conselice 2019
+* [Chen2019]_ Chen, Sesana, Conselice 2019.
 
 """
 
@@ -33,6 +60,14 @@ _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
 REDZ_SCALE_LOG = True
 REDZ_SAMPLE_VOLUME = True
+
+
+# ==============================
+# ====    SAM Components    ====
+# ==============================
+
+
+# ----    Galaxy Stellar-Mass Function    ----
 
 
 class _Galaxy_Stellar_Mass_Function(abc.ABC):
@@ -68,9 +103,9 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
 class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
     """Single Schechter Function - Galaxy Stellar Mass Function.
 
-    This is density per unit log10-interval of stellar mass, i.e. Phi = dn / dlog10(M)
+    This is density per unit log10-interval of stellar mass, i.e. $Phi = dn / d\\log_{10}(M)$
 
-    See: [Chen19] Eq.9 and enclosing section
+    See: [Chen19]_ Eq.9 and enclosing section.
 
     """
 
@@ -123,6 +158,9 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
         """See: [Chen19] Eq.11
         """
         return self._alpha0 + self._alphaz * redz
+
+
+# ----    Galaxy Pair Fraction    ----
 
 
 class _Galaxy_Pair_Fraction(abc.ABC):
@@ -207,6 +245,9 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
         gg = self._qgamma
         rv = f0p * np.power(mpri/am0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
         return rv
+
+
+# ----    Galaxy Merger Time    ----
 
 
 class _Galaxy_Merger_Time(abc.ABC):
@@ -302,6 +343,11 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
         mtime = tau0 * np.power(mpri/bm0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
         mtime = mtime
         return mtime
+
+
+# ===================================
+# ====    Semi-Analytic Model    ====
+# ===================================
 
 
 class Semi_Analytic_Model:
@@ -652,6 +698,11 @@ class Semi_Analytic_Model:
             hc = hc.squeeze()
 
         return hc
+
+
+# ===============================
+# ====    Utility Methods    ====
+# ===============================
 
 
 def _integrate_differential_number(edges, dnum, freq=False):
