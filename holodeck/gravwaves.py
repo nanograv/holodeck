@@ -1,4 +1,9 @@
-"""
+"""Gravitational Wave (GW) calculations module.
+
+This module provides tools for calculating GW signals from MBH binaries.
+Currently the components here are used with the 'discrete' / 'illustris' population of binaries,
+and not the semi-analytic or observational population models.
+
 """
 
 import numpy as np

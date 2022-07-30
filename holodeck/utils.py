@@ -24,7 +24,7 @@ import h5py
 from holodeck import log
 from holodeck.constants import NWTG, SCHW, SPLC, YR
 
-# e.g. [Sesana2004]_ Eq.36
+# [Sesana2004]_ Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
 _GW_DADT_SEP_CONST = - 64 * np.power(NWTG, 3) / 5 / np.power(SPLC, 5)
 _GW_DEDT_ECC_CONST = - 304 * np.power(NWTG, 3) / 15 / np.power(SPLC, 5)
@@ -613,6 +613,45 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
     return rv
 
 
+def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = True):
+    """Perform a cumulative integration along the given axis.
+
+    Parameters
+    ----------
+    yy : ArrayLike of scalar,
+        Input to be integrated.
+    xx : ArrayLike of scalar,
+        The sample points corresponding to the `yy` values.
+        This must be either be shaped as
+        * the same number of dimensions as `yy`, with the same length along the `axis` dimension, or
+        * 1D with length matching `yy[axis]`
+    axis : int,
+        The axis over which to integrate.
+
+    Returns
+    -------
+    ct : ndarray of scalar,
+        Cumulative trapezoid rule integration.
+
+    """
+    if np.ndim(xx) == 1:
+        pass
+    elif np.ndim(xx) == np.ndim(yy):
+        xx = xx[axis]
+    else:
+        err = f"Bad shape for `xx` (xx.shape={np.shape(xx)}, yy.shape={np.shape(yy)})!"
+        log.error(err)
+        raise ValueError(err)
+    ct = np.moveaxis(yy, axis, 0)
+    ct = 0.5 * (ct[1:] + ct[:-1])
+    ct = np.moveaxis(ct, 0, -1)
+    ct = ct * np.diff(xx)
+    if cumsum:
+        ct = np.cumsum(ct, axis=-1)
+    ct = np.moveaxis(ct, -1, axis)
+    return ct
+
+
 def trapz_loglog(
         yy: npt.ArrayLike,
         xx: npt.ArrayLike,
@@ -731,45 +770,6 @@ def trapz_loglog(
         integ = hi - lo
 
     return integ
-
-
-def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = True):
-    """Perform a cumulative integration along the given axis.
-
-    Parameters
-    ----------
-    yy : ArrayLike of scalar,
-        Input to be integrated.
-    xx : ArrayLike of scalar,
-        The sample points corresponding to the `yy` values.
-        This must be either be shaped as
-        * the same number of dimensions as `yy`, with the same length along the `axis` dimension, or
-        * 1D with length matching `yy[axis]`
-    axis : int,
-        The axis over which to integrate.
-
-    Returns
-    -------
-    ct : ndarray of scalar,
-        Cumulative trapezoid rule integration.
-
-    """
-    if np.ndim(xx) == 1:
-        pass
-    elif np.ndim(xx) == np.ndim(yy):
-        xx = xx[axis]
-    else:
-        err = f"Bad shape for `xx` (xx.shape={np.shape(xx)}, yy.shape={np.shape(yy)})!"
-        log.error(err)
-        raise ValueError(err)
-    ct = np.moveaxis(yy, axis, 0)
-    ct = 0.5 * (ct[1:] + ct[:-1])
-    ct = np.moveaxis(ct, 0, -1)
-    ct = ct * np.diff(xx)
-    if cumsum:
-        ct = np.cumsum(ct, axis=-1)
-    ct = np.moveaxis(ct, -1, axis)
-    return ct
 
 
 def _parse_log_norm_pars(vals, size, default=None):

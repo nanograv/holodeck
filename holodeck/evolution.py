@@ -1,4 +1,4 @@
-"""Module for binary evolution from time of formation/galaxy-merger until BH coalescence.
+"""Module for binary evolution from the time of formation/galaxy-merger until BH coalescence.
 
 To-Do
 -----
