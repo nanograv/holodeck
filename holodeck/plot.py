@@ -370,7 +370,7 @@ def plot_bin_pop(pop):
 
 
 def plot_mbh_scaling_relations(pop, fname=None, color='r'):
-    units = "$[\log_{10}(M/M_\odot)]$"
+    units = r"$[\log_{10}(M/M_\odot)]$"
     fig, ax = plt.subplots(figsize=[8, 5])
     ax.set(xlabel=f'Stellar Mass {units}', ylabel=f'BH Mass {units}')
 

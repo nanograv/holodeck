@@ -1,9 +1,16 @@
 name: generate coverage and upload to Codecov
-on: [push]
+on:
+  push:
     branches:
       - "main"
       - "dev"
       - "docs"
+  pull_request:
+    branches:
+      - "main"
+      - "dev"
+      - "docs"
+
 jobs:
   run:
     runs-on: ${{ matrix.os }}

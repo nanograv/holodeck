@@ -1,6 +1,4 @@
 """Tests for `population.py` holodeck submodule.
-
-
 """
 
 import numpy as np
@@ -19,6 +17,10 @@ from holodeck.constants import MSOL, PC
 
 
 def test_pop_illustris_basic():
+    """Basic Pop_Illustris tests.
+
+    Make sure the expected attributes (`keys`) exist, and have the appropriate range of values.
+    """
     print("test_pop_illustris_basic()")
     pop = holo.population.Pop_Illustris()
 

@@ -1,6 +1,5 @@
-"""MBH Binary Populations and related tools.
+"""Discrete MBH Binary Populations (from cosmological hydrodynamic simulations) and related tools.
 
-Currently only 'discrete' (i.e. Illustris) based populations are implemented here.
 For semi-analytic models, see the `sam.py` module.  For observational populatons, see
 `pop_observational.py`.
 
