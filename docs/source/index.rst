@@ -105,7 +105,7 @@ To install `nbstripout` for the `holodeck` git package, make sure you're in the 
 Test Suite
 ----------
 
-**Before submitting a pull request, run `scripts/tester.sh -bv; tox` to run the full suite of builtin tests.**
+**Before submitting a pull request, run `$ tox` to execute the full suite of builtin tests.**
 
 (Unit)tests should be developed in two ways: for simple functions/behaviors, standard unit-tests can be placed in the `holodeck/tests/` directory.  More complex functionality should be tested in notebooks (in `notebooks/`) where they can also be used as demonstrations/tutorials for that behavior.  The python script `scripts/convert_notebook_tests.py` converts target notebooks into python scripts in the `holodeck/tests/converted_notebooks` directory, which can then be run by `pytest`.  The script `scripts/tester.sh` will run the conversion script and then run `pytest`, for help and usage information, run `$ scripts/tester.sh -h`.
 
