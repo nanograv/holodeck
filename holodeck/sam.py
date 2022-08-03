@@ -382,10 +382,10 @@ class Semi_Analytic_Model:
         """
 
         # Sanitize input classes/instances
-        utils._get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
-        utils._get_subclass_instance(gpf, None, _Galaxy_Pair_Fraction)
-        utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
-        utils._get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
+        gsmf = utils._get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
+        gpf = utils._get_subclass_instance(gpf, None, _Galaxy_Pair_Fraction)
+        gmt = utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
+        mmbulge = utils._get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
 
         # NOTE: Create a copy of input args to make sure they aren't overwritten (in-place)
         mtot = [mt for mt in mtot]
