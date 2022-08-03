@@ -1,4 +1,4 @@
-name: CI with tox pytest
+name: tox pytest unit tests
 
 on:
   push:
@@ -47,29 +47,3 @@ jobs:
     - name: Run pytest with tox
       # Run tox using the version of Python in `PATH`
       run: tox -e py
-
-    # - name: lint with flake8 on py39
-    #     if:  matrix.python-version == '3.9'
-    #     run: tox -e flake8
-
-    # - name: Run tests
-    #   run: |
-    #      python ./convert_notebook_tests.py
-    #      bash ./scripts/tester.sh -b -v
-
-    # - name: CodeCov
-    #   uses: codecov/codecov-action@v1
-    #   with:
-    #     file: ./coverage.xml
-    #     flags: unittests
-    #     name: codecov-${{ matrix.os }}-py${{ matrix.python-version }}
-
-    # - name: Run tests and collect coverage
-    #       run: pytest --cov .
-    #     - name: Upload coverage reports to Codecov
-    #       run: |
-    #         # Replace `linux` below with the appropriate OS
-    #         # Options are `alpine`, `linux`, `macos`, `windows`
-    #         curl -Os https://uploader.codecov.io/latest/linux/codecov
-    #         chmod +x codecov
-    #         ./codecov -t ${CODECOV_TOKEN}
