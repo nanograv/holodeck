@@ -12,10 +12,10 @@ import logging
 TEST_NOTEBOOK_NAMES = [
     # 'continuous_observational',
     'discrete_illustris',
-    'relations',
     'host-relations',
+    'relations',
+    'semi-analytic-models',
     'utils',
-    'sam/quickstart',
 ]
 
 REPLACEMENTS = [
