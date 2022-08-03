@@ -11,7 +11,7 @@ set -e    # exit on error
 CONVERTER_NAME="scripts/convert_notebook_tests.py"
 TESTS_NAME="holodeck/tests/"
 NOTEBOOK_TESTS_NAME="holodeck/tests/converted_notebooks/"
-PYTEST_ARGS=("-v" "--cov=holodeck" "--cov-report=html" "--color=yes")
+PYTEST_ARGS=("-v" "--cov=holodeck" "--cov-report=html:.pytest_cov" "--color=yes")
 VERBOSE=false;
 DRY=false;
 BUILD=false;
@@ -29,13 +29,13 @@ function help()
     echo "Syntax: tester.sh [-h|v|d|b] [FILES/DIRS...]"
     echo
     echo "options:"
-    echo "h     (help)    print this Help."
-    echo "v     (verbose) verbose output."
-    echo "d     (dryrun)  print commands without running them."
-    echo "l     (list)    list collected tests without running them."
-    echo "b     (build)   rebuild notebook tests."
-    echo "s     (skip)    skip    notebook tests."
-    echo "x     (exit)    exit on first failure."
+    echo "h   (help)    print this Help."
+    echo "v   (verbose) verbose output."
+    echo "d   (dryrun)  print commands without running them."
+    echo "l   (list)    list collected tests without running them."
+    echo "b   (build)   rebuild notebook tests."
+    echo "s   (skip)    skip    notebook tests."
+    echo "x   (exit)    exit on first failure."
     echo
 }
 
