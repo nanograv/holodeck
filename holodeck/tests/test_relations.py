@@ -80,7 +80,7 @@ def check_relation(mmbulge_relation, truth_func):
 def check_scatter_per_dex(mmbulge_relation, scatter_dex):
     EXTR = [9.0, 12.0]   # values are log10(X/Msol)
     NUM = 1e4
-    TOL = 3.0
+    TOL = 4.0
     SIGMAS = [-2, -1, 0, 1, 2]
     # draw a single, random (log-uniform) bulge-mass within given bounds
     mbulge = np.random.uniform(*EXTR)
