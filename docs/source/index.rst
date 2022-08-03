@@ -105,12 +105,11 @@ To install `nbstripout` for the `holodeck` git package, make sure you're in the 
 Test Suite
 ----------
 
-(Unit)tests should be developed in two ways: for simple functions/behaviors, standard unit-tests can be placed in the `holodeck/tests/` directory.  More complex functionality should be tested in notebooks (in `notebooks/`) where they can also be used as demonstrations/tutorials for that behavior.  The python script `scripts/convert_notebook_tests.py` converts target notebooks into python scripts in the `holodeck/tests/` directory, which can then be run by `pytest`.  The script `scripts/tester.sh` will run the conversion script and then run `pytest`.
+**Before submitting a pull request, run `scripts/tester.sh -bv; tox` to run the full suite of builtin tests.**
 
-The full test suite can be run on all supported python versions using `tox`.  In the base package directory, simply run `$ tox` and it will use `conda` to create evironments and run tests on all supported python versions.
+(Unit)tests should be developed in two ways: for simple functions/behaviors, standard unit-tests can be placed in the `holodeck/tests/` directory.  More complex functionality should be tested in notebooks (in `notebooks/`) where they can also be used as demonstrations/tutorials for that behavior.  The python script `scripts/convert_notebook_tests.py` converts target notebooks into python scripts in the `holodeck/tests/converted_notebooks` directory, which can then be run by `pytest`.  The script `scripts/tester.sh` will run the conversion script and then run `pytest`, for help and usage information, run `$ scripts/tester.sh -h`.
 
-**Before submitting a pull request, run `scripts/tester.sh -bv` to run the builtin tests.**
-For more comprehensive testing (e.g. against numerous python versions, and building from the sdist package), you can use the python `tox` package: simply run `tox` in the root directory and it will use the configuration specified in `tox.ini`.  The script `scripts/run_tox.sh` is also provided to setup and execute tox tests and required environments.
+The full test suite can be run on all supported python versions using `tox`.  In the base package directory, simply run `$ tox` and it will use `conda` to create environments and run tests on all supported python versions.  To include the notebook tests, make sure to run `scripts/tester.sh` before running `tox`.
 
 
 Attribution & Referencing
