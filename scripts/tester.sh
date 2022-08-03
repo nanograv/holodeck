@@ -11,7 +11,7 @@ set -e    # exit on error
 CONVERTER_NAME="scripts/convert_notebook_tests.py"
 TESTS_NAME="holodeck/tests/"
 NOTEBOOK_TESTS_NAME="holodeck/tests/converted_notebooks/"
-PYTEST_ARGS=("-v" "--cov=holodeck" "--cov-report=html:.pytest_cov" "--color=yes")
+PYTEST_ARGS=("-v" "--cov=holodeck" "--cov-report=html:coverage" "--color=yes")
 VERBOSE=false;
 DRY=false;
 BUILD=false;
