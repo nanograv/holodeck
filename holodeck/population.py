@@ -79,6 +79,7 @@ References
 
 import abc
 import os
+from typing import Tuple
 
 import numpy as np
 
@@ -148,7 +149,8 @@ class _Population_Discrete(abc.ABC):
     def _update_derived(self):
         """Set or reset any derived quantities.
         """
-        pass
+        self._size = self.sepa.size
+        return
 
     @property
     def size(self):
@@ -348,15 +350,6 @@ class Pop_Illustris(_Population_Discrete):
         self.vdisp = data['SubhaloVelDisp']    #: Velocity dispersion of galaxy [?cm/s?]
         return
 
-    def _update_derived(self):
-        """Reset any derived quantities.
-
-        This is called after modifiers are applied, which may change class attributes.
-
-        """
-        self._size = self.sepa.size            #: Number of binaries
-        return
-
 
 # =========================
 # ====    Modifiers    ====
@@ -373,7 +366,7 @@ class PM_Eccentricity(_Population_Modifier):
     """Population Modifier to implement eccentricity in the binary population.
     """
 
-    def __init__(self, eccen_dist=_DEF_ECCEN_DIST):
+    def __init__(self, eccen_dist: Tuple[float, float] = _DEF_ECCEN_DIST):
         """Initialize eccentricity modifier.
 
         Parameters
