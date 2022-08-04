@@ -5,4 +5,5 @@ numpydoc
 kalepy
 astropy
 sphinx-math-dollar
+sphinx-rtd-theme
 # sphinxcontrib-bibtex
