@@ -4,9 +4,17 @@ Annotated Bibliography
 
 Generating references on :ref:`NASA ADS <https://ui.adsabs.harvard.edu/user/libraries/DDrcbmynS-CEJgm24zT0ig>`:
 
-* For short references (e.g. in code files): `* [%1.1h%Y]_ %3.1M (%Y)`.
-* For :ref:`annotated bibliography <Bibliography>` section: `* **%3.1M %Y**, [%1.1h%Y]_ - `%T <%u>`_\n`
-* For full references (e.g. in the :ref:`References` section below): `.. [%1.1h%Y] : %3.1M (%Y), %q, %V, %S.\n   %T\n   %u\n`.
+* For short references (e.g. in code files)::
+
+    * [%1.1h%Y]_ %3.1M (%Y)`.
+
+* For :ref:`annotated bibliography <Bibliography>` section::
+
+    * **%3.1M %Y**, [%1.1h%Y]_ - `%T <%u>`_\n`
+
+* For full references (e.g. in the :ref:`References` section below)::
+
+    .. [%1.1h%Y] %3.1M (%Y), %q, %V, %S.\n   %T\n   %u\n`.
 
 
 Bibliography
@@ -85,7 +93,7 @@ These are provided here for easy copy-and-paste usage in other files.
    Introducing the Illustris project: the evolution of galaxy populations across cosmic time
    https://ui.adsabs.harvard.edu/abs/2014MNRAS.445..175G
 
-.. [Guo2010] : Guo, White, Li & Boylan-Kolchin 2010.  MNRAS, 404, 3.
+.. [Guo2010] Guo, White, Li & Boylan-Kolchin 2010.  MNRAS, 404, 3.
     How do galaxies populate dark matter haloes?
     https://ui.adsabs.harvard.edu/abs/2010MNRAS.404.1111G/abstract
 
@@ -113,11 +121,11 @@ These are provided here for easy copy-and-paste usage in other files.
     Revisiting the Scaling Relations of Black Hole Masses and Host Galaxy Properties
     https://ui.adsabs.harvard.edu/abs/2013ApJ...764..184M/abstract
 
-.. [NFW1997] : Navarro, Frenk & White 1997.  ApJ, 490, 2.
+.. [NFW1997] Navarro, Frenk & White 1997.  ApJ, 490, 2.
     A Universal Density Profile from Hierarchical Clustering
     https://ui.adsabs.harvard.edu/abs/1997ApJ...490..493N/abstract
 
-.. [Nelson2015] : Nelson et al. (2015), A&C, 13,.
+.. [Nelson2015] Nelson et al. (2015), A&C, 13,.
    The illustris simulation: Public data release
    https://ui.adsabs.harvard.edu/abs/2015A&C....13...12N
 
@@ -155,15 +163,15 @@ These are provided here for easy copy-and-paste usage in other files.
     Implications for Gravitational Wave Observations
     https://ui.adsabs.harvard.edu/abs/2010ApJ...719..851S/abstract
 
-.. [Sijacki2015] : Sijacki et al. (2015), MNRAS, 452, 1.
+.. [Sijacki2015] Sijacki et al. (2015), MNRAS, 452, 1.
    The Illustris simulation: the evolving population of black holes across cosmic time
    https://ui.adsabs.harvard.edu/abs/2015MNRAS.452..575S
 
-.. [Springel2010] : Springel (2010), MNRAS, 401, 2.
+.. [Springel2010] Springel (2010), MNRAS, 401, 2.
    E pur si muove: Galilean-invariant cosmological hydrodynamical simulations on a moving mesh
    https://ui.adsabs.harvard.edu/abs/2010MNRAS.401..791S
 
-.. [Vogelsberger2014] : Vogelsberger et al. (2014), MNRAS, 444, 2.
+.. [Vogelsberger2014] Vogelsberger et al. (2014), MNRAS, 444, 2.
    Introducing the Illustris Project: simulating the coevolution of dark and visible matter in the Universe
    https://ui.adsabs.harvard.edu/abs/2014MNRAS.444.1518V
 
