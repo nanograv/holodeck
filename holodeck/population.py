@@ -25,6 +25,38 @@ the :class:`_Population_Modifier` base class.  Examples of currently implemented
 adding eccentricity to otherwise circular binaries (:class:`PM_Eccentricity`), or changing the MBH
 masses to match prescribed scaling relations (:class:`PM_Mass_Reset`).
 
+The implementation for binary evolution (e.g. environmental hardening processes), as a function of
+separation or frequency, are included in the :mod:`holodeck.evolution` module.  The population
+classes describe the 'initial conditions' of binaries.  The initial conditions, or 'formation', of
+the binary can be defined arbitrarily.  In
+practice, due to cosmologcal-simulation resolution constraints, this is at/during the galaxy merger
+when the two MBHs are at separations of roughly a kiloparsec, and not gravitational bound, or even
+interacting.  Depending on what evolution model is used along with the initial population, all or
+only some fraction of 'binaries' (MBH pairs) will actually reach the small separations to become
+a true, gravitationally-bound binary.
+
+The fundamental, required attributes for all population classes are:
+* `sepa` the initial binary separation in [cm].  This should be shaped as (N,) for N binaries.
+* `mass` the mass of each component in the binary in [gram].  This should be shaped as (N, 2) for
+  N binaries, and the two components of the binary.  The 0th index should refer to the more massive
+  primary, while the 1th component refers to the less massive secondary.
+* `scafa` the scale-factor defining the age of the universe for formation of this binary.  This
+  should be shaped as (N,).
+
+
+Notes
+-----
+* **Populations** (subclasses of :class:`_Population_Discrete`)
+    * The `_init()` method is used to set the basic attributes of the binary population (i.e. `sepa`,
+      `mass`, and `scafa`).
+    * The `_update_derived()` method is used to set quantities that are derived from the basic
+      attributes.  For example, the `size` attribute should be set here, based on the length of the
+      attribute arrays.
+* **Modifiers** (subclasses of :class:`_Population_Modifier`)
+    * The `modify()` method must be overridden to change the attributes of a population instance.
+      The changes should be made in-place (i.e. without returning a new copy of the population
+      instance).
+
 To-Do
 -----
 
@@ -32,6 +64,9 @@ To-Do
 References
 ----------
 * [Genel2014]_ Genel et al. (2014)
+* [Kelley2017a]_ Kelley, Blecha, and Hernquist (2017a).
+* [Kelley2017b]_ Kelley et al. (2017b).
+* [Kelley2018]_ Kelley et al. (2018).
 * [Nelson2015]_ Nelson et al. (2015)
 * [Rodriguez-Gomez2015]_ Rodriguez-Gomez et al. (2015)
 * [Sijacki2015]_ Sijacki et al. (2015)
@@ -54,8 +89,16 @@ _DEF_ECCEN_DIST = (1.0, 0.2)
 _DEF_ILLUSTRIS_FNAME = "illustris-galaxy-mergers_L75n1820FP_gas-100_dm-100_star-100_bh-000.hdf5"
 
 
+# ===========================
+# ====    Populations    ====
+# ===========================
+
+
 class _Population_Discrete(abc.ABC):
     """Base class for representing discrete binaries, e.g. from cosmo hydrodynamic simulations.
+
+    This class must be subclasses for specific implementations (i.e. for specific cosmo sims).
+
     """
 
     def __init__(self, *args, mods=None, check=True, **kwargs):
@@ -75,18 +118,7 @@ class _Population_Discrete(abc.ABC):
 
         """
         self._check_flag = check
-        # Initialize the population
-        self._init()
-        # Apply modifications (using `Modifer` instances), run `_finalize` and `_check()`
-        self.modify(mods)
-        return
 
-    def _init(self):
-        """Initialize basic binary parameters.
-
-        This function should typically be overridden in subclasses.
-
-        """
         # Initial binary values (i.e. at time of formation)
         self.mass = None    #: blackhole masses    (N, 2)
         self.sepa = None    #: binary separation `a` (N,)
@@ -97,9 +129,21 @@ class _Population_Discrete(abc.ABC):
 
         self._size = None   #: number of binaries
         self._sample_volume = None    #: comoving volume containing the binary population [cm^3]
+
+        # Initialize the population
+        self._init()
+        # Apply modifications (using `Modifer` instances), run `_finalize` and `_check()`
+        self.modify(mods)
         return
 
     @abc.abstractmethod
+    def _init(self):
+        """Initialize basic binary parameters.
+
+        This function should typically be overridden in subclasses.
+        """
+        return
+
     def _update_derived(self):
         """Set or reset any derived quantities.
         """
@@ -144,6 +188,11 @@ class _Population_Discrete(abc.ABC):
     def modify(self, mods=None):
         """Apply any population modifiers to this population.
 
+        Process:
+        1) Each modifier is applied to the population and `_update_derived()` is called.
+        2) After all modifiers are applied, `_finalize()` is called.
+        3) If the `_check_flag` attribute is true, then the `_check()` method is called.
+
         Parameters
         ----------
         mods : None or (list of `Population_Modifer`)
@@ -156,16 +205,13 @@ class _Population_Discrete(abc.ABC):
         elif not np.iterable(mods):
             mods = [mods]
 
+        self._update_derived()
+
         # Run Modifiers
-        updated = False
         for mod in mods:
             if mod is not None:
                 mod(self)
                 self._update_derived()
-                updated = True
-
-        if not updated:
-            self._update_derived()
 
         self._finalize()
         if self._check_flag:
@@ -194,8 +240,8 @@ class _Population_Discrete(abc.ABC):
         for name in array_names:
             vals = getattr(self, name)
             shape = np.shape(vals)
-            msg = None if (vals is None) else shape
-            log.debug(f"{name:>10s} :: {msg}")
+            msg = f"{name:>10s} :: shape={shape}"
+            log.debug(msg)
             if vals is None:
                 if name in allow_none:
                     continue
@@ -204,6 +250,7 @@ class _Population_Discrete(abc.ABC):
 
             bad_shape = False
             if (len(shape) == 0) or (size != shape[0]):
+                log.error(f"Bad shape, len(shape)==0 or size!=shape[0]!  size={size} shape={shape}")
                 bad_shape = True
 
             if name in two_dim:
@@ -230,6 +277,16 @@ class _Population_Discrete(abc.ABC):
 
 class Pop_Illustris(_Population_Discrete):
     """Discrete population derived from the Illustris cosmological hydrodynamic simulations.
+
+    Illustris are a suite of cosmological simulations that co-evolve gas, stars, dark-matter, and
+    BHs from the early universe until redshift zero.  The simulations are based on the moving-mesh
+    hydrodynamics code arepo [Springel2010]_.  The basic results of the simulations are
+    presented in [Vogelsberger2014]_ & [Genel2014]_, which emphasize the simulations' accuracy in
+    reproducing the properties and evolution of galaxies across cosmic time.  [Sijacki2015]_ goes
+    into more depth about the MBH implementation, their results, and comparisons with observational
+    measuremens of MBHs and AGN.  The Illustris data, including MBH binary catalogs, are available
+    online, described in [Nelson2015]_.  Catalogs of galaxy-galaxy mergers have also been calculated
+    and released publically, described in [Rodriguez-Gomez2015]_.
 
     Takes as input a data file that includes BH and subhalo data for BH and/or galaxy mergers.
 
@@ -277,15 +334,17 @@ class Pop_Illustris(_Population_Discrete):
         # Select the stellar radius
         part_names = header['part_names'].tolist()
         st_idx = part_names.index('star')
+        # ---- Binary Properties
         gal_rads = data['SubhaloHalfmassRadType']
         gal_rads = gal_rads[:, st_idx, :]
         # Set initial separation to sum of stellar half-mass radii
         self.sepa = np.sum(gal_rads, axis=-1)       #: Initial binary separation [cm]
+        self.mass = data['SubhaloBHMass']      #: BH Mass in subhalo [grams]
+        self.scafa = data['time']              #: scale-factor at time of 'merger' event in sim []
+        # ---- Galaxy Properties
         # Get the stellar mass, and take that as bulge mass
         self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :]   #: Stellar mass / stellar-bulge mass [grams]
         self.vdisp = data['SubhaloVelDisp']    #: Velocity dispersion of galaxy [?cm/s?]
-        self.mass = data['SubhaloBHMass']      #: BH Mass in subhalo [grams]
-        self.scafa = data['time']              #: scale-factor at time of 'merger' event in sim []
         return
 
     def _update_derived(self):
@@ -296,6 +355,11 @@ class Pop_Illustris(_Population_Discrete):
         """
         self._size = self.sepa.size            #: Number of binaries
         return
+
+
+# =========================
+# ====    Modifiers    ====
+# =========================
 
 
 class _Population_Modifier(utils._Modifier):
@@ -319,6 +383,9 @@ class PM_Eccentricity(_Population_Modifier):
 
         """
         self.eccen_dist = eccen_dist        #: Two parameter specification for eccentricity distribution
+        if np.shape(eccen_dist) != (2,):
+            raise ValueError(f"`eccen_dist` must be shaped (2,)")
+
         return
 
     def modify(self, pop):
@@ -332,12 +399,27 @@ class PM_Eccentricity(_Population_Modifier):
             Binary population to be modified.
 
         """
-        eccen_dist = self.eccen_dist
         size = pop.size
         # Draw eccentricities from the `eccen_func` defined to be [0.0, 1.0]
-        eccen = utils.eccen_func(*eccen_dist, size)
+        eccen = self._random_eccentricities(size)
         pop.eccen = eccen
         return
+
+    def _random_eccentricities(self, size) -> np.ndarray:
+        """Draw random eccentricities from the standard distribution.
+
+        Parameters
+        ----------
+        size : scalar,
+            The number of eccentricity values to draw.  Cast to `int`.
+
+        Returns
+        -------
+        ndarray
+            Eccentricities, with shape (N,) such that N is the parameter `size` cast to `int` type.
+
+        """
+        return utils.eccen_func(*self.eccen_dist, int(size))
 
 
 class PM_Resample(_Population_Modifier):
