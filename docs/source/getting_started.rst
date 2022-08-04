@@ -5,7 +5,7 @@ Getting Started
 Overview
 ========
 
-The `holodeck` package aims to simulate populations of MBH binaries, and calculate their GW signals.  In general the calculation proceeds in three stages.
+The `holodeck` package aims to simulate populations of MBH binaries, and calculate their GW signals.  In general the calculation proceeds in three stages:
 
 (1) **Population**: Construct an initial population of MBH 'binaries'.  This is typically done for pairs of MBHs when their galaxies merge (i.e. long before the two MBHs are actually a gravitationally-bound binary).  Constructing the initial binary population may occur in a single step: e.g. gathering MBH-MBH encounters from cosmological hydrodynamic simulations; or it may occur over two steps: (i) gathering galaxy-galaxy encounters, and (ii) prescribing MBH properties for each galaxy.
 (2) **Evolution**: Evolve the binary population from their initial conditions (i.e. large separations) until coalescence (i.e. small separations).  The complexity of this evolutionary stage can range tremendously in complexity.  In the simplest models, binaries are assumed to coalesce instantaneously (in that the age of the universe is the same at formation and coalescence), and are assumed to evolve purely due to GW emission (in that the time spent in any range of orbital frequencies can be calculated from the GW hardening timescale).  Note that these two assumptions are contradictory.
