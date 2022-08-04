@@ -1,8 +1,9 @@
 # holodeck
 
 [//]: # (Badges)
-[![GitHub Actions Build Status](https://github.com/nanograv/holodeck/workflows/CI/badge.svg)](https://github.com/nanograv/holodeck/actions?query=workflow%3ACI)
-[![codecov](https://codecov.io/gh/nanograv/holodeck/branch/master/graph/badge.svg)](https://codecov.io/gh/nanograv/holodeck/branch/master)
+[![GitHub version](https://badge.fury.io/gh/nanograv%2Fholodeck.svg)](https://badge.fury.io/gh/nanograv%2Fholodeck)
+[![build-status](https://github.com/nanograv/holodeck/actions/workflows/tests.yaml/badge.svg)](https://github.com/nanograv/holodeck/actions/workflows/tests.yaml)
+[![codecov](https://codecov.io/gh/nanograv/holodeck/branch/main/graph/badge.svg?token=K63WQH3ED9)](https://codecov.io/gh/nanograv/holodeck)
 [![Documentation Status](https://readthedocs.org/projects/holodeck-gw/badge/?version=main)](https://holodeck-gw.readthedocs.io/en/main/?badge=main)
 
 *Massive Black-Hole Binary Population Synthesis for Gravitational Wave Calculations ≋●≋●≋*
