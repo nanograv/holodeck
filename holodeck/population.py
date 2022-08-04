@@ -36,6 +36,7 @@ only some fraction of 'binaries' (MBH pairs) will actually reach the small separ
 a true, gravitationally-bound binary.
 
 The fundamental, required attributes for all population classes are:
+
 * `sepa` the initial binary separation in [cm].  This should be shaped as (N,) for N binaries.
 * `mass` the mass of each component in the binary in [gram].  This should be shaped as (N, 2) for
   N binaries, and the two components of the binary.  The 0th index should refer to the more massive
