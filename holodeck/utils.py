@@ -237,7 +237,7 @@ def _get_subclass_instance(value, default, superclass):
 # =================================================================================================
 
 
-def eccen_func(norm: float, std: float, size: int) -> np.ndarray:
+def eccen_func(cent: float, width: float, size: int) -> np.ndarray:
     """Draw random values between [0.0, 1.0] with a given center and width.
 
     This function is a bit contrived, but the `norm` defines the center-point of the distribution,
@@ -247,10 +247,15 @@ def eccen_func(norm: float, std: float, size: int) -> np.ndarray:
 
     Parameters
     ----------
-    norm : float,
-        Specification of the center-point of the distribution.
-    std : float,
-        Specification of the width of the distribution.
+    cent : float,
+        Specification of the center-point of the distribution.  Range: positive numbers.
+        Values `norm << 1` correspond to small eccentricities, while `norm >> 1` are large
+        eccentricities, with the distribution symmetric around `norm=1.0` (and eccens of 0.5).
+    width : float,
+        Specification of the width of the distribution.  Specifically how near or far values tend
+        to be from the given central value (`norm`).  Range: positive numbers.
+        Note that the 'width' of the distribution depends on the `norm` value, in addition to `std`.
+        Smaller values (typically `std << 1`) produce narrower distributions.
     size : int,
         Number of samples to draw.
 
@@ -260,7 +265,9 @@ def eccen_func(norm: float, std: float, size: int) -> np.ndarray:
         Values between [0.0, 1.0] with shape given by the `size` parameter.
 
     """
-    eccen = log_normal_base_10(1.0/norm, std, size=size)
+    assert np.shape(cent) == () and cent > 0.0
+    assert np.shape(width) == () and width > 0.0
+    eccen = log_normal_base_10(1.0/cent, width, size=size)
     eccen = 1.0 / (eccen + 1.0)
     return eccen
 
