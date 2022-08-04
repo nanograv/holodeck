@@ -1,20 +1,20 @@
 """Semi Analytic Modeling (SAM) submodule.
 
-The core element of the SAM module is the `Semi_Analytic_Model` class.  This class requires four
+The core element of the SAM module is the :class:`Semi_Analytic_Model` class.  This class requires four
 components as arguments:
 
 (1) Galaxy Stellar Mass Function (GSMF): gives the comoving number-density of galaxies as a function
-    of stellar mass.  This is implemented as subclasses of the `_Galaxy_Stellar_Mass_Function`
+    of stellar mass.  This is implemented as subclasses of the :class:`_Galaxy_Stellar_Mass_Function`
     base class.
 (2) Galaxy Pair Fraction (GPF): gives the fraction of galaxies that are in a 'pair' with a given
     mass ratio (and typically a function of redshift and primary-galaxy mass).  Implemented as
-    subclasses of the `_Galaxy_Pair_Fraction` subclass.
+    subclasses of the :class:`_Galaxy_Pair_Fraction` subclass.
 (3) Galaxy Merger Time (GMT): gives the characteristic time duration for galaxy 'mergers' to occur.
-    Implemented as subclasses of the `_Galaxy_Merger_Time` subclass.
+    Implemented as subclasses of the :class:`_Galaxy_Merger_Time` subclass.
 (4) M_bh - M_bulge Relation (mmbulge): gives MBH properties for a given galaxy stellar-bulge mass.
-    Implemented as subcalsses of the `holodeck.relations._MMBulge_Relation` subclass.
+    Implemented as subcalsses of the :class:`holodeck.relations._MMBulge_Relation` subclass.
 
-The `Semi_Analytic_Model` class defines a grid in parameter space of total MBH mass ($M=M_1 + M_2$),
+The :class:`Semi_Analytic_Model` class defines a grid in parameter space of total MBH mass ($M=M_1 + M_2$),
 MBH mass ratio ($q \\equiv M_1/M_2$), redshift ($z$), and at times binary separation
 (semi-major axis $a$) or binary rest-frame frequency ($f_r$).  Over this grid, the distribution of
 comoving number-density of MBH binaries in the Universe is calculated.  Methods are also provided
