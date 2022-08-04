@@ -291,7 +291,7 @@ def frac_str(vals: npt.ArrayLike, prec: int = 2) -> str:
 
     """
     num = np.count_nonzero(vals)
-    den = vals.size
+    den = np.size(vals)
     frc = num / den
     rv = f"{num:.{prec}e}/{den:.{prec}e} = {frc:.{prec}e}"
     return rv
@@ -388,7 +388,7 @@ def isinteger(val: object) -> bool:
 
 def log_normal_base_10(
     mu: float, sigma: float, size: Union[int, List[int]] = None, shift: float = 0.0,
-) -> npt.ArrayLike:
+) -> np.ndarray:
     """Draw from a log-normal distribution using base-10 standard-deviation.
 
     i.e. the `sigma` argument is in "dex", or powers of ten.
@@ -432,6 +432,7 @@ def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
 
     """
     if filter:
+        vals = np.asarray(vals)
         vv = vals[np.isfinite(vals)]
     else:
         vv = vals
@@ -505,7 +506,7 @@ def quantiles(
     weights: Optional[npt.ArrayLike] = None,
     axis: Optional[int] = None,
     values_sorted: bool = False,
-) -> np.ndarray:
+) -> Union[np.ndarray, np.ma.masked_array]:
     """Compute weighted percentiles.
 
     NOTE: if `values` is a masked array, then only unmasked values are used!
@@ -549,10 +550,11 @@ def quantiles(
 
     percs = np.array(percs)
     if weights is None:
-        weights = np.ones_like(values)
-    weights = np.array(weights)
+        ww = np.ones_like(values)
+    else:
+        ww = np.array(weights)
     try:
-        weights = np.ma.masked_array(weights, mask=values.mask)
+        ww = np.ma.masked_array(ww, mask=values.mask)  # type: ignore
     except AttributeError:
         pass
 
@@ -561,19 +563,19 @@ def quantiles(
     if not values_sorted:
         sorter = np.argsort(values, axis=axis)
         values = np.take_along_axis(values, sorter, axis=axis)
-        weights = np.take_along_axis(weights, sorter, axis=axis)
+        ww = np.take_along_axis(ww, sorter, axis=axis)
 
     if axis is None:
-        weighted_quantiles = np.cumsum(weights) - 0.5 * weights
-        weighted_quantiles /= np.sum(weights)
+        weighted_quantiles = np.cumsum(ww) - 0.5 * ww
+        weighted_quantiles /= np.sum(ww)
         percs = np.interp(percs, weighted_quantiles, values)
         return percs
 
-    weights = np.moveaxis(weights, axis, -1)
+    ww = np.moveaxis(ww, axis, -1)
     values = np.moveaxis(values, axis, -1)
 
-    weighted_quantiles = np.cumsum(weights, axis=-1) - 0.5 * weights
-    weighted_quantiles /= np.sum(weights, axis=-1)[..., np.newaxis]
+    weighted_quantiles = np.cumsum(ww, axis=-1) - 0.5 * ww
+    weighted_quantiles /= np.sum(ww, axis=-1)[..., np.newaxis]
     percs = [np.interp(percs, weighted_quantiles[idx], values[idx])
              for idx in np.ndindex(values.shape[:-1])]
     percs = np.array(percs)
@@ -603,7 +605,7 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
 
     """
     try:
-        if len(vals) == 0:
+        if len(vals) == 0:        # type: ignore
             raise TypeError
     except TypeError:
         raise TypeError(f"`vals` (shape={np.shape(vals)}) is not iterable!")
@@ -615,8 +617,8 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
 
     # stats = np.percentile(vals, percs*100)
     stats = quantiles(vals, percs)
-    rv = ["{val:.{prec}e}".format(prec=prec, val=ss) for ss in stats]
-    rv = ", ".join(rv)
+    _rv = ["{val:.{prec}e}".format(prec=prec, val=ss) for ss in stats]
+    rv = ", ".join(_rv)
     return rv
 
 
@@ -641,6 +643,7 @@ def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = T
         Cumulative trapezoid rule integration.
 
     """
+    xx = np.asarray(xx)
     if np.ndim(xx) == 1:
         pass
     elif np.ndim(xx) == np.ndim(yy):
@@ -649,7 +652,7 @@ def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = T
         err = f"Bad shape for `xx` (xx.shape={np.shape(xx)}, yy.shape={np.shape(yy)})!"
         log.error(err)
         raise ValueError(err)
-    ct = np.moveaxis(yy, axis, 0)
+    ct = np.moveaxis(yy, axis, 0)   # type: ignore
     ct = 0.5 * (ct[1:] + ct[:-1])
     ct = np.moveaxis(ct, 0, -1)
     ct = ct * np.diff(xx)
@@ -718,7 +721,7 @@ def trapz_loglog(
         xx = np.insert(xx, ii, bounds, axis=axis)
         yy = np.insert(yy, ii, newy, axis=axis)
         ii = np.array([ii[0], ii[1]+1])
-        assert np.alltrue(xx[ii] == bounds), "FAILED!"
+        assert np.all(xx[ii] == bounds), "FAILED!"   # type: ignore
 
     if np.ndim(yy) != np.ndim(xx):
         if np.ndim(xx) != 1:
