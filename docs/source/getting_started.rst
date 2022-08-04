@@ -7,12 +7,13 @@ Getting Started
    :depth: 2
 
 
-The Getting Started Guide
-=========================
+Files in the Getting Started Guide
+==================================
 
 .. toctree::
    :maxdepth: 1
 
+   Getting Started Overview/Introduction <getting_started>
    Calculating Gravitational Waves <calc_gws>
    Definitions and Abbreviations <defs_abbrevs>
    Annotated Bibliography <biblio>
@@ -25,6 +26,7 @@ Calculating GW Signatures
 -------------------------
 
 For more details, see the document :doc:`Getting Started: Calculating Gravitational Waves <calc_gws>`.
+For the implementation of much of the gravitational wave calculations, see the :mod:`GravWaves submodule <holodeck.gravwaves>`.
 
 The chirp-mass is defined as: :math:`\mathcal{M} \equiv \frac{\left(m_1 m_2\right)^{3/5}}{M^{1/5}} = M \frac{q^{3/5}}{\left(1 + q\right)^{6/5}}`, for a total mass :math:`M = m_1 + m_2`, and mass-ratio :math:`q \equiv m_2 / m_1 \leq 1`.
 
@@ -140,6 +142,24 @@ Combining :math:numref:`eq:cont_eq_result` with :math:numref:`num_num_dens`, we 
 
 Implementation
 ^^^^^^^^^^^^^^
+Full code documentation: :mod:`SAM submodule <holodeck.sam>` submodule.
+
+
+Finite Volume Cosmological (Hydrodynamic) Simulations
+-----------------------------------------------------
+
+
+Implementation
+^^^^^^^^^^^^^^
+Full code documentation: :mod:`discrete populations <holodeck.population>` submodule.
+
+
+Observational (AGN/Quasar) Catalogs
+-----------------------------------
+
+Implementation
+^^^^^^^^^^^^^^
+Full code documentation: :mod:`observational populations <holodeck.pop_observational>` submodule.
 
 
 Binary Evolution/Hardening Models
