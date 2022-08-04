@@ -354,6 +354,7 @@ class Semi_Analytic_Model:
     """Semi-Analytic Model of MBH Binary populations.
 
     Based on four components:
+
     * Galaxy Stellar-Mass Function (GSMF): the distribution of galaxy masses
     * Galaxy Pair Fraction (GPF): the probability of galaxies having a companion
     * Galaxy Merger Time (GMT): the expected galaxy-merger timescale for a pair of galaxies

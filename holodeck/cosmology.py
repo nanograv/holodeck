@@ -68,7 +68,7 @@ class Cosmology(ap.cosmology.FlatLambdaCDM):
         return
 
     def __str__(self):
-        """Return a string description of this
+        """Return a string description of this instance.
         """
         rstr = f"{__class__} :: H0 = {self._H0_sub}, Om0 = {self.Omega0}, Ob0 = {self.OmegaBaryon}"
         return rstr
