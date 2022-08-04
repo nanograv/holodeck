@@ -6,15 +6,15 @@ Generating references on :ref:`NASA ADS <https://ui.adsabs.harvard.edu/user/libr
 
 * For short references (e.g. in code files)::
 
-    * [%1.1h%Y]_ %3.1M (%Y)`.
+    * [%1.1h%Y]_ %3.1M (%Y).
 
 * For :ref:`annotated bibliography <Bibliography>` section::
 
-    * **%3.1M %Y**, [%1.1h%Y]_ - `%T <%u>`_\n`
+    * **%3.1M %Y**, [%1.1h%Y]_ - `%T <%u>`_\n
 
 * For full references (e.g. in the :ref:`References` section below)::
 
-    .. [%1.1h%Y] %3.1M (%Y), %q, %V, %S.\n   %T\n   %u\n`.
+    .. [%1.1h%Y] %3.1M (%Y), %q, %V, %S.\n   %T\n   %u\n
 
 
 Bibliography
@@ -30,6 +30,16 @@ Bibliography
 
 * **Hogg 1999**, [Hogg1999]_ - `Distance measures in cosmology <https://ui.adsabs.harvard.edu/abs/1999astro.ph..5116H>`_.
     * This is the go-to reference/cheat-sheet for basic cosmological calculations such as distances (comoving, luminosity), volume of the universe, lookback times, etc.
+
+* **Kelley, Blecha, and Hernquist 2017**, [Kelley2017a]_ - `Massive black hole binary mergers in dynamical galactic environments <https://ui.adsabs.harvard.edu/abs/2017MNRAS.464.3131K>`_
+  * Describes the MBH-MBH mergers from the Illustris cosmological hydrodynamic simulations.
+  * Results include comprehensive semi-analytic models for post-processing the binary mergers at sub-grid scales.
+
+* **Kelley et al. 2017**, [Kelley2017b]_ - `The gravitational wave background from massive black hole binaries in Illustris: spectral features and time to detection with pulsar timing arrays <https://ui.adsabs.harvard.edu/abs/2017MNRAS.471.4508K>`_
+  * Uses the MBH-MBH merger catalogs from Illustris, along with comprehensive semi-analytic models of the unresolved binary evolution process, to calculate the expected properties of the GWB and PTA detection prospects.
+
+* **Kelley et al. 2018**, [Kelley2018]_ - `Single sources in the low-frequency gravitational wave sky: properties and time to detection by pulsar timing arrays <https://ui.adsabs.harvard.edu/abs/2018MNRAS.477..964K>`_
+  * Uses the MBH-MBH merger catalogs from Illustris, along with comprehensive semi-analytic models of the unresolved binary evolution process, to calculate the expected properties of individual continuous wave (CW) GW sources and PTA detection prospects.
 
 * **Nelson et al. 2015**, [Nelson2015]_ - `The illustris simulation: Public data release <https://ui.adsabs.harvard.edu/abs/2015A&C....13...12N>`_
   * One of the standard references for the original Illustris simulations written by the Illustris team.
@@ -105,9 +115,17 @@ These are provided here for easy copy-and-paste usage in other files.
     Distance measures in cosmology.
     https://ui.adsabs.harvard.edu/abs/1999astro.ph..5116H
 
-.. [Kelley2017] Kelley, Blecha & Hernquist 2017
-    Massive black hole binary mergers in dynamical galactic environments
-    https://ui.adsabs.harvard.edu/abs/2017MNRAS.464.3131K/abstract
+.. [Kelley2017a] Kelley, Blecha, and Hernquist (2017), MNRAS, 464, 3.
+   Massive black hole binary mergers in dynamical galactic environments
+   https://ui.adsabs.harvard.edu/abs/2017MNRAS.464.3131K
+
+.. [Kelley2017b] Kelley et al. (2017), MNRAS, 471, 4.
+   The gravitational wave background from massive black hole binaries in Illustris: spectral features and time to detection with pulsar timing arrays
+   https://ui.adsabs.harvard.edu/abs/2017MNRAS.471.4508K
+
+.. [Kelley2018] Kelley et al. (2018), MNRAS, 477, 1.
+   Single sources in the low-frequency gravitational wave sky: properties and time to detection by pulsar timing arrays
+   https://ui.adsabs.harvard.edu/abs/2018MNRAS.477..964K
 
 .. [Klypin2016] : Klypin, Yepes, Gottlöber, et al. 2016.  MNRAS, 457, 4.
     MultiDark simulations: the story of dark matter halo concentrations and density profiles
