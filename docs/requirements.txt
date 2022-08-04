@@ -2,7 +2,7 @@ ipykernel
 nbsphinx
 numpy
 numpydoc
+kalepy
 astropy
 sphinx-math-dollar
 # sphinxcontrib-bibtex
-# kalepy
