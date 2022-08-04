@@ -30,5 +30,19 @@ def test_init_generic_evolution():
 
     pop = Good_Pop()
     hard = Good_Hard()
-    evo = holo.evolution.Evolution(pop, hard)
+    holo.evolution.Evolution(pop, hard)
+    holo.evolution.Evolution(pop, [hard])
+
+    with pytest.raises(TypeError):
+        holo.evolution.Evolution(pop, pop)
+
+    with pytest.raises(TypeError):
+        holo.evolution.Evolution(hard, hard)
+
+    with pytest.raises(TypeError):
+        holo.evolution.Evolution(pop, None)
+
+    with pytest.raises(TypeError):
+        holo.evolution.Evolution(None, hard)
+
     return

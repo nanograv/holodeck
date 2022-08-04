@@ -149,13 +149,13 @@ class Evolution:
         if not isinstance(pop, holo.population._Population_Discrete):
             err = f"`pop` is {pop}, must be subclass of `holo.population._Population_Discrete`!"
             log.exception(err)
-            raise ValueError(err)
+            raise TypeError(err)
 
         for hh in self._hard:
             if not isinstance(hh, _Hardening):
                 err = f"hardening instance is {hh}, must be subclass of `holo.evolution._Hardening`!"
                 log.exception(err)
-                raise ValueError(err)
+                raise TypeError(err)
 
         # Store additional parameters
         for par in self._STORE_FROM_POP:
