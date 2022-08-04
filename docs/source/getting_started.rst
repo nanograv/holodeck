@@ -2,6 +2,17 @@
 Getting Started
 ===============
 
+Overview
+========
+
+The `holodeck` package aims to simulate populations of MBH binaries, and calculate their GW signals.  In general the calculation proceeds in three stages.
+
+(1) **Population**: Construct an initial population of MBH 'binaries'.  This is typically done for pairs of MBHs when their galaxies merge (i.e. long before the two MBHs are actually a gravitationally-bound binary).  Constructing the initial binary population may occur in a single step: e.g. gathering MBH-MBH encounters from cosmological hydrodynamic simulations; or it may occur over two steps: (i) gathering galaxy-galaxy encounters, and (ii) prescribing MBH properties for each galaxy.
+(2) **Evolution**: Evolve the binary population from their initial conditions (i.e. large separations) until coalescence (i.e. small separations).  The complexity of this evolutionary stage can range tremendously in complexity.  In the simplest models, binaries are assumed to coalesce instantaneously (in that the age of the universe is the same at formation and coalescence), and are assumed to evolve purely due to GW emission (in that the time spent in any range of orbital frequencies can be calculated from the GW hardening timescale).  Note that these two assumptions are contradictory.
+(3) **Gravitational Waves**: Calculate the resulting GW signals based on the binaries and their evolution.  Note that GWs can only be calculated based on some sort of model for binary evolution.  The model may be extremely simple, in which case it is sometimes glanced over.
+
+The contents of this file are as follows.
+
 .. contents:: File Contents
    :local:
    :depth: 2
@@ -144,14 +155,75 @@ Implementation
 ^^^^^^^^^^^^^^
 Full code documentation: :mod:`SAM submodule <holodeck.sam>` submodule.
 
+The core element of the SAM module is the :class:`Semi_Analytic_Model <holodeck.sam.Semi_Analytic_Model>` class.  This class requires four
+components as arguments:
+
+(1) Galaxy Stellar Mass Function (GSMF): gives the comoving number-density of galaxies as a function
+    of stellar mass.  This is implemented as subclasses of the :class:`_Galaxy_Stellar_Mass_Function <holodeck.sam._Galaxy_Stellar_Mass_Function>`
+    base class.
+(2) Galaxy Pair Fraction (GPF): gives the fraction of galaxies that are in a 'pair' with a given
+    mass ratio (and typically a function of redshift and primary-galaxy mass).  Implemented as
+    subclasses of the :class:`_Galaxy_Pair_Fraction <holodeck.sam._Galaxy_Pair_Fraction>` subclass.
+(3) Galaxy Merger Time (GMT): gives the characteristic time duration for galaxy 'mergers' to occur.
+    Implemented as subclasses of the :class:`_Galaxy_Merger_Time <holodeck.sam._Galaxy_Merger_Time>` subclass.
+(4) M_bh - M_bulge Relation (mmbulge): gives MBH properties for a given galaxy stellar-bulge mass.
+    Implemented as subcalsses of the :class:`holodeck.relations._MMBulge_Relation` subclass.
+
+The :class:`Semi_Analytic_Model <holodeck.sam.Semi_Analytic_Model>` class defines a grid in parameter space of total MBH mass ($M=M_1 + M_2$),
+MBH mass ratio ($q \\equiv M_1/M_2$), redshift ($z$), and at times binary separation
+(semi-major axis $a$) or binary rest-frame frequency ($f_r$).  Over this grid, the distribution of
+comoving number-density of MBH binaries in the Universe is calculated.  Methods are also provided
+that interface with the `kalepy` package to draw 'samples' (discretized binaries) from the
+distribution, and to calculate GW signatures.
+
+The step of going from a number-density of binaries in $(M, q, z)$ space, to also the distribution
+in $a$ or $f$ is subtle, as it requires modeling the binary evolution (i.e. hardening rate).
+
+
 
 Finite Volume Cosmological (Hydrodynamic) Simulations
 -----------------------------------------------------
 
+Cosmological hydrodynamic simulations model the universe by co-evolving gas along with particles that
+represent dark matter (DM), stars, and often BHs.  These simulations strive to model physical
+processes at the most fundamental level allowed by resolution constraints / computational
+limitations.  For example, BH accretion will typically be calculated by measuring the local density
+(and thermal properties) of gas, which may also be subjected to 'feedback' processes from the
+accreting BH itself, thereby producing a 'self-consistent' model.  However, no cosmological
+simulations are able to fully resolve either the accretion or the feedback process, such that
+'sub-grid models' (simplified prescriptions) must be adopted to model the physics at sub-resolution
+scales.
+
+In `holodeck`, MBH binary populations are derived from processed data files produced from cosmo-hydro
+simulations.  To get to MBHBs, data must be provided either on the encounter ('merger')
+rate of MBHs from the cosmological simulations directly, or based on the galaxy-galaxy encounters
+and then prescribing MBH-MBH pairs onto those.  The initial binary populations must specify the binary
+masses, their initial binary separation, and the redshift at which they formed (or are otherwise identified).
+
+Note that the evolution of binaries, i.e. hardening from large separations to small separations and eventually coalescence, is treated separately (See :ref:`Binary Evolution/Hardening Models` below).
 
 Implementation
 ^^^^^^^^^^^^^^
 Full code documentation: :mod:`discrete populations <holodeck.population>` submodule.
+
+This submodule provides a generalized base-class, :class:`_Population_Discrete <holodeck.population._Population_Discrete>`, that is subclassed
+to implement populations from particular cosmological simulations.  At the time of this writing,
+an Illustris-based implementation is included, :class:`Pop_Illustris <holodeck.population.Pop_Illustris>`.  Additionally, a set of
+classes are also provided that can make 'modifications' to these populations based on subclasses of
+the :class:`_Population_Modifier <holodeck.population._Population_Modifier>` base class.  Examples of currently implemented modifiers are:
+adding eccentricity to otherwise circular binaries (:class:`PM_Eccentricity <holodeck.population.PM_Eccentricity>`), or changing the MBH
+masses to match prescribed scaling relations (:class:`PM_Mass_Reset <holodeck.population.PM_Mass_Reset>`).
+
+The fundamental, required attributes for all population classes are:
+* `sepa` the initial binary separation in [cm].  This should be shaped as (N,) for N binaries.
+* `mass` the mass of each component in the binary in [gram].  This should be shaped as (N, 2) for
+  N binaries, and the two components of the binary.  The 0th index should refer to the more massive
+  primary, while the 1th component refers to the less massive secondary.
+* `scafa` the scale-factor defining the age of the universe for formation of this binary.  This
+  should be shaped as (N,).
+
+The implementation for binary evolution (e.g. environmental hardening processes), as a function of
+separation or frequency, are included in the :mod:`holodeck.evolution` module, see also below.
 
 
 Observational (AGN/Quasar) Catalogs
