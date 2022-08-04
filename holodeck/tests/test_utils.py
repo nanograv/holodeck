@@ -1,7 +1,7 @@
 """
 """
 
-import pytest  # noqa
+import pytest
 import numpy as np
 
 # import holodeck as holo
