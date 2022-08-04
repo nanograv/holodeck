@@ -1,7 +1,43 @@
 """Discrete MBH Binary Populations (from cosmological hydrodynamic simulations) and related tools.
 
-For semi-analytic models, see the `sam.py` module.  For observational populatons, see
-`pop_observational.py`.
+Cosmological hydrodynamic simulations model the universe by coevolving gas along with particles that
+represent dark matter (DM), stars, and often BHs.  These simulations strive to model physical
+processes at the most fundamental level allowed by resolution constraints / computational
+limitations.  For example, BH accretion will typically be calculated by measuring the local density
+(and thermal properties) of gas, which may also be subjected to 'feedback' processes from the
+accreting BH itself, thereby producing a 'self-consistent' model.  However, no cosmological
+simulations are able to fully resolve either the accretion or the feedback process, such that
+'sub-grid models' (simplified prescriptions) must be adopted to model the physics at sub-resolution
+scales.
+
+The numerical methods and subgrid modeling details of cosmological hydrodynamic simulations vary
+significantly from one code-base and simulation suite to another.  This `holodeck` submodule
+generates populations of MBH binaries using processed data files derived what whatever cosmo-hydro
+simulations are used.  To get to MBHBs, data must be provided either on the encounter ('merger')
+rate of MBHs from the cosmological simulations directly, or based on the galaxy-galaxy encounters
+and then prescribing MBH-MBH pairs onto those.
+
+This submodule provides a generalized base-class, :class:`_Population_Discrete`, that is subclassed
+to implement populations from particular cosmological simulations.  At the time of this writing,
+an Illustris-based implementation is included, :class:`Pop_Illustris`.  Additionally, a set of
+classes are also provided that can make 'modifications' to these populations based on subclasses of
+the :class:`_Population_Modifier` base class.  Examples of currently implemented modifiers are:
+adding eccentricity to otherwise circular binaries (:class:`PM_Eccentricity`), or changing the MBH
+masses to match prescribed scaling relations (:class:`PM_Mass_Reset`).
+
+To-Do
+-----
+
+
+References
+----------
+* [Genel2014]_ Genel et al. (2014)
+* [Nelson2015]_ Nelson et al. (2015)
+* [Rodriguez-Gomez2015]_ Rodriguez-Gomez et al. (2015)
+* [Sijacki2015]_ Sijacki et al. (2015)
+* [Springel2010]_ Springel (2010)
+* [Vogelsberger2014]_ Vogelsberger et al. (2014)
+
 
 """
 
@@ -262,13 +298,13 @@ class Pop_Illustris(_Population_Discrete):
         return
 
 
-class Population_Modifier(utils._Modifier):
+class _Population_Modifier(utils._Modifier):
     """Base class for constructing Modifiers that are applied to `_Discrete_Population` instances.
     """
     pass
 
 
-class PM_Eccentricity(Population_Modifier):
+class PM_Eccentricity(_Population_Modifier):
     """Population Modifier to implement eccentricity in the binary population.
     """
 
@@ -304,7 +340,7 @@ class PM_Eccentricity(Population_Modifier):
         return
 
 
-class PM_Resample(Population_Modifier):
+class PM_Resample(_Population_Modifier):
     """Population Modifier to resample a population instance to a new number of binaries.
 
     Uses `kalepy` kernel density estimation (KDE) to resample the original population into a new
@@ -482,7 +518,7 @@ class PM_Resample(Population_Modifier):
         return corner.fig
 
 
-class PM_Mass_Reset(Population_Modifier):
+class PM_Mass_Reset(_Population_Modifier):
     """Reset the masses of a target population based on a given M-Host relation.
     """
 
