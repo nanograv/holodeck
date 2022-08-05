@@ -3,13 +3,17 @@
 In `holodeck`, initial binary populations are typically defined near the time of galaxy-galaxy
 merger, when two MBHs come together at roughly kiloparsec scales.  Environmental 'hardening'
 mechanisms are required to dissipate orbital energy and angular momentum, allowing the binary
-separation to shrink ('harden'). Typically dynamical friction (DF) is most important at large scales
-($\sim \mathrm{kpc}$).  Near where the pair of MBHs become a gravitationally-bound binary, the
-DF approximations break down, and individual stellar scattering events (from stars in the 'loss
-cone' of parameter space) need to be considered.  In the presence of significant gas (i.e. from
-accretion), a circumbinary accretion disk (CBD) may form, and gravitational torques from the gas
-distribution (typically spiral waves) may become important.  Finally, at the smaller separations,
-GW emission takes over.
+separation to shrink ('harden'). Typically *dynamical friction (DF)* is most important at large
+scales ($\sim \mathrm{kpc}$).  Near where the pair of MBHs become a gravitationally-bound binary,
+the DF approximations break down, and individual *stellar scattering* events (from stars in the
+'loss cone' of parameter space) need to be considered.  In the presence of significant gas (i.e.
+from accretion), a circumbinary accretion disk (CBD) may form, and gravitational
+*circumbinary disk torques* from the gas distribution (typically spiral waves) may become important.
+Finally, at the smaller separations, *GW emission* takes over.  The classic work describing the
+overall process of binary evolution in its different stages is [BBR1980]_.  [Kelley2017a]_ goes
+into significant detail on implementations and properties of each component of binary evolution
+also.  Triple MBH interactions, and perturbations from other massive objects (e.g. molecular
+clouds) can also be important.
 
 The :mod:`holodeck.evolution` submodule provides tools for modeling the binary evolution from the
 time of binary 'formation' (i.e. galaxy merger) until coalescence.  Models for binary evolutionary
@@ -106,15 +110,15 @@ _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 class Evolution:
     """Base class to evolve discrete binary populations forward in time.
 
-    This class is primary built to be used with the :class:`holodeck.population.Pop_Illustris`
-    class.  The `Evolution` class is instantiated with a
-    :class:`holodeck.population._Population_Discrete` instance, and a particular binary hardening
-    model (subclass of :class:`_Hardening`).  It then numerically integrates each binary from their
-    initial separation to coalescence, determining how much time that process takes, and thus the
-    rate of redshift/time evolution.
+    NOTE: This class is primary built to be used with :class:`holodeck.population.Pop_Illustris`.
+
+    The `Evolution` class is instantiated with a :class:`holodeck.population._Population_Discrete`
+    instance, and a particular binary hardening model (subclass of :class:`_Hardening`).  It then
+    numerically integrates each binary from their initial separation to coalescence, determining
+    how much time that process takes, and thus the rate of redshift/time evolution.
 
     **Initialization**: all attributes are set to empty arrays of the appropriate size.
-    NOTE: the 0th step is *not* initialized at this time.
+    NOTE: the 0th step is *not* initialized at this time, it happens in :meth:`Evolution.evolve()`.
 
     **Evolution**: binary evolution is performed by running the :meth:`Evolution.evolve()` function.
     This function first calls :meth:`Evolution._init_step_zero()`, which sets the 0th step values,
@@ -658,7 +662,6 @@ class Evolution:
                 dedt[:] += _er
 
         return dadt, dedt
-
 
     def _check(self):
         """Perform basic diagnostics on parameter validity after evolution.
