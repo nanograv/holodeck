@@ -2,6 +2,9 @@
 Getting Started
 ===============
 
+.. contents:: File Contents
+   :local:
+
 Overview
 ========
 
@@ -11,12 +14,6 @@ The `holodeck` package aims to simulate populations of MBH binaries, and calcula
 (2) **Evolution**: Evolve the binary population from their initial conditions (i.e. large separations) until coalescence (i.e. small separations).  The complexity of this evolutionary stage can range tremendously in complexity.  In the simplest models, binaries are assumed to coalesce instantaneously (in that the age of the universe is the same at formation and coalescence), and are assumed to evolve purely due to GW emission (in that the time spent in any range of orbital frequencies can be calculated from the GW hardening timescale).  Note that these two assumptions are contradictory.
 (3) **Gravitational Waves**: Calculate the resulting GW signals based on the binaries and their evolution.  Note that GWs can only be calculated based on some sort of model for binary evolution.  The model may be extremely simple, in which case it is sometimes glanced over.
 
-The contents of this file are as follows.
-
-.. contents:: File Contents
-   :local:
-   :depth: 2
-
 
 Files in the Getting Started Guide
 ==================================
@@ -24,7 +21,6 @@ Files in the Getting Started Guide
 .. toctree::
    :maxdepth: 1
 
-   Getting Started Overview/Introduction <getting_started>
    Calculating Gravitational Waves <calc_gws>
    Definitions and Abbreviations <defs_abbrevs>
    Annotated Bibliography <biblio>
@@ -151,8 +147,8 @@ Combining :math:numref:`eq:cont_eq_result` with :math:numref:`num_num_dens`, we 
    :name: eq:sam_final
 
 
-Implementation
-^^^^^^^^^^^^^^
+SAM Implementation
+^^^^^^^^^^^^^^^^^^
 Full code documentation: :mod:`SAM submodule <holodeck.sam>` submodule.
 
 The core element of the SAM module is the :class:`Semi_Analytic_Model <holodeck.sam.Semi_Analytic_Model>` class.  This class requires four
@@ -200,7 +196,7 @@ rate of MBHs from the cosmological simulations directly, or based on the galaxy-
 and then prescribing MBH-MBH pairs onto those.  The initial binary populations must specify the binary
 masses, their initial binary separation, and the redshift at which they formed (or are otherwise identified).
 
-Note that the evolution of binaries, i.e. hardening from large separations to small separations and eventually coalescence, is treated separately (See :ref:`Binary Evolution/Hardening Models` below).
+Note that the evolution of binaries, i.e. hardening from large separations to small separations and eventually coalescence, is treated separately (See `Binary Evolution`_ below).
 
 Implementation
 ^^^^^^^^^^^^^^
@@ -215,6 +211,7 @@ adding eccentricity to otherwise circular binaries (:class:`PM_Eccentricity <hol
 masses to match prescribed scaling relations (:class:`PM_Mass_Reset <holodeck.population.PM_Mass_Reset>`).
 
 The fundamental, required attributes for all population classes are:
+
 * `sepa` the initial binary separation in [cm].  This should be shaped as (N,) for N binaries.
 * `mass` the mass of each component in the binary in [gram].  This should be shaped as (N, 2) for
   N binaries, and the two components of the binary.  The 0th index should refer to the more massive
@@ -229,13 +226,13 @@ separation or frequency, are included in the :mod:`holodeck.evolution` module, s
 Observational (AGN/Quasar) Catalogs
 -----------------------------------
 
-Implementation
-^^^^^^^^^^^^^^
+Observational Implementation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Full code documentation: :mod:`observational populations <holodeck.pop_observational>` submodule.
 
 
-Binary Evolution/Hardening Models
-=================================
+Binary Evolution
+================
 
 In `holodeck`, initial binary populations are typically defined near the time of galaxy-galaxy
 merger, when two MBHs come together at roughly kiloparsec scales.  Environmental 'hardening'
@@ -264,8 +261,8 @@ evolution of each binary, and also the GW calculation.  Note that GWs can only b
 on some sort of model for binary evolution.  The model may be extremely simple, in which case it is
 sometimes glanced over.
 
-Implementation
-^^^^^^^^^^^^^^
+Evolution Implementation
+------------------------
 
 The core component of the evolution module is the :class:`Evolution` class.  This class combines a
 population of initial binary parameters (i.e. from the :class:`holodeck.population._Population_Discrete`

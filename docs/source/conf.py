@@ -27,6 +27,7 @@ release = holodeck.__version__
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
+    'sphinx.ext.autosectionlabel',  # {path/to/page}:{title-of-section}
     'sphinx.ext.extlinks',
     'sphinx.ext.intersphinx',
     'sphinx.ext.mathjax',
@@ -62,6 +63,9 @@ nitpick_ignore = [
 ]
 
 # ---- Extensions ------------------------------------------------------------
+
+# Make sure autosection targets are unique
+autosectionlabel_prefix_document = True
 
 mathjax3_config = {
     "tex": {

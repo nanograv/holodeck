@@ -45,5 +45,5 @@ Terminology
 ===========
 * **AGN/Quasar**: There is a long and convoluted history of terms for different types of EM-bright astronomical sources that are now all believed to be produced by accreting massive black holes.  'Active galactic nuclei' is perhaps the most generic term for any accreting MBH which is then producing EM emission.  Formally 'quasars' are relatively massive MBHs that are accreting at very high rates, and are thus very bright.  Often 'quasar' is used relatively interchangeably with AGN (for instance in 'Quasar Luminosity Function').
 * **Hardening**: the shrinking of the semi-major axis of a binary system by extracting energy and angular momentum.  This term is also often used to simply mean the process of bringing two bodies (i.e. MBHs) closer together, even if they are not formally a gravitational-bound binary.  'Hardening' is typically due to either GW emission, or interactions between the binary and the surrounding environment.
-* **M-Mbulge**: the $M_{bh} - M_\\mathrm{bulge}$ relation, whereby the mass of MBHs is closely correlated with the mass of the stellar bulge of their host galaxy.
+* **M-Mbulge**: the $M_{bh} - M_{\\mathrm{bulge}}$ relation, whereby the mass of MBHs is closely correlated with the mass of the stellar bulge of their host galaxy.
 * **Stellar Bulge**
