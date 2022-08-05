@@ -107,9 +107,21 @@ class Evolution:
     """Base class to evolve discrete binary populations forward in time.
 
     This class is primary built to be used with the :class:`holodeck.population.Pop_Illustris`
-    class.  The `Evolution` class is instantiated with a `Pop_Illustris` instance, and a particular
-    binary hardening model.  It then numerically integrates each binary from their initial
-    separation to coalescence.
+    class.  The `Evolution` class is instantiated with a
+    :class:`holodeck.population._Population_Discrete` instance, and a particular binary hardening
+    model (subclass of :class:`_Hardening`).  It then numerically integrates each binary from their
+    initial separation to coalescence, determining how much time that process takes, and thus the
+    rate of redshift/time evolution.
+
+    **Initialization**: all attributes are set to empty arrays of the appropriate size.
+    NOTE: the 0th step is *not* initialized at this time.
+
+    **Evolution**: binary evolution is performed by running the :meth:`Evolution.evolve()` function.
+    This function first calls :meth:`Evolution._init_step_zero()`, which sets the 0th step values,
+    and then iterates over each subsequent step, calling :meth:`Evolution._take_next_step()`.  Once
+    all steps are taken (integration is completed), then :meth:`Evolution._finalize()` is called,
+    at which points any stored modifiers (:class:`utils._Modifier` subclasses, in the
+    :attr:`Evolution._mods` attribute) are applied.
 
     """
 
@@ -206,6 +218,17 @@ class Evolution:
     def evolve(self, progress=True):
         """Evolve binary population from initial separation until coalescence in discrete steps.
 
+        Each binary has a fixed number of 'steps' from initial separation until coalescence.  The
+        role of the `evolve()` method is to determine the amount of time each step takes, based on
+        the 'hardening rate' (in separation and possible eccentricity i.e. $da/dt$ and $de/dt$).
+        The hardening rate is calculated from the stored :class:`_Hardening` instances in the
+        iterable :attr:`Evolution._hard` attribute.
+
+        When :meth:`Evolution.evolve()` is called, the 0th step is initialized separately, using
+        the :meth:`Evolution._init_step_zero()` method, and then each step is integrated by calling
+        the :meth:`Evolution._take_next_step()` method.  Once all steps are completed, the
+        :meth:`Evolution._finalize()` method is called, where any stored modifiers are applied.
+
         Parameters
         ----------
         progress : bool,
@@ -220,11 +243,7 @@ class Evolution:
         steps_list = range(1, nsteps)
         steps_list = utils.tqdm(steps_list, desc="evolving binaries") if progress else steps_list
         for step in steps_list:
-            rv = self._take_next_step(step)
-            if rv is _EVO.END:
-                break
-            elif rv not in _EVO:
-                raise ValueError("Recieved bad `rv` ({}) after step {}!".format(rv, step))
+            self._take_next_step(step)
 
         # ---- Finalize
         self._finalize()
@@ -491,7 +510,13 @@ class Evolution:
     # ==== Internal Methods
 
     def _init_step_zero(self):
-        """Set the initial conditions of the binaries at step zero.
+        """Set the initial conditions of the binaries at the 0th step.
+
+        Transfers attributes from the stored :class:`holodeck.population._Population_Discrete`
+        instance to the 0th index of the evolution arrays.  The attributes are [`sepa`, `scafa`,
+        `mass`, and optionally `eccen`].  The hardening model is also used to calculate the 0th
+        hardening rates `dadt` and `dedt`.  The initial lookback time, `tlbk` is also set.
+
         """
         pop = self._pop
         size, nsteps = self.shape
@@ -505,52 +530,37 @@ class Evolution:
         # Get log-space range of separations for each of N ==> (N, S), for S steps
         sepa = np.apply_along_axis(lambda xx: np.logspace(*xx, nsteps), 0, sepa).T
         self.sepa[:, :] = sepa
+        if (pop.eccen is not None):
+            self.eccen[:, 0] = pop.eccen
 
         self.scafa[:, 0] = pop.scafa
         redz = cosmo.a_to_z(pop.scafa)
         tlbk = cosmo.z_to_tlbk(redz)
         self.tlbk[:, 0] = tlbk
-        self.mass[:, 0, :] = pop.mass
-        self.mass[:, :, :] = self.mass[:, 0, np.newaxis, :]
+        # `pop.mass` has shape (N, 2), broadcast to (N, S, 2) for `S` steps
+        self.mass[:, 0, :] = pop.mass[:, np.newaxis, :]
 
         # ---- Initialize hardening rate at first step
+        dadt_init, dedt_init = self._hardening_rate(step=0)
 
-        # these are just for the first step
-        dadt = np.zeros(size)
-        if pop.eccen is not None:
-            dedt = np.zeros(self.shape)
-
-        # addional record-keeping / diagnostics for debugging
-        if self._debug:
-            # initialzie variables to store da/dt hardening rates from each hardening component
-            for ii in range(len(self._hard)):
-                setattr(self, f"_dadt_{ii}", np.zeros(self.shape))
-                if pop.eccen is not None:
-                    setattr(self, f"_dedt_{ii}", np.zeros(self.shape))
-
-        # Get hardening rates for each hardening model
-        for ii, hard in enumerate(self._hard):
-            _a1, _e1 = hard.dadt_dedt(self, 0)
-            if self._debug:
-                # Store individual hardening rates
-                getattr(self, f"_dadt_{ii}")[:, 0] = _a1[...]
-
-            dadt[:] += _a1
-            if pop.eccen is not None:
-                dedt[:] += _e1
-
-        self.dadt[:, 0] = dadt
-
-        # ---- Initialize eccentricities as needed
-
+        self.dadt[:, 0] = dadt_init
         if (pop.eccen is not None):
-            self.eccen[:, 0] = pop.eccen
-            self.dedt[:, 0] = dedt
+            self.dedt[:, 0] = dedt_init
 
         return
 
     def _take_next_step(self, step):
         """Integrate the binary population forward (to smaller separations) by one step.
+
+        For an integration step `s`, we are moving from index `s-1` to index `s`.  These correspond
+        to the 'left' and 'right' edges of the step.  The evolutionary trajectory values have
+        already been calculated on the left edges (during either the previous time step, or the
+        initial time step).  Each subsequent integration step then proceeds as follows:
+
+        (1) The hardening rate is calculated at the right edge of the step.
+        (2) The time it takes to move from the left to right edge is calculated using a trapezoid
+            rule in log-log space.
+        (3) The right edge evolution values are stored and updated.
 
         Parameters
         ----------
@@ -559,43 +569,32 @@ class Evolution:
 
         """
         # ---- Initialize
-        debug = self._debug
         size, nsteps = self.shape
         left = step - 1     # the previous time-step (already completed)
         right = step        # the next     time-step
-        dadt_r = np.zeros(size)
-        if self.eccen is not None:
-            dedt_r = np.zeros_like(dadt_r)
 
-        # ---- Get hardening rates for each hardening model
-        for ii, hard in enumerate(self._hard):
-            _ar, _er = hard.dadt_dedt(self, right)
-            if debug:
-                log.debug(f"hard={hard} : dadt = {utils.stats(_ar)}")
-                # Store individual hardening rates
-                getattr(self, f"_dadt_{ii}")[:, right] = _ar[...]
-                # Raise error on invalid entries
-                if not np.all(np.isfinite(_ar)) or np.any(_ar > 0.0):
-                    utils.error(f"invalid `dadt` for hard={hard}!")
-
-            dadt_r[:] += _ar
-            if self.eccen is not None:
-                dedt_r[:] += _er
-
-        # Store right-edge hardening rates
+        # ---- Hardening rates at the right-edge of the step
+        # calculate
+        dadt_r, dedt_r = self._hardening_rate(right)
+        # store
         self.dadt[:, right] = dadt_r
         if self.eccen is not None:
             self.dedt[:, right] = dedt_r
 
         # ---- Calculate time between edges
 
-        dtda = 1.0 / - self.dadt[:, (left, right)]   # convert dadt to positive
+        # get the $dt/da$ rate on both edges of the step
+        dtda = 1.0 / - self.dadt[:, (left, right)]   # NOTE: `dadt` is negative, convert to positive
+        # get the deparation $a$ on both edges
         sepa = self.sepa[:, (right, left)]   # sepa is decreasing, so switch left-right order
+        # use trapezoid rule to find total time for this step
         dt = utils.trapz_loglog(dtda, sepa, axis=-1).squeeze()   # this should come out positive
         if np.any(dt < 0.0):
             utils.error(f"Negative time-steps found at step={step}!")
 
         # ---- Update right-edge values
+        # NOTE/ENH: this would be a good place to make a function `_update_right_edge()` (or something like that),
+        # that stores the updated right edge values, and also performs any additional updates, such as mass evolution
 
         # Update lookback time based on duration of this step
         tlbk = self.tlbk[:, left] - dt
@@ -613,7 +612,53 @@ class Evolution:
             decc = utils.trapz_loglog(dedt, time, axis=-1).squeeze()
             self.eccen[:, right] = self.eccen[:, left] + decc
 
-        return _EVO.CONT
+        return
+
+    def _hardening_rate(self, step):
+        """Calculate the net hardening rate for the given integration step.
+
+        The hardening rates (:class:`_Hardening` subclasses) stored in the :attr:`Evolution._hard`
+        attribute are called in sequence, their :meth:`_Hardening.dadt_dedt` methods are called,
+        and the $da/dt$ and $de/dt$ hardening rates are added together.
+        NOTE: the da/dt and de/dt values are added together to get the net rate, this is an
+        approximation.
+
+        Parameters
+        ----------
+        step : int
+            Current step number (the destination of the current step, i.e. step=1 is for integrating
+            from 0 to 1.)
+
+        Returns
+        -------
+        dadt : np.ndarray
+            The hardening rate in separation, $da/dt$, in units of [cm/s].
+            The shape is (N,) where N is the number of binaries.
+        dedt : np.ndarray or None
+            If eccentricity is not being evolved, this is `None`.  If eccentricity is being evolved,
+            this is the hardening rate in eccentricity, $de/dt$, in units of [1/s].
+            In this case, the shape is (N,) where N is the number of binaries.
+
+        """
+        dadt = np.zeros(self.shape[0])
+        dedt = None if self.eccen is None else np.zeros_like(dadt)
+
+        for ii, hard in enumerate(self._hard):
+            _ar, _er = hard.dadt_dedt(self, step)
+            if self._debug:
+                log.debug(f"hard={hard} : dadt = {utils.stats(_ar)}")
+                # Store individual hardening rates
+                getattr(self, f"_dadt_{ii}")[:, step] = _ar[...]
+                # Raise error on invalid entries
+                if not np.all(np.isfinite(_ar)) or np.any(_ar > 0.0):
+                    utils.error(f"invalid `dadt` for hard={hard}!")
+
+            dadt[:] += _ar
+            if self.eccen is not None:
+                dedt[:] += _er
+
+        return dadt, dedt
+
 
     def _check(self):
         """Perform basic diagnostics on parameter validity after evolution.
@@ -1310,12 +1355,6 @@ class Fixed_Time_SAM(Fixed_Time):
 # =================================================================================================
 # ====    Utility Classes and Functions    ====
 # =================================================================================================
-
-
-@enum.unique
-class _EVO(enum.Enum):
-    CONT = 1
-    END = -1
 
 
 class _Quinlan1996:
