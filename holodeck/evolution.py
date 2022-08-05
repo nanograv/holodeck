@@ -133,15 +133,6 @@ class Evolution:
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
 
-    # scafa: np.ndarray      #: scale-factor of the universe, set to 1.0 after z=0
-    # tlbk: np.ndarray       #: lookback time, negative after redshift zero [sec]
-    # sepa: np.ndarray       #: semi-major axis (separation) [cm]
-    # mass: np.ndarray       #: mass of BHs, 0-primary, 1-secondary, [g]
-    # mdot: np.ndarray       #: accretion rate onto each component of binary [g/s]
-    # dadt: np.ndarray       #: hardening rate in separation [cm/s]
-    # eccen: np.ndarray      #: eccentricity, `None` if not being evolved []
-    # dedt: np.ndarray       #: eccen evolution, `None` if not evolved [1/s]
-
     def __init__(self, pop, hard, nsteps: int = 100, mods=None, debug: bool = False):
         """Initialize a new Evolution instance.
 
@@ -218,7 +209,7 @@ class Evolution:
 
     # ==== API and Core Functions
 
-    def evolve(self, progress=True):
+    def evolve(self, progress=False):
         """Evolve binary population from initial separation until coalescence in discrete steps.
 
         Each binary has a fixed number of 'steps' from initial separation until coalescence.  The
@@ -712,9 +703,18 @@ class Evolution:
 
     @property
     def shape(self):
-        """The number of binaries and number of steps (N, S).
-        """
+        """The number of binaries and number of steps (N, S)."""
         return self._shape
+
+    @property
+    def size(self):
+        """The number of binaries"""
+        return self._shape[0]
+
+    @property
+    def steps(self):
+        """The number of evolution steps"""
+        return self._shape[1]
 
     @property
     def coal(self):
@@ -757,7 +757,6 @@ class Evolution:
 
 class _Hardening(abc.ABC):
     """Base class for binary-hardening models, providing the `dadt_dedt(evo, step, ...)` method.
-
 
 
     """

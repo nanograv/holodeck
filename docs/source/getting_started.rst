@@ -265,7 +265,7 @@ Evolution Implementation
 ------------------------
 
 The core component of the evolution module is the :class:`Evolution` class.  This class combines a
-population of initial binary parameters (i.e. from the :class:`holodeck.population._Population_Discrete`
+population of initial binary parameters (i.e. from the :class:`_Population_Discrete <holodeck.population._Population_Discrete>`
 class), along with a specific binary hardening model (:class:`_Hardening` subclass), and performs
 the numerical integration of each binary over time - from large separations to coalescence.  The
 :class:`Evolution` class also acts to store the binary evolution histories ('trajectories' or
@@ -275,21 +275,21 @@ trajectories.
 
 The :class:`Evolution <holodeck.evolution.Evolution>` class is (currently) primary built to be used with a
 :class:`Pop_Illustris <holodeck.population.Pop_Illustris>` instance.
-More generally, the `Evolution` class is instantiated with a :class:`holodeck.population._Population_Discrete`
+More generally, the `Evolution` class is instantiated with a :class:`_Population_Discrete <holodeck.population._Population_Discrete>`
 instance, and a particular binary hardening model (one or more subclass of :class:`_Hardening`).  It
 then numerically integrates each binary from their
 initial separation to coalescence, determining how much time that process takes, and thus the
 rate of redshift/time evolution.
 
 **Initialization**: the evolution constructor sets all attributes to empty arrays of the appropriate sizes.
-NOTE: the 0th step is *not* initialized at this time, instead it happens in `Evolution.evolve()` method.
+NOTE: the 0th step is *not* initialized at this time, instead it happens in :meth:`Evolution.evolve()` method.
 
 **Integration**: binary evolution is performed by running the
 :meth:`Evolution.evolve() <holodeck.evolution.Evolution.evolve>` method.  The process is as follows:
 
 (1) Step zero is initialized using the
     :meth:`Evolution._init_step_zero() <holodeck.evolution.Evolution._init_step_zero>` method.  This transfers
-    attributes from the stored :class:`holodeck.population._Population_Discrete` instance to the 0th index of the
+    attributes from the stored :class:`_Population_Discrete <holodeck.population._Population_Discrete>` instance to the 0th index of the
     evolution arrays.  The attributes are [`sepa`, `scafa`, `mass`, and optionally `eccen`].  The hardening model
     is also used to calculate the 0th hardening rates [`dadt`, `dedt`].
 (2) Integration is performed over all subsequent steps, by progressively calling :meth:`Evolution._take_next_step() <holodeck.evolution.Evolution._take_next_step>`.  For an integration step `s`, we move from index `s-1` to index
@@ -302,7 +302,7 @@ NOTE: the 0th step is *not* initialized at this time, instead it happens in `Evo
             rule in log-log space.
         (c) The right edge evolution values are stored and updated.
 
-(3) Integration is completed once all steps have been taken, and the :meth:`Evolution._finalize() <holodeck.evolution.Evolution._finalize>` method is called.  Any stored modifiers (:class:`utils._Modifier` subclasses) are applied using the :meth:`Evolution._modify() <holodeck.evolution.Evolution._modify>` method, and any diagnostic checks are run with the :meth:`Evolution._check() <holodeck.evolution.Evolution._check>` method.
+(3) Integration is completed once all steps have been taken, and the :meth:`Evolution._finalize() <holodeck.evolution.Evolution._finalize>` method is called.  Any stored modifiers (:class:`holodeck.utils._Modifier` subclasses) are applied using the :meth:`Evolution._modify() <holodeck.evolution.Evolution._modify>` method, and any diagnostic checks are run with the :meth:`Evolution._check() <holodeck.evolution.Evolution._check>` method.
 
 
 Observational Constraints on MBH and MBH-Binary Populations
@@ -314,5 +314,7 @@ Observational Constraints on MBH and MBH-Binary Populations
 References
 ==========
 
-* [Sesana2008]_ Sesana, Veccio, & Colacino 2008.
+* [BBR1980]_ Begelman, Blandford & Rees 1980.
 * [Chen2019]_ Chen, Sesana, Conselice 2019.
+* [Kelley2017a]_ Kelley, Blecha, and Hernquist (2017)
+* [Sesana2008]_ Sesana, Veccio, & Colacino 2008.
