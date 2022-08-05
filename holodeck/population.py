@@ -378,7 +378,7 @@ class PM_Eccentricity(_Population_Modifier):
         """
         self.eccen_dist = eccen_dist        #: Two parameter specification for eccentricity distribution
         if np.shape(eccen_dist) != (2,):
-            raise ValueError(f"`eccen_dist` must be shaped (2,)")
+            raise ValueError(f"`eccen_dist` (shape = {np.shape(eccen_dist)}) must be shaped (2,)")
 
         return
 
