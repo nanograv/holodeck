@@ -149,7 +149,7 @@ class _Population_Discrete(abc.ABC):
     def _update_derived(self):
         """Set or reset any derived quantities.
         """
-        self._size = self.sepa.size
+        self._size = np.size(self.sepa) if (self.sepa is not None) else None
         return
 
     @property

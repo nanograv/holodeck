@@ -61,18 +61,18 @@ def test_valid_population_subclass():
     with pytest.raises(TypeError):
         Bad_1()
 
-    # ---- Initializing a subclass that *does* override `_init()` and sets `size` should succeed
+    # ---- Initializing a subclass that *does* override `_init()` and sets attributes should succeed
     class Good_1(holo.population._Population_Discrete):
         def _init(self):
             self.mass = np.zeros((10, 2))
             self.sepa = np.zeros(10)
             self.scafa = np.zeros(10)
-            self._size = 10
             return
 
     Good_1()
 
-    # ---- Initializing a subclass that overrides `_init()` but does not set `_size` should fail
+    # ---- Initializing a subclass that overrides `_init()`, but does not set attributers should fail
+    # because `sepa` is not set, `_size` will be `None` which will raise a `ValueError` in `_check()`
     class Bad_2(holo.population._Population_Discrete):
         def _init(self):
             return
@@ -83,7 +83,6 @@ def test_valid_population_subclass():
     class Bad_3(holo.population._Population_Discrete):
         def _init(self):
             self.mass = np.zeros((10, 2))
-            self.sepa = np.zeros(10)
             self.scafa = np.zeros(10)
             return
 
