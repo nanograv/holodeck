@@ -2,17 +2,17 @@
 Annotated Bibliography
 ======================
 
-Generating references on :ref:`NASA ADS <https://ui.adsabs.harvard.edu/user/libraries/DDrcbmynS-CEJgm24zT0ig>`:
+Generating references on `NASA ADS <https://ui.adsabs.harvard.edu/user/libraries/DDrcbmynS-CEJgm24zT0ig>`_:
 
 * For short references (e.g. in code files)::
 
     * [%1.1h%Y]_ %3.1M (%Y).
 
-* For :ref:`annotated bibliography <Bibliography>` section::
+* For `Bibliography`_ section::
 
     * **%3.1M %Y**, [%1.1h%Y]_ - `%T <%u>`_\n
 
-* For full references (e.g. in the :ref:`References` section below)::
+* For full references (e.g. in the `References`_ section below)::
 
     .. [%1.1h%Y] %3.1M (%Y), %q, %V, %S.\n   %T\n   %u\n
 
