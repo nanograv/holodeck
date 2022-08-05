@@ -236,7 +236,76 @@ Full code documentation: :mod:`observational populations <holodeck.pop_observati
 
 Binary Evolution/Hardening Models
 =================================
-Prescriptions for modeling binary evolution on less-than about kpc scales, with interactions between binaries are their galactic environments.
+
+In `holodeck`, initial binary populations are typically defined near the time of galaxy-galaxy
+merger, when two MBHs come together at roughly kiloparsec scales.  Environmental 'hardening'
+mechanisms are required to dissipate orbital energy and angular momentum, allowing the binary
+separation to shrink ('harden'). Typically *dynamical friction (DF)* is most important at large scales
+($\sim \mathrm{kpc}$).  Near where the pair of MBHs become a gravitationally-bound binary, the
+DF approximations break down, and individual *stellar scattering* events (from stars in the 'loss
+cone' of parameter space) need to be considered.  In the presence of significant gas (i.e. from
+accretion), a circumbinary accretion disk (CBD) may form, and gravitational *circumbinary disk torques*
+from the gas distribution (typically spiral waves) may become important.  Finally, at the smaller separations,
+*GW emission* takes over.  The classic work describing the overall process of binary evolution in
+its different stages is [BBR1980]_.  [Kelley2017a]_ goes into significant detail on implementations
+and properties of each component of binary evolution also.  Triple MBH interactions, and perturbations
+from other massive objects (e.g. molecular clouds) can also be important.
+
+The :mod:`holodeck.evolution` submodule provides tools for modeling the binary evolution from the
+time of binary 'formation' (i.e. galaxy merger) until coalescence.  Models for binary evolutionary
+can range tremendously in complexity.  In the simplest models, binaries are assumed to coalesce
+instantaneously (in that the age of the universe is the same at formation and coalescence), and are
+also assumed to evolve purely due to GW emission (in that the time spent in any range of orbital
+frequencies can be calculated from the GW hardening timescale).  Note that these two assumptions
+are contradictory, but commonly employed in the literature.  The ideal, self-consistent approach,
+is to model binary evolution using self-consistently derived environments (e.g. gas and stellar
+mass distributions), and applying the same time-evolution prescription to both the redshift
+evolution of each binary, and also the GW calculation.  Note that GWs can only be calculated based
+on some sort of model for binary evolution.  The model may be extremely simple, in which case it is
+sometimes glanced over.
+
+Implementation
+^^^^^^^^^^^^^^
+
+The core component of the evolution module is the :class:`Evolution` class.  This class combines a
+population of initial binary parameters (i.e. from the :class:`holodeck.population._Population_Discrete`
+class), along with a specific binary hardening model (:class:`_Hardening` subclass), and performs
+the numerical integration of each binary over time - from large separations to coalescence.  The
+:class:`Evolution` class also acts to store the binary evolution histories ('trajectories' or
+'tracks'), which are then used to calculate GW signals (e.g. the GWB).  To facilitate GW and
+similar calculations, :class:`Evolution` also provides interpolation functionality along binary
+trajectories.
+
+The :class:`Evolution <holodeck.evolution.Evolution>` class is (currently) primary built to be used with a
+:class:`Pop_Illustris <holodeck.population.Pop_Illustris>` instance.
+More generally, the `Evolution` class is instantiated with a :class:`holodeck.population._Population_Discrete`
+instance, and a particular binary hardening model (one or more subclass of :class:`_Hardening`).  It
+then numerically integrates each binary from their
+initial separation to coalescence, determining how much time that process takes, and thus the
+rate of redshift/time evolution.
+
+**Initialization**: the evolution constructor sets all attributes to empty arrays of the appropriate sizes.
+NOTE: the 0th step is *not* initialized at this time, instead it happens in `Evolution.evolve()` method.
+
+**Integration**: binary evolution is performed by running the
+:meth:`Evolution.evolve() <holodeck.evolution.Evolution.evolve>` method.  The process is as follows:
+
+(1) Step zero is initialized using the
+    :meth:`Evolution._init_step_zero() <holodeck.evolution.Evolution._init_step_zero>` method.  This transfers
+    attributes from the stored :class:`holodeck.population._Population_Discrete` instance to the 0th index of the
+    evolution arrays.  The attributes are [`sepa`, `scafa`, `mass`, and optionally `eccen`].  The hardening model
+    is also used to calculate the 0th hardening rates [`dadt`, `dedt`].
+(2) Integration is performed over all subsequent steps, by progressively calling :meth:`Evolution._take_next_step() <holodeck.evolution.Evolution._take_next_step>`.  For an integration step `s`, we move from index `s-1` to index
+    `s`.  These correspond to the 'left' and 'right' edges of the step.  The evolutionary trajectory values have
+    already been calculated on the left edges (during either the previous time step, or the initial time step).
+    The numerical integration proceeds as:
+
+        (a) The hardening rate is calculated at the right edge of the step.
+        (b) The time it takes to move from the left to right edge is calculated using a trapezoid
+            rule in log-log space.
+        (c) The right edge evolution values are stored and updated.
+
+(3) Integration is completed once all steps have been taken, and the :meth:`Evolution._finalize() <holodeck.evolution.Evolution._finalize>` method is called.  Any stored modifiers (:class:`utils._Modifier` subclasses) are applied using the :meth:`Evolution._modify() <holodeck.evolution.Evolution._modify>` method, and any diagnostic checks are run with the :meth:`Evolution._check() <holodeck.evolution.Evolution._check>` method.
 
 
 Observational Constraints on MBH and MBH-Binary Populations
