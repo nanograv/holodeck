@@ -235,11 +235,11 @@ def test_resample_basic():
 
             msg = [f"{xx:{fmt}}" for xx in old_aves]
             msg = ", ".join(msg)
-            old_aves_str = f"old_aves = " + msg
+            old_aves_str = "old_aves = " + msg
 
             msg = [f"{xx:{fmt}}" for xx in old_stdevs]
             msg = ", ".join(msg)
-            old_stdevs_str = f"old_stdevs = " + msg
+            old_stdevs_str = "old_stdevs = " + msg
         else:
             assert pop.size == old_size
 
@@ -257,12 +257,12 @@ def test_resample_basic():
         print(old_aves_str)
         msg = [f"{xx:{fmt}}" for xx in new_aves]
         msg = ", ".join(msg)
-        print(f"new_aves = " + msg)
+        print("new_aves = " + msg)
 
         print(old_stdevs_str)
         msg = [f"{xx:{fmt}}" for xx in new_stdevs]
         msg = ", ".join(msg)
-        print(f"new_stdevs = " + msg)
+        print("new_stdevs = " + msg)
 
         # Make sure the averages and stdevs match
         assert np.allclose(new_aves, old_aves, rtol=1e-1)

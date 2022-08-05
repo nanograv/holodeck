@@ -6,9 +6,9 @@ on both statistical and systematic uncertainties.  Currently, binary populations
 based on: cosmological hydrodynamic simulations (Illustris), semi-analytic/semi-empirical models,
 and observational catalogs of local galaxies and/or quasars.
 
-See the :ref:`README.md` file for more information.
-The github repository is: :ref:`https://github.com/nanograv/holodeck`.
-Additional documentation can be found at: :ref:`holodeck-gw.readthedocs.io/en/docs/index.html`.
+See the `README.md` file for more information.
+The github repository is: `<https://github.com/nanograv/holodeck>`_.
+Additional documentation can be found at: `<holodeck-gw.readthedocs.io/en/docs/index.html>`_.
 Note that the readthedocs documentation can also be built locally from the `holodeck/docs` folder.
 A methods paper for `holodeck` is currently in preparation.
 
@@ -40,6 +40,7 @@ __license__ = "MIT"
 import os
 import logging
 
+__all__ = ["log", "cosmo"]
 
 # ---- Setup root package variables
 

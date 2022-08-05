@@ -47,7 +47,15 @@ class _Modifier(abc.ABC):
         return
 
     @abc.abstractmethod
-    def modify(self, base):
+    def modify(self, base: object):
+        """Perform an in-place modification on the passed object instance.
+
+        Parameters
+        ----------
+        base: object
+            The object instance to be modified.
+
+        """
         pass
 
 

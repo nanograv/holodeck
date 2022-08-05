@@ -66,14 +66,13 @@ References
 * [Sesana2006]_ Sesana, Haardt & Madau et al. 2006.
 * [BBR1980]_ Begelman, Blandford & Rees 1980.
 * [Sesana2010]_ Sesana 2010.
-* [Kelley2017]_ Kelley, Blecha & Hernquist 2017.
+* [Kelley2017a]_ Kelley, Blecha & Hernquist 2017.
 * [Chen2017]_ Chen, Sesana, & Del Pozzo 2017.
 
 """
 from __future__ import annotations
 
 import abc
-import enum
 import inspect
 import json
 import os
@@ -542,7 +541,7 @@ class Evolution:
         tlbk = cosmo.z_to_tlbk(redz)
         self.tlbk[:, 0] = tlbk
         # `pop.mass` has shape (N, 2), broadcast to (N, S, 2) for `S` steps
-        self.mass[:, 0, :] = pop.mass[:, np.newaxis, :]
+        self.mass[:, :, :] = pop.mass[:, np.newaxis, :]
 
         # ---- Initialize hardening rate at first step
         dadt_init, dedt_init = self._hardening_rate(step=0)
@@ -613,8 +612,16 @@ class Evolution:
         if self.eccen is not None:
             dedt = self.dedt[:, (left, right)]
             time = self.tlbk[:, (right, left)]   # tlbk is decreasing, so switch left-right order
-            decc = utils.trapz_loglog(dedt, time, axis=-1).squeeze()
+            # decc = utils.trapz_loglog(dedt, time, axis=-1).squeeze()
+            decc = utils.trapz(dedt, time, axis=-1).squeeze()
             self.eccen[:, right] = self.eccen[:, left] + decc
+            if self._debug:
+                bads = ~np.isfinite(decc)
+                if np.any(bads):
+                    utils.print_stats(print_func=log.error, dedt=dedt, time=time, decc=decc)
+                    err = f"Non-finite changes in eccentricity found in step {step}!"
+                    log.exception(err)
+                    raise ValueError(err)
 
         return
 
@@ -658,7 +665,7 @@ class Evolution:
                     utils.error(f"invalid `dadt` for hard={hard}!")
 
             dadt[:] += _ar
-            if self.eccen is not None:
+            if (self.eccen is not None) and (_er is not None):
                 dedt[:] += _er
 
         return dadt, dedt
@@ -1019,7 +1026,7 @@ class Dynamical_Friction_NFW(_Hardening):
         if self._time_dynamical is None:
             self._time_dynamical = self._NFW.time_dynamical(sepa, mhalo, redz) * 10
 
-        # model tidal-stripping of secondary's bulge (see: [Kelley2017] Eq.6)
+        # model tidal-stripping of secondary's bulge (see: [Kelley2017a] Eq.6)
         pow = np.clip(1.0 - dt / self._time_dynamical, 0.0, 1.0)
         meff = m2 * np.power((m2 + mstar_sec)/m2, pow)
 
@@ -1625,7 +1632,7 @@ def _density_at_influence_radius_dehnen(mbh, mstar, gamma=1.0):
 
 def _radius_hard_BBR1980_dehnen(mbh, mstar, gamma=1.0):
     """
-    [Kelley2017]_ paragraph below Eq.8 - from [BBR1980]_
+    [Kelley2017a]_ paragraph below Eq.8 - from [BBR1980]_
     """
     rbnd = _radius_influence_dehnen(mbh, mstar, gamma=gamma)
     rstar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
@@ -1635,7 +1642,7 @@ def _radius_hard_BBR1980_dehnen(mbh, mstar, gamma=1.0):
 
 def _radius_loss_cone_BBR1980_dehnen(mbh, mstar, gamma=1.0):
     """
-    [Kelley2017]_ Eq.9 - from [BBR1980]_
+    [Kelley2017a]_ Eq.9 - from [BBR1980]_
     """
     mass_of_a_star = 0.6 * MSOL
     rbnd = _radius_influence_dehnen(mbh, mstar, gamma=gamma)
