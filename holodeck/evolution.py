@@ -128,8 +128,8 @@ class Evolution:
 
     """
 
-    _EVO_PARS = ['mass', 'sepa', 'eccen', 'scafa', 'tlbk', 'dadt', 'dedt']
-    _LIN_INTERP_PARS = ['eccen', 'scafa', 'tlbk', 'dadt', 'dedt']
+    _EVO_PARS = ['mass', 'sepa', 'eccen', 'scafa', 'tlook', 'dadt', 'dedt']
+    _LIN_INTERP_PARS = ['eccen', 'scafa', 'tlook', 'dadt', 'dedt']
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
 
@@ -190,7 +190,7 @@ class Evolution:
 
         # ---- Initialize empty arrays for tracking binary evolution
         self.scafa = np.zeros(shape)           #: scale-factor of the universe, set to 1.0 after z=0
-        self.tlbk = np.zeros(shape)            #: lookback time, negative after redshift zero [sec]
+        self.tlook = np.zeros(shape)            #: lookback time, negative after redshift zero [sec]
         self.sepa = np.zeros(shape)            #: semi-major axis (separation) [cm]
         self.mass = np.zeros(shape + (2,))     #: mass of BHs, 0-primary, 1-secondary, [g]
         self.mdot = np.zeros(shape + (2,))     #: accretion rate onto each component of binary [g/s]
@@ -509,7 +509,7 @@ class Evolution:
         Transfers attributes from the stored :class:`holodeck.population._Population_Discrete`
         instance to the 0th index of the evolution arrays.  The attributes are [`sepa`, `scafa`,
         `mass`, and optionally `eccen`].  The hardening model is also used to calculate the 0th
-        hardening rates `dadt` and `dedt`.  The initial lookback time, `tlbk` is also set.
+        hardening rates `dadt` and `dedt`.  The initial lookback time, `tlook` is also set.
 
         """
         pop = self._pop
@@ -529,8 +529,8 @@ class Evolution:
 
         self.scafa[:, 0] = pop.scafa
         redz = cosmo.a_to_z(pop.scafa)
-        tlbk = cosmo.z_to_tlbk(redz)
-        self.tlbk[:, 0] = tlbk
+        tlook = cosmo.z_to_tlbk(redz)
+        self.tlook[:, 0] = tlook
         # `pop.mass` has shape (N, 2), broadcast to (N, S, 2) for `S` steps
         self.mass[:, :, :] = pop.mass[:, np.newaxis, :]
 
@@ -591,18 +591,18 @@ class Evolution:
         # that stores the updated right edge values, and also performs any additional updates, such as mass evolution
 
         # Update lookback time based on duration of this step
-        tlbk = self.tlbk[:, left] - dt
-        self.tlbk[:, right] = tlbk
-        # update scale-factor for systems at z > 0.0 (i.e. a < 1.0 and tlbk > 0.0)
-        val = (tlbk > 0.0)
-        self.scafa[val, right] = cosmo.z_to_a(cosmo.tlbk_to_z(tlbk[val]))
+        tlook = self.tlook[:, left] - dt
+        self.tlook[:, right] = tlook
+        # update scale-factor for systems at z > 0.0 (i.e. a < 1.0 and tlook > 0.0)
+        val = (tlook > 0.0)
+        self.scafa[val, right] = cosmo.z_to_a(cosmo.tlbk_to_z(tlook[val]))
         # set systems after z = 0 to scale-factor of unity
         self.scafa[~val, right] = 1.0
 
         # update eccentricity if it's being evolved
         if self.eccen is not None:
             dedt = self.dedt[:, (left, right)]
-            time = self.tlbk[:, (right, left)]   # tlbk is decreasing, so switch left-right order
+            time = self.tlook[:, (right, left)]   # tlook is decreasing, so switch left-right order
             # decc = utils.trapz_loglog(dedt, time, axis=-1).squeeze()
             decc = utils.trapz(dedt, time, axis=-1).squeeze()
             self.eccen[:, right] = self.eccen[:, left] + decc
@@ -664,7 +664,7 @@ class Evolution:
     def _check(self):
         """Perform basic diagnostics on parameter validity after evolution.
         """
-        _check_var_names = ['sepa', 'scafa', 'mass', 'tlbk', 'dadt']
+        _check_var_names = ['sepa', 'scafa', 'mass', 'tlook', 'dadt']
         _check_var_names_eccen = ['eccen', 'dedt']
 
         def check_vars(names):
@@ -981,7 +981,7 @@ class Dynamical_Friction_NFW(_Hardening):
         """
         mass = evo.mass[:, step, :]
         sepa = evo.sepa[:, step]
-        dt = evo.tlbk[:, 0] - evo.tlbk[:, step]   # positive time-duration since 'formation'
+        dt = evo.tlook[:, 0] - evo.tlook[:, step]   # positive time-duration since 'formation'
         # NOTE `scafa` is nan for systems "after" redshift zero (i.e. do not merge before redz=0)
         redz = np.zeros_like(sepa)
         val = (evo.scafa[:, step] > 0.0)

@@ -77,14 +77,14 @@ class Test_Illustris_Fixed:
     def _test_has_keys(self, evolution_illustris_fixed_time_circ):
         evo = evolution_illustris_fixed_time_circ
         # Make sure evolution attributes all exist
-        keys = ['mass', 'sepa', 'eccen', 'scafa', 'tlbk', 'dadt', 'dedt']
+        keys = ['mass', 'sepa', 'eccen', 'scafa', 'tlook', 'dadt', 'dedt']
         for kk in keys:
             assert kk in evo._EVO_PARS, f"Missing attribute key '{kk}' in evolution instance!"
 
     def test_has_derived_keys(self, evolution_illustris_fixed_time_eccen):
         evo = evolution_illustris_fixed_time_eccen
         # Make sure evolution attributes all exist
-        keys = ['mass', 'sepa', 'eccen', 'scafa', 'tlbk', 'dadt', 'dedt']
+        keys = ['mass', 'sepa', 'eccen', 'scafa', 'tlook', 'dadt', 'dedt']
         for kk in keys:
             vv = getattr(evo, kk)
             err = f"Attribute '{kk}' has <= 0.0 or non-finite values: {holo.utils.stats(vv)}"
@@ -126,7 +126,7 @@ class Test_Illustris_Fixed:
 
     def _test_evo_time(self, evo):
         # Make sure lifetimes are close to target
-        time = evo.tlbk
+        time = evo.tlook
         dt = time[:, 0] - time[:, -1]
         ave = dt.mean()
         std = dt.std()
