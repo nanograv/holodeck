@@ -1,9 +1,7 @@
+-r ../requirements-dev.txt
 ipykernel
 nbsphinx
-numpy
 numpydoc
-kalepy
-astropy
 sphinx-math-dollar
 sphinx-rtd-theme
 # sphinxcontrib-bibtex

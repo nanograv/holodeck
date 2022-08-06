@@ -42,6 +42,16 @@ import logging
 
 __all__ = ["log", "cosmo"]
 
+# ---- Define Global Parameters
+
+
+class Parameters:
+    # These are WMAP9 parameters, see [WMAP9], Table 3, WMAP+BAO+H0
+    Omega0 = 0.2880                #: Matter density parameter "Om0"
+    OmegaBaryon = 0.0472           #: Baryon density parameter "Ob0"
+    HubbleParam = 0.6933           #: Hubble Parameter as H0/[100 km/s/Mpc], i.e. 0.69 instead of 69
+
+
 # ---- Setup root package variables
 
 _PATH_PACKAGE = os.path.dirname(os.path.abspath(__file__))
@@ -64,12 +74,18 @@ for cp in _check_paths:
 from . import logger   # noqa
 log = logger.get_logger(__name__, logging.DEBUG)       #: global root logger from `holodeck.logger`
 
+# ---- Load cosmology instance
+
+import cosmopy
+cosmo = cosmopy.Cosmology(h=Parameters.HubbleParam, Om0=Parameters.Omega0, Ob0=Parameters.OmegaBaryon)
+del cosmopy
 
 # ---- Import submodules
 
 # NOTE: Must load and initialize cosmology before importing other submodules!
-from . import cosmology   # noqa
-cosmo = cosmology.Cosmology()              #: global cosmology instance for cosmolical calculations
+# from . import cosmology   # noqa
+# cosmo = cosmology.Cosmology()              #: global cosmology instance for cosmolical calculations
+
 
 from . import constants   # noqa
 from . import evolution   # noqa
