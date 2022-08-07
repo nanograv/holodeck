@@ -280,7 +280,8 @@ class Evolution:
             Parameters that should be interpolated.
             If `None`, defaults to `self._EVO_PARS` attribute.
         coal : bool,
-            Only return evolution values for binaries coalescing before redshift zero.
+            Only store evolution values for binaries coalescing before redshift zero.
+            Interpolated values for other binaries are set to `np.nan`.
         lin_interp : None or bool,
 
         Returns
@@ -327,28 +328,40 @@ class Evolution:
             scafa = self.scafa[:, ::-1]
             tt = np.log10(targets)
             rev = True
-        else:
+        else:   # pragma: no cover
             raise ValueError("Bad `xpar` {}!".format(xpar))
 
-        # Find the evolution-steps immediately before and after the target frequency
+        # Make sure target values are within bounds
         textr = utils.minmax(tt)
         xextr = utils.minmax(_xvals)
         if (textr[1] < xextr[0]) | (textr[0] > xextr[1]):
-            err = "`targets` extrema ({}) ourside `xvals` extema ({})!  Bad units?".format(
+            err = "`targets` extrema ({}) outside `xvals` extema ({})!  Bad units?".format(
                 (10.0**textr), (10.0**xextr))
             raise ValueError(err)
 
         # Convert to (N, T, M)
         #     `tt` is (T,)  `xvals` is (N, M) for N-binaries and M-steps
         select = (tt[np.newaxis, :, np.newaxis] <= _xvals[:, np.newaxis, :])
+
+        test = np.argmax(select, axis=-1)
+        test = (test > 0)
+        print(f"\n===============\n")
+        print(utils.frac_str(test))
+        print(utils.frac_str(~test))
+        print(f"\n===============\n")
+
         # Select only binaries that coalesce before redshift zero (a=1.0)
         if coal:
-            select = select & (scafa[:, np.newaxis, :] > 0.0) & (scafa[:, np.newaxis, :] < 1.0)
+            # select = select & (scafa[:, np.newaxis, :] > 0.0) & (scafa[:, np.newaxis, :] < 1.0)
+            select = select & self.coal[:, np.newaxis, np.newaxis]
 
         # (N, T), find the index of the xvalue following each target point (T,), for each binary (N,)
         aft = np.argmax(select, axis=-1)
         # zero values in `aft` mean no xvals after the targets were found
         valid = (aft > 0)
+        if coal:
+            valid = valid & self.coal[:, np.newaxis]
+
         bef = np.copy(aft)
         bef[valid] -= 1
 
@@ -392,7 +405,7 @@ class Evolution:
                     use_cut = cut[:, :, np.newaxis]
                     use_frac = frac[:, np.newaxis, :]
                     reshape = True
-                else:
+                else:   # pragma: no cover
                     raise ValueError("Unexpected shape of data: {}!".format(np.shape(_data)))
 
             if not lin_interp_flag:
@@ -584,7 +597,7 @@ class Evolution:
         sepa = self.sepa[:, (right, left)]   # sepa is decreasing, so switch left-right order
         # use trapezoid rule to find total time for this step
         dt = utils.trapz_loglog(dtda, sepa, axis=-1).squeeze()   # this should come out positive
-        if np.any(dt < 0.0):
+        if np.any(dt < 0.0):    # nocov
             utils.error(f"Negative time-steps found at step={step}!")
 
         # ---- Update right-edge values
@@ -607,7 +620,7 @@ class Evolution:
             # decc = utils.trapz_loglog(dedt, time, axis=-1).squeeze()
             decc = utils.trapz(dedt, time, axis=-1).squeeze()
             self.eccen[:, right] = self.eccen[:, left] + decc
-            if self._debug:
+            if self._debug:    # pragma: no cover
                 bads = ~np.isfinite(decc)
                 if np.any(bads):
                     utils.print_stats(print_func=log.error, dedt=dedt, time=time, decc=decc)
@@ -648,7 +661,7 @@ class Evolution:
 
         for ii, hard in enumerate(self._hard):
             _ar, _er = hard.dadt_dedt(self, step)
-            if self._debug:
+            if self._debug:    # pragma: no cover
                 log.debug(f"hard={hard} : dadt = {utils.stats(_ar)}")
                 # Store individual hardening rates
                 getattr(self, f"_dadt_{ii}")[:, step] = _ar[...]
@@ -671,7 +684,7 @@ class Evolution:
         def check_vars(names):
             for cv in names:
                 vals = getattr(self, cv)
-                if np.any(~np.isfinite(vals)):
+                if np.any(~np.isfinite(vals)):    # pragma: no cover
                     err = "Found non-finite '{}' !".format(cv)
                     raise ValueError(err)
 

@@ -57,7 +57,6 @@ def evolution_illustris_fixed_time_circ():
     fixed = holo.evolution.Fixed_Time.from_pop(pop, TIME)
     evo = holo.evolution.Evolution(pop, fixed, nsteps=30)
     evo.evolve()
-    print("SETUP `evo` circ!")
     return evo
 
 
@@ -68,7 +67,23 @@ def evolution_illustris_fixed_time_eccen():
     fixed = holo.evolution.Fixed_Time.from_pop(pop, TIME)
     evo = holo.evolution.Evolution(pop, fixed, nsteps=30)
     evo.evolve()
-    print("SETUP `evo` eccen!")
+    return evo
+
+
+@pytest.fixture(scope='session')
+def evo_def():
+    ecc = holo.population.PM_Eccentricity()
+    pop = holo.population.Pop_Illustris(mods=ecc)
+    fixed = holo.evolution.Fixed_Time.from_pop(pop, TIME)
+    evo = holo.evolution.Evolution(pop, fixed, nsteps=30)
+
+    assert evo._evolved is False
+    with pytest.raises(RuntimeError):
+        evo._check_evolved()
+
+    evo.evolve()
+    assert evo._evolved is True
+    evo._check_evolved()
     return evo
 
 
@@ -145,6 +160,183 @@ class Test_Illustris_Fixed:
 
     def test_evo_time_eccen(self, evolution_illustris_fixed_time_eccen):
         self._test_evo_time(evolution_illustris_fixed_time_eccen)
+
+
+class Test_Evolution_Basics:
+
+    _EVO_PARS = ['mass', 'sepa', 'eccen', 'scafa', 'tlook', 'dadt', 'dedt']
+    _PARS_POSITIVE = ['mass', 'sepa', 'eccen', 'scafa']
+
+    def test_at_failures(self, evo_def):
+        evo = evo_def
+
+        # Make sure single, and iterable values work
+        xpar = 'fobs'
+        evo.at(xpar, [1/YR, 2/YR])
+        evo.at(xpar, [1/YR])
+        evo.at(xpar, 1/YR)
+        evo.at(xpar, 1/YR, pars=['sepa', 'scafa'])
+        evo.at(xpar, 1/YR, pars=['mass'])
+        evo.at(xpar, 1/YR, pars='mass')
+
+        xpar = 'sepa'
+        evo.at(xpar, [1*PC, 2*PC])
+        evo.at(xpar, [1*PC])
+        evo.at(xpar, 1*PC)
+        evo.at(xpar, 1*PC, pars=['mass', 'scafa'])
+        evo.at(xpar, 1*PC, pars=['mass'])
+        evo.at(xpar, 1*PC, pars='mass')
+
+        fobs = np.logspace(-2, 1, 4) / YR
+        # sepa = np.logspace(-2, 2, 5) * PC
+
+        # use invalid 'xpar' name ('mass')
+        with pytest.raises(ValueError, match='`xpar` must be one of '):
+            evo.at('mass', fobs)
+
+        with pytest.raises(ValueError, match='`targets` extrema'):
+            evo.at('fobs', 1e20/YR)
+
+        with pytest.raises(ValueError, match='`targets` extrema'):
+            evo.at('sepa', 1e6*PC)
+
+        with pytest.raises(ValueError, match='`targets` extrema'):
+            evo.at('sepa', 1e-10*PC)
+
+        return
+
+    def test_at_fobs_all(self, evo_def):
+        evo = evo_def
+        xpar = 'fobs'
+        coal = False
+
+        # Choose interpolation targets
+        fobs = np.logspace(-3, 0, 9) / YR
+        numx = fobs.size
+        # For a moderate range of frequencies (after formation, before coalescence), then all values
+        # should be finite (`nan`s are returned either before formation, or after coalescence)
+        FINITE_FLAG = True
+        print(f"{fobs*YR=}")
+        vals = evo.at(xpar, fobs, coal=coal)
+        print(f"received `at` vals with {vals.keys()=}!")
+
+        for par in self._EVO_PARS:
+            # Make sure parameter is also included in `evolution` instance's list of parameters
+            assert par in evo._EVO_PARS
+            # Make sure parameter is actually returned
+            assert par in vals, f"'{par}' missing from returned `at` dictionary!"
+
+            # Check shape, should be (N, X) N-binaries, X-targets, except for `mass` which is (N, X, 2)
+            vv = vals[par]
+            assert vv.shape[0] == evo.size
+            assert vv.shape[1] == numx
+            assert np.ndim(vv) == 2 or np.shape(vv)[2] == 2
+
+            if FINITE_FLAG:
+                err = f"{par} found {holo.utils.frac_str(~np.isfinite(vv))} non-finite values!"
+                assert np.all(np.isfinite(vv)), err
+
+            # Make sure values are positive when they should be
+            if par in self._PARS_POSITIVE:
+                print(par, np.all(vv > 0.0), holo.utils.frac_str(vv > 0.0), np.any(vv <= 0.0), np.any(~np.isfinite(vv)))
+                assert np.all(vv > 0.0), f"{par} values found to be non-positive ({holo.utils.frac_str(vv > 0.0)})!"
+
+        for par in evo._EVO_PARS:
+            assert par in vals, f"'{par}' missing from returned `at` dictionary!"
+
+        # Choose interpolation targets
+        # 0th element here should be within evolution range, while 1th element should be after coalesence -> `nan` vals
+        fobs = np.array([0.1, 1e6]) / YR
+        print(f"{fobs*YR=}")
+        vals = evo.at(xpar, fobs, coal=coal)
+
+        for ii in range(2):
+            msg = "all values should be "
+            msg += "finite" if ii == 0 else "non-finite"
+            for kk, vv in vals.items():
+                vv = vv[:, ii]
+                test = np.isfinite(vv) if ii == 0 else ~np.isfinite(vv)
+                err = f"{kk} {msg}, good={holo.utils.frac_str(test)} | bad={holo.utils.frac_str(~test)}"
+                print(err)
+                assert np.all(test), err
+
+    def test_at_sepa_coal(self, evo_def):
+        evo = evo_def
+        xpar = 'sepa'
+        coal = True
+
+        # Choose interpolation targets
+        sepa = 1e1 * PC
+        vals = evo.at(xpar, sepa, coal=coal)
+
+        ncoal = np.count_nonzero(evo.coal)
+        ntot = evo.size
+        assert ncoal < ntot, f"This test requires that not all binaries are coalescing ({ncoal}/{ntot})!"
+
+        vv = vals['sepa']
+
+        assert vv.shape[0] == ntot
+        assert np.count_nonzero(np.isfinite(vv)) == ncoal
+        assert np.all(np.isfinite(vv) == evo.coal)
+
+        return
+
+    def test_at_sepa_all(self, evo_def):
+        evo = evo_def
+        xpar = 'sepa'
+        coal = False
+
+        # Choose interpolation targets
+        sepa = np.logspace(-1, 3, 8) * PC
+        numx = sepa.size
+        # For a moderate range of frequencies (after formation, before coalescence), then all values
+        # should be finite (`nan`s are returned either before formation, or after coalescence)
+        FINITE_FLAG = True
+        print(f"{sepa/PC=}")
+        vals = evo.at(xpar, sepa, coal=coal)
+        print(f"received `at` vals with {vals.keys()=}!")
+
+        for par in self._EVO_PARS:
+            # Make sure parameter is also included in `evolution` instance's list of parameters
+            assert par in evo._EVO_PARS
+            # Make sure parameter is actually returned
+            assert par in vals, f"'{par}' missing from returned `at` dictionary!"
+
+            # Check shape, should be (N, X) N-binaries, X-targets, except for `mass` which is (N, X, 2)
+            vv = vals[par]
+            assert vv.shape[0] == evo.size
+            assert vv.shape[1] == numx
+            assert np.ndim(vv) == 2 or np.shape(vv)[2] == 2
+
+            if FINITE_FLAG:
+                err = f"{par} found {holo.utils.frac_str(~np.isfinite(vv))} non-finite values!"
+                assert np.all(np.isfinite(vv)), err
+
+            # Make sure values are positive when they should be
+            if par in self._PARS_POSITIVE:
+                print(par, np.all(vv > 0.0), holo.utils.frac_str(vv > 0.0), np.any(vv <= 0.0), np.any(~np.isfinite(vv)))
+                assert np.all(vv > 0.0), f"{par} values found to be non-positive ({holo.utils.frac_str(vv > 0.0)})!"
+
+        for par in evo._EVO_PARS:
+            assert par in vals, f"'{par}' missing from returned `at` dictionary!"
+
+        # Choose interpolation targets
+        # 0th element here should be within evolution range, while 1th element should be after coalesence -> `nan` vals
+        sepa = np.array([1e6, 0.1, 1e-8]) * PC
+        print(f"{sepa/PC=}")
+        vals = evo.at(xpar, sepa, coal=coal)
+
+        for ii in range(2):
+            msg = "all values should be "
+            msg += "finite" if ii == 1 else "non-finite"
+            for kk, vv in vals.items():
+                vv = vv[:, ii]
+                test = np.isfinite(vv) if ii == 1 else ~np.isfinite(vv)
+                err = f"{kk} {msg}, good={holo.utils.frac_str(test)} | bad={holo.utils.frac_str(~test)}"
+                print(err)
+                assert np.all(test), err
+
+        return
 
 
 def mockup_modified():
