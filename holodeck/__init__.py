@@ -76,7 +76,7 @@ log = logger.get_logger(__name__, logging.DEBUG)       #: global root logger fro
 
 # ---- Load cosmology instance
 
-import cosmopy
+import cosmopy   # noqa
 cosmo = cosmopy.Cosmology(h=Parameters.HubbleParam, Om0=Parameters.Omega0, Ob0=Parameters.OmegaBaryon)
 del cosmopy
 
