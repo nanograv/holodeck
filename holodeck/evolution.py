@@ -293,8 +293,9 @@ class Evolution:
 
         Notes
         -----
-        Out of bounds values are set to `np.nan`.
-        Interpolation is 1st-order in log-log space.
+        * Out of bounds values are set to `np.nan`.
+        * Interpolation is 1st-order in log-log space in general, but properties which are in the
+          `_LIN_INTERP_PARS` array are interpolated at 1st-order in lin-lin space.
 
         """
         self._check_evolved()
@@ -721,7 +722,7 @@ class Evolution:
         """Indices of binaries that coalesce before redshift zero.
         """
         if self._coal is None:
-            self._coal = (self.redz[:, -1] > 0.0)
+            self._coal = (self.scafa[:, -1] < 1.0)
         return self._coal
 
     @property
