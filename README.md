@@ -2,7 +2,7 @@
 
 [//]: # (Badges)
 [![GitHub version](https://badge.fury.io/gh/nanograv%2Fholodeck.svg)](https://badge.fury.io/gh/nanograv%2Fholodeck)
-[![build-status](https://github.com/nanograv/holodeck/actions/workflows/tests.yaml/badge.svg)](https://github.com/nanograv/holodeck/actions/workflows/tests.yaml)
+[![build-status](https://github.com/nanograv/holodeck/actions/workflows/build-status.yaml/badge.svg)](https://github.com/nanograv/holodeck/actions/workflows/build-status.yaml)
 [![codecov](https://codecov.io/gh/nanograv/holodeck/branch/main/graph/badge.svg?token=K63WQH3ED9)](https://codecov.io/gh/nanograv/holodeck)
 [![Documentation Status](https://readthedocs.org/projects/holodeck-gw/badge/?version=main)](https://holodeck-gw.readthedocs.io/en/main/?badge=main)
 

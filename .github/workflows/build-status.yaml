@@ -1,4 +1,4 @@
-name: tox pytest unit tests
+name: build-status
 
 on:
   push:
