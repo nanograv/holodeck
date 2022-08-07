@@ -190,13 +190,13 @@ class Evolution:
 
         # ---- Initialize empty arrays for tracking binary evolution
         self.scafa = np.zeros(shape)           #: scale-factor of the universe, set to 1.0 after z=0
-        self.tlook = np.zeros(shape)            #: lookback time, negative after redshift zero [sec]
+        self.tlook = np.zeros(shape)           #: lookback time [sec], NOTE: negative after redshift zero
         self.sepa = np.zeros(shape)            #: semi-major axis (separation) [cm]
-        self.mass = np.zeros(shape + (2,))     #: mass of BHs, 0-primary, 1-secondary, [g]
+        self.mass = np.zeros(shape + (2,))     #: mass of BHs [g], 0-primary, 1-secondary
         self.mdot = np.zeros(shape + (2,))     #: accretion rate onto each component of binary [g/s]
         self.dadt = np.zeros(shape)            #: hardening rate in separation [cm/s]
-        self.eccen = eccen                     #: eccentricity, `None` if not being evolved []
-        self.dedt = dedt                       #: eccen evolution, `None` if not evolved [1/s]
+        self.eccen = eccen                     #: eccentricity [], `None` if not being evolved
+        self.dedt = dedt                       #: eccen evolution rate [1/s], `None` if not evolved
 
         self._dadt_0 = None   # this is a placeholder for initializing debug output
 
