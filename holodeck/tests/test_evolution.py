@@ -85,10 +85,17 @@ class Test_Illustris_Fixed:
         evo = evolution_illustris_fixed_time_eccen
         # Make sure evolution attributes all exist
         keys = ['mass', 'sepa', 'eccen', 'scafa', 'tlook', 'dadt', 'dedt']
+        positive = ['mass', 'sepa', 'eccen', 'scafa', ]
         for kk in keys:
             vv = getattr(evo, kk)
-            err = f"Attribute '{kk}' has <= 0.0 or non-finite values: {holo.utils.stats(vv)}"
-            assert np.all(vv > 0.0) and np.all(np.isfinite(vv)), err
+
+            err = f"Attribute '{kk}' has non-finite values: {holo.utils.stats(vv)}"
+            assert np.all(np.isfinite(vv)), err
+
+            if kk in positive:
+                err = f"Attribute '{kk}' has <= 0.0 values: {holo.utils.stats(vv)}"
+                assert np.all(vv > 0.0), err
+
         return
 
     def test_has_keys_circ(self, evolution_illustris_fixed_time_circ):
