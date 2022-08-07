@@ -216,9 +216,9 @@ class Test_Evolution_Basics:
         # For a moderate range of frequencies (after formation, before coalescence), then all values
         # should be finite (`nan`s are returned either before formation, or after coalescence)
         FINITE_FLAG = True
-        print(f"{fobs*YR=}")
+        print(f"{fobs*YR}")
         vals = evo.at(xpar, fobs, coal=coal)
-        print(f"received `at` vals with {vals.keys()=}!")
+        print(f"received `at` vals with keys: {vals.keys()}!")
 
         for par in self._EVO_PARS:
             # Make sure parameter is also included in `evolution` instance's list of parameters
@@ -247,7 +247,7 @@ class Test_Evolution_Basics:
         # Choose interpolation targets
         # 0th element here should be within evolution range, while 1th element should be after coalesence -> `nan` vals
         fobs = np.array([0.1, 1e6]) / YR
-        print(f"{fobs*YR=}")
+        print(f"fobs = {fobs*YR} [1/yr]")
         vals = evo.at(xpar, fobs, coal=coal)
 
         for ii in range(2):
@@ -292,9 +292,9 @@ class Test_Evolution_Basics:
         # For a moderate range of frequencies (after formation, before coalescence), then all values
         # should be finite (`nan`s are returned either before formation, or after coalescence)
         FINITE_FLAG = True
-        print(f"{sepa/PC=}")
+        print(f"sepa/PC = {sepa/PC}")
         vals = evo.at(xpar, sepa, coal=coal)
-        print(f"received `at` vals with {vals.keys()=}!")
+        print(f"received `at` vals with keys: {vals.keys()}!")
 
         for par in self._EVO_PARS:
             # Make sure parameter is also included in `evolution` instance's list of parameters
@@ -323,7 +323,7 @@ class Test_Evolution_Basics:
         # Choose interpolation targets
         # 0th element here should be within evolution range, while 1th element should be after coalesence -> `nan` vals
         sepa = np.array([1e6, 0.1, 1e-8]) * PC
-        print(f"{sepa/PC=}")
+        print(f"sepa/PC = {sepa/PC}")
         vals = evo.at(xpar, sepa, coal=coal)
 
         for ii in range(2):

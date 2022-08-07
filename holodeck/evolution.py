@@ -507,12 +507,9 @@ class Evolution:
         vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo)]
         nsamp = np.random.poisson(weights.sum())
         reflect = [None, [None, 0.0], None, np.log10([0.95*fobs[0], fobs[-1]*1.05])]
-        # print(f"{nsamp=:.4e}, {np.shape(vals)=}")
         samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
-        # print(f"{samples.shape=}")
 
         samples = np.asarray([10.0 ** ss for ss in samples])
-        # hs, fo = holo.sam._strains_from_samples(samples)
         return samples
 
     # ==== Internal Methods
