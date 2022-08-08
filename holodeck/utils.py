@@ -1073,6 +1073,7 @@ def chirp_mass(m1, m2=None):
         Chirp mass [grams] of the binary.
 
     """
+    m1, m2 = _array_args(m1, m2)
     # (N, 2)  ==>  (N,), (N,)
     if m2 is None:
         m1, m2 = np.moveaxis(m1, -1, 0)
@@ -1137,6 +1138,7 @@ def gw_dedt(m1, m2, sepa, eccen):
         NOTE: returned value is negative or zero.
 
     """
+    m1, m2, sepa, eccen = _array_args(m1, m2, sepa, eccen)
     cc = _GW_DEDT_ECC_CONST
     e2 = eccen**2
     dedt = cc * m1 * m2 * (m1 + m2) / np.power(sepa, 4)
@@ -1168,6 +1170,7 @@ def gw_dade(m1, m2, sepa, eccen):
         NOTE: returned value is positive.
 
     """
+    m1, m2, sepa, eccen = _array_args(m1, m2, sepa, eccen)
     e2 = eccen**2
     num = (1 + (73.0/24.0)*e2 + (37.0/96.0)*e2*e2)
     den = (1 - e2) * (1.0 + (121.0/304.0)*e2)
@@ -1242,6 +1245,7 @@ def gw_hardening_rate_dadt(m1, m2, sepa, eccen=None):
         Binary hardening rate [cm/s] due to GW emission.
 
     """
+    m1, m2, sepa, eccen = _array_args(m1, m2, sepa, eccen)
     cc = _GW_DADT_SEP_CONST
     dadt = cc * m1 * m2 * (m1 + m2) / np.power(sepa, 3)
     if eccen is not None:
@@ -1270,6 +1274,7 @@ def gw_hardening_rate_dfdt(m1, m2, freq_orb, eccen=None):
         Hardening rate in terms of frequency for each binary [1/s^2].
 
     """
+    m1, m2, freq_orb, eccen = _array_args(m1, m2, freq_orb, eccen)
     sepa = kepler_sepa_from_freq(m1+m2, freq_orb)
     dfdt = gw_hardening_rate_dadt(m1, m2, sepa, eccen=eccen)
     # dfdt, _ = dfdt_from_dadt(dfdt, sepa, mtot=m1+m2)
@@ -1295,6 +1300,7 @@ def gw_hardening_timescale_freq(mchirp, frst):
         GW hardening timescale defined w.r.t. orbital frequency [sec].
 
     """
+    mchirp, frst = _array_args(mchirp, frst)
     tau = (5.0 / 96.0) * np.power(NWTG*mchirp/SPLC**3, -5.0/3.0) * np.power(2*np.pi*frst, -8.0/3.0)
     return tau
 
@@ -1317,6 +1323,7 @@ def gw_lum_circ(mchirp, freq_orb_rest):
         GW Luminosity [erg/s].
 
     """
+    mchirp, freq_orb_rest = _array_args(mchirp, freq_orb_rest)
     lgw_circ = _GW_LUM_CONST * np.power(2.0*np.pi*freq_orb_rest*mchirp, 10.0/3.0)
     return lgw_circ
 
@@ -1341,6 +1348,7 @@ def gw_strain_source(mchirp, dcom, freq_orb_rest):
         GW Strain (*not* characteristic strain).
 
     """
+    mchirp, dcom, freq_orb_rest = _array_args(mchirp, dcom, freq_orb_rest)
     hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_orb_rest, 2/3) / dcom
     return hs
 
@@ -1365,6 +1373,7 @@ def sep_to_merge_in_time(m1, m2, time):
         Initial binary separation [cm].
 
     """
+    m1, m2, time = _array_args(m1, m2, time)
     GW_CONST = 64*np.power(NWTG, 3.0)/(5.0*np.power(SPLC, 5.0))
     a1 = rad_isco(m1, m2)
     return np.power(GW_CONST*m1*m2*(m1+m2)*time - np.power(a1, 4.0), 1./4.)
@@ -1390,6 +1399,7 @@ def time_to_merge_at_sep(m1, m2, sepa):
         Duration of time for binary to coalesce [sec].
 
     """
+    m1, m2, sepa = _array_args(m1, m2, sepa)
     GW_CONST = 64*np.power(NWTG, 3.0)/(5.0*np.power(SPLC, 5.0))
     a1 = rad_isco(m1, m2)
     delta_sep = np.power(sepa, 4.0) - np.power(a1, 4.0)
@@ -1417,3 +1427,10 @@ def _gw_ecc_func(eccen):
     den = np.power(1 - e2, 7/2)
     fe = num / den
     return fe
+
+
+def _array_args(*args):
+    # args = [np.atleast_1d(aa) for aa in args]
+    args = [np.asarray(aa) if aa is not None else None
+            for aa in args]
+    return args
