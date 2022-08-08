@@ -2,7 +2,7 @@
 #
 
 # You can set these variables from the command line.
-SPHINXOPTS    =
+SPHINXOPTS    = -v -T -j auto
 # SPHINXOPTS    = -W --keep-going -n      # FAIL on errors, but finish build attempt; be nit-picky
 # SPHINXOPTS    = -W --keep-going      # FAIL on errors, but finish build attempt
 SPHINXBUILD   = sphinx-build

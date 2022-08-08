@@ -4,14 +4,21 @@ holodeck
 
 |rtd| |actions|
 
-.. |rtd| image:: https://readthedocs.org/projects/kalepy/badge/?version=latest
-.. |actions| image:: https://github.com/nanograv/holodeck/actions?query=workflow%3ACI
+.. |rtd|
+   image:: https://readthedocs.org/projects/kalepy/badge/?version=latest
+   target:: https://kalepy.readthedocs.io/en/latest/
+
+.. |actions|
+   image:: https://github.com/nanograv/holodeck/actions/workflows/tests.yaml/badge.svg
+   target:: https://github.com/nanograv/holodeck/actions/workflows/tests.yaml
 
 *Massive Black-Hole Binary Population Synthesis for Gravitational Wave Calculations ≋●≋●≋*
 
 `holodeck on github <https://github.com/nanograv/holodeck>`_
 
-This package is aimed at providing a comprehensive framework for MBH binary population synthesis.  The framework includes modules to perform pop synth using a variety of methodologies to get a handle on both statistical and systematic uncertainties.  Currently, binary populations can be synthesis based on: cosmological hydrodynamic simulations (Illustris), semi-analytic/semi-empirical models (SAMs), and observational catalogs of local galaxies and/or quasars.
+This package is aimed at providing a comprehensive framework for MBH binary population synthesis.  The framework includes modules to perform pop synth using a variety of methodologies to get a handle on both statistical and systematic uncertainties.  Currently, binary populations can be synthesized based on: cosmological hydrodynamic simulations (Illustris), semi-analytic/semi-empirical models (SAMs), and observational catalogs of local galaxies and/or quasars.
+
+**This File:**
 
 .. contents:: :local:
 
@@ -27,17 +34,10 @@ Contents of Documentation
    :maxdepth: 1
 
    Getting Started Guide <getting_started>
-
    Calculating Gravitational Waves <calc_gws>
-
    Definitions and Abbreviations <defs_abbrevs>
-
    Annotated Bibliography <biblio>
-
-   Full Package Documentation <apidoc_modules/holodeck>
-
-   Modules list <apidoc_modules/modules>
-
+   Full Package Documentation <holodeck>
 
 
 
@@ -138,20 +138,7 @@ A NANOGrav paper on `holodeck` is currently in preparation.
 
 Indices and tables
 ==================
-..    :template: custom-module-template.rst
-
-.. automodule:: holodeck
-    :members:
-    :undoc-members:
-    :private-members:
-    :special-members:
-
-.. autosummary::
-   :toctree: _autosummary
-   :recursive:
-
-..    holodeck
 
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`
+* :ref:`modindex`

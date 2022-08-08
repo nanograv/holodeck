@@ -1,5 +1,43 @@
 """Module for binary evolution from the time of formation/galaxy-merger until BH coalescence.
 
+In `holodeck`, initial binary populations are typically defined near the time of galaxy-galaxy
+merger, when two MBHs come together at roughly kiloparsec scales.  Environmental 'hardening'
+mechanisms are required to dissipate orbital energy and angular momentum, allowing the binary
+separation to shrink ('harden'). Typically *dynamical friction (DF)* is most important at large
+scales ($\sim \mathrm{kpc}$).  Near where the pair of MBHs become a gravitationally-bound binary,
+the DF approximations break down, and individual *stellar scattering* events (from stars in the
+'loss cone' of parameter space) need to be considered.  In the presence of significant gas (i.e.
+from accretion), a circumbinary accretion disk (CBD) may form, and gravitational
+*circumbinary disk torques* from the gas distribution (typically spiral waves) may become important.
+Finally, at the smaller separations, *GW emission* takes over.  The classic work describing the
+overall process of binary evolution in its different stages is [BBR1980]_.  [Kelley2017a]_ goes
+into significant detail on implementations and properties of each component of binary evolution
+also.  Triple MBH interactions, and perturbations from other massive objects (e.g. molecular
+clouds) can also be important.
+
+The :mod:`holodeck.evolution` submodule provides tools for modeling the binary evolution from the
+time of binary 'formation' (i.e. galaxy merger) until coalescence.  Models for binary evolutionary
+can range tremendously in complexity.  In the simplest models, binaries are assumed to coalesce
+instantaneously (in that the age of the universe is the same at formation and coalescence), and are
+also assumed to evolve purely due to GW emission (in that the time spent in any range of orbital
+frequencies can be calculated from the GW hardening timescale).  Note that these two assumptions
+are contradictory, but commonly employed in the literature.  The ideal, self-consistent approach,
+is to model binary evolution using self-consistently derived environments (e.g. gas and stellar
+mass distributions), and applying the same time-evolution prescription to both the redshift
+evolution of each binary, and also the GW calculation.  Note that GWs can only be calculated based
+on some sort of model for binary evolution.  The model may be extremely simple, in which case it is
+sometimes glanced over.
+
+The core component of the evolution module is the :class:`Evolution` class.  This class combines a
+population of initial binary parameters (i.e. from the :class:`holodeck.population.Pop_Illustris`
+class), along with a specific binary hardening model (:class:`_Hardening` subclass), and performs
+the numerical integration of each binary over time - from large separations to coalescence.  The
+:class:`Evolution` class also acts to store the binary evolution histories ('trajectories' or
+'tracks'), which are then used to calculate GW signals (e.g. the GWB).  To facilitate GW and
+similar calculations, :class:`Evolution` also provides interpolation functionality along binary
+trajectories.
+
+
 To-Do
 -----
 * General
@@ -28,16 +66,23 @@ References
 * [Sesana2006]_ Sesana, Haardt & Madau et al. 2006.
 * [BBR1980]_ Begelman, Blandford & Rees 1980.
 * [Sesana2010]_ Sesana 2010.
-* [Kelley2017]_ Kelley, Blecha & Hernquist 2017.
+* [Kelley2017a]_ Kelley, Blecha & Hernquist 2017.
 * [Chen2017]_ Chen, Sesana, & Del Pozzo 2017.
 
 """
+from __future__ import annotations
+
+# ! ===============================================================================================!
+# ! -- UPDATE `_take_next_step` -- !
+# ! -- write a function to set right-edge values, call it with estimate from left edge -- !
+# ! -- then call it again with a revision to the estimate, using right-edge values -- !
+# ! ===============================================================================================!
 
 import abc
-import enum
-import inspect
+# import inspect
 import json
 import os
+# from typing import Union, TypeVar  # , Callable, Iterator
 import warnings
 
 import numpy as np
@@ -50,32 +95,59 @@ import holodeck as holo
 from holodeck import utils, cosmo, log, _PATH_DATA
 from holodeck.constants import GYR, NWTG, PC, MSOL, YR, SPLC
 
+_MAX_ECCEN_ONE_MINUS = 1.0e-6
 _DEF_TIME_DELAY = (5.0*GYR, 0.2)   #: default delay-time parameters, (mean, stdev)
 _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 
+# Pop = TypeVar('Pop', bound=holo.population._Population_Discrete)  # Must be exactly str or bytes
+# A = TypeVar('A', str, bytes)  # Must be exactly str or bytes
+# S = TypeVar('S', bound=str)  # Can be any subtype of str
+# Hard = TypeVar('Hard', bound=holo.evolution._Hardening)  # Can be any subtype of str
+# Hard = TypeVar('Hard', holo.evolution._Hardening, list[holo.evolution._Hardening])  # Can be any subtype of str
+# AliasType = Union[list[dict[tuple[int, str], set[int]]], tuple[str, list[str]]]
+# Hard_list = Union[list[Hard], Hard]
+
 
 # =================================================================================================
-# ====    API Classes and Functions    ====
+# ====    Evolution Class    ====
 # =================================================================================================
 
 
 class Evolution:
-    """Base class use to evolve discrete binary populations forward in time.
+    """Base class to evolve discrete binary populations forward in time.
+
+    NOTE: This class is primary built to be used with :class:`holodeck.population.Pop_Illustris`.
+
+    The `Evolution` class is instantiated with a :class:`holodeck.population._Population_Discrete`
+    instance, and a particular binary hardening model (subclass of :class:`_Hardening`).  It then
+    numerically integrates each binary from their initial separation to coalescence, determining
+    how much time that process takes, and thus the rate of redshift/time evolution.
+
+    **Initialization**: all attributes are set to empty arrays of the appropriate size.
+    NOTE: the 0th step is *not* initialized at this time, it happens in :meth:`Evolution.evolve()`.
+
+    **Evolution**: binary evolution is performed by running the :meth:`Evolution.evolve()` function.
+    This function first calls :meth:`Evolution._init_step_zero()`, which sets the 0th step values,
+    and then iterates over each subsequent step, calling :meth:`Evolution._take_next_step()`.  Once
+    all steps are taken (integration is completed), then :meth:`Evolution._finalize()` is called,
+    at which points any stored modifiers (:class:`utils._Modifier` subclasses, in the
+    :attr:`Evolution._mods` attribute) are applied.
+
     """
 
-    _EVO_PARS = ['mass', 'sepa', 'eccen', 'scafa', 'tlbk', 'dadt', 'dedt']
-    _LIN_INTERP_PARS = ['eccen', 'scafa', 'tlbk', 'dadt', 'dedt']
+    _EVO_PARS = ['mass', 'sepa', 'eccen', 'scafa', 'tlook', 'dadt', 'dedt']
+    _LIN_INTERP_PARS = ['eccen', 'scafa', 'tlook', 'dadt', 'dedt']
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
 
-    def __init__(self, pop, hard, nsteps=100, mods=None, debug=False):
+    def __init__(self, pop, hard, nsteps: int = 100, mods=None, debug: bool = False):
         """Initialize a new Evolution instance.
 
         Parameters
         ----------
         pop : `population._Population_Discrete` instance,
             Binary population with initial parameters of the binary from which to start evolution.
-        hard : `_Hardening` instance, or list
+        hard : `_Hardening` instance, or list of
             Model for binary hardening used to evolve population's separation over time.
         nsteps : int,
             Number of steps between initial separations and coalescence for all binaries.
@@ -86,14 +158,28 @@ class Evolution:
 
         """
         # --- Store basic parameters to instance
-        self._pop = pop
-        self._debug = debug
-        self._nsteps = nsteps
-        self._mods = mods
+        self._pop = pop                       #: initial binary population instance
+        self._debug = debug                   #: debug flag for performing extra diagnostics and output
+        self._nsteps = nsteps                 #: number of integration steps for each binary
+        self._mods = mods                     #: modifiers to be applied after evolution is completed
 
+        # Store hardening instances as a list
         if not np.iterable(hard):
             hard = [hard, ]
         self._hard = hard
+
+        # Make sure types look right
+        if not isinstance(pop, holo.population._Population_Discrete):
+            err = f"`pop` is {pop}, must be subclass of `holo.population._Population_Discrete`!"
+            log.exception(err)
+            raise TypeError(err)
+
+        for hh in self._hard:
+            good = isinstance(hh, _Hardening) or issubclass(hh, _Hardening)
+            if not good:
+                err = f"hardening instance is {hh}, must be subclass of `{_Hardening}`!"
+                log.exception(err)
+                raise TypeError(err)
 
         # Store additional parameters
         for par in self._STORE_FROM_POP:
@@ -103,14 +189,6 @@ class Evolution:
         shape = (size, nsteps)
         self._shape = shape
 
-        # ---- Initialize empty arrays for tracking binary evolution
-        self.scafa = np.zeros(shape)           #: scale-factor of the universe, set to 1.0 after z=0
-        self.tlbk = np.zeros(shape)            #: lookback time, negative after redshift zero [sec]
-        self.sepa = np.zeros(shape)            #: semi-major axis (separation) [cm]
-        self.mass = np.zeros(shape + (2,))     #: mass of BHs, 0-primary, 1-secondary, [g]
-        self.mdot = np.zeros(shape + (2,))     #: accretion rate onto each component of binary [g/s]
-        self.dadt = np.zeros(shape)            #: hardening rate in separation [cm/s]
-
         if pop.eccen is not None:
             eccen = np.zeros(shape)
             dedt = np.zeros(shape)
@@ -118,10 +196,15 @@ class Evolution:
             eccen = None
             dedt = None
 
-        self.eccen = eccen                     #: eccentricity, `None` if not being evolved []
-        self.dedt = dedt                       #: eccen evolution, `None` if not evolved [1/s]
-
-        self._dadt_0 = None   # this is a placeholder for initializing debug output
+        # ---- Initialize empty arrays for tracking binary evolution
+        self.scafa = np.zeros(shape)           #: scale-factor of the universe, set to 1.0 after z=0
+        self.tlook = np.zeros(shape)           #: lookback time [sec], NOTE: negative after redshift zero
+        self.sepa = np.zeros(shape)            #: semi-major axis (separation) [cm]
+        self.mass = np.zeros(shape + (2,))     #: mass of BHs [g], 0-primary, 1-secondary
+        self.mdot = np.zeros(shape + (2,))     #: accretion rate onto each component of binary [g/s]
+        self.dadt = np.zeros(shape)            #: hardening rate in separation [cm/s]
+        self.eccen = eccen                     #: eccentricity [], `None` if not being evolved
+        self.dedt = dedt                       #: eccen evolution rate [1/s], `None` if not evolved
 
         # Derived and internal parameters
         self._freq_orb_rest = None
@@ -130,14 +213,21 @@ class Evolution:
 
         return
 
-    @property
-    def shape(self):
-        """The number of binaries and number of steps (N, S).
-        """
-        return self._shape
+    # ==== API and Core Functions
 
-    def evolve(self, progress=True):
+    def evolve(self, progress=False):
         """Evolve binary population from initial separation until coalescence in discrete steps.
+
+        Each binary has a fixed number of 'steps' from initial separation until coalescence.  The
+        role of the `evolve()` method is to determine the amount of time each step takes, based on
+        the 'hardening rate' (in separation and possible eccentricity i.e. $da/dt$ and $de/dt$).
+        The hardening rate is calculated from the stored :class:`_Hardening` instances in the
+        iterable :attr:`Evolution._hard` attribute.
+
+        When :meth:`Evolution.evolve()` is called, the 0th step is initialized separately, using
+        the :meth:`Evolution._init_step_zero()` method, and then each step is integrated by calling
+        the :meth:`Evolution._take_next_step()` method.  Once all steps are completed, the
+        :meth:`Evolution._finalize()` method is called, where any stored modifiers are applied.
 
         Parameters
         ----------
@@ -153,180 +243,10 @@ class Evolution:
         steps_list = range(1, nsteps)
         steps_list = utils.tqdm(steps_list, desc="evolving binaries") if progress else steps_list
         for step in steps_list:
-            rv = self._take_next_step(step)
-            if rv is _EVO.END:
-                break
-            elif rv not in _EVO:
-                raise ValueError("Recieved bad `rv` ({}) after step {}!".format(rv, step))
+            self._take_next_step(step)
 
         # ---- Finalize
         self._finalize()
-        return
-
-    @property
-    def coal(self):
-        """Indices of binaries that coalesce before redshift zero.
-        """
-        if self._coal is None:
-            self._coal = (self.redz[:, -1] > 0.0)
-        return self._coal
-
-    def _init_step_zero(self):
-        """Set the initial conditions of the binaries at step zero.
-        """
-        pop = self._pop
-        size, nsteps = self.shape
-
-        # ---- Initialize basic parameters
-
-        # Initialize ALL separations ranging from initial to mutual-ISCO, for each binary
-        rad_isco = utils.rad_isco(*pop.mass.T)
-        # (2, N)
-        sepa = np.log10([pop.sepa, rad_isco])
-        # Get log-space range of separations for each of N ==> (N, S), for S steps
-        sepa = np.apply_along_axis(lambda xx: np.logspace(*xx, nsteps), 0, sepa).T
-        self.sepa[:, :] = sepa
-
-        self.scafa[:, 0] = pop.scafa
-        redz = cosmo.a_to_z(pop.scafa)
-        tlbk = cosmo.z_to_tlbk(redz)
-        self.tlbk[:, 0] = tlbk
-        self.mass[:, 0, :] = pop.mass
-        self.mass[:, :, :] = self.mass[:, 0, np.newaxis, :]
-
-        # ---- Initialize hardening rate at first step
-
-        # these are just for the first step
-        dadt = np.zeros(size)
-        if pop.eccen is not None:
-            dedt = np.zeros(self.shape)
-
-        # addional record-keeping / diagnostics for debugging
-        if self._debug:
-            # initialzie variables to store da/dt hardening rates from each hardening component
-            for ii in range(len(self._hard)):
-                setattr(self, f"_dadt_{ii}", np.zeros(self.shape))
-                if pop.eccen is not None:
-                    setattr(self, f"_dedt_{ii}", np.zeros(self.shape))
-
-        # Get hardening rates for each hardening model
-        for ii, hard in enumerate(self._hard):
-            _a1, _e1 = hard.dadt_dedt(self, 0)
-            if self._debug:
-                # Store individual hardening rates
-                getattr(self, f"_dadt_{ii}")[:, 0] = _a1[...]
-
-            dadt[:] += _a1
-            if pop.eccen is not None:
-                dedt[:] += _e1
-
-        self.dadt[:, 0] = dadt
-
-        # ---- Initialize eccentricities as needed
-
-        if (pop.eccen is not None):
-            self.eccen[:, 0] = pop.eccen
-            self.dedt[:, 0] = dedt
-
-        return
-
-    def _take_next_step(self, step):
-        """Integrate the binary population forward (to smaller separations) by one step.
-
-        Parameters
-        ----------
-        step : int
-            The destination integration step number, i.e. `step=1` means integrate from 0 to 1.
-
-        """
-        # ---- Initialize
-        debug = self._debug
-        size, nsteps = self.shape
-        left = step - 1     # the previous time-step (already completed)
-        right = step        # the next     time-step
-        dadt_r = np.zeros(size)
-        if self.eccen is not None:
-            dedt_r = np.zeros_like(dadt_r)
-
-        # ---- Get hardening rates for each hardening model
-        for ii, hard in enumerate(self._hard):
-            _ar, _er = hard.dadt_dedt(self, right)
-            if debug:
-                log.debug(f"hard={hard} : dadt = {utils.stats(_ar)}")
-                # Store individual hardening rates
-                getattr(self, f"_dadt_{ii}")[:, right] = _ar[...]
-                # Raise error on invalid entries
-                if not np.all(np.isfinite(_ar)) or np.any(_ar > 0.0):
-                    utils.error(f"invalid `dadt` for hard={hard}!")
-
-            dadt_r[:] += _ar
-            if self.eccen is not None:
-                dedt_r[:] += _er
-
-        # Store right-edge hardening rates
-        self.dadt[:, right] = dadt_r
-        if self.eccen is not None:
-            self.dedt[:, right] = dedt_r
-
-        # ---- Calculate time between edges
-
-        dtda = 1.0 / - self.dadt[:, (left, right)]   # convert dadt to positive
-        sepa = self.sepa[:, (right, left)]   # sepa is decreasing, so switch left-right order
-        dt = utils.trapz_loglog(dtda, sepa, axis=-1).squeeze()   # this should come out positive
-        if np.any(dt < 0.0):
-            utils.error(f"Negative time-steps found at step={step}!")
-
-        # ---- Update right-edge values
-
-        # Update lookback time based on duration of this step
-        tlbk = self.tlbk[:, left] - dt
-        self.tlbk[:, right] = tlbk
-        # update scale-factor for systems at z > 0.0 (i.e. a < 1.0 and tlbk > 0.0)
-        val = (tlbk > 0.0)
-        self.scafa[val, right] = cosmo.z_to_a(cosmo.tlbk_to_z(tlbk[val]))
-        # set systems after z = 0 to scale-factor of unity
-        self.scafa[~val, right] = 1.0
-
-        # update eccentricity if it's being evolved
-        if self.eccen is not None:
-            dedt = self.dedt[:, (left, right)]
-            time = self.tlbk[:, (right, left)]   # tlbk is decreasing, so switch left-right order
-            decc = utils.trapz_loglog(dedt, time, axis=-1).squeeze()
-            self.eccen[:, right] = self.eccen[:, left] + decc
-
-        return _EVO.CONT
-
-    def _check(self):
-        """Perform basic diagnostics on parameter validity after evolution.
-        """
-        _check_var_names = ['sepa', 'scafa', 'mass', 'tlbk', 'dadt']
-        _check_var_names_eccen = ['eccen', 'dedt']
-
-        def check_vars(names):
-            for cv in names:
-                vals = getattr(self, cv)
-                if np.any(~np.isfinite(vals)):
-                    err = "Found non-finite '{}' !".format(cv)
-                    raise ValueError(err)
-
-        check_vars(_check_var_names)
-
-        if self.eccen is None:
-            return
-
-        check_vars(_check_var_names_eccen)
-
-        return
-
-    def _finalize(self):
-        """Perform any actions after completing all of the integration steps.
-        """
-        # Set a flag to record that evolution has been completed
-        self._evolved = True
-        # Apply any modifiers
-        self.modify()
-        # Run diagnostics
-        self._check()
         return
 
     def modify(self, mods=None):
@@ -351,10 +271,711 @@ class Evolution:
         self._update_derived()
         return
 
+    def at(self, xpar, targets, params=None, coal=False, lin_interp=None):
+        """Interpolate evolution to the given target locations in either separation or frequency.
+
+        The variable of interpolation is specified with the `xpar` argument.  The evolutionary
+        tracks are interpolated in that variable, to the new target locations given by `targets`.
+        We use 'x' to refer to the independent variable, and 'y' to refer to the dependent variable
+        that is being interpolated.  Which values are interpolated are specified with the `params`
+        argument.
+
+        The behavior of this function is broken into three sub-functions, that are only used here:
+        * :meth:`Evolution._at__inputs` : parse the input arguments.
+        * :meth:`Evolution._at__index_frac` : find the indices in the evolutionary tracks bounding
+          the target interpolation locations, and also the fractional distance to interpolate
+          between them.
+        * :meth:`Evolution._at__interpolate_array` : actually interpolate each parameter to a
+          the target location.
+
+        Parameters
+        ----------
+        xpar : str, in ['fobs', 'sepa']
+            String specifying the variable of interpolation.
+        targets : array_like,
+            Locations to interpolate to.
+            * if ``xpar == sepa``  : binary separation, units of [cm],
+            * if ``xpar == xfobs`` : binary frequency,  units of [1/s] = [Hz],
+        params : None or (list of str)
+            Names of the parameters that should be interpolated.
+            If `None`, defaults to :attr:`Evolution._EVO_PARS` attribute.
+        coal : bool,
+            Only store evolution values for binaries coalescing before redshift zero.
+            Interpolated values for other binaries are set to `np.nan`.
+        lin_interp : None or bool,
+            Interpolate parameters in linear space.
+            * True : all parameters interpolated in lin-lin space.
+            * False: all parameters interpolated in log-log space.
+            * None : parameters are interpolated in log-log space, unless they're included in the
+              :attr:`Evolution._LIN_INTERP_PARS` attribute.
+
+        Returns
+        -------
+        vals : dict,
+            Dictionary of arrays for each interpolated parameter.
+            The returned shape is (N, T), where `T` is the number of target locations to interpolate
+            to, and `N` is the total number of binaries.
+            Each data array is filled with `np.nan` values if the targets are outside of its
+            evolution track.  If ``coal=True``, then binaries that do *not* coalesce before redshift
+            zero also have their data array values fillwed with `np.nan`.
+
+        Notes
+        -----
+        * Out of bounds values are set to `np.nan`.
+        * Interpolation is 1st-order in log-log space in general, but properties which are in the
+          `_LIN_INTERP_PARS` array are interpolated at 1st-order in lin-lin space.  Parameters
+          which can be negative should be interpolated in linear space.  Passing a boolean for the
+          `lin_interp` parameter will override the behavior (see `Parameters`_ above).
+
+        """
+        # parse/sanitize input arguments
+        xnew, xold, params, lin_interp_list, rev, squeeze = self._at__inputs(xpar, targets, params, lin_interp)
+
+        # (N, M); scale-factors; make sure direction matches that of `xold`
+        scafa = self.scafa[:, ::-1] if rev else self.scafa[...]
+
+        # find indices between which to interpolate, and the fractional distance to go between them
+        cut_idx, interp_frac, valid = self._at__index_frac(xnew, xold)
+
+        # if we only want coalescing systems, set non-coalescing (stalling) systems to invalid
+        if coal:
+            valid = valid & self.coal[:, np.newaxis]
+
+        # Valid binaries must be valid at both `bef` and `aft` indices
+        # BUG: is this actually doing what it's supposed to be doing?
+        for cc in cut_idx:
+            valid = valid & np.isfinite(np.take_along_axis(scafa, cc, axis=-1))
+
+        invalid = ~valid
+
+        data = dict()
+        # Interpolate each parameter to the given locations, store to `dict`
+        for par in params:
+            # Load the raw evolution data for this parameter, can be None or ndarray shaped (N, M) or (N, M, 2)
+            yold = getattr(self, par)
+            if yold is None:
+                data[par] = None
+                continue
+
+            # Reverse data to match x-values, if needed
+            if rev:
+                yold = yold[..., ::-1]
+
+            # interpolate
+            lin_interp_flag = (par in lin_interp_list)
+            ynew = self._at__interpolate_array(yold, cut_idx, interp_frac, lin_interp_flag)
+
+            # fill 'invalid' (i.e. out of bounds, or non-coalescing binaries if ``coal==True``)
+            ynew[invalid, ...] = np.nan
+            # remove excess dimensions if a single target was requested (i.e. ``T=1``)
+            if squeeze:
+                ynew = ynew.squeeze()
+            # store
+            data[par] = ynew
+
+        return data
+
+    def _at__inputs(self, xpar, targets, params, lin_interp):
+        """Parse/sanitize the inputs of the :meth:`Evolution.at` method.
+
+        Parameters
+        ----------
+        xpar : str, in ['fobs', 'sepa']
+            String specifying the variable of interpolation.
+        targets : array_like,
+            Locations to interpolate to.
+            * if ``xpar == sepa``  : binary separation, units of [cm],
+            * if ``xpar == xfobs`` : binary frequency,  units of [1/s] = [Hz],
+        params : None or list[str]
+            Names of parameters that should be interpolated.
+            If `None`, defaults to :attr:`Evolution._EVO_PARS` attribute.
+
+        Returns
+        -------
+        xnew : np.ndarray
+            (T,) Log10 of the target locations to interpolate to, i.e. ``log10(targets)``.
+        xold : np.ndarray
+            (N, M) Log10 of the x-values at which to evaluate the target interpolation points.
+            Either ``log10(sepa)`` or ``log10(freq_orb_obs)``.
+            NOTE: these values will be returned in *increasing* order.  If they have been reversed,
+            then ``rev=True``.
+        params : list[str]
+            Names of parameters that should be interpolated.
+        rev : bool
+            Whether or not the `xold` array has been reversed.
+        squeeze : bool
+            Whether or not the `targets` were a single scalar value (i.e. ``T=1``, as opposed to an
+            iterable).  If `targets` were a scalar, then the data returned from :meth:`Evolution.at`
+            will be shaped as (N,) instead of (N,T); since in this case, T=1.
+
+        """
+        # Raise an error if this instance has not been evolved yet
+        self._check_evolved()
+
+        _allowed = ['sepa', 'fobs']
+        if xpar not in _allowed:
+            raise ValueError("`xpar` must be one of '{}'!".format(_allowed))
+
+        if params is None:
+            params = self._EVO_PARS
+        if np.isscalar(params):
+            params = [params]
+
+        if lin_interp is None:
+            lin_interp_list = self._LIN_INTERP_PARS
+        elif isinstance(lin_interp, list):
+            lin_interp_list = lin_interp
+            lin_interp = None
+            for ll in lin_interp_list:
+                if ll not in params:
+                    err = f"`lin_interp` value {ll} not in parameters list {params}!"
+                    raise ValueError(err)
+        elif lin_interp is True:
+            lin_interp_list = params
+        elif lin_interp is False:
+            lin_interp_list = []
+        else:
+            err = f"`lin_interp` ({lin_interp}) must be `None`, boolean, or a list of parameter names!"
+            raise ValueError(err)
+
+        squeeze = False
+        if np.isscalar(targets):
+            targets = np.atleast_1d(targets)
+            squeeze = True
+
+        size, nsteps = self.shape
+
+        # Observed-Frequency, units of 1/yr
+        if xpar == 'fobs':
+            # frequency is already increasing
+            xold = np.log10(self.freq_orb_obs)
+            xnew = np.log10(targets)
+            rev = False
+        # Binary-Separation, units of pc
+        elif xpar == 'sepa':
+            # separation is decreasing, reverse to increasing
+            xold = np.log10(self.sepa)[:, ::-1]
+            xnew = np.log10(targets)
+            rev = True
+        else:   # nocov
+            raise ValueError("Bad `xpar` {}!".format(xpar))
+
+        # Make sure target values are within bounds
+        textr = utils.minmax(xnew)
+        xextr = utils.minmax(xold)
+        if (textr[1] < xextr[0]) | (textr[0] > xextr[1]):
+            err = "`targets` extrema ({}) outside `xvals` extema ({})!  Bad units?".format(
+                (10.0**textr), (10.0**xextr))
+            raise ValueError(err)
+
+        return xnew, xold, params, lin_interp_list, rev, squeeze
+
+    def _at__index_frac(self, xnew, xold):
+        """Find indices bounding target locations, and the fractional distance to go between them.
+
+        Parameters
+        ----------
+        xnew : np.ndarray
+            Target locations to interplate to.  Shape (T,).
+        xold : np.ndarray
+            Values of the x-coordinate between which to interpolate.  Shape (N, M).
+            These are the x-values of either `sepa` or `fobs` from the evolutionary tracks of each
+            binary.
+
+        Returns
+        -------
+        cut_idx : np.ndarray
+            For each binary, the step-number indices between which to interpolate, for each target
+            interpolation point.  shape (2, N, T); where the 0th dimension, the 0th value is the
+            low/before index, and the 1th value is the high/after index.
+            i.e. for binary 'i' and target 'j', we need to interpolate between indices given by
+            [0, i, j] and [1, i, j].
+        interp_frac : np.ndarray
+            The fractional distance between the low value and the high value, to interpolate to.
+            Shape (2, N, M).  For binary 'i' and target 'j', `interp_frac[i, j]` is how the
+            fraction of the way, from index `cut_idx[0, i, j]` to `cut_idx[1, i, j]` to interpolate
+            to, in the `data` array.
+        valid : np.ndarray
+            Array of boolean values, giving whether or not the target interpolation points are
+            within the bounds of each binary's evolution track.  Shape (N, T).
+
+        """
+        # ---- For every binary, find the step index immediately following each target value
+        # (N, T, M) | `xnew` is (T,) for T-targets,  `xold` is (N, M) for N-binaries and M-steps
+        select = (xnew[np.newaxis, :, np.newaxis] <= xold[:, np.newaxis, :])
+        # (N, T), xvalue index [0, M-1] following each target point (T,), for each binary (N,)
+        aft = np.argmax(select, axis=-1)
+
+        # ---- Determine which locations are 'valid' (i.e. within the evolutionary tracks)
+        # zero values in `aft` mean no `xold` after the targets were found; these are 'invalid',
+        # these will be converted to `np.nan` later
+        valid = (aft > 0)
+
+        # ---- get the x-value index immediately preceding each target point
+        bef = np.copy(aft)
+        bef[valid] -= 1
+        # (2, N, T)
+        cut_idx = np.array([aft, bef])
+
+        # Get the x-values before and after the target locations  (2, N, T)
+        xold_temp = [np.take_along_axis(xold, cc, axis=-1) for cc in cut_idx]
+        # Find how far to interpolate between values (in log-space; `xold` was already log10'd
+        #     (N, T)
+        denom = np.subtract(*xold_temp)
+        numer = xnew[np.newaxis, :] - xold_temp[1]
+        interp_frac = np.zeros_like(numer)
+        idx = (denom != 0.0)
+        interp_frac[idx] = numer[idx] / denom[idx]
+
+        return cut_idx, interp_frac, valid
+
+    def _at__interpolate_array(self, yold, cut_idx, interp_frac, lin_interp_flag):
+        """Interpolate a parameter to a fraction between integration steps.
+
+        Parameters
+        ----------
+        yold : np.ndarray
+            The data to be interpolated.  This is the raw evolution data, for each binary and
+            each step.  Shaped either as (N, M) or (N, M, 2) if parameter is mass.
+        cut_idx : np.ndarray
+            For each binary, the step-number indices between which to interpolate, for each target
+            interpolation point.  shape (2, N, T); where the 0th dimension, the 0th value is the
+            low/before index, and the 1th value is the high/after index.
+            i.e. for binary 'i' and target 'j', we need to interpolate between indices given by
+            [0, i, j] and [1, i, j].
+        interp_frac : np.ndarray
+            The fractional distance between the low value and the high value, to interpolate to.
+            Shape (2, N, M).  For binary 'i' and target 'j', `interp_frac[i, j]` is how the
+            fraction of the way, from index `cut_idx[0, i, j]` to `cut_idx[1, i, j]` to interpolate
+            to, in the `data` array.
+        lin_interp_flag : bool,
+            Whether data should be interpolated in lin-lin space (True), or log-log space (False).
+
+        Returns
+        -------
+        ynew : np.ndarray
+            The input `data` interpolated to the new target locations.
+            Shape is (N, T) or (N, T, 2) for N-binaries, T-target points.  A third dimension is
+            present if the input `data` was 3D.
+
+        """
+
+        reshape = False
+        cut = cut_idx
+        frac = interp_frac
+        # Sometimes there is a third dimension for the 2 binaries (e.g. `mass`)
+        #    which will have shape, (N, T, 2) --- calling this "double-data"
+        if np.ndim(yold) != 2:
+            if (np.ndim(yold) == 3) and (np.shape(yold)[-1] == 2):
+                # Keep the interpolation axis last (N, T, 2) ==> (N, 2, T)
+                yold = np.moveaxis(yold, -1, -2)
+                # Expand other arrays appropriately
+                cut = cut[:, :, np.newaxis]
+                frac = frac[:, np.newaxis, :]
+                reshape = True
+            else:   # nocov
+                raise ValueError("Unexpected shape of yold: {}!".format(np.shape(yold)))
+
+        if not lin_interp_flag:
+            yold = np.log10(yold)
+
+        # (2, N, T) for scalar data or (2, N, 2, T) for "double-data"
+        yold = [np.take_along_axis(yold, cc, axis=-1) for cc in cut]
+        # Interpolate by `frac` for each binary   (N, T) or (N, 2, T) for "double-data"
+        ynew = yold[1] + (np.subtract(*yold) * frac)
+        # In the "double-data" case, move the doublet back to the last dimension
+        #    (N, T) or (N, T, 2)
+        if reshape:
+            ynew = np.moveaxis(ynew, 1, -1)
+
+        # fill return dictionary
+        if not lin_interp_flag:
+            ynew = 10.0 ** ynew
+
+        return ynew
+
+    def _sample_universe(self, fobs, down_sample=None):
+        """Construct a full universe of binaries based on resampling this population.
+
+        NOTE: This function needs to be cleaned up / tested for public use.
+
+        Parameters
+        ----------
+        fobs : array_like,
+            Target observer-frame frequencies at which to sample population.
+        down_sample : None or float,
+            Factor by which to downsample the resulting population.
+            For example, `10.0` will produce 10x fewer output binaries.
+
+        Returns
+        -------
+        names : list[str], size (4,)
+            Names of the returned data arrays in `samples`.
+        samples : np.ndarray, shape (4, S)
+            Sampled binary data.  For each binary samples S, 4 parameters are returned:
+            ['mtot', 'mrat', 'redz', 'fobs'] (these are listed in the `names` returned value.)
+
+        Notes
+        -----
+        * This should sample in volume instead of `redz`, see how it's done in sam module.
+        * BUG: the binning is NOT being considered appropriately?  i.e. if the number of `fobs`
+          points is increases, with the same range, the number of binaries increase!!
+
+        """
+        log.warning("!!`Evolution._sample_universe` is not yet working correctly!!")
+        fobs = np.atleast_1d(fobs)
+
+        # Interpolate binaries to given frequencies
+        # only need this set of parameters
+        PARAMS = ['mass', 'sepa', 'dadt', 'scafa']
+        data_fobs = self.at('fobs', fobs, params=PARAMS)
+
+        # Only examine binaries reaching the given locations before redshift zero (other redz=infinite)
+        redz = cosmo.a_to_z(data_fobs['scafa'])
+        valid = np.isfinite(redz) & (redz > 0.0)
+        log.info(f"After interpolation, valid binary-targets: {utils.frac_str(valid)}")
+
+        # Get rest-frame frequency [1/s]
+        frst = utils.frst_from_fobs(fobs[np.newaxis, :], redz)
+        # Comoving distance [cm]
+        dcom = cosmo.z_to_dcom(redz)
+
+        # `mass` has shape (Binaries, Frequencies, 2), units [gram]
+        #    convert to (2, B, F), then separate into m1, m2 each with shape (B, F)
+        m1, m2 = np.moveaxis(data_fobs['mass'], -1, 0)
+        dfdt, _ = utils.dfdt_from_dadt(data_fobs['dadt'], data_fobs['sepa'], freq_orb=frst)
+        _tres = frst / dfdt
+
+        vfac = 4.0*np.pi*SPLC * (redz+1.0) * dcom**2 / self._sample_volume   # * thub
+        tfac = _tres  # / thub
+
+        # ---- Get the "Lambda"/Poisson weighting factor ----
+        lambda_factor = vfac * tfac
+
+        # select only valid entries
+        mt, mr = utils.mtmr_from_m1m2(m1[valid], m2[valid])
+        fo = (fobs[np.newaxis, :] * np.ones_like(redz))[valid]
+        redz = redz[valid]
+        weights = lambda_factor[valid]
+        log.info(f"Weights (lambda values) at targets: {utils.stats(weights)}")
+
+        # down-sample weights to decrease the number of sample points
+        if down_sample is not None:
+            prev_sum = weights.sum()
+            weights /= down_sample
+            next_sum = weights.sum()
+            msg = f"DOWNSAMPLING ARTIFICIALLY!!  down_sample={down_sample:g} :: total: {prev_sum:.4e}==>{next_sum:.4e}"
+            log.warning(msg)
+
+        # TODO/FIX: Consider sampling in comoving-volume instead of redz (like in sam.py)
+        #           can also return dcom instead of redz for easier strain calculation
+        # Convert to log-space
+        vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo)]
+        names = ['mtot', 'mrat', 'redz', 'fobs']
+        nsamp = np.random.poisson(weights.sum())
+        reflect = [None, [None, 0.0], None, np.log10([0.95*fobs[0], fobs[-1]*1.05])]
+        # reflect = [None, [None, 0.0], None, np.log10([fobs[0], fobs[-1]])]
+        samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
+
+        # Convert back to normal-space
+        samples = np.asarray([10.0 ** ss for ss in samples])
+        return names, samples
+
+    # ==== Internal Methods
+
+    def _init_step_zero(self):
+        """Set the initial conditions of the binaries at the 0th step.
+
+        Transfers attributes from the stored :class:`holodeck.population._Population_Discrete`
+        instance to the 0th index of the evolution arrays.  The attributes are [`sepa`, `scafa`,
+        `mass`, and optionally `eccen`].  The hardening model is also used to calculate the 0th
+        hardening rates `dadt` and `dedt`.  The initial lookback time, `tlook` is also set.
+
+        """
+        pop = self._pop
+        size, nsteps = self.shape
+
+        # ---- Initialize basic parameters
+
+        # Initialize ALL separations ranging from initial to mutual-ISCO, for each binary
+        rad_isco = utils.rad_isco(*pop.mass.T)
+        # (2, N)
+        sepa = np.log10([pop.sepa, rad_isco])
+        # Get log-space range of separations for each of N ==> (N, S), for S steps
+        sepa = np.apply_along_axis(lambda xx: np.logspace(*xx, nsteps), 0, sepa).T
+        self.sepa[:, :] = sepa
+        if (pop.eccen is not None):
+            self.eccen[:, 0] = pop.eccen
+
+        self.scafa[:, 0] = pop.scafa
+        redz = cosmo.a_to_z(pop.scafa)
+        tlook = cosmo.z_to_tlbk(redz)
+        self.tlook[:, 0] = tlook
+        # `pop.mass` has shape (N, 2), broadcast to (N, S, 2) for `S` steps
+        self.mass[:, :, :] = pop.mass[:, np.newaxis, :]
+
+        if self._debug:    # nocov
+            for ii, hard in enumerate(self._hard):
+                # Store individual hardening rates
+                setattr(self, f"_dadt_{ii}", np.zeros_like(self.dadt))
+                setattr(self, f"_dedt_{ii}", np.zeros_like(self.dadt))
+
+        # ---- Initialize hardening rate at first step
+        dadt_init, dedt_init = self._hardening_rate(step=0)
+
+        self.dadt[:, 0] = dadt_init
+        if (pop.eccen is not None):
+            self.dedt[:, 0] = dedt_init
+
+        return
+
+    def _take_next_step(self, step):
+        """Integrate the binary population forward (to smaller separations) by one step.
+
+        For an integration step `s`, we are moving from index `s-1` to index `s`.  These correspond
+        to the 'left' and 'right' edges of the step.  The evolutionary trajectory values have
+        already been calculated on the left edges (during either the previous time step, or the
+        initial time step).  Each subsequent integration step then proceeds as follows:
+
+        (1) The hardening rate is calculated at the right edge of the step.
+        (2) The time it takes to move from the left to right edge is calculated using a trapezoid
+            rule in log-log space.
+        (3) The right edge evolution values are stored and updated.
+
+        Parameters
+        ----------
+        step : int
+            The destination integration step number, i.e. `step=1` means integrate from 0 to 1.
+
+        """
+        # ---- Initialize
+        size, nsteps = self.shape
+        left = step - 1     # the previous time-step (already completed)
+        right = step        # the next     time-step
+
+        # get the separation $a$ on both edges
+        sepa = self.sepa[:, (right, left)]   # sepa is decreasing, so switch left-right order
+
+        # ! ====================================================================
+        # ---- Hardening rates at the left-edge of the step
+        # calculate
+        dadt_l, dedt_l = self._hardening_rate(left)
+        da = np.diff(sepa, axis=-1)
+        da = da[:, 0]
+        dt = da / -dadt_l
+        if np.any(dt < 0.0):    # nocov
+            utils.error(f"Negative time-steps found at step={step}!")
+
+        if self.eccen is not None:
+            de = dedt_l * dt
+            ecc_r = self.eccen[:, left] + de
+            self.eccen[:, right] = ecc_r
+
+        # Update lookback time based on duration of this step
+        tlook = self.tlook[:, left] - dt
+        self.tlook[:, right] = tlook
+        # update scale-factor for systems at z > 0.0 (i.e. a < 1.0 and tlook > 0.0)
+        val = (tlook > 0.0)
+        self.scafa[val, right] = cosmo.z_to_a(cosmo.tlbk_to_z(tlook[val]))
+        # set systems after z = 0 to scale-factor of unity
+        self.scafa[~val, right] = 1.0
+        # ! ====================================================================
+
+        # ---- Hardening rates at the right-edge of the step
+        # calculate
+        dadt_r, dedt_r = self._hardening_rate(right)
+
+        # store
+        self.dadt[:, right] = dadt_r
+        if self.eccen is not None:
+            self.dedt[:, right] = dedt_r
+
+        # ---- Calculate time between edges
+
+        # get the $dt/da$ rate on both edges of the step
+        dtda = 1.0 / - self.dadt[:, (left, right)]   # NOTE: `dadt` is negative, convert to positive
+        # use trapezoid rule to find total time for this step
+        dt = utils.trapz_loglog(dtda, sepa, axis=-1).squeeze()   # this should come out positive
+        if np.any(dt < 0.0):    # nocov
+            utils.error(f"Negative time-steps found at step={step}!")
+
+        # ---- Update right-edge values
+        # NOTE/ENH: this would be a good place to make a function `_update_right_edge()` (or something like that),
+        # that stores the updated right edge values, and also performs any additional updates, such as mass evolution
+
+        # Update lookback time based on duration of this step
+        tlook = self.tlook[:, left] - dt
+        self.tlook[:, right] = tlook
+        # update scale-factor for systems at z > 0.0 (i.e. a < 1.0 and tlook > 0.0)
+        val = (tlook > 0.0)
+        self.scafa[val, right] = cosmo.z_to_a(cosmo.tlbk_to_z(tlook[val]))
+        # set systems after z = 0 to scale-factor of unity
+        self.scafa[~val, right] = 1.0
+
+        # update eccentricity if it's being evolved
+        if self.eccen is not None:
+            dedt = self.dedt[:, (left, right)]
+            time = self.tlook[:, (right, left)]   # tlook is decreasing, so switch left-right order
+            # decc = utils.trapz_loglog(dedt, time, axis=-1).squeeze()
+            decc = utils.trapz(dedt, time, axis=-1).squeeze()
+            ecc_r = self.eccen[:, left] + decc
+            ecc_r = np.clip(ecc_r, 0.0, 1.0 - _MAX_ECCEN_ONE_MINUS)
+            self.eccen[:, right] = ecc_r
+            if self._debug:    # nocov
+                bads = ~np.isfinite(decc)
+                if np.any(bads):
+                    utils.print_stats(print_func=log.error, dedt=dedt, time=time, decc=decc)
+                    err = f"Non-finite changes in eccentricity found in step {step}!"
+                    log.exception(err)
+                    raise ValueError(err)
+
+        return
+
+    def _hardening_rate(self, step):
+        """Calculate the net hardening rate for the given integration step.
+
+        The hardening rates (:class:`_Hardening` subclasses) stored in the :attr:`Evolution._hard`
+        attribute are called in sequence, their :meth:`_Hardening.dadt_dedt` methods are called,
+        and the $da/dt$ and $de/dt$ hardening rates are added together.
+        NOTE: the da/dt and de/dt values are added together to get the net rate, this is an
+        approximation.
+
+        Parameters
+        ----------
+        step : int
+            Current step number (the destination of the current step, i.e. step=1 is for integrating
+            from 0 to 1.)
+
+        Returns
+        -------
+        dadt : np.ndarray
+            The hardening rate in separation, $da/dt$, in units of [cm/s].
+            The shape is (N,) where N is the number of binaries.
+        dedt : np.ndarray or None
+            If eccentricity is not being evolved, this is `None`.  If eccentricity is being evolved,
+            this is the hardening rate in eccentricity, $de/dt$, in units of [1/s].
+            In this case, the shape is (N,) where N is the number of binaries.
+
+        """
+        dadt = np.zeros(self.shape[0])
+        dedt = None if self.eccen is None else np.zeros_like(dadt)
+
+        for ii, hard in enumerate(self._hard):
+            _sma, _ecc = hard.dadt_dedt(self, step)
+            dadt[:] += _sma
+            if self._debug:    # nocov
+                log.debug(f"{step} hard={hard} : dadt = {utils.stats(_sma)}")
+                # Store individual hardening rates
+                getattr(self, f"_dadt_{ii}")[:, step] = _sma[...]
+                # Raise error on invalid entries
+                if not np.all(np.isfinite(_sma)) or np.any(_sma > 0.0):
+                    utils.error(f"invalid `dadt` for hard={hard}!")
+
+            if (self.eccen is not None):
+                if _ecc is None:
+                    log.warning(f"`Evolution.eccen` is not None, but `dedt` is None!  {step} {hard}")
+                    continue
+                dedt[:] += _ecc
+                if self._debug:    # nocov
+                    log.debug(f"{step} hard={hard} : dedt = {utils.stats(_ecc)}")
+                    # Store individual hardening rates
+                    getattr(self, f"_dedt_{ii}")[:, step] = _ecc[...]
+
+        return dadt, dedt
+
+    def _check(self):
+        """Perform basic diagnostics on parameter validity after evolution.
+        """
+        _check_var_names = ['sepa', 'scafa', 'mass', 'tlook', 'dadt']
+        _check_var_names_eccen = ['eccen', 'dedt']
+
+        def check_vars(names):
+            for cv in names:
+                vals = getattr(self, cv)
+                if np.any(~np.isfinite(vals)):    # pragma: no cover
+                    err = "Found non-finite '{}' !".format(cv)
+                    raise ValueError(err)
+
+        check_vars(_check_var_names)
+
+        if self.eccen is None:
+            return
+
+        check_vars(_check_var_names_eccen)
+
+        return
+
+    def _finalize(self):
+        """Perform any actions after completing all of the integration steps.
+        """
+        # Set a flag to record that evolution has been completed
+        self._evolved = True
+        # Apply any modifiers
+        self.modify()
+        # Run diagnostics
+        self._check()
+        return
+
     def _update_derived(self):
         """Update any derived quantities after modifiers are applied.
         """
         pass
+
+    # ==== Properties and generic functionality
+
+    @property
+    def shape(self):
+        """The number of binaries and number of steps (N, S)."""
+        return self._shape
+
+    @property
+    def size(self):
+        """The number of binaries"""
+        return self._shape[0]
+
+    @property
+    def steps(self):
+        """The number of evolution steps"""
+        return self._shape[1]
+
+    @property
+    def coal(self):
+        """Indices of binaries that coalesce before redshift zero.
+        """
+        if self._coal is None:
+            self._coal = (self.scafa[:, -1] < 1.0)
+        return self._coal
+
+    @property
+    def tage(self):
+        """Age of the universe [sec] for each binary-step.
+
+        Derived from :attr:`Evolution.tlook`.
+
+        Returns
+        -------
+        ta : np.ndarray,
+            (B, S).  Age of the universe.
+
+        """
+        ta = cosmo.age(0.0).cgs.value - self.tlook
+        return ta
+
+    @property
+    def mtmr(self):
+        """Total-mass and mass-ratio.
+
+        Returns
+        -------
+        mt : np.ndarray
+            Total mass ($M = m_1 + m_2$) in [gram].
+        mr : np.ndarray
+            Mass ratio ($q = m_2/m_1 \leq 1.0$).
+
+        """
+        mass = np.moveaxis(self.mass, -1, 0)   # (N, M, 2) ==> (2, N, M)
+        mt, mr = utils.mtmr_from_m1m2(*mass)
+        return mt, mr
 
     @property
     def freq_orb_rest(self):
@@ -381,245 +1002,14 @@ class Evolution:
             raise RuntimeError("This instance has not been evolved yet!")
         return
 
-    def at(self, xpar, targets, pars=None, coal=False, lin_interp=None):
-        """Interpolate evolution to the given observed, orbital frequency.
 
-        Parameters
-        ----------
-        xpar : str, in ['fobs', 'sepa']
-            String specifying the variable to interpolate to.
-        targets : float or array_like,
-            Locations to interpolate to.
-            `sepa` : units of cm
-            `fobs` : units of 1/s [Hz]
-        pars : None or (list of str)
-            Parameters that should be interpolated.
-            If `None`, defaults to `self._EVO_PARS` attribute.
-        coal : bool,
-            Only return evolution values for binaries coalescing before redshift zero.
-        lin_interp : None or bool,
-
-        Returns
-        -------
-        vals : dict,
-            Dictionary of arrays for each interpolated parameter.
-            The returned shape is (N, T), where `T` is the number of target locations to interpolate
-            to, and `N` is the total number of binaries (``coal=False``) or the number of binaries
-            coalescing before redshift zero (``coal=True``).
-
-        Notes
-        -----
-        Out of bounds values are set to `np.nan`.
-        Interpolation is 1st-order in log-log space.
-
-        """
-        self._check_evolved()
-        _allowed = ['sepa', 'fobs']
-        if xpar not in _allowed:
-            raise ValueError("`xpar` must be one of '{}'!".format(_allowed))
-
-        if pars is None:
-            pars = self._EVO_PARS
-        if np.isscalar(pars):
-            pars = [pars]
-        squeeze = False
-        if np.isscalar(targets):
-            targets = np.atleast_1d(targets)
-            squeeze = True
-
-        size, nsteps = self.shape
-        # Observed-Frequency, units of 1/yr
-        if xpar == 'fobs':
-            # frequency is already increasing
-            _xvals = np.log10(self.freq_orb_obs)
-            scafa = self.scafa[:, :]
-            tt = np.log10(targets)
-            rev = False
-        # Binary-Separation, units of pc
-        elif xpar == 'sepa':
-            # separation is decreasing, reverse to increasing
-            _xvals = np.log10(self.sepa)[:, ::-1]
-            scafa = self.scafa[:, ::-1]
-            tt = np.log10(targets)
-            rev = True
-        else:
-            raise ValueError("Bad `xpar` {}!".format(xpar))
-
-        # Find the evolution-steps immediately before and after the target frequency
-        textr = utils.minmax(tt)
-        xextr = utils.minmax(_xvals)
-        if (textr[1] < xextr[0]) | (textr[0] > xextr[1]):
-            err = "`targets` extrema ({}) ourside `xvals` extema ({})!  Bad units?".format(
-                (10.0**textr), (10.0**xextr))
-            raise ValueError(err)
-
-        # Convert to (N, T, M)
-        #     `tt` is (T,)  `xvals` is (N, M) for N-binaries and M-steps
-        select = (tt[np.newaxis, :, np.newaxis] <= _xvals[:, np.newaxis, :])
-        # Select only binaries that coalesce before redshift zero (a=1.0)
-        if coal:
-            select = select & (scafa[:, np.newaxis, :] > 0.0) & (scafa[:, np.newaxis, :] < 1.0)
-
-        # (N, T), find the index of the xvalue following each target point (T,), for each binary (N,)
-        aft = np.argmax(select, axis=-1)
-        # zero values in `aft` mean no xvals after the targets were found
-        valid = (aft > 0)
-        bef = np.copy(aft)
-        bef[valid] -= 1
-
-        # (2, N, T)
-        cut = np.array([aft, bef])
-        # Valid binaries must be valid at both `bef` and `aft` indices
-        for cc in cut:
-            valid = valid & np.isfinite(np.take_along_axis(scafa, cc, axis=-1))
-
-        inval = ~valid
-        # Get the x-values before and after the target locations  (2, N, T)
-        xvals = [np.take_along_axis(_xvals, cc, axis=-1) for cc in cut]
-        # Find how far to interpolate between values (in log-space)
-        #     (N, T)
-        temp = np.subtract(*xvals)
-        numer = tt[np.newaxis, :] - xvals[1]
-        frac = np.zeros_like(numer)
-        idx = (temp != 0.0)
-        frac[idx] = numer[idx] / temp[idx]
-
-        vals = dict()
-        # Interpolate each target parameter
-        for pp in pars:
-            lin_interp_flag = (pp in self._LIN_INTERP_PARS) if lin_interp is None else lin_interp
-            # Either (N, M) or (N, M, 2)
-            _data = getattr(self, pp)
-            if _data is None:
-                vals[pp] = None
-                continue
-
-            reshape = False
-            use_cut = cut
-            use_frac = frac
-            # Sometimes there is a third dimension for the 2 binaries (e.g. `mass`)
-            #    which will have shape, (N, T, 2) --- calling this "double-data"
-            if np.ndim(_data) != 2:
-                if (np.ndim(_data) == 3) and (np.shape(_data)[-1] == 2):
-                    # Keep the interpolation axis last (N, T, 2) ==> (N, 2, T)
-                    _data = np.moveaxis(_data, -1, -2)
-                    # Expand other arrays appropriately
-                    use_cut = cut[:, :, np.newaxis]
-                    use_frac = frac[:, np.newaxis, :]
-                    reshape = True
-                else:
-                    raise ValueError("Unexpected shape of data: {}!".format(np.shape(_data)))
-
-            if not lin_interp_flag:
-                _data = np.log10(_data)
-
-            if rev:
-                _data = _data[..., ::-1]
-            # (2, N, T) for scalar data or (2, N, 2, T) for "double-data"
-            data = [np.take_along_axis(_data, cc, axis=-1) for cc in use_cut]
-            # Interpolate by `frac` for each binary   (N, T) or (N, 2, T) for "double-data"
-            new = data[1] + (np.subtract(*data) * use_frac)
-            # In the "double-data" case, move the doublet back to the last dimension
-            #    (N, T) or (N, T, 2)
-            if reshape:
-                new = np.moveaxis(new, 1, -1)
-            # Set invalid binaries to nan
-            new[inval, ...] = np.nan
-
-            # if np.any(~np.isfinite(new[valid, ...])):
-            #     raise ValueError("Non-finite values after interpolation of '{}'".format(pp))
-
-            # fill return dictionary
-            if not lin_interp_flag:
-                new = 10.0 ** new
-            if squeeze:
-                new = new.squeeze()
-            vals[pp] = new
-
-            # if np.any(~np.isfinite(new[valid, ...])):
-            #     raise ValueError("Non-finite values after exponentiation of '{}'".format(pp))
-
-        return vals
-
-    def sample_full_population(self, freqs, DOWN=None):
-        """Construct a full universe of binaries based on resampling this population.
-
-        !**WARNING**!
-        NOTE: This function should be cleaned up / improved for public use.
-
-        Parameters
-        ----------
-        freqs : array_like,
-            Target observer-frame frequencies at which to sample population.
-        DOWN : None or float,
-            Factor by which to downsample the resulting population.
-            For example, `10.0` will produce 10x fewer output binaries.
-
-        Returns
-        -------
-        samples
-
-
-        """
-        PARAMS = ['mass', 'sepa', 'dadt', 'scafa']
-        fobs = kale.utils.spacing(freqs, scale='log', dex=10, log_stretch=0.1)
-        log.info(f"Converted input freqs ({kale.utils.stats_str(freqs)}) ==> {kale.utils.stats_str(fobs)}")
-        data_fobs = self.at('fobs', fobs, pars=PARAMS)
-
-        # Only examine binaries reaching the given locations before redshift zero (other redz=infinite)
-        redz = data_fobs['scafa']
-        redz = cosmo.a_to_z(redz)
-        valid = np.isfinite(redz) & (redz > 0.0)
-        # nvalid = np.count_nonzero(valid)
-        # print(f"Valid indices: {nvalid}/{valid.size}={nvalid/valid.size:.4e}")
-
-        frst = utils.frst_from_fobs(fobs[np.newaxis, :], redz)
-        dcom = cosmo.z_to_dcom(redz)
-
-        # `mass` has shape (Binaries, Frequencies, 2)
-        #    convert to (2, B, F), then separate into m1, m2 each with shape (B, F)
-        m1, m2 = np.moveaxis(data_fobs['mass'], -1, 0)
-        # mchirp = utils.chirp_mass(m1, m2)
-        dfdt, _ = utils.dfdt_from_dadt(data_fobs['dadt'], data_fobs['sepa'], freq_orb=frst)
-        _tres = frst / dfdt
-
-        vfac = 4.0*np.pi*SPLC * (redz+1.0) * dcom**2 / self._sample_volume   # * thub
-        tfac = _tres  # / thub
-
-        # ---- Get the "Lambda"/Poisson weighting factor ----
-        # Calculate weightings
-        #    Sesana+08, Eq.10
-        lambda_factor = vfac * tfac
-        # print(f"`lambda_factor` = {lambda_factor.shape}, {utils.stats(lambda_factor)}")
-
-        mt, mr = utils.mtmr_from_m1m2(m1[valid], m2[valid])
-        fo = (fobs[np.newaxis, :] * np.ones_like(redz))[valid]
-        redz = redz[valid]
-        weights = lambda_factor[valid]
-
-        if DOWN is not None:
-            prev_sum = weights.sum()
-            weights /= DOWN
-            next_sum = weights.sum()
-            log.warning(f"DOWNSAMPLING ARTIFICIALLY!!  DOWN={DOWN:g} :: {prev_sum:.4e}==>{next_sum:.4e}")
-
-        # vals = [mt, mr, redz, fo]
-        # TODO/FIX: Consider sampling in comoving-volume instead of redz (like in sam.py)
-        #           can also return dcom instead of redz for easier strain calculation
-        vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo)]
-        nsamp = np.random.poisson(weights.sum())
-        reflect = [None, [None, 0.0], None, np.log10([0.95*fobs[0], fobs[-1]*1.05])]
-        # print(f"{nsamp=:.4e}, {np.shape(vals)=}")
-        samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
-        # print(f"{samples.shape=}")
-
-        samples = np.asarray([10.0 ** ss for ss in samples])
-        # hs, fo = holo.sam._strains_from_samples(samples)
-        return samples
+# =================================================================================================
+# ====    Hardening Classes    ====
+# =================================================================================================
 
 
 class _Hardening(abc.ABC):
-    """Abstract class for binary-hardening models.  Subclasses must define `dadt_dedt(evo, step, ...)` method.
+    """Base class for binary-hardening models, providing the `dadt_dedt(evo, step, ...)` method.
     """
 
     @abc.abstractmethod
@@ -633,6 +1023,24 @@ class Hard_GW(_Hardening):
 
     @staticmethod
     def dadt_dedt(evo, step):
+        """Calculate GW binary evolution (hardening rate) in semi-major-axis and eccentricity.
+
+        Parameters
+        ----------
+        evo : `Evolution`
+            Evolution instance providing the binary parameters for calculating hardening rates.
+        step : int
+            Evolution integration step index from which to load binary parameters.
+            e.g. separations are loaded as ``evo.sepa[:, step]``.
+
+        Returns
+        -------
+        dadt : np.ndarray
+            Hardening rate in semi-major-axis, returns negative value, units [cm/s].
+        dedt : np.ndarray
+            Hardening rate in eccentricity, returns negative value, units [1/s].
+
+        """
         m1, m2 = evo.mass[:, step, :].T    # (Binaries, Steps, 2) ==> (2, Binaries)
         sepa = evo.sepa[:, step]
         eccen = evo.eccen[:, step] if (evo.eccen is not None) else None
@@ -641,15 +1049,64 @@ class Hard_GW(_Hardening):
         if eccen is None:
             dedt = None
         else:
-            dedt = utils.gw_dedt(m1, m2, evo.sepa, evo.eccen)
+            dedt = utils.gw_dedt(m1, m2, sepa, eccen)
 
         return dadt, dedt
 
     @staticmethod
-    def dadt(mt, mr, sepa):
-        m1, m2 = utils.m1m2_from_mtmr(mt, mr)
-        dadt = utils.gw_hardening_rate_dadt(m1, m2, sepa, eccen=None)
+    def dadt(mtot, mrat, sepa, eccen=None):
+        """Calculate GW Hardening rate of semi-major-axis vs. time.
+
+        Parameters
+        ----------
+        mtot : array_like
+            Total mass of each binary system.  Units of [gram].
+        mrat : array_like
+            Mass ratio of each binary, defined as $q \equiv m_1/m_2 \leq 1.0$.
+        sepa : array_like
+            Binary semi-major axis (separation), in units of [cm].
+        eccen : array_like or None
+            Binary eccentricity, `None` is the same as zero eccentricity (circular orbit).
+
+        Returns
+        -------
+        dadt : np.ndarray
+            Hardening rate in semi-major-axis, result is negative, units [cm/s].
+
+        """
+        m1, m2 = utils.m1m2_from_mtmr(mtot, mrat)
+        dadt = utils.gw_hardening_rate_dadt(m1, m2, sepa, eccen=eccen)
         return dadt
+
+    @staticmethod
+    def dedt(mtot, mrat, sepa, eccen=None):
+        """Calculate GW Hardening rate of eccentricity vs. time.
+
+        If `eccen` is `None`, zeros are returned.
+
+        Parameters
+        ----------
+        mtot : array_like
+            Total mass of each binary system.  Units of [gram].
+        mrat : array_like
+            Mass ratio of each binary, defined as $q \equiv m_1/m_2 \leq 1.0$.
+        sepa : array_like
+            Binary semi-major axis (separation), in units of [cm].
+        eccen : array_like or None
+            Binary eccentricity, `None` is the same as zero eccentricity (circular orbit).
+
+        Returns
+        -------
+        dedt : np.ndarray
+            Hardening rate in eccentricity, result is <= 0.0, units [1/s].
+            Zero values if `eccen` is `None`.
+
+        """
+        if eccen is None:
+            return np.zeros_like(mtot)
+        m1, m2 = utils.m1m2_from_mtmr(mtot, mrat)
+        dedt = utils.gw_dedt(m1, m2, sepa, eccen=eccen)
+        return dedt
 
 
 class Sesana_Scattering(_Hardening):
@@ -659,22 +1116,27 @@ class Sesana_Scattering(_Hardening):
     `_SHM06` class.  Scattering is assumed to only be effective once the binary is bound.  An
     exponential cutoff is imposed at larger radii.
 
-    Parameters
-    ----------
-    gamma_dehnen : scalar  or  (N,) array-like of scalar
-        Dehnen stellar-density profile inner power-law slope.
-        Fiducial Dehnen inner density profile slope gamma=1.0 is used in [Chen2017]_.
-    gbh : _Galaxy_Blackhole_Relation class/instance  or  `None`
-        Galaxy-Blackhole Relation used for calculating stellar parameters.
-        If `None` the default is loaded.
-
     """
 
-    def __init__(self, gamma_dehnen=1.0, gbh=None):
-        gbh = _get_galaxy_blackhole_relation(gbh)
-        self._gbh = gbh
-        self._gamma_dehnen = gamma_dehnen
+    def __init__(self, gamma_dehnen=1.0, mmbulge=None, msigma=None):
+        """Construct an `Stellar_Scattering` instance with the given MBH-Host relations.
 
+        Parameters
+        ----------
+        gamma_dehnen : array_like
+            Dehnen stellar-density profile inner power-law slope.
+            Fiducial Dehnen inner density profile slope ``gamma=1.0`` is used in [Chen2017]_.
+        mmbulge : None or `holodeck.relations._MMBulge_Relation`
+            Mbh-Mbulge relation to calculate stellar mass for a given BH mass.
+            If `None` a default relationship is used.
+        msigma : None or `holodeck.relations._MSigma_Relation`
+            Mbh-Sigma relation to calculate stellar velocity dispersion for a given BH mass.
+            If `None` a default relationship is used.
+
+        """
+        self._mmbulge = holo.relations.get_mmbulge_relation(mmbulge)
+        self._msigma = holo.relations.get_msigma_relation(msigma)
+        self._gamma_dehnen = gamma_dehnen
         self._shm06 = _SHM06()
         return
 
@@ -683,15 +1145,16 @@ class Sesana_Scattering(_Hardening):
 
         Parameters
         ----------
-        evo : `Evolution` instance
+        evo : `Evolution`
+            Evolution instance providing binary parameters at the given intergration step.
         step : int
             Integration step at which to calculate hardening rates.
 
         Returns
         -------
-        dadt : (N,) array-like of scalar
+        dadt : array_like
             Binary hardening rates in units of [cm/s], defined to be negative.
-        dedt : (N,) array-like of scalar
+        dedt : array_like
             Binary rate-of-change of eccentricity in units of [1/sec].
 
         """
@@ -706,11 +1169,11 @@ class Sesana_Scattering(_Hardening):
 
         Parameters
         ----------
-        mass : (N,2) array-like of scalar
+        mass : (N,2) array_like
             Masses of each MBH component (0-primary, 1-secondary) in units of [gram].
-        sepa : (N,) array-like of scalar
+        sepa : (N,) array_like
             Binary separation in units of [cm].
-        eccen : (N,) array-like of scalar or `None`
+        eccen : (N,) array_like or `None`
             Binary eccentricity.  `None` if eccentricity is not being evolved.
 
         Returns
@@ -722,9 +1185,12 @@ class Sesana_Scattering(_Hardening):
             If eccentricity is not being evolved (i.e. `eccen==None`) then `None` is returned.
 
         """
+        mass = np.atleast_2d(mass)
+        sepa = np.atleast_1d(sepa)
+        eccen = np.atleast_1d(eccen) if eccen is not None else None
         mtot, mrat = utils.mtmr_from_m1m2(mass)
-        vdisp = self._gbh.vdisp_from_mbh(mtot)
-        mbulge = self._gbh.mbulge_from_mbh(mtot)
+        mbulge = self._mmbulge.mbulge_from_mbh(mtot, scatter=False)
+        vdisp = self._msigma.vdisp_from_mbh(mtot, scatter=False)
         dens = _density_at_influence_radius_dehnen(mtot, mbulge, self._gamma_dehnen)
 
         rhard = _Quinlan1996.radius_hardening(mass[:, 1], vdisp)
@@ -751,7 +1217,7 @@ class Dynamical_Friction_NFW(_Hardening):
     each MBH binary.  The `holodeck.observations.NFW` class is used for profile calculations, and the halo parameters
     are calculated from Stellar-mass--Halo-mass relations (see 'arguments' below).  The 'effective-mass' of the
     inspiralling secondary is modeled as a power-law decreasing from the sum of secondary MBH and its stellar-bulge
-    (calculated using the `gbh` - Galaxy-Blackhole relation), down to just the bare secondary MBH after 10 dynamical
+    (calculated using the `mmbulge` - Mbh-Mbulge relation), down to just the bare secondary MBH after 10 dynamical
     times.  This is to model tidal-stripping of the secondary host galaxy.
 
     Attenuation of the DF hardening rate is typically also included, to account for the inefficiency of DF once the
@@ -759,47 +1225,154 @@ class Dynamical_Friction_NFW(_Hardening):
     characteristic radii, needed for the attenuation calculation, currently use a fixed Dehnen stellar-density profile
     as in [Chen2017]_, and a fixed scaling relationship to find the characteristic stellar-radius.
 
-    This module does not evolve eccentricity.
-
-    Parameters
-    ----------
-    gbh : class, instance or None
-        Galaxy-blackhole relation (_Galaxy_Blackhole_Relation subclass)
-        If `None` the default is loaded.
-    smhm : class, instance or None
-        Stellar-mass--halo-mass relation (_StellarMass_HaloMass subclass)
-        If `None` the default is loaded.
-    coulomb : scalar,
-        coulomb-logarithm ("log(Lambda)"), typically in the range of 10-20.
-        This parameter is formally the log of the ratio of maximum to minimum impact parameters.
-    attenuate : bool,
-        Whether the DF hardening rate should be 'attenuated' due to stellar-scattering effects at
-        small radii.  If `True`, DF becomes significantly less effective for radii < R_hard and R_LC
-    rbound_from_density : bool,
-        Determines how the binding radius (of MBH pair) is calculated, which is used for attenuation.
-        NOTE: this is only used if `attenuate==True`
-        If True:  calculate R_bound using an assumed stellar density profile.
-        If False: calculate R_bound using a velocity dispersion (constant in radius, from `gbh` instance).
-
     Notes
     -----
+    *   This module does not evolve eccentricity.
     *   The hardening rate (da/dt) is not allowed to be larger than the orbital/virial velocity of the halo
         (as a function of radius).
 
     """
 
-    def __init__(self, gbh=None, smhm=None, coulomb=10.0, attenuate=True, rbound_from_density=True):
-        gbh = _get_galaxy_blackhole_relation(gbh)
-        smhm = _get_stellar_mass_halo_mass_relation(smhm)
-        self._gbh = gbh
-        self._smhm = smhm
+    def __init__(self, mmbulge=None, msigma=None, smhm=None, coulomb=10.0, attenuate=True, rbound_from_density=True):
+        """Create a hardening rate instance with the given parameters.
+
+        Parameters
+        ----------
+        mmbulge : None or `holodeck.relations._MMBulge_Relation`
+            Mbh-Mbulge relation to calculate stellar mass for a given BH mass.
+            If `None` a default relationship is used.
+        msigma : None or `holodeck.relations._MSigma_Relation`
+            Mbh-Sigma relation to calculate stellar velocity dispersion for a given BH mass.
+            If `None` a default relationship is used.
+        smhm : class, instance or None
+            Stellar-mass--halo-mass relation (_StellarMass_HaloMass subclass)
+            If `None` the default is loaded.
+        coulomb : scalar,
+            coulomb-logarithm ("log(Lambda)"), typically in the range of 10-20.
+            This parameter is formally the log of the ratio of maximum to minimum impact parameters.
+        attenuate : bool,
+            Whether the DF hardening rate should be 'attenuated' due to stellar-scattering effects at
+            small radii.  If `True`, DF becomes significantly less effective for radii < R_hard and R_LC
+        rbound_from_density : bool,
+            Determines how the binding radius (of MBH pair) is calculated, which is used for attenuation.
+            NOTE: this is only used if `attenuate==True`
+            If True:  calculate R_bound using an assumed stellar density profile.
+            If False: calculate R_bound using a velocity dispersion (constant in radius, from `gbh` instance).
+
+        """
+        self._mmbulge = holo.relations.get_mmbulge_relation(mmbulge)
+        self._msigma = holo.relations.get_msigma_relation(msigma)
+        self._smhm = holo.relations.get_stellar_mass_halo_mass_relation(smhm)
         self._coulomb = coulomb
         self._attenuate = attenuate
         self._rbound_from_density = rbound_from_density
 
-        self._NFW = holo.observations.NFW
+        self._NFW = holo.relations.NFW
         self._time_dynamical = None
         return
+
+    def dadt_dedt(self, evo, step, attenuate=None):
+        """Calculate DF hardening rate given `Evolution` instance, and an integration `step`.
+
+        Parameters
+        ----------
+        evo : `Evolution` instance
+        step : int,
+            Integration step at which to calculate hardening rates.
+
+        Returns
+        -------
+        dadt : (N,) np.ndarray of scalar,
+            Binary hardening rates in units of [cm/s].
+        dedt : (N,) np.ndarray of scalar, NOTE: always zero
+            Rate-of-change of eccentricity, which is not included in this calculation (i.e. zero)
+
+        """
+        if attenuate is None:
+            attenuate = self._attenuate
+
+        mass = evo.mass[:, step, :]
+        sepa = evo.sepa[:, step]
+        eccen = evo.eccen[:, step] if evo.eccen is not None else None
+        dt = evo.tlook[:, 0] - evo.tlook[:, step]   # positive time-duration since 'formation'
+        # NOTE `scafa` is nan for systems "after" redshift zero (i.e. do not merge before redz=0)
+        redz = np.zeros_like(sepa)
+        val = (evo.scafa[:, step] > 0.0)
+        redz[val] = cosmo.a_to_z(evo.scafa[val, step])
+
+        dadt, dedt = self._dadt_dedt(mass, sepa, redz, dt, eccen, attenuate)
+
+        return dadt, dedt
+
+    def _dadt_dedt(self, mass, sepa, redz, dt, eccen, attenuate):
+        """Calculate DF hardening rate given physical quantities.
+
+        Parameters
+        ----------
+        mass : (N, 2) array_like
+            Masses of both MBHs (0-primary, 1-secondary) in units of [grams].
+        sepa : (N,) array_like
+            Binary separation in [cm].
+        redz : (N,) array_like
+            Binary redshifts.
+        dt : (N,) array_like
+            Time step [sec], required for modeling tidal stripping of secondary galaxy.
+        eccen : (N,) array_like or None
+            Binary eccentricity.
+        attenuate : bool
+            Whether to include 'attenuation' as the radius approach the stellar-scattering regime.
+
+        Returns
+        -------
+        dadt : (N,) np.ndarray
+            Binary hardening rates in units of [cm/s].
+        dedt : (N,) np.ndarray or None
+            Rate-of-change of eccentricity, which is not included in this calculation, it is zero.
+            `None` is returned if the input `eccen` is None.
+
+        """
+        # ---- Get Host DM-Halo mass
+        # use "bulge-mass" as a proxy for total stellar mass
+        # mstar = self._mmbulge.mbulge_from_mbh(mass[:, 0], scatter=False)   # use primary-bh's mass (index 0)
+        mstar = self._mmbulge.mbulge_from_mbh(mass.sum(axis=-1), scatter=False)   # use total bh-mass
+        mhalo = self._smhm.halo_mass(mstar, redz, clip=True)
+
+        # ---- Get effective mass of inspiraling secondary
+        m2 = mass[:, 1]
+        mstar_sec = self._mmbulge.mbulge_from_mbh(m2, scatter=False)
+        if self._time_dynamical is None:
+            self._time_dynamical = self._NFW.time_dynamical(sepa, mhalo, redz) * 10
+
+        # model tidal-stripping of secondary's bulge (see: [Kelley2017a]_ Eq.6)
+        pow = np.clip(1.0 - dt / self._time_dynamical, 0.0, 1.0)
+        meff = m2 * np.power((m2 + mstar_sec)/m2, pow)
+
+        dens = self._NFW.density(sepa, mhalo, redz)
+        velo = self._NFW.velocity_circular(sepa, mhalo, redz)
+        tdyn = self._NFW.time_dynamical(sepa, mhalo, redz)
+        # Note: this should be returned as negative values
+        dvdt = self._dvdt(meff, dens, velo)
+
+        # convert from deceleration to hardening-rate assuming virialized orbit (i.e. ``GM/a = v^2``)
+        dadt = 2 * tdyn * dvdt
+        dedt = None if (eccen is None) else np.zeros_like(dadt)
+
+        # Hardening rate cannot be larger than orbital/virial velocity
+        log.debug(f"|dadt| = {utils.stats(np.fabs(dadt))}")
+        log.debug(f"|velo| = {utils.stats(velo)}")
+        clip = (np.fabs(dadt) > velo)
+        if np.any(clip):
+            log.debug(f"clipping {utils.frac_str(clip)} `dadt` values to vcirc")
+            prev = dadt.copy()
+            dadt[clip] = - velo[clip]
+            log.debug(f"\t{utils.stats(prev*YR/PC)} ==> {utils.stats(dadt*YR/PC)}")
+            del prev
+
+        if attenuate:
+            atten = self._attenuation_BBR1980(sepa, mass, mstar)
+            dadt = dadt / atten
+
+        return dadt, dedt
 
     def _dvdt(self, mass_sec_eff, dens, velo):
         """Chandrasekhar dynamical friction formalism providing a deceleration (dv/dt).
@@ -822,98 +1395,6 @@ class Dynamical_Friction_NFW(_Hardening):
         """
         dvdt = - 2*np.pi * mass_sec_eff * dens * self._coulomb * np.square(NWTG / velo)
         return dvdt
-
-    def dadt_dedt(self, evo, step):
-        """Calculate DF hardening rate given `Evolution` instance, and an integration `step`.
-
-        Parameters
-        ----------
-        evo : `Evolution` instance
-        step : int,
-            Integration step at which to calculate hardening rates.
-
-        Returns
-        -------
-        dadt : (N,) np.ndarray of scalar,
-            Binary hardening rates in units of [cm/s].
-        dedt : (N,) np.ndarray of scalar, NOTE: always zero
-            Rate-of-change of eccentricity, which is not included in this calculation (i.e. zero)
-
-        """
-        mass = evo.mass[:, step, :]
-        sepa = evo.sepa[:, step]
-        dt = evo.tlbk[:, 0] - evo.tlbk[:, step]   # positive time-duration since 'formation'
-        # NOTE `scafa` is nan for systems "after" redshift zero (i.e. do not merge before redz=0)
-        redz = np.zeros_like(sepa)
-        val = (evo.scafa[:, step] > 0.0)
-        redz[val] = cosmo.a_to_z(evo.scafa[val, step])
-
-        dadt, dedt = self._dadt_dedt(mass, sepa, redz, dt)
-
-        return dadt, dedt
-
-    def _dadt_dedt(self, mass, sepa, redz, dt, attenuate=None):
-        """Calculate DF hardening rate given physical quantities.
-
-        Parameters
-        ----------
-        mass : (N, 2) array-like of scalar,
-            Masses of both MBHs (0-primary, 1-secondary) in units of [grams].
-        sepa : (N,) array-like of scalar,
-            Binary separation in [cm].
-        redz : (N,) array-like of scalar,
-            Binary redshifts.
-
-        Returns
-        -------
-        dadt : (N,) np.ndarray of scalar,
-            Binary hardening rates in units of [cm/s].
-        dedt : (N,) np.ndarray of scalar, NOTE: always zero
-            Rate-of-change of eccentricity, which is not included in this calculation.
-
-        """
-        if attenuate is None:
-            attenuate = self._attenuate
-
-        # ---- Get Host DM-Halo mass
-        # use "bulge-mass" as a proxy for total stellar mass
-        mstar = self._gbh.mbulge_from_mbh(mass[:, 0])   # use primary-bh's mass (index 0)
-        mhalo = self._smhm.halo_mass(mstar, redz, clip=True)
-
-        # ---- Get effective mass of inspiraling secondary
-        m2 = mass[:, 1]
-        mstar_sec = self._gbh.mbulge_from_mbh(m2)
-        if self._time_dynamical is None:
-            self._time_dynamical = self._NFW.time_dynamical(sepa, mhalo, redz) * 10
-
-        # model tidal-stripping of secondary's bulge (see: [Kelley2017] Eq.6)
-        pow = np.clip(1.0 - dt / self._time_dynamical, 0.0, 1.0)
-        meff = m2 * np.power((m2 + mstar_sec)/m2, pow)
-
-        dens = self._NFW.density(sepa, mhalo, redz)
-        velo = self._NFW.velocity_circular(sepa, mhalo, redz)
-        tdyn = self._NFW.time_dynamical(sepa, mhalo, redz)
-        # Note: this should be returned as negative values
-        dvdt = self._dvdt(meff, dens, velo)
-
-        # convert from deceleration to hardening-rate assuming virialized orbit (i.e. ``GM/a = v^2``)
-        dadt = 2 * tdyn * dvdt
-        dedt = np.zeros_like(dadt)
-
-        # Hardening rate cannot be larger than orbital/virial velocity
-        clip = (np.fabs(dadt) > velo)
-        if np.any(clip):
-            log.info(f"clipping {utils.frac_str(clip)} `dadt` values to vcirc")
-            prev = dadt[:]
-            dadt[clip] = - velo[clip]
-            log.debug(f"\t{utils.stats(prev*YR/PC)} ==> {utils.stats(dadt*YR/PC)}")
-            del prev
-
-        if attenuate:
-            atten = self._attenuation_BBR1980(sepa, mass, mstar)
-            dadt = dadt / atten
-
-        return dadt, dedt
 
     def _attenuation_BBR1980(self, sepa, m1m2, mstar):
         """Calculate attentuation factor following [BBR1980]_ prescription.
@@ -957,7 +1438,7 @@ class Dynamical_Friction_NFW(_Hardening):
             rbnd = _radius_influence_dehnen(mbh, mstar)
         # Calculate R_bound based on uniform velocity dispersion (MBH scaling relation)
         else:
-            vdisp = self._gbh.vdisp_from_mbh(m1)   # use primary-bh's mass (index 0)
+            vdisp = self._msigma.vdisp_from_mbh(m1)   # use primary-bh's mass (index 0)
             rbnd = NWTG * mbh / vdisp**2
 
         # Number of stars in the stellar bulge/core
@@ -980,7 +1461,6 @@ class Dynamical_Friction_NFW(_Hardening):
         atten = np.maximum(atten_hard, atten_lc)
         # Make sure that attenuation is always >= 1.0 (i.e. this never _increases_ the hardening rate)
         atten = np.maximum(atten, 1.0)
-
         return atten
 
 
@@ -1223,14 +1703,8 @@ class Fixed_Time_SAM(Fixed_Time):
 
 
 # =================================================================================================
-# ====    Internal/Utility Classes and Functions    ====
+# ====    Utility Classes and Functions    ====
 # =================================================================================================
-
-
-@enum.unique
-class _EVO(enum.Enum):
-    CONT = 1
-    END = -1
 
 
 class _Quinlan1996:
@@ -1438,36 +1912,9 @@ class _SHM06:
         return
 
 
-def _get_galaxy_blackhole_relation(gbh=None):
-    if gbh is None:
-        gbh = holo.observations.Kormendy_Ho_2013
-
-    if inspect.isclass(gbh):
-        gbh = gbh()
-    elif not isinstance(gbh, holo.observations._Galaxy_Blackhole_Relation):
-        err = "`gbh` must be an instance or subclass of `holodeck.observations._Galaxy_Blackhole_Relation`!"
-        log.error(err)
-        raise ValueError(err)
-
-    return gbh
-
-
-def _get_stellar_mass_halo_mass_relation(smhm=None):
-    if smhm is None:
-        smhm = holo.observations.Behroozi_2013
-
-    if inspect.isclass(smhm):
-        smhm = smhm()
-    elif not isinstance(smhm, holo.observations._StellarMass_HaloMass):
-        err = "`smhm` must be an instance or subclass of `holodeck.observations._StellarMass_HaloMass`!"
-        log.error(err)
-        raise ValueError(err)
-
-    return smhm
-
-
 def _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma=1.0):
-    """
+    """Characteristic stellar radius based on total stellar mass.
+
     [Chen2017]_ Eq.27 - from [Dabringhausen+2008]
     """
     rchar = 239 * PC * (np.power(2.0, 1.0/(3.0 - gamma)) - 1.0)
@@ -1476,7 +1923,8 @@ def _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma=1.0):
 
 
 def _radius_influence_dehnen(mbh, mstar, gamma=1.0):
-    """
+    """Characteristic radius of influence based on a Dehnen density profile.
+
     [Chen2017]_ Eq.25
     """
     rchar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
@@ -1486,7 +1934,7 @@ def _radius_influence_dehnen(mbh, mstar, gamma=1.0):
 
 
 def _density_at_influence_radius_dehnen(mbh, mstar, gamma=1.0):
-    """
+    """Density at the characteristic influence radius, based on a Dehnen density profile.
     [Chen2017]_ Eq.26
     """
     # [Chen2017] Eq.27 - from [Dabringhausen+2008]
@@ -1497,8 +1945,9 @@ def _density_at_influence_radius_dehnen(mbh, mstar, gamma=1.0):
 
 
 def _radius_hard_BBR1980_dehnen(mbh, mstar, gamma=1.0):
-    """
-    [Kelley2017]_ paragraph below Eq.8 - from [BBR1980]_
+    """Characteristic 'hardened' radius from [BBR1980]_, assuming a Dehnen stellar density profile.
+
+    [Kelley2017a]_ paragraph below Eq.8 - from [BBR1980]_
     """
     rbnd = _radius_influence_dehnen(mbh, mstar, gamma=gamma)
     rstar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
@@ -1507,8 +1956,9 @@ def _radius_hard_BBR1980_dehnen(mbh, mstar, gamma=1.0):
 
 
 def _radius_loss_cone_BBR1980_dehnen(mbh, mstar, gamma=1.0):
-    """
-    [Kelley2017]_ Eq.9 - from [BBR1980]
+    """Characteristic 'loss-cone' radius from [BBR1980]_, assuming a Dehnen stellar density profile.
+
+    [Kelley2017a]_ Eq.9 - from [BBR1980]_
     """
     mass_of_a_star = 0.6 * MSOL
     rbnd = _radius_influence_dehnen(mbh, mstar, gamma=gamma)

@@ -1,20 +1,20 @@
 """Semi Analytic Modeling (SAM) submodule.
 
-The core element of the SAM module is the `Semi_Analytic_Model` class.  This class requires four
+The core element of the SAM module is the :class:`Semi_Analytic_Model` class.  This class requires four
 components as arguments:
 
 (1) Galaxy Stellar Mass Function (GSMF): gives the comoving number-density of galaxies as a function
-    of stellar mass.  This is implemented as subclasses of the `_Galaxy_Stellar_Mass_Function`
+    of stellar mass.  This is implemented as subclasses of the :class:`_Galaxy_Stellar_Mass_Function`
     base class.
 (2) Galaxy Pair Fraction (GPF): gives the fraction of galaxies that are in a 'pair' with a given
     mass ratio (and typically a function of redshift and primary-galaxy mass).  Implemented as
-    subclasses of the `_Galaxy_Pair_Fraction` subclass.
+    subclasses of the :class:`_Galaxy_Pair_Fraction` subclass.
 (3) Galaxy Merger Time (GMT): gives the characteristic time duration for galaxy 'mergers' to occur.
-    Implemented as subclasses of the `_Galaxy_Merger_Time` subclass.
+    Implemented as subclasses of the :class:`_Galaxy_Merger_Time` subclass.
 (4) M_bh - M_bulge Relation (mmbulge): gives MBH properties for a given galaxy stellar-bulge mass.
-    Implemented as subcalsses of the `holodeck.relations._MMBulge_Relation` subclass.
+    Implemented as subcalsses of the :class:`holodeck.relations._MMBulge_Relation` subclass.
 
-The `Semi_Analytic_Model` class defines a grid in parameter space of total MBH mass ($M=M_1 + M_2$),
+The :class:`Semi_Analytic_Model` class defines a grid in parameter space of total MBH mass ($M=M_1 + M_2$),
 MBH mass ratio ($q \\equiv M_1/M_2$), redshift ($z$), and at times binary separation
 (semi-major axis $a$) or binary rest-frame frequency ($f_r$).  Over this grid, the distribution of
 comoving number-density of MBH binaries in the Universe is calculated.  Methods are also provided
@@ -105,7 +105,7 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
 
     This is density per unit log10-interval of stellar mass, i.e. $Phi = dn / d\\log_{10}(M)$
 
-    See: [Chen19]_ Eq.9 and enclosing section.
+    See: [Chen2019]_ Eq.9 and enclosing section.
 
     """
 
@@ -121,7 +121,7 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
     def __call__(self, mstar, redz):
         """Return the number-density of galaxies at a given stellar mass.
 
-        See: [Chen19] Eq.8
+        See: [Chen2019] Eq.8
 
         Parameters
         ----------
@@ -140,22 +140,22 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
         mref = self._mref_func(redz)
         alpha = self._alpha_func(redz)
         xx = mstar / mref
-        # [Chen19] Eq.8
+        # [Chen2019]_ Eq.8
         rv = np.log(10.0) * phi * np.power(xx, 1.0 + alpha) * np.exp(-xx)
         return rv
 
     def _phi_func(self, redz):
-        """See: [Chen19] Eq.9
+        """See: [Chen2019]_ Eq.9
         """
         return np.power(10.0, self._phi0 + self._phiz * redz)
 
     def _mref_func(self, redz):
-        """See: [Chen19] Eq.10 - NOTE: added `redz` term
+        """See: [Chen2019]_ Eq.10 - NOTE: added `redz` term
         """
         return self._mref0 + self._mrefz * redz
 
     def _alpha_func(self, redz):
-        """See: [Chen19] Eq.11
+        """See: [Chen2019]_ Eq.11
         """
         return self._alpha0 + self._alphaz * redz
 
@@ -209,7 +209,7 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
             pair_norm = (qhi**pow - qlo**pow) / pow
             frac_norm = frac_norm_allq / pair_norm
 
-        # normalization corresponds to f0-prime in [Chen19]
+        # normalization corresponds to f0-prime in [Chen2019]_
         self._frac_norm = frac_norm   # f0 = 0.025 b/t [+0.02, +0.03]  [+0.01, +0.05]
         self._malpha = malpha         #      0.0   b/t [-0.2 , +0.2 ]  [-0.5 , +0.5 ]  # noqa
         self._zbeta = zbeta           #      0.8   b/t [+0.6 , +0.1 ]  [+0.0 , +2.0 ]  # noqa
@@ -311,7 +311,7 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
         self._zbeta = zbeta           # -0.5   b/t [-2.0, +1.0]  [-3.0, +1.0 ]
         self._qgamma = qgamma         # +0.0   b/t [-0.2, +0.2]  [-0.2, +0.2 ]
 
-        # [Msol]  NOTE: this is `b * M_0 = 0.4e11 Msol / h0` in [Chen19]
+        # [Msol]  NOTE: this is `b * M_0 = 0.4e11 Msol / h0` in [Chen2019]_
         self._mref = mref
         return
 
@@ -354,6 +354,7 @@ class Semi_Analytic_Model:
     """Semi-Analytic Model of MBH Binary populations.
 
     Based on four components:
+
     * Galaxy Stellar-Mass Function (GSMF): the distribution of galaxy masses
     * Galaxy Pair Fraction (GPF): the probability of galaxies having a companion
     * Galaxy Merger Time (GMT): the expected galaxy-merger timescale for a pair of galaxies
@@ -507,7 +508,7 @@ class Semi_Analytic_Model:
             # these are now 1D arrays of the valid indices
             mstar_pri, mstar_rat, mstar_tot, redz = [ee[idx] for ee in [mstar_pri, mstar_rat, mstar_tot, redz]]
 
-            # ---- Get Galaxy Merger Rate  [Chen19] Eq.5
+            # ---- Get Galaxy Merger Rate  [Chen2019] Eq.5
             # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]
             dens[idx] = self._gsmf(mstar_pri, redz) * self._gpf(mstar_tot, mstar_rat, redz) * cosmo.dtdz(redz)
             # convert from 1/dlog10(M_star-pri) to 1/dM_star-tot

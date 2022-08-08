@@ -1,12 +1,35 @@
-"""holodeck
-
-Massive Black-Hole Binary Population Synthesis for Gravitational Wave Calculations ≋●≋●≋
+"""holodeck: Massive Black-Hole Binary Population Synthesis & Gravitational Wave Calculations ≋●≋●≋
 
 This package is aimed at providing a comprehensive framework for MBH binary population synthesis.
 The framework includes modules to perform pop synth using a variety of methodologies to get a handle
 on both statistical and systematic uncertainties.  Currently, binary populations can be synthesis
 based on: cosmological hydrodynamic simulations (Illustris), semi-analytic/semi-empirical models,
 and observational catalogs of local galaxies and/or quasars.
+
+See the `README.md` file for more information.
+The github repository is: `<https://github.com/nanograv/holodeck>`_.
+Additional documentation can be found at: `<holodeck-gw.readthedocs.io/en/docs/index.html>`_.
+Note that the readthedocs documentation can also be built locally from the `holodeck/docs` folder.
+A methods paper for `holodeck` is currently in preparation.
+
+In general, `holodeck` calculations proceed in three stages:
+
+(1) **Population**: Construct an initial population of MBH 'binaries'.  This is typically done for
+    pairs of MBHs when their galaxies merge (i.e. long before the two MBHs are actually a
+    gravitationally-bound binary).  Constructing the initial binary population may occur in a
+    single step: e.g. gathering MBH-MBH encounters from cosmological hydrodynamic simulations; or
+    it may occur over two steps: (i) gathering galaxy-galaxy encounters, and (ii) prescribing MBH
+    properties for each galaxy.
+(2) **Evolution**: Evolve the binary population from their initial conditions (i.e. large
+    separations) until coalescence (i.e. small separations).  The complexity of this evolutionary
+    stage can range tremendously in complexity.  In the simplest models, binaries are assumed to
+    coalesce instantaneously (in that the age of the universe is the same at formation and
+    coalescence), and are assumed to evolve purely due to GW emission (in that the time spent in
+    any range of orbital frequencies can be calculated from the GW hardening timescale).  Note
+    that these two assumptions are contradictory.
+(3) **Gravitational Waves**: Calculate the resulting GW signals based on the binaries and their
+    evolution.  Note that GWs can only be calculated based on some sort of model for binary
+    evolution.  The model may be extremely simple, in which case it is sometimes glanced over.
 
 """
 
@@ -16,6 +39,17 @@ __license__ = "MIT"
 
 import os
 import logging
+
+__all__ = ["log", "cosmo"]
+
+# ---- Define Global Parameters
+
+
+class Parameters:
+    # These are WMAP9 parameters, see [WMAP9], Table 3, WMAP+BAO+H0
+    Omega0 = 0.2880                #: Matter density parameter "Om0"
+    OmegaBaryon = 0.0472           #: Baryon density parameter "Ob0"
+    HubbleParam = 0.6933           #: Hubble Parameter as H0/[100 km/s/Mpc], i.e. 0.69 instead of 69
 
 
 # ---- Setup root package variables
@@ -40,12 +74,18 @@ for cp in _check_paths:
 from . import logger   # noqa
 log = logger.get_logger(__name__, logging.DEBUG)       #: global root logger from `holodeck.logger`
 
+# ---- Load cosmology instance
+
+import cosmopy   # noqa
+cosmo = cosmopy.Cosmology(h=Parameters.HubbleParam, Om0=Parameters.Omega0, Ob0=Parameters.OmegaBaryon)
+del cosmopy
 
 # ---- Import submodules
 
 # NOTE: Must load and initialize cosmology before importing other submodules!
-from . import cosmology   # noqa
-cosmo = cosmology.Cosmology()              #: global cosmology instance for cosmolical calculations
+# from . import cosmology   # noqa
+# cosmo = cosmology.Cosmology()              #: global cosmology instance for cosmolical calculations
+
 
 from . import constants   # noqa
 from . import evolution   # noqa

@@ -47,7 +47,15 @@ class _Modifier(abc.ABC):
         return
 
     @abc.abstractmethod
-    def modify(self, base):
+    def modify(self, base: object):
+        """Perform an in-place modification on the passed object instance.
+
+        Parameters
+        ----------
+        base: object
+            The object instance to be modified.
+
+        """
         pass
 
 
@@ -237,7 +245,7 @@ def _get_subclass_instance(value, default, superclass):
 # =================================================================================================
 
 
-def eccen_func(norm: float, std: float, size: int) -> np.ndarray:
+def eccen_func(cent: float, width: float, size: int) -> np.ndarray:
     """Draw random values between [0.0, 1.0] with a given center and width.
 
     This function is a bit contrived, but the `norm` defines the center-point of the distribution,
@@ -247,10 +255,15 @@ def eccen_func(norm: float, std: float, size: int) -> np.ndarray:
 
     Parameters
     ----------
-    norm : float,
-        Specification of the center-point of the distribution.
-    std : float,
-        Specification of the width of the distribution.
+    cent : float,
+        Specification of the center-point of the distribution.  Range: positive numbers.
+        Values `norm << 1` correspond to small eccentricities, while `norm >> 1` are large
+        eccentricities, with the distribution symmetric around `norm=1.0` (and eccens of 0.5).
+    width : float,
+        Specification of the width of the distribution.  Specifically how near or far values tend
+        to be from the given central value (`norm`).  Range: positive numbers.
+        Note that the 'width' of the distribution depends on the `norm` value, in addition to `std`.
+        Smaller values (typically `std << 1`) produce narrower distributions.
     size : int,
         Number of samples to draw.
 
@@ -260,7 +273,9 @@ def eccen_func(norm: float, std: float, size: int) -> np.ndarray:
         Values between [0.0, 1.0] with shape given by the `size` parameter.
 
     """
-    eccen = log_normal_base_10(1.0/norm, std, size=size)
+    assert np.shape(cent) == () and cent > 0.0
+    assert np.shape(width) == () and width > 0.0
+    eccen = log_normal_base_10(1.0/cent, width, size=size)
     eccen = 1.0 / (eccen + 1.0)
     return eccen
 
@@ -284,7 +299,7 @@ def frac_str(vals: npt.ArrayLike, prec: int = 2) -> str:
 
     """
     num = np.count_nonzero(vals)
-    den = vals.size
+    den = np.size(vals)
     frc = num / den
     rv = f"{num:.{prec}e}/{den:.{prec}e} = {frc:.{prec}e}"
     return rv
@@ -381,7 +396,7 @@ def isinteger(val: object) -> bool:
 
 def log_normal_base_10(
     mu: float, sigma: float, size: Union[int, List[int]] = None, shift: float = 0.0,
-) -> npt.ArrayLike:
+) -> np.ndarray:
     """Draw from a log-normal distribution using base-10 standard-deviation.
 
     i.e. the `sigma` argument is in "dex", or powers of ten.
@@ -425,6 +440,7 @@ def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
 
     """
     if filter:
+        vals = np.asarray(vals)
         vv = vals[np.isfinite(vals)]
     else:
         vv = vals
@@ -498,7 +514,7 @@ def quantiles(
     weights: Optional[npt.ArrayLike] = None,
     axis: Optional[int] = None,
     values_sorted: bool = False,
-) -> np.ndarray:
+) -> Union[np.ndarray, np.ma.masked_array]:
     """Compute weighted percentiles.
 
     NOTE: if `values` is a masked array, then only unmasked values are used!
@@ -542,10 +558,11 @@ def quantiles(
 
     percs = np.array(percs)
     if weights is None:
-        weights = np.ones_like(values)
-    weights = np.array(weights)
+        ww = np.ones_like(values)
+    else:
+        ww = np.array(weights)
     try:
-        weights = np.ma.masked_array(weights, mask=values.mask)
+        ww = np.ma.masked_array(ww, mask=values.mask)  # type: ignore
     except AttributeError:
         pass
 
@@ -554,19 +571,19 @@ def quantiles(
     if not values_sorted:
         sorter = np.argsort(values, axis=axis)
         values = np.take_along_axis(values, sorter, axis=axis)
-        weights = np.take_along_axis(weights, sorter, axis=axis)
+        ww = np.take_along_axis(ww, sorter, axis=axis)
 
     if axis is None:
-        weighted_quantiles = np.cumsum(weights) - 0.5 * weights
-        weighted_quantiles /= np.sum(weights)
+        weighted_quantiles = np.cumsum(ww) - 0.5 * ww
+        weighted_quantiles /= np.sum(ww)
         percs = np.interp(percs, weighted_quantiles, values)
         return percs
 
-    weights = np.moveaxis(weights, axis, -1)
+    ww = np.moveaxis(ww, axis, -1)
     values = np.moveaxis(values, axis, -1)
 
-    weighted_quantiles = np.cumsum(weights, axis=-1) - 0.5 * weights
-    weighted_quantiles /= np.sum(weights, axis=-1)[..., np.newaxis]
+    weighted_quantiles = np.cumsum(ww, axis=-1) - 0.5 * ww
+    weighted_quantiles /= np.sum(ww, axis=-1)[..., np.newaxis]
     percs = [np.interp(percs, weighted_quantiles[idx], values[idx])
              for idx in np.ndindex(values.shape[:-1])]
     percs = np.array(percs)
@@ -596,7 +613,7 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
 
     """
     try:
-        if len(vals) == 0:
+        if len(vals) == 0:        # type: ignore
             raise TypeError
     except TypeError:
         raise TypeError(f"`vals` (shape={np.shape(vals)}) is not iterable!")
@@ -608,8 +625,8 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
 
     # stats = np.percentile(vals, percs*100)
     stats = quantiles(vals, percs)
-    rv = ["{val:.{prec}e}".format(prec=prec, val=ss) for ss in stats]
-    rv = ", ".join(rv)
+    _rv = ["{val:.{prec}e}".format(prec=prec, val=ss) for ss in stats]
+    rv = ", ".join(_rv)
     return rv
 
 
@@ -634,6 +651,7 @@ def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = T
         Cumulative trapezoid rule integration.
 
     """
+    xx = np.asarray(xx)
     if np.ndim(xx) == 1:
         pass
     elif np.ndim(xx) == np.ndim(yy):
@@ -642,7 +660,7 @@ def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = T
         err = f"Bad shape for `xx` (xx.shape={np.shape(xx)}, yy.shape={np.shape(yy)})!"
         log.error(err)
         raise ValueError(err)
-    ct = np.moveaxis(yy, axis, 0)
+    ct = np.moveaxis(yy, axis, 0)   # type: ignore
     ct = 0.5 * (ct[1:] + ct[:-1])
     ct = np.moveaxis(ct, 0, -1)
     ct = ct * np.diff(xx)
@@ -711,7 +729,7 @@ def trapz_loglog(
         xx = np.insert(xx, ii, bounds, axis=axis)
         yy = np.insert(yy, ii, newy, axis=axis)
         ii = np.array([ii[0], ii[1]+1])
-        assert np.alltrue(xx[ii] == bounds), "FAILED!"
+        assert np.all(xx[ii] == bounds), "FAILED!"   # type: ignore
 
     if np.ndim(yy) != np.ndim(xx):
         if np.ndim(xx) != 1:
@@ -1055,6 +1073,7 @@ def chirp_mass(m1, m2=None):
         Chirp mass [grams] of the binary.
 
     """
+    m1, m2 = _array_args(m1, m2)
     # (N, 2)  ==>  (N,), (N,)
     if m2 is None:
         m1, m2 = np.moveaxis(m1, -1, 0)
@@ -1099,8 +1118,7 @@ def gw_dedt(m1, m2, sepa, eccen):
 
     NOTE: returned value is negative.
 
-    See Peters 1964, Eq. 5.8
-    http://adsabs.harvard.edu/abs/1964PhRv..136.1224P
+    See [Peters1964]_, Eq. 5.8
 
     Parameters
     ----------
@@ -1120,6 +1138,7 @@ def gw_dedt(m1, m2, sepa, eccen):
         NOTE: returned value is negative or zero.
 
     """
+    m1, m2, sepa, eccen = _array_args(m1, m2, sepa, eccen)
     cc = _GW_DEDT_ECC_CONST
     e2 = eccen**2
     dedt = cc * m1 * m2 * (m1 + m2) / np.power(sepa, 4)
@@ -1151,6 +1170,7 @@ def gw_dade(m1, m2, sepa, eccen):
         NOTE: returned value is positive.
 
     """
+    m1, m2, sepa, eccen = _array_args(m1, m2, sepa, eccen)
     e2 = eccen**2
     num = (1 + (73.0/24.0)*e2 + (37.0/96.0)*e2*e2)
     den = (1 - e2) * (1.0 + (121.0/304.0)*e2)
@@ -1225,6 +1245,7 @@ def gw_hardening_rate_dadt(m1, m2, sepa, eccen=None):
         Binary hardening rate [cm/s] due to GW emission.
 
     """
+    m1, m2, sepa, eccen = _array_args(m1, m2, sepa, eccen)
     cc = _GW_DADT_SEP_CONST
     dadt = cc * m1 * m2 * (m1 + m2) / np.power(sepa, 3)
     if eccen is not None:
@@ -1253,6 +1274,7 @@ def gw_hardening_rate_dfdt(m1, m2, freq_orb, eccen=None):
         Hardening rate in terms of frequency for each binary [1/s^2].
 
     """
+    m1, m2, freq_orb, eccen = _array_args(m1, m2, freq_orb, eccen)
     sepa = kepler_sepa_from_freq(m1+m2, freq_orb)
     dfdt = gw_hardening_rate_dadt(m1, m2, sepa, eccen=eccen)
     # dfdt, _ = dfdt_from_dadt(dfdt, sepa, mtot=m1+m2)
@@ -1278,6 +1300,7 @@ def gw_hardening_timescale_freq(mchirp, frst):
         GW hardening timescale defined w.r.t. orbital frequency [sec].
 
     """
+    mchirp, frst = _array_args(mchirp, frst)
     tau = (5.0 / 96.0) * np.power(NWTG*mchirp/SPLC**3, -5.0/3.0) * np.power(2*np.pi*frst, -8.0/3.0)
     return tau
 
@@ -1300,6 +1323,7 @@ def gw_lum_circ(mchirp, freq_orb_rest):
         GW Luminosity [erg/s].
 
     """
+    mchirp, freq_orb_rest = _array_args(mchirp, freq_orb_rest)
     lgw_circ = _GW_LUM_CONST * np.power(2.0*np.pi*freq_orb_rest*mchirp, 10.0/3.0)
     return lgw_circ
 
@@ -1324,6 +1348,7 @@ def gw_strain_source(mchirp, dcom, freq_orb_rest):
         GW Strain (*not* characteristic strain).
 
     """
+    mchirp, dcom, freq_orb_rest = _array_args(mchirp, dcom, freq_orb_rest)
     hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_orb_rest, 2/3) / dcom
     return hs
 
@@ -1348,6 +1373,7 @@ def sep_to_merge_in_time(m1, m2, time):
         Initial binary separation [cm].
 
     """
+    m1, m2, time = _array_args(m1, m2, time)
     GW_CONST = 64*np.power(NWTG, 3.0)/(5.0*np.power(SPLC, 5.0))
     a1 = rad_isco(m1, m2)
     return np.power(GW_CONST*m1*m2*(m1+m2)*time - np.power(a1, 4.0), 1./4.)
@@ -1373,6 +1399,7 @@ def time_to_merge_at_sep(m1, m2, sepa):
         Duration of time for binary to coalesce [sec].
 
     """
+    m1, m2, sepa = _array_args(m1, m2, sepa)
     GW_CONST = 64*np.power(NWTG, 3.0)/(5.0*np.power(SPLC, 5.0))
     a1 = rad_isco(m1, m2)
     delta_sep = np.power(sepa, 4.0) - np.power(a1, 4.0)
@@ -1400,3 +1427,10 @@ def _gw_ecc_func(eccen):
     den = np.power(1 - e2, 7/2)
     fe = num / den
     return fe
+
+
+def _array_args(*args):
+    # args = [np.atleast_1d(aa) for aa in args]
+    args = [np.asarray(aa) if aa is not None else None
+            for aa in args]
+    return args
