@@ -2,6 +2,28 @@
 
 The docs for this project are built with [Sphinx](http://www.sphinx-doc.org/en/master/).
 
+## Building Documentation
+
+1) Make sure the requirements are installed:
+
+    ```bash
+    pip install docs/requirements.txt
+    ```
+
+    or
+
+    ```bash
+    conda install --file docs/requirements.txt
+    ```
+
+2) Build the documentation
+
+    ```bash
+    ./docs/docgen.sh
+    ```
+
+The resulting documentation can be found in the `docs/build` directory, in particular the `docs/build/html/index.html` file.
+
 ## Contents
 
 * build/
@@ -11,11 +33,11 @@ The docs for this project are built with [Sphinx](http://www.sphinx-doc.org/en/m
 * references/
   * PDF files of relevant reference material, mostly published papers
 * source/
-  * Source files for holodeck documention.  This is a combination of manually and automatically generated files.  In general, manually created files should live in the `source/` root directory, while automatic files should be stored in subdirectories (e.g. `apidoc_modules`)
+  * Source files for holodeck documentation.  This is a combination of manually and automatically generated files.  In general, manually created files should live in the `source/` root directory, while automatic files should be stored in subdirectories (e.g. `apidoc_modules`)
 * docgen.sh
   * Script to run the sphinx document generation project
 * requirements.txt
-  * Requirements specific to documention and the sphinx build.
+  * Requirements specific to documentation and the sphinx build.
 
 
 ## Notes

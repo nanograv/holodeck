@@ -1,4 +1,5 @@
 astropy
+cosmopy
 h5py
 ipywidgets   # required for tqdm to work (at the moment, looks like a bug)
 kalepy

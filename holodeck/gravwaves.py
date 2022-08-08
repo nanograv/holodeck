@@ -120,7 +120,7 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
     # ---- Interpolate data to all harmonics of this frequency
     harm_range = np.asarray(harm_range)
     # Each parameter will be (N, H) = (binaries, harmonics)
-    data_harms = bin_evo.at('fobs', fobs / harm_range, pars=_CALC_MC_PARS)
+    data_harms = bin_evo.at('fobs', fobs / harm_range, params=_CALC_MC_PARS)
 
     # Only examine binaries reaching the given locations before redshift zero (other redz=inifinite)
     redz = data_harms['scafa']
