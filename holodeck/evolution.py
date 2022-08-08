@@ -435,7 +435,7 @@ class Evolution:
         elif lin_interp is False:
             lin_interp_list = []
         else:
-            err = f"`lin_interp` must be `None`, boolean, or a list of parameter names!"
+            err = f"`lin_interp` ({lin_interp}) must be `None`, boolean, or a list of parameter names!"
             raise ValueError(err)
 
         squeeze = False
@@ -755,7 +755,6 @@ class Evolution:
 
         # get the separation $a$ on both edges
         sepa = self.sepa[:, (right, left)]   # sepa is decreasing, so switch left-right order
-
 
         # ! ====================================================================
         # ---- Hardening rates at the left-edge of the step

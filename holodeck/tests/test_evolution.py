@@ -644,5 +644,3 @@ class Test_Dynamical_Friction_NFW:
                         assert np.all(dedt == 0.0)
 
         return
-
-
