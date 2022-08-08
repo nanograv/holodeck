@@ -1117,8 +1117,7 @@ def gw_dedt(m1, m2, sepa, eccen):
 
     NOTE: returned value is negative.
 
-    See Peters 1964, Eq. 5.8
-    http://adsabs.harvard.edu/abs/1964PhRv..136.1224P
+    See [Peters1964]_, Eq. 5.8
 
     Parameters
     ----------
