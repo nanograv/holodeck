@@ -87,6 +87,31 @@ def evo_def():
     return evo
 
 
+@pytest.fixture(scope='session')
+def simplest():
+    SIZE = 100
+
+    class Pop(holo.population._Population_Discrete):
+        def _init(self):
+            self.mass = (10.0 ** np.random.uniform(6, 10, (SIZE, 2))) * MSOL
+            self.sepa = (10.0 ** np.random.uniform(1, 3, SIZE)) * 1e3 * PC
+            self.scafa = np.random.uniform(0.25, 0.75, SIZE)
+            self.eccen = np.random.uniform(0.4, 0.6, SIZE)
+            return
+
+    class Hard(holo.evolution._Hardening):
+        def dadt_dedt(self, evo, step, *args, **kwargs):
+            dadt = -(PC/YR) * np.ones(evo.size)
+            dedt = None
+            return dadt, dedt
+
+    pop = Pop()
+    hard = Hard()
+    evo = holo.evolution.Evolution(pop, hard)
+
+    return evo
+
+
 class Test_Illustris_Fixed:
 
     def _test_has_keys(self, evolution_illustris_fixed_time_circ):
@@ -160,6 +185,35 @@ class Test_Illustris_Fixed:
 
     def test_evo_time_eccen(self, evolution_illustris_fixed_time_eccen):
         self._test_evo_time(evolution_illustris_fixed_time_eccen)
+
+
+class Test_Evolution_Basic:
+
+    def test_tage(self, evo_def):
+        evo = evo_def
+
+        tage = evo.tage
+        assert tage.shape == evo.tlook.shape
+
+        check = holo.cosmo.age(0.0).cgs.value - evo.tlook
+        assert np.allclose(tage, check)
+        return
+
+    def test_mtmr(self, evo_def):
+        evo = evo_def
+
+        mt, mr = evo.mtmr
+        assert mt.shape == evo.sepa.shape
+        assert mr.shape == evo.sepa.shape
+
+        mass = evo.mass
+        assert mass.shape == (evo.size, evo.steps, 2)
+        mass = np.moveaxis(mass, -1, 0)
+        mt_check, mr_check = holo.utils.mtmr_from_m1m2(*mass)
+        assert np.all(mt == mt_check)
+        assert np.all(mr == mr_check)
+
+        return
 
 
 class Test_Evolution_Advanced:
@@ -415,3 +469,180 @@ class Test_Modified:
         print("after evolving, make sure modified (sets mass to zero) took effect")
         assert np.all(evo.mass == 0.0)
         return
+
+
+# ==============================================================================
+# ====    Hardening Classes and Functions    ====
+# ==============================================================================
+
+
+class Test_Hardening_Generic:
+    """Make sure that the :class:`evolution._Hardening` base-class behaves correctly.
+    """
+
+    def test_subclassing(self):
+        with pytest.raises(TypeError, match="Can't instantiate abstract class"):
+            holo.evolution._Hardening()
+
+        # Without overriding `dadt_dedt` method, `TypeError` raises on instantiation
+        class Hard_Fail(holo.evolution._Hardening):
+            pass
+
+        with pytest.raises(TypeError, match="Can't instantiate abstract class"):
+            Hard_Fail()
+
+        # Overriding `dadt_dedt` method, instantiation allowed
+        class Hard_Succeed(holo.evolution._Hardening):
+            def dadt_dedt(self, evo, step):
+                pass
+
+        Hard_Succeed()
+        return
+
+    def test_simplest_subclass(self, simplest):
+        evo = simplest
+        evo.evolve()
+
+        msg = "`Evolution.tage` should always be increasing!"
+        print(msg)
+        assert np.all(np.diff(evo.tage, axis=-1) >= 0.0), msg
+
+        msg = "`Evolution.sepa` should always be decreasing!"
+        print(msg)
+        assert np.all(np.diff(evo.sepa, axis=-1) < 0.0)
+
+        return
+
+
+class Test_Hard_GW:
+    """Test the :class:`evolution.Hard_GW` class.
+    """
+
+    def test_static_methods(self, simplest):
+        evo = simplest
+        evo.evolve()
+
+        step = np.random.randint(evo.steps)
+        print(f"step = {step}")
+        dadt, dedt = holo.evolution.Hard_GW.dadt_dedt(evo, step)
+        assert np.shape(dadt) == (evo.size,)
+        assert np.shape(dedt) == (evo.size,)
+        assert np.all(dadt <= 0.0)
+        assert np.all(dedt <= 0.0)
+
+        mt, mr = [mm[:, step] for mm in evo.mtmr]
+        aa = evo.sepa[:, step]
+        ee = evo.eccen[:, step]
+
+        # Make sure combined method matches individual methods
+        _dadt = holo.evolution.Hard_GW.dadt(mt, mr, aa, eccen=ee)
+        _dedt = holo.evolution.Hard_GW.dedt(mt, mr, aa, eccen=ee)
+
+        assert np.shape(dadt) == np.shape(_dadt)
+        assert np.shape(dedt) == np.shape(_dedt)
+        assert np.allclose(dadt, _dadt, rtol=1e-10)
+        assert np.allclose(dedt, _dedt, rtol=1e-10)
+
+        # Make sure combined method matches `utils` GW methods
+        _dadt = holo.evolution.Hard_GW.dadt(mt, mr, aa, eccen=ee)
+        _dedt = holo.evolution.Hard_GW.dedt(mt, mr, aa, eccen=ee)
+
+        assert np.shape(dadt) == np.shape(_dadt)
+        assert np.shape(dedt) == np.shape(_dedt)
+        assert np.allclose(dadt, _dadt, rtol=1e-10)
+        assert np.allclose(dedt, _dedt, rtol=1e-10)
+
+        return
+
+
+class Test_Sesana_Scattering:
+
+    def test_basics(self):
+        SIZE = 6
+        mmbulge = holo.relations.MMBulge_KH2013()
+        msigma = holo.relations.MSigma_KH2013()
+        mass = (10.0 ** np.random.uniform(6, 10, (SIZE, 2))) * MSOL
+        sepa = (10.0 ** np.random.uniform(1, 3, SIZE)) * PC
+
+        kwargs_list = [
+            dict(),
+            dict(gamma_dehnen=0.5),
+            dict(mmbulge=mmbulge),
+            dict(msigma=msigma),
+            dict(mmbulge=mmbulge, msigma=msigma),
+        ]
+
+        for eccen in [None, np.random.uniform(0.0, 1.0, sepa.size)]:
+            print(f"\neccen = {eccen}")
+            for kw in kwargs_list:
+                print(f"kw = {kw}")
+                sc = holo.evolution.Sesana_Scattering(**kw)
+                dadt, dedt = sc._dadt_dedt(mass, sepa, eccen)
+                print(f"dadt = {dadt}")
+                print(f"dedt = {dedt}")
+                assert np.shape(dadt) == np.shape(sepa)
+                assert np.all(dadt < 0.0)
+
+                if eccen is None:
+                    assert dedt is None
+                else:
+                    assert np.shape(dedt) == np.shape(sepa)
+                    assert np.all(dadt < 0.0)
+
+        return
+
+
+class Test_Dynamical_Friction_NFW:
+
+    def test_basics(self):
+        SIZE = 600
+        mmbulge = holo.relations.MMBulge_KH2013()
+        msigma = holo.relations.MSigma_KH2013()
+        mass = (10.0 ** np.random.uniform(6, 9, (SIZE, 2))) * MSOL
+        sepa = (10.0 ** np.random.uniform(1, 3, SIZE)) * PC
+        redz = np.random.uniform(0.1, 2.0, SIZE)
+        dt = 1e5 * YR
+
+        print(f"mass[:, 0] = {mass[:, 0]}")
+        print(f"mass[:, 1] = {mass[:, 1]}")
+        print(f"sepa = {sepa}")
+        print(f"redz = {redz}")
+        print(f"dt = {dt}")
+
+        kwargs_list = [
+            dict(),
+            dict(mmbulge=mmbulge),
+            dict(msigma=msigma),
+            dict(mmbulge=mmbulge, msigma=msigma),
+        ]
+
+        for eccen in [None, np.random.uniform(0.0, 1.0, sepa.size)]:
+            for atten in [True, False]:
+                print(f"\neccen = {eccen}, atten = {atten}")
+                for kw in kwargs_list:
+                    print(f"kw = {kw}")
+                    df = holo.evolution.Dynamical_Friction_NFW(**kw)
+                    dadt, dedt = df._dadt_dedt(mass, sepa, redz, dt, eccen, attenuate=atten)
+                    print(f"dadt = {dadt}")
+                    print(f"dedt = {dedt}")
+
+                    bads = ~np.isfinite(dadt)
+                    if np.any(bads):
+                        print(f"FOUND BADS {holo.utils.frac_str(bads)}")
+                        for kk, vv in dict(mass=mass, sepa=sepa, redz=redz, eccen=eccen).items():
+                            if vv is None:
+                                continue
+                            print(f"{kk} :: {vv[bads]}")
+
+                    assert np.shape(dadt) == np.shape(sepa)
+                    assert np.all(dadt < 0.0)
+
+                    if eccen is None:
+                        assert dedt is None
+                    else:
+                        assert np.shape(dedt) == np.shape(sepa)
+                        assert np.all(dedt == 0.0)
+
+        return
+
+
