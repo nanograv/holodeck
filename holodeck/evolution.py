@@ -571,45 +571,55 @@ class Evolution:
 
         return ynew
 
-    def sample_universe(self, freqs, DOWN=None):
+    def _sample_universe(self, fobs, down_sample=None):
         """Construct a full universe of binaries based on resampling this population.
 
-        !**WARNING**!
-        NOTE: This function should be cleaned up / improved for public use.
+        NOTE: This function needs to be cleaned up / tested for public use.
 
         Parameters
         ----------
-        freqs : array_like,
+        fobs : array_like,
             Target observer-frame frequencies at which to sample population.
-        DOWN : None or float,
+        down_sample : None or float,
             Factor by which to downsample the resulting population.
             For example, `10.0` will produce 10x fewer output binaries.
 
         Returns
         -------
-        samples
+        names : list[str], size (4,)
+            Names of the returned data arrays in `samples`.
+        samples : np.ndarray, shape (4, S)
+            Sampled binary data.  For each binary samples S, 4 parameters are returned:
+            ['mtot', 'mrat', 'redz', 'fobs'] (these are listed in the `names` returned value.)
 
+        Notes
+        -----
+        * This should sample in volume instead of `redz`, see how it's done in sam module.
+        * BUG: the binning is NOT being considered appropriately?  i.e. if the number of `fobs`
+          points is increases, with the same range, the number of binaries increase!!
 
         """
+        log.warning("!!`Evolution._sample_universe` is not yet working correctly!!")
+        fobs = np.atleast_1d(fobs)
+
+        # Interpolate binaries to given frequencies
+        # only need this set of parameters
         PARAMS = ['mass', 'sepa', 'dadt', 'scafa']
-        fobs = kale.utils.spacing(freqs, scale='log', dex=10, log_stretch=0.1)
-        log.info(f"Converted input freqs ({kale.utils.stats_str(freqs)}) ==> {kale.utils.stats_str(fobs)}")
         data_fobs = self.at('fobs', fobs, params=PARAMS)
 
         # Only examine binaries reaching the given locations before redshift zero (other redz=infinite)
-        redz = data_fobs['scafa']
-        redz = cosmo.a_to_z(redz)
+        redz = cosmo.a_to_z(data_fobs['scafa'])
         valid = np.isfinite(redz) & (redz > 0.0)
-        # nvalid = np.count_nonzero(valid)
-        # print(f"Valid indices: {nvalid}/{valid.size}={nvalid/valid.size:.4e}")
+        log.info(f"After interpolation, valid binary-targets: {utils.frac_str(valid)}")
 
+        # Get rest-frame frequency [1/s]
         frst = utils.frst_from_fobs(fobs[np.newaxis, :], redz)
+        # Comoving distance [cm]
         dcom = cosmo.z_to_dcom(redz)
 
-        # `mass` has shape (Binaries, Frequencies, 2)
+        # `mass` has shape (Binaries, Frequencies, 2), units [gram]
         #    convert to (2, B, F), then separate into m1, m2 each with shape (B, F)
         m1, m2 = np.moveaxis(data_fobs['mass'], -1, 0)
-        # mchirp = utils.chirp_mass(m1, m2)
         dfdt, _ = utils.dfdt_from_dadt(data_fobs['dadt'], data_fobs['sepa'], freq_orb=frst)
         _tres = frst / dfdt
 
@@ -617,32 +627,36 @@ class Evolution:
         tfac = _tres  # / thub
 
         # ---- Get the "Lambda"/Poisson weighting factor ----
-        # Calculate weightings
-        #    Sesana+08, Eq.10
         lambda_factor = vfac * tfac
-        # print(f"`lambda_factor` = {lambda_factor.shape}, {utils.stats(lambda_factor)}")
 
+        # select only valid entries
         mt, mr = utils.mtmr_from_m1m2(m1[valid], m2[valid])
         fo = (fobs[np.newaxis, :] * np.ones_like(redz))[valid]
         redz = redz[valid]
         weights = lambda_factor[valid]
+        log.info(f"Weights (lambda values) at targets: {utils.stats(weights)}")
 
-        if DOWN is not None:
+        # down-sample weights to decrease the number of sample points
+        if down_sample is not None:
             prev_sum = weights.sum()
-            weights /= DOWN
+            weights /= down_sample
             next_sum = weights.sum()
-            log.warning(f"DOWNSAMPLING ARTIFICIALLY!!  DOWN={DOWN:g} :: {prev_sum:.4e}==>{next_sum:.4e}")
+            msg = f"DOWNSAMPLING ARTIFICIALLY!!  down_sample={down_sample:g} :: total: {prev_sum:.4e}==>{next_sum:.4e}"
+            log.warning(msg)
 
-        # vals = [mt, mr, redz, fo]
         # TODO/FIX: Consider sampling in comoving-volume instead of redz (like in sam.py)
         #           can also return dcom instead of redz for easier strain calculation
+        # Convert to log-space
         vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo)]
+        names = ['mtot', 'mrat', 'redz', 'fobs']
         nsamp = np.random.poisson(weights.sum())
         reflect = [None, [None, 0.0], None, np.log10([0.95*fobs[0], fobs[-1]*1.05])]
+        # reflect = [None, [None, 0.0], None, np.log10([fobs[0], fobs[-1]])]
         samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
 
+        # Convert back to normal-space
         samples = np.asarray([10.0 ** ss for ss in samples])
-        return samples
+        return names, samples
 
     # ==== Internal Methods
 
