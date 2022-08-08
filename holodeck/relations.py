@@ -54,7 +54,7 @@ class _Host_Relation(abc.ABC):
     """Base class for general relationships between MBHs and their host galaxies.
     """
 
-    _PROPERTIES: list[str] = []    #: list of property names to retrieve from population instances.
+    _PROPERTIES = []    #: list of property names to retrieve from population instances.
 
     def get_host_properties(self, pop, copy=True) -> dict:
         """Get the host properties specified in the `_PROPERTIES` list of variable names.
