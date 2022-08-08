@@ -942,9 +942,53 @@ class Hard_GW(_Hardening):
         return dadt, dedt
 
     @staticmethod
-    def dadt(mt, mr, sepa):
-        m1, m2 = utils.m1m2_from_mtmr(mt, mr)
-        dadt = utils.gw_hardening_rate_dadt(m1, m2, sepa, eccen=None)
+    def dadt(mtot, mrat, sepa, eccen=None):
+        """Calculate GW Hardening rate of semi-major-axis vs. time.
+
+        Parameters
+        ----------
+        mtot : array_like
+            Total mass of each binary system.  Units of [gram].
+        mrat : array_like
+            Mass ratio of each binary, defined as $q \equiv m_1/m_2 \leq 1.0$.
+        sepa : array_like
+            Binary semi-major axis (separation), in units of [cm].
+        eccen : array_like or None
+            Binary eccentricity, `None` is the same as zero eccentricity (circular orbit).
+
+        Returns
+        -------
+        dadt : np.ndarray
+            Hardening rate in semi-major-axis, result is negative, units [cm/s].
+
+        """
+        m1, m2 = utils.m1m2_from_mtmr(mtot, mrat)
+        dadt = utils.gw_hardening_rate_dadt(m1, m2, sepa, eccen=eccen)
+        return dadt
+
+    @staticmethod
+    def dedt(mtot, mrat, sepa, eccen=None):
+        """Calculate GW Hardening rate of eccentricity vs. time.
+
+        Parameters
+        ----------
+        mtot : array_like
+            Total mass of each binary system.  Units of [gram].
+        mrat : array_like
+            Mass ratio of each binary, defined as $q \equiv m_1/m_2 \leq 1.0$.
+        sepa : array_like
+            Binary semi-major axis (separation), in units of [cm].
+        eccen : array_like or None
+            Binary eccentricity, `None` is the same as zero eccentricity (circular orbit).
+
+        Returns
+        -------
+        dedt : np.ndarray
+            Hardening rate in eccentricity, result is negative, units [1/s].
+
+        """
+        m1, m2 = utils.m1m2_from_mtmr(mtot, mrat)
+        dadt = utils.gw_dedt(m1, m2, sepa, eccen=eccen)
         return dadt
 
 
