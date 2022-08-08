@@ -162,7 +162,7 @@ class Test_Illustris_Fixed:
         self._test_evo_time(evolution_illustris_fixed_time_eccen)
 
 
-class Test_Evolution_Basics:
+class Test_Evolution_Advanced:
 
     _EVO_PARS = ['mass', 'sepa', 'eccen', 'scafa', 'tlook', 'dadt', 'dedt']
     _PARS_POSITIVE = ['mass', 'sepa', 'eccen', 'scafa']
@@ -175,17 +175,17 @@ class Test_Evolution_Basics:
         evo.at(xpar, [1/YR, 2/YR])
         evo.at(xpar, [1/YR])
         evo.at(xpar, 1/YR)
-        evo.at(xpar, 1/YR, pars=['sepa', 'scafa'])
-        evo.at(xpar, 1/YR, pars=['mass'])
-        evo.at(xpar, 1/YR, pars='mass')
+        evo.at(xpar, 1/YR, params=['sepa', 'scafa'])
+        evo.at(xpar, 1/YR, params=['mass'])
+        evo.at(xpar, 1/YR, params='mass')
 
         xpar = 'sepa'
         evo.at(xpar, [1*PC, 2*PC])
         evo.at(xpar, [1*PC])
         evo.at(xpar, 1*PC)
-        evo.at(xpar, 1*PC, pars=['mass', 'scafa'])
-        evo.at(xpar, 1*PC, pars=['mass'])
-        evo.at(xpar, 1*PC, pars='mass')
+        evo.at(xpar, 1*PC, params=['mass', 'scafa'])
+        evo.at(xpar, 1*PC, params=['mass'])
+        evo.at(xpar, 1*PC, params='mass')
 
         fobs = np.logspace(-2, 1, 4) / YR
         # sepa = np.logspace(-2, 2, 5) * PC
@@ -278,6 +278,24 @@ class Test_Evolution_Basics:
         assert vv.shape[0] == ntot
         assert np.count_nonzero(np.isfinite(vv)) == ncoal
         assert np.all(np.isfinite(vv) == evo.coal)
+
+        # ---- make sure the right values are finite and non-finite
+        sel = (evo.scafa[:, -1] < 1.0)
+
+        def fstr(xx):
+            return holo.utils.frac_str(xx, 8)
+
+        # make sure returned `at` values are all finite for coalescing systems
+        yesfin = np.isfinite(vv[sel])
+        msg = f"{fstr(sel)} systems are coalescing, `at` samples should be finite: {fstr(yesfin)}"
+        print(msg)
+        assert np.all(yesfin), msg
+
+        # make sure returned `at` values are all non-finite for non-coalescing systems
+        notfin = ~np.isfinite(vv[~sel])
+        msg = f"{fstr(~sel)} systems are stalling  , `at` samples should be non-finite: {fstr(notfin)}"
+        print(msg)
+        assert np.all(notfin), msg
 
         return
 

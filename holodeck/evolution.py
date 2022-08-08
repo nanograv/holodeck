@@ -265,41 +265,148 @@ class Evolution:
         self._update_derived()
         return
 
-    def at(self, xpar, targets, pars=None, coal=False, lin_interp=None):
-        """Interpolate evolution to the given observed, orbital frequency.
+    def at(self, xpar, targets, params=None, coal=False, lin_interp=None):
+        """Interpolate evolution to the given target locations in either separation or frequency.
+
+        The variable of interpolation is specified with the `xpar` argument.  The evolutionary
+        tracks are interpolated in that variable, to the new target locations given by `targets`.
+        We use 'x' to refer to the independent variable, and 'y' to refer to the dependent variable
+        that is being interpolated.  Which values are interpolated are specified with the `params`
+        argument.
+
+        The behavior of this function is broken into three sub-functions, that are only used here:
+        * :meth:`Evolution._at__inputs` : parse the input arguments.
+        * :meth:`Evolution._at__index_frac` : find the indices in the evolutionary tracks bounding
+          the target interpolation locations, and also the fractional distance to interpolate
+          between them.
+        * :meth:`Evolution._at__interpolate_array` : actually interpolate each parameter to a
+          the target location.
 
         Parameters
         ----------
         xpar : str, in ['fobs', 'sepa']
-            String specifying the variable to interpolate to.
-        targets : float or array_like,
+            String specifying the variable of interpolation.
+        targets : array_like,
             Locations to interpolate to.
-            `sepa` : units of cm
-            `fobs` : units of 1/s [Hz]
-        pars : None or (list of str)
-            Parameters that should be interpolated.
-            If `None`, defaults to `self._EVO_PARS` attribute.
+            * if ``xpar == sepa``  : binary separation, units of [cm],
+            * if ``xpar == xfobs`` : binary frequency,  units of [1/s] = [Hz],
+        params : None or (list of str)
+            Names of the parameters that should be interpolated.
+            If `None`, defaults to :attr:`Evolution._EVO_PARS` attribute.
         coal : bool,
             Only store evolution values for binaries coalescing before redshift zero.
             Interpolated values for other binaries are set to `np.nan`.
         lin_interp : None or bool,
+            Interpolate parameters in linear space.
+            * True : all parameters interpolated in lin-lin space.
+            * False: all parameters interpolated in log-log space.
+            * None : parameters are interpolated in log-log space, unless they're included in the
+              :attr:`Evolution._LIN_INTERP_PARS` attribute.
 
         Returns
         -------
         vals : dict,
             Dictionary of arrays for each interpolated parameter.
             The returned shape is (N, T), where `T` is the number of target locations to interpolate
-            to, and `N` is the total number of binaries (``coal=False``) or the number of binaries
-            coalescing before redshift zero (``coal=True``).
+            to, and `N` is the total number of binaries.
+            Each data array is filled with `np.nan` values if the targets are outside of its
+            evolution track.  If ``coal=True``, then binaries that do *not* coalesce before redshift
+            zero also have their data array values fillwed with `np.nan`.
 
         Notes
         -----
         * Out of bounds values are set to `np.nan`.
         * Interpolation is 1st-order in log-log space in general, but properties which are in the
-          `_LIN_INTERP_PARS` array are interpolated at 1st-order in lin-lin space.
+          `_LIN_INTERP_PARS` array are interpolated at 1st-order in lin-lin space.  Parameters
+          which can be negative should be interpolated in linear space.  Passing a boolean for the
+          `lin_interp` parameter will override the behavior (see `Parameters`_ above).
 
         """
+
+        # parse/sanitize input arguments
+        xnew, xold, params, rev, squeeze = self._at__inputs(xpar, targets, params)
+
+        # (N, M); scale-factors; make sure direction matches that of `xold`
+        scafa = self.scafa[:, ::-1] if rev else self.scafa[...]
+
+        # find indices between which to interpolate, and the fractional distance to go between them
+        cut_idx, interp_frac, valid = self._at__index_frac(xnew, xold)
+
+        # if we only want coalescing systems, set non-coalescing (stalling) systems to invalid
+        if coal:
+            valid = valid & self.coal[:, np.newaxis]
+
+        # Valid binaries must be valid at both `bef` and `aft` indices
+        # BUG: is this actually doing what it's supposed to be doing?
+        for cc in cut_idx:
+            valid = valid & np.isfinite(np.take_along_axis(scafa, cc, axis=-1))
+
+        invalid = ~valid
+
+        data = dict()
+        # Interpolate each parameter to the given locations, store to `dict`
+        for par in params:
+            # Load the raw evolution data for this parameter, can be None or ndarray shaped (N, M) or (N, M, 2)
+            yold = getattr(self, par)
+            if yold is None:
+                data[par] = None
+                continue
+
+            # Reverse data to match x-values, if needed
+            if rev:
+                yold = yold[..., ::-1]
+
+            # interpolate
+            lin_interp_flag = (par in self._LIN_INTERP_PARS) if lin_interp is None else lin_interp
+            ynew = self._at__interpolate_array(yold, cut_idx, interp_frac, lin_interp_flag)
+
+            # fill 'invalid' (i.e. out of bounds, or non-coalescing binaries if ``coal==True``)
+            ynew[invalid, ...] = np.nan
+            # remove excess dimensions if a single target was requested (i.e. ``T=1``)
+            if squeeze:
+                ynew = ynew.squeeze()
+            # store
+            data[par] = ynew
+
+        return data
+
+    def _at__inputs(self, xpar, targets, pars):
+        """Parse/sanitize the inputs of the :meth:`Evolution.at` method.
+
+        Parameters
+        ----------
+        xpar : str, in ['fobs', 'sepa']
+            String specifying the variable of interpolation.
+        targets : array_like,
+            Locations to interpolate to.
+            * if ``xpar == sepa``  : binary separation, units of [cm],
+            * if ``xpar == xfobs`` : binary frequency,  units of [1/s] = [Hz],
+        pars : None or list[str]
+            Names of parameters that should be interpolated.
+            If `None`, defaults to :attr:`Evolution._EVO_PARS` attribute.
+
+        Returns
+        -------
+        xnew : np.ndarray
+            (T,) Log10 of the target locations to interpolate to, i.e. ``log10(targets)``.
+        xold : np.ndarray
+            (N, M) Log10 of the x-values at which to evaluate the target interpolation points.
+            Either ``log10(sepa)`` or ``log10(freq_orb_obs)``.
+            NOTE: these values will be returned in *increasing* order.  If they have been reversed,
+            then ``rev=True``.
+        pars : list[str]
+            Names of parameters that should be interpolated.
+        rev : bool
+            Whether or not the `xold` array has been reversed.
+        squeeze : bool
+            Whether or not the `targets` were a single scalar value (i.e. ``T=1``, as opposed to an
+            iterable).  If `targets` were a scalar, then the data returned from :meth:`Evolution.at`
+            will be shaped as (N,) instead of (N,T); since in this case, T=1.
+
+        """
+        # Raise an error if this instance has not been evolved yet
         self._check_evolved()
+
         _allowed = ['sepa', 'fobs']
         if xpar not in _allowed:
             raise ValueError("`xpar` must be one of '{}'!".format(_allowed))
@@ -314,132 +421,157 @@ class Evolution:
             squeeze = True
 
         size, nsteps = self.shape
+
         # Observed-Frequency, units of 1/yr
         if xpar == 'fobs':
             # frequency is already increasing
-            _xvals = np.log10(self.freq_orb_obs)
-            scafa = self.scafa[:, :]
-            tt = np.log10(targets)
+            xold = np.log10(self.freq_orb_obs)
+            xnew = np.log10(targets)
             rev = False
         # Binary-Separation, units of pc
         elif xpar == 'sepa':
             # separation is decreasing, reverse to increasing
-            _xvals = np.log10(self.sepa)[:, ::-1]
-            scafa = self.scafa[:, ::-1]
-            tt = np.log10(targets)
+            xold = np.log10(self.sepa)[:, ::-1]
+            xnew = np.log10(targets)
             rev = True
-        else:   # pragma: no cover
+        else:   # nocov
             raise ValueError("Bad `xpar` {}!".format(xpar))
 
         # Make sure target values are within bounds
-        textr = utils.minmax(tt)
-        xextr = utils.minmax(_xvals)
+        textr = utils.minmax(xnew)
+        xextr = utils.minmax(xold)
         if (textr[1] < xextr[0]) | (textr[0] > xextr[1]):
             err = "`targets` extrema ({}) outside `xvals` extema ({})!  Bad units?".format(
                 (10.0**textr), (10.0**xextr))
             raise ValueError(err)
 
-        # Convert to (N, T, M)
-        #     `tt` is (T,)  `xvals` is (N, M) for N-binaries and M-steps
-        select = (tt[np.newaxis, :, np.newaxis] <= _xvals[:, np.newaxis, :])
+        return xnew, xold, pars, rev, squeeze
 
-        test = np.argmax(select, axis=-1)
-        test = (test > 0)
-        print(f"\n===============\n")
-        print(utils.frac_str(test))
-        print(utils.frac_str(~test))
-        print(f"\n===============\n")
+    def _at__index_frac(self, xnew, xold):
+        """Find indices bounding target locations, and the fractional distance to go between them.
 
-        # Select only binaries that coalesce before redshift zero (a=1.0)
-        if coal:
-            # select = select & (scafa[:, np.newaxis, :] > 0.0) & (scafa[:, np.newaxis, :] < 1.0)
-            select = select & self.coal[:, np.newaxis, np.newaxis]
+        Parameters
+        ----------
+        xnew : np.ndarray
+            Target locations to interplate to.  Shape (T,).
+        xold : np.ndarray
+            Values of the x-coordinate between which to interpolate.  Shape (N, M).
+            These are the x-values of either `sepa` or `fobs` from the evolutionary tracks of each
+            binary.
 
-        # (N, T), find the index of the xvalue following each target point (T,), for each binary (N,)
+        Returns
+        -------
+        cut_idx : np.ndarray
+            For each binary, the step-number indices between which to interpolate, for each target
+            interpolation point.  shape (2, N, T); where the 0th dimension, the 0th value is the
+            low/before index, and the 1th value is the high/after index.
+            i.e. for binary 'i' and target 'j', we need to interpolate between indices given by
+            [0, i, j] and [1, i, j].
+        interp_frac : np.ndarray
+            The fractional distance between the low value and the high value, to interpolate to.
+            Shape (2, N, M).  For binary 'i' and target 'j', `interp_frac[i, j]` is how the
+            fraction of the way, from index `cut_idx[0, i, j]` to `cut_idx[1, i, j]` to interpolate
+            to, in the `data` array.
+        valid : np.ndarray
+            Array of boolean values, giving whether or not the target interpolation points are
+            within the bounds of each binary's evolution track.  Shape (N, T).
+
+        """
+        # ---- For every binary, find the step index immediately following each target value
+        # (N, T, M) | `xnew` is (T,) for T-targets,  `xold` is (N, M) for N-binaries and M-steps
+        select = (xnew[np.newaxis, :, np.newaxis] <= xold[:, np.newaxis, :])
+        # (N, T), xvalue index [0, M-1] following each target point (T,), for each binary (N,)
         aft = np.argmax(select, axis=-1)
-        # zero values in `aft` mean no xvals after the targets were found
-        valid = (aft > 0)
-        if coal:
-            valid = valid & self.coal[:, np.newaxis]
 
+        # ---- Determine which locations are 'valid' (i.e. within the evolutionary tracks)
+        # zero values in `aft` mean no `xold` after the targets were found; these are 'invalid',
+        # these will be converted to `np.nan` later
+        valid = (aft > 0)
+
+        # ---- get the x-value index immediately preceding each target point
         bef = np.copy(aft)
         bef[valid] -= 1
-
         # (2, N, T)
-        cut = np.array([aft, bef])
-        # Valid binaries must be valid at both `bef` and `aft` indices
-        for cc in cut:
-            valid = valid & np.isfinite(np.take_along_axis(scafa, cc, axis=-1))
+        cut_idx = np.array([aft, bef])
 
-        inval = ~valid
         # Get the x-values before and after the target locations  (2, N, T)
-        xvals = [np.take_along_axis(_xvals, cc, axis=-1) for cc in cut]
-        # Find how far to interpolate between values (in log-space)
+        xold_temp = [np.take_along_axis(xold, cc, axis=-1) for cc in cut_idx]
+        # Find how far to interpolate between values (in log-space; `xold` was already log10'd
         #     (N, T)
-        temp = np.subtract(*xvals)
-        numer = tt[np.newaxis, :] - xvals[1]
-        frac = np.zeros_like(numer)
-        idx = (temp != 0.0)
-        frac[idx] = numer[idx] / temp[idx]
+        denom = np.subtract(*xold_temp)
+        numer = xnew[np.newaxis, :] - xold_temp[1]
+        interp_frac = np.zeros_like(numer)
+        idx = (denom != 0.0)
+        interp_frac[idx] = numer[idx] / denom[idx]
 
-        vals = dict()
-        # Interpolate each target parameter
-        for pp in pars:
-            lin_interp_flag = (pp in self._LIN_INTERP_PARS) if lin_interp is None else lin_interp
-            # Either (N, M) or (N, M, 2)
-            _data = getattr(self, pp)
-            if _data is None:
-                vals[pp] = None
-                continue
+        return cut_idx, interp_frac, valid
 
-            reshape = False
-            use_cut = cut
-            use_frac = frac
-            # Sometimes there is a third dimension for the 2 binaries (e.g. `mass`)
-            #    which will have shape, (N, T, 2) --- calling this "double-data"
-            if np.ndim(_data) != 2:
-                if (np.ndim(_data) == 3) and (np.shape(_data)[-1] == 2):
-                    # Keep the interpolation axis last (N, T, 2) ==> (N, 2, T)
-                    _data = np.moveaxis(_data, -1, -2)
-                    # Expand other arrays appropriately
-                    use_cut = cut[:, :, np.newaxis]
-                    use_frac = frac[:, np.newaxis, :]
-                    reshape = True
-                else:   # pragma: no cover
-                    raise ValueError("Unexpected shape of data: {}!".format(np.shape(_data)))
+    def _at__interpolate_array(self, yold, cut_idx, interp_frac, lin_interp_flag):
+        """Interpolate a parameter to a fraction between integration steps.
 
-            if not lin_interp_flag:
-                _data = np.log10(_data)
+        Parameters
+        ----------
+        yold : np.ndarray
+            The data to be interpolated.  This is the raw evolution data, for each binary and
+            each step.  Shaped either as (N, M) or (N, M, 2) if parameter is mass.
+        cut_idx : np.ndarray
+            For each binary, the step-number indices between which to interpolate, for each target
+            interpolation point.  shape (2, N, T); where the 0th dimension, the 0th value is the
+            low/before index, and the 1th value is the high/after index.
+            i.e. for binary 'i' and target 'j', we need to interpolate between indices given by
+            [0, i, j] and [1, i, j].
+        interp_frac : np.ndarray
+            The fractional distance between the low value and the high value, to interpolate to.
+            Shape (2, N, M).  For binary 'i' and target 'j', `interp_frac[i, j]` is how the
+            fraction of the way, from index `cut_idx[0, i, j]` to `cut_idx[1, i, j]` to interpolate
+            to, in the `data` array.
+        lin_interp_flag : bool,
+            Whether data should be interpolated in lin-lin space (True), or log-log space (False).
 
-            if rev:
-                _data = _data[..., ::-1]
-            # (2, N, T) for scalar data or (2, N, 2, T) for "double-data"
-            data = [np.take_along_axis(_data, cc, axis=-1) for cc in use_cut]
-            # Interpolate by `frac` for each binary   (N, T) or (N, 2, T) for "double-data"
-            new = data[1] + (np.subtract(*data) * use_frac)
-            # In the "double-data" case, move the doublet back to the last dimension
-            #    (N, T) or (N, T, 2)
-            if reshape:
-                new = np.moveaxis(new, 1, -1)
-            # Set invalid binaries to nan
-            new[inval, ...] = np.nan
+        Returns
+        -------
+        ynew : np.ndarray
+            The input `data` interpolated to the new target locations.
+            Shape is (N, T) or (N, T, 2) for N-binaries, T-target points.  A third dimension is
+            present if the input `data` was 3D.
 
-            # if np.any(~np.isfinite(new[valid, ...])):
-            #     raise ValueError("Non-finite values after interpolation of '{}'".format(pp))
+        """
 
-            # fill return dictionary
-            if not lin_interp_flag:
-                new = 10.0 ** new
-            if squeeze:
-                new = new.squeeze()
-            vals[pp] = new
+        reshape = False
+        cut = cut_idx
+        frac = interp_frac
+        # Sometimes there is a third dimension for the 2 binaries (e.g. `mass`)
+        #    which will have shape, (N, T, 2) --- calling this "double-data"
+        if np.ndim(yold) != 2:
+            if (np.ndim(yold) == 3) and (np.shape(yold)[-1] == 2):
+                # Keep the interpolation axis last (N, T, 2) ==> (N, 2, T)
+                yold = np.moveaxis(yold, -1, -2)
+                # Expand other arrays appropriately
+                cut = cut[:, :, np.newaxis]
+                frac = frac[:, np.newaxis, :]
+                reshape = True
+            else:   # nocov
+                raise ValueError("Unexpected shape of yold: {}!".format(np.shape(yold)))
 
-            # if np.any(~np.isfinite(new[valid, ...])):
-            #     raise ValueError("Non-finite values after exponentiation of '{}'".format(pp))
+        if not lin_interp_flag:
+            yold = np.log10(yold)
 
-        return vals
+        # (2, N, T) for scalar data or (2, N, 2, T) for "double-data"
+        yold = [np.take_along_axis(yold, cc, axis=-1) for cc in cut]
+        # Interpolate by `frac` for each binary   (N, T) or (N, 2, T) for "double-data"
+        ynew = yold[1] + (np.subtract(*yold) * frac)
+        # In the "double-data" case, move the doublet back to the last dimension
+        #    (N, T) or (N, T, 2)
+        if reshape:
+            ynew = np.moveaxis(ynew, 1, -1)
 
-    def sample_full_population(self, freqs, DOWN=None):
+        # fill return dictionary
+        if not lin_interp_flag:
+            ynew = 10.0 ** ynew
+
+        return ynew
+
+    def sample_universe(self, freqs, DOWN=None):
         """Construct a full universe of binaries based on resampling this population.
 
         !**WARNING**!
@@ -462,7 +594,7 @@ class Evolution:
         PARAMS = ['mass', 'sepa', 'dadt', 'scafa']
         fobs = kale.utils.spacing(freqs, scale='log', dex=10, log_stretch=0.1)
         log.info(f"Converted input freqs ({kale.utils.stats_str(freqs)}) ==> {kale.utils.stats_str(fobs)}")
-        data_fobs = self.at('fobs', fobs, pars=PARAMS)
+        data_fobs = self.at('fobs', fobs, params=PARAMS)
 
         # Only examine binaries reaching the given locations before redshift zero (other redz=infinite)
         redz = data_fobs['scafa']
