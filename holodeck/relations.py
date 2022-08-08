@@ -54,7 +54,7 @@ class _Host_Relation(abc.ABC):
     """Base class for general relationships between MBHs and their host galaxies.
     """
 
-    _PROPERTIES = []    #: list of property names to retrieve from population instances.
+    _PROPERTIES: list[str] = []    #: list of property names to retrieve from population instances.
 
     def get_host_properties(self, pop, copy=True) -> dict:
         """Get the host properties specified in the `_PROPERTIES` list of variable names.
@@ -94,7 +94,7 @@ class _Host_Relation(abc.ABC):
         return
 
     @abc.abstractmethod
-    def mbh_from_host(self, pop) -> ArrayLike:
+    def mbh_from_host(self, pop, *args, **kwargs) -> np.ndarray:
         """Convert from abstract host galaxy properties to blackhole mass.
 
         The `pop` instance must contain the attributes required for this class's scaling relations.
@@ -551,10 +551,17 @@ class _MSigma_Relation(_Host_Relation):
 
     _PROPERTIES = ['vdisp']
 
-    # ---- Abstract Methods : must be overridden in subclasses  ----
+    # @abc.abstractmethod
+    # def dmbh_dsigma(self, sigma):
+    #     pass
+
     @abc.abstractmethod
-    def dmbh_dsigma(self, sigma):
-        return
+    def mbh_from_vdisp(self, vdisp, scatter):
+        pass
+
+    @abc.abstractmethod
+    def vdisp_from_mbh(self, mbh, scatter):
+        pass
 
 
 class MSigma_Standard(_MSigma_Relation):
@@ -957,8 +964,8 @@ class NFW(_Density_Profile):
     """Navarro, Frank & White dark-matter density profile from [NFW1997]_.
     """
 
-    @classmethod
-    def density(cls, rads: ArrayLike, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
+    @staticmethod
+    def density(rads: ArrayLike, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
         """NFW DM Density profile.
 
         Parameters
@@ -976,14 +983,14 @@ class NFW(_Density_Profile):
             Densities at the given radii.  [g/cm^3]
 
         """
-        rho_s, rs = cls._nfw_rho_rad(mhalo, redz)
+        rho_s, rs = NFW._nfw_rho_rad(mhalo, redz)
         dens = rads / rs
         dens = dens * np.square(1 + dens)
         dens = rho_s / dens
         return dens
 
-    @classmethod
-    def mass(cls, rads: ArrayLike, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
+    @staticmethod
+    def mass(rads: ArrayLike, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
         """DM mass enclosed at the given radii from an NFW profile.
 
         Parameters
@@ -1003,7 +1010,7 @@ class NFW(_Density_Profile):
         """
         rads, mhalo, redz = np.broadcast_arrays(rads, mhalo, redz)
         # Get Halo concentration
-        rho_s, rs = cls._nfw_rho_rad(mhalo, redz)
+        rho_s, rs = NFW._nfw_rho_rad(mhalo, redz)
         # NOTE: Expression causes numerical problems for rads/rs <~ 1e-8
         # only use proper analytic expression in safe regime ("hi")
         # use small radius approximation for unsafe regime ("lo")
@@ -1020,8 +1027,8 @@ class NFW(_Density_Profile):
     def _concentration(mhalo, redz):
         return Klypin_2016.concentration(mhalo, redz)
 
-    @classmethod
-    def _nfw_rho_rad(cls, mhalo, redz):
+    @staticmethod
+    def _nfw_rho_rad(mhalo, redz):
         """Return the DM halo parameters for characteristic density and halo scale radius.
 
         Parameters
@@ -1039,7 +1046,7 @@ class NFW(_Density_Profile):
             Scale radius of the DM halo.  [cm]
 
         """
-        conc = cls._concentration(mhalo, redz)
+        conc = NFW._concentration(mhalo, redz)
         log_c_term = np.log(1 + conc) - conc/(1+conc)
 
         # Critical over-density
@@ -1051,8 +1058,8 @@ class NFW(_Density_Profile):
         rs = np.power(rs, 1.0/3.0)
         return rho_s, rs
 
-    @classmethod
-    def radius_scale(cls, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
+    @staticmethod
+    def radius_scale(mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
         """Return the DM-halo scale radius.
 
         Parameters
@@ -1068,11 +1075,11 @@ class NFW(_Density_Profile):
             Scale radius of the DM halo.  [cm]
 
         """
-        rs = cls._nfw_rho_rad(mhalo, redz)[1]
+        rs = NFW._nfw_rho_rad(mhalo, redz)[1]
         return rs
 
-    @classmethod
-    def density_characteristic(cls, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
+    @staticmethod
+    def density_characteristic(mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
         """Return the DM halo parameters for characteristic density.
 
         Parameters
@@ -1088,7 +1095,7 @@ class NFW(_Density_Profile):
             DM halo characteristic density.   [g/cm^3]
 
         """
-        rs = cls._nfw_rho_rad(mhalo, redz)[0]
+        rs = NFW._nfw_rho_rad(mhalo, redz)[0]
         return rs
 
 
@@ -1117,7 +1124,7 @@ class _StellarMass_HaloMass(abc.ABC):
         return
 
     @abc.abstractmethod
-    def stellar_mass(self, mhalo: ArrayLike) -> ArrayLike:
+    def stellar_mass(self, *args, **kwargs) -> np.ndarray:
         """Calculate the stellar-mass for the given halo mass.
 
         Parameters
@@ -1131,9 +1138,9 @@ class _StellarMass_HaloMass(abc.ABC):
             Stellar mass.  [gram]
 
         """
-        return
+        pass
 
-    def halo_mass(self, mstar: ArrayLike) -> ArrayLike:
+    def halo_mass(self, mstar: ArrayLike) -> np.ndarray:
         """Calculate the stellar-mass for the given halo mass.
 
         Parameters
@@ -1216,7 +1223,7 @@ class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
         return
 
     @abc.abstractmethod
-    def stellar_mass(self, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
+    def stellar_mass(self, mhalo: ArrayLike, redz: ArrayLike) -> np.ndarray:
         """Calculate the stellar-mass for the given halo mass and redshift.
 
         Parameters
@@ -1232,9 +1239,9 @@ class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
             Stellar mass.  [gram]
 
         """
-        return
+        pass
 
-    def halo_mass(self, mstar: ArrayLike, redz: ArrayLike, clip: bool = False) -> ArrayLike:
+    def halo_mass(self, mstar: ArrayLike, redz: ArrayLike, clip: bool = False) -> np.ndarray:
         """Calculate the halo-mass for the given stellar mass and redshift.
 
         Parameters
@@ -1260,16 +1267,16 @@ class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
             raise ValueError(err)
 
         squeeze = np.isscalar(mstar)
-        mstar = np.log10(mstar/MSOL)
+        mstar_log10 = np.log10(mstar/MSOL)
         if clip:
             bounds = np.array([self._mstar_grid[0], self._mstar_grid[-1]])
             bounds = np.log10(bounds / MSOL)
-            idx = (mstar < bounds[0]) | (bounds[1] < mstar)
+            idx = (mstar_log10 < bounds[0]) | (bounds[1] < mstar_log10)
             if np.any(idx):
-                log.info(f"clipping {utils.frac_str(idx)} `mstar` values outside bounds ({bounds})!")
-                mstar[idx] = np.clip(mstar[idx], *bounds)
+                log.debug(f"clipping {utils.frac_str(idx)} `mstar` values outside bounds ({bounds})!")
+                mstar_log10[idx] = np.clip(mstar_log10[idx], *bounds)
 
-        vals = np.array([mstar, redz])
+        vals = np.array([mstar_log10, redz])
         try:
             ynew = MSOL * 10.0 ** self._mhalo_from_mstar_redz(vals.T)
         except ValueError as err:
