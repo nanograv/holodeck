@@ -28,7 +28,7 @@ def test_init_generic_evolution():
 
     class Good_Hard(holo.evolution._Hardening):
 
-        def dadt_dedt(self, *args, **kwargs):
+        def dadt_dedt(self, *args, **kwargs):   # nocov
             return 0.0
 
     pop = Good_Pop()
@@ -188,6 +188,19 @@ class Test_Illustris_Fixed:
 
 
 class Test_Evolution_Basic:
+
+    def test_construction(self):
+        pop = holo.population.Pop_Illustris()
+        with pytest.raises(TypeError):
+            holo.evolution.Evolution(pop, pop, nsteps=30)
+        with pytest.raises(TypeError):
+            holo.evolution.Evolution(pop, None, nsteps=30)
+        with pytest.raises(TypeError):
+            holo.evolution.Evolution(pop, 2.0, nsteps=30)
+
+        holo.evolution.Evolution(pop, holo.evolution.Hard_GW, nsteps=30)
+
+        return
 
     def test_tage(self, evo_def):
         evo = evo_def
@@ -493,7 +506,7 @@ class Test_Hardening_Generic:
 
         # Overriding `dadt_dedt` method, instantiation allowed
         class Hard_Succeed(holo.evolution._Hardening):
-            def dadt_dedt(self, evo, step):
+            def dadt_dedt(self, evo, step):   # nocov
                 pass
 
         Hard_Succeed()
@@ -627,12 +640,13 @@ class Test_Dynamical_Friction_NFW:
                     print(f"dedt = {dedt}")
 
                     bads = ~np.isfinite(dadt)
-                    if np.any(bads):
-                        print(f"FOUND BADS {holo.utils.frac_str(bads)}")
-                        for kk, vv in dict(mass=mass, sepa=sepa, redz=redz, eccen=eccen).items():
-                            if vv is None:
-                                continue
-                            print(f"{kk} :: {vv[bads]}")
+                    assert not np.any(bads)
+                    # if np.any(bads):
+                    #     print(f"FOUND BADS {holo.utils.frac_str(bads)}")
+                    #     for kk, vv in dict(mass=mass, sepa=sepa, redz=redz, eccen=eccen).items():
+                    #         if vv is None:
+                    #             continue
+                    #         print(f"{kk} :: {vv[bads]}")
 
                     assert np.shape(dadt) == np.shape(sepa)
                     assert np.all(dadt < 0.0)
