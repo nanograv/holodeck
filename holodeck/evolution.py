@@ -714,7 +714,7 @@ class Evolution:
         # `pop.mass` has shape (N, 2), broadcast to (N, S, 2) for `S` steps
         self.mass[:, :, :] = pop.mass[:, np.newaxis, :]
 
-        if self._debug:
+        if self._debug:    # nocov
             for ii, hard in enumerate(self._hard):
                 # Store individual hardening rates
                 setattr(self, f"_dadt_{ii}", np.zeros_like(self.dadt))

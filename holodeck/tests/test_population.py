@@ -112,7 +112,7 @@ def test_valid_pop_mod_init():
     """PM subclasses should raise errors when not overriding `modify`
     """
     class PM_Good_1(holo.population._Population_Modifier):
-        def modify(self):
+        def modify(self):   # nocov
             pass
 
     PM_Good_1()
@@ -185,12 +185,11 @@ def test_eccentricity_illustris_trends():
             aves.append(np.mean(xx))
 
         # make sure averages are all increasing
-        if not np.all(np.diff(aves) > 0.0):
-            err = (
-                f"wid={wid} | cents={cent_list} gives non-monotonically increasing averages!  "
-                f"  ::  aves={aves}"
-            )
-            raise ValueError(err)
+        err = (
+            f"wid={wid} | cents={cent_list} gives non-monotonically increasing averages!  "
+            f"  ::  aves={aves}"
+        )
+        assert np.all(np.diff(aves) > 0.0), err
 
     """Make sure that as the width value increases, the eccentricity stdev increases
     """
@@ -205,12 +204,11 @@ def test_eccentricity_illustris_trends():
             stdevs.append(np.std(xx))
 
         # make sure averages are all increasing
-        if not np.all(np.diff(stdevs) > 0.0):
-            err = (
-                f"cent={cent} | widths={wids_list} gives non-monotonically increasing stdevs!  "
-                f"  ::  stdevs={stdevs}"
-            )
-            raise ValueError(err)
+        err = (
+            f"cent={cent} | widths={wids_list} gives non-monotonically increasing stdevs!  "
+            f"  ::  stdevs={stdevs}"
+        )
+        assert np.all(np.diff(stdevs) > 0.0), err
 
     return
 
