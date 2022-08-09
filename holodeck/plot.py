@@ -270,7 +270,9 @@ def _get_norm(data, midpoint=None, log=False):
         try:
             min, max = utils.minmax(data, filter=log)
         except:
-            utils.error(f"Input `data` ({type(data)}) must be an integer, (2,) of scalar, or ndarray of scalar!")
+            err = f"Input `data` ({type(data)}) must be an integer, (2,) of scalar, or ndarray of scalar!"
+            log.exception(err)
+            raise ValueError(err)
 
     # print(f"{min=}, {max=}")
 
@@ -335,7 +337,8 @@ def _get_hist_steps(xx, yy):
     size = len(xx) - 1
     if size != len(yy):
         err = f"Length of `xx` ({len(xx)}) should be length of `yy` ({len(yy)}) + 1!"
-        utils.error(err)
+        log.exception(err)
+        raise ValueError(err)
 
     aa = [[xx[ii], xx[ii+1]] for ii in range(xx.size-1)]
     bb = [[yy[ii], yy[ii]] for ii in range(xx.size-1)]
@@ -611,7 +614,9 @@ def plot_evo(evo, freqs):
 
 def plot_evo(evo, freqs=None, sepa=None, ax=None):
     if (freqs is None) and (sepa is None):
-        utils.error("Either `freqs` or `sepa` must be provided!")
+        err = "Either `freqs` or `sepa` must be provided!"
+        log.exception(err)
+        raise ValueError(err)
 
     if freqs is not None:
         data = evo.at('fobs', freqs)

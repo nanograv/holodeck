@@ -759,12 +759,14 @@ class Evolution:
         # ! ====================================================================
         # ---- Hardening rates at the left-edge of the step
         # calculate
-        dadt_l, dedt_l = self._hardening_rate(left)
+        dadt_l, dedt_l = self._hardening_rate(left, store_debug=False)
         da = np.diff(sepa, axis=-1)
         da = da[:, 0]
         dt = da / -dadt_l
         if np.any(dt < 0.0):    # nocov
-            utils.error(f"Negative time-steps found at step={step}!")
+            err = f"Negative time-steps found at step={step}!"
+            log.exception(err)
+            raise ValueError(err)
 
         if self.eccen is not None:
             de = dedt_l * dt
@@ -783,7 +785,7 @@ class Evolution:
 
         # ---- Hardening rates at the right-edge of the step
         # calculate
-        dadt_r, dedt_r = self._hardening_rate(right)
+        dadt_r, dedt_r = self._hardening_rate(right, store_debug=True)
 
         # store
         self.dadt[:, right] = dadt_r
@@ -797,7 +799,9 @@ class Evolution:
         # use trapezoid rule to find total time for this step
         dt = utils.trapz_loglog(dtda, sepa, axis=-1).squeeze()   # this should come out positive
         if np.any(dt < 0.0):    # nocov
-            utils.error(f"Negative time-steps found at step={step}!")
+            err = f"Negative time-steps found at step={step}!"
+            log.exception(err)
+            raise ValueError(err)
 
         # ---- Update right-edge values
         # NOTE/ENH: this would be a good place to make a function `_update_right_edge()` (or something like that),
@@ -831,7 +835,7 @@ class Evolution:
 
         return
 
-    def _hardening_rate(self, step):
+    def _hardening_rate(self, step, store_debug=True):
         """Calculate the net hardening rate for the given integration step.
 
         The hardening rates (:class:`_Hardening` subclasses) stored in the :attr:`Evolution._hard`
@@ -865,11 +869,14 @@ class Evolution:
             dadt[:] += _sma
             if self._debug:    # nocov
                 log.debug(f"{step} hard={hard} : dadt = {utils.stats(_sma)}")
-                # Store individual hardening rates
-                getattr(self, f"_dadt_{ii}")[:, step] = _sma[...]
                 # Raise error on invalid entries
                 if not np.all(np.isfinite(_sma)) or np.any(_sma > 0.0):
-                    utils.error(f"invalid `dadt` for hard={hard}!")
+                    err = f"invalid `dadt` for hard={hard}!"
+                    log.exception(err)
+                    raise ValueError(err)
+                # Store individual hardening rates
+                if store_debug:
+                    getattr(self, f"_dadt_{ii}")[:, step] = _sma[...]
 
             if (self.eccen is not None):
                 if _ecc is None:
@@ -878,8 +885,14 @@ class Evolution:
                 dedt[:] += _ecc
                 if self._debug:    # nocov
                     log.debug(f"{step} hard={hard} : dedt = {utils.stats(_ecc)}")
+                    # Raise error on invalid entries
+                    if not np.all(np.isfinite(_ecc)):
+                        err = f"invalid `dedt` for hard={hard}!"
+                        log.exception(err)
+                        raise ValueError(err)
                     # Store individual hardening rates
-                    getattr(self, f"_dedt_{ii}")[:, step] = _ecc[...]
+                    if store_debug:
+                        getattr(self, f"_dedt_{ii}")[:, step] = _ecc[...]
 
         return dadt, dedt
 
@@ -1519,7 +1532,9 @@ class Fixed_Time(_Hardening):
         elif callable(time):
             time = time(mtot, mrat, redz)
         elif np.shape(time) != np.shape(mtot):
-            utils.error(f"Shape of `time` ({np.shape(time)}) does not match `mtot` ({np.shape(mtot)})!")
+            err = f"Shape of `time` ({np.shape(time)}) does not match `mtot` ({np.shape(mtot)})!"
+            log.exception(err)
+            raise ValueError(err)
 
         # `rchar` must be a function of only mtot, mrat; or otherwise a fixed value
         # This is because it is not being used as an interpolation variable, only an external parameter
@@ -1528,12 +1543,16 @@ class Fixed_Time(_Hardening):
         if callable(rchar):
             rchar = rchar(mtot, mrat, redz)
         elif not np.isscalar(rchar):
-            utils.error("`rchar` must be a scalar or callable: (`rchar(mtot, mrat)`)!")
+            err = "`rchar` must be a scalar or callable: (`rchar(mtot, mrat)`)!"
+            log.exception(err)
+            raise ValueError(err)
 
         # ---- Calculate normalization parameter
         mtot, mrat, time, sepa = np.broadcast_arrays(mtot, mrat, time, sepa)
         if mtot.ndim != 1:
-            utils.error(f"Error in input shapes (`mtot.shpae={np.shape(mtot)})")
+            err = f"Error in input shapes (`mtot.shpae={np.shape(mtot)})"
+            log.exception(err)
+            raise ValueError(err)
 
         # If there are lots of points, construct and use an interpolant
         if len(mtot) > self._INTERP_THRESH_PAD_FACTOR * self._INTERP_NUM_POINTS:
@@ -1558,7 +1577,9 @@ class Fixed_Time(_Hardening):
                 norm[bads] = backup(bp)
                 bads = ~np.isfinite(norm)
                 if np.any(bads):
-                    utils.error(f"Backup interpolant failed on {utils.frac_str(bads, 4)} points!")
+                    err = f"Backup interpolant failed on {utils.frac_str(bads, 4)} points!"
+                    log.exception(err)
+                    raise ValueError(err)
 
             norm = 10.0 ** norm
 
