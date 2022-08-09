@@ -727,7 +727,7 @@ class Test_Composite_Hardening:
         bads = ~np.isclose(dadt_sum, evo.dadt, rtol=1e-6)
         if np.any(bads):
             bads = np.where(bads)
-            print(f"BADS = ", bads)
+            print("BADS = ", bads)
             print(f"{dadt_sum[bads]}")
             print(f"{evo.dadt[bads]}")
 
@@ -786,10 +786,10 @@ class Test_Composite_Hardening:
             print(f"BADS: {holo.utils.frac_str(bads)}")
             bads = np.where(bads)
             print(bads)
-            print(f"noatt = ", holo.utils.stats(noatt_dadt[bads]))
-            print(f"atten = ", holo.utils.stats(atten_dadt[bads]))
-            print(f"noatt = ", noatt_dadt[bads])
-            print(f"atten = ", atten_dadt[bads])
+            print("noatt = ", holo.utils.stats(noatt_dadt[bads]))
+            print("atten = ", holo.utils.stats(atten_dadt[bads]))
+            print("noatt = ", noatt_dadt[bads])
+            print("atten = ", atten_dadt[bads])
 
         assert not np.any(bads)
 
