@@ -658,3 +658,139 @@ class Test_Dynamical_Friction_NFW:
                         assert np.all(dedt == 0.0)
 
         return
+
+
+@pytest.fixture(scope='session')
+def composite_circ():
+    resamp = holo.population.PM_Resample(0.2)
+    pop = holo.population.Pop_Illustris(mods=resamp)
+
+    hards = [
+        holo.evolution.Hard_GW,
+        holo.evolution.Sesana_Scattering(),
+        holo.evolution.Dynamical_Friction_NFW(),
+    ]
+
+    evo = holo.evolution.Evolution(pop, hards, debug=True)
+    evo.evolve()
+    return evo
+
+
+@pytest.fixture(scope='session')
+def composite_eccen():
+    resamp = holo.population.PM_Resample(0.2)
+    ecc = holo.population.PM_Eccentricity()
+    pop = holo.population.Pop_Illustris(mods=[ecc, resamp])
+
+    hards = [
+        holo.evolution.Hard_GW,
+        holo.evolution.Sesana_Scattering(),
+        holo.evolution.Dynamical_Friction_NFW(),
+    ]
+
+    evo = holo.evolution.Evolution(pop, hards, debug=True)
+    evo.evolve()
+    return evo
+
+
+class Test_Composite_Hardening:
+    """Test a composite hardening rate composed of GW+Sesana_Scattering+DF_NFW.
+    """
+
+    def _test_basics(self, evo):
+        num_hards = len(evo._hard)
+        assert num_hards == 3, f"3-hard were hard-coded in constructor `composite()`, loaded {num_hards} instead!"
+        assert evo._debug is True, "`evo._debug` setting is required to be True for this test to work!"
+        eccen_flag = evo.eccen is not None
+        print(f"eccen_flag = {eccen_flag}")
+
+        dadt_sum = np.zeros_like(evo.dadt)
+        dedt_sum = np.zeros_like(evo.dadt)
+        for ii in range(num_hards):
+            key = f"_dadt_{ii}"
+            assert hasattr(evo, key)
+            comp_hard = getattr(evo, key)
+            assert np.shape(comp_hard) == (evo.size, evo.steps)
+            assert np.all(comp_hard <= 0.0)
+            dadt_sum[...] = dadt_sum[...] + comp_hard[...]
+
+            if not eccen_flag:
+                continue
+            key = f"_dedt_{ii}"
+            assert hasattr(evo, key)
+            comp_hard = getattr(evo, key)
+            assert np.shape(comp_hard) == (evo.size, evo.steps)
+            dedt_sum[...] = dedt_sum[...] + comp_hard[...]
+
+        print(f"dadt_sum = {holo.utils.stats(dadt_sum)}")
+        print(f"evo.dadt = {holo.utils.stats(evo.dadt)}")
+        bads = ~np.isclose(dadt_sum, evo.dadt, rtol=1e-6)
+        if np.any(bads):
+            bads = np.where(bads)
+            print(f"BADS = ", bads)
+            print(f"{dadt_sum[bads]}")
+            print(f"{evo.dadt[bads]}")
+
+        assert not np.any(bads)
+
+        if eccen_flag:
+            print(f"dedt_sum = {holo.utils.stats(dedt_sum)}")
+            print(f"evo.dedt = {holo.utils.stats(evo.dedt)}")
+            assert np.allclose(dedt_sum, evo.dedt, rtol=1e-6)
+
+        assert np.all(np.diff(evo.tage, axis=-1) >= 0.0)
+        assert np.all(np.diff(evo.sepa, axis=-1) < 0.0)
+        assert np.all((0.0 < evo.scafa) & (evo.scafa <= 1.0))
+
+        return
+
+    def test_basics_circ(self, composite_circ):
+        self._test_basics(composite_circ)
+        return
+
+    def test_basics_eccen(self, composite_eccen):
+        self._test_basics(composite_eccen)
+        return
+
+    def test_attenuated(self, composite_circ):
+        evo_atten = composite_circ
+        assert isinstance(evo_atten._hard[-1], holo.evolution.Dynamical_Friction_NFW)
+        assert evo_atten._hard[-1]._attenuate is True
+
+        # resamp = holo.population.PM_Resample(0.2)
+        # pop = holo.population.Pop_Illustris(mods=resamp)
+
+        hards = [
+            holo.evolution.Hard_GW,
+            holo.evolution.Sesana_Scattering(),
+            holo.evolution.Dynamical_Friction_NFW(attenuate=False),
+        ]
+
+        evo_noatt = holo.evolution.Evolution(evo_atten._pop, hards, debug=True)
+        evo_noatt.evolve()
+
+        # Attenuated DF should always be weaker (less negative) than un-attenuated
+        # NOTE: there is too much noise for one-to-one comparisons with tage, use percentiles
+        percs = [10, 25, 50, 75, 90]
+        noatt_percs = np.percentile(evo_noatt.tage, percs)
+        atten_percs = np.percentile(evo_atten.tage, percs)
+        assert np.all(atten_percs >= noatt_percs)
+
+        # compare hardening rates directly
+        noatt_dadt = evo_noatt._dadt_2
+        atten_dadt = evo_atten._dadt_2
+        assert noatt_dadt.shape == atten_dadt.shape
+
+        bads = (noatt_dadt > atten_dadt)
+        if np.any(bads):
+            print(f"BADS: {holo.utils.frac_str(bads)}")
+            bads = np.where(bads)
+            print(bads)
+            print(f"noatt = ", holo.utils.stats(noatt_dadt[bads]))
+            print(f"atten = ", holo.utils.stats(atten_dadt[bads]))
+            print(f"noatt = ", noatt_dadt[bads])
+            print(f"atten = ", atten_dadt[bads])
+
+        assert not np.any(bads)
+
+        return
