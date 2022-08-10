@@ -20,6 +20,7 @@ Abbreviations
 * **LISA**: Laser Interferometer Space Antenna, future space-based GW detector
 * **MBH**: Massive Black-Hole, usually treated interchangeably with 'SMBH' (super-massive black-hole)
 * **MBHB**: Massive Black-Hole Binary, also referred to as BSMBH, SMBHB, ...
+* **NFW**: Navarro-Frenk-White dark matter radial-density profile for a dark-matter halo.
 * **PTA**: Pulsar Timing Array.
 * **QLF**: Quasar Luminosity Function.  The number-density of quasars/AGN as a function of their brightness.
 * **SAM**: Semi-Analytic Models.  (Grey area relative to SEMs).
@@ -44,6 +45,6 @@ Symbols
 Terminology
 ===========
 * **AGN/Quasar**: There is a long and convoluted history of terms for different types of EM-bright astronomical sources that are now all believed to be produced by accreting massive black holes.  'Active galactic nuclei' is perhaps the most generic term for any accreting MBH which is then producing EM emission.  Formally 'quasars' are relatively massive MBHs that are accreting at very high rates, and are thus very bright.  Often 'quasar' is used relatively interchangeably with AGN (for instance in 'Quasar Luminosity Function').
-* **Hardening**: the shrinking of the semi-major axis of a binary system by extracting energy and angular momentum.  This term is also often used to simply mean the process of bringing two bodies (i.e. MBHs) closer together, even if they are not formally a gravitational-bound binary.  'Hardening' is typically due to either GW emission, or interactions between the binary and the surrounding environment.
+* **Hardening**: the shrinking of the semi-major axis of a binary system by extracting energy and angular momentum.  This term is also often used to simply mean the process of bringing two bodies (i.e. MBHs) closer together, even if they are not formally a gravitational-bound binary.  'Hardening' is typically due to either GW emission, or interactions between the binary and the surrounding environment.  More generally, the "hardness" of a binary refers to how its binding energy compares to the kinetic energy of the surrounding environment (typically stars).  If the binding energy is larger, then the binary is said to be 'hard'; if the binding energy is less, it is said to be 'soft'.  The "Heggie Law" or the "Heggie-Hills Law" states that hard binaries tend to harden further, and soft binaries tend to soften further, both based on interactions with the surrounding medium.  This is based on a pair of papers: [Heggie1975] and [Hills1975].
 * **M-Mbulge**: the $M_{bh} - M_{\\mathrm{bulge}}$ relation, whereby the mass of MBHs is closely correlated with the mass of the stellar bulge of their host galaxy.
 * **Stellar Bulge**
