@@ -40,34 +40,40 @@ trajectories.
 
 To-Do
 -----
-* General
-    * evolution modifiers should act at each step, instead of after all steps?  This would be
+*   General
+    *   evolution modifiers should act at each step, instead of after all steps?  This would be
       a way to implement a changing accretion rate, for example; or to set a max/min hardening rate.
-    * re-implement "magic" hardening models that coalesce in zero change-of-redshift or fixed
+    *   re-implement "magic" hardening models that coalesce in zero change-of-redshift or fixed
       amounts of time.
-* Dynamical_Friction_NFW
-    * Allow stellar-density profiles to also be specified (instead of using a hard-coded
+*   Dynamical_Friction_NFW
+    *   Allow stellar-density profiles to also be specified (instead of using a hard-coded
       Dehnen profile)
-    * Generalize calculation of stellar characteristic radius.  Make self-consistent with
+    *   Generalize calculation of stellar characteristic radius.  Make self-consistent with
       stellar-profile, and user-specifiable.
-* Sesana_Scattering
-    * Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
+*   Sesana_Scattering
+    *   Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
       and flexible.  Currently hard-coded to Dehnen profile estimate.
-* _SHM06
-    * Interpolants of hardening parameters return 2D arrays which we then take the diagonal
+*   _SHM06
+    *   Interpolants of hardening parameters return 2D arrays which we then take the diagonal
       of, but there should be a better way of doing this.
-* Fixed_Time
-    * Handle `rchar` better with respect to interpolation.  Currently not an interpolation
-      variable, which restricts it's usage.
+*   Fixed_Time
+    *   Handle `rchar` better with respect to interpolation.  Currently not an interpolation
+        variable, which restricts it's usage.
+    *   This class should be separated into a generic `_Fixed_Time` class that can use any
+        functional form, and then a 2-power-law functional form that requires a specified
+        normalization.  When they're combined, it will produce the same effect.  Another good
+        functional form to implement would be GW + log-uniform hardening time, the same as the
+        current phenomenological model but with both power-laws set to 0.
+
 
 References
 ----------
+* [BBR1980]_ Begelman, Blandford & Rees 1980.
+* [Chen2017]_ Chen, Sesana, & Del Pozzo 2017.
+* [Kelley2017a]_ Kelley, Blecha & Hernquist 2017.
 * [Quinlan1996]_ Quinlan 1996.
 * [Sesana2006]_ Sesana, Haardt & Madau et al. 2006.
-* [BBR1980]_ Begelman, Blandford & Rees 1980.
 * [Sesana2010]_ Sesana 2010.
-* [Kelley2017a]_ Kelley, Blecha & Hernquist 2017.
-* [Chen2017]_ Chen, Sesana, & Del Pozzo 2017.
 
 """
 from __future__ import annotations
@@ -121,7 +127,11 @@ class Evolution:
     The `Evolution` class is instantiated with a :class:`holodeck.population._Population_Discrete`
     instance, and a particular binary hardening model (subclass of :class:`_Hardening`).  It then
     numerically integrates each binary from their initial separation to coalescence, determining
-    how much time that process takes, and thus the rate of redshift/time evolution.
+    how much time that process takes, and thus the rate of redshift/time evolution.  NOTE: at
+    initialization, a regular range of binary separations are chosen for each binary being evolved,
+    and the integration calculates the time it takes for each step to complete.  This is unlike most
+    types of dynamical integration in which there is a prescribed time-step, and the amount of
+    distance (etc) traveled over that time is then calculated.
 
     **Initialization**: all attributes are set to empty arrays of the appropriate size.
     NOTE: the 0th step is *not* initialized at this time, it happens in :meth:`Evolution.evolve()`.
@@ -1246,6 +1256,8 @@ class Dynamical_Friction_NFW(_Hardening):
 
     """
 
+    _TIDAL_STRIPPING_DYNAMICAL_TIMES = 10.0
+
     def __init__(self, mmbulge=None, msigma=None, smhm=None, coulomb=10.0, attenuate=True, rbound_from_density=True):
         """Create a hardening rate instance with the given parameters.
 
@@ -1355,8 +1367,15 @@ class Dynamical_Friction_NFW(_Hardening):
         # ---- Get effective mass of inspiraling secondary
         m2 = mass[:, 1]
         mstar_sec = self._mmbulge.mbulge_from_mbh(m2, scatter=False)
-        if self._time_dynamical is None:
-            self._time_dynamical = self._NFW.time_dynamical(sepa, mhalo, redz) * 10
+        #! ----------
+        #! BUG/FIX: is `_time_dynamical` changing at every step?!
+        #! This was being stored initially, but I just commented it out to relculate each time
+        #! Luke Zoltan Kelley, 2022-08-10
+        # if self._time_dynamical is None:
+        #     self._time_dynamical = self._NFW.time_dynamical(sepa, mhalo, redz) * self._TIDAL_STRIPPING_DYNAMICAL_TIMES
+
+        self._time_dynamical = self._NFW.time_dynamical(sepa, mhalo, redz) * self._TIDAL_STRIPPING_DYNAMICAL_TIMES
+        #! ^^^^^^^^^^^
 
         # model tidal-stripping of secondary's bulge (see: [Kelley2017a]_ Eq.6)
         pow = np.clip(1.0 - dt / self._time_dynamical, 0.0, 1.0)
@@ -1484,7 +1503,7 @@ class Fixed_Time(_Hardening):
 
     This class uses a phenomenological functional form (defined in :meth:`Fixed_Time.function`) to
     model the hardening rate ($da/dt$) of binaries.  The functional form is,
-    $$\dot{a} = - A * (1.0 + x)^(-g_2 - 1) / x^(g_1 - 1),$$
+    $$\dot{a} = - A * (1.0 + x)^{-g_2 - 1} / x^{g_1 - 1},$$
     where $x \equiv a / r_\mathrm{char}$ is the binary separation scaled to a characteristic
     transition radius ($r_\mathrm{char}$) between two power-law indices $g_1$ and $g_2$.  There is
     also an overall normalization $A$ that is calculated to yield the desired binary lifetimes.
@@ -1755,7 +1774,7 @@ class Fixed_Time(_Hardening):
         """Hardening rate given the parameters for this hardening model.
 
         The functional form is,
-        $$\dot{a} = - A * (1.0 + x)^(-g_2 - 1) / x^(g_1 - 1),$$
+        $$\dot{a} = - A * (1.0 + x)^{-g_2 - 1} / x^{g_1 - 1},$$
         Where $A$ is an overall normalization, and $x \equiv a / r_\mathrm{char}$ is the binary
         separation scaled to a characteristic transition radius ($r_\mathrm{char}$) between two
         power-law indices $g_1$ and $g_2$.

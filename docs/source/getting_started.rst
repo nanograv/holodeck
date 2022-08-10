@@ -10,9 +10,9 @@ Overview
 
 The `holodeck` package aims to simulate populations of MBH binaries, and calculate their GW signals.  In general the calculation proceeds in three stages:
 
-(1) **Population**: Construct an initial population of MBH 'binaries'.  This is typically done for pairs of MBHs when their galaxies merge (i.e. long before the two MBHs are actually a gravitationally-bound binary).  Constructing the initial binary population may occur in a single step: e.g. gathering MBH-MBH encounters from cosmological hydrodynamic simulations; or it may occur over two steps: (i) gathering galaxy-galaxy encounters, and (ii) prescribing MBH properties for each galaxy.
-(2) **Evolution**: Evolve the binary population from their initial conditions (i.e. large separations) until coalescence (i.e. small separations).  The complexity of this evolutionary stage can range tremendously in complexity.  In the simplest models, binaries are assumed to coalesce instantaneously (in that the age of the universe is the same at formation and coalescence), and are assumed to evolve purely due to GW emission (in that the time spent in any range of orbital frequencies can be calculated from the GW hardening timescale).  Note that these two assumptions are contradictory.
-(3) **Gravitational Waves**: Calculate the resulting GW signals based on the binaries and their evolution.  Note that GWs can only be calculated based on some sort of model for binary evolution.  The model may be extremely simple, in which case it is sometimes glanced over.
+(1) :ref:`Population <populations>`: Construct an initial population of MBH 'binaries'.  This is typically done for pairs of MBHs when their galaxies merge (i.e. long before the two MBHs are actually a gravitationally-bound binary).  Constructing the initial binary population may occur in a single step: e.g. gathering MBH-MBH encounters from cosmological hydrodynamic simulations; or it may occur over two steps: (i) gathering galaxy-galaxy encounters, and (ii) prescribing MBH properties for each galaxy.
+(2) :ref:`Evolution <binary-evolution>`: Evolve the binary population from their initial conditions (i.e. large separations) until coalescence (i.e. small separations).  The complexity of this evolutionary stage can range tremendously in different implementations/models.  In the simplest models, binaries are assumed to coalesce instantaneously (in that the age of the universe is the same at formation and coalescence), and are assumed to evolve purely due to GW emission (in that the time spent in any range of orbital frequencies can be calculated from the GW hardening timescale).  Note that these two assumptions are contradictory.
+(3) :ref:`Gravitational Waves <grav-waves>`: Calculate the resulting GW signals based on the binaries and their evolution.  Note that GWs can only be calculated based on some sort of model for binary evolution.  The model may be extremely simple, in which case it is sometimes glanced over.
 
 
 Files in the Getting Started Guide
@@ -25,6 +25,8 @@ Files in the Getting Started Guide
    Definitions and Abbreviations <defs_abbrevs>
    Annotated Bibliography <biblio>
 
+
+.. _grav-waves:
 
 Gravitational Waves (GWs)
 =========================
@@ -79,6 +81,8 @@ The frequency range that PTAs are sensitive to is determined primarily by the ab
 While there have been a large number of proposed sources of GWs in the nanohertz regime, the best studied sources are binaries of supermassive black holes, with total masses :math:`M \gtrsim 10^8 \, M_\odot`.
 
 
+.. _populations:
+
 Methods for Simulating MBH Binary Populations
 =============================================
 Simulations of MBH Binary (MBHB) populations require three components:
@@ -89,12 +93,15 @@ Simulations of MBH Binary (MBHB) populations require three components:
 
 Components (1) and (2) can be produced in a variety of ways described below and, indeed, in numerous combinations of these methods.
 
-   (A) **Cosmological hydrodynamic simulations** strive to model the fundamental processes underlying galaxy and star formation to produce populations of galaxies, including galaxy mergers, and often massive black holes.
-   (B) **Semi-analytic models (SAMs)** use relatively simple analytic prescriptions for properties of galaxy and MBHs, typically calibrated to observations, to produce initial populations of binary MBHs.
-   (C) **Semi-empirical models (SEMs)** are similar to SAMs, but rely more strongly on observational relationships, and are typically much more complex/comprehensive, often including models for not only galaxy populations but even the internal structure of galaxies and their co-evolution with MBHs.  In this way, SEMs are somewhere in-between SAMs and hydrodynamic simulations, but rely heavily on observations of populations of galaxies and MBHs/AGNs.
-   (D) **Observational catalogs** can also be used to construct binary population more directly, e.g. by starting from  observed AGN or quasars, and prescribing the occurrence rates of binaries.  These observational catalogs will typically use components of SAMs, SEMs, or hydrodynamic simulations to complement the directly observed properties of systems.
+   (A) :ref:`Cosmological hydrodynamic simulations <pop-discrete>` strive to model the fundamental processes underlying galaxy and star formation to produce populations of galaxies, including galaxy mergers, and often massive black holes.
+   (B) :ref:`Semi-analytic models (SAMs) <pop-sams>` use relatively simple analytic prescriptions for properties of galaxy and MBHs, typically calibrated to observations, to produce initial populations of binary MBHs.
+   (C) `Semi-empirical models (SEMs)` [*Not currently implemented in Holodeck*] are similar to SAMs, but rely more strongly on observational relationships, and are typically much more complex/comprehensive, often including models for not only galaxy populations but even the internal structure of galaxies and their co-evolution with MBHs.  In this way, SEMs are somewhere in-between SAMs and hydrodynamic simulations, but rely heavily on observations of populations of galaxies and MBHs/AGNs.
+   (D) :ref:`Observational catalogs <pop-obs>` can also be used to construct binary population more directly, e.g. by starting from  observed AGN or quasars, and prescribing the occurrence rates of binaries.  These observational catalogs will typically use components of SAMs, SEMs, or hydrodynamic simulations to complement the directly observed properties of systems.
 
 Component (3) always requires the same type of implementation: some level of semi-analytic modeling of the physical interactions between MBHBs and the environments of their surrounding galactic nuclei.  The physical processes which mediate *"binary hardening"*, the process of extracting energy and angular momentum to allow the binary orbit to shrink, cannot be resolved directly in either cosmological hydrodynamic simulations or observations which are currently both limited to physical scales :math:`r \gtrsim 100 \, \mathrm{pc}` where the most massive MBHBs are only just starting to gravitationally interact with each other.
+
+
+.. _pop-sams:
 
 Semi-Analytic Models
 --------------------
@@ -176,6 +183,7 @@ The step of going from a number-density of binaries in $(M, q, z)$ space, to als
 in $a$ or $f$ is subtle, as it requires modeling the binary evolution (i.e. hardening rate).
 
 
+.. _pop-discrete:
 
 Finite Volume Cosmological (Hydrodynamic) Simulations
 -----------------------------------------------------
@@ -198,8 +206,8 @@ masses, their initial binary separation, and the redshift at which they formed (
 
 Note that the evolution of binaries, i.e. hardening from large separations to small separations and eventually coalescence, is treated separately (See `Binary Evolution`_ below).
 
-Implementation
-^^^^^^^^^^^^^^
+Finite Volume / Discrete Implementation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Full code documentation: :mod:`discrete populations <holodeck.population>` submodule.
 
 This submodule provides a generalized base-class, :class:`_Population_Discrete <holodeck.population._Population_Discrete>`, that is subclassed
@@ -223,6 +231,8 @@ The implementation for binary evolution (e.g. environmental hardening processes)
 separation or frequency, are included in the :mod:`holodeck.evolution` module, see also below.
 
 
+.. _pop-obs:
+
 Observational (AGN/Quasar) Catalogs
 -----------------------------------
 
@@ -230,6 +240,9 @@ Observational Implementation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Full code documentation: :mod:`observational populations <holodeck.pop_observational>` submodule.
 
+
+
+.. _binary-evolution:
 
 Binary Evolution
 ================
@@ -261,22 +274,24 @@ evolution of each binary, and also the GW calculation.  Note that GWs can only b
 on some sort of model for binary evolution.  The model may be extremely simple, in which case it is
 sometimes glanced over.
 
+
 Evolution Implementation
 ------------------------
+Full code documentation: :mod:`evolution submodule <holodeck.evolution>` submodule.
 
-The core component of the evolution module is the :class:`Evolution` class.  This class combines a
-population of initial binary parameters (i.e. from the :class:`_Population_Discrete <holodeck.population._Population_Discrete>`
-class), along with a specific binary hardening model (:class:`_Hardening` subclass), and performs
-the numerical integration of each binary over time - from large separations to coalescence.  The
+The core component of the evolution module is the :class:`Evolution <holodeck.evolution.Evolution>` class.  This class combines a population of initial binary parameters (i.e. from the :class:`_Population_Discrete <holodeck.population._Population_Discrete>` class), along with a specific binary hardening model (:class:`_Hardening` subclass), and performs the numerical integration of each binary over time - from large separations to coalescence.
+The
 :class:`Evolution` class also acts to store the binary evolution histories ('trajectories' or
 'tracks'), which are then used to calculate GW signals (e.g. the GWB).  To facilitate GW and
 similar calculations, :class:`Evolution` also provides interpolation functionality along binary
 trajectories.
 
+Integration of the binary evolution takes place starting from a regular range/grid of binary separations that are chosen for each binary being evolved.  **The separation (`sepa`) thus acts as the independent variable**.  The integration calculates the time it takes for each step to complete.  This is unlike most types of dynamical integration in which there is a prescribed time-step, and the amount of distance (etc) traveled over that time is then calculated.
+
 The :class:`Evolution <holodeck.evolution.Evolution>` class is (currently) primary built to be used with a
 :class:`Pop_Illustris <holodeck.population.Pop_Illustris>` instance.
 More generally, the `Evolution` class is instantiated with a :class:`_Population_Discrete <holodeck.population._Population_Discrete>`
-instance, and a particular binary hardening model (one or more subclass of :class:`_Hardening`).  It
+instance, and a particular binary hardening model (one or more subclass of :class:`_Hardening <holodeck.evolution._Hardening>`).  It
 then numerically integrates each binary from their
 initial separation to coalescence, determining how much time that process takes, and thus the
 rate of redshift/time evolution.
@@ -285,14 +300,14 @@ rate of redshift/time evolution.
 NOTE: the 0th step is *not* initialized at this time, instead it happens in :meth:`Evolution.evolve()` method.
 
 **Integration**: binary evolution is performed by running the
-:meth:`Evolution.evolve() <holodeck.evolution.Evolution.evolve>` method.  The process is as follows:
+:meth:`Evolution.evolve <holodeck.evolution.Evolution.evolve>` method.  The process is as follows:
 
 (1) Step zero is initialized using the
-    :meth:`Evolution._init_step_zero() <holodeck.evolution.Evolution._init_step_zero>` method.  This transfers
+    :meth:`Evolution._init_step_zero <holodeck.evolution.Evolution._init_step_zero>` method.  This transfers
     attributes from the stored :class:`_Population_Discrete <holodeck.population._Population_Discrete>` instance to the 0th index of the
     evolution arrays.  The attributes are [`sepa`, `scafa`, `mass`, and optionally `eccen`].  The hardening model
     is also used to calculate the 0th hardening rates [`dadt`, `dedt`].
-(2) Integration is performed over all subsequent steps, by progressively calling :meth:`Evolution._take_next_step() <holodeck.evolution.Evolution._take_next_step>`.  For an integration step `s`, we move from index `s-1` to index
+(2) Integration is performed over all subsequent steps, by progressively calling :meth:`Evolution._take_next_step <holodeck.evolution.Evolution._take_next_step>`.  For an integration step `s`, we move from index `s-1` to index
     `s`.  These correspond to the 'left' and 'right' edges of the step.  The evolutionary trajectory values have
     already been calculated on the left edges (during either the previous time step, or the initial time step).
     The numerical integration proceeds as:
@@ -302,11 +317,39 @@ NOTE: the 0th step is *not* initialized at this time, instead it happens in :met
             rule in log-log space.
         (c) The right edge evolution values are stored and updated.
 
-(3) Integration is completed once all steps have been taken, and the :meth:`Evolution._finalize() <holodeck.evolution.Evolution._finalize>` method is called.  Any stored modifiers (:class:`holodeck.utils._Modifier` subclasses) are applied using the :meth:`Evolution._modify() <holodeck.evolution.Evolution._modify>` method, and any diagnostic checks are run with the :meth:`Evolution._check() <holodeck.evolution.Evolution._check>` method.
+(3) Integration is completed once all steps have been taken, and the :meth:`Evolution._finalize <holodeck.evolution.Evolution._finalize>` method is called.  Any stored modifiers (:class:`holodeck.utils._Modifier` subclasses) are applied using the :meth:`Evolution._modify <holodeck.evolution.Evolution._modify>` method, and any diagnostic checks are run with the :meth:`Evolution._check <holodeck.evolution.Evolution._check>` method.
+
+
+Binary Hardening Models
+-----------------------
+A large number of physical processes serve to extract energy and angular momentum from MBH binaries, making their binary separation (i.e. semi-major axis) decrease.  This is called 'hardening'.  In `holodeck` hardening is typically parametrized in terms of a rate of change of the binary semi-major axis $a$, i.e. $da/dt$. It can just as easily be defined with respect to frequency, $df/dt$.  During hardening processes, the eccentricity ($e$) of binaries can also change, parametrized with $de/dt$.  From a theoretical perspective, the eccentricity evolution is even more uncertain than the semi-major axis evolution, and even fewer prescriptions exist for its modeling.  The definitive, early reference for MBH binary hardening (evolution more generally), is [BBR1980]_.
+
+Presentation of example hardening models and their usage can be found in the :mod:`discrete hardening models notebook <holodeck.notebooks.discrete_hardening_models>`.
+
+
+Hardening Implementation
+^^^^^^^^^^^^^^^^^^^^^^^^
+Full code documentation: :mod:`evolution submodule <holodeck.evolution>` submodule.
+
+Hardening models, i.e. methods of calculating $da/dt$ and $de/dt$, are implemented as subclasses of :class:`holodeck.evolution._Hardening`.  Each one, or a combination of them, are passed to the constructor of an :class:`Evolution <holodeck.evolution.Evolution>` instance, and they are used when calling :meth:`Evolution.evolve <holodeck.evolution.Evolution.evolve>`.  **Currently, hardening rates are combined by adding the $da/dt$ and $de/dt$ values directly.  NOTE that this is an approximation, and is not necessarily the correct way to calculate the cumulative hardening rate.**  A more accurate approach would be to calculate (or estimate) the rate of change of the binaries' energy and angular momentum, sum these rates, and derive a corresponding rate of change of semi-major axis and eccentricity.
+
+The only API method that individual hardening models (`_Hardening` subclasses) must implement are the :meth:`_Hardening.dadt_dedt(self, evo, step, *args, **kwargs) <holodeck.evolution._Hardening.dadt_dedt>` method.  The first two arguments are the `Evolution` instance (this is passed in as `self` indirectly during calls to  `Evolution.evolve`), and the `step` number - which of the finite number of evolutionary 'steps' is currently being evaluated.  Each evolution 'step' corresponds to moving from a 'before' state to an 'after' state, such that `step` is the destination: the 'after' state.  Binary parameters are loaded from the 'before' state (e.g. universe scale-factor as `evo.scafa[:, step-1]`), and the values at the 'after' state are calculated and stored (e.g. at `evo.scafa[:, step]`).  `_Hardening.dadt_dedt` then returns the semi-major axis and eccentricity evolution rates, ``dadt, dedt``.  By convention, when eccentricity is not being evolved (i.e. ``evo.eccen is None``) then ``dedt = None`` should be returned.  When eccentricity is being evolved, if the given hardening model does not evolve eccentricity, then `dedt` should be an `np.ndarray` of all zeros, matching the shape of `dadt`.  It is preferable, although not required by the API, for there to be an internal method `_dadt_dedt` which accepts the necessary physical parameters at a given point in time, and returns the derived ``dadt, dedt`` values (e.g. `_dadt_dedt(self, mtot, mrat, sepa)`).  This is useful for testing, plotting, and other diagnostics; and may be required in the future.
+
+Recall that upon initialization of the `Evolution` instance, a fixed range/grid of binary separations is chosen for each binary (in log-space between the initial binary separation, and the coalescence radius).  From :meth:`Evolution.evolve <holodeck.evolution.Evolution.evolve>`, once the cumulate evolution rates ($da/dt$, $de/dt$) are calculated from all stored `_Hardening` instances, then the time it takes to move one step of binary separation is calculated.  This time is then converted to a change in scale-factor of the universe, and the `Evolution.scafa` attribute is updated for the next step.
+
+Some of the implemented hardening models are described below:
+
+*   :class:`Hard_GW <holodeck.evolution.Hard_GW>` : gravitational-wave driven evolution.
+*   :class:`Dynamical_Friction_NFW <holodeck.evolution.Dynamical_Friction_NFW>` : dynamical friction based on a simple semi-analytic model assuming an NFW dark matter halo, and Dehnen stellar density profile.
+*   :class:`Sesana_Scattering <holodeck.evolution.Sesana_Scattering>` : stellar 'loss-cone' scattering model.  This is implemented assuming a Dehnen stellar density profile, and the prescription of [Quinlan1996]_, with the numerically calculated coefficients and fit-functions from [Sesana2006]_.
+*   :class:`Fixed_Time <holodeck.evolution.Fixed_Time>` : a phenomenological hardening model with 4 parameters: two power-laws (defined in hardening time, $a / (da/dt)$), $\gamma_1$ and $\gamma_2$; a characteristic transition radius between the two, $r_c$; and an overall hardening rate normalization $A$.  The `Fixed_Time` model includes GW hardening.
+
 
 
 Observational Constraints on MBH and MBH-Binary Populations
 ===========================================================
+
+
 
 
 
