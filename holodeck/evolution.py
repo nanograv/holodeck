@@ -1485,15 +1485,6 @@ class Fixed_Time(_Hardening):
     _INTERP_THRESH_PAD_FACTOR = 5.0      #
     _TIME_TOTAL_RMIN = 1.0e-5 * PC       # minimum radius [cm] used to calculate inspiral time
 
-    @classmethod
-    def from_pop(cls, pop, time, **kwargs):
-        return cls(time, *pop.mtmr, pop.redz, pop.sepa, **kwargs)
-
-    @classmethod
-    def from_sam(cls, sam, time, sepa_init=1e4*PC, **kwargs):
-        mtot, mrat, redz = [gg.ravel() for gg in sam.grid]
-        return cls(time, mtot, mrat, redz, sepa_init, **kwargs)
-
     def __init__(self, time, mtot, mrat, redz, sepa, rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5, progress=True):
         """
 
@@ -1519,10 +1510,6 @@ class Fixed_Time(_Hardening):
 
         """
         self._progress = progress
-
-        # mtot, mrat = utils.mtmr_from_m1m2(pop.mass)
-        # sepa = pop.sepa
-        # redz = cosmo.a_to_z(pop.scafa)
 
         # ---- Initialize / Sanitize arguments
 
@@ -1593,11 +1580,21 @@ class Fixed_Time(_Hardening):
         self._rchar = rchar
         return
 
+    @classmethod
+    def from_pop(cls, pop, time, **kwargs):
+        return cls(time, *pop.mtmr, pop.redz, pop.sepa, **kwargs)
+
+    @classmethod
+    def from_sam(cls, sam, time, sepa_init=1e4*PC, **kwargs):
+        mtot, mrat, redz = [gg.ravel() for gg in sam.grid]
+        return cls(time, mtot, mrat, redz, sepa_init, **kwargs)
+
     def dadt_dedt(self, evo, step):
         mass = evo.mass[:, step, :]
         sepa = evo.sepa[:, step]
         mt, mr = utils.mtmr_from_m1m2(mass)
-        dadt, dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_sc, self._gamma_df)
+        dadt, _dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_sc, self._gamma_df)
+        dedt = None if evo.eccen is None else np.zeros_like(dadt)
         return dadt, dedt
 
     def dadt(self, mt, mr, sepa):
