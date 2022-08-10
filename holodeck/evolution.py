@@ -1367,15 +1367,15 @@ class Dynamical_Friction_NFW(_Hardening):
         # ---- Get effective mass of inspiraling secondary
         m2 = mass[:, 1]
         mstar_sec = self._mmbulge.mbulge_from_mbh(m2, scatter=False)
-        #! ----------
-        #! BUG/FIX: is `_time_dynamical` changing at every step?!
-        #! This was being stored initially, but I just commented it out to relculate each time
-        #! Luke Zoltan Kelley, 2022-08-10
+        # ! ----------
+        # ! BUG/FIX: is `_time_dynamical` changing at every step?!
+        # ! This was being stored initially, but I just commented it out to relculate each time
+        # ! Luke Zoltan Kelley, 2022-08-10
         # if self._time_dynamical is None:
         #     self._time_dynamical = self._NFW.time_dynamical(sepa, mhalo, redz) * self._TIDAL_STRIPPING_DYNAMICAL_TIMES
 
         self._time_dynamical = self._NFW.time_dynamical(sepa, mhalo, redz) * self._TIDAL_STRIPPING_DYNAMICAL_TIMES
-        #! ^^^^^^^^^^^
+        # ! ^^^^^^^^^^^
 
         # model tidal-stripping of secondary's bulge (see: [Kelley2017a]_ Eq.6)
         pow = np.clip(1.0 - dt / self._time_dynamical, 0.0, 1.0)
@@ -1962,13 +1962,13 @@ class Fixed_Time(_Hardening):
         # Assume linear scaling to refine the first guess
         g0 = guess * np.ones_like(target_time)
         test = integ(g0)
-        guess = g0 * (test / target_time)
-        log.debug(f"Guess {g0:.4e} ==> {utils.stats(guess)}")
+        g1 = g0 * (test / target_time)
+        log.debug(f"Guess {guess:.4e} ==> {utils.stats(g1)}")
 
         # perform optimization
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            norm = sp.optimize.newton(lambda xx: integ(xx) - target_time, guess)
+            norm = sp.optimize.newton(lambda xx: integ(xx) - target_time, g1)
 
         return norm
 

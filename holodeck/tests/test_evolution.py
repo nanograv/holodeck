@@ -794,3 +794,51 @@ class Test_Composite_Hardening:
         assert not np.any(bads)
 
         return
+
+
+class Test_Fixed_Time:
+
+    def test_circ(self):
+        resamp = holo.population.PM_Resample(0.2)
+        pop = holo.population.Pop_Illustris(mods=resamp)
+
+        TIME = 2 * GYR
+        fixed = holo.evolution.Fixed_Time.from_pop(pop, TIME)
+        evo = holo.evolution.Evolution(pop, fixed, debug=False)
+        evo.evolve()
+
+        assert np.all((evo.dadt < 0.0))
+        assert evo.eccen is None
+        assert evo.dedt is None
+        assert np.all(evo.tage > 0.0)
+
+        tage = evo.tage
+        time = tage[:, -1] - tage[:, 0]
+        err = f"Targe time: {TIME/GYR} [Gyr] | actual = {holo.utils.stats(time/GYR)}!"
+        print(err)
+        assert np.allclose(time, TIME, rtol=0.1), err
+
+        return
+
+    def test_eccen(self):
+        resamp = holo.population.PM_Resample(0.2)
+        eccen = holo.population.PM_Eccentricity()
+        pop = holo.population.Pop_Illustris(mods=[resamp, eccen])
+
+        TIME = 2 * GYR
+        fixed = holo.evolution.Fixed_Time.from_pop(pop, TIME)
+        evo = holo.evolution.Evolution(pop, fixed, debug=False)
+        evo.evolve()
+
+        assert np.all((evo.dadt < 0.0))
+        assert np.shape(evo.eccen) == np.shape(evo.sepa)
+        assert np.shape(evo.dedt) == np.shape(evo.dadt)
+        assert np.all(evo.tage > 0.0)
+
+        tage = evo.tage
+        time = tage[:, -1] - tage[:, 0]
+        err = f"Targe time: {TIME/GYR} [Gyr] | actual = {holo.utils.stats(time/GYR)}!"
+        print(err)
+        assert np.allclose(time, TIME, rtol=0.1), err
+
+        return
