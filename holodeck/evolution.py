@@ -1290,6 +1290,7 @@ class Dynamical_Friction_NFW(_Hardening):
         Parameters
         ----------
         evo : `Evolution` instance
+            The evolutionary tracks of the binary population, providing binary parameters.
         step : int,
             Integration step at which to calculate hardening rates.
 
@@ -1297,8 +1298,9 @@ class Dynamical_Friction_NFW(_Hardening):
         -------
         dadt : (N,) np.ndarray of scalar,
             Binary hardening rates in units of [cm/s].
-        dedt : (N,) np.ndarray of scalar, NOTE: always zero
-            Rate-of-change of eccentricity, which is not included in this calculation (i.e. zero)
+        dedt : (N,) np.ndarray or None
+            Rate-of-change of eccentricity, which is not included in this calculation, it is zero.
+            `None` is returned if the input `eccen` is None.
 
         """
         if attenuate is None:
@@ -1478,7 +1480,33 @@ class Dynamical_Friction_NFW(_Hardening):
 
 
 class Fixed_Time(_Hardening):
-    """
+    """Provide a binary hardening rate such that the total lifetime matches a given value.
+
+    This class uses a phenomenological functional form (defined in :meth:`Fixed_Time.function`) to
+    model the hardening rate ($da/dt$) of binaries.  The functional form is,
+    $$\dot{a} = - A * (1.0 + x)^(-g_2 - 1) / x^(g_1 - 1),$$
+    where $x \equiv a / r_\mathrm{char}$ is the binary separation scaled to a characteristic
+    transition radius ($r_\mathrm{char}$) between two power-law indices $g_1$ and $g_2$.  There is
+    also an overall normalization $A$ that is calculated to yield the desired binary lifetimes.
+
+    NOTE/BUG: the actual binary lifetimes tend to be 1-5% shorter than the requested value.
+
+    The normalization for each binary, to produce the desired lifetime, is calculated as follows:
+    (1) A set of random test binary parameters are chosen.
+    (2) The normalization constants are determined, using least-squares optimization, to yield the
+        desired lifetime.
+    (3) Interpolants are constructed to interpolate between the test binary parameters.
+    (4) The interpolants are called on the provided binary parameters, to calculate the
+        interpolated normalization constants to reach the desired lifetimes.
+
+    Construction/Initialization: note that in addition to the standard :meth:`Fixed_Time.__init__`
+    constructor, there are two additional constructors are provided:
+    *   :meth:`Fixed_Time.from_pop` - accept a :class:`holodeck.population._Discrete_Population`,
+    *   :meth:`Fixed_Time.from_sam` - accept a :class:`holodeck.sam.Semi_Analytic_Model`.
+
+    #! Using a callable for `rchar` probably doesnt work - `_calculate_norm_interpolant` looks like
+    #! it only accepts a scalar value.
+
     """
 
     _INTERP_NUM_POINTS = 1e4             # number of random data points used to construct interpolant
@@ -1486,27 +1514,34 @@ class Fixed_Time(_Hardening):
     _TIME_TOTAL_RMIN = 1.0e-5 * PC       # minimum radius [cm] used to calculate inspiral time
 
     def __init__(self, time, mtot, mrat, redz, sepa, rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5, progress=True):
-        """
+        """Initialize `Fixed_Time` instance for the given binary properties and function parameters.
 
         Parameters
         ----------
-        pop : `_Population` instance
-        time : scalar, callable  or  array_like[scalar]
+        time : float,  callable  or  array_like
             Total merger time of binaries, units of [sec], specifiable in the following ways:
-            *   scalar : uniform merger time for all binaries
+            *   float : uniform merger time for all binaries
             *   callable : function `time(mtot, mrat, redz)` which returns the total merger time
             *   array_like : (N,) matching the shape of `mtot` (etc) giving the merger time for
                 each binary
+        mtot : array_like
+            Binary total-mass [gram].
+        mrat : array_like
+            Binary mass-ratio $q \equiv m_2 / m_1 \leq 1$.
+        redz : array_like
+            Redshift.
+        sepa : array_like
+            Binary semi-major axis (separation) [cm].
         rchar : scalar  or  callable
             Characteristic radius dividing two power-law regimes, in units of [cm]:
             *   scalar : uniform radius for all binaries
             *   callable : function `rchar(mtot, mrat, redz)` which returns the radius
         gamma_sc : scalar
-            Power-law of hardening timescale in the stellar-scattering regime
-            (small separations: r < rchar)
+            Power-law of hardening timescale in the stellar-scattering regime,
+            (small separations: r < rchar), at times referred to internally as `g1`.
         gamma_df : scalar
             Power-law of hardening timescale in the dynamical-friction regime
-            (large separations: r > rchar)
+            (large separations: r > rchar), at times referred to internally as `g1`.
 
         """
         self._progress = progress
@@ -1525,7 +1560,7 @@ class Fixed_Time(_Hardening):
 
         # `rchar` must be a function of only mtot, mrat; or otherwise a fixed value
         # This is because it is not being used as an interpolation variable, only an external parameter
-        # FIX: either an ndarray could be allowed when interpolation is not needed (i.e. small numbers of systems)
+        # FIX/BUG: either an ndarray could be allowed when interpolation is not needed (i.e. small numbers of systems)
         #      or `rchar` could be added as an explicit interpolation variable
         if callable(rchar):
             rchar = rchar(mtot, mrat, redz)
@@ -1548,8 +1583,6 @@ class Fixed_Time(_Hardening):
             # the 4 parameters are:      [log10(M/MSOL), log10(q), time/Gyr, log10(Rmax/PC)]
             # the interpolants return the log10 of the norm values
             interp, backup = self._calculate_norm_interpolant(rchar, gamma_sc, gamma_df)
-            # self._interp = interp
-            # self._interp_backup = backup
 
             points = [np.log10(mtot/MSOL), np.log10(mrat), time/GYR, np.log10(sepa/PC)]
             points = np.array(points)
@@ -1580,16 +1613,85 @@ class Fixed_Time(_Hardening):
         self._rchar = rchar
         return
 
+    # ====     Constructors    ====
+
     @classmethod
     def from_pop(cls, pop, time, **kwargs):
+        """Initialize a `Fixed_Time` instance using a provided `_Discrete_Population` instance.
+
+        Parameters
+        ----------
+        pop : `_Discrete_Population`
+            Input population, from which to use masses, redshifts and separations.
+        time : float,  callable  or  array_like
+            Total merger time of binaries, units of [sec], specifiable in the following ways:
+            *   float : uniform merger time for all binaries
+            *   callable : function `time(mtot, mrat, redz)` which returns the total merger time
+            *   array_like : (N,) matching the shape of `mtot` (etc) giving the merger time for
+                each binary
+        **kwargs : dict
+            Additional keyword-argument pairs passed to the `Fixed_Time` initialization method.
+
+        Returns
+        -------
+        `Fixed_Time`
+            Instance configured for the given binary population.
+
+        """
         return cls(time, *pop.mtmr, pop.redz, pop.sepa, **kwargs)
 
     @classmethod
     def from_sam(cls, sam, time, sepa_init=1e4*PC, **kwargs):
+        """Initialize a `Fixed_Time` instance using a provided `_Discrete_Population` instance.
+
+        Parameters
+        ----------
+        sam : `holodeck.sam.Semi_Analytic_Model`
+            Input population, from which to use masses, redshifts and separations.
+        time : float,  callable  or  array_like
+            Total merger time of binaries, units of [sec], specifiable in the following ways:
+            *   float : uniform merger time for all binaries
+            *   callable : function `time(mtot, mrat, redz)` which returns the total merger time
+            *   array_like : (N,) matching the shape of `mtot` (etc) giving the merger time for
+                each binary
+        sepa_init : float  or  array_like
+            Initial binary separation.  Units of [cm].
+            *   float : initial separation applied to all binaries,
+            *   array_like : initial separations for all binaries, shaped (N,) matching the number
+                binaries.
+        **kwargs : dict
+            Additional keyword-argument pairs passed to the `Fixed_Time` initialization method.
+
+        Returns
+        -------
+        `Fixed_Time`
+            Instance configured for the given binary population.
+
+        """
         mtot, mrat, redz = [gg.ravel() for gg in sam.grid]
         return cls(time, mtot, mrat, redz, sepa_init, **kwargs)
 
+    # ====     Hardening Rate Methods    ====
+
     def dadt_dedt(self, evo, step):
+        """Calculate hardening rate at the given integration `step`, for the given population.
+
+        Parameters
+        ----------
+        evo : `Evolution` instance
+            The evolutionary tracks of the binary population, providing binary parameters.
+        step : int,
+            Integration step at which to calculate hardening rates.
+
+        Returns
+        -------
+        dadt : (N,) np.ndarray
+            Binary hardening rates in units of [cm/s].
+        dedt : (N,) np.ndarray or None
+            Rate-of-change of eccentricity, which is not included in this calculation, it is zero.
+            `None` is returned if the input `eccen` is None.
+
+        """
         mass = evo.mass[:, step, :]
         sepa = evo.sepa[:, step]
         mt, mr = utils.mtmr_from_m1m2(mass)
@@ -1597,13 +1699,46 @@ class Fixed_Time(_Hardening):
         dedt = None if evo.eccen is None else np.zeros_like(dadt)
         return dadt, dedt
 
-    def dadt(self, mt, mr, sepa):
-        dadt, dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_sc, self._gamma_df)
-        return dadt
+    # def dadt(self, mt, mr, sepa):
+    #     dadt, dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_sc, self._gamma_df)
+    #     return dadt
 
     @classmethod
-    def _dadt_dedt(cls, mt, mr, sepa, norm, rchar, g1, g2):
-        m1, m2 = utils.m1m2_from_mtmr(mt, mr)
+    def _dadt_dedt(cls, mtot, mrat, sepa, norm, rchar, g1, g2):
+        """Calculate hardening rate for the given raw parameters.
+
+        Parameters
+        ----------
+        mtot : array_like
+            Binary total-mass [gram].
+        mrat : array_like
+            Binary mass-ratio $q \equiv m_2 / m_1 \leq 1$.
+        redz : array_like
+            Redshift.
+        sepa : array_like
+            Binary semi-major axis (separation) [cm].
+        norm : array_like
+            Hardening rate normalization, units of [cm/s].
+        rchar : array_like
+            Characteristic transition radius between the two power-law indices of the hardening
+            rate model, units of [cm].
+        g1 : scalar
+            Power-law of hardening timescale in the stellar-scattering regime,
+            (small separations: r < rchar).
+        g2 : scalar
+            Power-law of hardening timescale in the dynamical-friction regime,
+            (large separations: r > rchar).
+
+        Returns
+        -------
+        dadt : (N,) np.ndarray
+            Binary hardening rates in units of [cm/s].
+        dedt : (N,) np.ndarray or None
+            Rate-of-change of eccentricity, which is not included in this calculation, it is zero.
+            `None` is returned if the input `eccen` is None.
+
+        """
+        m1, m2 = utils.m1m2_from_mtmr(mtot, mrat)
         dadt_gw = utils.gw_hardening_rate_dadt(m1, m2, sepa)
 
         xx = sepa / rchar
@@ -1613,49 +1748,102 @@ class Fixed_Time(_Hardening):
         dedt = None
         return dadt, dedt
 
+    # ====     Internal Functions    ====
+
     @classmethod
     def function(cls, norm, xx, g1, g2):
+        """Hardening rate given the parameters for this hardening model.
+
+        The functional form is,
+        $$\dot{a} = - A * (1.0 + x)^(-g_2 - 1) / x^(g_1 - 1),$$
+        Where $A$ is an overall normalization, and $x \equiv a / r_\mathrm{char}$ is the binary
+        separation scaled to a characteristic transition radius ($r_\mathrm{char}$) between two
+        power-law indices $g_1$ and $g_2$.
+
+        Parameters
+        ----------
+        norm : array_like
+            Hardening rate normalization, units of [cm/s].
+        xx : array_like
+            Dimensionless binary separation, the semi-major axis in units of the characteristic
+            (i.e. transition) radius of the model `rchar`.
+        g1 : scalar
+            Power-law of hardening timescale in the stellar-scattering regime,
+            (small separations: r < rchar).
+        g2 : scalar
+            Power-law of hardening timescale in the dynamical-friction regime,
+            (large separations: r > rchar).
+
+        """
         dadt = - norm * np.power(1.0 + xx, -g2-1) / np.power(xx, g1-1)
         return dadt
 
     @classmethod
-    def _time_total(cls, norm, mt, mr, rchar, g1, g2, rmax, num=100):
-        norm = np.atleast_1d(norm)
-        args = [norm, mt, mr, rchar, g1, g2, rmax, cls._TIME_TOTAL_RMIN]
-        args = np.broadcast_arrays(*args)
-        norm, mt, mr, rchar, g1, g2, rmax, rmin = args
-        if np.ndim(norm) != 1:
-            raise
+    def _calculate_norm_interpolant(cls, rchar, gamma_sc, gamma_df):
+        """Generate interpolants to map from binary parameters to hardening rate normalization.
 
-        rextr = np.log10([rmin, rmax]).T
-        rads = np.linspace(0.0, 1.0, num)[np.newaxis, :]
+        Interpolants are calculated as follows:
+        (1) A set of random test binary parameters and lifetimes are chosen.
+        (2) The normalizations to yield those binary lifetimes are calculated with least-squares
+            optimization.
+        (3) Interpolants are constructed to yield the normalization paramters for the given
+            binary parameters and binary lifetime.
 
-        rads = rextr[:, 0, np.newaxis] + rads * np.diff(rextr, axis=1)
-        rads = 10.0 ** rads
+        Two interpolators are returned, a linear-interpolator that is the preferable one, and a
+        backup nearest-interplator that is more robust and works at times when the linear
+        interpolator fails.
 
-        args = [norm, mt, mr, rchar, g1, g2]
-        args = [aa[:, np.newaxis] for aa in args]
-        norm, mt, mr, rchar, g1, g2 = args
+        Parameters
+        ----------
+        rchar : scalar  or  array_like  #! Possible that only a scalar value is currently working!
+            Characteristic radius separating the two power-law regimes, in units of [cm]:
+            *   scalar : uniform radius for all binaries
+            *   array_like : characteristic radius for each binary.
+        gamma_sc : scalar
+            Power-law of hardening timescale in the stellar-scattering regime,
+            (small separations: r < rchar), at times referred to internally as `g1`.
+        gamma_df : scalar
+            Power-law of hardening timescale in the dynamical-friction regime
+            (large separations: r > rchar), at times referred to internally as `g1`.
 
-        dadt, _ = cls._dadt_dedt(mt, mr, rads, norm, rchar, g1, g2)
+        Returns
+        -------
+        interp : callable
+            Linear interpolator from (M, q, t, r) => A
+            (total-mass, mass-ratio, lifetime, initial-radius) => hardening normalization
+        backup : callable
+            Nearest interpolator from (M, q, t, r) => A, to use as a backup when `interp` fails.
+            (total-mass, mass-ratio, lifetime, initial-radius) => hardening normalization
 
-        tt = utils.trapz_loglog(- 1.0 / dadt, rads, axis=-1)
-        tt = tt[:, -1]
-        return tt
+        """
+        mt = [1e6, 1e11]
+        mr = [1e-5, 1.0]
+        td = [0.0, 20.0]
+        rm = [1e3, 1e5]
 
-    @classmethod
-    def _get_norm(cls, tau, *args, guess=1e0):
-        def integ(norm):
-            return cls._time_total(norm, *args)
+        num_points = int(cls._INTERP_NUM_POINTS)
+        mt = 10.0 ** np.random.uniform(*np.log10(mt), num_points) * MSOL
+        mr = 10.0 ** np.random.uniform(*np.log10(mr), mt.size)
+        td = np.random.uniform(*td, mt.size+1)[1:] * GYR
+        rm = 10.0 ** np.random.uniform(*np.log10(rm), mt.size) * PC
 
-        g0 = guess * np.ones_like(tau)
-        test = integ(g0)
-        guess = g0 * (test / tau)
+        norm = cls._get_norm_chunk(td, mt, mr, rchar, gamma_sc, gamma_df, rm)
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            rv = sp.optimize.newton(lambda xx: integ(xx) - tau, guess)
-        return rv
+        valid = np.isfinite(norm) & (norm > 0.0)
+        if not np.all(valid):
+            err = f"Invalid normalizations!  {utils.frac_str(valid, 4)}"
+            log.error(err)
+            raise ValueError(err)
+
+        points = [mt, mr, td, rm]
+        units = [MSOL, 1.0, GYR, PC]
+        logs = [True, True, False, True]
+        points = [pp/uu for pp, uu in zip(points, units)]
+        points = [np.log10(pp) if ll else pp for pp, ll in zip(points, logs)]
+        points = np.array(points).T
+        interp = sp.interpolate.LinearNDInterpolator(points, np.log10(norm))
+        backup = sp.interpolate.NearestNDInterpolator(points, np.log10(norm))
+        return interp, backup
 
     @classmethod
     def _get_norm_chunk(cls, tau, *args, guess=1e0, chunk=1e3, progress=True):
@@ -1683,41 +1871,43 @@ class Fixed_Time(_Hardening):
         return sol
 
     @classmethod
-    def _calculate_norm_interpolant(cls, rchar, gamma_one, gamma_two):
-        mt = [1e6, 1e11]
-        mr = [1e-5, 1.0]
-        td = [0.0, 20.0]
-        rm = [1e3, 1e5]
+    def _get_norm(cls, tau, *args, guess=1e0):
+        def integ(norm):
+            return cls._time_total(norm, *args)
 
-        num_points = int(cls._INTERP_NUM_POINTS)
-        mt = 10.0 ** np.random.uniform(*np.log10(mt), num_points) * MSOL
-        mr = 10.0 ** np.random.uniform(*np.log10(mr), mt.size)
-        td = np.random.uniform(*td, mt.size+1)[1:] * GYR
-        rm = 10.0 ** np.random.uniform(*np.log10(rm), mt.size) * PC
+        g0 = guess * np.ones_like(tau)
+        test = integ(g0)
+        guess = g0 * (test / tau)
 
-        norm = cls._get_norm_chunk(td, mt, mr, rchar, gamma_one, gamma_two, rm)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            rv = sp.optimize.newton(lambda xx: integ(xx) - tau, guess)
+        return rv
 
-        valid = np.isfinite(norm) & (norm > 0.0)
-        if not np.all(valid):
-            err = f"Invalid normalizations!  {utils.frac_str(valid, 4)}"
-            log.error(err)
-            raise ValueError(err)
+    @classmethod
+    def _time_total(cls, norm, mt, mr, rchar, g1, g2, rmax, num=100):
+        norm = np.atleast_1d(norm)
+        args = [norm, mt, mr, rchar, g1, g2, rmax, cls._TIME_TOTAL_RMIN]
+        args = np.broadcast_arrays(*args)
+        norm, mt, mr, rchar, g1, g2, rmax, rmin = args
+        if np.ndim(norm) != 1:
+            raise
 
-        points = [mt, mr, td, rm]
-        units = [MSOL, 1.0, GYR, PC]
-        logs = [True, True, False, True]
-        points = [pp/uu for pp, uu in zip(points, units)]
-        points = [np.log10(pp) if ll else pp for pp, ll in zip(points, logs)]
-        points = np.array(points).T
-        interp = sp.interpolate.LinearNDInterpolator(points, np.log10(norm))
-        backup = sp.interpolate.NearestNDInterpolator(points, np.log10(norm))
-        return interp, backup
+        rextr = np.log10([rmin, rmax]).T
+        rads = np.linspace(0.0, 1.0, num)[np.newaxis, :]
 
+        rads = rextr[:, 0, np.newaxis] + rads * np.diff(rextr, axis=1)
+        rads = 10.0 ** rads
 
-class Fixed_Time_SAM(Fixed_Time):
+        args = [norm, mt, mr, rchar, g1, g2]
+        args = [aa[:, np.newaxis] for aa in args]
+        norm, mt, mr, rchar, g1, g2 = args
 
-    def __init__(self, sam, time, **kwargs):
-        pass
+        dadt, _ = cls._dadt_dedt(mt, mr, rads, norm, rchar, g1, g2)
+
+        tt = utils.trapz_loglog(- 1.0 / dadt, rads, axis=-1)
+        tt = tt[:, -1]
+        return tt
 
 
 # =================================================================================================
