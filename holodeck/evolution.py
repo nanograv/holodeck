@@ -1359,52 +1359,47 @@ class Dynamical_Friction_NFW(_Hardening):
 
         """
         # ---- Get Host DM-Halo mass
-        # use "bulge-mass" as a proxy for total stellar mass
-        # mstar = self._mmbulge.mbulge_from_mbh(mass[:, 0], scatter=False)   # use primary-bh's mass (index 0)
-        mstar = self._mmbulge.mbulge_from_mbh(mass.sum(axis=-1), scatter=False)   # use total bh-mass
+        mstar = self._mmbulge.mstar_from_mbh(mass.sum(axis=-1), scatter=False)   # use total bh-mass
         mhalo = self._smhm.halo_mass(mstar, redz, clip=True)
 
         # ---- Get effective mass of inspiraling secondary
         m2 = mass[:, 1]
-        mstar_sec = self._mmbulge.mbulge_from_mbh(m2, scatter=False)
-        # ! ----------
-        # ! BUG/FIX: is `_time_dynamical` changing at every step?!
-        # ! This was being stored initially, but I just commented it out to relculate each time
-        # ! Luke Zoltan Kelley, 2022-08-10
-        # if self._time_dynamical is None:
-        #     self._time_dynamical = self._NFW.time_dynamical(sepa, mhalo, redz) * self._TIDAL_STRIPPING_DYNAMICAL_TIMES
-
-        self._time_dynamical = self._NFW.time_dynamical(sepa, mhalo, redz) * self._TIDAL_STRIPPING_DYNAMICAL_TIMES
-        # ! ^^^^^^^^^^^
+        mstar_sec = self._mmbulge.mstar_from_mbh(m2, scatter=False)
 
         # model tidal-stripping of secondary's bulge (see: [Kelley2017a]_ Eq.6)
-        pow = np.clip(1.0 - dt / self._time_dynamical, 0.0, 1.0)
-        meff = m2 * np.power((m2 + mstar_sec)/m2, pow)
+        time_dyn = self._NFW.time_dynamical(sepa, mhalo, redz)
+        tfrac = dt / (time_dyn * self._TIDAL_STRIPPING_DYNAMICAL_TIMES)
+        log.debug(f"DF tfrac = {utils.stats(tfrac)}")
+        power_index = np.clip(1.0 - tfrac, 0.0, 1.0)
+        log.debug(f"DF m2   = {utils.stats(m2/MSOL)} [Msol]")
+        meff = m2 * np.power((m2 + mstar_sec)/m2, power_index)
+        log.debug(f"DF meff = {utils.stats(meff/MSOL)} [Msol]")
 
         dens = self._NFW.density(sepa, mhalo, redz)
         velo = self._NFW.velocity_circular(sepa, mhalo, redz)
-        tdyn = self._NFW.time_dynamical(sepa, mhalo, redz)
         # Note: this should be returned as negative values
         dvdt = self._dvdt(meff, dens, velo)
+        log.debug(f"DF dvdt = {utils.stats(dvdt*GYR/1e5)} [km/s/Gyr]")
 
         # convert from deceleration to hardening-rate assuming virialized orbit (i.e. ``GM/a = v^2``)
-        dadt = 2 * tdyn * dvdt
+        dadt = 2 * time_dyn * dvdt
         dedt = None if (eccen is None) else np.zeros_like(dadt)
-
-        # Hardening rate cannot be larger than orbital/virial velocity
-        log.debug(f"|dadt| = {utils.stats(np.fabs(dadt))}")
-        log.debug(f"|velo| = {utils.stats(velo)}")
-        clip = (np.fabs(dadt) > velo)
-        if np.any(clip):
-            log.debug(f"clipping {utils.frac_str(clip)} `dadt` values to vcirc")
-            prev = dadt.copy()
-            dadt[clip] = - velo[clip]
-            log.debug(f"\t{utils.stats(prev*YR/PC)} ==> {utils.stats(dadt*YR/PC)}")
-            del prev
+        log.debug(f"DF dadt = {utils.stats(dadt*GYR/PC)} [pc/Gyr]")
 
         if attenuate:
             atten = self._attenuation_BBR1980(sepa, mass, mstar)
             dadt = dadt / atten
+
+        # Hardening rate cannot be larger than orbital/virial velocity
+        log.debug(f"DF velo = {utils.stats(velo*GYR/PC)} [pc/Gyr]")
+        clip = (np.fabs(dadt) > velo)
+        log.debug(f"clipping {utils.frac_str(clip)} `dadt` values to vcirc")
+        dadt[clip] = - velo[clip]
+        # if np.any(clip):
+        #     dadt[clip] = - velo[clip]
+        #     prev = dadt.copy()
+        #     log.debug(f"\t{utils.stats(prev*YR/PC)} ==> {utils.stats(dadt*YR/PC)}")
+        #     del prev
 
         return dadt, dedt
 

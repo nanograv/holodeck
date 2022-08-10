@@ -754,8 +754,8 @@ class Test_Composite_Hardening:
 
     def test_attenuated(self, composite_circ):
         evo_atten = composite_circ
-        assert isinstance(evo_atten._hard[-1], holo.evolution.Dynamical_Friction_NFW)
-        assert evo_atten._hard[-1]._attenuate is True
+        assert isinstance(evo_atten._hard[-1], holo.evolution.Dynamical_Friction_NFW), "BAD INSTANCE"
+        assert evo_atten._hard[-1]._attenuate is True, "BAD SETTING"
 
         # resamp = holo.population.PM_Resample(0.2)
         # pop = holo.population.Pop_Illustris(mods=resamp)
@@ -774,14 +774,16 @@ class Test_Composite_Hardening:
         percs = [10, 25, 50, 75, 90]
         noatt_percs = np.percentile(evo_noatt.tage, percs)
         atten_percs = np.percentile(evo_atten.tage, percs)
-        assert np.all(atten_percs >= noatt_percs)
+        assert np.all(atten_percs >= noatt_percs), "BAD PERCENTILES"
 
         # compare hardening rates directly
         noatt_dadt = evo_noatt._dadt_2
         atten_dadt = evo_atten._dadt_2
-        assert noatt_dadt.shape == atten_dadt.shape
+        assert noatt_dadt.shape == atten_dadt.shape, "BAD SHAPE"
 
-        bads = (noatt_dadt > atten_dadt)
+        bads = (noatt_dadt > atten_dadt) & ~np.isclose(noatt_dadt, atten_dadt, rtol=1e-6)
+        err = f"Found {holo.utils.frac_str(bads)} cases where attenuated DF is stronger than un-attenuated!"
+        print(err)
         if np.any(bads):
             print(f"BADS: {holo.utils.frac_str(bads)}")
             bads = np.where(bads)
@@ -791,7 +793,7 @@ class Test_Composite_Hardening:
             print("noatt = ", noatt_dadt[bads])
             print("atten = ", atten_dadt[bads])
 
-        assert not np.any(bads)
+        assert not np.any(bads), err
 
         return
 
