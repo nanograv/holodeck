@@ -1509,9 +1509,9 @@ class Fixed_Time(_Hardening):
 
     """
 
-    _INTERP_NUM_POINTS = 1e4             # number of random data points used to construct interpolant
-    _INTERP_THRESH_PAD_FACTOR = 5.0      #
-    _TIME_TOTAL_RMIN = 1.0e-5 * PC       # minimum radius [cm] used to calculate inspiral time
+    _INTERP_NUM_POINTS = 1e4             #: number of random data points used to construct interpolant
+    _INTERP_THRESH_PAD_FACTOR = 5.0      #: allowance for when to use chunking and when to process full array
+    _TIME_TOTAL_RMIN = 1.0e-5 * PC       #: minimum radius [cm] used to calculate inspiral time
 
     def __init__(self, time, mtot, mrat, redz, sepa, rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5, progress=True):
         """Initialize `Fixed_Time` instance for the given binary properties and function parameters.
@@ -1816,95 +1816,198 @@ class Fixed_Time(_Hardening):
             (total-mass, mass-ratio, lifetime, initial-radius) => hardening normalization
 
         """
-        mt = [1e6, 1e11]
-        mr = [1e-5, 1.0]
-        td = [0.0, 20.0]
-        rm = [1e3, 1e5]
 
+        # ---- Initialization
+        # Define the range of parameters to be explored
+        mt = [1e5, 1e11]   #: total mass [Msol]
+        mr = [1e-5, 1.0]   #: mass ratio
+        td = [0.0, 20.0]   #: lifetime [Gyr]
+        rm = [1e3, 1e5]    #: radius maximum (initial separation) [pc]
+
+        # Choose random test binary parameters
         num_points = int(cls._INTERP_NUM_POINTS)
         mt = 10.0 ** np.random.uniform(*np.log10(mt), num_points) * MSOL
         mr = 10.0 ** np.random.uniform(*np.log10(mr), mt.size)
         td = np.random.uniform(*td, mt.size+1)[1:] * GYR
         rm = 10.0 ** np.random.uniform(*np.log10(rm), mt.size) * PC
 
+        # ---- Get normalization for these parameters
         norm = cls._get_norm_chunk(td, mt, mr, rchar, gamma_sc, gamma_df, rm)
 
+        # Make sure results are valid
         valid = np.isfinite(norm) & (norm > 0.0)
         if not np.all(valid):
             err = f"Invalid normalizations!  {utils.frac_str(valid, 4)}"
-            log.error(err)
+            log.exception(err)
             raise ValueError(err)
 
+        # ---- Construct interpolants
         points = [mt, mr, td, rm]
         units = [MSOL, 1.0, GYR, PC]
-        logs = [True, True, False, True]
+        logs = [True, True, False, True]   #: which parameters to interpolate in log-space
         points = [pp/uu for pp, uu in zip(points, units)]
         points = [np.log10(pp) if ll else pp for pp, ll in zip(points, logs)]
         points = np.array(points).T
+        # construct both a linear (1th order) and nearest (0th order) interpolant
         interp = sp.interpolate.LinearNDInterpolator(points, np.log10(norm))
         backup = sp.interpolate.NearestNDInterpolator(points, np.log10(norm))
         return interp, backup
 
     @classmethod
-    def _get_norm_chunk(cls, tau, *args, guess=1e0, chunk=1e3, progress=True):
-        if np.ndim(tau) != 1:
+    def _get_norm_chunk(cls, target_time, *args, guess=1e0, chunk=1e3, progress=True):
+        """Calculate normalizations in 'chunks' of the input arrays, to obtain the target lifetime.
+
+        Calculates normalizations for groups of parameters of size `chunk` at a time.  Loops over
+        these chunks until all inputs have been processed.  Calls :meth:`Fixed_Time._get_norm` to
+        calculate the normalization for each chunk.
+
+        Parameters
+        ----------
+        target_time : (N,) np.ndarray
+            Target binary lifetimes, units of [sec].
+        *args : list[np.ndarray]
+            The parameters eventually passed to :meth:`Fixed_Time._time_total`, to get the total
+            lifetime.  The normalization parameter is varied until the `_time_total` return value
+            matches the target input lifetime.
+        guess : float
+            Initial value of the normalization parameter for the optimization routine to start on.
+            Units of [cm/s].
+        chunk : float
+            Size of each 'chunk' of parameters to process at a time, cast to `int`.
+        progress : bool
+            Whether or not to show a `tqdm` progress bar while iterating over chunks.
+
+        Returns
+        -------
+        norm : (N,) np.ndarray
+            The normalizations required to produce the target lifetimes given by `target_time`.
+
+        """
+        if np.ndim(target_time) != 1:
             raise
+
         chunk = int(chunk)
-        size = np.size(tau)
+        size = np.size(target_time)
+        # if number of array elements is less than (or comparable to) chunk size, to it all in one pass
         if size <= chunk * cls._INTERP_THRESH_PAD_FACTOR:
-            return cls._get_norm(tau, *args, guess=guess)
+            return cls._get_norm(target_time, *args, guess=guess)
 
-        args = [tau, *args]
-        args = np.broadcast_arrays(*args)
-        tau, *args = args
+        # broadcast arrays to all be the same shape (some `floats` are passed in)
+        args = [target_time, *args]
+        target_time, *args = np.broadcast_arrays(*args)
 
+        # iterate over each chunk, storing the normalization values
         num = int(np.ceil(size / chunk))
-        sol = np.zeros_like(tau)
+        norm = np.zeros_like(target_time)
         step_iter = range(num)
         step_iter = utils.tqdm(step_iter, desc='calculating hardening normalization') if progress else step_iter
         for ii in step_iter:
             lo = ii * chunk
             hi = np.minimum((ii + 1) * chunk, size)
             cut = slice(lo, hi)
-            sol[cut] = cls._get_norm(tau[cut], *[aa[cut] for aa in args], guess=guess)
+            # calculate normalizations for this chunk
+            norm[cut] = cls._get_norm(target_time[cut], *[aa[cut] for aa in args], guess=guess)
 
-        return sol
+        return norm
 
     @classmethod
-    def _get_norm(cls, tau, *args, guess=1e0):
+    def _get_norm(cls, target_time, *args, guess=1e0):
+        """Calculate normalizations of the input arrays, to obtain the target binary lifetime.
+
+        Uses deterministic least-squares optimization to find the best normalization values, using
+        `scipy.optimize.newton`.
+
+        Parameters
+        ----------
+        target_time : (N,) np.ndarray
+            Target binary lifetimes, units of [sec].
+        *args : list[np.ndarray]
+            The parameters eventually passed to :meth:`Fixed_Time._time_total`, to get the total
+            lifetime.  The normalization parameter is varied until the `_time_total` return value
+            matches the target input lifetime.
+        guess : float
+            Initial value of the normalization parameter for the optimization routine to start on.
+            Units of [cm/s].
+
+        Returns
+        -------
+        norm : (N,) np.ndarray
+            The normalizations required to produce the target lifetimes given by `target_time`.
+
+        """
+
+        # convenience wrapper function
         def integ(norm):
             return cls._time_total(norm, *args)
 
-        g0 = guess * np.ones_like(tau)
+        # Assume linear scaling to refine the first guess
+        g0 = guess * np.ones_like(target_time)
         test = integ(g0)
-        guess = g0 * (test / tau)
+        guess = g0 * (test / target_time)
+        log.debug(f"Guess {g0:.4e} ==> {utils.stats(guess)}")
 
+        # perform optimization
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            rv = sp.optimize.newton(lambda xx: integ(xx) - tau, guess)
-        return rv
+            norm = sp.optimize.newton(lambda xx: integ(xx) - target_time, guess)
+
+        return norm
 
     @classmethod
     def _time_total(cls, norm, mt, mr, rchar, g1, g2, rmax, num=100):
+        """For the given parameters, integrate the binary evolution to find total lifetime.
+
+        Parameters
+        ----------
+        norm : float  or  array_like
+            Hardening rate normalization, units of [cm/s].
+        mtot : float  or  array_like
+            Binary total-mass [gram].
+        mrat : float  or  array_like
+            Binary mass-ratio $q \equiv m_2 / m_1 \leq 1$.
+        rchar : float  or  array_like
+            Characteristic transition radius between the two power-law indices of the hardening
+            rate model, units of [cm].
+        g1 : float  or  array_like
+            Power-law of hardening timescale in the stellar-scattering regime,
+            (small separations: r < rchar).
+        g2 : float  or  array_like
+            Power-law of hardening timescale in the dynamical-friction regime,
+            (large separations: r > rchar).
+        rmax : float  or  array_like
+            Initial binary separation.  Units of [cm].
+        num : int
+            Number of steps in separation overwhich to integrate the binary evolution
+
+        Returns
+        -------
+        tt : np.ndarray
+            Total binary lifetime [sec].
+
+        """
+
+        # Convert input values to broadcastable np.ndarray's
         norm = np.atleast_1d(norm)
         args = [norm, mt, mr, rchar, g1, g2, rmax, cls._TIME_TOTAL_RMIN]
         args = np.broadcast_arrays(*args)
         norm, mt, mr, rchar, g1, g2, rmax, rmin = args
-        if np.ndim(norm) != 1:
-            raise
 
+        # define separations (radii) for each binary's evolution
         rextr = np.log10([rmin, rmax]).T
         rads = np.linspace(0.0, 1.0, num)[np.newaxis, :]
-
         rads = rextr[:, 0, np.newaxis] + rads * np.diff(rextr, axis=1)
+        # (N, R) for N-binaries and R-radii (`num`)
         rads = 10.0 ** rads
 
+        # Make hardening parameters broadcastable
         args = [norm, mt, mr, rchar, g1, g2]
         args = [aa[:, np.newaxis] for aa in args]
         norm, mt, mr, rchar, g1, g2 = args
 
+        # Calculate hardening rates along full evolutionary history
         dadt, _ = cls._dadt_dedt(mt, mr, rads, norm, rchar, g1, g2)
 
+        # Integrate (inverse) hardening rates to calculate total lifetime
         tt = utils.trapz_loglog(- 1.0 / dadt, rads, axis=-1)
         tt = tt[:, -1]
         return tt
