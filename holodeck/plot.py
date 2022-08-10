@@ -257,6 +257,56 @@ def smap(args=[0.0, 1.0], cmap=None, log=False, norm=None, midpoint=None,
     return smap
 
 
+def set_axis_color(ax, axis='y', fs=None, color='k', side='right'):
+    # Set tick colors and font-sizes
+    kw = dict(labelsize=fs) if (fs is not None) else {}
+    ax.tick_params(axis=axis, which='both', colors=color, **kw)
+
+    if axis == 'x':
+        ax.xaxis.label.set_color(color)
+        offt = ax.get_xaxis().get_offset_text()
+    else:
+        ax.yaxis.label.set_color(color)
+        offt = ax.get_yaxis().get_offset_text()
+
+    # Set Spine colors
+    if side is not None:
+        ax.spines[side].set_color(color)
+    offt.set_color(color)
+    return ax
+
+
+def set_axis_pos(ax, axis, pos, side):
+    axis = axis.lower()
+
+    if axis == 'x':
+        offt = ax.get_xaxis().get_offset_text()
+
+        offt.set_y(pos)
+        ax.xaxis.set_label_position(side)
+        ax.xaxis.set_ticks_position(side)
+
+    elif axis == 'y':
+        offt = ax.get_yaxis().get_offset_text()
+
+        offt.set_x(pos)
+        ax.yaxis.set_label_position(side)
+        ax.yaxis.set_ticks_position(side)
+
+    else:
+        err = f"`axis` argument should be ['x', 'y'], got '{axis}'!"
+        log.exception(err)
+        raise ValueError(err)
+
+    # Set Spine colors
+    ax.set_frame_on(True)
+    ax.spines[side].set_position(('axes', pos))
+    ax.spines[side].set_visible(True)
+    ax.patch.set_visible(False)
+
+    return ax
+
+
 def _get_norm(data, midpoint=None, log=False):
     """
     """
