@@ -1112,7 +1112,7 @@ class _StellarMass_HaloMass(abc.ABC):
     """
 
     _NUM_GRID = 200              #: grid size
-    _MHALO_GRID_EXTR = [9, 16]   #: extrema for the halo mass grid [log10(M/Msol)]
+    _MHALO_GRID_EXTR = [7, 20]   #: extrema for the halo mass grid [log10(M/Msol)]
 
     def __init__(self):
         self._mhalo_grid = np.logspace(*self._MHALO_GRID_EXTR, self._NUM_GRID) * MSOL
@@ -1165,52 +1165,59 @@ class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
 
     """
 
-    _REDZ_GRID_EXTR = [0.0, 9.0]      #: edges of the parameter space in redshift
-    _MSTAR_GRID_EXTR = [5.0, 12.0]    #: edges of the parameter space in stellar-mass [log10(M/Msol)]
+    _REDZ_GRID_EXTR = [0.0, 10.0]     #: edges of the parameter space in redshift
+    _MSTAR_GRID_EXTR = [5.0, 14.0]    #: edges of the parameter space in stellar-mass [log10(M/Msol)]
 
     def __init__(self, extend_nearest=True):
-        self._mhalo_grid = np.logspace(*self._MHALO_GRID_EXTR, self._NUM_GRID) * MSOL
-        self._redz_grid = np.linspace(*self._REDZ_GRID_EXTR, self._NUM_GRID+2)
+        self._mhalo_grid = np.logspace(*self._MHALO_GRID_EXTR, self._NUM_GRID) * MSOL   # shape (H,)
+        self._redz_grid = np.linspace(*self._REDZ_GRID_EXTR, self._NUM_GRID+2)          # shape (Z,)
         mhalo = self._mhalo_grid[:, np.newaxis]
         redz = self._redz_grid[np.newaxis, :]
-        self._mstar = self.stellar_mass(mhalo, redz)  # should be units of [Msol]
+        # Calculate stellar-mass given the grid of halo-mass and redshift
+        # Shape (H, Z)
+        self._mstar = self.stellar_mass(mhalo, redz)  # units of [gram]
 
         # ---- Construct interpolator to go from (mstar, redz) ==> (mhalo)
+
         # first: convert data to grid of (mstar, redz) ==> (mhalo)
         mstar = np.log10(self._mstar / MSOL)
+        # store the normal shape (H, Z)
+        shape = mstar.shape
+        # convert from (H, Z) ==> (H*Z,)
+        mstar_rav = mstar.ravel()
+        # Get grids for halo-mass and redshift, (H, Z) ==> (H*Z,)
         redz = self._redz_grid
         mhalo = np.log10(self._mhalo_grid / MSOL)
-        aa = mstar.ravel()
-        cc, bb = np.meshgrid(mhalo, redz, indexing='ij')
-        bb, cc = [bc.ravel() for bc in [bb, cc]]
+        mhalo_ravel, redz_ravel = np.meshgrid(mhalo, redz, indexing='ij')
+        redz_ravel, mhalo_ravel = [bc.ravel() for bc in [redz_ravel, mhalo_ravel]]
 
-        shape = self._mstar.shape
-        aextr = [aa.min(), aa.max()]
+        mstar_out_extr = [mstar_rav.min(), mstar_rav.max()]
         if self._MSTAR_GRID_EXTR is not None:
             extr = self._MSTAR_GRID_EXTR
-            if extr[0] < aextr[0] or extr[1] > aextr[1]:
-                log.info("using wider range of stellar-mass than calculated from halo-mass grid!")
-                log.debug(f"\tmstar(mhalo) = [{aextr[0]:.2e}, {aextr[1]:.2e}]")
+            if extr[0] < mstar_out_extr[0] or extr[1] > mstar_out_extr[1]:
+                log.debug("using wider range of stellar-mass than calculated from halo-mass grid!")
+                log.debug(f"\tmstar(mhalo) = [{mstar_out_extr[0]:.2e}, {mstar_out_extr[1]:.2e}]")
                 log.debug(f"\tmstar grid   = [{extr[0]:.2e}, {extr[1]:.2e}]")
 
-            aextr = extr
+            mstar_out_extr = extr
 
-        xx = np.linspace(*aextr, shape[0])
+        xx = np.linspace(*mstar_out_extr, shape[0])
 
-        self._mstar_grid = MSOL * 10.0 ** xx
-        self._mhalo = MSOL * 10.0 ** cc.reshape(self._mstar.shape)
+        self._mstar_grid = MSOL * (10.0 ** xx)
+        self._mhalo = MSOL * (10.0 ** mhalo_ravel.reshape(shape))
         yy = redz
         xg, yg = np.meshgrid(xx, yy, indexing='ij')
-        self._aa = aa    # NOTE: these are being stored for debugging/diagnostics
-        self._bb = bb    # NOTE: these are being stored for debugging/diagnostics
-        self._cc = cc    # NOTE: these are being stored for debugging/diagnostics
-        # grid = sp.interpolate.LinearNDInterpolator((aa, bb), cc)((xg, yg))
-        # grid = sp.interpolate.NearestNDInterpolator((aa, bb), cc)((xg, yg))
-        grid = sp.interpolate.griddata((aa, bb), cc, (xg, yg))
+        self._xx = xx    # NOTE: these are being stored for debugging/diagnostics
+        self._yy = yy    # NOTE: these are being stored for debugging/diagnostics
+        self._aa = mstar_rav    # NOTE: these are being stored for debugging/diagnostics
+        self._bb = redz_ravel    # NOTE: these are being stored for debugging/diagnostics
+        self._cc = mhalo_ravel    # NOTE: these are being stored for debugging/diagnostics
+
+        grid = sp.interpolate.griddata((mstar_rav, redz_ravel), mhalo_ravel, (xg, yg))
         bads = ~np.isfinite(grid)
         if np.any(bads):
             if extend_nearest:
-                backup = sp.interpolate.NearestNDInterpolator((aa, bb), cc)((xg, yg))
+                backup = sp.interpolate.NearestNDInterpolator((mstar_rav, redz_ravel), mhalo_ravel)((xg, yg))
                 grid[bads] = backup[bads]
             else:
                 log.warning(f"Non-finite values ({utils.frac_str(bads)}) in mhalo interpolation grid!")
@@ -1254,7 +1261,6 @@ class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
             Whether or not to clip the input `mstar` values to the extrema of the predefined grid
             of stellar-masses (`_mstar_grid`).
 
-
         Returns
         -------
         mhalo : ArrayLike
@@ -1282,8 +1288,9 @@ class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
         except ValueError as err:
             log.exception("Interplation (mstar, redz) ==> mhalo failed!")
             log.error(err)
-            for vv, nn in zip(vals, ['log10(mstar/Msol)', 'redz']):
-                log.error(f"{nn} : {utils.stats(vv)}")
+            extr = [utils.minmax(xx) for xx in [self._xx, self._yy]]
+            for vv, nn, ee in zip(vals, ['log10(mstar/Msol)', 'redz'], extr):
+                log.error(f"{nn} (extrema = {ee}): {utils.stats(vv)}")
 
             raise
 
@@ -1326,6 +1333,14 @@ class Behroozi_2013(_StellarMass_HaloMass_Redshift):
         self._f0 = self._f_func(0.0)
         super().__init__(*args, **kwargs)
         return
+
+    def stellar_mass(self, mhalo, redz):
+        """This is [Behroozi2013]_ Eq.3 (upper)"""
+        eps = self._eps(redz)
+        m1 = self._m1(redz)
+        mstar = np.log10(eps*m1/MSOL) + self._f_func(np.log10(mhalo/m1), redz) - self._f0
+        mstar = np.power(10.0, mstar) * MSOL
+        return mstar
 
     def _nu_func(sca):
         """[Behroozi2013]_ Eq. 4"""
@@ -1407,14 +1422,6 @@ class Behroozi_2013(_StellarMass_HaloMass_Redshift):
         t3 = 1 + np.exp(10.0 ** -xx)
         ff = t1 + delta * t2 / t3
         return ff
-
-    def stellar_mass(self, mhalo, redz):
-        # This is [Behroozi2013] Eq.3 (upper)
-        eps = self._eps(redz)
-        m1 = self._m1(redz)
-        mstar = np.log10(eps*m1/MSOL) + self._f_func(np.log10(mhalo/m1), redz) - self._f0
-        mstar = np.power(10.0, mstar) * MSOL
-        return mstar
 
 
 def get_stellar_mass_halo_mass_relation(
