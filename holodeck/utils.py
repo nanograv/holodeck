@@ -507,6 +507,12 @@ def nyquist_freqs(
     return freqs
 
 
+def quantile_filtered(values, percs, axis, func=np.isfinite):
+    percs = np.asarray(percs)
+    assert np.all((percs > 0.0) & (percs < 1.0))
+    return np.apply_along_axis(lambda xx: np.percentile(np.asarray(xx)[func(xx)], percs*100), axis, values)
+
+
 def quantiles(
     values: npt.ArrayLike,
     percs: Optional[npt.ArrayLike] = None,
@@ -514,6 +520,7 @@ def quantiles(
     weights: Optional[npt.ArrayLike] = None,
     axis: Optional[int] = None,
     values_sorted: bool = False,
+    filter: Optional[str] = None,
 ) -> Union[np.ndarray, np.ma.masked_array]:
     """Compute weighted percentiles.
 
@@ -561,6 +568,7 @@ def quantiles(
         ww = np.ones_like(values)
     else:
         ww = np.array(weights)
+
     try:
         ww = np.ma.masked_array(ww, mask=values.mask)  # type: ignore
     except AttributeError:
