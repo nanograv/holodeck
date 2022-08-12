@@ -1057,6 +1057,30 @@ def schwarzschild_radius(mass):
     return rs
 
 
+def velocity_orbital(mt, mr, per=None, sepa=None):
+    sepa, per = _get_sepa_freq(mt, sepa, per)
+    v2 = np.power(NWTG*mt/sepa, 1.0/2.0) / (1 + mr)
+    # v2 = np.power(2*np.pi*NWTG*mt/per, 1.0/3.0) / (1 + mr)
+    v1 = v2 * mr
+    vels = np.moveaxis([v1, v2], 0, -1)
+    return vels
+
+
+def _get_sepa_freq(mt, sepa, freq):
+    if (freq is None) and (sepa is None):
+        raise ValueError("Either `freq` or `sepa` must be provided!")
+    if (freq is not None) and (sepa is not None):
+        raise ValueError("Only one of `freq` or `sepa` should be provided!")
+
+    if freq is None:
+        freq =  kepler_freq_from_sepa(mt, sepa)
+
+    if sepa is None:
+        sepa = kepler_sepa_from_freq(mt, freq)
+
+    return sepa, freq
+
+
 # =================================================================================================
 # ====    Gravitational Waves    ====
 # =================================================================================================
