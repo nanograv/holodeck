@@ -102,6 +102,8 @@ from holodeck import utils, cosmo, log, _PATH_DATA
 from holodeck.constants import GYR, NWTG, PC, MSOL, YR, SPLC
 
 _MAX_ECCEN_ONE_MINUS = 1.0e-6
+#: number of influence radii to set minimum radius for dens calculation
+_MIN_DENS_RAD__INFL_RAD_MULT = 10.0
 _DEF_TIME_DELAY = (5.0*GYR, 0.2)   #: default delay-time parameters, (mean, stdev)
 _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 
@@ -781,6 +783,7 @@ class Evolution:
         if self.eccen is not None:
             de = dedt_l * dt
             ecc_r = self.eccen[:, left] + de
+            ecc_r = np.clip(ecc_r, 0.0, 1.0 - _MAX_ECCEN_ONE_MINUS)
             self.eccen[:, right] = ecc_r
 
         # Update lookback time based on duration of this step
@@ -875,18 +878,23 @@ class Evolution:
         dedt = None if self.eccen is None else np.zeros_like(dadt)
 
         for ii, hard in enumerate(self._hard):
-            _sma, _ecc = hard.dadt_dedt(self, step)
-            dadt[:] += _sma
+            _hard_dadt, _ecc = hard.dadt_dedt(self, step)
+            dadt[:] += _hard_dadt
             if self._debug:    # nocov
-                log.debug(f"{step} hard={hard} : dadt = {utils.stats(_sma)}")
-                # Raise error on invalid entries
-                if not np.all(np.isfinite(_sma)) or np.any(_sma > 0.0):
-                    err = f"invalid `dadt` for hard={hard}!"
-                    log.exception(err)
-                    raise ValueError(err)
+                log.debug(f"{step} hard={hard} : dadt = {utils.stats(_hard_dadt)}")
                 # Store individual hardening rates
                 if store_debug:
-                    getattr(self, f"_dadt_{ii}")[:, step] = _sma[...]
+                    getattr(self, f"_dadt_{ii}")[:, step] = _hard_dadt[...]
+                # Raise error on invalid entries
+                bads = ~np.isfinite(_hard_dadt) | (_hard_dadt > 0.0)
+                if np.any(bads):
+                    log.error(f"{step} hard={hard} : dadt = {utils.stats(_hard_dadt)}")
+                    err = f"invalid `dadt` for hard={hard}  (bads: {utils.frac_str(bads)})!"
+                    log.exception(err)
+                    log.error(f"BAD dadt = {_hard_dadt[bads]}")
+                    log.error(f"BAD sepa = {self.sepa[bads, step]}")
+                    log.error(f"BAD mass = {self.sepa[bads, step]}")
+                    raise ValueError(err)
 
             if (self.eccen is not None):
                 if _ecc is None:
@@ -1358,48 +1366,55 @@ class Dynamical_Friction_NFW(_Hardening):
             `None` is returned if the input `eccen` is None.
 
         """
-        # ---- Get Host DM-Halo mass
-        mstar = self._mmbulge.mstar_from_mbh(mass.sum(axis=-1), scatter=False)   # use total bh-mass
+        assert np.shape(mass)[-1] == 2 and np.ndim(mass) <= 2
+        mass = np.atleast_2d(mass)
+        redz = np.atleast_1d(redz)
+
+        # Get Host DM-Halo mass
+        # assume galaxies are merged, and total stellar mass is given from Mstar-Mbh of total MBH mass
+        mstar = self._mmbulge.mstar_from_mbh(mass.sum(axis=-1), scatter=False)
         mhalo = self._smhm.halo_mass(mstar, redz, clip=True)
 
         # ---- Get effective mass of inspiraling secondary
         m2 = mass[:, 1]
         mstar_sec = self._mmbulge.mstar_from_mbh(m2, scatter=False)
-
         # model tidal-stripping of secondary's bulge (see: [Kelley2017a]_ Eq.6)
         time_dyn = self._NFW.time_dynamical(sepa, mhalo, redz)
         tfrac = dt / (time_dyn * self._TIDAL_STRIPPING_DYNAMICAL_TIMES)
-        log.debug(f"DF tfrac = {utils.stats(tfrac)}")
         power_index = np.clip(1.0 - tfrac, 0.0, 1.0)
-        log.debug(f"DF m2   = {utils.stats(m2/MSOL)} [Msol]")
         meff = m2 * np.power((m2 + mstar_sec)/m2, power_index)
-        log.debug(f"DF meff = {utils.stats(meff/MSOL)} [Msol]")
+        log.debug(f"DF tfrac = {utils.stats(tfrac)}")
+        log.debug(f"DF meff/m2 = {utils.stats(meff/m2)} [Msol]")
 
-        dens = self._NFW.density(sepa, mhalo, redz)
-        velo = self._NFW.velocity_circular(sepa, mhalo, redz)
-        # Note: this should be returned as negative values
+        # ---- Get local density
+        # set minimum radius to be a factor times influence-radius
+        rinfl = _MIN_DENS_RAD__INFL_RAD_MULT * _radius_influence_dehnen(m2, mstar_sec)
+        dens_rads = np.maximum(sepa, rinfl)
+        dens = self._NFW.density(dens_rads, mhalo, redz)
+
+        # ---- Get velocity of secondary MBH
+        mt, mr = utils.mtmr_from_m1m2(mass)
+        vhalo = self._NFW.velocity_circular(sepa, mhalo, redz)
+        vorb = utils.velocity_orbital(mt, mr, sepa=sepa)[:, 1]  # secondary velocity
+        velo = np.sqrt(vhalo**2 + vorb**2)
+
+        # ---- Calculate hardening rate
+        # dvdt is negative [cm/s]
         dvdt = self._dvdt(meff, dens, velo)
-        log.debug(f"DF dvdt = {utils.stats(dvdt*GYR/1e5)} [km/s/Gyr]")
-
         # convert from deceleration to hardening-rate assuming virialized orbit (i.e. ``GM/a = v^2``)
         dadt = 2 * time_dyn * dvdt
         dedt = None if (eccen is None) else np.zeros_like(dadt)
-        log.debug(f"DF dadt = {utils.stats(dadt*GYR/PC)} [pc/Gyr]")
 
+        # ---- Apply 'attenuation' following [BBR1980]_ to account for stellar-scattering / loss-cone effects
         if attenuate:
             atten = self._attenuation_BBR1980(sepa, mass, mstar)
             dadt = dadt / atten
 
         # Hardening rate cannot be larger than orbital/virial velocity
-        log.debug(f"DF velo = {utils.stats(velo*GYR/PC)} [pc/Gyr]")
         clip = (np.fabs(dadt) > velo)
-        log.debug(f"clipping {utils.frac_str(clip)} `dadt` values to vcirc")
-        dadt[clip] = - velo[clip]
-        # if np.any(clip):
-        #     dadt[clip] = - velo[clip]
-        #     prev = dadt.copy()
-        #     log.debug(f"\t{utils.stats(prev*YR/PC)} ==> {utils.stats(dadt*YR/PC)}")
-        #     del prev
+        if np.any(clip):
+            log.info(f"clipping {utils.frac_str(clip)} `dadt` values to vcirc")
+            dadt[clip] = - velo[clip]
 
         return dadt, dedt
 
