@@ -419,7 +419,8 @@ class Semi_Analytic_Model:
         if REDZ_SCALE_LOG:
             if redz[0] <= 0.0:
                 err = f"With `REDZ_SCALE_LOG={REDZ_SCALE_LOG}` redshift lower bound must be non-zero ({redz})!"
-                utils.error(err)
+                log.exception(err)
+                raise ValueError(err)
             self.redz = np.logspace(*np.log10(redz[:2]), redz[2])
         else:
             self.redz = np.linspace(*redz)
@@ -567,7 +568,9 @@ class Semi_Analytic_Model:
 
         """
         if (fobs is None) == (sepa is None):
-            utils.error("one (and only one) of `fobs` or `sepa` must be provided!")
+            err = "one (and only one) of `fobs` or `sepa` must be provided!"
+            log.exception(err)
+            raise ValueError(err)
 
         if fobs is not None:
             fobs = np.asarray(fobs)
@@ -638,7 +641,8 @@ class Semi_Analytic_Model:
 
         else:
             err = f"`limit_merger_time` ({type(limit_merger_time)}) must be boolean or scalar!"
-            utils.error(err)
+            log.exception(err)
+            raise ValueError(err)
 
         # convert `tau` to the correct shape, note that moveaxis MUST happen _before_ reshape!
         # (F, M*Q*Z) ==> (M*Q*Z, F)
@@ -680,7 +684,8 @@ class Semi_Analytic_Model:
         if np.isscalar(fobs) or np.size(fobs) == 1:
             err = "single values of `fobs` are not allowed, can only calculated GWB within some bin of frequency!"
             err += "  e.g. ``fobs = 1/YR; fobs = [0.9*fobs, 1.1*fobs]``"
-            utils.error(err)
+            log.exception(err)
+            raise ValueError(err)
 
         # ---- Get the differential-number of binaries for each bin
         # this is  ``d^4 n / [dlog10(M) dq dz dln(f_r)]``
