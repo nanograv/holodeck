@@ -344,6 +344,10 @@ def _get_hist_steps(xx, yy):
     return aa, bb
 
 
+def draw_hist_steps(ax, xx, yy, **kwargs):
+    return ax.plot(*_get_hist_steps(xx, yy), **kwargs)
+
+
 # =================================================================================================
 # ====    Below Needs Review / Cleaning    ====
 # =================================================================================================
