@@ -64,7 +64,7 @@ _PATH_OUTPUT = os.path.join(_PATH_ROOT, "output", "")
 _check_paths = [_PATH_PACKAGE, _PATH_ROOT, _PATH_DATA]
 for cp in _check_paths:
     cp = os.path.abspath(cp)
-    if not os.path.isdir(cp):
+    if not os.path.isdir(cp):   # nocov
         err = "ERROR: could not find directory '{}'!".format(cp)
         raise FileNotFoundError(err)
 

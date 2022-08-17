@@ -257,6 +257,56 @@ def smap(args=[0.0, 1.0], cmap=None, log=False, norm=None, midpoint=None,
     return smap
 
 
+def set_axis_color(ax, axis='y', fs=None, color='k', side='right'):
+    # Set tick colors and font-sizes
+    kw = dict(labelsize=fs) if (fs is not None) else {}
+    ax.tick_params(axis=axis, which='both', colors=color, **kw)
+
+    if axis == 'x':
+        ax.xaxis.label.set_color(color)
+        offt = ax.get_xaxis().get_offset_text()
+    else:
+        ax.yaxis.label.set_color(color)
+        offt = ax.get_yaxis().get_offset_text()
+
+    # Set Spine colors
+    if side is not None:
+        ax.spines[side].set_color(color)
+    offt.set_color(color)
+    return ax
+
+
+def set_axis_pos(ax, axis, pos, side):
+    axis = axis.lower()
+
+    if axis == 'x':
+        offt = ax.get_xaxis().get_offset_text()
+
+        offt.set_y(pos)
+        ax.xaxis.set_label_position(side)
+        ax.xaxis.set_ticks_position(side)
+
+    elif axis == 'y':
+        offt = ax.get_yaxis().get_offset_text()
+
+        offt.set_x(pos)
+        ax.yaxis.set_label_position(side)
+        ax.yaxis.set_ticks_position(side)
+
+    else:
+        err = f"`axis` argument should be ['x', 'y'], got '{axis}'!"
+        log.exception(err)
+        raise ValueError(err)
+
+    # Set Spine colors
+    ax.set_frame_on(True)
+    ax.spines[side].set_position(('axes', pos))
+    ax.spines[side].set_visible(True)
+    ax.patch.set_visible(False)
+
+    return ax
+
+
 def _get_norm(data, midpoint=None, log=False):
     """
     """
@@ -270,7 +320,9 @@ def _get_norm(data, midpoint=None, log=False):
         try:
             min, max = utils.minmax(data, filter=log)
         except:
-            utils.error(f"Input `data` ({type(data)}) must be an integer, (2,) of scalar, or ndarray of scalar!")
+            err = f"Input `data` ({type(data)}) must be an integer, (2,) of scalar, or ndarray of scalar!"
+            log.exception(err)
+            raise ValueError(err)
 
     # print(f"{min=}, {max=}")
 
@@ -335,7 +387,8 @@ def _get_hist_steps(xx, yy):
     size = len(xx) - 1
     if size != len(yy):
         err = f"Length of `xx` ({len(xx)}) should be length of `yy` ({len(yy)}) + 1!"
-        utils.error(err)
+        log.exception(err)
+        raise ValueError(err)
 
     aa = [[xx[ii], xx[ii+1]] for ii in range(xx.size-1)]
     bb = [[yy[ii], yy[ii]] for ii in range(xx.size-1)]
@@ -615,7 +668,9 @@ def plot_evo(evo, freqs):
 
 def plot_evo(evo, freqs=None, sepa=None, ax=None):
     if (freqs is None) and (sepa is None):
-        utils.error("Either `freqs` or `sepa` must be provided!")
+        err = "Either `freqs` or `sepa` must be provided!"
+        log.exception(err)
+        raise ValueError(err)
 
     if freqs is not None:
         data = evo.at('fobs', freqs)

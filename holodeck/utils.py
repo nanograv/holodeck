@@ -507,6 +507,12 @@ def nyquist_freqs(
     return freqs
 
 
+def quantile_filtered(values, percs, axis, func=np.isfinite):
+    percs = np.asarray(percs)
+    assert np.all((percs > 0.0) & (percs < 1.0))
+    return np.apply_along_axis(lambda xx: np.percentile(np.asarray(xx)[func(xx)], percs*100), axis, values)
+
+
 def quantiles(
     values: npt.ArrayLike,
     percs: Optional[npt.ArrayLike] = None,
@@ -514,6 +520,7 @@ def quantiles(
     weights: Optional[npt.ArrayLike] = None,
     axis: Optional[int] = None,
     values_sorted: bool = False,
+    filter: Optional[str] = None,
 ) -> Union[np.ndarray, np.ma.masked_array]:
     """Compute weighted percentiles.
 
@@ -561,6 +568,7 @@ def quantiles(
         ww = np.ones_like(values)
     else:
         ww = np.array(weights)
+
     try:
         ww = np.ma.masked_array(ww, mask=values.mask)  # type: ignore
     except AttributeError:
@@ -1047,6 +1055,30 @@ def schwarzschild_radius(mass):
     """
     rs = SCHW * mass
     return rs
+
+
+def velocity_orbital(mt, mr, per=None, sepa=None):
+    sepa, per = _get_sepa_freq(mt, sepa, per)
+    v2 = np.power(NWTG*mt/sepa, 1.0/2.0) / (1 + mr)
+    # v2 = np.power(2*np.pi*NWTG*mt/per, 1.0/3.0) / (1 + mr)
+    v1 = v2 * mr
+    vels = np.moveaxis([v1, v2], 0, -1)
+    return vels
+
+
+def _get_sepa_freq(mt, sepa, freq):
+    if (freq is None) and (sepa is None):
+        raise ValueError("Either `freq` or `sepa` must be provided!")
+    if (freq is not None) and (sepa is not None):
+        raise ValueError("Only one of `freq` or `sepa` should be provided!")
+
+    if freq is None:
+        freq =  kepler_freq_from_sepa(mt, sepa)
+
+    if sepa is None:
+        sepa = kepler_sepa_from_freq(mt, freq)
+
+    return sepa, freq
 
 
 # =================================================================================================
