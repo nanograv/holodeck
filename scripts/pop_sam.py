@@ -91,7 +91,7 @@ def main():
 
     # ---- Calculate Number of Binaries
 
-    edges, dnum = sam.diff_num_from_hardening(hard, fobs=fobs)
+    edges, dnum = sam.dynamic_binary_number(hard, fobs=fobs)
 
     edges_integrate = [np.copy(ee) for ee in edges]
     edges_sample = [np.log10(edges[0]), edges[1], edges[2], np.log(edges[3])]

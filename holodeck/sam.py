@@ -472,6 +472,12 @@ class Semi_Analytic_Model:
 
     @property
     def density(self):
+        err = "DEPRECATION `Semi_Analytic_Model.density` ==> `Semi_Analytic_Model.static_binary_density`"
+        log.exception(err)
+        raise AttributeError(err)
+
+    @property
+    def static_binary_density(self):
         """The number-density of binaries in each bin, 'd3n/[dz dlog10M dq]' in units of [Mpc^-3].
 
         This is calculated once and cached.
@@ -510,6 +516,7 @@ class Semi_Analytic_Model:
             mstar_pri, mstar_rat, mstar_tot, redz = [ee[idx] for ee in [mstar_pri, mstar_rat, mstar_tot, redz]]
 
             # ---- Get Galaxy Merger Rate  [Chen2019] Eq.5
+            # ! BUG: CHECK Whether primary vs total-mass is being used correctly !
             # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]
             dens[idx] = self._gsmf(mstar_pri, redz) * self._gpf(mstar_tot, mstar_rat, redz) * cosmo.dtdz(redz)
             # convert from 1/dlog10(M_star-pri) to 1/dM_star-tot
@@ -536,7 +543,15 @@ class Semi_Analytic_Model:
 
         return self._density
 
-    def diff_num_from_hardening(self, hard, fobs=None, sepa=None, limit_merger_time=None):
+    def diff_num_from_hardening(self, *args, **kwargs):
+        err = (
+            "DEPRECATION `Semi_Analytic_Model.diff_num_from_hardening` ==> "
+            "`Semi_Analytic_Model.dynamic_binary_number`"
+        )
+        log.exception(err)
+        raise AttributeError(err)
+
+    def dynamic_binary_number(self, hard, fobs=None, sepa=None, limit_merger_time=None):
         """Calculate the differential number of binaries (per bin-volume, per log-freq interval).
 
         The value returned is `d^4 N / [dlog10(M) dq dz dln(X)]`, where X is either
@@ -567,6 +582,7 @@ class Semi_Analytic_Model:
                             = (dn/dz) * (a / [da/dt]) * 4 pi c D_c^2 (1+z)
 
         """
+
         if (fobs is None) == (sepa is None):
             err = "one (and only one) of `fobs` or `sepa` must be provided!"
             log.exception(err)
@@ -581,7 +597,7 @@ class Semi_Analytic_Model:
             edges = self.edges + [sepa, ]
 
         # shape: (M, Q, Z)
-        dens = self.density   # d3n/[dz dlog10(M) dq]  units: [Mpc^-3]
+        dens = self.static_binary_density   # d3n/[dz dlog10(M) dq]  units: [Mpc^-3]
 
         # (Z,) comoving-distance in [Mpc]
         dc = cosmo.comoving_distance(self.redz).to('Mpc').value
@@ -690,7 +706,7 @@ class Semi_Analytic_Model:
         # ---- Get the differential-number of binaries for each bin
         # this is  ``d^4 n / [dlog10(M) dq dz dln(f_r)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
-        edges, dnum = self.diff_num_from_hardening(hard, fobs=fobs)
+        edges, dnum = self.dynamic_binary_number(hard, fobs=fobs)
 
         # "integrate" within each bin (i.e. multiply by bin volume)
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
@@ -783,7 +799,7 @@ def sample_sam_with_hardening(
 
     # returns  dN/[dlog10(M) dq dz dln(f_r)]
     # edges: Mtot [grams], mrat (q), redz (z), {fobs (f) [1/s] OR sepa (a) [cm]}
-    edges, dnum = sam.diff_num_from_hardening(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
+    edges, dnum = sam.dynamic_binary_number(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
 
     edges_integrate = [np.copy(ee) for ee in edges]
     edges_sample = [np.log10(edges[0]), edges[1], edges[2], np.log(edges[3])]
