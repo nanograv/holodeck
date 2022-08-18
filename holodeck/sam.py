@@ -583,6 +583,8 @@ class Semi_Analytic_Model:
 
         """
 
+        # ! BUG: is frequency handled correctly: rest-frame vs obs-frame and also GW vs. orbital !
+
         if (fobs is None) == (sepa is None):
             err = "one (and only one) of `fobs` or `sepa` must be provided!"
             log.exception(err)

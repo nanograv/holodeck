@@ -101,10 +101,15 @@ Components (1) and (2) can be produced in a variety of ways described below and,
 Component (3) always requires the same type of implementation: some level of semi-analytic modeling of the physical interactions between MBHBs and the environments of their surrounding galactic nuclei.  The physical processes which mediate *"binary hardening"*, the process of extracting energy and angular momentum to allow the binary orbit to shrink, cannot be resolved directly in either cosmological hydrodynamic simulations or observations which are currently both limited to physical scales :math:`r \gtrsim 100 \, \mathrm{pc}` where the most massive MBHBs are only just starting to gravitationally interact with each other.
 
 
+
+
+
 .. _pop-sams:
 
 Semi-Analytic Models
 --------------------
+
+.. _pop-sams-theory:
 
 Theory
 ^^^^^^
@@ -154,6 +159,8 @@ Combining :math:numref:`eq:cont_eq_result` with :math:numref:`num_num_dens`, we 
    :name: eq:sam_final
 
 
+.. _pop-sams-implement:
+
 SAM Implementation
 ^^^^^^^^^^^^^^^^^^
 Full code documentation: :mod:`SAM submodule <holodeck.sam>` submodule.
@@ -179,8 +186,32 @@ comoving number-density of MBH binaries in the Universe is calculated.  Methods 
 that interface with the `kalepy` package to draw 'samples' (discretized binaries) from the
 distribution, and to calculate GW signatures.
 
-The step of going from a number-density of binaries in $(M, q, z)$ space, to also the distribution
-in $a$ or $f$ is subtle, as it requires modeling the binary evolution (i.e. hardening rate).
+To calculate the distribution of binaries, `Semi_Analytic_Model` first calculates a 'static volume-density' of binaries, as a differential distribution over the intrinsic parameters $M$, $q$, $z$.  This is the quantity,
+
+.. math::
+   \frac{d^3 n}{d\log_{10}M \, dq \, dz} = \frac{dt}{dz} \frac{\Phi(M,z) \, P(M,q,z)}{T(M,q,z)} \, J_M.
+
+The $J_M$ term includes conversions between different masses and mass ratios, namely,
+
+.. math::
+   J_M = \frac{d \log_{10} m_{\star,1}}{dM_{\star}} \, \frac{dq_\star}{dq} \, \frac{dM_\star}{dM} M \log(10).
+
+This is returned by the :meth:`Semi_Analytic_Model.static_binary_density <holodeck.sam.Semi_Analytic_Model.static_binary_density>` method, and has units of $[\\mathrm{Mpc}^{-3}]$.
+
+The next step converts from a static volume-density of binaries in $(M, q, z)$ space, to also the distribution
+in $a$ or $f$.  This step is subtle, as it requires modeling the binary evolution (i.e. hardening rate; see :ref:`Binary Evolution <binary-evolution>`).  This is performed in the :meth:`Semi_Analytic_Model.dynamic_binary_number <holodeck.sam.Semi_Analytic_Model.dynamic_binary_number>` method, which also converted from volume-density to number of binaries (i.e. $dn \\rightarrow dN$).  The result is the quantity,
+
+.. math::
+   \frac{d^4 N}{d\log_{10}M \, dq \, dz \, d\ln X} = \frac{d^3 n}{d\log_{10}M \, dq \, dz} \frac{dz}{dt} \frac{dV_c}{dz} t_X,
+
+where $X$ can either be the binary separation $a$ or the binary GW frequency (?!GW OR ORBITAL?!) $f_r$.  The timescale is correspondingly defined in terms of either of these variables, i.e. $t_a = dt / d \ln f_r$ or $t_f = df_r / d \ln f_r$.  The returned value is dimensionless (i.e. a number).
+
+Gravitational Wave signals can then be calculated in two ways.  The smooth grid of differential number of binaries ($d^4 N / d\log_{10}M \, dq \, dz \, d\ln f_r$) can be used, which is done in the :meth:`Semi_Analytic_Model.gwb <holodeck.sam.Semi_Analytic_Model.gwb>` method.  Or the smooth distribution of binaries can be discretely sampled into a finite population of binaries in the universe, from which the total GW strain can be added up, which is done within the :meth:`sam.sampled_gws_from_sam <holodeck.sam.sampled_gws_from_sam>` method.
+
+DESCRIBE GW CALCULATION MORE HERE.
+
+
+
 
 
 .. _pop-discrete:
