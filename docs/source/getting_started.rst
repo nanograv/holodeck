@@ -203,8 +203,14 @@ in $a$ or $f$.  This step is subtle, as it requires modeling the binary evolutio
 
 .. math::
    \frac{d^4 N}{d\log_{10}M \, dq \, dz \, d\ln X} = \frac{d^3 n}{d\log_{10}M \, dq \, dz} \frac{dz}{dt} \frac{dV_c}{dz} t_X,
+   :name: eq:N_from_n
 
-where $X$ can either be the binary separation $a$ or the binary GW frequency (?!GW OR ORBITAL?!) $f_r$.  The timescale is correspondingly defined in terms of either of these variables, i.e. $t_a = dt / d \ln f_r$ or $t_f = df_r / d \ln f_r$.  The returned value is dimensionless (i.e. a number).
+where $X$ can either be the binary separation $a$ or the binary GW frequency (?!GW OR ORBITAL?!) $f_r$.  The timescale is correspondingly defined in terms of either of these variables, i.e. $t_a = dt / d \ln f_r$ or $t_f = df_r / d \ln f_r$.  The returned value is dimensionless (i.e. a number).  Note that the universe light-cone term can be expressed as,
+
+.. math::
+   \frac{dV_c}{dt} = \frac{dV_c}{dz} \frac{dz}{dt} = 4 \pi \, c \, (1 + z) \, d_c^2,
+
+where $d_c$ is the comoving distance to the corresponding age (or redshift or distance) of the Universe.
 
 Gravitational Wave signals can then be calculated in two ways.  The smooth grid of differential number of binaries ($d^4 N / d\log_{10}M \, dq \, dz \, d\ln f_r$) can be used, which is done in the :meth:`Semi_Analytic_Model.gwb <holodeck.sam.Semi_Analytic_Model.gwb>` method.  Or the smooth distribution of binaries can be discretely sampled into a finite population of binaries in the universe, from which the total GW strain can be added up, which is done within the :meth:`sam.sampled_gws_from_sam <holodeck.sam.sampled_gws_from_sam>` method.
 
@@ -237,6 +243,7 @@ masses, their initial binary separation, and the redshift at which they formed (
 
 Note that the evolution of binaries, i.e. hardening from large separations to small separations and eventually coalescence, is treated separately (See `Binary Evolution`_ below).
 
+
 Finite Volume / Discrete Implementation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Full code documentation: :mod:`discrete populations <holodeck.population>` submodule.
@@ -259,7 +266,25 @@ The fundamental, required attributes for all population classes are:
   should be shaped as (N,).
 
 The implementation for binary evolution (e.g. environmental hardening processes), as a function of
-separation or frequency, are included in the :mod:`holodeck.evolution` module, see also below.
+separation or frequency, are included in the :mod:`holodeck.evolution` module, see also below.  The result is an 'evolutionary track' or 'evolutionary history' for each binary in the finite volume of the cosmological simulation.
+
+At times, instead of the finite volume, we wish to calculate the distribution of binaries we would expect in a full universe.  To either sample such a population of binaries in a full universe, or to calculate the GW signals produced by such a population, we must extrapolate to the larger volume, taking into account both the size of the cosmological simulation and the rate of evolution of each binary.  The rate of evolution of the binaries is needed because distance/volume is connected to time by the observer's past light-cone.  i.e. something observed a given distance away, is also observed the corresponding light-travel time in the past.  This is treated as follows.
+
+First we choose an independent variable of interest to define where we sample our population.  Because GW signals are our primary interest, it is typically natural to pre-define a grid of observer-frame GW frequencies.  Equivalently binary separations can be defined, or redshift intervals, etc, but we typically use observer-frame GW frequencies.  Each binary evolution track is interpolated to find the point in time when the binary reaches each frequency of interest.  For each frequency, and each binary, we then have the binary intrinsic properties (e.g. $M, q, z$) in additional to its hardening rate ($da/dt$ or $df/dt$).  If the corresponding redshift (or scale-factor or age of the Universe) takes place after the current epoch (i.e. $z=0$), then the binary can be discarded at that frequency.
+
+Each binary, at each frequency, is then interpreted as contributing a volume-density of $n_{ij} = 1/V_\mathrm{sim}$ to the total distribution of binaries.  We can then convert from volume-density to number of binaries in the same way as for the semi-analytic-model calculation :math:numref:`eq:N_from_n`,
+
+.. math::
+   \frac{d N}{d\ln X} = n \frac{dV_c}{dz} \frac{dz}{dt} \frac{d t}{d\ln X},
+
+where $X$ can either be the binary separation $a$ or the binary GW frequency (?!GW OR ORBITAL?!) $f_r$.  The timescale is correspondingly defined in terms of either of these variables, i.e. $t_a = dt / d \ln f_r$ or $t_f = df_r / d \ln f_r$.  The returned value is dimensionless (i.e. a number).  Note that the universe light-cone term can be expressed as,
+
+.. math::
+   \frac{dV_c}{dt} = \frac{dV_c}{dz} \frac{dz}{dt} = 4 \pi \, c \, (1 + z) \, d_c^2,
+
+where $d_c$ is the comoving distance to the corresponding age (or redshift or distance) of the Universe.
+
+
 
 
 .. _pop-obs:
