@@ -115,11 +115,67 @@ class GW_Continuous(Grav_Waves):
         return
 
 
-def _calc_mc_at_fobs(fobs_gw, harm_range, nreals, bin_evo, box_vol, loudest=5):
+'''
+def _calc_mc_at_fobs(fogw, _harms, nreals, bin_evo, box_vol, loudest=5):
     """
+    """
+    fo_orb = fo_gw / 2.0
+    data_harms = bin_evo.at('fobs', fo_orb, params=_CALC_MC_PARS)
 
+    redz = cosmo.a_to_z(data_harms['scafa'])
+    valid = (redz > 0.0)
+    redz = redz[valid]
+    dcom = cosmo.z_to_dcom(redz)
+    zp1 = redz + 1
+    fr_orb = utils.frst_from_fobs(fo_orb, redz)
+    mchirp = data_harms['mass'][valid]
+    mchirp = utils.chirp_mass(*mchirp.T)
+    hs2 = utils.gw_strain_source(mchirp, dcom, fr_orb)**2
+
+    dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], data_harms['sepa'][valid], frst_orb=fr_orb)
+    tfac = fr_orb / dfdt
+    vfac = 4.0*np.pi*SPLC * zp1 * dcom**2 / box_vol
+
+    num_frac = vfac * tfac
+    num_pois = np.random.poisson(num_frac)
+    both = np.sum(hs2 * num_pois) * np.ones(nreals)
+    return both, np.zeros_like(both), np.zeros_like(both), np.zeros((loudest, nreals))
+'''
+
+
+def _calc_mc_at_fobs(fobs_gw, harm_range, nreals, bin_evo, box_vol, loudest=5):
+    """Calculate GW signal at range of frequency harmonics for a single observer-frame GW frequency.
+
+    Parameters
+    ----------
     fobs_gw : float
         Observer-frame GW-frequency in units of [1/sec].  This is a single, float value.
+    harm_range : list[int]
+        Harmonics of the orbital-frequency at which to calculate GW emission.  For circular orbits,
+        only [2] is needed, as the GW frequency is twice the orbital frequency.  For eccentric
+        orbital, GW emission is produced both at harmonic 1 and higher harmonics.  The higher the
+        eccentricity the more GW energy is emitted at higher and higher harmonics.
+    nreals : int
+        Number of realizations to calculate in Poisson sampling.
+    bin_evo : `holodeck.evolution.Evolution`
+        Initialized and evolved binary evolution instance, storing the binary evolution histories
+        of each binary.
+    box_vol : float
+        Volume of the simulation box that the binary population is derived from.  Units of [cm^3].
+    loudest : int
+        Number of 'loudest' (highest amplitude) strain values to calculate and return separately.
+
+    Returns
+    -------
+    mc_ecc_both : (R,) ndarray,
+        Combined (background + foreground) GW Strain at this frequency, for `R` realizations.
+    mc_ecc_fore : (R,) ndarray,
+        GW foreground strain (i.e. loudest single source) at this frequency, for `R` realizations.
+    mc_ecc_back : (R,) ndarray,
+        GW background strain (i.e. all sources except for the loudest) at this frequency, for `R`
+        realizations.
+    loud : (L, R) ndarray,
+        Strains of the `L` loudest binaries (L=`loudest` input parameter) for each realization.
 
     """
 
@@ -147,65 +203,44 @@ def _calc_mc_at_fobs(fobs_gw, harm_range, nreals, bin_evo, box_vol, loudest=5):
         gne = 1
     else:
         gne = utils.gw_freq_dist_func(harms, ee=eccen[valid])
-        # BUG: FIX: NOTE: this fails for zero eccentricities (at times?) fix manually!
-        sel_e0 = (eccen[valid] < 1e-8)
         # Select the elements corresponding to the n=2 (circular) harmonic, to use later
         sel_n2 = np.zeros_like(redz, dtype=bool)
         sel_n2[(harms == 2)] = 1
         sel_n2 = sel_n2[valid]
+
+        # BUG: FIX: NOTE: this fails for zero eccentricities (at times?)
+        # This is a reasonable, perhaps temporary, fix: when eccentricity is very low, set all
+        # harmonics to zero except for n=2
+        sel_e0 = (eccen[valid] < 1e-12)
         gne[sel_e0] = 0.0
         gne[sel_n2 & sel_e0] = 1.0
 
     # Calculate required parameters for valid binaries (V,)
-    # dlum = cosmo.z_to_dlum(redz)
     dcom = cosmo.z_to_dcom(redz)
-    zp1 = redz + 1
-    frst_orb = fobs_gw * zp1 / harms
+    frst_orb = utils.frst_from_fobs(fobs_gw, redz) / harms
     mchirp = data_harms['mass'][valid]
     mchirp = utils.chirp_mass(*mchirp.T)
-    dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], data_harms['sepa'][valid], freq_orb=frst_orb)
-    tfac = frst_orb / dfdt
-
     # Calculate strains from each source
-    # hs2 = utils.gw_strain_source(mchirp, dlum, frst_orb)**2
     hs2 = utils.gw_strain_source(mchirp, dcom, frst_orb)**2
 
-    # Calculate resampling factors
-    # [1/s] this is `(dVc/dz) * (dz/dt) / V_sim`
-    vfac = 4.0*np.pi*SPLC * zp1 * dcom**2 / box_vol
+    dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], data_harms['sepa'][valid], frst_orb=frst_orb)
+    lambda_fact = utils.lambda_factor_freq(frst_orb, dfdt, redz, dcom=None) / box_vol
 
-    # Calculate weightings
-    num_frac = vfac * tfac
-    shape = (num_frac.size, nreals)
-    num_pois = np.random.poisson(num_frac[:, np.newaxis], shape)
-    # num_pois = num_frac[:, np.newaxis] * np.ones(shape)
-    # print(f"{utils.frac_str(np.isfinite(num_frac))=}")
-    # print(f"{utils.stats(num_frac)=}")
+    shape = (lambda_fact.size, nreals)
+    num_pois = np.random.poisson(lambda_fact[:, np.newaxis], shape)
 
     # --- Calculate GW Signals
     temp = hs2 * gne * (2.0 / harms)**2
     mc_ecc_both = np.sum(temp[:, np.newaxis] * num_pois, axis=0)
-    # mc_circ_both = np.sum(temp[:, np.newaxis] * num_pois * sel_n2[:, np.newaxis], axis=0)
-    # sa_ecc = np.sum(temp * num_frac, axis=0)
-    # sa_circ = np.sum(temp * num_frac * sel_n2, axis=0)
 
     if np.count_nonzero(num_pois) > 0:
         # Find the L loudest binaries in each realizations
         loud = np.sort(temp[:, np.newaxis] * (num_pois > 0), axis=0)[::-1, :]
         mc_ecc_fore = loud[0, :]
         loud = loud[:loudest, :]
-        # mc_circ_fore = np.max(temp[:, np.newaxis] * (num_pois > 0) * sel_n2[:, np.newaxis], axis=0)
     else:
         mc_ecc_fore = np.zeros_like(mc_ecc_both)
-        # mc_circ_fore = np.zeros_like(mc_circ_both)
         loud = np.zeros((loudest, nreals))
 
     mc_ecc_back = mc_ecc_both - mc_ecc_fore
-    # mc_circ_back = mc_circ_both - mc_circ_fore
-
-    # Package and return
-    # mc_ecc = [mc_ecc_fore, mc_ecc_back, mc_ecc_both]
-    # mc_circ = [mc_circ_fore, mc_circ_back, mc_circ_both]
-
-    # return mc_ecc, mc_circ, sa_ecc, sa_circ, loud
     return mc_ecc_both, mc_ecc_fore, mc_ecc_back, loud
