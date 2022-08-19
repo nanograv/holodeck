@@ -1075,7 +1075,7 @@ def _get_sepa_freq(mt, sepa, freq):
         raise ValueError("Only one of `freq` or `sepa` should be provided!")
 
     if freq is None:
-        freq =  kepler_freq_from_sepa(mt, sepa)
+        freq = kepler_freq_from_sepa(mt, sepa)
 
     if sepa is None:
         sepa = kepler_sepa_from_freq(mt, freq)
@@ -1513,5 +1513,3 @@ def _array_args(*args):
     args = [np.asarray(aa) if aa is not None else None
             for aa in args]
     return args
-
-
