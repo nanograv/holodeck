@@ -619,7 +619,7 @@ def _draw_plaw(ax, freqs, amp=1e-15, f0=1/YR, **kwargs):
     kwargs.setdefault('alpha', 0.25)
     kwargs.setdefault('color', 'k')
     kwargs.setdefault('ls', '--')
-    plaw = amp * np.power(freqs/f0, -2/3)
+    plaw = amp * np.power(np.asarray(freqs)/f0, -2/3)
     return ax.plot(freqs, plaw, **kwargs)
 
 

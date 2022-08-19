@@ -21,7 +21,7 @@ import scipy as sp
 import scipy.stats
 import h5py
 
-from holodeck import log
+from holodeck import log, cosmo
 from holodeck.constants import NWTG, SCHW, SPLC, YR
 
 # [Sesana2004]_ Eq.36
@@ -843,7 +843,7 @@ def _parse_log_norm_pars(vals, size, default=None):
 # =================================================================================================
 
 
-def dfdt_from_dadt(dadt, sepa, mtot=None, freq_orb=None):
+def dfdt_from_dadt(dadt, sepa, mtot=None, frst_orb=None):
     """Convert from hardening rate in separation to hardening rate in frequency.
 
     Parameters
@@ -853,28 +853,30 @@ def dfdt_from_dadt(dadt, sepa, mtot=None, freq_orb=None):
     sepa : array_like
         Binary separations.
     mtot : None or array_like
-        Either `mtot` or `freq_orb` must be provided.
-    freq_orb : None or array_like
-        Either `mtot` or `freq_orb` must be provided.
+        Binary total-mass in units of [gram].
+        Either `mtot` or `frst_orb` must be provided.
+    frst_orb : None or array_like
+        Binary rest-frame orbital-frequency in units of [1/sec].
+        Either `mtot` or `frst_orb` must be provided.
 
     Returns
     -------
     dfdt :
-        Hardening rate in terms of frequency.
+        Hardening rate in terms of rest-frame frequency.  [1/sec^2]
         NOTE: Has the opposite sign as `dadt`.
-    freq_orb :
-        Orbital frequency, in the rest-frame
+    frst_orb :
+        Orbital frequency, in the rest-frame.  [1/sec]
 
     """
-    if (mtot is None) and (freq_orb is None):
-        err = "Either `mtot` or `freq_orb` must be provided!"
-        log.error(err)
+    if (mtot is None) and (frst_orb is None):
+        err = "Either `mtot` or `frst_orb` must be provided!"
+        log.exception(err)
         raise ValueError(err)
-    if freq_orb is None:
-        freq_orb = kepler_freq_from_sepa(mtot, sepa)
+    if frst_orb is None:
+        frst_orb = kepler_freq_from_sepa(mtot, sepa)
 
-    dfdt = - 1.5 * (freq_orb / sepa) * dadt
-    return dfdt, freq_orb
+    dfdt = - 1.5 * (frst_orb / sepa) * dadt
+    return dfdt, frst_orb
 
 
 def mtmr_from_m1m2(m1, m2=None):
@@ -1079,6 +1081,48 @@ def _get_sepa_freq(mt, sepa, freq):
         sepa = kepler_sepa_from_freq(mt, freq)
 
     return sepa, freq
+
+
+def lambda_factor_freq(frst, dfdt, redz, dcom=None):
+    """Account for the universe's differential space-time volume for a given hardening rate.
+
+    Calculate the factor, $$(dVc/dz) * (dz/dt) * [dt/dln(f)]$$, which has units of [Mpc^3].
+
+    Parameters
+    ----------
+    frst : ArrayLike
+        Binary frequency (typically rest-frame orbital frequency; but it just needs to match what's
+        provided in the `dfdt` term.  Units of [1/sec].
+    dfdt : ArrayLike
+        Binary hardening rate in terms of frequency (typically rest-frame orbital frequency, but it
+        just needs to match what's provided in `frst`).  Units of [1/sec^2].
+    redz : ArrayLike
+        Binary redshift.  Dimensionless.
+    dcom : ArrayLike
+        Comoving distance to binaries (for the corresponding redshift, `redz`).  Units of [cm].
+        If not provided, calculated from given `redz`.
+
+    Returns
+    -------
+    lambda_fact : ArrayLike
+        The differential comoving volume of the universe per log interval of binary frequency.
+
+    """
+    zp1 = redz + 1
+    if dcom is None:
+        dcom = cosmo.z_to_dcom(redz)
+
+    # Volume-factor
+    # [Mpc^3/s] this is `(dVc/dz) * (dz/dt)`
+    vfac = 4.0 * np.pi * SPLC * zp1 * (dcom**2)
+    # Time-factor
+    # [sec] this is `f / (df/dt) = dt/d ln(f)`
+    # frst = frst_orb = fobs * zp1 / harms
+    tfac = frst / dfdt
+
+    # Calculate weighting
+    lambda_fact = vfac * tfac
+    return lambda_fact
 
 
 # =================================================================================================
@@ -1363,7 +1407,9 @@ def gw_lum_circ(mchirp, freq_orb_rest):
 def gw_strain_source(mchirp, dcom, freq_orb_rest):
     """GW Strain from a single source in a circular orbit.
 
-    See: [Sesana2004]_ Eq.36 or [Enoki2004]_ Eq.5.
+    For reference, see:
+    *   [Sesana2004]_ Eq.36 : they use `f_r` to denote rest-frame GW-frequency.
+    *   [Enoki2004]_ Eq.5.
 
     Parameters
     ----------
@@ -1381,6 +1427,7 @@ def gw_strain_source(mchirp, dcom, freq_orb_rest):
 
     """
     mchirp, dcom, freq_orb_rest = _array_args(mchirp, dcom, freq_orb_rest)
+    # The factor of 2 below is to convert from orbital-frequency to GW-frequency
     hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_orb_rest, 2/3) / dcom
     return hs
 
@@ -1466,3 +1513,5 @@ def _array_args(*args):
     args = [np.asarray(aa) if aa is not None else None
             for aa in args]
     return args
+
+

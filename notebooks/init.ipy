@@ -29,6 +29,9 @@ import holodeck as holo
 import holodeck.sam
 from holodeck import cosmo, utils, plot
 from holodeck.constants import MSOL, PC, YR, MPC, GYR
+import holodeck.gravwaves
+import holodeck.evolution
+import holodeck.population
 
 # Silence annoying numpy errors
 np.seterr(divide='ignore', invalid='ignore', over='ignore')
