@@ -16,7 +16,7 @@ components as arguments:
 
 The :class:`Semi_Analytic_Model` class defines a grid in parameter space of total MBH mass ($M=M_1 + M_2$),
 MBH mass ratio ($q \\equiv M_1/M_2$), redshift ($z$), and at times binary separation
-(semi-major axis $a$) or binary rest-frame frequency ($f_r$).  Over this grid, the distribution of
+(semi-major axis $a$) or binary rest-frame orbital-frequency ($f_r$).  Over this grid, the distribution of
 comoving number-density of MBH binaries in the Universe is calculated.  Methods are also provided
 that interface with the `kalepy` package to draw 'samples' (discretized binaries) from the
 distribution, and to calculate GW signatures.
@@ -27,12 +27,8 @@ in $a$ or $f$ is subtle, as it requires modeling the binary evolution (i.e. hard
 
 To-Do
 -----
-* Check that _GW_ frequencies and _orbital_ frequencies are being used in the correct places.
-  Check `number_at_gw_fobs` and related methods.
 * Change mass-ratios and redshifts (1+z) to log-space; expand q parameter range.
 * Incorporate arbitrary hardening mechanisms into SAM construction, sample self-consistently.
-* When using `sample_outliers` check whether the density (used for intrabin sampling) should be
-  the log(dens) instead of just `dens`.
 * Should there be an additional dimension of parameter space for galaxy properties?  This way
   variance in scaling relations is incorporated directly before calculating realizations.
 * Allow SAM class to take M-sigma in addition to M-Mbulge.
@@ -554,16 +550,20 @@ class Semi_Analytic_Model:
     def dynamic_binary_number(self, hard, fobs=None, sepa=None, limit_merger_time=None):
         """Calculate the differential number of binaries (per bin-volume, per log-freq interval).
 
-        The value returned is `d^4 N / [dlog10(M) dq dz dln(X)]`, where X is either
-        separation (a) or frequency (f_r), depending on whether `sepa` or `fobs` is passed in.
+        The value returned is `d^4 N / [dlog10(M) dq dz dln(X)]`, where X is either:
+        *   separation (a) ::  if  `sepa` is passed in, or
+        *   observer-frame orbital-frequency (f_r) :: if `fobs` is passed in.
 
         Parameters
         ----------
-        hard : instance
-        fobs : observed frequency in [1/sec]
-        sepa : rest-frame separation in [cm]
+        hard : `holodeck.evolution._Hardening`
+            Hardening instance for calculating binary evolution rate.
+        fobs : ArrayLike
+            observer-frame orbital-frequency in [1/sec].
+        sepa : ArrayLike
+            Rest-frame binary separation in [cm].
         limit_merger_time : None or scalar,
-            Maximum allowed merger time in [sec]
+            Maximum allowed merger time in [sec].  If `None`, no maximum is imposed.
 
         Returns
         -------
@@ -581,9 +581,13 @@ class Semi_Analytic_Model:
         d^2 N / dz dln(a)   = (dn/dz) * (dz/dt) * (dt/d ln a) * (dVc/dz)
                             = (dn/dz) * (a / [da/dt]) * 4 pi c D_c^2 (1+z)
 
-        """
+        To-Do
+        -----
+        *   Use the `utils.lambda_factor_freq` function instead of calculating it manually.  Be
+            careful about units (Mpc).  Need to adjust the function to accept either sepa or freq
+            as arguments and outputs.
 
-        # ! BUG: is frequency handled correctly: rest-frame vs obs-frame and also GW vs. orbital !
+        """
 
         if (fobs is None) == (sepa is None):
             err = "one (and only one) of `fobs` or `sepa` must be provided!"
@@ -617,14 +621,14 @@ class Semi_Analytic_Model:
         mt, mr, rz = [gg.ravel() for gg in self.grid]
 
         if fobs is not None:
-            # Convert from obs-GW freq, to rest-frame _orbital_ freq
+            # Convert from observer-frame orbital freq, to rest-frame orbital freq
             # (F, M*Q*Z)
-            fr = fobs[:, np.newaxis] * (1.0 + rz[np.newaxis, :]) / 2.0
-            sa = utils.kepler_sepa_from_freq(mt[np.newaxis, :], fr)
+            frst_orb = fobs[:, np.newaxis] * (1.0 + rz[np.newaxis, :])
+            sa = utils.kepler_sepa_from_freq(mt[np.newaxis, :], frst_orb)
         else:
             sa = sepa[:, np.newaxis]
             # NOTE: `fr` is the _orbital_ frequency (not GW), and in rest-frame
-            fr = utils.kepler_freq_from_sepa(mt[np.newaxis, :], sa)
+            frst_orb = utils.kepler_freq_from_sepa(mt[np.newaxis, :], sa)
 
         # recall: these are negative (decreasing separation)  [cm/sec]
         dadt = hard.dadt(mt[np.newaxis, :], mr[np.newaxis, :], sa)
@@ -632,8 +636,8 @@ class Semi_Analytic_Model:
         # Calculate `tau = dt/dlnf_r = f_r / (df_r/dt)`
         if fobs is not None:
             # dfdt is positive (increasing frequency)
-            dfdt, fr = utils.dfdt_from_dadt(dadt, sa, freq_orb=fr)
-            tau = fr / dfdt
+            dfdt, frst_orb = utils.dfdt_from_dadt(dadt, sa, frst_orb=frst_orb)
+            tau = frst_orb / dfdt
         else:
             tau = - sa / dadt
 
@@ -675,13 +679,13 @@ class Semi_Analytic_Model:
 
         return edges, dnum
 
-    def gwb(self, fobs, hard=holo.evolution.Hard_GW, realize=False):
-        """Calculate the (smooth/semi-analytic) GWB at the given observed frequencies.
+    def gwb(self, fobs_gw, hard=holo.evolution.Hard_GW, realize=False):
+        """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
         Parameters
         ----------
-        fobs : (F,) array_like of scalar, [1/sec]
-            Observed GW frequencies.
+        fobs : (F,) array_like of scalar,
+            Observer-frame GW-frequencies. [1/sec]
         hard : holodeck.evolution._Hardening class or instance
             Hardening mechanism to apply over the range of `fobs`.
         realize : bool or int,
@@ -698,17 +702,19 @@ class Semi_Analytic_Model:
         """
 
         squeeze = True
-        fobs = np.atleast_1d(fobs)
-        if np.isscalar(fobs) or np.size(fobs) == 1:
-            err = "single values of `fobs` are not allowed, can only calculated GWB within some bin of frequency!"
-            err += "  e.g. ``fobs = 1/YR; fobs = [0.9*fobs, 1.1*fobs]``"
+        fobs_gw = np.atleast_1d(fobs_gw)
+        if np.isscalar(fobs_gw) or np.size(fobs_gw) == 1:
+            err = "single values of `fobs_gw` are not allowed, can only calculated GWB within some bin of frequency!"
+            err += "  e.g. ``fobs_gw = 1/YR; fobs_gw = [0.9*fobs_gw, 1.1*fobs_gw]``"
             log.exception(err)
             raise ValueError(err)
 
         # ---- Get the differential-number of binaries for each bin
+        # convert to orbital-frequency (from GW-frequency)
+        fobs_orb = fobs_gw / 2.0
         # this is  ``d^4 n / [dlog10(M) dq dz dln(f_r)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
-        edges, dnum = self.dynamic_binary_number(hard, fobs=fobs)
+        edges, dnum = self.dynamic_binary_number(hard, fobs=fobs_orb)
 
         # "integrate" within each bin (i.e. multiply by bin volume)
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
@@ -738,9 +744,9 @@ def _integrate_differential_number(edges, dnum, freq=False):
 
     Parameters
     ----------
-    edges : _type_
-    dnum : _type_
-    freq : bool, optional
+    edges : (4,) iterable of ArrayLike
+    dnum : ndarray
+    freq : bool
         Whether or not to also integrate the frequency dimension.
 
     Returns
@@ -772,8 +778,18 @@ def sample_sam_with_hardening(
 ):
     """Discretize Semi-Analytic Model into sampled binaries assuming the given binary hardening rate.
 
-    fobs in units of [1/yr]
-    sepa in units of [pc]
+    Parameters
+    ----------
+    sam : `Semi_Analytic_Model`
+        Instance of an initialized semi-analytic model.
+    hard : `holodeck.evolution._Hardening`
+        Binary hardening model for calculating binary hardening rates (dadt or dfdt).
+    fobs : ArrayLike
+        Observer-frame orbital-frequencies.  Units of [1/sec].
+        NOTE: Either `fobs` or `sepa` must be provided, and not both.
+    sepa : ArrayLike
+        Binary orbital separation.  Units of [cm].
+        NOTE: Either `fobs` or `sepa` must be provided, and not both.
 
     Returns
     -------
@@ -782,7 +798,7 @@ def sample_sam_with_hardening(
         * mtot : total mass of binary (m1+m2) in [grams]
         * mrat : mass ratio of binary (m2/m1 <= 1)
         * redz : redshift of binary
-        * fobs / sepa : observed-frequency (GW) [1/s] or binary separation [cm]
+        * fobs / sepa : observer-frame orbital-frequency [1/s]  or  binary separation [cm]
     weights : (S,) ndarray of scalar
         Weights of each sample point.
     edges : (4,) of list of scalars
@@ -800,7 +816,8 @@ def sample_sam_with_hardening(
         log.warning(msg)
 
     # returns  dN/[dlog10(M) dq dz dln(f_r)]
-    # edges: Mtot [grams], mrat (q), redz (z), {fobs (f) [1/s] OR sepa (a) [cm]}
+    # edges: Mtot [grams], mrat (q), redz (z), {fobs (f) [1/s]   OR   sepa (a) [cm]}
+    # `fobs` is observer-frame orbital-frequency
     edges, dnum = sam.dynamic_binary_number(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
 
     edges_integrate = [np.copy(ee) for ee in edges]
@@ -870,7 +887,7 @@ def sample_sam_with_hardening(
     return vals, weights, edges, dnum, mass
 
 
-def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
+def sampled_gws_from_sam(sam, fobs_gw, hard=holo.evolution.Hard_GW, **kwargs):
     """Sample the given binary population between the target frequencies, and calculate GW signals.
 
     NOTE: the input `fobs` are interpretted as bin edges, and GW signals are calculate within the
@@ -880,9 +897,9 @@ def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
     ----------
     sam : `Semi_Analytic_Model` instance,
         Binary population to sample.
-    fobs : (F+1,) array_like,
-        Target frequencies of interest in units of [?1/yr?]
-    hard : `evolution._Hardening` instance,
+    fobs_gw : (F+1,) array_like,
+        Target observer-frame GW-frequencies of interest in units of [1/sec]
+    hard : `holodeck.evolution._Hardening` instance,
         Binary hardening model used to calculate binary residence time at each frequency.
     kwargs : dict,
         Additional keyword-arguments passed to `sample_sam_with_hardening()`
@@ -890,7 +907,7 @@ def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
     Returns
     -------
     gff : (F,) ndarry,
-        Frequencies of the loudest binary in each bin [?? 1/s ??].
+        Observer-frame GW-frequencies of the loudest binary in each bin [1/sec].
     gwf : (F,) ndarry,
         GW Foreground: the characteristic strain of the loudest binary in each frequency bin.
     gwb : (F,) ndarry,
@@ -898,8 +915,9 @@ def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
         Does not include the strain from the loudest binary in each bin (`gwf`).
 
     """
-    vals, weights, edges, dens, mass = sample_sam_with_hardening(sam, hard, fobs=fobs, **kwargs)
-    gff, gwf, gwb = _gws_from_samples(vals, weights, fobs)
+    fobs_orb = fobs_gw / 2.0
+    vals, weights, edges, dens, mass = sample_sam_with_hardening(sam, hard, fobs=fobs_orb, **kwargs)
+    gff, gwf, gwb = _gws_from_samples(vals, weights, fobs_gw)
     return gff, gwf, gwb
 
 
@@ -915,14 +933,14 @@ def _strains_from_samples(vals):
         * 0) total binary mass [grams]
         * 1) binary mass-ratio [],
         * 2) redshift at this frequency [],
-        * 3) observer-frame binary GW frequency [1/sec].
+        * 3) *observer*-frame binary *orbital*-frequency [1/sec].
 
     Returns
     -------
     hs : (N,) ndarray,
         Source strains (i.e. not characteristic strains) of each binary.
-    fo : (N,) ndarray,
-        Observer-frame frequencies of each sampled binary.
+    fobs_gw : (N,) ndarray,
+        Observer-frame GW-frequencies of each sampled binary.  [1/sec].
 
     """
 
@@ -931,14 +949,15 @@ def _strains_from_samples(vals):
     rz = vals[2]
     dc = cosmo.comoving_distance(rz).cgs.value
 
-    fo = vals[3]
-    frst = utils.frst_from_fobs(fo, rz)
-    # convert from GW frequency to orbital (divide by 2.0)
-    hs = utils.gw_strain_source(mc, dc, frst/2.0)
-    return hs, fo
+    fobs_orb = vals[3]
+    frst_orb = utils.frst_from_fobs(fobs_orb, rz)
+    hs = utils.gw_strain_source(mc, dc, frst_orb)
+
+    fobs_gw = fobs_orb * 2.0
+    return hs, fobs_gw
 
 
-def _gws_from_samples(vals, weights, fobs):
+def _gws_from_samples(vals, weights, fobs_gw):
     """Calculate GW signals at the given frequencies, from weighted samples of a binary population.
 
     Parameters
@@ -948,15 +967,15 @@ def _gws_from_samples(vals, weights, fobs):
         * vals[0] : mtot [grams]
         * vals[1] : mrat []
         * vals[2] : redz []
-        * vals[3] : fobs [1/sec]
+        * vals[3] : *observer*-frame binary *orbital*-frequency [1/sec]
     weights : (N,) array of scalar,
-    fobs : (F,) array of scalar,
-        Target observer-frame frequencies to calculate GWs at.  Units of [1/sec].
+    fobs_gw : (F,) array of scalar,
+        Target observer-frame GW-frequencies to calculate GWs at.  Units of [1/sec].
 
     Returns
     -------
     gff : (F,) ndarry,
-        Frequencies of the loudest binary in each bin [?? 1/s ??].
+        Observer-frame GW-frequencies of the loudest binary in each bin [1/sec].
     gwf : (F,) ndarry,
         GW Foreground: the characteristic strain of the loudest binary in each frequency bin.
     gwb : (F,) ndarry,
@@ -964,21 +983,22 @@ def _gws_from_samples(vals, weights, fobs):
         Does not include the strain from the loudest binary in each bin (`gwf`).
 
     """
+    # `fo` is observer-frame GW-frequencies of binary samples
     hs, fo = _strains_from_samples(vals)
-    gff, gwf, gwb = gws_from_sampled_strains(fobs, fo, hs, weights)
+    gff, gwf, gwb = gws_from_sampled_strains(fobs_gw, fo, hs, weights)
     return gff, gwf, gwb
 
 
 @numba.njit
-def gws_from_sampled_strains(fobs, fo, hs, weights):
+def gws_from_sampled_strains(fobs_gw_bins, fo, hs, weights):
     """Calculate GW background/foreground from sampled GW strains.
 
     Parameters
     ----------
-    fobs : (F,) array_like of scalar
-        Frequency bins.
+    fobs_gw_bins : (F,) array_like of scalar
+        Observer-frame GW-frequency bins.
     fo : (S,) array_like of scalar
-        Observed GW frequency of each binary sample.
+        Observer-frame GW-frequency of each binary sample.  Units of [1/sec]
     hs : (S,) array_like of scalar
         GW source strain (*not characteristic strain*) of each binary sample.
     weights : (S,) array_like of int
@@ -989,7 +1009,7 @@ def gws_from_sampled_strains(fobs, fo, hs, weights):
     Returns
     -------
     gwf_freqs : (F,) ndarray of scalar
-        GW frequency of foreground sources in each frequency bin.
+        Observer-frame GW frequency of foreground sources in each frequency bin.  Units of [1/sec].
     gwfore : (F,) ndarray of scalar
         Strain amplitude of foreground sources in each frequency bin.
     gwback : (F,) ndarray of scalar
@@ -999,7 +1019,7 @@ def gws_from_sampled_strains(fobs, fo, hs, weights):
 
     # ---- Initialize
     num_samp = fo.size                 # number of binaries/samples
-    num_freq = fobs.size - 1           # number of frequency bins (edges - 1)
+    num_freq = fobs_gw_bins.size - 1           # number of frequency bins (edges - 1)
     gwback = np.zeros(num_freq)        # store GWB characteristic strain
     gwfore = np.zeros(num_freq)        # store loudest binary characteristic strain, for each bin
     gwf_freqs = np.zeros(num_freq)     # store frequency of loudest binary, for each bin
@@ -1012,10 +1032,10 @@ def gws_from_sampled_strains(fobs, fo, hs, weights):
 
     # ---- Calculate GW background and foreground in each frequency bin
     ii = 0
-    lo = fobs[ii]
+    lo = fobs_gw_bins[ii]
     for ff in range(num_freq):
         # upper-bound to this frequency bin
-        hi = fobs[ff+1]
+        hi = fobs_gw_bins[ff+1]
         # number of GW cycles (f/df), for conversion to characteristic strain
         # cycles = 0.5 * (hi + lo) / (hi - lo)
         # cycles = 1.0 / np.diff(np.log([lo, hi]))
@@ -1064,8 +1084,10 @@ def _gws_from_number_grid_centroids(edges, dnum, number, realize):
 
     Parameters
     ----------
-    edges : (4,) array_like of array_like,
-        The edges of each dimension of the parameter spaceeee.
+    edges : (4,) iterable of array_like,
+        The edges of each dimension of the parameter space.
+        The edges should be, in order: [mtot, mrat, redz, fobs],
+        In units of [grams], [], [], [1/sec].
     dnum : (M, Q, Z, F) ndarray,
         Differential comoving number-density of binaries in each bin.
     number : (M, Q, Z, F) ndarray,
@@ -1103,12 +1125,20 @@ def _gws_from_number_grid_centroids(edges, dnum, number, realize):
     # ---- calculate GW strain at bin centroids
     mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))
     dc = cosmo.comoving_distance(coms[2]).cgs.value
-    fr = utils.frst_from_fobs(coms[3], coms[2])
-    # convert from GW frequency to orbital frequency (divide by 2.0)
-    hs = utils.gw_strain_source(mc, dc, fr/2.0)
 
+    # ! -- 2022-08-19: `edges` should already be using *orbital*-frequency
+    fr = utils.frst_from_fobs(coms[3], coms[2])
+    # ! old:
+    # convert from GW frequency to orbital frequency (divide by 2.0)
+    # hs = utils.gw_strain_source(mc, dc, fr/2.0)
+    # ! new:
+    hs = utils.gw_strain_source(mc, dc, fr)
+    # ! --
+
+    # NOTE: for `dlogf` it doesnt matter if these are orbital- or GW- frequencies
     dlogf = np.diff(np.log(edges[-1]))
     dlogf = dlogf[np.newaxis, np.newaxis, np.newaxis, :]
+
     if realize is True:
         number = np.random.poisson(number)
     elif realize in [None, False]:
@@ -1125,9 +1155,11 @@ def _gws_from_number_grid_centroids(edges, dnum, number, realize):
     number = number / dlogf
     hs = np.nan_to_num(hs)
     hc = number * np.square(hs)
+
     # # (M',Q',Z',F) ==> (F,)
     # if integrate:
     #     hc = np.sqrt(np.sum(hc, axis=(0, 1, 2)))
+
     hc = np.sqrt(hc)
 
     return hc
@@ -1140,14 +1172,14 @@ def _gws_from_number_grid_integrated(edges, dnum, number, realize, integrate=Tru
     # ---- calculate GW strain at bin centroids
     mc = utils.chirp_mass(*utils.m1m2_from_mtmr(grid[0], grid[1]))
     dc = cosmo.comoving_distance(grid[2]).cgs.value
+    # These should be *orbital*-frequencies
     fr = utils.frst_from_fobs(grid[3], grid[2])
-    # convert from GW frequency to orbital frequency (divide by 2.0)
-    hs = utils.gw_strain_source(mc, dc, fr/2.0)
+    hs = utils.gw_strain_source(mc, dc, fr)
 
+    dlnf = np.diff(np.log(edges[-1]))[np.newaxis, np.newaxis, np.newaxis, :]
     integrand = dnum * (hs ** 2)
-    # hc = _integrate_differential_number(edges, integrand, freq=False)
     hc = _integrate_differential_number(edges, integrand, freq=True)
-    hc = hc / np.diff(np.log(edges[-1]))[np.newaxis, np.newaxis, np.newaxis, :]
+    hc = hc / dlnf
 
     if realize is True:
         number = np.random.poisson(number) / number
