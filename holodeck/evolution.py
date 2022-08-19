@@ -4,7 +4,7 @@ In `holodeck`, initial binary populations are typically defined near the time of
 merger, when two MBHs come together at roughly kiloparsec scales.  Environmental 'hardening'
 mechanisms are required to dissipate orbital energy and angular momentum, allowing the binary
 separation to shrink ('harden'). Typically *dynamical friction (DF)* is most important at large
-scales ($\sim \mathrm{kpc}$).  Near where the pair of MBHs become a gravitationally-bound binary,
+scales ($\\sim \\mathrm{kpc}$).  Near where the pair of MBHs become a gravitationally-bound binary,
 the DF approximations break down, and individual *stellar scattering* events (from stars in the
 'loss cone' of parameter space) need to be considered.  In the presence of significant gas (i.e.
 from accretion), a circumbinary accretion disk (CBD) may form, and gravitational
@@ -37,26 +37,34 @@ the numerical integration of each binary over time - from large separations to c
 similar calculations, :class:`Evolution` also provides interpolation functionality along binary
 trajectories.
 
-
 To-Do
 -----
 *   General
+
     *   evolution modifiers should act at each step, instead of after all steps?  This would be
-      a way to implement a changing accretion rate, for example; or to set a max/min hardening rate.
+        a way to implement a changing accretion rate, for example; or set a max/min hardening rate.
     *   re-implement "magic" hardening models that coalesce in zero change-of-redshift or fixed
-      amounts of time.
+        amounts of time.
+
 *   Dynamical_Friction_NFW
+
     *   Allow stellar-density profiles to also be specified (instead of using a hard-coded
-      Dehnen profile)
+        Dehnen profile)
     *   Generalize calculation of stellar characteristic radius.  Make self-consistent with
-      stellar-profile, and user-specifiable.
+        stellar-profile, and user-specifiable.
+
 *   Sesana_Scattering
+
     *   Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
-      and flexible.  Currently hard-coded to Dehnen profile estimate.
+        and flexible.  Currently hard-coded to Dehnen profile estimate.
+
 *   _SHM06
+
     *   Interpolants of hardening parameters return 2D arrays which we then take the diagonal
-      of, but there should be a better way of doing this.
+        of, but there should be a better way of doing this.
+
 *   Fixed_Time
+
     *   Handle `rchar` better with respect to interpolation.  Currently not an interpolation
         variable, which restricts it's usage.
     *   This class should be separated into a generic `_Fixed_Time` class that can use any
@@ -99,7 +107,7 @@ import kalepy as kale
 
 import holodeck as holo
 from holodeck import utils, cosmo, log, _PATH_DATA
-from holodeck.constants import GYR, NWTG, PC, MSOL, YR, SPLC
+from holodeck.constants import GYR, NWTG, PC, MSOL
 
 _MAX_ECCEN_ONE_MINUS = 1.0e-6
 #: number of influence radii to set minimum radius for dens calculation
@@ -144,6 +152,9 @@ class Evolution:
     all steps are taken (integration is completed), then :meth:`Evolution._finalize()` is called,
     at which points any stored modifiers (:class:`utils._Modifier` subclasses, in the
     :attr:`Evolution._mods` attribute) are applied.
+
+    NOTE: whenever `frequencies` are used (rest-frame or observer-frame), they refer to **orbital**
+    frequencies, not GW frequencies.  For circular binaries, GW-freq = 2 * orb-freq.
 
     """
 
@@ -306,8 +317,8 @@ class Evolution:
             String specifying the variable of interpolation.
         targets : array_like,
             Locations to interpolate to.
-            * if ``xpar == sepa``  : binary separation, units of [cm],
-            * if ``xpar == xfobs`` : binary frequency,  units of [1/s] = [Hz],
+            * if ``xpar == sepa`` : binary separation, units of [cm],
+            * if ``xpar == fobs`` : binary orbital freq, observer-frame, units of [1/sec],
         params : None or (list of str)
             Names of the parameters that should be interpolated.
             If `None`, defaults to :attr:`Evolution._EVO_PARS` attribute.
@@ -395,9 +406,9 @@ class Evolution:
         xpar : str, in ['fobs', 'sepa']
             String specifying the variable of interpolation.
         targets : array_like,
-            Locations to interpolate to.
+            Locations to interpolate to.  One of:
             * if ``xpar == sepa``  : binary separation, units of [cm],
-            * if ``xpar == xfobs`` : binary frequency,  units of [1/s] = [Hz],
+            * if ``xpar == fobs`` : binary orbital-frequency, observer-frame, units of [1/sec].
         params : None or list[str]
             Names of parameters that should be interpolated.
             If `None`, defaults to :attr:`Evolution._EVO_PARS` attribute.
@@ -457,19 +468,20 @@ class Evolution:
 
         size, nsteps = self.shape
 
-        # Observed-Frequency, units of 1/yr
+        # Observer-frame orbital frequency, units of [1/sec] = [Hz]
         if xpar == 'fobs':
-            # frequency is already increasing
+            # frequency is already increasing (must be true for interplation later)
             xold = np.log10(self.freq_orb_obs)
             xnew = np.log10(targets)
             rev = False
-        # Binary-Separation, units of pc
+        # Binary-Separation, units of [cm]
         elif xpar == 'sepa':
-            # separation is decreasing, reverse to increasing
+            # separation is decreasing, reverse to increasing (for interpolation)
             xold = np.log10(self.sepa)[:, ::-1]
             xnew = np.log10(targets)
             rev = True
         else:   # nocov
+            # This should never be reached, we already checked `xpar` is valid above
             raise ValueError("Bad `xpar` {}!".format(xpar))
 
         # Make sure target values are within bounds
@@ -606,7 +618,7 @@ class Evolution:
 
         return ynew
 
-    def _sample_universe(self, fobs, down_sample=None):
+    def _sample_universe(self, fobs_orb_edges, down_sample=None):
         """Construct a full universe of binaries based on resampling this population.
 
         NOTE: This function needs to be cleaned up / tested for public use.
@@ -614,7 +626,7 @@ class Evolution:
         Parameters
         ----------
         fobs : array_like,
-            Target observer-frame frequencies at which to sample population.
+            Observer-frame orbital-frequencies at which to sample population. Units of [1/sec].
         down_sample : None or float,
             Factor by which to downsample the resulting population.
             For example, `10.0` will produce 10x fewer output binaries.
@@ -626,6 +638,7 @@ class Evolution:
         samples : np.ndarray, shape (4, S)
             Sampled binary data.  For each binary samples S, 4 parameters are returned:
             ['mtot', 'mrat', 'redz', 'fobs'] (these are listed in the `names` returned value.)
+            NOTE: `fobs` is *observer*-frame *orbital*-frequencies.
 
         Notes
         -----
@@ -635,45 +648,57 @@ class Evolution:
 
         """
         log.warning("!!`Evolution._sample_universe` is not yet working correctly!!")
-        fobs = np.atleast_1d(fobs)
+        # fobs = np.atleast_1d(fobs_orb_edges)
+        fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges, log=False)
+        dlnf = np.diff(np.log(fobs_orb_edges))
 
-        # Interpolate binaries to given frequencies
-        # only need this set of parameters
+        # Interpolate binaries to given frequencies; these are the needed parameters
         PARAMS = ['mass', 'sepa', 'dadt', 'scafa']
-        data_fobs = self.at('fobs', fobs, params=PARAMS)
+        # each array within `data_fobs` is shaped (N, F) for N-binaries and F-frequencies (`fobs`)
+        data_fobs = self.at('fobs', fobs_orb_cents, params=PARAMS)
 
         # Only examine binaries reaching the given locations before redshift zero (other redz=infinite)
         redz = cosmo.a_to_z(data_fobs['scafa'])
-        valid = np.isfinite(redz) & (redz > 0.0)
+        valid = (redz > 0.0)
         log.info(f"After interpolation, valid binary-targets: {utils.frac_str(valid)}")
 
-        # Get rest-frame frequency [1/s]
-        frst = utils.frst_from_fobs(fobs[np.newaxis, :], redz)
+        # Get rest-frame orbital-frequency [1/s]
+        frst_orb = utils.frst_from_fobs(fobs_orb_cents[np.newaxis, :], redz)
         # Comoving distance [cm]
         dcom = cosmo.z_to_dcom(redz)
 
         # `mass` has shape (Binaries, Frequencies, 2), units [gram]
         #    convert to (2, B, F), then separate into m1, m2 each with shape (B, F)
         m1, m2 = np.moveaxis(data_fobs['mass'], -1, 0)
-        dfdt, _ = utils.dfdt_from_dadt(data_fobs['dadt'], data_fobs['sepa'], freq_orb=frst)
-        _tres = frst / dfdt
+        dfdt, _ = utils.dfdt_from_dadt(data_fobs['dadt'], data_fobs['sepa'], freq_orb=frst_orb)
 
-        vfac = 4.0*np.pi*SPLC * (redz+1.0) * dcom**2 / self._sample_volume   # * thub
-        tfac = _tres  # / thub
+        _lambda_factor = utils.lambda_factor_freq(frst_orb, dfdt, redz, dcom=dcom) / self._sample_volume
+        lambda_factor = _lambda_factor * dlnf[np.newaxis, :]
 
-        # ---- Get the "Lambda"/Poisson weighting factor ----
-        lambda_factor = vfac * tfac
+        # ! ======
+        mchirp = utils.chirp_mass(m1, m2)
+        hs2 = utils.gw_strain_source(mchirp, dcom, frst_orb)**2
+        # shape = np.shape(_lambda_factor) + (20,)
+        # hc = np.random.poisson(np.nan_to_num(_lambda_factor)[..., np.newaxis], size=shape)
+        # hc = hs2 * np.median(hc, axis=-1)
+        hc = hs2 * np.random.poisson(np.nan_to_num(_lambda_factor))
+        # hc = hs2 * lambda_factor
+        hc = np.sum(hc, axis=0)
+        hc = np.sqrt(hc)
+        # ! ======
 
         # select only valid entries
         mt, mr = utils.mtmr_from_m1m2(m1[valid], m2[valid])
-        fo = (fobs[np.newaxis, :] * np.ones_like(redz))[valid]
+        # broadcast `fobs` to match the shape of binaries, then select valid entries
+        fo = (fobs_orb_cents[np.newaxis, :] * np.ones_like(redz))[valid]
         redz = redz[valid]
         weights = lambda_factor[valid]
         log.info(f"Weights (lambda values) at targets: {utils.stats(weights)}")
 
         # down-sample weights to decrease the number of sample points
+        prev_sum = weights.sum()
+        log.info(f"Total weights (number of binaries in the universe): {prev_sum:.8e}")
         if down_sample is not None:
-            prev_sum = weights.sum()
             weights /= down_sample
             next_sum = weights.sum()
             msg = f"DOWNSAMPLING ARTIFICIALLY!!  down_sample={down_sample:g} :: total: {prev_sum:.4e}==>{next_sum:.4e}"
@@ -685,13 +710,15 @@ class Evolution:
         vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo)]
         names = ['mtot', 'mrat', 'redz', 'fobs']
         nsamp = np.random.poisson(weights.sum())
-        reflect = [None, [None, 0.0], None, np.log10([0.95*fobs[0], fobs[-1]*1.05])]
-        # reflect = [None, [None, 0.0], None, np.log10([fobs[0], fobs[-1]])]
+        reflect = [None, [None, 0.0], None, np.log10([fobs_orb_edges[0], fobs_orb_edges[-1]])]
         samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
+        num_samp = samples[0].size
+        log.info(f"Sampled {num_samp:.8e} binaries in the universe")
 
         # Convert back to normal-space
         samples = np.asarray([10.0 ** ss for ss in samples])
-        return names, samples
+        vals = np.asarray([10.0 ** vv for vv in vals])
+        return names, samples, hc, vals, weights
 
     # ==== Internal Methods
 
@@ -1285,12 +1312,12 @@ class Dynamical_Friction_NFW(_Hardening):
             This parameter is formally the log of the ratio of maximum to minimum impact parameters.
         attenuate : bool,
             Whether the DF hardening rate should be 'attenuated' due to stellar-scattering effects at
-            small radii.  If `True`, DF becomes significantly less effective for radii < R_hard and R_LC
+            small radii.  If `True`, DF becomes significantly less effective for radii < R-hard and R-LC
         rbound_from_density : bool,
             Determines how the binding radius (of MBH pair) is calculated, which is used for attenuation.
             NOTE: this is only used if `attenuate==True`
-            If True:  calculate R_bound using an assumed stellar density profile.
-            If False: calculate R_bound using a velocity dispersion (constant in radius, from `gbh` instance).
+            If True:  calculate R-bound using an assumed stellar density profile.
+            If False: calculate R-bound using a velocity dispersion (constant in radius, from `gbh` instance).
 
         """
         self._mmbulge = holo.relations.get_mmbulge_relation(mmbulge)
@@ -1477,10 +1504,10 @@ class Dynamical_Friction_NFW(_Hardening):
         # characteristic loss-cone-radius in [cm]
         rlc = _radius_loss_cone_BBR1980_dehnen(mbh, mstar)
 
-        # Calculate R_bound based on stellar density profile (mass enclosed)
+        # Calculate R-bound based on stellar density profile (mass enclosed)
         if self._rbound_from_density:
             rbnd = _radius_influence_dehnen(mbh, mstar)
-        # Calculate R_bound based on uniform velocity dispersion (MBH scaling relation)
+        # Calculate R-bound based on uniform velocity dispersion (MBH scaling relation)
         else:
             vdisp = self._msigma.vdisp_from_mbh(m1)   # use primary-bh's mass (index 0)
             rbnd = NWTG * mbh / vdisp**2
@@ -1513,9 +1540,12 @@ class Fixed_Time(_Hardening):
 
     This class uses a phenomenological functional form (defined in :meth:`Fixed_Time.function`) to
     model the hardening rate ($da/dt$) of binaries.  The functional form is,
-    $$\dot{a} = - A * (1.0 + x)^{-g_2 - 1} / x^{g_1 - 1},$$
-    where $x \equiv a / r_\mathrm{char}$ is the binary separation scaled to a characteristic
-    transition radius ($r_\mathrm{char}$) between two power-law indices $g_1$ and $g_2$.  There is
+
+    .. math::
+        \\dot{a} = - A * (1.0 + x)^{-g_2 - 1} / x^{g_1 - 1},
+
+    where :math:`x \\equiv a / r_\\mathrm{char}` is the binary separation scaled to a characteristic
+    transition radius (:math:`r_\\mathrm{char}`) between two power-law indices $g_1$ and $g_2$.  There is
     also an overall normalization $A$ that is calculated to yield the desired binary lifetimes.
 
     NOTE/BUG: the actual binary lifetimes tend to be 1-5% shorter than the requested value.
@@ -1784,9 +1814,11 @@ class Fixed_Time(_Hardening):
         """Hardening rate given the parameters for this hardening model.
 
         The functional form is,
-        $$\dot{a} = - A * (1.0 + x)^{-g_2 - 1} / x^{g_1 - 1},$$
-        Where $A$ is an overall normalization, and $x \equiv a / r_\mathrm{char}$ is the binary
-        separation scaled to a characteristic transition radius ($r_\mathrm{char}$) between two
+        .. math::
+            \\dot{a} = - A * (1.0 + x)^{-g_2 - 1} / x^{g_1 - 1},
+
+        Where $A$ is an overall normalization, and x \\equiv a / r_\\mathrm{char}$ is the binary
+        separation scaled to a characteristic transition radius ($r_\\mathrm{char}$) between two
         power-law indices $g_1$ and $g_2$.
 
         Parameters
