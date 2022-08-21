@@ -114,7 +114,7 @@ def main():
 
     # Find the 'mass' (total number of binaries in each bin) by multiplying each bin by its volume
     # NOTE: this needs to be done manually, instead of within kalepy, because of log-spacings
-    mass = holo.sam._integrate_differential_number(edges_integrate, dnum, freq=True)
+    mass = holo.utils._integrate_grid_differential_number(edges_integrate, dnum, freq=True)
 
     # ---- Prepare filenames
 

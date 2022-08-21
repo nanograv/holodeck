@@ -42,7 +42,7 @@ References
 
 import abc
 
-import numba
+# import numba
 import numpy as np
 
 import kalepy as kale
@@ -50,7 +50,7 @@ import kalepy as kale
 import holodeck as holo
 from holodeck import cosmo, utils, log
 from holodeck.constants import GYR, SPLC, MSOL, MPC
-from holodeck import relations
+from holodeck import relations, gravwaves
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
@@ -720,10 +720,10 @@ class Semi_Analytic_Model:
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
         #       after poisson calculation, need to convert back to dN/dlogf
         #       to get proper characteristic strain measurement
-        number = _integrate_differential_number(edges, dnum, freq=True)
+        number = utils._integrate_grid_differential_number(edges, dnum, freq=True)
 
         # ---- Get the GWB spectrum from number of binaries over grid
-        hc = _gws_from_number_grid_integrated(edges, dnum, number, realize)
+        hc = gravwaves._gws_from_number_grid_integrated(edges, dnum, number, realize)
         if squeeze:
             hc = hc.squeeze()
 
@@ -733,42 +733,6 @@ class Semi_Analytic_Model:
 # ===============================
 # ====    Utility Methods    ====
 # ===============================
-
-
-def _integrate_differential_number(edges, dnum, freq=False):
-    """Integrate the differential number-density of binaries over the given grid (edges).
-
-    NOTE: the `edges` provided MUST all be in linear space, mass is converted to ``log10(M)``
-    and frequency is converted to ``ln(f)``.
-    NOTE: the density `dnum` MUST correspond to `dn/ [dlog10(M) dq dz dln(f)]`
-
-    Parameters
-    ----------
-    edges : (4,) iterable of ArrayLike
-    dnum : ndarray
-    freq : bool
-        Whether or not to also integrate the frequency dimension.
-
-    Returns
-    -------
-    number : ndarray
-        Number of binaries in each bin of mass, mass-ratio, redshift, frequency.
-        NOTE: if `freq=False`, then `number` corresponds to `dN/dln(f)`, the number of binaries
-        per log-interval of frequency.
-
-    """
-    # ---- integrate from differential-number to number per bin
-    # integrate over dlog10(M)
-    number = holo.utils.trapz(dnum, np.log10(edges[0]), axis=0, cumsum=False)
-    # integrate over mass-ratio
-    number = holo.utils.trapz(number, edges[1], axis=1, cumsum=False)
-    # integrate over redshift
-    number = holo.utils.trapz(number, edges[2], axis=2, cumsum=False)
-    # integrate over frequency (if desired)
-    if freq:
-        number = holo.utils.trapz(number, np.log(edges[3]), axis=3, cumsum=False)
-
-    return number
 
 
 def sample_sam_with_hardening(
@@ -854,7 +818,7 @@ def sample_sam_with_hardening(
 
     # Find the 'mass' (total number of binaries in each bin) by multiplying each bin by its volume
     # NOTE: this needs to be done manually, instead of within kalepy, because of log-spacings
-    mass = _integrate_differential_number(edges_integrate, dnum, freq=True)
+    mass = utils._integrate_grid_differential_number(edges_integrate, dnum, freq=True)
 
     # ---- sample binaries from distribution
     if (sample_threshold is None) or (sample_threshold == 0.0):
@@ -885,316 +849,3 @@ def sample_sam_with_hardening(
         weights = weights[~bads]
 
     return vals, weights, edges, dnum, mass
-
-
-def sampled_gws_from_sam(sam, fobs_gw, hard=holo.evolution.Hard_GW, **kwargs):
-    """Sample the given binary population between the target frequencies, and calculate GW signals.
-
-    NOTE: the input `fobs` are interpretted as bin edges, and GW signals are calculate within the
-    corresponding bins.
-
-    Parameters
-    ----------
-    sam : `Semi_Analytic_Model` instance,
-        Binary population to sample.
-    fobs_gw : (F+1,) array_like,
-        Target observer-frame GW-frequencies of interest in units of [1/sec]
-    hard : `holodeck.evolution._Hardening` instance,
-        Binary hardening model used to calculate binary residence time at each frequency.
-    kwargs : dict,
-        Additional keyword-arguments passed to `sample_sam_with_hardening()`
-
-    Returns
-    -------
-    gff : (F,) ndarry,
-        Observer-frame GW-frequencies of the loudest binary in each bin [1/sec].
-    gwf : (F,) ndarry,
-        GW Foreground: the characteristic strain of the loudest binary in each frequency bin.
-    gwb : (F,) ndarry,
-        GW Background: the characteristic strain of the GWB in each frequency bin.
-        Does not include the strain from the loudest binary in each bin (`gwf`).
-
-    """
-    fobs_orb = fobs_gw / 2.0
-    vals, weights, edges, dens, mass = sample_sam_with_hardening(sam, hard, fobs=fobs_orb, **kwargs)
-    gff, gwf, gwb = _gws_from_samples(vals, weights, fobs_gw)
-    return gff, gwf, gwb
-
-
-def _strains_from_samples(vals):
-    """From a sampled binary population, calculate the GW strains.
-
-    NOTE: this assumes that vales[3] is the observer-frame GW frequency.
-
-    Parameters
-    ----------
-    vals : (4,) array_like of array_like,
-        Each element of `vals` is an array of binary parameters, the elements must be:
-        * 0) total binary mass [grams]
-        * 1) binary mass-ratio [],
-        * 2) redshift at this frequency [],
-        * 3) *observer*-frame binary *orbital*-frequency [1/sec].
-
-    Returns
-    -------
-    hs : (N,) ndarray,
-        Source strains (i.e. not characteristic strains) of each binary.
-    fobs_gw : (N,) ndarray,
-        Observer-frame GW-frequencies of each sampled binary.  [1/sec].
-
-    """
-
-    mc = utils.chirp_mass(*utils.m1m2_from_mtmr(vals[0], vals[1]))
-
-    rz = vals[2]
-    dc = cosmo.comoving_distance(rz).cgs.value
-
-    fobs_orb = vals[3]
-    frst_orb = utils.frst_from_fobs(fobs_orb, rz)
-    hs = utils.gw_strain_source(mc, dc, frst_orb)
-
-    fobs_gw = fobs_orb * 2.0
-    return hs, fobs_gw
-
-
-def _gws_from_samples(vals, weights, fobs_gw):
-    """Calculate GW signals at the given frequencies, from weighted samples of a binary population.
-
-    Parameters
-    ----------
-    vals : (4, N) ndarray of scalar,
-        Arrays of binary parameters.
-        * vals[0] : mtot [grams]
-        * vals[1] : mrat []
-        * vals[2] : redz []
-        * vals[3] : *observer*-frame binary *orbital*-frequency [1/sec]
-    weights : (N,) array of scalar,
-    fobs_gw : (F,) array of scalar,
-        Target observer-frame GW-frequencies to calculate GWs at.  Units of [1/sec].
-
-    Returns
-    -------
-    gff : (F,) ndarry,
-        Observer-frame GW-frequencies of the loudest binary in each bin [1/sec].
-    gwf : (F,) ndarry,
-        GW Foreground: the characteristic strain of the loudest binary in each frequency bin.
-    gwb : (F,) ndarry,
-        GW Background: the characteristic strain of the GWB in each frequency bin.
-        Does not include the strain from the loudest binary in each bin (`gwf`).
-
-    """
-    # `fo` is observer-frame GW-frequencies of binary samples
-    hs, fo = _strains_from_samples(vals)
-    gff, gwf, gwb = gws_from_sampled_strains(fobs_gw, fo, hs, weights)
-    return gff, gwf, gwb
-
-
-@numba.njit
-def gws_from_sampled_strains(fobs_gw_bins, fo, hs, weights):
-    """Calculate GW background/foreground from sampled GW strains.
-
-    Parameters
-    ----------
-    fobs_gw_bins : (F,) array_like of scalar
-        Observer-frame GW-frequency bins.
-    fo : (S,) array_like of scalar
-        Observer-frame GW-frequency of each binary sample.  Units of [1/sec]
-    hs : (S,) array_like of scalar
-        GW source strain (*not characteristic strain*) of each binary sample.
-    weights : (S,) array_like of int
-        Weighting factor for each binary.
-        NOTE: the GW calculation is ill-defined if weights have fractional values
-        (i.e. float values, instead of integral values; but the type itself doesn't matter)
-
-    Returns
-    -------
-    gwf_freqs : (F,) ndarray of scalar
-        Observer-frame GW frequency of foreground sources in each frequency bin.  Units of [1/sec].
-    gwfore : (F,) ndarray of scalar
-        Strain amplitude of foreground sources in each frequency bin.
-    gwback : (F,) ndarray of scalar
-        Strain amplitude of the background in each frequency bin.
-
-    """
-
-    # ---- Initialize
-    num_samp = fo.size                 # number of binaries/samples
-    num_freq = fobs_gw_bins.size - 1           # number of frequency bins (edges - 1)
-    gwback = np.zeros(num_freq)        # store GWB characteristic strain
-    gwfore = np.zeros(num_freq)        # store loudest binary characteristic strain, for each bin
-    gwf_freqs = np.zeros(num_freq)     # store frequency of loudest binary, for each bin
-
-    # ---- Sort input by frequency for faster iteration
-    idx = np.argsort(fo)
-    fo = np.copy(fo)[idx]
-    hs = np.copy(hs)[idx]
-    weights = np.copy(weights)[idx]
-
-    # ---- Calculate GW background and foreground in each frequency bin
-    ii = 0
-    lo = fobs_gw_bins[ii]
-    for ff in range(num_freq):
-        # upper-bound to this frequency bin
-        hi = fobs_gw_bins[ff+1]
-        # number of GW cycles (f/df), for conversion to characteristic strain
-        # cycles = 0.5 * (hi + lo) / (hi - lo)
-        # cycles = 1.0 / np.diff(np.log([lo, hi]))
-        cycles = 1.0 / (np.log(hi) - np.log(lo))
-        # amplitude and frequency of the loudest source in this bin
-        hmax = 0.0
-        fmax = 0.0
-        # iterate over all sources with frequencies below this bin's limit (right edge)
-        while (fo[ii] < hi) and (ii < num_samp):
-            # Store the amplitude and frequency of loudest source
-            #    NOTE: loudest source could be a single-sample (weight==1) or from a weighted-bin (weight > 1)
-            #          the max
-            if (weights[ii] >= 1) and (hs[ii] > hmax):
-                hmax = hs[ii]
-                fmax = fo[ii]
-            # if (weights[ii] > 1.0) and poisson:
-            #     h2temp *= np.random.poisson(weights[ii])
-            h2temp = weights[ii] * (hs[ii] ** 2)
-            gwback[ff] += h2temp
-
-            # increment binary/sample index
-            ii += 1
-
-        # subtract foreground source from background
-        gwf_freqs[ff] = fmax
-        gwback[ff] -= hmax**2
-        # Convert to *characteristic* strain
-        gwback[ff] = gwback[ff] * cycles      # hs^2 ==> hc^2  (squared, so cycles^1)
-        gwfore[ff] = hmax * np.sqrt(cycles)   # hs ==> hc (not squared, so sqrt of cycles)
-        lo = hi
-
-    gwback = np.sqrt(gwback)
-    return gwf_freqs, gwfore, gwback
-
-
-def _gws_from_number_grid_centroids(edges, dnum, number, realize):
-    """Calculate GWs based on a grid of number-of-binaries.
-
-    NOTE: `_gws_from_number_grid_integrated()` should be more accurate, but this method better
-    matches GWB from sampled (`kale.sample_`) populations!!
-
-    The input number of binaries is `N` s.t. $$N = (d^4 N / [dlog10(M) dq dz dlogf] ) * dlog10(M) dq dz dlogf$$
-    The number `N` is evaluated on a 4d grid, specified by `edges`, i.e. $$N = N(M, q, z, f_r)$$
-    NOTE: the provided `number` must also summed/integrated over dlogf.
-    To calculate characteristic strain, this function divides again by the dlogf term.
-
-    Parameters
-    ----------
-    edges : (4,) iterable of array_like,
-        The edges of each dimension of the parameter space.
-        The edges should be, in order: [mtot, mrat, redz, fobs],
-        In units of [grams], [], [], [1/sec].
-    dnum : (M, Q, Z, F) ndarray,
-        Differential comoving number-density of binaries in each bin.
-    number : (M, Q, Z, F) ndarray,
-        Volumetric comoving number-density of binaries in each bin.
-    realize : bool or int,
-        Whether or not to calculate one or multiple realizations of the population.
-        BUG: explain more.
-
-    Returns
-    -------
-    hc : (M',Q',Z',F) ndarray,
-        Total characteristic GW strain from each bin of parameter space.
-        NOTE: to get total strain from all bins, must sum in quarature!
-        e.g. ``gwb = np.sqrt(np.square(hc).sum())``
-
-    """
-
-    # # ---- find 'center-of-mass' of each bin (i.e. based on grid edges)
-    # # (3, M', Q', Z')
-    # # coms = self.grid
-    # # ===> (3, M', Q', Z', 1)
-    # coms = [cc[..., np.newaxis] for cc in grid]
-    # # ===> (4, M', Q', Z', F)
-    # coms = np.broadcast_arrays(*coms, fobs[np.newaxis, np.newaxis, np.newaxis, :])
-
-    # # ---- find weighted bin centers
-    # # get unweighted centers
-    # cent = kale.utils.midpoints(dnum, log=False, axis=(0, 1, 2, 3))
-    # # get weighted centers for each dimension
-    # for ii, cc in enumerate(coms):
-    #     coms[ii] = kale.utils.midpoints(dnum * cc, log=False, axis=(0, 1, 2, 3)) / cent
-    # print(f"{kale.utils.jshape(edges)=}, {dnum.shape=}")
-    coms = kale.utils.centroids(edges, dnum)
-
-    # ---- calculate GW strain at bin centroids
-    mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))
-    dc = cosmo.comoving_distance(coms[2]).cgs.value
-
-    # ! -- 2022-08-19: `edges` should already be using *orbital*-frequency
-    fr = utils.frst_from_fobs(coms[3], coms[2])
-    # ! old:
-    # convert from GW frequency to orbital frequency (divide by 2.0)
-    # hs = utils.gw_strain_source(mc, dc, fr/2.0)
-    # ! new:
-    hs = utils.gw_strain_source(mc, dc, fr)
-    # ! --
-
-    # NOTE: for `dlogf` it doesnt matter if these are orbital- or GW- frequencies
-    dlogf = np.diff(np.log(edges[-1]))
-    dlogf = dlogf[np.newaxis, np.newaxis, np.newaxis, :]
-
-    if realize is True:
-        number = np.random.poisson(number)
-    elif realize in [None, False]:
-        pass
-    elif utils.isinteger(realize):
-        shape = number.shape + (realize,)
-        number = np.random.poisson(number[..., np.newaxis], size=shape)
-        hs = hs[..., np.newaxis]
-        dlogf = dlogf[..., np.newaxis]
-    else:
-        err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
-        raise ValueError(err)
-
-    number = number / dlogf
-    hs = np.nan_to_num(hs)
-    hc = number * np.square(hs)
-
-    # # (M',Q',Z',F) ==> (F,)
-    # if integrate:
-    #     hc = np.sqrt(np.sum(hc, axis=(0, 1, 2)))
-
-    hc = np.sqrt(hc)
-
-    return hc
-
-
-def _gws_from_number_grid_integrated(edges, dnum, number, realize, integrate=True):
-
-    grid = np.meshgrid(*edges, indexing='ij')
-
-    # ---- calculate GW strain at bin centroids
-    mc = utils.chirp_mass(*utils.m1m2_from_mtmr(grid[0], grid[1]))
-    dc = cosmo.comoving_distance(grid[2]).cgs.value
-    # These should be *orbital*-frequencies
-    fr = utils.frst_from_fobs(grid[3], grid[2])
-    hs = utils.gw_strain_source(mc, dc, fr)
-
-    dlnf = np.diff(np.log(edges[-1]))[np.newaxis, np.newaxis, np.newaxis, :]
-    integrand = dnum * (hs ** 2)
-    hc = _integrate_differential_number(edges, integrand, freq=True)
-    hc = hc / dlnf
-
-    if realize is True:
-        number = np.random.poisson(number) / number
-    elif realize in [None, False]:
-        pass
-    elif utils.isinteger(realize):
-        shape = number.shape + (realize,)
-        number = np.random.poisson(number[..., np.newaxis], size=shape) / number[..., np.newaxis]
-        hc = hc[..., np.newaxis] * np.nan_to_num(number)
-    else:
-        err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
-        raise ValueError(err)
-
-    # (M',Q',Z',F) ==> (F,)
-    if integrate:
-        hc = np.sqrt(np.sum(hc, axis=(0, 1, 2)))
-
-    return hc

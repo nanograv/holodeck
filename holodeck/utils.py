@@ -15,11 +15,11 @@ import numbers
 import os
 from typing import Optional, Tuple, Union, List  # , Sequence,
 
+import h5py
 import numpy as np
 import numpy.typing as npt
 import scipy as sp
 import scipy.stats
-import h5py
 
 from holodeck import log, cosmo
 from holodeck.constants import NWTG, SCHW, SPLC, YR
@@ -836,6 +836,42 @@ def _parse_log_norm_pars(vals, size, default=None):
         raise ValueError(err)
 
     return vals
+
+
+def _integrate_grid_differential_number(edges, dnum, freq=False):
+    """Integrate the differential number-density of binaries over the given grid (edges).
+
+    NOTE: the `edges` provided MUST all be in linear space, mass is converted to ``log10(M)``
+    and frequency is converted to ``ln(f)``.
+    NOTE: the density `dnum` MUST correspond to `dn/ [dlog10(M) dq dz dln(f)]`
+
+    Parameters
+    ----------
+    edges : (4,) iterable of ArrayLike
+    dnum : ndarray
+    freq : bool
+        Whether or not to also integrate the frequency dimension.
+
+    Returns
+    -------
+    number : ndarray
+        Number of binaries in each bin of mass, mass-ratio, redshift, frequency.
+        NOTE: if `freq=False`, then `number` corresponds to `dN/dln(f)`, the number of binaries
+        per log-interval of frequency.
+
+    """
+    # ---- integrate from differential-number to number per bin
+    # integrate over dlog10(M)
+    number = trapz(dnum, np.log10(edges[0]), axis=0, cumsum=False)
+    # integrate over mass-ratio
+    number = trapz(number, edges[1], axis=1, cumsum=False)
+    # integrate over redshift
+    number = trapz(number, edges[2], axis=2, cumsum=False)
+    # integrate over frequency (if desired)
+    if freq:
+        number = trapz(number, np.log(edges[3]), axis=3, cumsum=False)
+
+    return number
 
 
 # =================================================================================================
