@@ -1,4 +1,7 @@
 """Plotting module.
+
+Provides convenience methods for generating standard plots and components using `matplotlib`.
+
 """
 
 import numpy as np
@@ -59,7 +62,8 @@ def figax(figsize=[10, 4], ncols=1, nrows=1, sharex=False, sharey=False, squeeze
           widths=None, heights=None, grid=True, **kwargs):
     """Create matplotlib figure and axes instances.
 
-    Convenience function to create fig/axes using `plt.subplots`, and set default parameters.
+    Convenience function to create fig/axes using `plt.subplots`, and quickly modify standard
+    parameters.
 
     Parameters
     ----------
@@ -76,7 +80,7 @@ def figax(figsize=[10, 4], ncols=1, nrows=1, sharex=False, sharey=False, squeeze
     squeeze : bool, optional
         Remove dimensions of length (1,) in the `axes` object.
     scale : [type], optional
-        Axes scaling to be applied to all x/y axes ['log', 'lin'].
+        Axes scaling to be applied to all x/y axes.  One of ['log', 'lin'].
     xscale : str, optional
         Axes scaling for xaxes ['log', 'lin'].
     xlabel : str, optional
@@ -184,8 +188,8 @@ def smap(args=[0.0, 1.0], cmap=None, log=False, norm=None, midpoint=None,
          under='0.8', over='0.8', left=None, right=None):
     """Create a colormap from a scalar range to a set of colors.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     args : scalar or array_like of scalar
         Range of valid scalar values to normalize with
     cmap : None, str, or ``matplotlib.colors.Colormap`` object
@@ -366,13 +370,15 @@ def plot_bin_pop(pop):
 
 
 def plot_mbh_scaling_relations(pop, fname=None, color='r'):
+    units = r"$[\log_{10}(M/M_\odot)]$"
     fig, ax = plt.subplots(figsize=[8, 5])
+    ax.set(xlabel=f'Stellar Mass {units}', ylabel=f'BH Mass {units}')
 
     #   ====    Plot McConnell+Ma-2013 Data    ====
     handles = []
     names = []
     if fname is not None:
-        hh = _draw_mm13_data(ax, fname)
+        hh = _draw_MM2013_data(ax, fname)
         handles.append(hh)
         names.append('McConnell+Ma')
 
@@ -385,7 +391,7 @@ def plot_mbh_scaling_relations(pop, fname=None, color='r'):
     return fig
 
 
-def _draw_mm13_data(ax):
+def _draw_MM2013_data(ax):
     data = observations.load_mcconnell_ma_2013()
     data = {kk: data[kk] if kk == 'name' else np.log10(data[kk]) for kk in data.keys()}
     key = 'mbulge'
@@ -464,8 +470,8 @@ def plot_gwb(gwb, color=None, uniform=False, nreals=5):
 
     Plots samples, confidence intervals, power-law, and adds twin-Hz axis (x2).
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     gwb : `gravwaves.Grav_Waves` (subclass) instance
 
     Returns
@@ -603,7 +609,7 @@ def plot_evo(evo, freqs):
 '''
 
 
-def plot_evo(evo, freqs=None, sepa=None):
+def plot_evo(evo, freqs=None, sepa=None, ax=None):
     if (freqs is None) and (sepa is None):
         utils.error("Either `freqs` or `sepa` must be provided!")
 
@@ -616,7 +622,10 @@ def plot_evo(evo, freqs=None, sepa=None):
         xx = sepa / PC
         xlabel = 'Binary Separation [pc]'
 
-    fig, ax = figax(xlabel=xlabel)
+    if ax is None:
+        fig, ax = figax(xlabel=xlabel)
+    else:
+        fig = ax.get_figure()
 
     def _draw_vals_conf(ax, xx, vals, color=None, label=None):
         if color is None:

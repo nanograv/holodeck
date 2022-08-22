@@ -1,4 +1,9 @@
-"""
+"""Gravitational Wave (GW) calculations module.
+
+This module provides tools for calculating GW signals from MBH binaries.
+Currently the components here are used with the 'discrete' / 'illustris' population of binaries,
+and not the semi-analytic or observational population models.
+
 """
 
 import numpy as np
@@ -49,7 +54,9 @@ class GW_Discrete(Grav_Waves):
         else:
             harm_range = [2]
 
-        for ii, fobs in utils.tqdm(enumerate(freqs), total=len(freqs), desc='GW frequencies'):
+        freq_iter = enumerate(freqs)
+        freq_iter = utils.tqdm(freq_iter, total=len(freqs), desc='GW frequencies') if progress else freq_iter
+        for ii, fobs in freq_iter:
             _fore, _back, _loud = _calc_mc_at_fobs(
                 fobs, harm_range, nreals, bin_evo, box_vol,
                 loudest=nloudest
@@ -113,7 +120,7 @@ def _calc_mc_at_fobs(fobs, harm_range, nreals, bin_evo, box_vol, loudest=5):
     # ---- Interpolate data to all harmonics of this frequency
     harm_range = np.asarray(harm_range)
     # Each parameter will be (N, H) = (binaries, harmonics)
-    data_harms = bin_evo.at('fobs', fobs / harm_range, pars=_CALC_MC_PARS)
+    data_harms = bin_evo.at('fobs', fobs / harm_range, params=_CALC_MC_PARS)
 
     # Only examine binaries reaching the given locations before redshift zero (other redz=inifinite)
     redz = data_harms['scafa']

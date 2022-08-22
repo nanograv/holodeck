@@ -1,22 +1,50 @@
-"""Holodeck - Semi Analytic Modeling submodule
+"""Semi Analytic Modeling (SAM) submodule.
 
-References
-----------
--   Chen, Sesana, Conselice 2019 = [Chen19]
-    https://ui.adsabs.harvard.edu/abs/2019MNRAS.488..401C/abstract
-    Constraining astrophysical observables of galaxy and supermassive black hole binary mergers
-        using pulsar timing arrays
+The core element of the SAM module is the :class:`Semi_Analytic_Model` class.  This class requires four
+components as arguments:
+
+(1) Galaxy Stellar Mass Function (GSMF): gives the comoving number-density of galaxies as a function
+    of stellar mass.  This is implemented as subclasses of the :class:`_Galaxy_Stellar_Mass_Function`
+    base class.
+(2) Galaxy Pair Fraction (GPF): gives the fraction of galaxies that are in a 'pair' with a given
+    mass ratio (and typically a function of redshift and primary-galaxy mass).  Implemented as
+    subclasses of the :class:`_Galaxy_Pair_Fraction` subclass.
+(3) Galaxy Merger Time (GMT): gives the characteristic time duration for galaxy 'mergers' to occur.
+    Implemented as subclasses of the :class:`_Galaxy_Merger_Time` subclass.
+(4) M_bh - M_bulge Relation (mmbulge): gives MBH properties for a given galaxy stellar-bulge mass.
+    Implemented as subcalsses of the :class:`holodeck.relations._MMBulge_Relation` subclass.
+
+The :class:`Semi_Analytic_Model` class defines a grid in parameter space of total MBH mass ($M=M_1 + M_2$),
+MBH mass ratio ($q \\equiv M_1/M_2$), redshift ($z$), and at times binary separation
+(semi-major axis $a$) or binary rest-frame frequency ($f_r$).  Over this grid, the distribution of
+comoving number-density of MBH binaries in the Universe is calculated.  Methods are also provided
+that interface with the `kalepy` package to draw 'samples' (discretized binaries) from the
+distribution, and to calculate GW signatures.
+
+The step of going from a number-density of binaries in $(M, q, z)$ space, to also the distribution
+in $a$ or $f$ is subtle, as it requires modeling the binary evolution (i.e. hardening rate).
+
 
 To-Do
 -----
-*[ ]Check that _GW_ frequencies and _orbital_ frequencies are being used in the correct places.
-    Check `number_at_gw_fobs` and related methods.
-*[ ]Incorporate arbitrary hardening mechanisms into SAM construction, sample self-consistently.
+* Check that _GW_ frequencies and _orbital_ frequencies are being used in the correct places.
+  Check `number_at_gw_fobs` and related methods.
+* Change mass-ratios and redshifts (1+z) to log-space; expand q parameter range.
+* Incorporate arbitrary hardening mechanisms into SAM construction, sample self-consistently.
+* When using `sample_outliers` check whether the density (used for intrabin sampling) should be
+  the log(dens) instead of just `dens`.
+* Should there be an additional dimension of parameter space for galaxy properties?  This way
+  variance in scaling relations is incorporated directly before calculating realizations.
+* Allow SAM class to take M-sigma in addition to M-Mbulge.
+* Should GW calculations be moved to the `gravwaves.py` module?
+
+References
+----------
+* [Chen2019]_ Chen, Sesana, Conselice 2019.
 
 """
 
 import abc
-import inspect
 
 import numba
 import numpy as np
@@ -34,6 +62,14 @@ REDZ_SCALE_LOG = True
 REDZ_SAMPLE_VOLUME = True
 
 
+# ==============================
+# ====    SAM Components    ====
+# ==============================
+
+
+# ----    Galaxy Stellar-Mass Function    ----
+
+
 class _Galaxy_Stellar_Mass_Function(abc.ABC):
     """Galaxy Stellar-Mass Function base-class.  Used to calculate number-density of galaxies.
     """
@@ -48,8 +84,8 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
 
         i.e. Phi = dn / dlog10(M)
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mstar : scalar or ndarray
             Galaxy stellar-mass in units of [grams]
         redz : scalar or ndarray
@@ -67,9 +103,9 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
 class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
     """Single Schechter Function - Galaxy Stellar Mass Function.
 
-    This is density per unit log10-interval of stellar mass, i.e. Phi = dn / dlog10(M)
+    This is density per unit log10-interval of stellar mass, i.e. $Phi = dn / d\\log_{10}(M)$
 
-    See: [Chen19] Eq.9 and enclosing section
+    See: [Chen2019]_ Eq.9 and enclosing section.
 
     """
 
@@ -85,10 +121,10 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
     def __call__(self, mstar, redz):
         """Return the number-density of galaxies at a given stellar mass.
 
-        See: [Chen19] Eq.8
+        See: [Chen2019] Eq.8
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mstar : scalar or ndarray
             Galaxy stellar-mass in units of [grams]
         redz : scalar or ndarray
@@ -104,24 +140,27 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
         mref = self._mref_func(redz)
         alpha = self._alpha_func(redz)
         xx = mstar / mref
-        # [Chen19] Eq.8
+        # [Chen2019]_ Eq.8
         rv = np.log(10.0) * phi * np.power(xx, 1.0 + alpha) * np.exp(-xx)
         return rv
 
     def _phi_func(self, redz):
-        """See: [Chen19] Eq.9
+        """See: [Chen2019]_ Eq.9
         """
         return np.power(10.0, self._phi0 + self._phiz * redz)
 
     def _mref_func(self, redz):
-        """See: [Chen19] Eq.10 - NOTE: added `redz` term
+        """See: [Chen2019]_ Eq.10 - NOTE: added `redz` term
         """
         return self._mref0 + self._mrefz * redz
 
     def _alpha_func(self, redz):
-        """See: [Chen19] Eq.11
+        """See: [Chen2019]_ Eq.11
         """
         return self._alpha0 + self._alphaz * redz
+
+
+# ----    Galaxy Pair Fraction    ----
 
 
 class _Galaxy_Pair_Fraction(abc.ABC):
@@ -136,8 +175,8 @@ class _Galaxy_Pair_Fraction(abc.ABC):
     def __call__(self, mtot, mrat, redz):
         """Return the fraction of galaxies in pairs of the given parameters.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mtot : scalar or ndarray,
             Total-mass of combined system, units of [grams].
         mrat : scalar or ndarray,
@@ -170,7 +209,7 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
             pair_norm = (qhi**pow - qlo**pow) / pow
             frac_norm = frac_norm_allq / pair_norm
 
-        # normalization corresponds to f0-prime in [Chen19]
+        # normalization corresponds to f0-prime in [Chen2019]_
         self._frac_norm = frac_norm   # f0 = 0.025 b/t [+0.02, +0.03]  [+0.01, +0.05]
         self._malpha = malpha         #      0.0   b/t [-0.2 , +0.2 ]  [-0.5 , +0.5 ]  # noqa
         self._zbeta = zbeta           #      0.8   b/t [+0.6 , +0.1 ]  [+0.0 , +2.0 ]  # noqa
@@ -182,8 +221,8 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
     def __call__(self, mtot, mrat, redz):
         """Return the fraction of galaxies in pairs of the given parameters.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mtot : scalar or ndarray,
             Total-mass of combined system, units of [grams].
         mrat : scalar or ndarray,
@@ -208,6 +247,9 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
         return rv
 
 
+# ----    Galaxy Merger Time    ----
+
+
 class _Galaxy_Merger_Time(abc.ABC):
     """Galaxy Merger Time base class, used to model merger timescale of galaxy pairs.
     """
@@ -220,8 +262,8 @@ class _Galaxy_Merger_Time(abc.ABC):
     def __call__(self, mtot, mrat, redz):
         """Return the galaxy merger time for the given parameters.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mtot : scalar or ndarray,
             Total-mass of combined system, units of [grams].
         mrat : scalar or ndarray,
@@ -269,15 +311,15 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
         self._zbeta = zbeta           # -0.5   b/t [-2.0, +1.0]  [-3.0, +1.0 ]
         self._qgamma = qgamma         # +0.0   b/t [-0.2, +0.2]  [-0.2, +0.2 ]
 
-        # [Msol]  NOTE: this is `b * M_0 = 0.4e11 Msol / h0` in [Chen19]
+        # [Msol]  NOTE: this is `b * M_0 = 0.4e11 Msol / h0` in [Chen2019]_
         self._mref = mref
         return
 
     def __call__(self, mtot, mrat, redz):
         """Return the galaxy merger time for the given parameters.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         mtot : (N,) array_like[scalar]
             Total mass of each binary, converted to primary-mass (used in literature equations).
         mrat : (N,) array_like[scalar]
@@ -303,10 +345,16 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
         return mtime
 
 
+# ===================================
+# ====    Semi-Analytic Model    ====
+# ===================================
+
+
 class Semi_Analytic_Model:
     """Semi-Analytic Model of MBH Binary populations.
 
     Based on four components:
+
     * Galaxy Stellar-Mass Function (GSMF): the distribution of galaxy masses
     * Galaxy Pair Fraction (GPF): the probability of galaxies having a companion
     * Galaxy Merger Time (GMT): the expected galaxy-merger timescale for a pair of galaxies
@@ -316,9 +364,8 @@ class Semi_Analytic_Model:
 
     def __init__(
         self, mtot=[2.75e5*MSOL, 1.0e11*MSOL, 46], mrat=[0.02, 1.0, 50], redz=[0.01, 6.0, 61],
-        # self, mtot=[2.75e5*MSOL, 1.0e11*MSOL, 11], mrat=[0.02, 1.0, 10], redz=[0.0, 6.0, 9],
         shape=None,
-        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM13
+        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013
     ):
         """
 
@@ -335,25 +382,11 @@ class Semi_Analytic_Model:
 
         """
 
-        if inspect.isclass(gsmf):
-            gsmf = gsmf()
-        elif not isinstance(gsmf, _Galaxy_Stellar_Mass_Function):
-            raise ValueError("`gsmf` must be an instance or subclass of `_Galaxy_Stellar_Mass_Function`!")
-
-        if inspect.isclass(gpf):
-            gpf = gpf()
-        elif not isinstance(gpf, _Galaxy_Pair_Fraction):
-            raise ValueError("`gpf` must be an instance or subclass of `_Galaxy_Pair_Fraction`!")
-
-        if inspect.isclass(gmt):
-            gmt = gmt()
-        elif not isinstance(gmt, _Galaxy_Merger_Time):
-            raise ValueError("`gmt` must be an instance or subclass of `_Galaxy_Merger_Time`!")
-
-        if inspect.isclass(mmbulge):
-            mmbulge = mmbulge()
-        elif not isinstance(mmbulge, relations._MMBulge_Relation):
-            raise ValueError("`mmbulge` must be an instance or subclass of `_MMBulge_Relation`!")
+        # Sanitize input classes/instances
+        gsmf = utils._get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
+        gpf = utils._get_subclass_instance(gpf, None, _Galaxy_Pair_Fraction)
+        gmt = utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
+        mmbulge = utils._get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
 
         # NOTE: Create a copy of input args to make sure they aren't overwritten (in-place)
         mtot = [mt for mt in mtot]
@@ -391,27 +424,33 @@ class Semi_Analytic_Model:
         else:
             self.redz = np.linspace(*redz)
 
-        self._gsmf = gsmf
-        self._gpf = gpf
-        self._gmt = gmt
-        self._mmbulge = mmbulge
+        self._gsmf = gsmf             #: Galaxy Stellar-Mass Function (`_Galaxy_Stellar_Mass_Function` instance)
+        self._gpf = gpf               #: Galaxy Pair Fraction (`_Galaxy_Pair_Fraction` instance)
+        self._gmt = gmt               #: Galaxy Merger Time (`_Galaxy_Merger_Time` instance)
+        self._mmbulge = mmbulge       #: Mbh-Mbulge relation (`relations._MMBulge_Relation` instance)
 
-        self._density = None
-        self._grid = None
+        self._density = None          #: Binary comoving number-density
+        self._grid = None             #: Domain of population: total-mass, mass-ratio, and redshift
         return
 
     @property
     def edges(self):
+        """The grid edges defining the domain (list of: [`mtot`, `mrat`, `redz`])
+        """
         return [self.mtot, self.mrat, self.redz]
 
     @property
     def grid(self):
+        """Grid of parameter space over which binary population is defined, ndarray (3, M, Q, Z).
+        """
         if self._grid is None:
             self._grid = np.meshgrid(*self.edges, indexing='ij')
         return self._grid
 
     @property
     def shape(self):
+        """Shape of the parameter space domain (number of edges in each dimension), (3,) tuple
+        """
         shape = [len(ee) for ee in self.edges]
         return tuple(shape)
 
@@ -421,7 +460,7 @@ class Semi_Analytic_Model:
         Returns
         -------
         masses : (N, 2) ndarray of scalar,
-            Galaxy total stellar masses for all MBH.  [:, 0] is primary, [:, 1] is secondary.
+            Galaxy total stellar masses for all MBH. [:, 0] is primary, [:, 1] is secondary [grams].
 
         """
         # total-mass, mass-ratio ==> (M1, M2)
@@ -456,7 +495,7 @@ class Semi_Analytic_Model:
             redz = self.redz[np.newaxis, np.newaxis, :]
             args = [mstar_pri[..., np.newaxis], mstar_rat[..., np.newaxis], mstar_tot[..., np.newaxis], redz]
             # Convert to shape (M, Q, Z)
-            mstar_pri, mstar_rat, mstar_tot, redz = utils.expand_broadcastable(*args)
+            mstar_pri, mstar_rat, mstar_tot, redz = np.broadcast_arrays(*args)
 
             zprime = self._gmt.zprime(mstar_tot, mstar_rat, redz)
             # find valid entries (M, Q, Z)
@@ -469,7 +508,7 @@ class Semi_Analytic_Model:
             # these are now 1D arrays of the valid indices
             mstar_pri, mstar_rat, mstar_tot, redz = [ee[idx] for ee in [mstar_pri, mstar_rat, mstar_tot, redz]]
 
-            # ---- Get Galaxy Merger Rate  [Chen19] Eq.5
+            # ---- Get Galaxy Merger Rate  [Chen2019] Eq.5
             # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]
             dens[idx] = self._gsmf(mstar_pri, redz) * self._gpf(mstar_tot, mstar_rat, redz) * cosmo.dtdz(redz)
             # convert from 1/dlog10(M_star-pri) to 1/dM_star-tot
@@ -502,9 +541,9 @@ class Semi_Analytic_Model:
         The value returned is `d^4 N / [dlog10(M) dq dz dln(X)]`, where X is either
         separation (a) or frequency (f_r), depending on whether `sepa` or `fobs` is passed in.
 
-        Arguments
-        ---------
-        hard :
+        Parameters
+        ----------
+        hard : instance
         fobs : observed frequency in [1/sec]
         sepa : rest-frame separation in [cm]
         limit_merger_time : None or scalar,
@@ -617,8 +656,8 @@ class Semi_Analytic_Model:
     def gwb(self, fobs, hard=holo.evolution.Hard_GW, realize=False):
         """Calculate the (smooth/semi-analytic) GWB at the given observed frequencies.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         fobs : (F,) array_like of scalar, [1/sec]
             Observed GW frequencies.
         hard : holodeck.evolution._Hardening class or instance
@@ -662,11 +701,16 @@ class Semi_Analytic_Model:
         return hc
 
 
+# ===============================
+# ====    Utility Methods    ====
+# ===============================
+
+
 def _integrate_differential_number(edges, dnum, freq=False):
     """Integrate the differential number-density of binaries over the given grid (edges).
 
     NOTE: the `edges` provided MUST all be in linear space, mass is converted to ``log10(M)``
-          and frequency is converted to ``ln(f)``.
+    and frequency is converted to ``ln(f)``.
     NOTE: the density `dnum` MUST correspond to `dn/ [dlog10(M) dq dz dln(f)]`
 
     Parameters
@@ -681,7 +725,7 @@ def _integrate_differential_number(edges, dnum, freq=False):
     number : ndarray
         Number of binaries in each bin of mass, mass-ratio, redshift, frequency.
         NOTE: if `freq=False`, then `number` corresponds to `dN/dln(f)`, the number of binaries
-              per log-interval of frequency.
+        per log-interval of frequency.
 
     """
     # ---- integrate from differential-number to number per bin
@@ -804,12 +848,31 @@ def sample_sam_with_hardening(
 
 
 def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
-    """
+    """Sample the given binary population between the target frequencies, and calculate GW signals.
 
-    Arguments
-    ---------
-    fobs : (F,) array_like of scalar,
-        Target frequencies of interest in units of [1/yr]
+    NOTE: the input `fobs` are interpretted as bin edges, and GW signals are calculate within the
+    corresponding bins.
+
+    Parameters
+    ----------
+    sam : `Semi_Analytic_Model` instance,
+        Binary population to sample.
+    fobs : (F+1,) array_like,
+        Target frequencies of interest in units of [?1/yr?]
+    hard : `evolution._Hardening` instance,
+        Binary hardening model used to calculate binary residence time at each frequency.
+    kwargs : dict,
+        Additional keyword-arguments passed to `sample_sam_with_hardening()`
+
+    Returns
+    -------
+    gff : (F,) ndarry,
+        Frequencies of the loudest binary in each bin [?? 1/s ??].
+    gwf : (F,) ndarry,
+        GW Foreground: the characteristic strain of the loudest binary in each frequency bin.
+    gwb : (F,) ndarry,
+        GW Background: the characteristic strain of the GWB in each frequency bin.
+        Does not include the strain from the loudest binary in each bin (`gwf`).
 
     """
     vals, weights, edges, dens, mass = sample_sam_with_hardening(sam, hard, fobs=fobs, **kwargs)
@@ -817,19 +880,27 @@ def sampled_gws_from_sam(sam, fobs, hard=holo.evolution.Hard_GW, **kwargs):
     return gff, gwf, gwb
 
 
-def _strains_from_samples(vals, redz=True):
-    """
+def _strains_from_samples(vals):
+    """From a sampled binary population, calculate the GW strains.
 
     NOTE: this assumes that vales[3] is the observer-frame GW frequency.
 
     Parameters
     ----------
-    vals : _type_
-    redz : bool, optional
+    vals : (4,) array_like of array_like,
+        Each element of `vals` is an array of binary parameters, the elements must be:
+        * 0) total binary mass [grams]
+        * 1) binary mass-ratio [],
+        * 2) redshift at this frequency [],
+        * 3) observer-frame binary GW frequency [1/sec].
 
     Returns
     -------
-    _type_
+    hs : (N,) ndarray,
+        Source strains (i.e. not characteristic strains) of each binary.
+    fo : (N,) ndarray,
+        Observer-frame frequencies of each sampled binary.
+
     """
 
     mc = utils.chirp_mass(*utils.m1m2_from_mtmr(vals[0], vals[1]))
@@ -845,10 +916,10 @@ def _strains_from_samples(vals, redz=True):
 
 
 def _gws_from_samples(vals, weights, fobs):
-    """
+    """Calculate GW signals at the given frequencies, from weighted samples of a binary population.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     vals : (4, N) ndarray of scalar,
         Arrays of binary parameters.
         * vals[0] : mtot [grams]
@@ -858,6 +929,16 @@ def _gws_from_samples(vals, weights, fobs):
     weights : (N,) array of scalar,
     fobs : (F,) array of scalar,
         Target observer-frame frequencies to calculate GWs at.  Units of [1/sec].
+
+    Returns
+    -------
+    gff : (F,) ndarry,
+        Frequencies of the loudest binary in each bin [?? 1/s ??].
+    gwf : (F,) ndarry,
+        GW Foreground: the characteristic strain of the loudest binary in each frequency bin.
+    gwb : (F,) ndarry,
+        GW Background: the characteristic strain of the GWB in each frequency bin.
+        Does not include the strain from the loudest binary in each bin (`gwf`).
 
     """
     hs, fo = _strains_from_samples(vals)
@@ -869,8 +950,8 @@ def _gws_from_samples(vals, weights, fobs):
 def gws_from_sampled_strains(fobs, fo, hs, weights):
     """Calculate GW background/foreground from sampled GW strains.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     fobs : (F,) array_like of scalar
         Frequency bins.
     fo : (S,) array_like of scalar
@@ -878,9 +959,9 @@ def gws_from_sampled_strains(fobs, fo, hs, weights):
     hs : (S,) array_like of scalar
         GW source strain (*not characteristic strain*) of each binary sample.
     weights : (S,) array_like of int
-        Weighting factor for each binary
+        Weighting factor for each binary.
         NOTE: the GW calculation is ill-defined if weights have fractional values
-              (i.e. float values, instead of integral values; but the type itself doesn't matter)
+        (i.e. float values, instead of integral values; but the type itself doesn't matter)
 
     Returns
     -------
@@ -947,25 +1028,35 @@ def gws_from_sampled_strains(fobs, fo, hs, weights):
     return gwf_freqs, gwfore, gwback
 
 
-def _gws_from_number_grid_centroids(edges, dnum, number, realize, integrate=True):
+def _gws_from_number_grid_centroids(edges, dnum, number, realize):
     """Calculate GWs based on a grid of number-of-binaries.
 
     NOTE: `_gws_from_number_grid_integrated()` should be more accurate, but this method better
-          matches GWB from sampled (kale.sample_) populations!!
+    matches GWB from sampled (`kale.sample_`) populations!!
 
-    The input number of binaries is `N` s.t.
-        ``N = (d^4 N / [dlog10(M) dq dz dlogf] ) * dlog10(M) dq dz dlogf``
-    The number `N` is evaluated on a 4d grid, specified by `edges`, i.e.
-        ``N = N(M, q, z, f_r)``
+    The input number of binaries is `N` s.t. $$N = (d^4 N / [dlog10(M) dq dz dlogf] ) * dlog10(M) dq dz dlogf$$
+    The number `N` is evaluated on a 4d grid, specified by `edges`, i.e. $$N = N(M, q, z, f_r)$$
     NOTE: the provided `number` must also summed/integrated over dlogf.
     To calculate characteristic strain, this function divides again by the dlogf term.
 
     Parameters
     ----------
-    fobs : _type_
-    edges : _type_
-    dnum : _type_
-    number : _type_
+    edges : (4,) array_like of array_like,
+        The edges of each dimension of the parameter spaceeee.
+    dnum : (M, Q, Z, F) ndarray,
+        Differential comoving number-density of binaries in each bin.
+    number : (M, Q, Z, F) ndarray,
+        Volumetric comoving number-density of binaries in each bin.
+    realize : bool or int,
+        Whether or not to calculate one or multiple realizations of the population.
+        BUG: explain more.
+
+    Returns
+    -------
+    hc : (M',Q',Z',F) ndarray,
+        Total characteristic GW strain from each bin of parameter space.
+        NOTE: to get total strain from all bins, must sum in quarature!
+        e.g. ``gwb = np.sqrt(np.square(hc).sum())``
 
     """
 
@@ -1011,9 +1102,10 @@ def _gws_from_number_grid_centroids(edges, dnum, number, realize, integrate=True
     number = number / dlogf
     hs = np.nan_to_num(hs)
     hc = number * np.square(hs)
-    # (M',Q',Z',F) ==> (F,)
-    if integrate:
-        hc = np.sqrt(np.sum(hc, axis=(0, 1, 2)))
+    # # (M',Q',Z',F) ==> (F,)
+    # if integrate:
+    #     hc = np.sqrt(np.sum(hc, axis=(0, 1, 2)))
+    hc = np.sqrt(hc)
 
     return hc
 
