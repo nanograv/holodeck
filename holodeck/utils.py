@@ -1149,11 +1149,10 @@ def lambda_factor_freq(frst, dfdt, redz, dcom=None):
         dcom = cosmo.z_to_dcom(redz)
 
     # Volume-factor
-    # [Mpc^3/s] this is `(dVc/dz) * (dz/dt)`
+    # this is `(dVc/dz) * (dz/dt)`,  units of [Mpc^3/s]
     vfac = 4.0 * np.pi * SPLC * zp1 * (dcom**2)
     # Time-factor
-    # [sec] this is `f / (df/dt) = dt/d ln(f)`
-    # frst = frst_orb = fobs * zp1 / harms
+    # this is `f / (df/dt) = dt/d ln(f)`,  units of [sec]
     tfac = frst / dfdt
 
     # Calculate weighting
@@ -1193,24 +1192,29 @@ def chirp_mass(m1, m2=None):
     return mc
 
 
-def gw_char_strain(hs, dur_obs, freq_orb_obs, freq_orb_rst, dfdt):
-    """GW Characteristic Strain.
+def gw_char_strain_nyquist(dur_obs, hs, frst_orb, redz, dfdt_rst):
+    """GW Characteristic Strain assuming frequency bins are Nyquist sampled.
 
-    See, e.g., Sesana+2004, Eq.35
+    Nyquist assumption: the bin-width is equal to 1/T, for T the total observing duration.
+
+    See, e.g., [Sesana2004]_, Eq.35, and surrounding text.
     NOTE: make sure this is the correct definition of "characteristic" strain for your application!
+
+    # ! THIS FUNCTION MAY NOT BE CORRECT [LZK:2022-08-25] ! #
 
     Parameters
     ----------
-    hs : array_like,
-        Strain amplitude (e.g. `gw_strain()`, sky- and polarization- averaged) of the source.
     dur_obs : array_like,
-        Duration of observations, in the observer frame.
-    freq_orb_obs : array_like,
-        Observer-frame orbital frequency.
-    freq_orb_rst : array_like,
-        Rest-frame orbital frequency.
-    dfdt : array_like,
-        Rate of frequency evolution of the binary, in the rest-frame.
+        Duration of observations, in the observer frame, in units of [sec].
+        Typically this is a single float value.
+    hs : array_like,
+        Strain amplitude of the source.  Dimensionless.
+    frst_orb : array_like,
+        Observer-frame orbital frequency, units of [1/sec].
+    redz : array_like,
+        Redshift of the binary.  Dimensionless.
+    dfdt_rst : array_like,
+        Rate of orbital-frequency evolution of the binary, in the rest-frame.  Units of [1/sec^2].
 
     Returns
     -------
@@ -1218,9 +1222,16 @@ def gw_char_strain(hs, dur_obs, freq_orb_obs, freq_orb_rst, dfdt):
         Characteristic strain of the binary.
 
     """
+    log.warning(f"`holodeck.utils.gw_char_strain_nyquist` may not be correct!")
 
-    ncycles = freq_orb_rst**2 / dfdt
-    ncycles = np.clip(ncycles, None, dur_obs * freq_orb_obs)
+    fobs_gw = fobs_from_frst(frst_orb, redz) * 2.0
+    # Calculate the time each binary spends within the band
+    dfdt_obs = dfdt_rst * (1 + redz)**2
+    bandwidth = (1.0 / dur_obs)   # I think this is right
+    # bandwidth = fobs_gw           # I think this is wrong
+    tband = bandwidth / dfdt_obs
+
+    ncycles = fobs_gw * np.minimum(dur_obs, tband)
     hc = hs * np.sqrt(ncycles)
     return hc
 
@@ -1366,7 +1377,7 @@ def gw_hardening_rate_dadt(m1, m2, sepa, eccen=None):
     return dadt
 
 
-def gw_hardening_rate_dfdt(m1, m2, freq_orb, eccen=None):
+def gw_hardening_rate_dfdt(m1, m2, frst_orb, eccen=None):
     """GW Hardening rate in frequency (df/dt).
 
     Parameters
@@ -1386,12 +1397,12 @@ def gw_hardening_rate_dfdt(m1, m2, freq_orb, eccen=None):
         Hardening rate in terms of frequency for each binary [1/s^2].
 
     """
-    m1, m2, freq_orb, eccen = _array_args(m1, m2, freq_orb, eccen)
-    sepa = kepler_sepa_from_freq(m1+m2, freq_orb)
+    m1, m2, frst_orb, eccen = _array_args(m1, m2, frst_orb, eccen)
+    sepa = kepler_sepa_from_freq(m1+m2, frst_orb)
     dfdt = gw_hardening_rate_dadt(m1, m2, sepa, eccen=eccen)
     # dfdt, _ = dfdt_from_dadt(dfdt, sepa, mtot=m1+m2)
-    dfdt, _ = dfdt_from_dadt(dfdt, sepa, freq_orb=freq_orb)
-    return dfdt, freq_orb
+    dfdt, _ = dfdt_from_dadt(dfdt, sepa, frst_orb=frst_orb)
+    return dfdt, frst_orb
 
 
 def gw_hardening_timescale_freq(mchirp, frst):
