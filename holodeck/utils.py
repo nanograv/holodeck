@@ -11,9 +11,12 @@ References
 
 import abc
 import copy
+import functools
+import inspect
 import numbers
 import os
 from typing import Optional, Tuple, Union, List  # , Sequence,
+import warnings
 
 import h5py
 import numpy as np
@@ -62,6 +65,56 @@ class _Modifier(abc.ABC):
 # =================================================================================================
 # ====    General Logistical    ====
 # =================================================================================================
+
+
+def deprecated_pass(new_func, msg="", exc_info=True):
+    """Decorator for functions that have been deprecated, warn and pass arguments to new function.
+    """
+
+    def decorator(func):
+        nonlocal msg
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            nonlocal msg
+            old_name = func.__name__
+            new_name = new_func.__name__
+            _frame = inspect.currentframe().f_back
+            file_name = inspect.getfile(_frame.f_code)
+            fline = _frame.f_lineno
+            msg = f"{file_name}({fline}):{old_name} ==> {new_name}" + (len(msg) > 0) * " | " + msg
+            warnings.warn_explicit(msg, category=DeprecationWarning, filename=file_name, lineno=fline)
+            log.warning(f"DEPRECATION: {msg}", exc_info=exc_info)
+            return new_func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def deprecated_fail(new_func, msg="", exc_info=True):
+    """Decorator for functions that have been deprecated, warn and raise error.
+    """
+
+    def decorator(func):
+        nonlocal msg
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            nonlocal msg
+            old_name = func.__name__
+            new_name = new_func.__name__
+            _frame = inspect.currentframe().f_back
+            file_name = inspect.getfile(_frame.f_code)
+            fline = _frame.f_lineno
+            msg = f"{file_name}({fline}):{old_name} ==> {new_name}" + (len(msg) > 0) * " | " + msg
+            warnings.warn_explicit(msg, category=DeprecationWarning, filename=file_name, lineno=fline)
+            log.exception(f"DEPRECATION: {msg}", exc_info=exc_info)
+            raise RuntimeError
+
+        return wrapper
+
+    return decorator
 
 
 def load_hdf5(fname, keys=None):
@@ -1119,10 +1172,13 @@ def _get_sepa_freq(mt, sepa, freq):
     return sepa, freq
 
 
-def lambda_factor_freq(frst, dfdt, redz, dcom=None):
+def lambda_factor_dlnf(frst, dfdt, redz, dcom=None):
     """Account for the universe's differential space-time volume for a given hardening rate.
 
-    Calculate the factor, $$(dVc/dz) * (dz/dt) * [dt/dln(f)]$$, which has units of [Mpc^3].
+    For each binary, calculate the factor: $$\\Lambda \\equiv (dVc/dz) * (dz/dt) * [dt/dln(f)]$$,
+    which has units of [Mpc^3].  When multiplied by a number-density [Mpc^-3], it gives the number
+    of binaries in the Universe *per log-frequency interval*.  This value must still be multiplied
+    by $\\Delta \\ln(f)$ to get a number of binaries across a frequency in.
 
     Parameters
     ----------
