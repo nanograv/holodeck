@@ -86,34 +86,6 @@ class GW_Discrete(Grav_Waves):
         return
 
 
-'''
-def _calc_mc_at_fobs(fogw, _harms, nreals, bin_evo, box_vol, loudest=5):
-    """
-    """
-    fo_orb = fo_gw / 2.0
-    data_harms = bin_evo.at('fobs', fo_orb, params=_CALC_MC_PARS)
-
-    redz = cosmo.a_to_z(data_harms['scafa'])
-    valid = (redz > 0.0)
-    redz = redz[valid]
-    dcom = cosmo.z_to_dcom(redz)
-    zp1 = redz + 1
-    fr_orb = utils.frst_from_fobs(fo_orb, redz)
-    mchirp = data_harms['mass'][valid]
-    mchirp = utils.chirp_mass(*mchirp.T)
-    hs2 = utils.gw_strain_source(mchirp, dcom, fr_orb)**2
-
-    dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], data_harms['sepa'][valid], frst_orb=fr_orb)
-    tfac = fr_orb / dfdt
-    vfac = 4.0*np.pi*SPLC * zp1 * dcom**2 / box_vol
-
-    num_frac = vfac * tfac
-    num_pois = np.random.poisson(num_frac)
-    both = np.sum(hs2 * num_pois) * np.ones(nreals)
-    return both, np.zeros_like(both), np.zeros_like(both), np.zeros((loudest, nreals))
-'''
-
-
 def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, loudest=5):
     """Calculate GW signal at range of frequency harmonics for a single observer-frame GW frequency.
 

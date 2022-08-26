@@ -37,26 +37,38 @@ Calculating GW Signatures
 For more details, see the document :doc:`Getting Started: Calculating Gravitational Waves <calc_gws>`.
 For the implementation of much of the gravitational wave calculations, see the :mod:`GravWaves submodule <holodeck.gravwaves>`.
 
-The chirp-mass is defined as: :math:`\mathcal{M} \equiv \frac{\left(m_1 m_2\right)^{3/5}}{M^{1/5}} = M \frac{q^{3/5}}{\left(1 + q\right)^{6/5}}`, for a total mass :math:`M = m_1 + m_2`, and mass-ratio :math:`q \equiv m_2 / m_1 \leq 1`.
+The chirp-mass is defined as: :math:`\mathcal{M} \equiv \frac{\left(m_1 m_2\right)^{3/5}}{M^{1/5}} = M \frac{q^{3/5}}{\left(1 + q\right)^{6/5}}`, for a total mass :math:`M = m_1 + m_2`, and mass-ratio :math:`q \equiv m_2 / m_1 \leq 1`.  NOTE: we define chirp-mass as an intrinsic property of the binary (i.e. it always refers to the rest-frame chirp-mass).  Chirp-mass can also be defined as the mass inferred based on a *measured* chirp of GW frequency, but we do not use this definition.
 
 The 'hardening timescale' is defined as, :math:`\tau_f \equiv \frac{dt}{d\ln f_r} = \frac{f_r}{df_r/dt}`.
 
 The hardening timescale due purely to GW emission, from a circular binary, is: :math:`\tau_\textrm{GW,circ}= \frac{5}{96}\left(\frac{G\mathcal{M}}{c^3}\right)^{-5/3} \left(2 \pi f_r\right)^{-8/3}`.
 
-The GW strain produced by a circular binary is,
+The GW strain amplitude produced by a circular binary is,
 
 .. math::
-   h_\textrm{s,circ}(f_r) = \frac{8}{10^{1/2}} \frac{\left(G\mathcal{M}\right)^{5/3}}{c^4 \, d_L}
+   h_\textrm{s,circ}(f_r) = \frac{8}{10^{1/2}} \frac{\left(G\mathcal{M}\right)^{5/3}}{c^4 \, d_c}
            \left(2 \pi f_r\right)^{2/3},
 
-Where :math:`d_L` is the luminosity distance to the source.
+Where :math:`d_c` is the comoving distance to the source.  NOTE: we always use 'chirp mass' to refer to the rest-frame chirp mass; if, instead, one uses the redshifted (i.e. measured) chirp mass, then the distance in the denominator should instead be the luminosity distance.
 
-The characteristic strain (:math:`h_c`) of the GWB can be calculate based on the comoving-volumetric number-density of binaries in the universe (:math:`n_c \equiv dN/dV_c`) as:
+The characteristic strain (:math:`h_c`) of the GWB can be calculate from the distribution of number of binaries in the universe ($N$) per log-frequency interval as [Sesana2008]_:
 
 .. math::
-   h_c^2(f) = \int_0^\infty \!\! dz \; \frac{dn_c}{dz} \, h_s^2 \, 4\pi c \, d_c^2 \cdot \left(1+z\right) \, \tau_f,
+   h_c^2(f) = \int_0^\infty \!\! h_s^2(f_r) \, \frac{d^2N}{dz \, d\ln f_r} \bigg|_{f_r = f \cdot (1 + z)} \; dz,
+   :name: eq:gwb_numtotal
 
-where :math:`d_c` is the comoving distance to a source, related to luminosity distance as: :math:`d_L = d_c \, (1+z)`.  For a finite volume, with a finite number of binaries, this can be discretized to:
+This can also be written equivalently in terms of the comoving volumetric number-density of binaries in the universe (:math:`n_c \equiv dN/dV_c`) as [Phinney2001]_:
+
+.. math::
+   h_c^2(f) = \int_0^\infty h_s^2 \, \frac{dn_c}{dz} \, 4\pi c \, d_c^2 \cdot \left(1+z\right) \, \tau_f \; dz,
+   :name: eq:gwb_numdens
+
+where :math:`d_c` is the comoving distance to a source, related to luminosity distance as: :math:`d_L = d_c \, (1+z)`.  Comparing :math:numref:`eq:gwb_numdens` to :math:numref:`eq:gwb_numtotal`, we can identify the term,
+
+.. math::
+   \frac{d^2N}{dz \, d\ln f_r} = \frac{dn_c}{dz} \, 4\pi c \, d_c^2 \cdot \left(1+z\right) \, \tau_f.
+
+For a finite volume, with a finite number of binaries, this can be discretized to:
 
 .. math::
    h_c^2(f) = \sum_\textrm{redshift} \; \sum_\textrm{binaries} \; h_s^2 \; \frac{4\pi \, c \, d_c^2 \cdot \left(1 + z\right)}{V_\textrm{sim}} \; \tau_f.
@@ -64,8 +76,10 @@ where :math:`d_c` is the comoving distance to a source, related to luminosity di
 To account for cosmic variance and the discreteness of binary sources, we can instead treat this as an expectation value and draw from a Poisson distribution (:math:`\mathcal{P}(x)`):
 
 .. math::
-    h_c^2(f) = & \sum_\textrm{redshift} \; \sum_\textrm{binaries} \; h_s^2 \cdot \mathcal{P}(\Lambda), \\
+    h_c^2(f) = & \sum_\textrm{redshift} \; \sum_\textrm{binaries} \; h_s^2 \cdot \frac{ \mathcal{P}(\Lambda \cdot \Delta \ln f_r) }{ \Delta \ln f_r }, \\
            \Lambda \equiv & \frac{4\pi \, c \, d_c^2 \cdot \left(1 + z\right)}{V_\textrm{sim}} \; \tau_f.
+
+The interpretation for $\Lambda$, is the number of binaries in the observers past light-cone, per unit logarithmic frequency interval, that is expected for a given simulated binary, it's redshift, and it's rate of frequency evolution.
 
 The observed GW frequencies :math:`f` are arbitrarily chosen.  Typically, for pulsar timing arrays, these are chosen based on Nyquist sampling for a given observational duration :math:`T \sim 15 \, \textrm{yr}` and cadence :math:`\Delta t \sim 2 \, \textrm{week}`, such that :math:`f = \left[1/T, 2/T, 3/T, \, \ldots \, , 1/\left(2 \Delta t\right)\right]`.
 
@@ -79,6 +93,9 @@ Many noise sources (e.g. due to the neutron star, the source of radio emission, 
 The frequency range that PTAs are sensitive to is determined primarily by the ability to reconstruct periodic signals from the time-series data of pulsar TOAs.  The lowest sensitive frequency is determined by the Nyquist frequency, i.e. the inverse of the total observing duration.  High-precision TOA measurements have been performed for about two decades, meaning that PTAs are starting to probe frequencies as low as nanohertz (nHz).  The highest sensitive frequency is determined by the typically interval between observations, which tends to be on the order of a few weeks, or hundreds of nanohertz.
 
 While there have been a large number of proposed sources of GWs in the nanohertz regime, the best studied sources are binaries of supermassive black holes, with total masses :math:`M \gtrsim 10^8 \, M_\odot`.
+
+
+
 
 
 .. _populations:
