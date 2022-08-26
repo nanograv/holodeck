@@ -28,6 +28,10 @@ class Grav_Waves:
         self._bin_evo = bin_evo
         return
 
+    @property
+    def freqs(self):
+        return self.fobs_gw
+
 
 class GW_Discrete(Grav_Waves):
 
@@ -139,16 +143,14 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
 
     # Broadcast harmonics numbers to correct shape
     harms = np.ones_like(redz, dtype=int) * harm_range[np.newaxis, :]
-    # Select only the valid elements, also converts to 1D, i.e. (N, H) ==> (V,)
-    harms = harms[valid]
-    redz = redz[valid]
 
     # If there are eccentricities, calculate the freq-dist-function
+    # shape (N, H)
     eccen = data_harms['eccen']
     if eccen is None:
         gne = 1
     else:
-        gne = utils.gw_freq_dist_func(harms, ee=eccen[valid])
+        gne = utils.gw_freq_dist_func(harms[valid], ee=eccen[valid])
         # Select the elements corresponding to the n=2 (circular) harmonic, to use later
         sel_n2 = np.zeros_like(redz, dtype=bool)
         sel_n2[(harms == 2)] = 1
@@ -161,6 +163,9 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
         gne[sel_e0] = 0.0
         gne[sel_n2 & sel_e0] = 1.0
 
+    # Select only the valid elements, also converts to 1D, i.e. (N, H) ==> (V,)
+    harms = harms[valid]
+    redz = redz[valid]
     # Calculate required parameters for valid binaries (V,)
     dcom = cosmo.z_to_dcom(redz)
     frst_orb = utils.frst_from_fobs(fobs_gw, redz) / harms
