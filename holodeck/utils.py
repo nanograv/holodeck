@@ -1284,7 +1284,7 @@ def gw_char_strain_nyquist(dur_obs, hs, frst_orb, redz, dfdt_rst):
         Characteristic strain of the binary.
 
     """
-    log.warning(f"`holodeck.utils.gw_char_strain_nyquist` may not be correct!")
+    log.warning("`holodeck.utils.gw_char_strain_nyquist` may not be correct!", exc_info=True)
 
     fobs_gw = fobs_from_frst(frst_orb, redz) * 2.0
     # Calculate the time each binary spends within the band
