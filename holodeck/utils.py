@@ -78,7 +78,10 @@ def deprecated_pass(new_func, msg="", exc_info=True):
         def wrapper(*args, **kwargs):
             nonlocal msg
             old_name = func.__name__
-            new_name = new_func.__name__
+            try:
+                new_name = new_func.__name__
+            except AttributeError:
+                new_name = str(new_func)
             _frame = inspect.currentframe().f_back
             file_name = inspect.getfile(_frame.f_code)
             fline = _frame.f_lineno
@@ -103,7 +106,10 @@ def deprecated_fail(new_func, msg="", exc_info=True):
         def wrapper(*args, **kwargs):
             nonlocal msg
             old_name = func.__name__
-            new_name = new_func.__name__
+            try:
+                new_name = new_func.__name__
+            except AttributeError:
+                new_name = str(new_func)
             _frame = inspect.currentframe().f_back
             file_name = inspect.getfile(_frame.f_code)
             fline = _frame.f_lineno

@@ -622,7 +622,11 @@ class Evolution:
 
         return ynew
 
-    def _sample_universe(self, fobs_orb_edges, down_sample=None):
+    @utils.deprecated_fail('Evolution.sample_universe')
+    def sample_full_population(self, fobs, DOWN=None):
+        return
+
+    def sample_universe(self, fobs_orb_edges, down_sample=None):
         """Construct a full universe of binaries based on resampling this population.
 
         Parameters
