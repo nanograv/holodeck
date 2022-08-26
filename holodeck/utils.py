@@ -1507,7 +1507,7 @@ def gw_lum_circ(mchirp, freq_orb_rest):
     return lgw_circ
 
 
-def gw_strain_source(mchirp, dcom, freq_orb_rest):
+def gw_strain_source(mchirp, dcom, freq_rest_orb):
     """GW Strain from a single source in a circular orbit.
 
     For reference, see:
@@ -1529,9 +1529,9 @@ def gw_strain_source(mchirp, dcom, freq_orb_rest):
         GW Strain (*not* characteristic strain).
 
     """
-    mchirp, dcom, freq_orb_rest = _array_args(mchirp, dcom, freq_orb_rest)
+    mchirp, dcom, freq_rest_orb = _array_args(mchirp, dcom, freq_rest_orb)
     # The factor of 2 below is to convert from orbital-frequency to GW-frequency
-    hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_orb_rest, 2/3) / dcom
+    hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_rest_orb, 2/3) / dcom
     return hs
 
 
