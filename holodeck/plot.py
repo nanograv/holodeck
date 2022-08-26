@@ -366,7 +366,7 @@ def _get_cmap(cmap):
         raise
 
 
-def _get_hist_steps(xx, yy):
+def _get_hist_steps(xx, yy, yfilter=None):
     """Convert from
 
     Parameters
@@ -378,9 +378,9 @@ def _get_hist_steps(xx, yy):
 
     Returns
     -------
-    aa : array (N,)
+    xnew : array (N,)
         x-values
-    bb : array (N,)
+    ynew : array (N,)
         y-values
 
     """
@@ -390,15 +390,25 @@ def _get_hist_steps(xx, yy):
         log.exception(err)
         raise ValueError(err)
 
-    aa = [[xx[ii], xx[ii+1]] for ii in range(xx.size-1)]
-    bb = [[yy[ii], yy[ii]] for ii in range(xx.size-1)]
-    aa = np.array(aa).flatten()
-    bb = np.array(bb).flatten()
-    return aa, bb
+    xnew = [[xx[ii], xx[ii+1]] for ii in range(xx.size-1)]
+    ynew = [[yy[ii], yy[ii]] for ii in range(xx.size-1)]
+    xnew = np.array(xnew).flatten()
+    ynew = np.array(ynew).flatten()
+
+    if yfilter is not None:
+        if yfilter is True:
+            idx = (ynew > 0.0)
+        else:
+            idx = yfilter(ynew)
+
+        xnew = xnew[idx]
+        ynew = ynew[idx]
+
+    return xnew, ynew
 
 
-def draw_hist_steps(ax, xx, yy, **kwargs):
-    return ax.plot(*_get_hist_steps(xx, yy), **kwargs)
+def draw_hist_steps(ax, xx, yy, yfilter=None, **kwargs):
+    return ax.plot(*_get_hist_steps(xx, yy, yfilter=yfilter), **kwargs)
 
 
 # =================================================================================================
@@ -621,6 +631,31 @@ def _draw_plaw(ax, freqs, amp=1e-15, f0=1/YR, **kwargs):
     kwargs.setdefault('ls', '--')
     plaw = amp * np.power(np.asarray(freqs)/f0, -2/3)
     return ax.plot(freqs, plaw, **kwargs)
+
+
+def draw_med_conf(ax, xx, vals, percs=[25, 75], axis=-1, yfilter=None, **kwargs):
+    kwargs.setdefault('alpha', 0.5)
+    assert len(percs) == 2
+    med, *conf = np.percentile(vals, [50, percs[0], percs[1]], axis=-1)
+    if (xx.size,) == med.shape:
+        hist_flag = False
+    elif (xx.size-1,) == med.shape:
+        hist_flag = True
+    else:
+        raise ValueError(f"Bad shapes!  {np.shape(xx)=}, {np.shape(vals)=}")
+
+    if hist_flag:
+        hh, = draw_hist_steps(ax, xx, med, yfilter=yfilter, **kwargs)
+        _xx, lo = _get_hist_steps(xx, conf[0])
+        _xx, hi = _get_hist_steps(xx, conf[1])
+    else:
+        hh, = ax.plot(xx, med, **kwargs)
+        _xx = xx
+        lo = conf[0]
+        hi = conf[1]
+
+    fill = ax.fill_between(_xx, lo, hi, alpha=0.2, color=hh.get_color())
+    return (hh, fill)
 
 
 '''
