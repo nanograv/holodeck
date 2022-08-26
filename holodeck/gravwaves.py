@@ -12,8 +12,8 @@ import numpy as np
 import kalepy as kale
 
 import holodeck as holo
-from holodeck import utils, cosmo
-from holodeck.constants import MPC, MSOL
+from holodeck import utils, cosmo, log
+# from holodeck.constants import MPC, MSOL
 
 
 _CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen']
@@ -34,6 +34,11 @@ class GW_Discrete(Grav_Waves):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._box_vol_cgs = self._bin_evo._sample_volume
+
+        dlnf = np.diff(np.log(self.fobs_gw))
+        if not np.allclose(dlnf[0], dlnf):
+            log.exception("`GW_Discrete` will not work properly with unevenly sampled frequency (log-space)!")
+
         return
 
     def emit(self, eccen=None, stats=False, progress=True, nloudest=5):
@@ -62,8 +67,11 @@ class GW_Discrete(Grav_Waves):
         freq_iter = enumerate(fobs_gw)
         freq_iter = utils.tqdm(freq_iter, total=len(fobs_gw), desc='GW frequencies') if progress else freq_iter
         for ii, fogw in freq_iter:
-            _both, _fore, _back, _loud = _calc_mc_at_fobs(
-                fogw, harm_range, nreals, bin_evo, box_vol, loudest=nloudest
+            lo = fobs_gw[0] if (ii == 0) else fobs_gw[ii-1]
+            hi = fobs_gw[1] if (ii == 0) else fobs_gw[ii]
+            dlnf = np.log(hi) - np.log(lo)
+            _both, _fore, _back, _loud = _gws_harmonics_at_evo_fobs(
+                fogw, dlnf, bin_evo, harm_range, nreals, box_vol, loudest=nloudest
             )
             loudest[ii, :] = _loud
             both[ii, :] = _both
@@ -75,47 +83,6 @@ class GW_Discrete(Grav_Waves):
         self.back = np.sqrt(back)
         self.strain = np.sqrt(back + fore)
         self.loudest = loudest
-        return
-
-
-class GW_Continuous(Grav_Waves):
-
-    def emit(self, eccen=None, stats=False, progress=True, nloudest=5):
-        fobs_gw = self.fobs_gw
-        bin_evo = self._bin_evo
-        pop = bin_evo._pop
-        weight = pop.weight
-        dm = np.log10(pop._mtot[1]/MSOL) - np.log10(pop._mtot[0]/MSOL)
-        dq = pop._mrat[1] - pop._mrat[0]
-        dz = pop._redz[1] - pop._redz[0]
-
-        # (N,) ==> (1, N)    for later conversion to (F, N)
-        m1, m2 = [mm[np.newaxis, :] for mm in pop.mass.T]
-        mchirp = utils.chirp_mass(m1, m2)
-
-        H0 = cosmo.H0*1e5 / MPC   # convert from [km/s/Mpc] to [1/s]
-        redz = cosmo.a_to_z(pop.scafa)                     # (N,)
-        redz = np.clip(redz, 0.1, None)
-        dlum = cosmo.luminosity_distance(redz).cgs.value
-        dzdt = H0 * cosmo.efunc(redz) * np.square(1.0 + redz)  # (N,)
-
-        # ==> shape (F,N)
-        frest = fobs_gw[:, np.newaxis] / (1.0 + redz[np.newaxis, :])   # rest-frame GW frequency
-        temp, _ = utils.gw_hardening_rate_dfdt(m1, m2, frest)
-        dtr_dlnfr = frest / temp
-        # Calculate source-strain for each source (h;  NOT characteristic strain)
-        #     convert from rest-frame GW frequency to orbital frequency (divide by 2)
-        strain = utils.gw_strain_source(mchirp, dlum[np.newaxis, :], frest/2.0)
-
-        time_fac = dzdt * dtr_dlnfr
-
-        # Convert to characteristic-strain (squared)
-        strain = weight[np.newaxis, :] * time_fac * strain**2
-
-        dvol = dm * dq * dz
-        # Sum over all binaries, convert from hc^2 ==> hc
-        strain = np.sqrt(np.sum(strain * dvol, axis=-1))
-        self.strain = strain
         return
 
 
@@ -147,13 +114,19 @@ def _calc_mc_at_fobs(fogw, _harms, nreals, bin_evo, box_vol, loudest=5):
 '''
 
 
-def _calc_mc_at_fobs(fobs_gw, harm_range, nreals, bin_evo, box_vol, loudest=5):
+def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, loudest=5):
     """Calculate GW signal at range of frequency harmonics for a single observer-frame GW frequency.
 
     Parameters
     ----------
     fobs_gw : float
         Observer-frame GW-frequency in units of [1/sec].  This is a single, float value.
+    dlnf : float
+        Log-width of observered-frequency bin, i.e. $\\Delta \\ln f$.  This is width of observed
+        GW frequency bins.
+    evo : `holodeck.evolution.Evolution`
+        Initialized and evolved binary evolution instance, storing the binary evolution histories
+        of each binary.
     harm_range : list[int]
         Harmonics of the orbital-frequency at which to calculate GW emission.  For circular orbits,
         only [2] is needed, as the GW frequency is twice the orbital frequency.  For eccentric
@@ -161,9 +134,6 @@ def _calc_mc_at_fobs(fobs_gw, harm_range, nreals, bin_evo, box_vol, loudest=5):
         eccentricity the more GW energy is emitted at higher and higher harmonics.
     nreals : int
         Number of realizations to calculate in Poisson sampling.
-    bin_evo : `holodeck.evolution.Evolution`
-        Initialized and evolved binary evolution instance, storing the binary evolution histories
-        of each binary.
     box_vol : float
         Volume of the simulation box that the binary population is derived from.  Units of [cm^3].
     loudest : int
@@ -188,7 +158,7 @@ def _calc_mc_at_fobs(fobs_gw, harm_range, nreals, bin_evo, box_vol, loudest=5):
     # (H,) observer-frame orbital-frequency for each harmonic
     fobs_orb = fobs_gw / harm_range
     # Each parameter will be (N, H) = (binaries, harmonics)
-    data_harms = bin_evo.at('fobs', fobs_orb, params=_CALC_MC_PARS)
+    data_harms = evo.at('fobs', fobs_orb, params=_CALC_MC_PARS)
 
     # Only examine binaries reaching the given locations before redshift zero (other redz=inifinite)
     redz = data_harms['scafa']
@@ -228,26 +198,27 @@ def _calc_mc_at_fobs(fobs_gw, harm_range, nreals, bin_evo, box_vol, loudest=5):
     hs2 = utils.gw_strain_source(mchirp, dcom, frst_orb)**2
 
     dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], data_harms['sepa'][valid], frst_orb=frst_orb)
-    lambda_fact = utils.lambda_factor_freq(frst_orb, dfdt, redz, dcom=None) / box_vol
+    _lambda_fact = utils.lambda_factor_dlnf(frst_orb, dfdt, redz, dcom=None) / box_vol
+    num_binaries = _lambda_fact * dlnf
 
-    shape = (lambda_fact.size, nreals)
-    num_pois = np.random.poisson(lambda_fact[:, np.newaxis], shape)
+    shape = (num_binaries.size, nreals)
+    num_pois = np.random.poisson(num_binaries[:, np.newaxis], shape)
 
     # --- Calculate GW Signals
     temp = hs2 * gne * (2.0 / harms)**2
-    mc_ecc_both = np.sum(temp[:, np.newaxis] * num_pois, axis=0)
+    both = np.sum(temp[:, np.newaxis] * num_pois / dlnf, axis=0)
 
     if np.any(num_pois > 0):
         # Find the L loudest binaries in each realizations
         loud = np.sort(temp[:, np.newaxis] * (num_pois > 0), axis=0)[::-1, :]
-        mc_ecc_fore = loud[0, :]
+        fore = loud[0, :]
         loud = loud[:loudest, :]
     else:
-        mc_ecc_fore = np.zeros_like(mc_ecc_both)
+        fore = np.zeros_like(both)
         loud = np.zeros((loudest, nreals))
 
-    mc_ecc_back = mc_ecc_both - mc_ecc_fore
-    return mc_ecc_both, mc_ecc_fore, mc_ecc_back, loud
+    back = both - fore
+    return both, fore, back, loud
 
 
 def _gws_from_samples(vals, weights, fobs_gw):
@@ -353,9 +324,9 @@ def gws_from_sampled_strains(fobs_gw_bins, fo, hs, weights):
 
     # ---- Sort input by frequency for faster iteration
     idx = np.argsort(fo)
-    fo = np.copy(fo)[idx]
-    hs = np.copy(hs)[idx]
-    weights = np.copy(weights)[idx]
+    fo = fo[idx]
+    hs = hs[idx]
+    weights = weights[idx]
 
     # ---- Calculate GW background and foreground in each frequency bin
     ii = 0
@@ -364,7 +335,7 @@ def gws_from_sampled_strains(fobs_gw_bins, fo, hs, weights):
         # upper-bound to this frequency bin
         hi = fobs_gw_bins[ff+1]
         # number of GW cycles (1/dlnf), for conversion to characteristic strain
-        cycles = 1.0 / (np.log(hi) - np.log(lo))
+        dlnf = (np.log(hi) - np.log(lo))
         # amplitude and frequency of the loudest source in this bin
         hmax = 0.0
         fmax = 0.0
@@ -388,8 +359,8 @@ def gws_from_sampled_strains(fobs_gw_bins, fo, hs, weights):
         gwf_freqs[ff] = fmax
         gwback[ff] -= hmax**2
         # Convert to *characteristic* strain
-        gwback[ff] = gwback[ff] * cycles      # hs^2 ==> hc^2  (squared, so cycles^1)
-        gwfore[ff] = hmax * np.sqrt(cycles)   # hs ==> hc (not squared, so sqrt of cycles)
+        gwback[ff] = gwback[ff] / dlnf      # hs^2 ==> hc^2  (squared, so dlnf^-1)
+        gwfore[ff] = hmax / np.sqrt(dlnf)   # hs ==> hc (not squared, so sqrt of 1/dlnf)
         lo = hi
 
     gwback = np.sqrt(gwback)
@@ -565,3 +536,13 @@ def _gws_from_number_grid_integrated(edges, dnum, number, realize, integrate=Tru
         hc = np.sqrt(np.sum(hc, axis=(0, 1, 2)))
 
     return hc
+
+
+# ==============================================================================
+# ====    Deprecated Functions    ====
+# ==============================================================================
+
+
+@utils.deprecated_fail(_gws_harmonics_at_evo_fobs)
+def _calc_mc_at_fobs(*args, **kwargs):
+    return
