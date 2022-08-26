@@ -53,6 +53,10 @@ To-Do
     *   Generalize calculation of stellar characteristic radius.  Make self-consistent with
         stellar-profile, and user-specifiable.
 
+*   Evolution
+
+    *   `_sample_universe()` : sample in comoving-volume instead of redshift
+
 *   Sesana_Scattering
 
     *   Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
@@ -621,12 +625,10 @@ class Evolution:
     def _sample_universe(self, fobs_orb_edges, down_sample=None):
         """Construct a full universe of binaries based on resampling this population.
 
-        NOTE: This function needs to be cleaned up / tested for public use.
-
         Parameters
         ----------
         fobs : array_like,
-            Observer-frame orbital-frequencies at which to sample population. Units of [1/sec].
+            Observer-frame *orbital*-frequencies at which to sample population. Units of [1/sec].
         down_sample : None or float,
             Factor by which to downsample the resulting population.
             For example, `10.0` will produce 10x fewer output binaries.
@@ -640,15 +642,11 @@ class Evolution:
             ['mtot', 'mrat', 'redz', 'fobs'] (these are listed in the `names` returned value.)
             NOTE: `fobs` is *observer*-frame *orbital*-frequencies.
 
-        Notes
+        To-Do
         -----
         * This should sample in volume instead of `redz`, see how it's done in sam module.
-        * BUG: the binning is NOT being considered appropriately?  i.e. if the number of `fobs`
-          points is increases, with the same range, the number of binaries increase!!
 
         """
-        log.warning("!!`Evolution._sample_universe` is not yet working correctly!!")
-        # fobs = np.atleast_1d(fobs_orb_edges)
         fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges, log=False)
         dlnf = np.diff(np.log(fobs_orb_edges))
 
@@ -660,40 +658,28 @@ class Evolution:
         # Only examine binaries reaching the given locations before redshift zero (other redz=infinite)
         redz = cosmo.a_to_z(data_fobs['scafa'])
         valid = (redz > 0.0)
-        log.info(f"After interpolation, valid binary-targets: {utils.frac_str(valid)}")
+        log.debug(f"After interpolation, valid binary-targets: {utils.frac_str(valid)}")
 
         # Get rest-frame orbital-frequency [1/s]
-        frst_orb = utils.frst_from_fobs(fobs_orb_cents[np.newaxis, :], redz)
+        frst_orb_cents = utils.frst_from_fobs(fobs_orb_cents[np.newaxis, :], redz)
         # Comoving distance [cm]
         dcom = cosmo.z_to_dcom(redz)
 
         # `mass` has shape (Binaries, Frequencies, 2), units [gram]
         #    convert to (2, B, F), then separate into m1, m2 each with shape (B, F)
         m1, m2 = np.moveaxis(data_fobs['mass'], -1, 0)
-        dfdt, _ = utils.dfdt_from_dadt(data_fobs['dadt'], data_fobs['sepa'], freq_orb=frst_orb)
+        dfdt, _ = utils.dfdt_from_dadt(data_fobs['dadt'], data_fobs['sepa'], frst_orb=frst_orb_cents)
 
-        _lambda_factor = utils.lambda_factor_freq(frst_orb, dfdt, redz, dcom=dcom) / self._sample_volume
-        lambda_factor = _lambda_factor * dlnf[np.newaxis, :]
-
-        # ! ======
-        mchirp = utils.chirp_mass(m1, m2)
-        hs2 = utils.gw_strain_source(mchirp, dcom, frst_orb)**2
-        # shape = np.shape(_lambda_factor) + (20,)
-        # hc = np.random.poisson(np.nan_to_num(_lambda_factor)[..., np.newaxis], size=shape)
-        # hc = hs2 * np.median(hc, axis=-1)
-        hc = hs2 * np.random.poisson(np.nan_to_num(_lambda_factor))
-        # hc = hs2 * lambda_factor
-        hc = np.sum(hc, axis=0)
-        hc = np.sqrt(hc)
-        # ! ======
+        _lambda_factor = utils.lambda_factor_dlnf(frst_orb_cents, dfdt, redz, dcom=dcom) / self._sample_volume
+        num_binaries = _lambda_factor * dlnf[np.newaxis, :]
 
         # select only valid entries
         mt, mr = utils.mtmr_from_m1m2(m1[valid], m2[valid])
         # broadcast `fobs` to match the shape of binaries, then select valid entries
         fo = (fobs_orb_cents[np.newaxis, :] * np.ones_like(redz))[valid]
         redz = redz[valid]
-        weights = lambda_factor[valid]
-        log.info(f"Weights (lambda values) at targets: {utils.stats(weights)}")
+        weights = num_binaries[valid]
+        log.debug(f"Weights (lambda values) at targets: {utils.stats(weights)}")
 
         # down-sample weights to decrease the number of sample points
         prev_sum = weights.sum()
@@ -701,7 +687,7 @@ class Evolution:
         if down_sample is not None:
             weights /= down_sample
             next_sum = weights.sum()
-            msg = f"DOWNSAMPLING ARTIFICIALLY!!  down_sample={down_sample:g} :: total: {prev_sum:.4e}==>{next_sum:.4e}"
+            msg = f"downsampling artificially: down_sample={down_sample:g} :: total: {prev_sum:.4e}==>{next_sum:.4e}"
             log.warning(msg)
 
         # TODO/FIX: Consider sampling in comoving-volume instead of redz (like in sam.py)
@@ -713,12 +699,12 @@ class Evolution:
         reflect = [None, [None, 0.0], None, np.log10([fobs_orb_edges[0], fobs_orb_edges[-1]])]
         samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
         num_samp = samples[0].size
-        log.info(f"Sampled {num_samp:.8e} binaries in the universe")
+        log.debug(f"Sampled {num_samp:.8e} binaries in the universe")
 
         # Convert back to normal-space
         samples = np.asarray([10.0 ** ss for ss in samples])
         vals = np.asarray([10.0 ** vv for vv in vals])
-        return names, samples, hc, vals, weights
+        return names, samples, vals, weights
 
     # ==== Internal Methods
 
