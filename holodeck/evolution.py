@@ -651,6 +651,19 @@ class Evolution:
         * This should sample in volume instead of `redz`, see how it's done in sam module.
 
         """
+
+        # these are `log10(values)` where values are in CGS units
+        # names = ['mtot', 'mrat', 'redz', 'fobs']
+        names, vals, weights = self._sample_universe__at_values_weights(fobs_orb_edges)
+
+        samples = self._sample_universe__resample(fobs_orb_edges, vals, weights, down_sample)
+
+        # Convert back to normal-space
+        samples = np.asarray([10.0 ** ss for ss in samples])
+        vals = np.asarray([10.0 ** vv for vv in vals])
+        return names, samples, vals, weights
+
+    def _sample_universe__at_values_weights(self, fobs_orb_edges):
         fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges, log=False)
         dlnf = np.diff(np.log(fobs_orb_edges))
 
@@ -685,6 +698,12 @@ class Evolution:
         weights = num_binaries[valid]
         log.debug(f"Weights (lambda values) at targets: {utils.stats(weights)}")
 
+        # Convert to log-space
+        vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo)]
+        names = ['mtot', 'mrat', 'redz', 'fobs']
+        return names, vals, weights
+
+    def _sample_universe__resample(self, fobs_orb_edges, vals, weights, down_sample):
         # down-sample weights to decrease the number of sample points
         prev_sum = weights.sum()
         log.info(f"Total weights (number of binaries in the universe): {prev_sum:.8e}")
@@ -696,19 +715,12 @@ class Evolution:
 
         # TODO/FIX: Consider sampling in comoving-volume instead of redz (like in sam.py)
         #           can also return dcom instead of redz for easier strain calculation
-        # Convert to log-space
-        vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo)]
-        names = ['mtot', 'mrat', 'redz', 'fobs']
         nsamp = np.random.poisson(weights.sum())
         reflect = [None, [None, 0.0], None, np.log10([fobs_orb_edges[0], fobs_orb_edges[-1]])]
         samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
         num_samp = samples[0].size
         log.debug(f"Sampled {num_samp:.8e} binaries in the universe")
-
-        # Convert back to normal-space
-        samples = np.asarray([10.0 ** ss for ss in samples])
-        vals = np.asarray([10.0 ** vv for vv in vals])
-        return names, samples, vals, weights
+        return samples
 
     # ==== Internal Methods
 
