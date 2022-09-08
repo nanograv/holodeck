@@ -708,7 +708,7 @@ class Evolution:
         prev_sum = weights.sum()
         log.info(f"Total weights (number of binaries in the universe): {prev_sum:.8e}")
         if down_sample is not None:
-            weights /= down_sample
+            weights = weights / down_sample
             next_sum = weights.sum()
             msg = f"downsampling artificially: down_sample={down_sample:g} :: total: {prev_sum:.4e}==>{next_sum:.4e}"
             log.warning(msg)
@@ -718,6 +718,7 @@ class Evolution:
         nsamp = np.random.poisson(weights.sum())
         reflect = [None, [None, 0.0], None, np.log10([fobs_orb_edges[0], fobs_orb_edges[-1]])]
         samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
+        samples = np.power(10.0, samples)
         num_samp = samples[0].size
         log.debug(f"Sampled {num_samp:.8e} binaries in the universe")
         return samples
