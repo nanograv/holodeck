@@ -2,26 +2,33 @@
 """
 
 import holodeck as holo
+from holodeck import log
 from holodeck.constants import MSOL, GYR
 
 
 class Realizer:
 
-    def __init__(self, fobs_orb_edges, resample=None, lifetime=2*GYR, **mmbulge_kwargs):
+    def __init__(self, fobs_orb_edges, resample=None, lifetime=2*GYR, dens=None, **mmbulge_kwargs):
         pop = holo.population.Pop_Illustris()
         if resample is not None:
             mod_resamp = holo.population.PM_Resample(resample=resample)
             pop.modify(mod_resamp)
+            log.info(f"Resampling population by {resample}")
 
-        # mmbulge = holo.relations.MMBulge_KH2013(mamp=7e8*MSOL)
-        mmbulge = holo.relations.MMBulge_KH2013(**mmbulge_kwargs)
-        mod_mm13 = holo.population.PM_Mass_Reset(mmbulge, scatter=True)
-        mt, _ = holo.utils.mtmr_from_m1m2(pop.mass)
-        print("mass bef = ", holo.utils.stats(mt/MSOL))
-        pop.modify(mod_mm13)
-        mt, _ = holo.utils.mtmr_from_m1m2(pop.mass)
-        print("mass aft = ", holo.utils.stats(mt/MSOL))
-        pop._sample_volume = pop._sample_volume / 2.0
+        if dens is not None:
+            mod_dens = holo.population.PM_Density(factor=dens)
+            pop.modify(mod_dens)
+            log.info(f"Modifying population density by {dens}")
+
+        if len(mmbulge_kwargs):
+            log.info(f"Modifying population masses with params: {mmbulge_kwargs}")
+            mmbulge = holo.relations.MMBulge_KH2013(**mmbulge_kwargs)
+            mod_mm13 = holo.population.PM_Mass_Reset(mmbulge, scatter=True)
+            mt, _ = holo.utils.mtmr_from_m1m2(pop.mass)
+            log.debug(f"mass bef = {holo.utils.stats(mt/MSOL)}")
+            pop.modify(mod_mm13)
+            mt, _ = holo.utils.mtmr_from_m1m2(pop.mass)
+            log.debug(f"mass aft = {holo.utils.stats(mt/MSOL)}")
 
         fixed = holo.evolution.Fixed_Time.from_pop(pop, lifetime)
         evo = holo.evolution.Evolution(pop, fixed)

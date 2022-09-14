@@ -633,3 +633,23 @@ class PM_Mass_Reset(_Population_Modifier):
         # if `scatter` is `True`, then it is set to the value in `mhost.SCATTER_DEX`
         pop.mass = self.mhost.mbh_from_host(pop, scatter)
         return
+
+
+class PM_Density(_Population_Modifier):
+
+    def __init__(self, factor):
+        """Initialize this population-modifier to change the density by the given factor.
+
+        This is done by changing the finite population volume (`_sample_volume`) by the same factor.
+        """
+        self._factor = factor
+        return
+
+    def modify(self, pop):
+        try:
+            pop._sample_volume = pop._sample_volume / self._factor
+        except:
+            log.exception("Failed to modify `pop._sample_volume`= ({pop._sample_volume}) by factor of {self._factor}")
+            raise
+
+        return
