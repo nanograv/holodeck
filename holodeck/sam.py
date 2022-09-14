@@ -570,7 +570,7 @@ class Semi_Analytic_Model:
         edges : (4,) list of 1darrays of scalar
             A list containing the edges along each dimension.
         dnum : (M, Q, Z, F) ndarray of scalar
-            Differential number of binaries.
+            Differential number of binaries.  Units are dimensionless number of binaries.
 
         Notes
         -----
@@ -632,6 +632,9 @@ class Semi_Analytic_Model:
 
         # recall: these are negative (decreasing separation)  [cm/sec]
         dadt = hard.dadt(mt[np.newaxis, :], mr[np.newaxis, :], sa)
+
+        # log.warning("Using `dadt_dedt` instead of `dadt` which doesn't exist... why is this")
+        # dadt, _ = hard.dadt_dedt(mt[np.newaxis, :], mr[np.newaxis, :], sa)
 
         # Calculate `tau = dt/dlnf_r = f_r / (df_r/dt)`
         if fobs is not None:
