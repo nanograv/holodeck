@@ -21,6 +21,7 @@ class Realizer:
         pop.modify(mod_mm13)
         mt, _ = holo.utils.mtmr_from_m1m2(pop.mass)
         print("mass aft = ", holo.utils.stats(mt/MSOL))
+        pop._sample_volume = pop._sample_volume / 2.0
 
         fixed = holo.evolution.Fixed_Time.from_pop(pop, lifetime)
         evo = holo.evolution.Evolution(pop, fixed)
