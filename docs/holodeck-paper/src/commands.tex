@@ -5,6 +5,19 @@
 \newcommand{\python}{\texttt{python}}
 \newcommand{\mmbulge}{{$M_\textrm{BH}$--$M_\textrm{bulge}$}}
 
+\definecolor{purple1}{rgb}{0.6, 0.0, 0.8}
+
+% \newcommand{\todo}[1]{{\textbf{\color{purple1}TODO: #1}}}
+\newcommand{\todo}[1]{{\textbf{\color{purple1}\{#1\}}}}
+\newcommand{\NOTE}[1]{\noindent\textbf{\color{red}!!#1!!}}
+\newcommand{\note}[1]{{\color{purple1}#1}}
+\newcommand*{\needcite}[1]{
+    \ifthenelse{\equal{#1}{}}{
+        {\color{red}[???]}
+    }{
+        {\color{red} [#1]}
+    }
+}
 
 % ==============================================================================
 % ====    Units and General Astronomy Symbols
@@ -111,10 +124,6 @@
 \newcommand{\secref}[1]{\textsection\ref{#1}}
 \newcommand{\refeq}[1]{{Eq.~\ref{#1}}}
 \newcommand{\tabref}[1]{{Table~\ref{#1}}}
-\newcommand{\needcite}{{\color{red}[???]}}
-\newcommand{\missing}{ {\color{red}??|??|??} }
-\newcommand{\NOTE}[1]{\noindent\textbf{\color{red}!!#1!!}}
-\newcommand{\note}[1]{{\color{violet}#1}}
 \newcommand{\fnm}[1]{\footnotemark[#1]}
 \newcommand{\fnt}[2]{\footnotemark[#1]{#2}}
 \newcommand{\mc}[2]{\multicolumn{#1}{c}{#2}}
