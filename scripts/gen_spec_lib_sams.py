@@ -1,7 +1,7 @@
 """
 
 
-mpirun -n 14 --use-hwthread-cpus python ./scripts/gen_lib_sams.py output/test_2022-06-27
+mpirun -n 14 --use-hwthread-cpus python ./scripts/gen_spec_lib_sams.py output/test_2022-06-27
 
 
 """
@@ -107,7 +107,7 @@ BEG = datetime.now()
 
 parser = argparse.ArgumentParser()
 parser.add_argument('output', metavar='output', type=str,
-                    help='output path [created if doesnt exist')
+                    help='output path [created if doesnt exist]')
 
 # parser.add_argument('-r', '--reals', action='store', dest='reals', type=int,
 #                     help='number of realizations', default=10)
@@ -211,7 +211,7 @@ def main():
         indices = np.array_split(indices, comm.size)
         num_ind_per_proc = [len(ii) for ii in indices]
         # LOG.info(f"{npars=}, {nreals=}, total={npars*nreals} || ave runs per core = {np.mean(num_ind_per_proc)}")
-        LOG.info(f"{npars=}, {nreals=} || ave runs per core = {np.mean(num_ind_per_proc)}")
+        LOG.info(f"{npars=}, {nreals=} || avg runs per core = {np.mean(num_ind_per_proc)}")
     else:
         indices = None
     indices = comm.scatter(indices, root=0)
@@ -264,27 +264,26 @@ def main():
 
 def run_sam(pnum, real, path_output):
 
-    iterator = range(args.NUM_REALS)
-    if comm.rank == 0:
-        iterator = holo.utils.tqdm(iterator, leave=False)
+#     iterator = range(args.NUM_REALS)
+#     if comm.rank == 0:
+#         iterator = holo.utils.tqdm(iterator, leave=False)
 
-    for real in iterator:
+    
+    fname = f"lib_sams__p{pnum:06d}.npz"
+    fname = os.path.join(path_output, fname)
+    if os.path.exists(fname):
+        LOG.warning(f"File {fname} already exists.")
 
-        fname = f"lib_sams__p{pnum:06d}_r{real:03d}.npz"
-        fname = os.path.join(path_output, fname)
-        if os.path.exists(fname):
-            LOG.warning(f"File {fname} already exists.")
-            continue
+    fobs = holo.utils.nyquist_freqs(args.PTA_DUR, args.PTA_CAD)
 
-        fobs = holo.utils.nyquist_freqs(args.PTA_DUR, args.PTA_CAD)
-
-        sam = SPACE.sam_for_number(pnum)
-        hard = holo.evolution.Hard_GW()
-        vals, weights, edges, dens, mass = holo.sam.sample_sam_with_hardening(sam, hard, fobs=fobs, sample_threshold=1e2, poisson_inside=True, poisson_outside=True)
-        gff, gwf, gwb = holo.gravwaves._gws_from_samples(vals, weights, fobs)
-        legend = SPACE.param_dict_for_number(pnum)
-        np.savez(fname, fobs=fobs, gff=gff, gwb=gwb, gwf=gwf, pnum=pnum, real=real, **legend)
-        LOG.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
+    sam = SPACE.sam_for_number(pnum)
+#         hard = holo.evolution.Hard_GW()
+#         vals, weights, edges, dens, mass = holo.sam.sample_sam_with_hardening(sam, hard, fobs=fobs, sample_threshold=1e2, poisson_inside=True, poisson_outside=True)
+#         gff, gwf, gwb = holo.gravwaves._gws_from_samples(vals, weights, fobs)
+    gwbspec = sam.gwb(fobs, realize=args.NUM_REALS)
+    legend = SPACE.param_dict_for_number(pnum)
+    np.savez(fname, fobs=fobs, gwbspec=gwbspec, pnum=pnum, nreals=args.NUM_REALS, **legend)
+    LOG.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
 
     return
 
