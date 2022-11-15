@@ -1077,6 +1077,14 @@ class _Hardening(abc.ABC):
     def dadt_dedt(self, evo, step, *args, **kwargs):
         pass
 
+    def dadt(self, *args, **kwargs):
+        rv_dadt, _dedt = self.dadt_dedt(*args, **kwargs)
+        return rv_dadt
+
+    def dedt(self, *args, **kwargs):
+        _dadt, rv_dedt = self.dadt_dedt(*args, **kwargs)
+        return rv_dedt
+
 
 class Hard_GW(_Hardening):
     """Gravitational-wave driven binary hardening.
@@ -1649,6 +1657,7 @@ class Fixed_Time(_Hardening):
             points = [np.log10(mtot/MSOL), np.log10(mrat), time/GYR, np.log10(sepa/PC)]
             points = np.array(points)
             norm = interp(points.T)
+            print(f"from interp: {utils.stats(norm)=}")
             bads = ~np.isfinite(norm)
             if np.any(bads):
                 msg = f"Normal interpolant failed on {utils.frac_str(bads, 4)} points.  Using backup interpolant"
@@ -1657,6 +1666,7 @@ class Fixed_Time(_Hardening):
                 # If scipy throws an error on the shape here, see: https://github.com/scipy/scipy/issues/4123
                 # or https://stackoverflow.com/a/26806707/230468
                 norm[bads] = backup(bp)
+                print(f"from backup: {utils.stats(norm[bads])=}")
                 bads = ~np.isfinite(norm)
                 if np.any(bads):
                     err = f"Backup interpolant failed on {utils.frac_str(bads, 4)} points!"
@@ -1761,9 +1771,13 @@ class Fixed_Time(_Hardening):
         dedt = None if evo.eccen is None else np.zeros_like(dadt)
         return dadt, dedt
 
-    # def dadt(self, mt, mr, sepa):
-    #     dadt, dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_sc, self._gamma_df)
-    #     return dadt
+    def dadt(self, mt, mr, sepa):
+        dadt, _dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_sc, self._gamma_df)
+        return dadt
+
+    def dedt(self, mt, mr, sepa):
+        _dadt, dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_sc, self._gamma_df)
+        return dedt
 
     @classmethod
     def _dadt_dedt(cls, mtot, mrat, sepa, norm, rchar, g1, g2):
@@ -1885,18 +1899,22 @@ class Fixed_Time(_Hardening):
         # Define the range of parameters to be explored
         mt = [1e5, 1e11]   #: total mass [Msol]
         mr = [1e-5, 1.0]   #: mass ratio
-        td = [0.0, 20.0]   #: lifetime [Gyr]
+        # td = [0.0, 20.0]   #: lifetime [Gyr]    LINEAR
+        td = [1e-3, 20.0]   #: lifetime [Gyr]        LOG
         rm = [1e3, 1e5]    #: radius maximum (initial separation) [pc]
 
         # Choose random test binary parameters
         num_points = int(cls._INTERP_NUM_POINTS)
         mt = 10.0 ** np.random.uniform(*np.log10(mt), num_points) * MSOL
         mr = 10.0 ** np.random.uniform(*np.log10(mr), mt.size)
-        td = np.random.uniform(*td, mt.size+1)[1:] * GYR
+        # td = np.random.uniform(*td, mt.size+1)[1:] * GYR
+        td = 10.0 ** np.random.uniform(*np.log10(td), mt.size) * GYR
+        print(f"{utils.stats(td/GYR)=}")
         rm = 10.0 ** np.random.uniform(*np.log10(rm), mt.size) * PC
 
         # ---- Get normalization for these parameters
         norm = cls._get_norm_chunk(td, mt, mr, rchar, gamma_sc, gamma_df, rm)
+        print(f"{utils.stats(norm)=}")
 
         # Make sure results are valid
         valid = np.isfinite(norm) & (norm > 0.0)
@@ -1908,7 +1926,8 @@ class Fixed_Time(_Hardening):
         # ---- Construct interpolants
         points = [mt, mr, td, rm]
         units = [MSOL, 1.0, GYR, PC]
-        logs = [True, True, False, True]   #: which parameters to interpolate in log-space
+        # logs = [True, True, False, True]   #: which parameters to interpolate in log-space
+        logs = [True, True, True, True]   #: which parameters to interpolate in log-space
         points = [pp/uu for pp, uu in zip(points, units)]
         points = [np.log10(pp) if ll else pp for pp, ll in zip(points, logs)]
         points = np.array(points).T
@@ -1918,7 +1937,7 @@ class Fixed_Time(_Hardening):
         return interp, backup
 
     @classmethod
-    def _get_norm_chunk(cls, target_time, *args, guess=1e0, chunk=1e3, progress=True):
+    def _get_norm_chunk(cls, target_time, *args, chunk=1e3, progress=True, **kwargs):
         """Calculate normalizations in 'chunks' of the input arrays, to obtain the target lifetime.
 
         Calculates normalizations for groups of parameters of size `chunk` at a time.  Loops over
@@ -1954,7 +1973,7 @@ class Fixed_Time(_Hardening):
         size = np.size(target_time)
         # if number of array elements is less than (or comparable to) chunk size, to it all in one pass
         if size <= chunk * cls._INTERP_THRESH_PAD_FACTOR:
-            return cls._get_norm(target_time, *args, guess=guess)
+            return cls._get_norm(target_time, *args, **kwargs)
 
         # broadcast arrays to all be the same shape (some `floats` are passed in)
         args = [target_time, *args]
@@ -1970,12 +1989,12 @@ class Fixed_Time(_Hardening):
             hi = np.minimum((ii + 1) * chunk, size)
             cut = slice(lo, hi)
             # calculate normalizations for this chunk
-            norm[cut] = cls._get_norm(target_time[cut], *[aa[cut] for aa in args], guess=guess)
+            norm[cut] = cls._get_norm(target_time[cut], *[aa[cut] for aa in args], **kwargs)
 
         return norm
 
     @classmethod
-    def _get_norm(cls, target_time, *args, guess=1e0):
+    def _get_norm(cls, target_time, *args, guess=1e7):
         """Calculate normalizations of the input arrays, to obtain the target binary lifetime.
 
         Uses deterministic least-squares optimization to find the best normalization values, using
