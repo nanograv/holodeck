@@ -1,0 +1,336 @@
+% =================================================================================================
+% Holodeck Methods Paper - Manuscript
+% -----------------------------------
+%
+%
+%
+% =================================================================================================
+
+% =================================================================================================
+% ====   Header & Setup
+% =================================================================================================
+
+% general package imports and setup
+\input{src/packages}
+% definitions of custom commands
+\input{src/commands}
+% journal abbreviations for bibliography
+\input{src/abbrevs}
+
+% =================================================================================================
+% ====    Front Matter
+% =================================================================================================
+
+\newtotcounter{citnum} % From the package documentation
+\def\oldbibitem{} \let\oldbibitem=\bibitem
+\def\bibitem{\stepcounter{citnum}\oldbibitem}
+
+\newcommand{\orcidauthorA}{0000-0002-6625-6450} % For author A
+
+\title[Short Title]{Very long and verbose title}
+\author[NANOGrav]{the NANOGrav collaboration}
+% \author[L.Z.~Kelley et al.]{
+%     Luke Zoltan Kelley$^{1}$\thanks{E-mail:lzkelley@northwestern.edu}\orcidA{} \\
+%     $^{1}$ \begin{minipage}[t]{\linewidth} Center for Interdisciplinary Exploration and Research in Astrophysics (CIERA), and\\Department of Physics \& Astronomy, Northwestern University, Evanston, IL 60208
+%     \end{minipage}
+% }
+
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    abstract
+\end{abstract}
+
+\begin{keywords}
+    quasars: supermassive black holes
+\end{keywords}
+
+
+% =================================================================================================
+% ====    Section 1 - Introduction
+% =================================================================================================
+
+\begin{itemize}
+    \item Change $f_r \rightarrow f$
+    \item holodeck uses $f_\trt{obs}$ as grid variable, not $f_r$, mesh this with the analytic formalism and description
+\end{itemize}
+
+
+\section{Introduction}
+    \label{sec:intro}
+
+    Massive black holes (MBHs) are known to occupy the centers of most if not all massive galaxies \needcite{}.
+    Binaries of MBHs are believed to form following the merger of massive galaxies \needcite{}.  Such MBH Binaries (MBHBs) could then produce low-frequency gravitational waves (GWs) \needcite{LF-GWs}, in the nano-Hertz regime, that would soon be detectable by experiments called pulsar timing arrays (PTAs) \needcite{PTAs}.  In this paper, we introduce the MBHB population synthesis code called \holodeck{}.  The goal of this package is to provide a cohesive and comprehensive framework for:
+    \begin{enumerate}
+        \item
+        modeling the physics of MBHB formation and evolution while accurately capturing the true uncertainties in this modeling;
+        \item
+        rapidly generating large simulated populations of MBHBs;
+        \item
+        calculating the resulting GW signals from these populations.
+    \end{enumerate}
+    % (1) modeling the physics of MBHB formation and evolution while accurately capturing the true uncertainties in this modeling, (2) rapidly generating large simulated populations of MBHBs, and (3) calculating the resulting GW signals from these populations.
+
+    As in the case of high-frequency GWs detected by LIGO-Virgo \needcite{}, tremendous uncertainties exist in the physics of the formation and evolution of the binary sources.  For individual MBHs, there are numerous, well-known scaling relationships between their properties and those of their host galaxies \needcite{MBH-Host relations}, but numerous questions remain such as where or not the observed sample of MBHs (i.e.~quasars and active galactic nuclei, AGN) accurately reflect the full population \needcite{MBH bias}, and how reliably these relationships extend to different host galaxies and redshift ranges.
+
+    For binary MBHs in particular, a variety of physical processes are required for the two MBHs to find the center of the post-merger host galaxy and eventually become gravitationally bound \needcite{BBR1990}.  In particular, the two MBHs must interact with their host galaxy environments through dynamical friction, stellar scattering, accretion disk torques, and possibly three-body interactions with a third MBH component \needcite{}, before reaching small enough binary separations for GW emission to eventually dominate the final coalescence of the binary.  Besides GW emission, none of these processes can be modeled exactly, necessitating the usage of simplified prescriptions which each containing numerous parametric uncertainties.  The resolution of cosmological hydrodynamic simulations is far too coarse to resolve the MBH binary phase, with some simulations instantaneously merging nearby MBHs \needcite{illustris}, and others using sub-grid models to `resolve' down to the scale of $\sim kpc$ \needcite{Romulus/Tremmel, Ma+Hopkins}.
+
+    In addition to the theoretical uncertainties, there exists a substantial dearth of observational constraints.  A growing number of \textit{candidate} MBHB systems have been identified through varying electromagnetic (EM) indicators in AGN \needcite{}, but a substantial fraction may be false positives \needcite{}.  To date, no gravitationally bound MBH binary has yet to be confirmed, although examples exist of dual AGN at close projected separation \needcite{Rodriguez et al. 2007}, and single AGN showing time-variability highly suggestive of a binary companion \needcite{OJ~287}.
+
+    GWs from MBHBs, particularly in the form of a stochastic gravitational wave background (GWB), have been forecast for decades.  Only recently have the sensitivities of PTA experiments begin to encroach on astrophysically plausible GWB amplitudes \needcite{PTA limits} \needcite{c.f.~Shannon et al.}.  Indeed, PTA upper-limits have already been used to place constraints on limited sub-spaces of MBHB parameters \needcite{11yr analysis, etc}.  In the 12.5yr dataset of the North-American nano-Hertz Observatory for Gravitational waves \needcite{NANOGrav}, a `common process' signal was identified that is consistent with a GWB but not yet statistically definitive.  Followup modelling suggests that the GW nature of the signal can be determined within the next few years \needcite{Pol}.  While the interpretation is currently entirely conjectural, the two currently measurable parameters of the common process, the GW-strain amplitude and strain spectral index, each challenge the standard expectations of theoretical models.  The \todo{possible} amplitude is larger than many models have predicted, and the spectral index significantly flatter than the canonical `-2/3' power-law \needcite{phinney} \needcite{c.f.~Sesana, Kocsis}.  Still, both of these parameters can easily be fit with current models, and indeed, studies have already performed MBHB model inference using the amplitude and spectral index of the candidate \todo{(what's the word besides `candidate'?)} signal \needcite{middleton}.
+
+    Studies which have used PTA observations to constrain MBHB models have been focused on demonstrating the feasibility of performing such inference, and thus have relied on single classes of models (semi-analytic models, SAMs) that make significant simplifications of the physical processes, and only explore small sub-spaces of astrophysical parameters.  The \holodeck{} framework, presented here, is structured to more fully capture the astrophysical uncertainties underlying our understanding of MBHB formation and evolution.  \holodeck{} uses comprehensive and self-consistent models for binary evolution, in addition to allowing SAMs to be interchanged with populations derived from cosmological hydrodynamic simulations.  In this way, \holodeck{} is designed to capture both statistical and systematic uncertainties by allowing the marginalization over not only specific astrophysical parameters, but also entire modeling methodologies.
+
+    In this paper, we present the simulation methodologies and their implementations in \holodeck{}.  We also use the framework to explore in more detail the range of plausible GW-strain spectral indices that would be detectable by PTAs. \todo{expand this paragraph}.
+
+
+% =================================================================================================
+% ====    Section 2 - Methods
+% =================================================================================================
+
+\section{Methods}
+    \label{sec:meth}
+
+    \subsection{Source Distributions and Gravitational Wave Calculations}
+
+    Let $N(z)$ denote the number of binaries out to a redshift $z$, corresponding to a comoving volume $V_c$.
+    We can calculate the characteristic strain from an ensemble of GW sources as \citep[][Eqs.~5/8]{Phinney-2001},
+        \begin{align}
+            h_c^2(f) = \int_0^\infty \!\! dz \; \frac{d^2 N}{dz \, d\ln f_r} \; h_s^2\lr{f_r}.
+        \end{align}
+    In practice, the total number of sources in the Universe is calculated from the number-density, $n \equiv dN / dV_c$, extrapolated into an observer's entire past light-cone.  These can be related as \citep[][Eq.~6]{Sesana+2008},
+        \begin{align}
+            \label{eq:num_num_dens}
+            \frac{d^2 N}{dz \, d\ln f_r} = \frac{d n_c}{dz} \frac{dz}{dt} \frac{dt}{d\ln f_r} \frac{d V_c}{dz}.
+        \end{align}
+    Note that the total number of binaries in a given frequency interval depends not only on the number density, but also their rate of frequency-evolution.  The faster binaries evolve through a given frequency interval, the fewer binaries will occupy that interval on average.  This is typically described by the binary `hardening' timescale (or `residence time'), given by the expression,
+    \begin{equation}
+        \thardf \equiv - \diffp{t}{{\ln\!f_r}} = - \frac{f_r}{\partial f_r / \partial t}.
+    \end{equation}
+    Plugging in the relevant cosmographic relationships (see \secref{sec:app_eqs}) we have,
+        \begin{align}
+            h_c^2(f) & = \int_0^\infty \!\! dz \; \frac{dn_c}{dz} \, h^2\lr{f_r} \, 4\pi c \, d_c^2 \lr{1+z} \, \thardf.
+        \end{align}
+    The challenge in modeling astrophysical sources of GWs is in calculating their number density.  Numerous approaches are possible, described in the following sections.
+
+
+
+    \subsection{Semi-Analytic Modeling}
+
+    Define the distribution function of sources as $F(M,q,a,z) = d^2 n(M,q,a,z) / dM dq$.  Here $M$ is the total mass of each systems, the mass-ratio is $q\equiv m_2/m_1 \leq 1$, $a$ is the binary separation, and $z$ is the redshift.
+    % Define the distribution function of sources as $F(M,q,f_r,z) = d^2 n(M,q,f_r,z) / dM dq$.  Here $M$ is the total mass of each systems, the mass-ratio is $q\equiv m_2/m_1 \leq 1$, $f_r$ is the binary orbital frequency in the rest frame, and $z$ is the redshift.
+    We can write the conservation equation for binaries as of function of redshift as,
+    \begin{equation}
+        \label{eq:conservation}
+        \diffp{F}{z} +
+            \diffp{}{M} \lrs{F \diffp{M}{z}} +
+            \diffp{}{q} \lrs{F \diffp{q}{z}} +
+            \diffp{}{a} \lrs{F \diffp{a}{z}} = S_{\!F}(M, q, a, z).
+    \end{equation}
+    Here $S_{\!F}$ is a source/sink function that can account for the creation or destruction of binaries.
+
+    We consider the standard semi-analytic model (SAM) formalism of MBH binary populations \citep[e.g.~][]{Sesana+2008, Chen+2019}.  In this style of calculation, $F$ is determined in a region of parameter space that can be observed/estimated, and this is evolved to find the distribution in a different region of parameter space that is of interest.  In practice, the observed parameter space is galaxies and galaxy mergers, and the parameter space of interest is closely separated MBH binaries that could be GW detectable.  Thus we assume that all binary `formation' is encapsulated from binaries moving from one part of parameter space (i.e.~large separations and redshifts) to other parts of parameter space (i.e.~smaller separations and redshifts), and we set $S_{\!F} = 0$.
+
+    We will express the distribution function as a product of a mass function, and a pair fraction:
+    \begin{equation}
+        \label{eq:dist_func}
+        F(M,q,z) = \frac{\Phi(M, z)}{M \ln\!10} \cdot P(M,q,z),
+    \end{equation}
+    where the mass function, $\Phi(M, q, z) \equiv \diffp{n_g}{{\logten{M}}}$, is calculated based on the number density of galaxies ($n_g$).  We assume that there is a one-to-one mapping from galaxy mass to MBH mass, such that the galaxy mass-function can still be used to uniquely define the mass distribution of MBHs.  Typically the MBH--galaxy relation is given in terms of an `$M_\trt{BH}$--$M_\trt{bulge}$' relation \citep[e.g.][]{Kormendy+Ho-2013}, which is an observationally derived relation between the mass of MBHs and the mass of the stellar bulge component of their host galaxy.
+    In \citet{Chen+2019}, the pair fraction is measured over some range of separations, and the separation-dependence is suppressed, i.e.~$P = \int_{a_0}^{a_1} P_a \, da$.
+
+    From $\eqref{eq:conservation}$, we use the chain rule to mix time and redshift evolution, and assume that the mass-change of binaries is negligible, i.e.~$\diffp{m}{t} = 0$ and $\diffp{q}{t} = 0$, giving:
+    \begin{equation}
+        \diffp{F}{z} = - \diffp{t}{z} \diffp{}{a} \lrs{F \diffp{a}{t}}.
+    \end{equation}
+
+    The binary population is assumed to be changing only in separation and redshift, which are related by $\partial a / \partial z = (\partial a / \partial t) (\partial t / \partial z)$.  Because the overall number-density is conserved, we can take a finite step in separation and time/redshift, $a\rightarrow a'$ and $z\rightarrow z'$.  Here the time it takes for a binary to go from $a \rightarrow a'$ is $T(M,q,a,z|a')$, which leads to a redshift at the later time of $z' = z'(t + T)$.  So far, we have left the binary separation $a$ as implicit in the expression for F.  To obtain the standard expression \citep[e.g.][~Eq.~5]{Chen+2019}, we make the approximation that,
+    \begin{equation}
+        \diffp{}{a} \lrs{F(M,q,z) \diffp{a}{t}} \approx \frac{F}{T(M,q,a,z|a')}.
+    \end{equation}
+    Thus giving,
+    \begin{equation}
+        \label{eq:cont_eq_result}
+        \diffp{F(M,q,a',z')}{{z'}} = \diffp{n}{{M}{q}{z'}} = - \diffp{t}{z} \frac{\Phi(M,z) \, P(M,q,z)}{T(M,q,a,z|a')}.
+    \end{equation}
+
+    Combining \eqref{eq:cont_eq_result} with \eqref{eq:num_num_dens}, we can finally write,
+    \begin{equation}
+        \label{eq:sam_final}
+        \diffp{N}{{M}{q}{z}{\ln\!f_r}} = \frac{\Phi(M,z) \, P(M,q,z)}{T(M,q,a,z|a')} \, \thardf \, \diffp{V_c}{z}.
+    \end{equation}
+
+    % From the SAM formalism, the number of binaries in each bin is calculated by `integrating' each finite element of \eqref{eq:sam_final}, i.e.,
+    % \begin{equation}
+    %     \diffp{N_{ijk}(f_r)}{{\ln\!f_r}} \equiv \diffp{N(M_i, q_j, z_k, {f_r})}{{M}{q}{z}{\ln\!f_r}} \, \Delta M \,\Delta q \, \Delta z.
+    % \end{equation}
+    % The characteristic strain of the GWB can then be calculated
+
+    % % Fig -
+    % \begin{figure}
+    %     \centering
+    %     \includegraphics[width=1\columnwidth]{{{example-image-c}}}
+    %     \caption{\textbf{header.} body.}
+    %     \label{fig:fig1}
+    % \end{figure}
+    %
+    %
+    % \begin{equation}\begin{split}
+    %     \label{eq:eq1}
+    %     2+2 & = 4 \\
+    %         & = 10 - 6
+    % \end{split}\end{equation}
+    %
+    % % Fig -
+    % \begin{figure*}
+	% 	\centering
+    %     \subfloat[first]{{
+    %         \includegraphics[width=1.75\columnwidth]{{{example-image-a}}}
+    %     }}
+	% 	\\
+    %     % \qquad
+    %     \subfloat[second]{{
+    %     	\includegraphics[width=1.75\columnwidth]{{{example-image-b}}}
+    %     }}
+    %     \caption{\textbf{Head.}  Body.}
+    %     \label{fig:fig2}
+    % \end{figure*}
+
+
+\section{Implementation}
+    \label{sec:imp}
+
+    The \holodeck{} framework is written primarily in \python{} using a class-based structure for modularity and extensibility.
+
+    \subsection{Semi-Analytic Models}
+        \label{sec:imp_sam}
+
+        The core of the semi-analytic modeling framework in \holodeck{} is implementing \eqref{eq:sam_final}.  There are classes for each of the key components: The galaxy stellar-mass function (GSMF, $\Phi$), the galaxy pair fraction \(F\), the merger timescale ($\tau$), and additional a scaling relation for mapping host galaxies via to MBH properties --- typically via an \mmbulge{} relation.  Each component class is implemented generically via basic API methods (e.g.~a GSMF that returns the number density of galaxies at a given stellar-mass and redshift), and can be subclassed to provide a particular implementation (e.g.~an analytic Schechter-function GSMF).  The number (or number density) of binaries is specified over a grid of parameters, typically in a four dimensional space of total mass ($M$), mass ratio ($q$), redshift ($z$), and binary rest-frame orbital frequency ($f_r$).
+
+        The semi-analytic model formalism defines a continuous distribution of MBH binaries.  For many calculations, the discrete nature of MBHB sources is important, not only for examining individual continuous wave sources but also because of the important effects of discrete sources on the shape of the GWB due to the non-linear scaling of GW strain \citep{Sesana+2008}.  Additional, a component of the uncertainty in expected GW signals is due to `cosmic variance', which can be treated as Poisson noise when creating multiple samples (or `realizations') of our binary populations.  To handle discretization and resampling we use the \texttt{kalepy} package \citep{kalepy2021}, in particular, a method of outlier sampling to capture regions of parameter space where finite number effects are important.  The \holodeck{} semi-analytic models specify the number (or number-density) of binaries over a grid, i.e.~$N_{ijkl}$.  By definition, grid cells which have an expected total number of binaries $\gg 1$ will not produce appreciable finite-number effects, so instead they are given a weighting based on a Poisson distribution centered around their expectation value, i.e.~$\mathcal{P}(N_{ijkl})$.  Grid cells with expected numbers of order unity or less do produce important finite-number effects, and thus are directly resampled
+
+% =================================================================================================
+% ====    Section 3 - Results
+% =================================================================================================
+\section{Results}
+    \label{sec:res}
+
+    % Fig -
+    % \begin{figure*}
+    %     \centering
+    %     \includegraphics[width=1.5\columnwidth]{{{figs/det-nums_fedd-1.00_voff+3.00_dvel+2.00_tobs+0.70}}}
+    %     \caption{\textbf{Distributions of parameters for all binaries (black) and those with a detectable kinematic signature in the secondary AGN (colors).}  Less than $10^{-7}$ of primaries are observable, which are not shown.  Secondary AGN with observable velocity offsets ($\voff$) are shown in blue assuming a sensitivity of \mbox{$\voffsens = 10^3 \kmps$}.  Secondaries with observable changing velocities ($\dvel$) are shown in orange (solid) for a sensitivity $\dvelsens = 10^2 \kmps$, and observing baseline of \mbox{$\tobs = 5\, \yr$}.  Systems where both offsets and changes are detectable (orange, dotted) are mostly a uniform subset of the $\dvel$ sample, and are almost indistinguishable in the 2D contour plots.  An optical flux cutoff of \mbox{$6\E{-14} \mathrm{erg/s/cm}^2$} (AB Mag $\approx 21$) is also imposed, where all AGN are assumed to be accreting at an Eddington fraction of $0.1$.}
+    %     \label{fig:det_bins_num}
+    % \end{figure*}
+
+
+
+% =================================================================================================
+% ====    Section 4 - Conclusions
+% =================================================================================================
+\section{Discussion \& Conclusions}
+    \label{sec:disc}
+
+
+
+% =================================================================================================
+% ====    End Matter
+% =================================================================================================
+
+
+% ====    Acknowledgments
+
+\section*{Acknowledgments}
+	I am very thankful to.
+
+    This research made use of \texttt{astropy}, a community-developed core Python package for Astronomy \citep{astropy2013}, in addition to \texttt{Scipy}~\citep{scipy}, \texttt{ipython}~\citep{ipython}, \texttt{jupyter}~notebook~\citep{jupyter}, \texttt{Numpy}~\citep{numpy2011} \& \texttt{SymPy}~\citep{sympy2017}.  All figures were generated using \texttt{matplotlib}~\citep{matplotlib2007}.  Kernel density estimation was performed using the \texttt{kalepy}{} package (\href{https://github.com/lzkelley/kalepy}{github.com/lzkelley/kalepy}) \citep{kalepy2020}.
+
+    The Illustris data is available online at \href{https://www.illustris-project.org/}{www.illustris-project.org} \citep{Nelson+2015}, and Illustris-TNG data at \href{https://www.tng-project.org/}{www.tng-project.org} \citep{Nelson+2019}.
+
+
+% ====    Bibliography
+
+\let\oldUrl\url
+\renewcommand{\url}[1]{\href{#1}{Link}}
+
+\quad{}
+\bibliographystyle{mnras}
+\bibliography{refs}
+
+\onecolumn
+\clearpage
+
+
+% ====    Appendices
+
+\appendix
+
+\section{Additional Equations}
+    \label{sec:app_eqs}
+    A binary is described by its total mass $M$, mass ratio $q \equiv m_2 / m_1$ (s.t.~$q\leq1$), (proper) semi-major axis $a$, and rest-frame orbital frequency $f_r$.  The characteristic gravitational wave mass is the chirp mass, $\mchirp \equiv M \, q^{3/5} \, \lr[-6/5]{1+q}$.
+
+    The GW strain from a circular binary is \citep[][Eq.~7; sky and polarization averaged]{Sesana+2008},
+        \begin{equation}
+        \label{eq:source_strain}
+        h_s = \frac{8}{10^{1/2}} \frac{\left(G\mchirp\right)^{5/3}}{c^4 \, d_L}
+            \left(2 \pi f_r \right)^{2/3},
+        \end{equation}
+    for a luminosity distance $d_L$.  Recall that the luminosity distance and comoving distance are related as $d_L = d_c \, (1+z)$, that the comoving volume of the Universe is given by \citep{Hogg-1999},
+    \begin{equation}
+        \frac{d V_c}{dz} = 4\pi \frac{c}{H_0} \frac{d_c^2}{E(z)},
+    \end{equation}
+    and that redshift can be related to time (or age of the universe) as,
+    \begin{align}
+        \frac{dz}{dt} = H_0 \lr{1+z} E(z).
+    \end{align}
+    The evolution of the Hubble parameter over redshift can be calculated from the matter-energy constituents of the universe as,
+    \begin{align}
+        H(z) & = H_0(z) E(z), \\
+        E(z) & \equiv \lrs[1/2]{\Omega_R \lr[4]{1+z} + \Omega_m \lr[3]{1+z} + \Omega_k \lr[2]{1+z} + \Omega_\Lambda}.
+    \end{align}
+    The $\Omega$ terms are the usual redshift-zero fractions of the critical density for radiation, non-relativistic matter, curvature, and dark energy.  We adopt the results of WMAP9 \citep{Hinshaw+2013} for our fiducial cosmology, assuming zero curvature: $H_0 = 69.33 \textrm{ km/s/Mpc}$, $\Omega_m = 0.2880$, $\Omega_\Lambda = 0.7120$.
+
+\section{Additional Material}
+    \label{sec:app}
+
+    \noindent\begin{minipage}{\linewidth}
+
+        % Fig -
+        % \centering
+        % \includegraphics[width=0.55\columnwidth]{{{figs/doan+2019_jitter}}}
+        % \captionof{figure}{Distribution of velocity-offset variations (`jitters') from \citep{Doan+2019}, for the red and blue components of the observed BLs.  Measurements are shown as ticks at $y=0$, and KDE distributions are shown using a Scott's factor bandwidth, and Gaussian kernel.  The purple curve is the KDE distribution taking both red and blue data as independent.  The KDE $50\%$ (median) and $99\%$ (Gaussian standard deviation $\sigma \approx 2.3$) jitter for each component are shown with dashed vertical lines and corresponding labels.}
+        % \label{fig:jitter_doan2019}
+        %
+        % \setlength{\tabcolsep}{8pt}
+        % \begin{tabular}{p{1.5cm} c c c c c c c}
+        %      & & & $5\%$ & $25\%$ & $50\%$ & $75\%$ & $95\%$ \\ [0.5ex]
+        %     \hline
+        %     \multirow{4}{*}{All}  & \multirow{4}{*}{-}
+        %         & $M \; [M_\odot]$ & $3.4 \times10^{ 6 }$ & $7.2 \times10^{ 6 }$ & $1.8 \times10^{ 7 }$ & $6.0 \times10^{ 7 }$ & $4.1 \times10^{ 8 }$ \\
+        %         & & q & $2.9 \times10^{ -2 }$ & $1.7 \times10^{ -1 }$ & $4.0 \times10^{ -1 }$ & $6.8 \times10^{ -1 }$ & $9.3 \times10^{ -1 }$ \\
+        %         & & z & 0.24 & 0.41 & 0.53 & 0.62 & 0.69 \\
+        %         & & $p \; [\mathrm{yr}]$ & $1.4 \times10^{ 2 }$ & $1.5 \times10^{ 3 }$ & $9.6 \times10^{ 3 }$ & $4.0 \times10^{ 4 }$ & $2.0 \times10^{ 5 }$ \\
+        %         & & $a \; [\mathrm{pc}]$ & $2.1 \times10^{ -2 }$ & $1.3 \times10^{ -1 }$ & $4.9 \times10^{ -1 }$ & $1.3 \times10^{ 0 }$ & $4.1 \times10^{ 0 }$ \\
+        %         & & $a \; [r_g]$ & $1.2 \times10^{ 4 }$ & $1.4 \times10^{ 5 }$ & $4.5 \times10^{ 5 }$ & $1.2 \times10^{ 6 }$ & $4.1 \times10^{ 6 }$ \\
+        %     \hline
+        %     \multirow{4}{1.5cm}{Secondary\newline Offset\newline($\voff$)} & \multirow{4}{*}{$0.49\%$}
+        %         & $M \; [M_\odot]$ & $1.4 \times10^{ 8 }$ & $4.0 \times10^{ 8 }$ & $7.6 \times10^{ 8 }$ & $1.4 \times10^{ 9 }$ & $3.7 \times10^{ 9 }$ \\
+        %         & & q & $9.6 \times10^{ -4 }$ & $4.2 \times10^{ -3 }$ & $1.2 \times10^{ -2 }$ & $3.6 \times10^{ -2 }$ & $1.5 \times10^{ -1 }$ \\
+        %         & & z & 0.25 & 0.42 & 0.54 & 0.63 & 0.69 \\
+        %         & & $p \; [\mathrm{yr}]$ & $8.3 \times10^{ 2 }$ & $1.5 \times10^{ 3 }$ & $2.3 \times10^{ 3 }$ & $3.7 \times10^{ 3 }$ & $9.0 \times10^{ 3 }$ \\
+        %         & & $a \; [\mathrm{pc}]$ & 0.22 & 0.41 & 0.58 & 0.87 & 1.82 \\
+        %         & & $a \; [r_g]$ & $5.0 \times10^{ 3 }$ & $1.1 \times10^{ 4 }$ & $1.8 \times10^{ 4 }$ & $2.9 \times10^{ 4 }$ & $4.9 \times10^{ 4 }$ \\
+        % \end{tabular}
+        % \captionof{table}{\textbf{Parameters of detectable binary systems with redshift $z < 0.7$.}  The indicated quantiles are given for total mass ($M$), mass ratio ($q$), separation ($a$), and orbital period ($p$).  In only four binaries ($2\E{-8}$ of systems) is the primary detectable, and those have parameters: \mbox{$M\approx 2$--$5\E{9} \, \msol$},
+        % \hspace{0.5ex} \mbox{$q \approx 0.7$--$0.9$}, \hspace{0.5ex} \mbox{$z \approx 0.6$--$0.8$}, \hspace{0.5ex} \mbox{$a \approx 2.2$--$2.8 \, \pc$}.}
+        % \label{tab:obs_pars}
+
+    \end{minipage}
+
+\twocolumn
+
+
+\end{document}
