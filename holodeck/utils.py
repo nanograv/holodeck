@@ -551,7 +551,7 @@ def nyquist_freqs(
 
     """
     fmin = 1.0 / dur
-    fmax = 1.0 / cad
+    fmax = 1.0 / cad * 0.5
     # df = fmin / sample
     df = fmin
     freqs = np.arange(fmin, fmax + df/10.0, df)
