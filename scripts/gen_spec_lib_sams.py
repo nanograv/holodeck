@@ -1,8 +1,6 @@
 """
 
-
 mpirun -n 14 --use-hwthread-cpus python ./scripts/gen_spec_lib_sams.py output/test_2022-06-27
-
 
 """
 
@@ -28,23 +26,29 @@ class Parameter_Space:
 
     def __init__(
         self,
-        gsmf_phi0=[-3.35, -2.23, 7],
+        # gsmf_phi0=[-3.35, -2.23, 7],
+        # gsmf_phi0=[-3.61, -1.93, 7],
+        times=[1e-2, 10.0, 7],   # [Gyr]
         # gsmf_alpha0=[-1.56, -0.92, 5],
-        mmb_amp=[0.39e9, 0.61e9, 11], mmb_plaw=[1.01, 1.33, 13]
+        # mmb_amp=[0.39e9, 0.61e9, 9], mmb_plaw=[1.01, 1.33, 11]
+        mmb_amp=[0.1e9, 1.0e9, 9], mmb_plaw=[0.8, 1.5, 11]
     ):
 
-        self.gsmf_phi0 = np.linspace(*gsmf_phi0)
+        # self.gsmf_phi0 = np.linspace(*gsmf_phi0)
+        self.times = np.logspace(*np.log10(times[:2]), times[2])
         # self.gsmf_alpha0 = np.linspace(*gsmf_alpha0)
         self.mmb_amp = np.linspace(*mmb_amp)
         self.mmb_plaw = np.linspace(*mmb_plaw)
         pars = [
-            self.gsmf_phi0,
+            self.times,   # [Gyr]
+            # self.gsmf_phi0,
             # self.gsmf_alpha0,
             self.mmb_amp,
             self.mmb_plaw
         ]
         self.names = [
-            'gsmf_phi0',
+            'times',
+            # 'gsmf_phi0',
             # 'gsmf_alpha0',
             'mmb_amp',
             'mmb_plaw'
@@ -78,15 +82,17 @@ class Parameter_Space:
     def sam_for_number(self, num):
         params = self.params_for_number(num)
 
-        gsmf_phi0, mmb_amp, mmb_plaw = params
+        # gsmf_phi0, mmb_amp, mmb_plaw = params
+        time, mmb_amp, mmb_plaw = params
 
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gsmf = holo.sam.GSMF_Schechter()
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
         mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp*MSOL, mplaw=mmb_plaw)
 
         sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge)
-        return sam
+        hard = holo.evolution.Fixed_Time.from_sam(sam, time*GYR, exact=True, progress=False)
+        return sam, hard
 
 
 comm = MPI.COMM_WORLD
@@ -126,7 +132,7 @@ parser.add_argument('-v', '--verbose', action='store_true', default=False, dest=
 # parser.add_argument('--version', action='version', version='%(prog)s 1.0')
 
 args = parser.parse_args()
-args.NUM_REALS = 30
+args.NUM_REALS = 100
 args.PTA_DUR = 15.0 * YR
 args.PTA_CAD = 0.1 * YR
 
@@ -157,7 +163,8 @@ comm.barrier()
 
 fname = f"{PATH_OUTPUT.joinpath(log_name)}.log"
 log_lvl = holo.logger.INFO if args.verbose else holo.logger.WARNING
-tostr = sys.stdout if comm.rank == 0 else None
+tostr = sys.stdout if comm.rank == 0 else False
+# LOG = holo.logger.get_logger(name=log_name, level_stream=log_lvl, tofile=fname, tostr=tostr)
 LOG = holo.logger.get_logger(name=log_name, level_stream=log_lvl, tofile=fname, tostr=tostr)
 LOG.info(head)
 LOG.info(f"Output path: {PATH_OUTPUT}")
@@ -268,21 +275,24 @@ def run_sam(pnum, real, path_output):
 #     if comm.rank == 0:
 #         iterator = holo.utils.tqdm(iterator, leave=False)
 
-    
     fname = f"lib_sams__p{pnum:06d}.npz"
     fname = os.path.join(path_output, fname)
     if os.path.exists(fname):
         LOG.warning(f"File {fname} already exists.")
 
-    fobs = holo.utils.nyquist_freqs(args.PTA_DUR, args.PTA_CAD)
+    _fobs = holo.utils.nyquist_freqs(args.PTA_DUR, args.PTA_CAD)
 
-    sam = SPACE.sam_for_number(pnum)
+    df = _fobs[0]/2
+    fobs_edges = _fobs - df
+    fobs_edges = np.concatenate([fobs_edges, [_fobs[-1] + df]])
+
+    sam, hard = SPACE.sam_for_number(pnum)
 #         hard = holo.evolution.Hard_GW()
 #         vals, weights, edges, dens, mass = holo.sam.sample_sam_with_hardening(sam, hard, fobs=fobs, sample_threshold=1e2, poisson_inside=True, poisson_outside=True)
 #         gff, gwf, gwb = holo.gravwaves._gws_from_samples(vals, weights, fobs)
-    gwbspec = sam.gwb(fobs, realize=args.NUM_REALS)
+    gwbspec = sam.gwb(fobs_edges, realize=args.NUM_REALS, hard=hard)
     legend = SPACE.param_dict_for_number(pnum)
-    np.savez(fname, fobs=fobs, gwbspec=gwbspec, pnum=pnum, nreals=args.NUM_REALS, **legend)
+    np.savez(fname, fobs=_fobs, fobs_edges=fobs_edges, gwbspec=gwbspec, pnum=pnum, nreals=args.NUM_REALS, **legend)
     LOG.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
 
     return
