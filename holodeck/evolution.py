@@ -239,9 +239,9 @@ class Evolution:
 
         # ---- Get hardening rates for each hardening model
         for ii, hard in enumerate(self._hard):
-            print("hard =", hard)
+            # print("hard =", hard)
             _ar, _er = hard.dadt_dedt(self, right)
-            print("_ar = ", _ar)
+            # print("_ar = ", _ar)
             if debug:
                 log.debug(f"hard={hard} : dadt = {utils.stats(_ar)}")
                 # Store individual hardening rates
@@ -249,9 +249,9 @@ class Evolution:
                 # Raise error on invalid entries
                 if not np.all(np.isfinite(_ar)) or np.any(_ar > 0.0):
                     ind_zero = _ar > 0.0
-                    print("dadt greater than zero: ", _ar[ind_zero])
+                    #print("dadt greater than zero: ", _ar[ind_zero])
                     ind_infinite = ~np.isfinite(_ar)
-                    print("dadt not finite: ", _ar[ind_infinite])
+                    #print("dadt not finite: ", _ar[ind_infinite])
                     utils.error(f"invalid `dadt` for hard={hard}!")
 
             dadt_r[:] += _ar
@@ -1481,11 +1481,12 @@ def _radius_loss_cone_bbr80_dehnen(mbh, mstar, gamma=1.0):
     rlc = np.power(mass_of_a_star / mbh, 0.25) * np.power(rbnd/rstar, 2.25) * rstar
     if np.isnan(rlc).any():
         ind_nans = np.isnan(rlc)
-        print("rbnd[ind_nans]", rbnd[ind_nans])
-        print("rstar[ind_nans]", rstar[ind_nans])
-        print("mbh[ind_nans]", mbh[ind_nans])
-        print("np.power(mass_of_a_star / mbh, 0.25)[ind_nans]",np.power(mass_of_a_star / mbh, 0.25)[ind_nans])
-        print("np.power(rbnd/rstar, 2.25)[ind_nans]", np.power(rbnd/rstar, 2.25)[ind_nans])
-        print("rlc[ind_nans]", rlc[ind_nans])
-        exit()
+        # print("rbnd[ind_nans]", rbnd[ind_nans])
+        # print("rstar[ind_nans]", rstar[ind_nans])
+        # print("mbh[ind_nans]", mbh[ind_nans])
+        # print("np.power(mass_of_a_star / mbh, 0.25)[ind_nans]",np.power(mass_of_a_star / mbh, 0.25)[ind_nans])
+        # print("np.power(rbnd/rstar, 2.25)[ind_nans]", np.power(rbnd/rstar, 2.25)[ind_nans])
+        # print("rlc[ind_nans]", rlc[ind_nans])
+        # import sys
+        # sys.exit()
     return rlc
