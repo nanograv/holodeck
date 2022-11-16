@@ -1579,11 +1579,14 @@ class Fixed_Time(_Hardening):
 
     """
 
-    _INTERP_NUM_POINTS = 1e4             #: number of random data points used to construct interpolant
+    # _INTERP_NUM_POINTS = 1e4             #: number of random data points used to construct interpolant
+    _INTERP_NUM_POINTS = 1e4
     _INTERP_THRESH_PAD_FACTOR = 5.0      #: allowance for when to use chunking and when to process full array
     _TIME_TOTAL_RMIN = 1.0e-5 * PC       #: minimum radius [cm] used to calculate inspiral time
+    _NORM_CHUNK_SIZE = 1e3
 
-    def __init__(self, time, mtot, mrat, redz, sepa, rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5, progress=True):
+    def __init__(self, time, mtot, mrat, redz, sepa,
+                 rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5, progress=True, exact=False):
         """Initialize `Fixed_Time` instance for the given binary properties and function parameters.
 
         Parameters
@@ -1599,7 +1602,8 @@ class Fixed_Time(_Hardening):
         mrat : array_like
             Binary mass-ratio $q \equiv m_2 / m_1 \leq 1$.
         redz : array_like
-            Redshift.
+            Binary Redshift.
+            NOTE: this is only used as an argument to callable `rchar` and `time` values.
         sepa : array_like
             Binary semi-major axis (separation) [cm].
         rchar : scalar  or  callable
@@ -1633,6 +1637,7 @@ class Fixed_Time(_Hardening):
         # FIX/BUG: either an ndarray could be allowed when interpolation is not needed (i.e. small numbers of systems)
         #      or `rchar` could be added as an explicit interpolation variable
         if callable(rchar):
+            log.warning("!!It looks like you're using a callable `rchar`, this probably doesn't work!!")
             rchar = rchar(mtot, mrat, redz)
         elif not np.isscalar(rchar):
             err = "`rchar` must be a scalar or callable: (`rchar(mtot, mrat)`)!"
@@ -1647,7 +1652,9 @@ class Fixed_Time(_Hardening):
             raise ValueError(err)
 
         # If there are lots of points, construct and use an interpolant
-        if len(mtot) > self._INTERP_THRESH_PAD_FACTOR * self._INTERP_NUM_POINTS:
+        lots_of_points = self._INTERP_THRESH_PAD_FACTOR * self._INTERP_NUM_POINTS
+        log.debug(f"size={len(mtot)} vs. limit={lots_of_points}; `exact`={exact}")
+        if (len(mtot) > lots_of_points) and (not exact):
             log.info("constructing hardening normalization interpolant")
             # both are callable as `interp(args)`, with `args` shaped (N, 4),
             # the 4 parameters are:      [log10(M/MSOL), log10(q), time/Gyr, log10(Rmax/PC)]
@@ -1677,6 +1684,7 @@ class Fixed_Time(_Hardening):
 
         # For small numbers of points, calculate the normalization directly
         else:
+            log.info("calculating normalization exactly")
             norm = self._get_norm_chunk(time, mtot, mrat, rchar, gamma_sc, gamma_df, sepa, progress=progress)
 
         self._gamma_sc = gamma_sc
@@ -1714,7 +1722,7 @@ class Fixed_Time(_Hardening):
 
     @classmethod
     def from_sam(cls, sam, time, sepa_init=1e4*PC, **kwargs):
-        """Initialize a `Fixed_Time` instance using a provided `_Discrete_Population` instance.
+        """Initialize a `Fixed_Time` instance using a provided `Semi_Analytic_Model` instance.
 
         Parameters
         ----------
@@ -1895,26 +1903,43 @@ class Fixed_Time(_Hardening):
 
         """
 
-        # ---- Initialization
-        # Define the range of parameters to be explored
-        mt = [1e5, 1e11]   #: total mass [Msol]
-        mr = [1e-5, 1.0]   #: mass ratio
-        # td = [0.0, 20.0]   #: lifetime [Gyr]    LINEAR
-        td = [1e-3, 20.0]   #: lifetime [Gyr]        LOG
-        rm = [1e3, 1e5]    #: radius maximum (initial separation) [pc]
+        def get_norm_for_random_points(num_points):
+            num = int(num_points)
 
-        # Choose random test binary parameters
+            # ---- Initialization
+            # Define the range of parameters to be explored
+            mt = [1e5, 1e11]   #: total mass [Msol]
+            mr = [1e-5, 1.0]   #: mass ratio
+            # td = [0.0, 20.0]   #: lifetime [Gyr]    LINEAR
+            td = [1e-3, 20.0]   #: lifetime [Gyr]        LOG
+            rm = [1e3, 1e5]    #: radius maximum (initial separation) [pc]
+
+            # Choose random test binary parameters
+            mt = 10.0 ** np.random.uniform(*np.log10(mt), num) * MSOL
+            mr = 10.0 ** np.random.uniform(*np.log10(mr), num)
+            td = np.random.uniform(*td, num+1)[1:] * GYR
+            # td = 10.0 ** np.random.uniform(*np.log10(td), num) * GYR
+            rm = 10.0 ** np.random.uniform(*np.log10(rm), num) * PC
+
+            # ---- Get normalization for these parameters
+            norm = cls._get_norm_chunk(td, mt, mr, rchar, gamma_sc, gamma_df, rm)
+
+            points = [mt, mr, td, rm]
+
+            return norm, points
+
+        def convert_points_to_interp_vals(points):
+            units = [MSOL, 1.0, GYR, PC]
+            logs = [True, True, False, True]   #: which parameters to interpolate in log-space
+            # logs = [True, True, True, True]   #: which parameters to interpolate in log-space
+            vals = [pp/uu for pp, uu in zip(points, units)]
+            vals = [np.log10(pp) if ll else pp for pp, ll in zip(vals, logs)]
+            vals = np.array(vals).T
+            return vals
+
         num_points = int(cls._INTERP_NUM_POINTS)
-        mt = 10.0 ** np.random.uniform(*np.log10(mt), num_points) * MSOL
-        mr = 10.0 ** np.random.uniform(*np.log10(mr), mt.size)
-        # td = np.random.uniform(*td, mt.size+1)[1:] * GYR
-        td = 10.0 ** np.random.uniform(*np.log10(td), mt.size) * GYR
-        print(f"{utils.stats(td/GYR)=}")
-        rm = 10.0 ** np.random.uniform(*np.log10(rm), mt.size) * PC
-
-        # ---- Get normalization for these parameters
-        norm = cls._get_norm_chunk(td, mt, mr, rchar, gamma_sc, gamma_df, rm)
-        print(f"{utils.stats(norm)=}")
+        norm, points = get_norm_for_random_points(num_points)
+        vals = convert_points_to_interp_vals(points)
 
         # Make sure results are valid
         valid = np.isfinite(norm) & (norm > 0.0)
@@ -1924,20 +1949,31 @@ class Fixed_Time(_Hardening):
             raise ValueError(err)
 
         # ---- Construct interpolants
-        points = [mt, mr, td, rm]
-        units = [MSOL, 1.0, GYR, PC]
-        # logs = [True, True, False, True]   #: which parameters to interpolate in log-space
-        logs = [True, True, True, True]   #: which parameters to interpolate in log-space
-        points = [pp/uu for pp, uu in zip(points, units)]
-        points = [np.log10(pp) if ll else pp for pp, ll in zip(points, logs)]
-        points = np.array(points).T
+
         # construct both a linear (1th order) and nearest (0th order) interpolant
-        interp = sp.interpolate.LinearNDInterpolator(points, np.log10(norm))
-        backup = sp.interpolate.NearestNDInterpolator(points, np.log10(norm))
+        interp = sp.interpolate.LinearNDInterpolator(vals, np.log10(norm))
+        backup = sp.interpolate.NearestNDInterpolator(vals, np.log10(norm))
+
+        '''
+        check_norm, check_points = get_norm_for_random_points(100)
+        check_vals = convert_points_to_interp_vals(check_points)
+        interp_norm = 10.0 ** interp(check_vals)
+        backup_norm = 10.0 ** backup(check_vals)
+        error_interp = (interp_norm - check_norm) / check_norm
+        error_backup = (backup_norm - check_norm) / check_norm
+
+        print("\n")
+        print(f"{utils.stats(check_norm)=}")
+        print(f"{utils.stats(interp_norm)=}")
+        print(f"{utils.stats(backup_norm)=}")
+        print(f"{utils.stats(error_interp)=}")
+        print(f"{utils.stats(error_backup)=}")
+        '''
+
         return interp, backup
 
     @classmethod
-    def _get_norm_chunk(cls, target_time, *args, chunk=1e3, progress=True, **kwargs):
+    def _get_norm_chunk(cls, target_time, *args, progress=True, **kwargs):
         """Calculate normalizations in 'chunks' of the input arrays, to obtain the target lifetime.
 
         Calculates normalizations for groups of parameters of size `chunk` at a time.  Loops over
@@ -1966,13 +2002,13 @@ class Fixed_Time(_Hardening):
             The normalizations required to produce the target lifetimes given by `target_time`.
 
         """
-        if np.ndim(target_time) != 1:
+        if np.ndim(target_time) not in [0, 1]:
             raise
 
-        chunk = int(chunk)
+        chunk_size = int(cls._NORM_CHUNK_SIZE)
         size = np.size(target_time)
         # if number of array elements is less than (or comparable to) chunk size, to it all in one pass
-        if size <= chunk * cls._INTERP_THRESH_PAD_FACTOR:
+        if size <= chunk_size * cls._INTERP_THRESH_PAD_FACTOR:
             return cls._get_norm(target_time, *args, **kwargs)
 
         # broadcast arrays to all be the same shape (some `floats` are passed in)
@@ -1980,13 +2016,13 @@ class Fixed_Time(_Hardening):
         target_time, *args = np.broadcast_arrays(*args)
 
         # iterate over each chunk, storing the normalization values
-        num = int(np.ceil(size / chunk))
+        num = int(np.ceil(size / chunk_size))
         norm = np.zeros_like(target_time)
         step_iter = range(num)
         step_iter = utils.tqdm(step_iter, desc='calculating hardening normalization') if progress else step_iter
         for ii in step_iter:
-            lo = ii * chunk
-            hi = np.minimum((ii + 1) * chunk, size)
+            lo = ii * chunk_size
+            hi = np.minimum((ii + 1) * chunk_size, size)
             cut = slice(lo, hi)
             # calculate normalizations for this chunk
             norm[cut] = cls._get_norm(target_time[cut], *[aa[cut] for aa in args], **kwargs)
@@ -2037,7 +2073,7 @@ class Fixed_Time(_Hardening):
         return norm
 
     @classmethod
-    def _time_total(cls, norm, mt, mr, rchar, g1, g2, rmax, num=100):
+    def _time_total(cls, norm, mt, mr, rchar, gamma_sc, gamma_df, rmax, num=100):
         """For the given parameters, integrate the binary evolution to find total lifetime.
 
         Parameters
@@ -2051,10 +2087,10 @@ class Fixed_Time(_Hardening):
         rchar : float  or  array_like
             Characteristic transition radius between the two power-law indices of the hardening
             rate model, units of [cm].
-        g1 : float  or  array_like
+        gamma_sc : float  or  array_like
             Power-law of hardening timescale in the stellar-scattering regime,
             (small separations: r < rchar).
-        g2 : float  or  array_like
+        gamma_df : float  or  array_like
             Power-law of hardening timescale in the dynamical-friction regime,
             (large separations: r > rchar).
         rmax : float  or  array_like
@@ -2071,9 +2107,9 @@ class Fixed_Time(_Hardening):
 
         # Convert input values to broadcastable np.ndarray's
         norm = np.atleast_1d(norm)
-        args = [norm, mt, mr, rchar, g1, g2, rmax, cls._TIME_TOTAL_RMIN]
+        args = [norm, mt, mr, rchar, gamma_sc, gamma_df, rmax, cls._TIME_TOTAL_RMIN]
         args = np.broadcast_arrays(*args)
-        norm, mt, mr, rchar, g1, g2, rmax, rmin = args
+        norm, mt, mr, rchar, gamma_sc, gamma_df, rmax, rmin = args
 
         # define separations (radii) for each binary's evolution
         rextr = np.log10([rmin, rmax]).T
@@ -2083,12 +2119,12 @@ class Fixed_Time(_Hardening):
         rads = 10.0 ** rads
 
         # Make hardening parameters broadcastable
-        args = [norm, mt, mr, rchar, g1, g2]
+        args = [norm, mt, mr, rchar, gamma_sc, gamma_df]
         args = [aa[:, np.newaxis] for aa in args]
-        norm, mt, mr, rchar, g1, g2 = args
+        norm, mt, mr, rchar, gamma_sc, gamma_df = args
 
         # Calculate hardening rates along full evolutionary history
-        dadt, _ = cls._dadt_dedt(mt, mr, rads, norm, rchar, g1, g2)
+        dadt, _ = cls._dadt_dedt(mt, mr, rads, norm, rchar, gamma_sc, gamma_df)
 
         # Integrate (inverse) hardening rates to calculate total lifetime
         tt = utils.trapz_loglog(- 1.0 / dadt, rads, axis=-1)
