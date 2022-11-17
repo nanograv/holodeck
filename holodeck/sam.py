@@ -550,6 +550,8 @@ class Semi_Analytic_Model:
     def dynamic_binary_number(self, hard, fobs=None, sepa=None, limit_merger_time=None):
         """Calculate the differential number of binaries (per bin-volume, per log-freq interval).
 
+        d^3 n / dlog10(M) dq dz ===> d^4 N / [dlog10(M) dq dz dln(f)
+
         The value returned is `d^4 N / [dlog10(M) dq dz dln(X)]`, where X is either:
         *   separation (a) ::  if  `sepa` is passed in, or
         *   observer-frame orbital-frequency (f_r) :: if `fobs` is passed in.
@@ -689,6 +691,8 @@ class Semi_Analytic_Model:
         ----------
         fobs : (F,) array_like of scalar,
             Observer-frame GW-frequencies. [1/sec]
+            These are the frequency bin edges, which are integrated across to get the number of binaries in each
+            frequency bin.
         hard : holodeck.evolution._Hardening class or instance
             Hardening mechanism to apply over the range of `fobs`.
         realize : bool or int,
@@ -715,7 +719,7 @@ class Semi_Analytic_Model:
         # ---- Get the differential-number of binaries for each bin
         # convert to orbital-frequency (from GW-frequency)
         fobs_orb = fobs_gw / 2.0
-        # this is  ``d^4 n / [dlog10(M) dq dz dln(f_r)]``
+        # `dnum` is  ``d^4 n / [dlog10(M) dq dz dln(f_r)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
         edges, dnum = self.dynamic_binary_number(hard, fobs=fobs_orb)
 
