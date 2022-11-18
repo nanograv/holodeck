@@ -1,8 +1,6 @@
 """
 
-
-mpirun -n 14 --use-hwthread-cpus python ./scripts/gen_lib_sams.py output/test_2022-06-27
-
+mpirun -n 14 python ./scripts/gen_lib_sams.py output/test_2022-06-27
 
 """
 
