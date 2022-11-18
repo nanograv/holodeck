@@ -1,6 +1,6 @@
 """
 
-mpirun -n 14 python ./scripts/gen_spec_lib_sams.py output/test_2022-06-27
+mpirun -n 14  python ./scripts/gen_spec_lib_sams.py output/test_2022-06-27
 
 """
 
@@ -21,41 +21,59 @@ import holodeck.sam
 import holodeck.logger
 from holodeck.constants import YR, MSOL, GYR  # noqa
 
+from scipy.stats import qmc
+import pyDOE
 
 class Parameter_Space:
 
     def __init__(
         self,
-        # gsmf_phi0=[-3.35, -2.23, 7],
+        #gsmf_phi0=[-3.35, -2.23, 7],
         # gsmf_phi0=[-3.61, -1.93, 7],
         times=[1e-2, 10.0, 7],   # [Gyr]
         # gsmf_alpha0=[-1.56, -0.92, 5],
         # mmb_amp=[0.39e9, 0.61e9, 9], mmb_plaw=[1.01, 1.33, 11]
-        mmb_amp=[0.1e9, 1.0e9, 9], mmb_plaw=[0.8, 1.5, 11]
+        mmb_amp=[0.1e9, 1.0e9, 9], mmb_plaw=[0.8, 1.5, 11],
+        nsamples=25
     ):
 
-        # self.gsmf_phi0 = np.linspace(*gsmf_phi0)
+        #self.gsmf_phi0 = np.linspace(*gsmf_phi0)
         self.times = np.logspace(*np.log10(times[:2]), times[2])
         # self.gsmf_alpha0 = np.linspace(*gsmf_alpha0)
         self.mmb_amp = np.linspace(*mmb_amp)
         self.mmb_plaw = np.linspace(*mmb_plaw)
         pars = [
             self.times,   # [Gyr]
-            # self.gsmf_phi0,
+            #self.gsmf_phi0,
             # self.gsmf_alpha0,
             self.mmb_amp,
             self.mmb_plaw
         ]
         self.names = [
             'times',
-            # 'gsmf_phi0',
+            #'gsmf_phi0',
             # 'gsmf_alpha0',
             'mmb_amp',
             'mmb_plaw'
         ]
+        self.paramdimen = len(pars)
+        maxints = [tmparr.size for tmparr in pars]
+        if False: # do scipy LHS
+            LHS = qmc.LatinHypercube(d=self.paramdimen, centered=False, strength=1)
+            # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
+            sampleindxs = LHS.random(n=nsamples)
+        else: # do pyDOE LHS
+            sampleindxs = pyDOE.lhs(n=self.paramdimen, samples=nsamples, criterion='m')
+        for i in range(self.paramdimen):
+            sampleindxs[:, i] = np.floor(maxints[i] * sampleindxs[:, i])
+        sampleindxs = sampleindxs.astype(int)
+        LOG.debug(f"d={len(pars)} samplelims={maxints} {nsamples=}")
+        self.sampleindxs = sampleindxs
         self.params = np.meshgrid(*pars, indexing='ij')
         self.shape = self.params[0].shape
         self.size = np.product(self.shape)
+        if self.size < nsamples:
+            LOG.warning(f"There are only {self.size} gridpoints in parameter space but you are requesting {nsamples} samples of them. They will be over-sampled")
         self.params = np.moveaxis(self.params, 0, -1)
 
         pass
@@ -63,7 +81,11 @@ class Parameter_Space:
     def number_to_index(self, num):
         idx = np.unravel_index(num, self.shape)
         return idx
-
+        
+    def lhsnumber_to_index(self, lhsnum):
+        idx = tuple(self.sampleindxs[lhsnum])
+        return idx
+        
     def index_to_number(self, idx):
         num = np.ravel_multi_index(idx, self.shape)
         return num
@@ -73,9 +95,20 @@ class Parameter_Space:
         pars = self.params[idx]
         rv = {nn: pp for nn, pp in zip(self.names, pars)}
         return rv
-
+        
+    def param_dict_for_lhsnumber(self, lhsnum):
+        idx = self.lhsnumber_to_index(lhsnum)
+        pars = self.params[idx]
+        rv = {nn: pp for nn, pp in zip(self.names, pars)}
+        return rv
+        
     def params_for_number(self, num):
         idx = self.number_to_index(num)
+        pars = self.params[idx]
+        return pars
+
+    def params_for_lhsnumber(self, lhsnum):
+        idx = self.lhsnumber_to_index(lhsnum)
         pars = self.params[idx]
         return pars
 
@@ -85,7 +118,7 @@ class Parameter_Space:
         # gsmf_phi0, mmb_amp, mmb_plaw = params
         time, mmb_amp, mmb_plaw = params
 
-        gsmf = holo.sam.GSMF_Schechter()
+        gsmf = holo.sam.GSMF_Schechter() #phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
         mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp*MSOL, mplaw=mmb_plaw)
@@ -94,6 +127,21 @@ class Parameter_Space:
         hard = holo.evolution.Fixed_Time.from_sam(sam, time*GYR, exact=True, progress=False)
         return sam, hard
 
+    def sam_for_lhsnumber(self, lhsnum):
+        params = self.params_for_lhsnumber(lhsnum)
+
+        # gsmf_phi0, mmb_amp, mmb_plaw = params
+        time, mmb_amp, mmb_plaw = params
+
+        gsmf = holo.sam.GSMF_Schechter() #phi0=gsmf_phi0)
+        gpf = holo.sam.GPF_Power_Law()
+        gmt = holo.sam.GMT_Power_Law()
+        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp*MSOL, mplaw=mmb_plaw)
+
+        sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge)
+        hard = holo.evolution.Fixed_Time.from_sam(sam, time*GYR, exact=True, progress=False)
+        return sam, hard        
+        
 
 comm = MPI.COMM_WORLD
 
@@ -114,7 +162,7 @@ BEG = datetime.now()
 parser = argparse.ArgumentParser()
 parser.add_argument('output', metavar='output', type=str,
                     help='output path [created if doesnt exist]')
-
+parser.add_argument('-n', '--nsamples', action='store', dest='nsamples', type=int, help='number of realizations, must be square of prime', default=25)
 # parser.add_argument('-r', '--reals', action='store', dest='reals', type=int,
 #                     help='number of realizations', default=10)
 # parser.add_argument('-s', '--shape', action='store', dest='shape', type=int,
@@ -127,6 +175,8 @@ parser.add_argument('output', metavar='output', type=str,
 #                     help='PTA observing cadence [yrs]', default=0.1)
 # parser.add_argument('-d', '--debug', action='store_true', default=False, dest='debug',
 #                     help='run in DEBUG mode')
+parser.add_argument('-t', '--test', action='store_true', default=False, dest='test',
+                    help='Do not actually run, just output what parameters would have been done.')
 parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
                     help='verbose output [INFO]')
 # parser.add_argument('--version', action='version', version='%(prog)s 1.0')
@@ -170,7 +220,7 @@ LOG.info(head)
 LOG.info(f"Output path: {PATH_OUTPUT}")
 LOG.info(f"        log: {fname}")
 
-SPACE = Parameter_Space() if comm.rank == 0 else None
+SPACE = Parameter_Space(nsamples=args.nsamples) if comm.rank == 0 else None
 SPACE = comm.bcast(SPACE, root=0)
 
 # ------------------------------------------------------------------------------
@@ -181,7 +231,8 @@ SPACE = comm.bcast(SPACE, root=0)
 def main():
     bnum = 0
     LOG.info(f"{SPACE=}, {id(SPACE)=}")
-    npars = SPACE.size
+    #npars = SPACE.size
+    npars = args.nsamples
     nreals = args.NUM_REALS
 
     # # -- Load Parameters from Input File
@@ -226,12 +277,14 @@ def main():
     bnum = _barrier(bnum)
     # prog_flag = (comm.rank == 0)
     iterator = holo.utils.tqdm(indices) if comm.rank == 0 else np.atleast_1d(indices)
+    if args.test:
+        LOG.info("Running in testing mode. Outputting parameters:")
 
     for ind in iterator:
         # Convert from 1D index into 2D (param, real) specification
         # param, real = np.unravel_index(ind, (npars, nreals))
         # LOG.info(f"rank:{comm.rank} index:{ind} => {param=} {real=}")
-        param = ind
+        lhsparam = ind
 
         # # - Check if all output files already exist, if so skip
         # key = pipeline(progress=prog_flag, key_only=True, **pars)
@@ -245,17 +298,19 @@ def main():
         # if np.all([os.path.exists(fn) and (os.path.getsize(fn) > 0) for fn in fnames]):
         #     print(f"\tkey: '{key}' already complete")
         #     continue
-
-        try:
-            run_sam(param, None, PATH_OUTPUT)
-        except Exception as err:
-            logging.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{ind}")
-            logging.warning(err)
-            LOG.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{ind}")
-            LOG.warning(err)
-            import traceback
-            traceback.print_exc()
-            print("x\n\n")
+        if args.test:
+            LOG.info(f"{comm.rank=} {ind=} {SPACE.param_dict_for_lhsnumber(lhsparam)}")
+        else:
+            try:
+    	        run_sam(lhsparam, None, PATH_OUTPUT)
+            except Exception as err:
+                logging.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{ind}")
+                logging.warning(err)
+                LOG.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{ind}")
+                LOG.warning(err)
+                import traceback
+                traceback.print_exc()
+                print("\n\n")
 
     end = datetime.now()
     print(f"\t{comm.rank} done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}")
@@ -280,22 +335,19 @@ def run_sam(pnum, real, path_output):
     if os.path.exists(fname):
         LOG.warning(f"File {fname} already exists.")
 
-#    _fobs = holo.utils.nyquist_freqs(args.PTA_DUR, args.PTA_CAD)
-#
-#    df = _fobs[0]/2
-#    fobs_edges = _fobs - df
-#    fobs_edges = np.concatenate([fobs_edges, [_fobs[-1] + df]])
-    fobs_centers=holo.utils.nyquist_freqs(args.PTA_DUR, args.PTA_CAD)
-    fobs_edges=holo.utils.nyquist_freqs_edges(args.PTA_DUR, args.PTA_CAD)
+    _fobs = holo.utils.nyquist_freqs(args.PTA_DUR, args.PTA_CAD)
 
-    sam, hard = SPACE.sam_for_number(pnum)
+    df = _fobs[0]/2
+    fobs_edges = _fobs - df
+    fobs_edges = np.concatenate([fobs_edges, [_fobs[-1] + df]])
+
+    sam, hard = SPACE.sam_for_lhsnumber(pnum)
 #         hard = holo.evolution.Hard_GW()
 #         vals, weights, edges, dens, mass = holo.sam.sample_sam_with_hardening(sam, hard, fobs=fobs, sample_threshold=1e2, poisson_inside=True, poisson_outside=True)
 #         gff, gwf, gwb = holo.gravwaves._gws_from_samples(vals, weights, fobs)
     gwbspec = sam.gwb(fobs_edges, realize=args.NUM_REALS, hard=hard)
-    legend = SPACE.param_dict_for_number(pnum)
-#    np.savez(fname, fobs=_fobs, fobs_edges=fobs_edges, gwbspec=gwbspec, pnum=pnum, nreals=args.NUM_REALS, **legend)
-    np.savez(fname, fobs=fobs_centers, fobs_edges=fobs_edges, gwbspec=gwbspec, pnum=pnum, nreals=args.NUM_REALS, **legend)
+    legend = SPACE.param_dict_for_lhsnumber(pnum)
+    np.savez(fname, fobs=_fobs, fobs_edges=fobs_edges, gwbspec=gwbspec, pnum=pnum, nreals=args.NUM_REALS, **legend)
     LOG.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
 
     return
