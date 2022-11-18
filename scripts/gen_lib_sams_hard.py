@@ -280,11 +280,13 @@ def run_sam(pnum, real, path_output):
     if os.path.exists(fname):
         LOG.warning(f"File {fname} already exists.")
 
-    _fobs = holo.utils.nyquist_freqs(args.PTA_DUR, args.PTA_CAD)
-
-    df = _fobs[0]/2
-    fobs_edges = _fobs - df
-    fobs_edges = np.concatenate([fobs_edges, [_fobs[-1] + df]])
+#    _fobs = holo.utils.nyquist_freqs(args.PTA_DUR, args.PTA_CAD)
+#
+#    df = _fobs[0]/2
+#    fobs_edges = _fobs - df
+#    fobs_edges = np.concatenate([fobs_edges, [_fobs[-1] + df]])
+    fobs_centers=holo.utils.nyquist_freqs(args.PTA_DUR, args.PTA_CAD)
+    fobs_edges=holo.utils.nyquist_freqs_edges(args.PTA_DUR, args.PTA_CAD)
 
     sam, hard = SPACE.sam_for_number(pnum)
 #         hard = holo.evolution.Hard_GW()
@@ -292,7 +294,8 @@ def run_sam(pnum, real, path_output):
 #         gff, gwf, gwb = holo.gravwaves._gws_from_samples(vals, weights, fobs)
     gwbspec = sam.gwb(fobs_edges, realize=args.NUM_REALS, hard=hard)
     legend = SPACE.param_dict_for_number(pnum)
-    np.savez(fname, fobs=_fobs, fobs_edges=fobs_edges, gwbspec=gwbspec, pnum=pnum, nreals=args.NUM_REALS, **legend)
+#    np.savez(fname, fobs=_fobs, fobs_edges=fobs_edges, gwbspec=gwbspec, pnum=pnum, nreals=args.NUM_REALS, **legend)
+    np.savez(fname, fobs=fobs_centers, fobs_edges=fobs_edges, gwbspec=gwbspec, pnum=pnum, nreals=args.NUM_REALS, **legend)
     LOG.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
 
     return
