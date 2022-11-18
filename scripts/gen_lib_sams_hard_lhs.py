@@ -22,12 +22,13 @@ import holodeck.logger
 from holodeck.constants import YR, MSOL, GYR  # noqa
 
 from scipy.stats import qmc
+import pyDOE
 
 class Parameter_Space:
 
     def __init__(
         self,
-        gsmf_phi0=[-3.35, -2.23, 7],
+        #gsmf_phi0=[-3.35, -2.23, 7],
         # gsmf_phi0=[-3.61, -1.93, 7],
         times=[1e-2, 10.0, 7],   # [Gyr]
         # gsmf_alpha0=[-1.56, -0.92, 5],
@@ -36,34 +37,42 @@ class Parameter_Space:
         nsamples=25
     ):
 
-        self.gsmf_phi0 = np.linspace(*gsmf_phi0)
+        #self.gsmf_phi0 = np.linspace(*gsmf_phi0)
         self.times = np.logspace(*np.log10(times[:2]), times[2])
         # self.gsmf_alpha0 = np.linspace(*gsmf_alpha0)
         self.mmb_amp = np.linspace(*mmb_amp)
         self.mmb_plaw = np.linspace(*mmb_plaw)
         pars = [
             self.times,   # [Gyr]
-            self.gsmf_phi0,
+            #self.gsmf_phi0,
             # self.gsmf_alpha0,
             self.mmb_amp,
             self.mmb_plaw
         ]
         self.names = [
             'times',
-            'gsmf_phi0',
+            #'gsmf_phi0',
             # 'gsmf_alpha0',
             'mmb_amp',
             'mmb_plaw'
         ]
-        LHS = qmc.LatinHypercube(d=len(pars), centered=True, strength=2)
-        # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
-        sampleindxs = LHS.integers([tmparr.size for tmparr in pars], n=nsamples)
-        LOG.debug(f"d={len(pars)} samplelims={[tmparr.size for tmparr in pars]} {nsamples=}")
+        self.paramdimen = len(pars)
+        maxints = [tmparr.size for tmparr in pars]
+        if False: # do scipy LHS
+            LHS = qmc.LatinHypercube(d=self.paramdimen, centered=False, strength=1)
+            # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
+            sampleindxs = LHS.random(n=nsamples)
+        else: # do pyDOE LHS
+            sampleindxs = pyDOE.lhs(n=self.paramdimen, samples=nsamples, criterion='m')
+        for i in range(self.paramdimen):
+            sampleindxs[:, i] = np.floor(maxints[i] * sampleindxs[:, i])
+        sampleindxs = sampleindxs.astype(int)
+        LOG.debug(f"d={len(pars)} samplelims={maxints} {nsamples=}")
         self.sampleindxs = sampleindxs
         self.params = np.meshgrid(*pars, indexing='ij')
         self.shape = self.params[0].shape
         self.size = np.product(self.shape)
-        if self.size > 0: #< nsamples:
+        if self.size < nsamples:
             LOG.warning(f"There are only {self.size} gridpoints in parameter space but you are requesting {nsamples} samples of them. They will be over-sampled")
         self.params = np.moveaxis(self.params, 0, -1)
 
@@ -100,16 +109,16 @@ class Parameter_Space:
 
     def params_for_lhsnumber(self, lhsnum):
         idx = self.lhsnumber_to_index(lhsnum)
-        pars = self.params[indx]
+        pars = self.params[idx]
         return pars
 
     def sam_for_number(self, num):
         params = self.params_for_number(num)
 
         # gsmf_phi0, mmb_amp, mmb_plaw = params
-        time, gsmf_phi0, mmb_amp, mmb_plaw = params
+        time, mmb_amp, mmb_plaw = params
 
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gsmf = holo.sam.GSMF_Schechter() #phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
         mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp*MSOL, mplaw=mmb_plaw)
@@ -119,12 +128,12 @@ class Parameter_Space:
         return sam, hard
 
     def sam_for_lhsnumber(self, lhsnum):
-        params = self.params_for_lhsnumber(num)
+        params = self.params_for_lhsnumber(lhsnum)
 
         # gsmf_phi0, mmb_amp, mmb_plaw = params
-        time, gsmf_phi0, mmb_amp, mmb_plaw = params
+        time, mmb_amp, mmb_plaw = params
 
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gsmf = holo.sam.GSMF_Schechter() #phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
         mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp*MSOL, mplaw=mmb_plaw)
