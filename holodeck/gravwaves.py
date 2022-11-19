@@ -478,8 +478,36 @@ def _gws_from_number_grid_centroids(edges, dnum, number, realize):
 def _gws_from_number_grid_integrated(edges, dnum, number, realize, integrate=True):
     """
 
-    # ! BUG: THIS ASSUMES THAT FREQUENCIES ARE NYQUIST SAMPLED !
-    # ! otherwise the conversion from hs to hc doesnt work !
+    #! --------------------------- !#
+    #! CHECK GW vs ORB FREQUENCIES !#
+    #! --------------------------- !#
+
+    Parameters
+    ----------
+    edges : (4,) list of 1darrays
+        A list containing the edges along each dimension.  The four dimensions correspond to
+        total mass, mass ratio, redshift, and rest-frame orbital frequency.
+        The length of each of the four arrays is M, Q, Z, F.
+    dnum : (M, Q, Z, F) ndarray
+        The differential number of binaries per unit bin-volume.  This is,
+        ``d^4 N / [dlog10(M) dq dz dln(f_r)]``.
+    number : (M-1, Q-1, Z-1, F-1) ndarray
+        The number of binaries in each bin of parameter space.  This is calculated by integrating
+        `dnum` over each bin.
+    realize : bool or int,
+        Specification of how to construct one or more discrete realizations.
+        If a `bool` value, then whether or not to construct a realization.
+        If an `int` value, then how many discrete realizations to construct.
+    integrate : bool,
+        Whether or not to integrate (sum) over axes {0, 1, 2}.
+
+    Returns
+    -------
+    hc : ndarray
+        Characteristic strain of the GWB.
+        The shape depends on whether `integrate` is true or false.
+        integrate = True:  shape is (F-1,)
+        integrate = False: shape is (M-1, Q-1, Z-1, F-1)
 
     """
     grid = np.meshgrid(*edges, indexing='ij')
@@ -491,6 +519,40 @@ def _gws_from_number_grid_integrated(edges, dnum, number, realize, integrate=Tru
     fr = utils.frst_from_fobs(grid[3], grid[2])
     hs = utils.gw_strain_source(mc, dc, fr)
 
+    print(f"{hs.shape=} {fr.shape=} {np.shape(grid)=}  aiouh79fe3")
+
+    if realize is True:
+        rnum = np.random.poisson(number)
+    elif realize in [None, False]:
+        rnum = number
+    elif utils.isinteger(realize):
+        shape = number.shape + (realize,)
+        rnum = np.random.poisson(number[..., np.newaxis], size=shape)
+    else:
+        err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
+        log.error(err)
+        raise ValueError(err)
+
+    # integrand = dnum * (hs ** 2)
+    # hs2_cent = utils._integrate_grid_differential_number(edges, integrand, freq=True) / number
+    # fr_cent = 0.5 * (fr[..., :-1] + fr[..., 1:])
+    # hs_cent = 0.5 * (hs[..., :-1] + hs[..., 1:])
+    fr_cent = kale.utils.midpoints(fr, log=False, axis=None)
+    hs_cent = kale.utils.midpoints(hs, log=False, axis=None)
+
+    print(f"{rnum.shape=}, {hs_cent.shape=}")
+
+    hc = rnum * ((hs_cent ** 2) * fr_cent)[..., np.newaxis]
+
+    dfr = np.diff(fr, axis=-1)
+    dfr = kale.utils.midpoints(dfr, axis=(0, 1, 2), log=False)
+
+    print(f"{hc.shape=}, {dfr.shape=}")
+
+    hc = np.sum(hc / dfr[..., np.newaxis], axis=(0, 1, 2))
+    hc = np.sqrt(hc)
+
+    '''
     dlnf = np.diff(np.log(edges[-1]))[np.newaxis, np.newaxis, np.newaxis, :]
     integrand = dnum * (hs ** 2)
     hc = utils._integrate_grid_differential_number(edges, integrand, freq=True)
@@ -511,6 +573,7 @@ def _gws_from_number_grid_integrated(edges, dnum, number, realize, integrate=Tru
     # (M',Q',Z',F) ==> (F,)
     if integrate:
         hc = np.sqrt(np.sum(hc, axis=(0, 1, 2)))
+    '''
 
     return hc
 
