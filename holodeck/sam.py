@@ -475,7 +475,7 @@ class Semi_Analytic_Model:
 
     @property
     def static_binary_density(self):
-        """The number-density of binaries in each bin, 'd3n/[dz dlog10M dq]' in units of [Mpc^-3].
+        """The number-density of binaries in each bin, 'd^3 n / [dlog10M dq dz]' in units of [Mpc^-3].
 
         This is calculated once and cached.
 
@@ -486,7 +486,7 @@ class Semi_Analytic_Model:
 
         Notes
         -----
-        This function effectively calculates Eq.21 & 5 of [Chen2019]_.
+        This function effectively calculates Eq.21 & 5 of [Chen2019]_; or equivalently, Eq. 6 of [Sesana2008]_.
 
         """
         if self._density is None:
@@ -544,42 +544,37 @@ class Semi_Analytic_Model:
 
         return self._density
 
-    def diff_num_from_hardening(self, *args, **kwargs):
-        err = (
-            "DEPRECATION `Semi_Analytic_Model.diff_num_from_hardening` ==> "
-            "`Semi_Analytic_Model.dynamic_binary_number`"
-        )
-        log.exception(err)
-        raise AttributeError(err)
-
-    def dynamic_binary_number(self, hard, fobs=None, sepa=None, limit_merger_time=None):
+    def dynamic_binary_number(self, hard, fobs_orb=None, sepa=None, limit_merger_time=None):
         """Calculate the differential number of binaries (per bin-volume, per log-freq interval).
+
+        #! BUG: `limit_merger_time` should compare merger time to the redshift of each bin !#
 
         d^4 N / [dlog10(M) dq dz dln(X)    <===    d^3 n / dlog10(M) dq dz
 
         The value returned is `d^4 N / [dlog10(M) dq dz dln(X)]`, where X is either:
-        *   separation (a)                     ::  if `sepa` is passed in, or
-        *   rest-frame orbital-frequency (f_r) ::  if `fobs` is passed in.
+        *   separation (a)                         ::  if `sepa`     is passed in, or
+        *   observer-frame orbital-frequency (f_o) ::  if `fobs_orb` is passed in.
 
         Parameters
         ----------
         hard : `holodeck.evolution._Hardening`
             Hardening instance for calculating binary evolution rate.
-        fobs : ArrayLike
+        fobs_orb : ArrayLike
             observer-frame orbital-frequency in [1/sec].
-            NOTE: either `fobs` or `sepa` must be provided (and not both).
+            NOTE: either `fobs_orb` or `sepa` must be provided (and not both).
         sepa : ArrayLike
             Rest-frame binary separation in [cm].
-            NOTE: either `fobs` or `sepa` must be provided (and not both).
+            NOTE: either `fobs_orb` or `sepa` must be provided (and not both).
         limit_merger_time : None or scalar,
             Maximum allowed merger time in [sec].  If `None`, no maximum is imposed.
 
         Returns
         -------
         edges : (4,) list of 1darrays of scalar
-            A list containing the edges along each dimension.
+            A list containing the edges along each dimension.  These are:
+            {total-mass, mass-ratio, redshift, observer-frame orbital-frequency}
         dnum : (M, Q, Z, F) ndarray of scalar
-            Differential number of binaries.  Units are dimensionless number of binaries.
+            Differential number of binaries at the grid edges.  Units are dimensionless number of binaries.
 
         Notes
         -----
@@ -601,15 +596,15 @@ class Semi_Analytic_Model:
 
         """
 
-        if (fobs is None) == (sepa is None):
-            err = "one (and only one) of `fobs` or `sepa` must be provided!"
+        if (fobs_orb is None) == (sepa is None):
+            err = "one (and only one) of `fobs_orb` or `sepa` must be provided!"
             log.exception(err)
             raise ValueError(err)
 
-        if fobs is not None:
-            fobs = np.asarray(fobs)
-            xsize = fobs.size
-            edges = self.edges + [fobs, ]
+        if fobs_orb is not None:
+            fobs_orb = np.asarray(fobs_orb)
+            xsize = fobs_orb.size
+            edges = self.edges + [fobs_orb, ]
         else:
             xsize = len(sepa)
             edges = self.edges + [sepa, ]
@@ -633,10 +628,10 @@ class Semi_Analytic_Model:
         mt, mr, rz = [gg.ravel() for gg in self.grid]
 
         # Make sure we have both `frst_orb` and binary separation `sa`; shapes (X, M*Q*Z)
-        if fobs is not None:
+        if fobs_orb is not None:
             # Convert from observer-frame orbital freq, to rest-frame orbital freq
             # (X, M*Q*Z)
-            frst_orb = fobs[:, np.newaxis] * (1.0 + rz[np.newaxis, :])
+            frst_orb = fobs_orb[:, np.newaxis] * (1.0 + rz[np.newaxis, :])
             sa = utils.kepler_sepa_from_freq(mt[np.newaxis, :], frst_orb)
         else:
             sa = sepa[:, np.newaxis]
@@ -647,7 +642,7 @@ class Semi_Analytic_Model:
         dadt = hard.dadt(mt[np.newaxis, :], mr[np.newaxis, :], sa)
 
         # Calculate `tau = dt/dlnf_r = f_r / (df_r/dt)`
-        if fobs is not None:
+        if fobs_orb is not None:
             # dfdt is positive (increasing frequency)
             dfdt, frst_orb = utils.dfdt_from_dadt(dadt, sa, frst_orb=frst_orb)
             tau = frst_orb / dfdt
@@ -698,12 +693,12 @@ class Semi_Analytic_Model:
 
         Parameters
         ----------
-        fobs : (F,) array_like of scalar,
+        fobs_gw : (F,) array_like of scalar,
             Observer-frame GW-frequencies. [1/sec]
             These are the frequency bin edges, which are integrated across to get the number of binaries in each
             frequency bin.
         hard : holodeck.evolution._Hardening class or instance
-            Hardening mechanism to apply over the range of `fobs`.
+            Hardening mechanism to apply over the range of `fobs_gw`.
         realize : bool or int,
             Whether to construct a Poisson 'realization' (discretization) of the SAM distribution.
             Realizations approximate the finite-source effects of a realistic population.
@@ -729,7 +724,7 @@ class Semi_Analytic_Model:
         fobs_orb = fobs_gw / 2.0
         # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f_r)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
-        edges, dnum = self.dynamic_binary_number(hard, fobs=fobs_orb)
+        edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb)
 
         # "integrate" within each bin (i.e. multiply by bin volume)
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
@@ -752,7 +747,7 @@ class Semi_Analytic_Model:
 
 def sample_sam_with_hardening(
         sam, hard,
-        fobs=None, sepa=None, sample_threshold=10.0, cut_below_mass=None, limit_merger_time=None,
+        fobs_orb=None, sepa=None, sample_threshold=10.0, cut_below_mass=None, limit_merger_time=None,
         **sample_kwargs
 ):
     """Discretize Semi-Analytic Model into sampled binaries assuming the given binary hardening rate.
@@ -763,12 +758,12 @@ def sample_sam_with_hardening(
         Instance of an initialized semi-analytic model.
     hard : `holodeck.evolution._Hardening`
         Binary hardening model for calculating binary hardening rates (dadt or dfdt).
-    fobs : ArrayLike
+    fobs_orb : ArrayLike
         Observer-frame orbital-frequencies.  Units of [1/sec].
-        NOTE: Either `fobs` or `sepa` must be provided, and not both.
+        NOTE: Either `fobs_orb` or `sepa` must be provided, and not both.
     sepa : ArrayLike
         Binary orbital separation.  Units of [cm].
-        NOTE: Either `fobs` or `sepa` must be provided, and not both.
+        NOTE: Either `fobs_orb` or `sepa` must be provided, and not both.
 
     Returns
     -------
@@ -777,11 +772,11 @@ def sample_sam_with_hardening(
         * mtot : total mass of binary (m1+m2) in [grams]
         * mrat : mass ratio of binary (m2/m1 <= 1)
         * redz : redshift of binary
-        * fobs / sepa : observer-frame orbital-frequency [1/s]  or  binary separation [cm]
+        * fobs_orb / sepa : observer-frame orbital-frequency [1/s]  or  binary separation [cm]
     weights : (S,) ndarray of scalar
         Weights of each sample point.
     edges : (4,) of list of scalars
-        Edges of parameter-space grid for each of above parameters (mtot, mrat, redz, fobs)
+        Edges of parameter-space grid for each of above parameters (mtot, mrat, redz, fobs_orb)
         The lengths of each list will be [(M,), (Q,), (Z,), (F,)]
     dnum : (M, Q, Z, F) ndarray of scalar
         Number-density of binaries over grid specified by `edges`.
@@ -795,9 +790,9 @@ def sample_sam_with_hardening(
         log.warning(msg)
 
     # returns  dN/[dlog10(M) dq dz dln(f_r)]
-    # edges: Mtot [grams], mrat (q), redz (z), {fobs (f) [1/s]   OR   sepa (a) [cm]}
-    # `fobs` is observer-frame orbital-frequency
-    edges, dnum = sam.dynamic_binary_number(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
+    # edges: Mtot [grams], mrat (q), redz (z), {fobs_orb (f) [1/s]   OR   sepa (a) [cm]}
+    # `fobs_orb` is observer-frame orbital-frequency
+    edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb, sepa=sepa, limit_merger_time=limit_merger_time)
 
     edges_integrate = [np.copy(ee) for ee in edges]
     edges_sample = [np.log10(edges[0]), edges[1], edges[2], np.log(edges[3])]
