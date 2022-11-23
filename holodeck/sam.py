@@ -481,7 +481,7 @@ class Semi_Analytic_Model:
 
         Returns
         -------
-        density : (M, Q, Z) ndarray of float
+        density : (M, Q, Z) ndarray
             Number density of binaries, per unit redshift, mass-ratio, and log10 of mass.  Units of [Mpc^-3].
 
         Notes
