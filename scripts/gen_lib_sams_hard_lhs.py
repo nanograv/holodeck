@@ -23,6 +23,7 @@ from holodeck.constants import YR, MSOL, GYR  # noqa
 
 from scipy.stats import qmc
 import pyDOE
+import pickle
 
 class Parameter_Space:
 
@@ -162,7 +163,7 @@ BEG = datetime.now()
 parser = argparse.ArgumentParser()
 parser.add_argument('output', metavar='output', type=str,
                     help='output path [created if doesnt exist]')
-parser.add_argument('-n', '--nsamples', action='store', dest='nsamples', type=int, help='number of realizations, must be square of prime', default=25)
+parser.add_argument('-n', '--nsamples', action='store', dest='nsamples', type=int, help='number of parameter space samples, must be square of prime', default=25)
 # parser.add_argument('-r', '--reals', action='store', dest='reals', type=int,
 #                     help='number of realizations', default=10)
 # parser.add_argument('-s', '--shape', action='store', dest='shape', type=int,
@@ -279,7 +280,14 @@ def main():
     iterator = holo.utils.tqdm(indices) if comm.rank == 0 else np.atleast_1d(indices)
     if args.test:
         LOG.info("Running in testing mode. Outputting parameters:")
+    if comm.rank == 0:
+        fname = f"parspaceobj.pickle"
+        fname = os.path.join(PATH_OUTPUT, fname)
+        if os.path.exists(fname):
+            LOG.warning(f"File {fname} already exists.")
 
+        with open(fname, 'wb') as fp:
+            pickle.dump(SPACE, fp)
     for ind in iterator:
         # Convert from 1D index into 2D (param, real) specification
         # param, real = np.unravel_index(ind, (npars, nreals))
@@ -347,7 +355,7 @@ def run_sam(pnum, real, path_output):
 #         gff, gwf, gwb = holo.gravwaves._gws_from_samples(vals, weights, fobs)
     gwbspec = sam.gwb(fobs_edges, realize=args.NUM_REALS, hard=hard)
     legend = SPACE.param_dict_for_lhsnumber(pnum)
-    np.savez(fname, fobs=_fobs, fobs_edges=fobs_edges, gwbspec=gwbspec, pnum=pnum, nreals=args.NUM_REALS, **legend)
+    np.savez(fname, fobs=_fobs, fobs_edges=fobs_edges, gwbspec=gwbspec, pnum=pnum, nreals=args.NUM_REALS, fullparspace=SPACE, **legend)
     LOG.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
 
     return
