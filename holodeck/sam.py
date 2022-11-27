@@ -50,7 +50,7 @@ import kalepy as kale
 
 import holodeck as holo
 from holodeck import cosmo, utils, log
-from holodeck.constants import GYR, SPLC, MSOL, MPC
+from holodeck.constants import GYR, SPLC, MSOL, MPC, NWTG
 from holodeck import relations, gravwaves
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
@@ -738,6 +738,39 @@ class Semi_Analytic_Model:
             hc = hc.squeeze()
 
         return hc
+
+    def gwb_ideal(self, fobs_gw):
+        """Calculate the idealized, continuous GWB amplitude.
+
+        Calculation follows [Phinney2001]_ (Eq.5) or equivalently [Enoki+Nagashima-2007] (Eq.3.6).
+        This calculation assumes a smooth, continuous population of binaries that are purely GW driven.
+        * There are no finite-number effects.
+        * There are no environmental or non-GW driven evolution effects.
+        * There is no coalescence of binaries cutting them off at high-frequencies.
+
+        """
+
+        const = ((4.0 * np.pi) / (3 * SPLC**2))
+        # (M, Q)
+        mc = utils.chirp_mass_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
+        mc = np.power(NWTG * mc, 5.0/3.0)
+        # (Z,)
+        rz = np.power(1 + self.redz, -1.0/3.0)
+        # (F,)
+        fogw = np.power(np.pi * fobs_gw, -4.0/3.0)
+
+        # d^3 n / [dlog10(M) dq dz] in units of [Mpc^-3]
+        ndens = self.static_binary_density / (MPC**3)
+
+        integ = ndens * mc[..., np.newaxis] * rz[np.newaxis, np.newaxis, :]
+        integ = utils.trapz(integ, np.log10(self.mtot), axis=0, cumsum=False)
+        integ = utils.trapz(integ, self.mrat, axis=1, cumsum=False)
+        integ = utils.trapz(integ, self.redz, axis=2, cumsum=False)
+
+        gwb = const * fogw * np.sum(integ)
+        gwb = np.sqrt(gwb)
+
+        return gwb
 
 
 # ===============================
