@@ -381,7 +381,7 @@ def sampled_gws_from_sam(sam, fobs_gw, hard=holo.evolution.Hard_GW, **kwargs):
     return gff, gwf, gwb
 
 
-def _gws_from_number_grid_centroids(edges, dnum, number, realize):
+def _gws_from_number_grid_centroids(edges, number, realize):
     """Calculate GWs based on a grid of number-of-binaries.
 
     # ! BUG: THIS ASSUMES THAT FREQUENCIES ARE NYQUIST SAMPLED !
@@ -481,19 +481,12 @@ def _gws_from_number_grid_centroids(edges, dnum, number, realize):
 def _gws_from_number_grid_integrated(edges, dnum, number, realize, sum=True):
     """
 
-    #! --------------------------- !#
-    #! CHECK GW vs ORB FREQUENCIES !#
-    #! --------------------------- !#
-
     Parameters
     ----------
     edges : (4,) list of 1darrays
         A list containing the edges along each dimension.  The four dimensions correspond to
         total mass, mass ratio, redshift, and observer-frame orbital frequency.
         The length of each of the four arrays is M, Q, Z, F.
-    dnum : (M, Q, Z, F) ndarray
-        The differential number of binaries per unit bin-volume.  This is,
-        ``d^4 N / [dlog10(M) dq dz dln(f_r)]``.
     number : (M-1, Q-1, Z-1, F-1) ndarray
         The number of binaries in each bin of parameter space.  This is calculated by integrating
         `dnum` over each bin.
@@ -513,23 +506,26 @@ def _gws_from_number_grid_integrated(edges, dnum, number, realize, sum=True):
         sum = False: shape is (M-1, Q-1, Z-1, F-1)
 
     """
-    grid = np.meshgrid(*edges, indexing='ij')
+
+    foo = edges[-1]                   #: should be observer-frame orbital-frequencies
+    df = np.diff(foo)                 #: frequency bin widths
+    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
 
     # ---- calculate GW strain ----
-    mc = utils.chirp_mass(*utils.m1m2_from_mtmr(grid[0], grid[1]))
-    dc = cosmo.comoving_distance(grid[2]).cgs.value
-    # These are *orbital*-frequencies (as long as `grid[3]` is orbital frequencies)
-    fr = utils.frst_from_fobs(grid[3], grid[2])
+    mt = kale.utils.midpoints(edges[0])
+    mr = kale.utils.midpoints(edges[1])
+    rz = kale.utils.midpoints(edges[2])
+    mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
+    mc = mc[:, :, np.newaxis, np.newaxis]
+    dc = cosmo.comoving_distance(rz).cgs.value
+    dc = dc[np.newaxis, np.newaxis, :, np.newaxis]
+
+    # convert from observer-frame to rest-frame; still using frequency-bin centers
+    fr = utils.frst_from_fobs(fc[np.newaxis, :], rz[:, np.newaxis])
+    fr = fr[np.newaxis, np.newaxis, :, :]
+
     hs = utils.gw_strain_source(mc, dc, fr)
-
-    fo_cent = kale.utils.midpoints(grid[3], log=False, axis=None)
-    hs_cent = kale.utils.midpoints(hs, log=False, axis=None)
-    # Observer-frame frequency bin width.  (M, Q, Z, F) ==> (M, Q, Z, F-1)
-    dfo = np.diff(grid[3], axis=3)
-    # (M, Q, Z, F-1) ==> (M-1, Q-1, Z-1, F-1)
-    dfo = kale.utils.midpoints(dfo, axis=(0, 1, 2), log=False)
-
-    hc = (hs_cent ** 2) * (2*fo_cent / dfo)
+    hc = (hs ** 2) * (fc / df)
 
     if realize is True:
         hc = hc * np.random.poisson(number)
@@ -542,29 +538,6 @@ def _gws_from_number_grid_integrated(edges, dnum, number, realize, sum=True):
         err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
         log.error(err)
         raise ValueError(err)
-
-    '''
-    dlnf = np.diff(np.log(edges[-1]))[np.newaxis, np.newaxis, np.newaxis, :]
-    integrand = dnum * (hs ** 2)
-    hc = utils._integrate_grid_differential_number(edges, integrand, freq=True)
-    hc = hc / dlnf
-
-    if realize is True:
-        number = np.random.poisson(number) / number
-    elif realize in [None, False]:
-        pass
-    elif utils.isinteger(realize):
-        shape = number.shape + (realize,)
-        number = np.random.poisson(number[..., np.newaxis], size=shape) / number[..., np.newaxis]
-        hc = hc[..., np.newaxis] * np.nan_to_num(number)
-    else:
-        err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
-        raise ValueError(err)
-
-    # (M',Q',Z',F) ==> (F,)
-    if integrate:
-        hc = np.sqrt(np.sum(hc, axis=(0, 1, 2)))
-    '''
 
     # Sum over M, Q, Z bins
     # (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])

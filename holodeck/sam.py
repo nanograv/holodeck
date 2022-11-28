@@ -688,7 +688,7 @@ class Semi_Analytic_Model:
 
         return edges, dnum
 
-    def gwb(self, fobs_gw, hard=holo.evolution.Hard_GW, realize=False):
+    def gwb(self, fobs_gw_edges, hard=holo.evolution.Hard_GW, realize=False):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
         Parameters
@@ -713,27 +713,36 @@ class Semi_Analytic_Model:
         """
 
         squeeze = True
-        fobs_gw = np.atleast_1d(fobs_gw)
-        if np.isscalar(fobs_gw) or np.size(fobs_gw) == 1:
-            err = "single values of `fobs_gw` are not allowed, can only calculated GWB within some bin of frequency!"
+        fobs_gw_edges = np.atleast_1d(fobs_gw_edges)
+        if np.isscalar(fobs_gw_edges) or np.size(fobs_gw_edges) == 1:
+            err = "GWB can only be calculated across bins of frequency, `fobs_gw_edges` must provide bin edges!"
             log.exception(err)
             raise ValueError(err)
 
+        fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
         # ---- Get the differential-number of binaries for each bin
         # convert to orbital-frequency (from GW-frequency)
-        fobs_orb = fobs_gw / 2.0
-        # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f_r)]``
+        fobs_orb_edges = fobs_gw_edges / 2.0
+        fobs_orb_cents = fobs_gw_cents / 2.0
+
+        # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
-        edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb)
+        #! NOTE: using frequency-bin _centers_ produces more accurate results than frequency-bin _edges_ !#
+        edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents)
+        # edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb_edges)
+        edges[-1] = fobs_orb_edges
 
         # "integrate" within each bin (i.e. multiply by bin volume)
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
         #       after poisson calculation, need to convert back to dN/dlogf
         #       to get proper characteristic strain measurement
-        number = utils._integrate_grid_differential_number(edges, dnum, freq=True)
+        #! doing  ``dn/dlnf * Delta(ln[f])``  seems to be more accurate than trapz over log(freq) !#
+        # number = utils._integrate_grid_differential_number(edges, dnum, freq=True)
+        number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
+        number = number * np.diff(np.log(fobs_gw_edges))
 
         # ---- Get the GWB spectrum from number of binaries over grid
-        hc = gravwaves._gws_from_number_grid_integrated(edges, dnum, number, realize)
+        hc = gravwaves._gws_from_number_grid_integrated(edges, number, realize)
         if squeeze:
             hc = hc.squeeze()
 
