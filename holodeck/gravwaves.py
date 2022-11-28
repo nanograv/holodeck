@@ -478,7 +478,7 @@ def _gws_from_number_grid_centroids(edges, number, realize):
     return hc
 
 
-def _gws_from_number_grid_integrated(edges, dnum, number, realize, sum=True):
+def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
     """
 
     Parameters
