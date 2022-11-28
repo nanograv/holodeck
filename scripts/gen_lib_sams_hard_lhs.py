@@ -16,6 +16,7 @@ import numpy as np
 # import h5py
 from mpi4py import MPI
 
+
 import holodeck as holo
 import holodeck.sam
 import holodeck.logger
@@ -178,6 +179,7 @@ parser.add_argument('-n', '--nsamples', action='store', dest='nsamples', type=in
 #                     help='run in DEBUG mode')
 parser.add_argument('-t', '--test', action='store_true', default=False, dest='test',
                     help='Do not actually run, just output what parameters would have been done.')
+parser.add_argument('-c', '--concatenate', action='store_true', default=False, dest='concatenateoutput', help='Concatenate output into single hdf5 file.')
 parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
                     help='verbose output [INFO]')
 # parser.add_argument('--version', action='version', version='%(prog)s 1.0')
@@ -360,6 +362,69 @@ def run_sam(pnum, real, path_output):
 
     return
 
+def concatenate_outputs():
+    regex = "lib_sams__p*.npz"
+    files = sorted(PATH_OUTPUT.glob(regex))
+    num_files = len(files)
+    print(PATH_OUTPUT, f"\n\texists={PATH_OUTPUT.exists()}", f"\n\tfound {num_files} files")
+
+    all_exist = True
+    for ii in range(num_files):
+        temp = PATH_OUTPUT.joinpath(regex.replace('*', f"{ii:06d}"))
+        exists = temp.exists()
+        # print(f"{ii:4d}, {temp.name}, {exists=}")
+        if not exists:
+            all_exist = False
+            break
+    print(f"All files exist?  {all_exist}")     
+    # Read in parameter space object
+    picklefname = f"parspaceobj.pickle"
+    picklefname = os.path.join(PATH_OUTPUT, picklefname)
+    with open(picklefname, 'rb') as fp:
+        space = pickle.load(fp)
+    shape = space.shape
+    # Check on one data file
+    temp = files[0]
+    data = np.load(temp)
+    fobs = data['fobs']
+    fobs_edges = data['fobs_edges']
+    nreals = data['nreals'][()]
+    nfreqs = fobs.size
+    temp_gwb = data['gwbspec']
+    
+    assert np.ndim(temp_gwb) == 2
+    assert temp_gwb.shape[0] == nfreqs
+    assert temp_gwb.shape[1] == nreals
+    
+    gwb_shape = list(shape) + [nfreqs, nreals,]
+    names = space.names + ['freqs', 'reals']
+    gwb = np.zeros(gwb_shape)
+    
+    for ii, file in enumerate(files):
+        temp = np.load(file)
+        assert np.allclose(fobs, temp['fobs'])
+        assert np.allclose(fobs_edges, temp['fobs_edges'])
+        pars = [pp[()] for pp in [temp['times'], temp['mmb_amp'], temp['mmb_plaw']]]
+        
+        idx = space.lhsnumber_to_index(ii)
+        space_pars = space.params[idx]
+        assert np.allclose(pars, space_pars)
+        
+        gwb[idx] = temp['gwbspec'][:]
+    print(holo.utils.stats(gwb))
+    print(holo.utils.frac_str(gwb > 0.0))
+    
+    out_filename = PATH_OUTPUT.joinpath('sam_lib.hdf5')
+    import h5py
+    with h5py.File(out_filename, 'w') as h5:
+        h5.create_dataset('params', data=space.params)
+        h5.create_dataset('fobs', data=fobs)
+        h5.create_dataset('fobs_edges', data=fobs_edges)
+        h5.create_dataset('gwb', data=gwb)
+        h5.create_dataset('names', data=names)
+
+    print(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
+    return
 
 def _barrier(bnum):
     LOG.debug(f"barrier {bnum}")
@@ -371,6 +436,9 @@ def _barrier(bnum):
 if __name__ == "__main__":
     np.seterr(divide='ignore', invalid='ignore', over='ignore')
     warnings.filterwarnings("ignore", category=UserWarning)
-
-    main()
+    if args.concatenateoutput == True:
+        if comm.rank == 0:
+            concatenate_outputs()
+    else:
+        main()
     sys.exit(0)
