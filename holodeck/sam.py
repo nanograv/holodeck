@@ -36,6 +36,7 @@ To-Do
 
 References
 ----------
+* [Sesana2008]_ Sesana, Vecchio, Colacino 2008.
 * [Chen2019]_ Chen, Sesana, Conselice 2019.
 
 """
@@ -49,7 +50,7 @@ import kalepy as kale
 
 import holodeck as holo
 from holodeck import cosmo, utils, log
-from holodeck.constants import GYR, SPLC, MSOL, MPC
+from holodeck.constants import GYR, SPLC, MSOL, MPC, NWTG
 from holodeck import relations, gravwaves
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
@@ -474,14 +475,18 @@ class Semi_Analytic_Model:
 
     @property
     def static_binary_density(self):
-        """The number-density of binaries in each bin, 'd3n/[dz dlog10M dq]' in units of [Mpc^-3].
+        """The number-density of binaries in each bin, 'd^3 n / [dlog10M dq dz]' in units of [Mpc^-3].
 
         This is calculated once and cached.
 
         Returns
         -------
-        density : (M, Q, Z) ndarray of float
+        density : (M, Q, Z) ndarray
             Number density of binaries, per unit redshift, mass-ratio, and log10 of mass.  Units of [Mpc^-3].
+
+        Notes
+        -----
+        This function effectively calculates Eq.21 & 5 of [Chen2019]_; or equivalently, Eq. 6 of [Sesana2008]_.
 
         """
         if self._density is None:
@@ -539,47 +544,49 @@ class Semi_Analytic_Model:
 
         return self._density
 
-    def diff_num_from_hardening(self, *args, **kwargs):
-        err = (
-            "DEPRECATION `Semi_Analytic_Model.diff_num_from_hardening` ==> "
-            "`Semi_Analytic_Model.dynamic_binary_number`"
-        )
-        log.exception(err)
-        raise AttributeError(err)
-
-    def dynamic_binary_number(self, hard, fobs=None, sepa=None, limit_merger_time=None):
+    def dynamic_binary_number(self, hard, fobs_orb=None, sepa=None, limit_merger_time=None):
         """Calculate the differential number of binaries (per bin-volume, per log-freq interval).
 
+        #! BUG: `limit_merger_time` should compare merger time to the redshift of each bin !#
+
+        d^4 N / [dlog10(M) dq dz dln(X)    <===    d^3 n / dlog10(M) dq dz
+
         The value returned is `d^4 N / [dlog10(M) dq dz dln(X)]`, where X is either:
-        *   separation (a) ::  if  `sepa` is passed in, or
-        *   observer-frame orbital-frequency (f_r) :: if `fobs` is passed in.
+        *   separation (a)                         ::  if `sepa`     is passed in, or
+        *   observer-frame orbital-frequency (f_o) ::  if `fobs_orb` is passed in.
 
         Parameters
         ----------
         hard : `holodeck.evolution._Hardening`
             Hardening instance for calculating binary evolution rate.
-        fobs : ArrayLike
+        fobs_orb : ArrayLike
             observer-frame orbital-frequency in [1/sec].
+            NOTE: either `fobs_orb` or `sepa` must be provided (and not both).
         sepa : ArrayLike
             Rest-frame binary separation in [cm].
+            NOTE: either `fobs_orb` or `sepa` must be provided (and not both).
         limit_merger_time : None or scalar,
             Maximum allowed merger time in [sec].  If `None`, no maximum is imposed.
 
         Returns
         -------
         edges : (4,) list of 1darrays of scalar
-            A list containing the edges along each dimension.
+            A list containing the edges along each dimension.  These are:
+            {total-mass, mass-ratio, redshift, observer-frame orbital-frequency}
         dnum : (M, Q, Z, F) ndarray of scalar
-            Differential number of binaries.  Units are dimensionless number of binaries.
+            Differential number of binaries at the grid edges.  Units are dimensionless number of binaries.
 
         Notes
         -----
+        This function is effectively Eq.6 of [Sesana2008]_.
 
         d^2 N / dz dln(f_r) = (dn/dz) * (dt/d ln f_r) * (dz/dt) * (dVc/dz)
                             = (dn/dz) * (f_r / [df_r/dt]) * 4 pi c D_c^2 (1+z)
+                            = `dens`  *      `tau`        *   `cosmo_fact`
 
         d^2 N / dz dln(a)   = (dn/dz) * (dz/dt) * (dt/d ln a) * (dVc/dz)
                             = (dn/dz) * (a / [da/dt]) * 4 pi c D_c^2 (1+z)
+                            = `dens`  *      `tau`        *   `cosmo_fact`
 
         To-Do
         -----
@@ -589,15 +596,15 @@ class Semi_Analytic_Model:
 
         """
 
-        if (fobs is None) == (sepa is None):
-            err = "one (and only one) of `fobs` or `sepa` must be provided!"
+        if (fobs_orb is None) == (sepa is None):
+            err = "one (and only one) of `fobs_orb` or `sepa` must be provided!"
             log.exception(err)
             raise ValueError(err)
 
-        if fobs is not None:
-            fobs = np.asarray(fobs)
-            xsize = fobs.size
-            edges = self.edges + [fobs, ]
+        if fobs_orb is not None:
+            fobs_orb = np.asarray(fobs_orb)
+            xsize = fobs_orb.size
+            edges = self.edges + [fobs_orb, ]
         else:
             xsize = len(sepa)
             edges = self.edges + [sepa, ]
@@ -608,40 +615,39 @@ class Semi_Analytic_Model:
         # (Z,) comoving-distance in [Mpc]
         dc = cosmo.comoving_distance(self.redz).to('Mpc').value
 
-        # [Mpc^3/s] this is `(dVc/dz) * (dz/dt)`
+        # (Z,) this is `(dVc/dz) * (dz/dt)` in units of [Mpc^3/s]
         cosmo_fact = 4 * np.pi * (SPLC/MPC) * np.square(dc) * (1.0 + self.redz)
 
-        # (M, Q)
+        # (M, Q) calculate chirp-mass
         mchirp = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
         mchirp = utils.chirp_mass(*mchirp)
-        # (M, Q, 1, 1)
+        # (M, Q, 1, 1) make shape broadcastable for later calculations
         mchirp = mchirp[..., np.newaxis, np.newaxis]
 
-        # (M*Q*Z,)
+        # (M*Q*Z,) 1D arrays of each total-mass, mass-ratio, and redshift
         mt, mr, rz = [gg.ravel() for gg in self.grid]
 
-        if fobs is not None:
+        # Make sure we have both `frst_orb` and binary separation `sa`; shapes (X, M*Q*Z)
+        if fobs_orb is not None:
             # Convert from observer-frame orbital freq, to rest-frame orbital freq
-            # (F, M*Q*Z)
-            frst_orb = fobs[:, np.newaxis] * (1.0 + rz[np.newaxis, :])
+            # (X, M*Q*Z)
+            frst_orb = fobs_orb[:, np.newaxis] * (1.0 + rz[np.newaxis, :])
             sa = utils.kepler_sepa_from_freq(mt[np.newaxis, :], frst_orb)
         else:
             sa = sepa[:, np.newaxis]
-            # NOTE: `fr` is the _orbital_ frequency (not GW), and in rest-frame
+            # (X, M*Q*Z), this is the _orbital_ frequency (not GW), and in rest-frame
             frst_orb = utils.kepler_freq_from_sepa(mt[np.newaxis, :], sa)
 
-        # recall: these are negative (decreasing separation)  [cm/sec]
+        # (X, M*Q*Z), hardening rate, negative values, units of [cm/sec]
         dadt = hard.dadt(mt[np.newaxis, :], mr[np.newaxis, :], sa)
 
-        # log.warning("Using `dadt_dedt` instead of `dadt` which doesn't exist... why is this")
-        # dadt, _ = hard.dadt_dedt(mt[np.newaxis, :], mr[np.newaxis, :], sa)
-
         # Calculate `tau = dt/dlnf_r = f_r / (df_r/dt)`
-        if fobs is not None:
+        if fobs_orb is not None:
             # dfdt is positive (increasing frequency)
             dfdt, frst_orb = utils.dfdt_from_dadt(dadt, sa, frst_orb=frst_orb)
             tau = frst_orb / dfdt
         else:
+            # recall: dadt is negative (decreasing separation), units of [cm/sec]
             tau = - sa / dadt
 
         # ---------------------
@@ -670,27 +676,29 @@ class Semi_Analytic_Model:
             raise ValueError(err)
 
         # convert `tau` to the correct shape, note that moveaxis MUST happen _before_ reshape!
-        # (F, M*Q*Z) ==> (M*Q*Z, F)
+        # (X, M*Q*Z) ==> (M*Q*Z, X)
         tau = np.moveaxis(tau, 0, -1)
-        # (M*Q*Z, F) ==> (M, Q, Z, F)
+        # (M*Q*Z, X) ==> (M, Q, Z, X)
         tau = tau.reshape(dens.shape + (xsize,))
 
         # (M, Q, Z) units: [1/s] i.e. number per second
         dnum = dens * cosmo_fact
-        # (M, Q, Z, F) units: [] unitless, i.e. number
+        # (M, Q, Z, X) units: [] unitless, i.e. number
         dnum = dnum[..., np.newaxis] * tau
 
         return edges, dnum
 
-    def gwb(self, fobs_gw, hard=holo.evolution.Hard_GW, realize=False):
+    def gwb(self, fobs_gw_edges, hard=holo.evolution.Hard_GW, realize=False):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
         Parameters
         ----------
-        fobs : (F,) array_like of scalar,
+        fobs_gw : (F,) array_like of scalar,
             Observer-frame GW-frequencies. [1/sec]
+            These are the frequency bin edges, which are integrated across to get the number of binaries in each
+            frequency bin.
         hard : holodeck.evolution._Hardening class or instance
-            Hardening mechanism to apply over the range of `fobs`.
+            Hardening mechanism to apply over the range of `fobs_gw`.
         realize : bool or int,
             Whether to construct a Poisson 'realization' (discretization) of the SAM distribution.
             Realizations approximate the finite-source effects of a realistic population.
@@ -705,32 +713,73 @@ class Semi_Analytic_Model:
         """
 
         squeeze = True
-        fobs_gw = np.atleast_1d(fobs_gw)
-        if np.isscalar(fobs_gw) or np.size(fobs_gw) == 1:
-            err = "single values of `fobs_gw` are not allowed, can only calculated GWB within some bin of frequency!"
-            err += "  e.g. ``fobs_gw = 1/YR; fobs_gw = [0.9*fobs_gw, 1.1*fobs_gw]``"
+        fobs_gw_edges = np.atleast_1d(fobs_gw_edges)
+        if np.isscalar(fobs_gw_edges) or np.size(fobs_gw_edges) == 1:
+            err = "GWB can only be calculated across bins of frequency, `fobs_gw_edges` must provide bin edges!"
             log.exception(err)
             raise ValueError(err)
 
+        fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
         # ---- Get the differential-number of binaries for each bin
         # convert to orbital-frequency (from GW-frequency)
-        fobs_orb = fobs_gw / 2.0
-        # this is  ``d^4 n / [dlog10(M) dq dz dln(f_r)]``
+        fobs_orb_edges = fobs_gw_edges / 2.0
+        fobs_orb_cents = fobs_gw_cents / 2.0
+
+        # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
-        edges, dnum = self.dynamic_binary_number(hard, fobs=fobs_orb)
+        #! NOTE: using frequency-bin _centers_ produces more accurate results than frequency-bin _edges_ !#
+        edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents)
+        # edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb_edges)
+        edges[-1] = fobs_orb_edges
 
         # "integrate" within each bin (i.e. multiply by bin volume)
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
         #       after poisson calculation, need to convert back to dN/dlogf
         #       to get proper characteristic strain measurement
-        number = utils._integrate_grid_differential_number(edges, dnum, freq=True)
+        #! doing  ``dn/dlnf * Delta(ln[f])``  seems to be more accurate than trapz over log(freq) !#
+        # number = utils._integrate_grid_differential_number(edges, dnum, freq=True)
+        number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
+        number = number * np.diff(np.log(fobs_gw_edges))
 
         # ---- Get the GWB spectrum from number of binaries over grid
-        hc = gravwaves._gws_from_number_grid_integrated(edges, dnum, number, realize)
+        hc = gravwaves._gws_from_number_grid_integrated(edges, number, realize)
         if squeeze:
             hc = hc.squeeze()
 
         return hc
+
+    def gwb_ideal(self, fobs_gw):
+        """Calculate the idealized, continuous GWB amplitude.
+
+        Calculation follows [Phinney2001]_ (Eq.5) or equivalently [Enoki+Nagashima-2007] (Eq.3.6).
+        This calculation assumes a smooth, continuous population of binaries that are purely GW driven.
+        * There are no finite-number effects.
+        * There are no environmental or non-GW driven evolution effects.
+        * There is no coalescence of binaries cutting them off at high-frequencies.
+
+        """
+
+        const = ((4.0 * np.pi) / (3 * SPLC**2))
+        # (M, Q)
+        mc = utils.chirp_mass_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
+        mc = np.power(NWTG * mc, 5.0/3.0)
+        # (Z,)
+        rz = np.power(1 + self.redz, -1.0/3.0)
+        # (F,)
+        fogw = np.power(np.pi * fobs_gw, -4.0/3.0)
+
+        # d^3 n / [dlog10(M) dq dz] in units of [Mpc^-3]
+        ndens = self.static_binary_density / (MPC**3)
+
+        integ = ndens * mc[..., np.newaxis] * rz[np.newaxis, np.newaxis, :]
+        integ = utils.trapz(integ, np.log10(self.mtot), axis=0, cumsum=False)
+        integ = utils.trapz(integ, self.mrat, axis=1, cumsum=False)
+        integ = utils.trapz(integ, self.redz, axis=2, cumsum=False)
+
+        gwb = const * fogw * np.sum(integ)
+        gwb = np.sqrt(gwb)
+
+        return gwb
 
 
 # ===============================
@@ -740,7 +789,7 @@ class Semi_Analytic_Model:
 
 def sample_sam_with_hardening(
         sam, hard,
-        fobs=None, sepa=None, sample_threshold=10.0, cut_below_mass=None, limit_merger_time=None,
+        fobs_orb=None, sepa=None, sample_threshold=10.0, cut_below_mass=None, limit_merger_time=None,
         **sample_kwargs
 ):
     """Discretize Semi-Analytic Model into sampled binaries assuming the given binary hardening rate.
@@ -751,12 +800,12 @@ def sample_sam_with_hardening(
         Instance of an initialized semi-analytic model.
     hard : `holodeck.evolution._Hardening`
         Binary hardening model for calculating binary hardening rates (dadt or dfdt).
-    fobs : ArrayLike
+    fobs_orb : ArrayLike
         Observer-frame orbital-frequencies.  Units of [1/sec].
-        NOTE: Either `fobs` or `sepa` must be provided, and not both.
+        NOTE: Either `fobs_orb` or `sepa` must be provided, and not both.
     sepa : ArrayLike
         Binary orbital separation.  Units of [cm].
-        NOTE: Either `fobs` or `sepa` must be provided, and not both.
+        NOTE: Either `fobs_orb` or `sepa` must be provided, and not both.
 
     Returns
     -------
@@ -765,11 +814,11 @@ def sample_sam_with_hardening(
         * mtot : total mass of binary (m1+m2) in [grams]
         * mrat : mass ratio of binary (m2/m1 <= 1)
         * redz : redshift of binary
-        * fobs / sepa : observer-frame orbital-frequency [1/s]  or  binary separation [cm]
+        * fobs_orb / sepa : observer-frame orbital-frequency [1/s]  or  binary separation [cm]
     weights : (S,) ndarray of scalar
         Weights of each sample point.
     edges : (4,) of list of scalars
-        Edges of parameter-space grid for each of above parameters (mtot, mrat, redz, fobs)
+        Edges of parameter-space grid for each of above parameters (mtot, mrat, redz, fobs_orb)
         The lengths of each list will be [(M,), (Q,), (Z,), (F,)]
     dnum : (M, Q, Z, F) ndarray of scalar
         Number-density of binaries over grid specified by `edges`.
@@ -783,9 +832,9 @@ def sample_sam_with_hardening(
         log.warning(msg)
 
     # returns  dN/[dlog10(M) dq dz dln(f_r)]
-    # edges: Mtot [grams], mrat (q), redz (z), {fobs (f) [1/s]   OR   sepa (a) [cm]}
-    # `fobs` is observer-frame orbital-frequency
-    edges, dnum = sam.dynamic_binary_number(hard, fobs=fobs, sepa=sepa, limit_merger_time=limit_merger_time)
+    # edges: Mtot [grams], mrat (q), redz (z), {fobs_orb (f) [1/s]   OR   sepa (a) [cm]}
+    # `fobs_orb` is observer-frame orbital-frequency
+    edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb, sepa=sepa, limit_merger_time=limit_merger_time)
 
     edges_integrate = [np.copy(ee) for ee in edges]
     edges_sample = [np.log10(edges[0]), edges[1], edges[2], np.log(edges[3])]

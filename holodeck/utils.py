@@ -551,7 +551,7 @@ def nyquist_freqs(
 
     """
     fmin = 1.0 / dur
-    fmax = 1.0 / cad
+    fmax = 1.0 / cad * 0.5
     # df = fmin / sample
     df = fmin
     freqs = np.arange(fmin, fmax + df/10.0, df)
@@ -1251,6 +1251,28 @@ def chirp_mass(m1, m2=None):
     if m2 is None:
         m1, m2 = np.moveaxis(m1, -1, 0)
     mc = np.power(m1 * m2, 3.0/5.0)/np.power(m1 + m2, 1.0/5.0)
+    return mc
+
+
+def chirp_mass_mtmr(mt, mr):
+    """Calculate the chirp-mass of a binary.
+
+    Parameters
+    ----------
+    mt : array_like,
+        Total mass [grams].  This is ``M = m1+m2``.
+    mr : array_like,
+        Mass ratio.  ``q = m2/m1 <= 1``.
+        This is defined as the secondary (smaller) divided by the primary (larger) mass.
+
+    Returns
+    -------
+    mc : array_like,
+        Chirp mass [grams] of the binary.
+
+    """
+    mt, mr = _array_args(mt, mr)
+    mc = mt * np.power(mr, 3.0/5.0) / np.power(1 + mr, 6.0/5.0)
     return mc
 
 

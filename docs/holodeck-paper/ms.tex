@@ -91,31 +91,39 @@
 % ====    Section 2 - Methods
 % =================================================================================================
 
+
 \section{Methods}
     \label{sec:meth}
 
     \subsection{Source Distributions and Gravitational Wave Calculations}
 
-    Let $N(z)$ denote the number of binaries out to a redshift $z$, corresponding to a comoving volume $V_c$.
-    We can calculate the characteristic strain from an ensemble of GW sources as \citep[][Eqs.~5/8]{Phinney-2001},
-        \begin{align}
-            h_c^2(f) = \int_0^\infty \!\! dz \; \frac{d^2 N}{dz \, d\ln f_r} \; h_s^2\lr{f_r}.
-        \end{align}
-    In practice, the total number of sources in the Universe is calculated from the number-density, $n \equiv dN / dV_c$, extrapolated into an observer's entire past light-cone.  These can be related as \citep[][Eq.~6]{Sesana+2008},
-        \begin{align}
-            \label{eq:num_num_dens}
-            \frac{d^2 N}{dz \, d\ln f_r} = \frac{d n_c}{dz} \frac{dz}{dt} \frac{dt}{d\ln f_r} \frac{d V_c}{dz}.
-        \end{align}
-    Note that the total number of binaries in a given frequency interval depends not only on the number density, but also their rate of frequency-evolution.  The faster binaries evolve through a given frequency interval, the fewer binaries will occupy that interval on average.  This is typically described by the binary `hardening' timescale (or `residence time'), given by the expression,
-    \begin{equation}
-        \thardf \equiv - \diffp{t}{{\ln\!f_r}} = - \frac{f_r}{\partial f_r / \partial t}.
-    \end{equation}
-    Plugging in the relevant cosmographic relationships (see \secref{sec:app_eqs}) we have,
-        \begin{align}
-            h_c^2(f) & = \int_0^\infty \!\! dz \; \frac{dn_c}{dz} \, h^2\lr{f_r} \, 4\pi c \, d_c^2 \lr{1+z} \, \thardf.
-        \end{align}
-    The challenge in modeling astrophysical sources of GWs is in calculating their number density.  Numerous approaches are possible, described in the following sections.
+        Let $N(M,q,z,\frst)$ denote the number of binaries up to a total mass $M$, mass ratio $q$, redshift $z$, and rest-frame orbital-frequency $\frst$.
+        We can calculate the characteristic strain from an ensemble of GW sources as \citep[][Eqs.~5/8]{Phinney-2001},
+            \begin{align}
+                h_c^2 = \int_0^\infty \!\! dz \; \frac{d^4 N}{dM \, dq \, dz \, d\ln\!\frst} \; \hs^2\lr{\frst}.
+            \end{align}
+        In practice, the total number of sources in the Universe is calculated from the number-density, $n \equiv dN / dV_c$, for some comoving volume $V_c$, extrapolated into an observer's entire past light-cone.  These can be related as \citep[][Eq.~6]{Sesana+2008},
+            \begin{align}
+                \label{eq:num_num_dens}
+                \frac{d^4 N}{dM \, dq \, dz \, d\ln\!\frst} = \frac{d^3 n_c}{dM \, dq \, dz} \frac{dz}{dt} \frac{dt}{d\ln\!\frst} \frac{d V_c}{dz}.
+            \end{align}
+        Note that the total number of binaries in a given frequency interval depends not only on the number density, but also their rate of frequency-evolution.  The faster binaries evolve through a given frequency interval, the fewer binaries will occupy that interval on average.  This is typically described by the binary `hardening' timescale (or `residence time'), given by the expression,
+        \begin{equation}
+            \label{eq:hardening}
+            \thardf \equiv - \diffp{t}{{\ln\!\frst}} = - \frac{\frst}{\partial \frst / \partial t}.
+        \end{equation}
 
+        % Plugging in the relevant cosmographic relationships (see \secref{sec:app_eqs}) we have,
+        %     \begin{align}
+            %         h_c^2(f) & = \int_0^\infty \!\! dz \; \frac{dn_c}{dz} \, h^2\lr{f_r} \, 4\pi c \, d_c^2 \lr{1+z} \, \thardf.
+            %     \end{align}
+            % The challenge in modeling astrophysical sources of GWs is in calculating their number density.  Numerous approaches are possible, described in the following sections.
+
+        Plugging in \eqref{eq:hardening} along with the relevant cosmographic relationships (see \secref{sec:app_eqs}) into \eqref{eq:num_num_dens} we have,
+        \begin{equation}
+            \frac{d^4 N}{dM \, dq \, dz \, d\ln\!\frst} =
+                \frac{d^3 n_c}{dM \, dq \, dz} \, 4\pi c \, d_c^2 \lr{1+z} \, \thardf.
+        \end{equation}
 
 
     \subsection{Semi-Analytic Modeling}
@@ -208,6 +216,10 @@
     \subsection{Semi-Analytic Models}
         \label{sec:imp_sam}
 
+
+
+
+
         The core of the semi-analytic modeling framework in \holodeck{} is implementing \eqref{eq:sam_final}.  There are classes for each of the key components: The galaxy stellar-mass function (GSMF, $\Phi$), the galaxy pair fraction \(F\), the merger timescale ($\tau$), and additional a scaling relation for mapping host galaxies via to MBH properties --- typically via an \mmbulge{} relation.  Each component class is implemented generically via basic API methods (e.g.~a GSMF that returns the number density of galaxies at a given stellar-mass and redshift), and can be subclassed to provide a particular implementation (e.g.~an analytic Schechter-function GSMF).  The number (or number density) of binaries is specified over a grid of parameters, typically in a four dimensional space of total mass ($M$), mass ratio ($q$), redshift ($z$), and binary rest-frame orbital frequency ($f_r$).
 
         The semi-analytic model formalism defines a continuous distribution of MBH binaries.  For many calculations, the discrete nature of MBHB sources is important, not only for examining individual continuous wave sources but also because of the important effects of discrete sources on the shape of the GWB due to the non-linear scaling of GW strain \citep{Sesana+2008}.  Additional, a component of the uncertainty in expected GW signals is due to `cosmic variance', which can be treated as Poisson noise when creating multiple samples (or `realizations') of our binary populations.  To handle discretization and resampling we use the \texttt{kalepy} package \citep{kalepy2021}, in particular, a method of outlier sampling to capture regions of parameter space where finite number effects are important.  The \holodeck{} semi-analytic models specify the number (or number-density) of binaries over a grid, i.e.~$N_{ijkl}$.  By definition, grid cells which have an expected total number of binaries $\gg 1$ will not produce appreciable finite-number effects, so instead they are given a weighting based on a Poisson distribution centered around their expectation value, i.e.~$\mathcal{P}(N_{ijkl})$.  Grid cells with expected numbers of order unity or less do produce important finite-number effects, and thus are directly resampled
@@ -215,6 +227,8 @@
 % =================================================================================================
 % ====    Section 3 - Results
 % =================================================================================================
+
+
 \section{Results}
     \label{sec:res}
 
@@ -231,6 +245,8 @@
 % =================================================================================================
 % ====    Section 4 - Conclusions
 % =================================================================================================
+
+
 \section{Discussion \& Conclusions}
     \label{sec:disc}
 
@@ -242,6 +258,7 @@
 
 
 % ====    Acknowledgments
+
 
 \section*{Acknowledgments}
 	I am very thankful to.
@@ -258,7 +275,7 @@
 
 \quad{}
 \bibliographystyle{mnras}
-\bibliography{refs}
+\bibliography{src/refs}
 
 \onecolumn
 \clearpage
@@ -267,6 +284,7 @@
 % ====    Appendices
 
 \appendix
+
 
 \section{Additional Equations}
     \label{sec:app_eqs}
@@ -292,6 +310,7 @@
         E(z) & \equiv \lrs[1/2]{\Omega_R \lr[4]{1+z} + \Omega_m \lr[3]{1+z} + \Omega_k \lr[2]{1+z} + \Omega_\Lambda}.
     \end{align}
     The $\Omega$ terms are the usual redshift-zero fractions of the critical density for radiation, non-relativistic matter, curvature, and dark energy.  We adopt the results of WMAP9 \citep{Hinshaw+2013} for our fiducial cosmology, assuming zero curvature: $H_0 = 69.33 \textrm{ km/s/Mpc}$, $\Omega_m = 0.2880$, $\Omega_\Lambda = 0.7120$.
+
 
 \section{Additional Material}
     \label{sec:app}
