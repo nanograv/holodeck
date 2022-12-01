@@ -354,11 +354,10 @@ def concatenate_outputs():
     print(f"{temp=}\n\t{list(data.keys())=}")
     fobs = data['fobs']
     fobs_edges = data['fobs_edges']
-    # nreals = data['nreals'][()]
     nfreqs = fobs.size
     temp_gwb = data['gwbspec'][:]
     nreals = temp_gwb.shape[1]
-    params = data['params']
+    test_params = data['params']
     names = data['names']
     lhs_grid = data['lhs_grid']
 
@@ -368,7 +367,6 @@ def concatenate_outputs():
 
     # ---- Store results from all files
 
-    # gwb_shape = list(shape) + [nfreqs, args.NUM_REALS]
     gwb_shape = [num_files, nfreqs, args.NUM_REALS]
     names = SPACE.names + ['freqs', 'reals']
     gwb = np.zeros(gwb_shape)
@@ -376,19 +374,15 @@ def concatenate_outputs():
     grid_idx = np.zeros((num_files, SPACE.paramdimen), dtype=int)
 
     for ii, file in enumerate(files):
-        temp = np.load(file)
-        print(f"{ii=}, {file=}, {temp['pnum']=}")
+        temp = np.load(file, allow_pickle=True)
         assert ii == temp['pnum']
         assert np.allclose(fobs, temp['fobs'])
         assert np.allclose(fobs_edges, temp['fobs_edges'])
         pars = [pp[()] for pp in [temp['times'], temp['mmb_amp'], temp['mmb_plaw']]]
         for ii, (pp, nn) in enumerate(zip(temp['params'], temp['names'])):
-            assert np.allclose(pp, params[ii])
+            assert np.allclose(pp, test_params[ii])
             assert nn == names[ii]
 
-        idx = SPACE.lhsnumber_to_index(ii)
-        space_pars = SPACE.param_grid[idx]
-        assert np.allclose(pars, space_pars)
         assert np.all(lhs_grid == temp['lhs_grid'])
 
         tt = temp['gwbspec'][:]
@@ -405,9 +399,8 @@ def concatenate_outputs():
         h5.create_dataset('gwb', data=gwb)
         h5.create_dataset('params', data=params)
         h5.create_dataset('names', data=names)
+        h5.create_dataset('lhs_grid', data=lhs_grid)
         h5.create_dataset('lhs_grid_indices', data=grid_idx)
-        # h5.create_dataset('lhs_indices', data=SPACE.sampleindxs)
-        # h5.create_dataset('lhs_param_grid', data=SPACE.param_grid)
 
     print(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
     return
