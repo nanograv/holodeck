@@ -274,11 +274,11 @@ def run_sam(pnum, real, path_output):
             LOG.warning(f"File {fname} already exists.")
             continue
 
-        fobs = holo.utils.nyquist_freqs(args.PTA_DUR, args.PTA_CAD)
+        fobs = holo.utils.nyquist_freqs_edges(args.PTA_DUR, args.PTA_CAD)
 
         sam = SPACE.sam_for_number(pnum)
         hard = holo.evolution.Hard_GW()
-        vals, weights, edges, dens, mass = holo.sam.sample_sam_with_hardening(sam, hard, fobs=fobs, sample_threshold=1e2, poisson_inside=True, poisson_outside=True)
+        vals, weights, edges, dens, mass = holo.sam.sample_sam_with_hardening(sam, hard, fobs=fobs/2., sample_threshold=1e2, poisson_inside=True, poisson_outside=True)
         gff, gwf, gwb = holo.gravwaves._gws_from_samples(vals, weights, fobs)
         legend = SPACE.param_dict_for_number(pnum)
         np.savez(fname, fobs=fobs, gff=gff, gwb=gwb, gwf=gwf, pnum=pnum, real=real, **legend)
