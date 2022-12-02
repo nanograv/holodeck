@@ -1293,6 +1293,28 @@ def chirp_mass(m1, m2=None):
     return mc
 
 
+def chirp_mass_mtmr(mt, mr):
+    """Calculate the chirp-mass of a binary.
+
+    Parameters
+    ----------
+    mt : array_like,
+        Total mass [grams].  This is ``M = m1+m2``.
+    mr : array_like,
+        Mass ratio.  ``q = m2/m1 <= 1``.
+        This is defined as the secondary (smaller) divided by the primary (larger) mass.
+
+    Returns
+    -------
+    mc : array_like,
+        Chirp mass [grams] of the binary.
+
+    """
+    mt, mr = _array_args(mt, mr)
+    mc = mt * np.power(mr, 3.0/5.0) / np.power(1 + mr, 6.0/5.0)
+    return mc
+
+
 def gw_char_strain_nyquist(dur_obs, hs, frst_orb, redz, dfdt_rst):
     """GW Characteristic Strain assuming frequency bins are Nyquist sampled.
 

@@ -1664,7 +1664,6 @@ class Fixed_Time(_Hardening):
             points = [np.log10(mtot/MSOL), np.log10(mrat), time/GYR, np.log10(sepa/PC)]
             points = np.array(points)
             norm = interp(points.T)
-            print(f"from interp: {utils.stats(norm)=}")
             bads = ~np.isfinite(norm)
             if np.any(bads):
                 msg = f"Normal interpolant failed on {utils.frac_str(bads, 4)} points.  Using backup interpolant"
@@ -1673,7 +1672,6 @@ class Fixed_Time(_Hardening):
                 # If scipy throws an error on the shape here, see: https://github.com/scipy/scipy/issues/4123
                 # or https://stackoverflow.com/a/26806707/230468
                 norm[bads] = backup(bp)
-                print(f"from backup: {utils.stats(norm[bads])=}")
                 bads = ~np.isfinite(norm)
                 if np.any(bads):
                     err = f"Backup interpolant failed on {utils.frac_str(bads, 4)} points!"
