@@ -48,7 +48,7 @@ class Parameter_Space:
         times=[1e-2, 10.0, 7],   # [Gyr]
         # gsmf_alpha0=[-1.56, -0.92, 5],
         # mmb_amp=[0.39e9, 0.61e9, 9], mmb_plaw=[1.01, 1.33, 11]
-        mmb_amp=[0.1e9, 1.0e9, 9], mmb_plaw=[0.8, 1.5, 11],
+        mmb_amp=[0.1e9, 1.0e9, 9], mmb_plaw=[0.8, 1.5, 2],
         nsamples=8
     ):
 
@@ -321,10 +321,9 @@ def run_sam(pnum, path_output):
     fobs_edges = holo.utils.nyquist_freqs_edges(args.PTA_DUR, args.PTA_CAD)
     fobs_orb_edges = fobs_edges / 2.0
 
-    sam = SPACE.sam_for_number(pnum)
-    hard = holo.evolution.Hard_GW()
+    sam, hard = SPACE.sam_for_number(pnum)
     vals, weights, edges, dens, mass = holo.sam.sample_sam_with_hardening(
-        sam, hard, fobs=fobs_orb_edges,
+        sam, hard, fobs_orb=fobs_orb_edges,
         sample_threshold=1e2, poisson_inside=True, poisson_outside=True
     )
     gff, gwf, gwb = holo.gravwaves._gws_from_samples(vals, weights, fobs_edges)
@@ -359,9 +358,9 @@ def concatenate_outputs():
     temp = files[0]
     data = np.load(temp, allow_pickle=True)
     print(f"{temp=}\n\t{list(data.keys())=}")
-    fobs = data['fobs']
+    fobs_cents = data['fobs_cents']
     fobs_edges = data['fobs_edges']
-    nfreqs = fobs.size
+    nfreqs = fobs_cents.size
     temp_gwb = data['gwbspec'][:]
     nreals = temp_gwb.shape[1]
     test_params = data['params']
@@ -383,7 +382,7 @@ def concatenate_outputs():
     for ii, file in enumerate(files):
         temp = np.load(file, allow_pickle=True)
         assert ii == temp['pnum']
-        assert np.allclose(fobs, temp['fobs'])
+        assert np.allclose(fobs_cents, temp['fobs_cents'])
         assert np.allclose(fobs_edges, temp['fobs_edges'])
         pars = [pp[()] for pp in [temp['times'], temp['mmb_amp'], temp['mmb_plaw']]]
         for ii, (pp, nn) in enumerate(zip(temp['params'], temp['names'])):
