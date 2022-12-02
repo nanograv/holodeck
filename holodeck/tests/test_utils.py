@@ -22,7 +22,7 @@ class Test__nyquist_freqs:
     def test_basic(self):
         dur = 10.0
         cad = 0.1
-        truth = np.arange(1, 101) * 0.1
+        truth = np.arange(1, 51) * 0.1
         test = utils.nyquist_freqs(dur, cad)
         assert np.allclose(truth, test)
         return
@@ -31,8 +31,8 @@ class Test__nyquist_freqs:
         dur = 10.0
         cad = 0.1
         # Remove the first (0.1) and last (10.0) elements with `trim`
-        trim = [0.15, 9.95]
-        truth = np.arange(1, 101)[1:-1] * 0.1
+        trim = [0.15, 4.95]
+        truth = np.arange(1, 51)[1:-1] * 0.1
         test = utils.nyquist_freqs(dur, cad, trim=trim)
         assert np.allclose(truth, test)
         return
