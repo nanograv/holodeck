@@ -314,17 +314,23 @@ def run_sam(pnum, path_output):
     if os.path.exists(fname):
         LOG.warning(f"File {fname} already exists.")
 
-    _fobs = holo.utils.nyquist_freqs(args.PTA_DUR, args.PTA_CAD)
+    fobs_cents = holo.utils.nyquist_freqs(args.PTA_DUR, args.PTA_CAD)
+    fobs_edges = holo.utils.nyquist_freqs_edges(args.PTA_DUR, args.PTA_CAD)
+    fobs_orb_edges = fobs_edges / 2.0
 
-        fobs = holo.utils.nyquist_freqs_edges(args.PTA_DUR, args.PTA_CAD)
-
-        sam = SPACE.sam_for_number(pnum)
-        hard = holo.evolution.Hard_GW()
-        vals, weights, edges, dens, mass = holo.sam.sample_sam_with_hardening(sam, hard, fobs=fobs/2., sample_threshold=1e2, poisson_inside=True, poisson_outside=True)
-        gff, gwf, gwb = holo.gravwaves._gws_from_samples(vals, weights, fobs)
-        legend = SPACE.param_dict_for_number(pnum)
-        np.savez(fname, fobs=fobs, gff=gff, gwb=gwb, gwf=gwf, pnum=pnum, real=real, **legend)
-        LOG.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
+    sam = SPACE.sam_for_number(pnum)
+    hard = holo.evolution.Hard_GW()
+    vals, weights, edges, dens, mass = holo.sam.sample_sam_with_hardening(
+        sam, hard, fobs=fobs_orb_edges,
+        sample_threshold=1e2, poisson_inside=True, poisson_outside=True
+    )
+    gff, gwf, gwb = holo.gravwaves._gws_from_samples(vals, weights, fobs_edges)
+    legend = SPACE.param_dict_for_number(pnum)
+    np.savez(
+        fname, fobs_cents=fobs_cents, fobs_edges=fobs_edges, gff=gff, gwb=gwb, gwf=gwf,
+        pnum=pnum, **legend
+    )
+    LOG.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
 
     return
 
