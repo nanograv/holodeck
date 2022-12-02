@@ -75,11 +75,14 @@ class Parameter_Space:
         self.paramdimen = len(params)
         maxints = [tmparr.size for tmparr in params]
 
-        if False: # do scipy LHS
+        # do scipy LHS
+        if False:
             LHS = qmc.LatinHypercube(d=self.paramdimen, centered=False, strength=1)
             # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
             sampleindxs = LHS.random(n=nsamples)
-        else: # do pyDOE LHS
+
+        # do pyDOE LHS
+        else:
             sampleindxs = pyDOE.lhs(n=self.paramdimen, samples=nsamples, criterion='m')
 
         for i in range(self.paramdimen):
