@@ -11,7 +11,6 @@ To-Do
 * Use subclassing to cleanup `Parameter_Space` object.  e.g. implement LHS as subclass of generic Parameter_Space class.
 * Should we extract the LHS code from `pydoe`, instead of relying on the `pydoe` package formally?
 
-
 """
 
 import argparse
@@ -38,37 +37,39 @@ import pyDOE
 
 log.setLevel(log.WARNING)
 
-SAM_SHAPE = 20
+SAM_SHAPE = 5
 
 
 class Parameter_Space:
 
     def __init__(
         self, nsamples,
-        # gsmf_phi0=[-3.35, -2.23, 7],
-        # gsmf_phi0=[-3.61, -1.93, 7],
+        gsmf_phi0=[-3.28, -2.16, 5],
         times=[1e-2, 10.0, 7],   # [Gyr]
-        # gsmf_alpha0=[-1.56, -0.92, 5],
-        # mmb_amp=[0.39e9, 0.61e9, 9], mmb_plaw=[1.01, 1.33, 11]
+        gpf_qgamma=[-0.4, +0.4, 5],
+        hard_gamma_inner=[-1.5, -0.5, 5],
         mmb_amp=[0.1e9, 1.0e9, 9], mmb_plaw=[0.8, 1.5, 11]
     ):
 
-        # self.gsmf_phi0 = np.linspace(*gsmf_phi0)
+        self.gsmf_phi0 = np.linspace(*gsmf_phi0)
         self.times = np.logspace(*np.log10(times[:2]), times[2])
-        # self.gsmf_alpha0 = np.linspace(*gsmf_alpha0)
+        self.gpf_qgamma = np.linspace(*gpf_qgamma)
+        self.hard_gamma_inner = np.linspace(*hard_gamma_inner)
         self.mmb_amp = np.linspace(*mmb_amp)
         self.mmb_plaw = np.linspace(*mmb_plaw)
         params = [
+            self.gsmf_phi0,
             self.times,   # [Gyr]
-            # self.gsmf_phi0,
-            # self.gsmf_alpha0,
+            self.gpf_qgamma,
+            self.hard_gamma_inner,
             self.mmb_amp,
             self.mmb_plaw
         ]
         self.names = [
+            'gsmf_phi0',
             'times',
-            # 'gsmf_phi0',
-            # 'gsmf_alpha0',
+            'gpf_qgamma',
+            'hard_gamma_inner',
             'mmb_amp',
             'mmb_plaw'
         ]
@@ -137,32 +138,32 @@ class Parameter_Space:
         pars = self.param_grid[idx]
         return pars
 
-    def sam_for_number(self, num):
-        param_grid = self.params_for_number(num)
+    # def sam_for_number(self, num):
+    #     param_grid = self.params_for_number(num)
 
-        time, mmb_amp, mmb_plaw = param_grid
+    #     time, mmb_amp, mmb_plaw = param_grid
 
-        gsmf = holo.sam.GSMF_Schechter()
-        gpf = holo.sam.GPF_Power_Law()
-        gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp*MSOL, mplaw=mmb_plaw)
+    #     gsmf = holo.sam.GSMF_Schechter()
+    #     gpf = holo.sam.GPF_Power_Law()
+    #     gmt = holo.sam.GMT_Power_Law()
+    #     mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp*MSOL, mplaw=mmb_plaw)
 
-        sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge, shape=SAM_SHAPE)
-        hard = holo.evolution.Fixed_Time.from_sam(sam, time*GYR, exact=True, progress=False)
-        return sam, hard
+    #     sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge, shape=SAM_SHAPE)
+    #     hard = holo.evolution.Fixed_Time.from_sam(sam, time*GYR, exact=True, progress=False)
+    #     return sam, hard
 
     def sam_for_lhsnumber(self, lhsnum):
         param_grid = self.params_for_lhsnumber(lhsnum)
 
-        time, mmb_amp, mmb_plaw = param_grid
+        gsmf_phi0, time, gpf_qgamma, hard_gamma_inner, mmb_amp, mmb_plaw = param_grid
 
-        gsmf = holo.sam.GSMF_Schechter()
-        gpf = holo.sam.GPF_Power_Law()
+        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gpf = holo.sam.GPF_Power_Law(qgamma=gpf_qgamma)
         gmt = holo.sam.GMT_Power_Law()
         mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp*MSOL, mplaw=mmb_plaw)
 
         sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge)
-        hard = holo.evolution.Fixed_Time.from_sam(sam, time*GYR, exact=True, progress=False)
+        hard = holo.evolution.Fixed_Time.from_sam(sam, time*GYR, gamma_sc=hard_gamma_inner, exact=True, progress=False)
         return sam, hard
 
 
@@ -178,7 +179,7 @@ parser.add_argument('-n', '--nsamples', action='store', dest='nsamples', type=in
 parser.add_argument('-r', '--reals', action='store', dest='reals', type=int,
                     help='number of realizations', default=10)
 parser.add_argument('-d', '--dur', action='store', dest='pta_dur', type=float,
-                    help='PTA observing duration [yrs]', default=20.0)
+                    help='PTA observing duration [yrs]', default=16.03)
 parser.add_argument('-f', '--freqs', action='store', dest='freqs', type=int,
                     help='Number of frequency bins', default=50)
 parser.add_argument('-t', '--test', action='store_true', default=False, dest='test',
@@ -372,7 +373,7 @@ def concatenate_outputs():
         assert ii == temp['pnum']
         assert np.allclose(fobs, temp['fobs'])
         assert np.allclose(fobs_edges, temp['fobs_edges'])
-        pars = [pp[()] for pp in [temp['times'], temp['mmb_amp'], temp['mmb_plaw']]]
+        pars = [temp[nn][()] for nn in SPACE.names]
         for jj, (pp, nn) in enumerate(zip(temp['params'], temp['names'])):
             assert np.allclose(pp, test_params[jj])
             assert nn == names[jj]
