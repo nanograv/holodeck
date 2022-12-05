@@ -15,18 +15,18 @@ To-Do
 
 """
 
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 
 import argparse
 import os
 import logging
+import shutil
 import sys
 import warnings
 from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-import h5py
 from mpi4py import MPI
 
 import holodeck as holo
@@ -40,9 +40,6 @@ import pyDOE
 
 # silence default holodeck log
 _log.setLevel(_log.WARNING)
-
-# Parameter defaults
-SAM_SHAPE = 50
 
 # Default argparse parameters
 DEF_NUM_REALS = 100
@@ -59,9 +56,10 @@ class Parameter_Space:
         gpf_qgamma=[-0.4, +0.4, 5],
         hard_gamma_inner=[-1.5, -0.5, 5],
         mmb_amp=[0.1e9, 1.0e9, 9],
-        mmb_plaw=[0.8, 1.5, 11]
+        mmb_plaw=[0.8, 1.5, 11],
+        sam_shape=50,
     ):
-
+        self.sam_shape = sam_shape
         self.gsmf_phi0 = np.linspace(*gsmf_phi0)
         self.times = np.logspace(*np.log10(times[:2]), times[2])
         self.gpf_qgamma = np.linspace(*gpf_qgamma)
@@ -102,7 +100,7 @@ class Parameter_Space:
             sampleindxs[:, i] = np.floor(maxints[i] * sampleindxs[:, i])
 
         sampleindxs = sampleindxs.astype(int)
-        LOG.debug(f"d={len(params)} samplelims={maxints} {nsamples=}")
+        log.debug(f"d={len(params)} samplelims={maxints} {nsamples=}")
         self.sampleindxs = sampleindxs
 
         self.params = params
@@ -110,7 +108,7 @@ class Parameter_Space:
         self.shape = self.param_grid[0].shape
         self.size = np.product(self.shape)
         if self.size < nsamples:
-            LOG.warning(f"There are only {self.size} gridpoints in parameter space but you are requesting {nsamples} samples of them. They will be over-sampled")
+            log.warning(f"There are only {self.size} gridpoints in parameter space but you are requesting {nsamples} samples of them. They will be over-sampled")
         self.param_grid = np.moveaxis(self.param_grid, 0, -1)
 
         pass
@@ -173,7 +171,7 @@ class Parameter_Space:
         gmt = holo.sam.GMT_Power_Law()
         mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp*MSOL, mplaw=mmb_plaw)
 
-        sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge)
+        sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge, shape=self.sam_shape)
         hard = holo.evolution.Fixed_Time.from_sam(sam, time*GYR, gamma_sc=hard_gamma_inner, exact=True, progress=False)
         return sam, hard
 
@@ -216,10 +214,6 @@ head = "\n" + head + "\n" + "=" * len(head) + "\n"
 if comm.rank == 0:
     print(head)
 
-log_name = f"holodeck__gen_lib_sams_{BEG.strftime('%Y%m%d-%H%M%S')}"
-if comm.rank > 0:
-    log_name = f"_{log_name}_r{comm.rank}"
-
 PATH_OUTPUT = Path(args.output).resolve()
 if not PATH_OUTPUT.is_absolute:
     PATH_OUTPUT = Path('.').resolve() / PATH_OUTPUT
@@ -232,14 +226,23 @@ comm.barrier()
 
 # ---- setup logger ----
 
+log_name = f"holodeck__gen_lib_sams_{BEG.strftime('%Y%m%d-%H%M%S')}"
+if comm.rank > 0:
+    log_name = f"_{log_name}_r{comm.rank}"
+
 fname = f"{PATH_OUTPUT.joinpath(log_name)}.log"
 log_lvl = holo.logger.INFO if args.verbose else holo.logger.WARNING
 tostr = sys.stdout if comm.rank == 0 else False
-LOG = holo.logger.get_logger(name=log_name, level_stream=log_lvl, tofile=fname, tostr=tostr)
-LOG.info(head)
-LOG.info(f"Output path: {PATH_OUTPUT}")
-LOG.info(f"        log: {fname}")
+log = holo.logger.get_logger(name=log_name, level_stream=log_lvl, tofile=fname, tostr=tostr)
+log.info(head)
+log.info(f"Output path: {PATH_OUTPUT}")
+log.info(f"        log: {fname}")
 
+if comm.rank == 0:
+    src_file = Path(this_fname)
+    dst_file = PATH_OUTPUT.joinpath(src_file.name)
+    shutil.copyfile(src_file, dst_file)
+    log.info(f"Copied {__file__} to {dst_file}")
 
 # ---- setup Parameter_Space instance
 
@@ -264,7 +267,7 @@ def main():
         indices = np.random.permutation(indices)
         indices = np.array_split(indices, comm.size)
         num_ind_per_proc = [len(ii) for ii in indices]
-        LOG.info(f"{npars=} cores={comm.size} || max runs per core = {np.max(num_ind_per_proc)}")
+        log.info(f"{npars=} cores={comm.size} || max runs per core = {np.max(num_ind_per_proc)}")
     else:
         indices = None
 
@@ -274,15 +277,15 @@ def main():
     iterator = holo.utils.tqdm(indices) if comm.rank == 0 else np.atleast_1d(indices)
 
     if args.test:
-        LOG.info("Running in testing mode. Outputting parameters:")
+        log.info("Running in testing mode. Outputting parameters:")
 
     for ind in iterator:
         # Convert from 1D index into 2D (param, real) specification
         # param, real = np.unravel_index(ind, (npars, nreals))
-        # LOG.info(f"rank:{comm.rank} index:{ind} => {param=} {real=}")
+        # log.info(f"rank:{comm.rank} index:{ind} => {param=} {real=}")
         lhsparam = ind
 
-        LOG.info(f"{comm.rank=} {ind=} {SPACE.param_dict_for_lhsnumber(lhsparam)}")
+        log.info(f"{comm.rank=} {ind=} {SPACE.param_dict_for_lhsnumber(lhsparam)}")
         if args.test:
             continue
 
@@ -291,15 +294,15 @@ def main():
         except Exception as err:
             logging.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{ind}")
             logging.warning(err)
-            LOG.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{ind}")
-            LOG.warning(err)
+            log.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{ind}")
+            log.warning(err)
             import traceback
             traceback.print_exc()
             print("\n\n")
 
     end = datetime.now()
     print(f"\t{comm.rank} done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}")
-    LOG.info(f"\t{comm.rank} done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}")
+    log.info(f"\t{comm.rank} done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}")
     bnum = _barrier(bnum)
 
     return
@@ -309,9 +312,9 @@ def run_sam(pnum, path_output):
 
     fname = f"lib_sams__p{pnum:06d}.npz"
     fname = os.path.join(path_output, fname)
-    LOG.debug(f"{pnum=} :: {fname=}")
+    log.debug(f"{pnum=} :: {fname=}")
     if os.path.exists(fname):
-        LOG.warning(f"File {fname} already exists.")
+        log.warning(f"File {fname} already exists.")
 
     pta_dur = args.pta_dur * YR
     nfreqs = args.freqs
@@ -319,118 +322,30 @@ def run_sam(pnum, path_output):
     pta_cad = 1.0 / (2 * hifr)
     fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
     fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
-    LOG.info(f"Created {fobs_cents.size} frequency bins")
-    LOG.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
-    LOG.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
+    log.info(f"Created {fobs_cents.size} frequency bins")
+    log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
+    log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
     assert nfreqs == fobs_cents.size
 
-    LOG.debug("Selecting `sam` and `hard` instances")
+    log.debug("Selecting `sam` and `hard` instances")
     sam, hard = SPACE.sam_for_lhsnumber(pnum)
-    LOG.debug("Calculating GWB for shape ({fobs_cents.size}, {args.reals})")
+    log.debug("Calculating GWB for shape ({fobs_cents.size}, {args.reals})")
     gwb = sam.gwb(fobs_edges, realize=args.reals, hard=hard)
-    LOG.debug(f"{holo.utils.stats(gwb)=}")
+    log.debug(f"{holo.utils.stats(gwb)=}")
     legend = SPACE.param_dict_for_lhsnumber(pnum)
-    LOG.debug("Saving {pnum} to file")
+    log.debug("Saving {pnum} to file")
     np.savez(fname, fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb,
              pnum=pnum, pdim=SPACE.paramdimen, nsamples=args.nsamples,
              lhs_grid=SPACE.sampleindxs, lhs_grid_idx=SPACE.lhsnumber_to_index(pnum),
              params=SPACE.params, names=SPACE.names, version=__version__, **legend)
 
-    LOG.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
+    log.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
 
-    return
-
-
-def concatenate_outputs():
-    regex = "lib_sams__p*.npz"
-    files = sorted(PATH_OUTPUT.glob(regex))
-    num_files = len(files)
-    LOG.info(f"{PATH_OUTPUT=}\n\texists={PATH_OUTPUT.exists()}, found {num_files} files")
-
-    all_exist = True
-    for ii in range(num_files):
-        temp = PATH_OUTPUT.joinpath(regex.replace('*', f"{ii:06d}"))
-        exists = temp.exists()
-        if not exists:
-            all_exist = False
-            break
-
-    if not all_exist:
-        raise ValueError(f"Missing at least file number {ii} out of {num_files=}!")
-
-    # ---- Check one example data file
-    temp = files[0]
-    data = np.load(temp, allow_pickle=True)
-    LOG.info(f"Test file: {temp=}\n\t{list(data.keys())=}")
-    fobs_cents = data['fobs_cents']
-    fobs_edges = data['fobs_edges']
-    nfreqs = fobs_cents.size
-    temp_gwb = data['gwb'][:]
-    nreals = temp_gwb.shape[1]
-    test_params = data['params']
-    param_names = data['names']
-    lhs_grid = data['lhs_grid']
-    try:
-        pdim = data['pdim']
-    except KeyError:
-        pdim = SPACE.paramdimen
-
-    try:
-        nsamples = data['nsamples']
-        if num_files != nsamples:
-            raise ValueError(f"{nsamples=} but {num_files=} !!")
-    except KeyError:
-        pass
-
-    assert np.ndim(temp_gwb) == 2
-    assert temp_gwb.shape[0] == nfreqs
-    assert temp_gwb.shape[1] == args.reals
-
-    # ---- Store results from all files
-
-    gwb_shape = [num_files, nfreqs, args.reals]
-    shape_names = param_names + ['freqs', 'reals']
-    gwb = np.zeros(gwb_shape)
-    params = np.zeros((num_files, pdim))
-    grid_idx = np.zeros((num_files, pdim), dtype=int)
-
-    LOG.info(f"Collecting data from {len(files)} files")
-    for ii, file in enumerate(files):
-        temp = np.load(file, allow_pickle=True)
-        assert ii == temp['pnum']
-        assert np.allclose(fobs_cents, temp['fobs_cents'])
-        assert np.allclose(fobs_edges, temp['fobs_edges'])
-        pars = [temp[nn][()] for nn in param_names]
-        for jj, (pp, nn) in enumerate(zip(temp['params'], temp['names'])):
-            assert np.allclose(pp, test_params[jj])
-            assert nn == param_names[jj]
-
-        assert np.all(lhs_grid == temp['lhs_grid'])
-
-        tt = temp['gwb'][:]
-        assert np.shape(tt) == (nfreqs, nreals)
-        gwb[ii] = tt
-        params[ii, :] = pars
-        grid_idx[ii, :] = temp['lhs_grid_idx']
-
-    out_filename = PATH_OUTPUT.joinpath('sam_lib.hdf5')
-    LOG.info("Writing collected data to file {out_filename}")
-    with h5py.File(out_filename, 'w') as h5:
-        h5.create_dataset('fobs', data=fobs)
-        h5.create_dataset('fobs_edges', data=fobs_edges)
-        h5.create_dataset('gwb', data=gwb)
-        h5.create_dataset('params', data=params)
-        h5.create_dataset('param_names', data=param_names)
-        h5.create_dataset('shape_names', data=shape_names)
-        h5.create_dataset('lhs_grid', data=lhs_grid)
-        h5.create_dataset('lhs_grid_indices', data=grid_idx)
-
-    LOG.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
     return
 
 
 def _barrier(bnum):
-    LOG.debug(f"barrier {bnum}")
+    log.debug(f"barrier {bnum}")
     comm.barrier()
     bnum += 1
     return bnum
@@ -443,10 +358,10 @@ if __name__ == "__main__":
     if not args.concatenateoutput:
         main()
 
-    if comm.rank == 0:
-        LOG.info("Concatenating outputs into single file")
-        concatenate_outputs()
-        LOG.info("Concatenating completed")
+    if (comm.rank == 0) and (not args.test):
+        log.info("Concatenating outputs into single file")
+        holo.librarian.sam_lib_combine(PATH_OUTPUT, log)
+        log.info("Concatenating completed")
 
     if comm.rank == 0:
         end = datetime.now()
