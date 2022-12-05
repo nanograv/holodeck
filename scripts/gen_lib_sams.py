@@ -4,6 +4,8 @@ mpirun -n 14  python ./scripts/gen_lib_sams.py output/test_2022-06-27
 
 To-Do
 -----
+* Copy `gen_lib_sams.py` to output directory when code is run!
+
 * LHS (at least with pydoe) is not deterministic (i.e. not reproducible).  Find a way to make reproducible.
 * Rely less on `argparse` and instead just hardcode the parameters.  Save runtime parameters to output npz/hdf5 files.
 * Use LHS to choose parameters themselves, instead of grid-points.  Also remove usage of grid entirely.
@@ -12,6 +14,8 @@ To-Do
 * Should we extract the LHS code from `pydoe`, instead of relying on the `pydoe` package formally?
 
 """
+
+__version__ = '0.1.1'
 
 import argparse
 import os
@@ -29,15 +33,16 @@ import holodeck as holo
 import holodeck.sam
 import holodeck.logger
 from holodeck.constants import YR, MSOL, GYR
-from holodeck import log
+from holodeck import log as _log     #: import the default holodeck log just so that we can silence it
 
 from scipy.stats import qmc
 import pyDOE
-# import pickle
 
-log.setLevel(log.WARNING)
 
-SAM_SHAPE = 5
+# silence default holodeck log
+_log.setLevel(log.WARNING)
+
+SAM_SHAPE = 50
 
 
 class Parameter_Space:
@@ -48,7 +53,8 @@ class Parameter_Space:
         times=[1e-2, 10.0, 7],   # [Gyr]
         gpf_qgamma=[-0.4, +0.4, 5],
         hard_gamma_inner=[-1.5, -0.5, 5],
-        mmb_amp=[0.1e9, 1.0e9, 9], mmb_plaw=[0.8, 1.5, 11]
+        mmb_amp=[0.1e9, 1.0e9, 9],
+        mmb_plaw=[0.8, 1.5, 11]
     ):
 
         self.gsmf_phi0 = np.linspace(*gsmf_phi0)
@@ -298,7 +304,7 @@ def run_sam(pnum, path_output):
 
     fname = f"lib_sams__p{pnum:06d}.npz"
     fname = os.path.join(path_output, fname)
-    log.debug("{pnun=} :: {fname=}")
+    LOG.debug("{pnun=} :: {fname=}")
     if os.path.exists(fname):
         LOG.warning(f"File {fname} already exists.")
 
@@ -307,18 +313,19 @@ def run_sam(pnum, path_output):
     cad = 1.0 / (2 * hifr)
     fobs_cents = holo.utils.nyquist_freqs(args.pta_dur, cad)
     fobs_edges = holo.utils.nyquist_freqs_edges(args.pta_dur, cad)
-    log.info(f"Created {fobs_cents.size} frequency bins: [{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}]")
+    LOG.info(f"Created {fobs_cents.size} frequency bins: [{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}]")
     assert nfreqs == fobs_cents.size
 
-    log.debug("Selecting `sam` and `hard` instances")
+    LOG.debug("Selecting `sam` and `hard` instances")
     sam, hard = SPACE.sam_for_lhsnumber(pnum)
-    log.debug("Calculating GWB for shape ({fobs_cents.size}, {args.reals})")
+    LOG.debug("Calculating GWB for shape ({fobs_cents.size}, {args.reals})")
     gwb = sam.gwb(fobs_edges, realize=args.reals, hard=hard)
     legend = SPACE.param_dict_for_lhsnumber(pnum)
-    log.debug("Saving {pnum} to file")
-    np.savez(fname, fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb, pnum=pnum,
+    LOG.debug("Saving {pnum} to file")
+    np.savez(fname, fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb,
+             pnum=pnum, pdim=SPACE.paramdimen, nsamples=args.nsamples,
              lhs_grid=SPACE.sampleindxs, lhs_grid_idx=SPACE.lhsnumber_to_index(pnum),
-             params=SPACE.params, names=SPACE.names, **legend)
+             params=SPACE.params, names=SPACE.names, version=__version__, **legend)
 
     LOG.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
 
@@ -329,8 +336,7 @@ def concatenate_outputs():
     regex = "lib_sams__p*.npz"
     files = sorted(PATH_OUTPUT.glob(regex))
     num_files = len(files)
-    log.info(f"{PATH_OUTPUT=}\n\texists={PATH_OUTPUT.exists()}, found {num_files} files")
-    assert num_files == args.nsamples
+    LOG.info(f"{PATH_OUTPUT=}\n\texists={PATH_OUTPUT.exists()}, found {num_files} files")
 
     all_exist = True
     for ii in range(num_files):
@@ -340,21 +346,33 @@ def concatenate_outputs():
             all_exist = False
             break
 
-    log.info(f"All files exist?  {all_exist}")
+    if not all_exist:
+        raise ValueError(f"Missing at least file number {ii} out of {num_files=}!")
 
     # ---- Check one example data file
     temp = files[0]
     data = np.load(temp, allow_pickle=True)
-    log.info(f"Test file: {temp=}\n\t{list(data.keys())=}")
+    LOG.info(f"Test file: {temp=}\n\t{list(data.keys())=}")
     fobs = data['fobs']
     fobs_edges = data['fobs_edges']
     nfreqs = fobs.size
     temp_gwb = data['gwb'][:]
     nreals = temp_gwb.shape[1]
     test_params = data['params']
-    names = data['names']
+    param_names = data['names']
     lhs_grid = data['lhs_grid']
+    try:
+        pdim = data['pdim']
+    except KeyError:
+        pdim = SPACE.paramdimen
 
+    try:
+        nsamples = data['nsamples']
+        if num_files != nsamples:
+            raise ValueError(f"{nsamples=} but {num_files=} !!")
+    except KeyError:
+        pass
+        
     assert np.ndim(temp_gwb) == 2
     assert temp_gwb.shape[0] == nfreqs
     assert temp_gwb.shape[1] == args.reals
@@ -362,21 +380,21 @@ def concatenate_outputs():
     # ---- Store results from all files
 
     gwb_shape = [num_files, nfreqs, args.reals]
-    names = SPACE.names + ['freqs', 'reals']
+    shape_names = param_names + ['freqs', 'reals']
     gwb = np.zeros(gwb_shape)
-    params = np.zeros((num_files, SPACE.paramdimen))
-    grid_idx = np.zeros((num_files, SPACE.paramdimen), dtype=int)
+    params = np.zeros((num_files, pdim))
+    grid_idx = np.zeros((num_files, pdim), dtype=int)
 
-    log.info(f"Collecting data from {len(files)} files")
+    LOG.info(f"Collecting data from {len(files)} files")
     for ii, file in enumerate(files):
         temp = np.load(file, allow_pickle=True)
         assert ii == temp['pnum']
         assert np.allclose(fobs, temp['fobs'])
         assert np.allclose(fobs_edges, temp['fobs_edges'])
-        pars = [temp[nn][()] for nn in SPACE.names]
+        pars = [temp[nn][()] for nn in param_names]
         for jj, (pp, nn) in enumerate(zip(temp['params'], temp['names'])):
             assert np.allclose(pp, test_params[jj])
-            assert nn == names[jj]
+            assert nn == param_names[jj]
 
         assert np.all(lhs_grid == temp['lhs_grid'])
 
@@ -387,17 +405,18 @@ def concatenate_outputs():
         grid_idx[ii, :] = temp['lhs_grid_idx']
 
     out_filename = PATH_OUTPUT.joinpath('sam_lib.hdf5')
-    log.info("Writing collected data to file {out_filename}")
+    LOG.info("Writing collected data to file {out_filename}")
     with h5py.File(out_filename, 'w') as h5:
         h5.create_dataset('fobs', data=fobs)
         h5.create_dataset('fobs_edges', data=fobs_edges)
         h5.create_dataset('gwb', data=gwb)
         h5.create_dataset('params', data=params)
-        h5.create_dataset('names', data=names)
+        h5.create_dataset('param_names', data=param_names)
+        h5.create_dataset('shape_names', data=shape_names)
         h5.create_dataset('lhs_grid', data=lhs_grid)
         h5.create_dataset('lhs_grid_indices', data=grid_idx)
 
-    log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
+    LOG.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
     return
 
 
