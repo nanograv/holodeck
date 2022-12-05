@@ -731,6 +731,7 @@ class Semi_Analytic_Model:
         edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents)
         # edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb_edges)
         edges[-1] = fobs_orb_edges
+        log.debug(f"{utils.stats(dnum)=}")
 
         # "integrate" within each bin (i.e. multiply by bin volume)
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
@@ -740,6 +741,8 @@ class Semi_Analytic_Model:
         # number = utils._integrate_grid_differential_number(edges, dnum, freq=True)
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
         number = number * np.diff(np.log(fobs_gw_edges))
+        log.debug(f"{utils.stats(number)=}")
+        log.debug(f"{number.sum()=:.4e}")
 
         # ---- Get the GWB spectrum from number of binaries over grid
         hc = gravwaves._gws_from_number_grid_integrated(edges, number, realize)

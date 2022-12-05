@@ -38,11 +38,16 @@ from holodeck import log as _log     #: import the default holodeck log just so 
 from scipy.stats import qmc
 import pyDOE
 
-
 # silence default holodeck log
-_log.setLevel(log.WARNING)
+_log.setLevel(_log.WARNING)
 
+# Parameter defaults
 SAM_SHAPE = 50
+
+# Default argparse parameters
+DEF_NUM_REALS = 100
+DEF_NUM_FBINS = 50
+DEF_PTA_DUR = 16.03     # [yrs]
 
 
 class Parameter_Space:
@@ -183,11 +188,11 @@ parser.add_argument('output', metavar='output', type=str,
 parser.add_argument('-n', '--nsamples', action='store', dest='nsamples', type=int, default=25,
                     help='number of parameter space samples, must be square of prime')
 parser.add_argument('-r', '--reals', action='store', dest='reals', type=int,
-                    help='number of realizations', default=10)
+                    help='number of realizations', default=DEF_NUM_REALS)
 parser.add_argument('-d', '--dur', action='store', dest='pta_dur', type=float,
-                    help='PTA observing duration [yrs]', default=16.03)
+                    help='PTA observing duration [yrs]', default=DEF_PTA_DUR)
 parser.add_argument('-f', '--freqs', action='store', dest='freqs', type=int,
-                    help='Number of frequency bins', default=50)
+                    help='Number of frequency bins', default=DEF_NUM_FBINS)
 parser.add_argument('-t', '--test', action='store_true', default=False, dest='test',
                     help='Do not actually run, just output what parameters would have been done.')
 parser.add_argument('-c', '--concatenate', action='store_true', default=False, dest='concatenateoutput',
@@ -304,22 +309,26 @@ def run_sam(pnum, path_output):
 
     fname = f"lib_sams__p{pnum:06d}.npz"
     fname = os.path.join(path_output, fname)
-    LOG.debug("{pnun=} :: {fname=}")
+    LOG.debug(f"{pnum=} :: {fname=}")
     if os.path.exists(fname):
         LOG.warning(f"File {fname} already exists.")
 
+    pta_dur = args.pta_dur * YR
     nfreqs = args.freqs
-    hifr = nfreqs/args.pta_dur
-    cad = 1.0 / (2 * hifr)
-    fobs_cents = holo.utils.nyquist_freqs(args.pta_dur, cad)
-    fobs_edges = holo.utils.nyquist_freqs_edges(args.pta_dur, cad)
-    LOG.info(f"Created {fobs_cents.size} frequency bins: [{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}]")
+    hifr = nfreqs/pta_dur
+    pta_cad = 1.0 / (2 * hifr)
+    fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
+    fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
+    LOG.info(f"Created {fobs_cents.size} frequency bins")
+    LOG.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
+    LOG.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
     assert nfreqs == fobs_cents.size
 
     LOG.debug("Selecting `sam` and `hard` instances")
     sam, hard = SPACE.sam_for_lhsnumber(pnum)
     LOG.debug("Calculating GWB for shape ({fobs_cents.size}, {args.reals})")
     gwb = sam.gwb(fobs_edges, realize=args.reals, hard=hard)
+    LOG.debug(f"{holo.utils.stats(gwb)=}")
     legend = SPACE.param_dict_for_lhsnumber(pnum)
     LOG.debug("Saving {pnum} to file")
     np.savez(fname, fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb,
@@ -372,7 +381,7 @@ def concatenate_outputs():
             raise ValueError(f"{nsamples=} but {num_files=} !!")
     except KeyError:
         pass
-        
+
     assert np.ndim(temp_gwb) == 2
     assert temp_gwb.shape[0] == nfreqs
     assert temp_gwb.shape[1] == args.reals
