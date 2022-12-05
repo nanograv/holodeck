@@ -362,9 +362,9 @@ def concatenate_outputs():
     temp = files[0]
     data = np.load(temp, allow_pickle=True)
     LOG.info(f"Test file: {temp=}\n\t{list(data.keys())=}")
-    fobs = data['fobs']
+    fobs_cents = data['fobs_cents']
     fobs_edges = data['fobs_edges']
-    nfreqs = fobs.size
+    nfreqs = fobs_cents.size
     temp_gwb = data['gwb'][:]
     nreals = temp_gwb.shape[1]
     test_params = data['params']
