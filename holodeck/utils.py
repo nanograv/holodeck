@@ -565,6 +565,7 @@ def nyquist_freqs(
 
     return freqs
 
+
 def nyquist_freqs_edges(
     dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
 ) -> np.ndarray:
@@ -604,7 +605,8 @@ def nyquist_freqs_edges(
             freqs_edges = freqs_edges[freqs_edges < trim[1]]
 
     return freqs_edges
-    
+
+
 def quantile_filtered(values, percs, axis, func=np.isfinite):
     percs = np.asarray(percs)
     assert np.all((percs > 0.0) & (percs < 1.0))
