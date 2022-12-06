@@ -20,6 +20,8 @@ class _Parameter_Space(abc.ABC):
     def __init__(self, log, nsamples, sam_shape, **kwargs):
 
         self.log = log
+        self.nsamples = nsamples
+        self.sam_shape = sam_shape
 
         names = []
         params = []
@@ -44,7 +46,6 @@ class _Parameter_Space(abc.ABC):
             params.append(vv)
 
         '''
-        self.sam_shape = sam_shape
         self.gsmf_phi0 = np.linspace(*gsmf_phi0)
         self.times = np.logspace(*np.log10(times[:2]), times[2])
         self.gpf_qgamma = np.linspace(*gpf_qgamma)
@@ -139,8 +140,9 @@ class _Parameter_Space(abc.ABC):
         pars = self.param_grid[idx]
         return pars
 
-    @abc.abstractmethod
+    # @abc.abstractmethod
     def sam_for_number(self, num):
+        raise
         return
 
     @abc.abstractmethod
