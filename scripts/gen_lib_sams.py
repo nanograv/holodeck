@@ -15,7 +15,7 @@ To-Do
 
 """
 
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 import argparse
 import os
@@ -35,11 +35,13 @@ import holodeck.logger
 from holodeck.constants import YR, MSOL, GYR
 from holodeck import log as _log     #: import the default holodeck log just so that we can silence it
 
-from scipy.stats import qmc
-import pyDOE
+# from scipy.stats import qmc
+# import pyDOE
 
 # silence default holodeck log
 _log.setLevel(_log.WARNING)
+
+SAM_SHAPE = 50
 
 # Default argparse parameters
 DEF_NUM_REALS = 100
@@ -47,134 +49,47 @@ DEF_NUM_FBINS = 50
 DEF_PTA_DUR = 16.03     # [yrs]
 
 
-class Parameter_Space:
+class Parameter_Space_Mix01(holo.librarian._Parameter_Space):
 
-    def __init__(
-        self, nsamples,
-        gsmf_phi0=[-3.28, -2.16, 5],
-        times=[1e-2, 10.0, 7],   # [Gyr]
-        gpf_qgamma=[-0.4, +0.4, 5],
-        hard_gamma_inner=[-1.5, -0.5, 5],
-        mmb_amp=[0.1e9, 1.0e9, 9],
-        mmb_plaw=[0.8, 1.5, 11],
-        sam_shape=50,
-    ):
-        self.sam_shape = sam_shape
-        self.gsmf_phi0 = np.linspace(*gsmf_phi0)
-        self.times = np.logspace(*np.log10(times[:2]), times[2])
-        self.gpf_qgamma = np.linspace(*gpf_qgamma)
-        self.hard_gamma_inner = np.linspace(*hard_gamma_inner)
-        self.mmb_amp = np.linspace(*mmb_amp)
-        self.mmb_plaw = np.linspace(*mmb_plaw)
-        params = [
-            self.gsmf_phi0,
-            self.times,   # [Gyr]
-            self.gpf_qgamma,
-            self.hard_gamma_inner,
-            self.mmb_amp,
-            self.mmb_plaw
-        ]
-        self.names = [
-            'gsmf_phi0',
-            'times',
-            'gpf_qgamma',
-            'hard_gamma_inner',
-            'mmb_amp',
-            'mmb_plaw'
-        ]
+    _PARAM_NAMES = [
+        'gsmf_phi0',
+        'time',
+        'gpf_qgamma',
+        'hard_gamma_inner',
+        'mmb_amp',
+        'mmb_plaw'
+    ]
 
-        self.paramdimen = len(params)
-        maxints = [tmparr.size for tmparr in params]
+    def __init__(self, nsamples, sam_shape):
 
-        # do scipy LHS
-        if False:
-            LHS = qmc.LatinHypercube(d=self.paramdimen, centered=False, strength=1)
-            # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
-            sampleindxs = LHS.random(n=nsamples)
-
-        # do pyDOE LHS
-        else:
-            sampleindxs = pyDOE.lhs(n=self.paramdimen, samples=nsamples, criterion='m')
-
-        for i in range(self.paramdimen):
-            sampleindxs[:, i] = np.floor(maxints[i] * sampleindxs[:, i])
-
-        sampleindxs = sampleindxs.astype(int)
-        log.debug(f"d={len(params)} samplelims={maxints} {nsamples=}")
-        self.sampleindxs = sampleindxs
-
-        self.params = params
-        self.param_grid = np.meshgrid(*params, indexing='ij')
-        self.shape = self.param_grid[0].shape
-        self.size = np.product(self.shape)
-        if self.size < nsamples:
-            log.warning(f"There are only {self.size} gridpoints in parameter space but you are requesting {nsamples} samples of them. They will be over-sampled")
-        self.param_grid = np.moveaxis(self.param_grid, 0, -1)
-
-        pass
-
-    def number_to_index(self, num):
-        idx = np.unravel_index(num, self.shape)
-        return idx
-
-    def lhsnumber_to_index(self, lhsnum):
-        idx = tuple(self.sampleindxs[lhsnum])
-        return idx
-
-    def index_to_number(self, idx):
-        num = np.ravel_multi_index(idx, self.shape)
-        return num
-
-    def param_dict_for_number(self, num):
-        idx = self.number_to_index(num)
-        pars = self.param_grid[idx]
-        rv = {nn: pp for nn, pp in zip(self.names, pars)}
-        return rv
-
-    def param_dict_for_lhsnumber(self, lhsnum):
-        idx = self.lhsnumber_to_index(lhsnum)
-        pars = self.param_grid[idx]
-        rv = {nn: pp for nn, pp in zip(self.names, pars)}
-        return rv
-
-    def params_for_number(self, num):
-        idx = self.number_to_index(num)
-        pars = self.param_grid[idx]
-        return pars
-
-    def params_for_lhsnumber(self, lhsnum):
-        idx = self.lhsnumber_to_index(lhsnum)
-        pars = self.param_grid[idx]
-        return pars
-
-    # def sam_for_number(self, num):
-    #     param_grid = self.params_for_number(num)
-
-    #     time, mmb_amp, mmb_plaw = param_grid
-
-    #     gsmf = holo.sam.GSMF_Schechter()
-    #     gpf = holo.sam.GPF_Power_Law()
-    #     gmt = holo.sam.GMT_Power_Law()
-    #     mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp*MSOL, mplaw=mmb_plaw)
-
-    #     sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge, shape=SAM_SHAPE)
-    #     hard = holo.evolution.Fixed_Time.from_sam(sam, time*GYR, exact=True, progress=False)
-    #     return sam, hard
+        super().__init__(
+            nsamples, sam_shape,
+            gsmf_phi0=[-3.28, -2.16, 5],
+            time=[-2.0, +1.0, 7],   # [log10(Gyr)]
+            gpf_qgamma=[-0.4, +0.4, 5],
+            hard_gamma_inner=[-1.5, -0.5, 5],
+            mmb_amp=[0.1e9, 1.0e9, 9],
+            mmb_plaw=[0.8, 1.5, 11],
+        )
 
     def sam_for_lhsnumber(self, lhsnum):
         param_grid = self.params_for_lhsnumber(lhsnum)
 
         gsmf_phi0, time, gpf_qgamma, hard_gamma_inner, mmb_amp, mmb_plaw = param_grid
+        time = (10.0 ** time) * GYR
+        mmb_amp = mmb_amp*MSOL
 
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law(qgamma=gpf_qgamma)
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp*MSOL, mplaw=mmb_plaw)
+        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
 
         sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge, shape=self.sam_shape)
-        hard = holo.evolution.Fixed_Time.from_sam(sam, time*GYR, gamma_sc=hard_gamma_inner, exact=True, progress=False)
+        hard = holo.evolution.Fixed_Time.from_sam(sam, time, gamma_sc=hard_gamma_inner, exact=True, progress=False)
         return sam, hard
 
+
+SPACE = Parameter_Space_Mix01
 
 comm = MPI.COMM_WORLD
 
@@ -246,8 +161,9 @@ if comm.rank == 0:
 
 # ---- setup Parameter_Space instance
 
-SPACE = Parameter_Space(args.nsamples) if comm.rank == 0 else None
-SPACE = comm.bcast(SPACE, root=0)
+log.warning(f"SPACE = {SPACE}")
+space = SPACE(log, args.nsamples, SAM_SHAPE) if comm.rank == 0 else None
+space = comm.bcast(space, root=0)
 
 # ------------------------------------------------------------------------------
 # ----    Methods
@@ -256,7 +172,6 @@ SPACE = comm.bcast(SPACE, root=0)
 
 def main():
     bnum = 0
-    # npars = SPACE.size
     npars = args.nsamples
 
     bnum = _barrier(bnum)
@@ -285,7 +200,7 @@ def main():
         # log.info(f"rank:{comm.rank} index:{ind} => {param=} {real=}")
         lhsparam = ind
 
-        log.info(f"{comm.rank=} {ind=} {SPACE.param_dict_for_lhsnumber(lhsparam)}")
+        log.info(f"{comm.rank=} {ind=} {space.param_dict_for_lhsnumber(lhsparam)}")
         if args.test:
             continue
 
@@ -328,16 +243,16 @@ def run_sam(pnum, path_output):
     assert nfreqs == fobs_cents.size
 
     log.debug("Selecting `sam` and `hard` instances")
-    sam, hard = SPACE.sam_for_lhsnumber(pnum)
+    sam, hard = space.sam_for_lhsnumber(pnum)
     log.debug("Calculating GWB for shape ({fobs_cents.size}, {args.reals})")
     gwb = sam.gwb(fobs_edges, realize=args.reals, hard=hard)
     log.debug(f"{holo.utils.stats(gwb)=}")
-    legend = SPACE.param_dict_for_lhsnumber(pnum)
+    legend = space.param_dict_for_lhsnumber(pnum)
     log.debug("Saving {pnum} to file")
     np.savez(fname, fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb,
-             pnum=pnum, pdim=SPACE.paramdimen, nsamples=args.nsamples,
-             lhs_grid=SPACE.sampleindxs, lhs_grid_idx=SPACE.lhsnumber_to_index(pnum),
-             params=SPACE.params, names=SPACE.names, version=__version__, **legend)
+             pnum=pnum, pdim=space.paramdimen, nsamples=args.nsamples,
+             lhs_grid=space.sampleindxs, lhs_grid_idx=space.lhsnumber_to_index(pnum),
+             params=space.params, names=space.names, version=__version__, **legend)
 
     log.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
 
