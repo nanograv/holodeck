@@ -533,7 +533,15 @@ def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
         hc = hc * number
     elif utils.isinteger(realize):
         shape = number.shape + (realize,)
-        hc = hc[..., np.newaxis] * np.random.poisson(number[..., np.newaxis], size=shape)
+        try:
+            hc = hc[..., np.newaxis] * np.random.poisson(number[..., np.newaxis], size=shape)
+        except ValueError as err:
+            log.error(str(err))
+            print(f"{utils.stats(number)=}")
+            print(f"{number.max()=:.8e}")
+            print(f"{number.dtype=}")
+            raise
+
     else:
         err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
         log.error(err)
