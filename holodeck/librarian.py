@@ -9,12 +9,12 @@ import holodeck as holo
 
 
 def sam_lib_combine(path_output, log, debug=False):
-    log.info(f"{path_output=}")
+    log.info(f"Path output = {path_output}")
 
     regex = "lib_sams__p*.npz"
     files = sorted(path_output.glob(regex))
     num_files = len(files)
-    log.info(f"{path_output=}\n\texists={path_output.exists()}, found {num_files} files")
+    log.info(f"\texists={path_output.exists()}, found {num_files} files")
 
     all_exist = True
     log.info("Checking files")
@@ -26,14 +26,14 @@ def sam_lib_combine(path_output, log, debug=False):
             break
 
     if not all_exist:
-        err = f"Missing at least file number {ii} out of {num_files=}!"
+        err = f"Missing at least file number {ii} out of {num_files} files!"
         log.exception(err)
         raise ValueError(err)
 
     # ---- Check one example data file
     temp = files[0]
     data = np.load(temp, allow_pickle=True)
-    log.info(f"Test file: {temp=}\n\t{list(data.keys())=}")
+    log.info(f"Test file: {temp}\n\tkeys: {list(data.keys())}")
     fobs = data['fobs']
     fobs_edges = data['fobs_edges']
     nfreqs = fobs.size
@@ -50,15 +50,15 @@ def sam_lib_combine(path_output, log, debug=False):
     try:
         nsamples = data['nsamples']
         if num_files != nsamples:
-            raise ValueError(f"{nsamples=} but {num_files=} !!")
+            raise ValueError(f"nsamples={nsamples} but num_files={num_files} !!")
     except KeyError:
         pass
 
     assert np.ndim(temp_gwb) == 2
     if temp_gwb.shape[0] != nfreqs:
-        raise ValueError(f"{temp_gwb.shape=} but {nfreqs=}!!")
+        raise ValueError(f"temp_gwb.shape={temp_gwb.shape} but nfreqs={nfreqs}!!")
     if temp_gwb.shape[1] != nreals:
-        raise ValueError(f"{temp_gwb.shape=} but {nreals=}!!")
+        raise ValueError(f"temp_gwb.shape={temp_gwb.shape} but nreals={nreals}!!")
 
     # ---- Store results from all files
 
@@ -90,7 +90,7 @@ def sam_lib_combine(path_output, log, debug=False):
             break
 
     out_filename = path_output.joinpath('sam_lib.hdf5')
-    log.info("Writing collected data to file {out_filename}")
+    log.info(f"Writing collected data to file {out_filename}")
     with h5py.File(out_filename, 'w') as h5:
         h5.create_dataset('fobs', data=fobs)
         h5.create_dataset('fobs_edges', data=fobs_edges)
