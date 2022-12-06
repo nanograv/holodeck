@@ -1647,7 +1647,7 @@ class Fixed_Time(_Hardening):
         # ---- Calculate normalization parameter
         mtot, mrat, time, sepa = np.broadcast_arrays(mtot, mrat, time, sepa)
         if mtot.ndim != 1:
-            err = f"Error in input shapes (`mtot.shpae={np.shape(mtot)})"
+            err = f"Error in input shapes (`mtot.shape={np.shape(mtot)})"
             log.exception(err)
             raise ValueError(err)
 
@@ -1684,6 +1684,12 @@ class Fixed_Time(_Hardening):
         else:
             log.info("calculating normalization exactly")
             norm = self._get_norm_chunk(time, mtot, mrat, rchar, gamma_sc, gamma_df, sepa, progress=progress)
+
+        # bads = ~np.isfinite(norm)
+        # if np.any(bads):
+        #     err = f"Found non-finite normalizations in {utils.frac_str(bads)} cases!"
+        #     log.exception(err)
+        #     raise ValueError(err)
 
         self._gamma_sc = gamma_sc
         self._gamma_df = gamma_df
