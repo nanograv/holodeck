@@ -1,11 +1,151 @@
 """
 """
 
+import abc
+
 import h5py
 import numpy as np
 import tqdm
 
+from scipy.stats import qmc
+import pyDOE
+
 import holodeck as holo
+
+
+class _Parameter_Space(abc.ABC):
+
+    _PARAM_NAMES = []
+
+    def __init__(self, log, nsamples, sam_shape, **kwargs):
+
+        self.log = log
+
+        names = []
+        params = []
+
+        log.debug(f"Loading parameters: {self._PARAM_NAMES}")
+        for par in self._PARAM_NAMES:
+            if par not in kwargs:
+                err = f"Parameter '{par}' missing from kwargs={kwargs}!"
+                log.exception(err)
+                raise ValueError(err)
+
+            vv = kwargs.pop(par)
+            msg = f"{par}: {vv}"
+            log.debug(f"\t{msg}")
+            try:
+                vv = np.linspace(*vv)
+            except Exception as err:
+                log.exception(f"Failed to create spacing from: {msg} ({err})")
+                raise
+
+            names.append(par)
+            params.append(vv)
+
+        '''
+        self.sam_shape = sam_shape
+        self.gsmf_phi0 = np.linspace(*gsmf_phi0)
+        self.times = np.logspace(*np.log10(times[:2]), times[2])
+        self.gpf_qgamma = np.linspace(*gpf_qgamma)
+        self.hard_gamma_inner = np.linspace(*hard_gamma_inner)
+        self.mmb_amp = np.linspace(*mmb_amp)
+        self.mmb_plaw = np.linspace(*mmb_plaw)
+        params = [
+            self.gsmf_phi0,
+            self.times,   # [Gyr]
+            self.gpf_qgamma,
+            self.hard_gamma_inner,
+            self.mmb_amp,
+            self.mmb_plaw
+        ]
+        self.names = [
+            'gsmf_phi0',
+            'times',
+            'gpf_qgamma',
+            'hard_gamma_inner',
+            'mmb_amp',
+            'mmb_plaw'
+        ]
+        '''
+
+        self.paramdimen = len(params)
+        self.params = params
+        self.names = names
+        maxints = [tmparr.size for tmparr in params]
+
+        # do scipy LHS
+        if False:
+            LHS = qmc.LatinHypercube(d=self.paramdimen, centered=False, strength=1)
+            # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
+            sampleindxs = LHS.random(n=nsamples)
+
+        # do pyDOE LHS
+        else:
+            sampleindxs = pyDOE.lhs(n=self.paramdimen, samples=nsamples, criterion='m')
+
+        for i in range(self.paramdimen):
+            sampleindxs[:, i] = np.floor(maxints[i] * sampleindxs[:, i])
+
+        sampleindxs = sampleindxs.astype(int)
+        log.debug(f"d={len(params)} samplelims={maxints} {nsamples=}")
+        self.sampleindxs = sampleindxs
+
+        self.param_grid = np.meshgrid(*params, indexing='ij')
+        self.shape = self.param_grid[0].shape
+        self.size = np.product(self.shape)
+        if self.size < nsamples:
+            err = (
+                f"There are only {self.size} gridpoints in parameter space but you are requesting "
+                f"{nsamples} samples of them. They will be over-sampled!"
+            )
+            log.warning(err)
+
+        self.param_grid = np.moveaxis(self.param_grid, 0, -1)
+
+        pass
+
+    def number_to_index(self, num):
+        idx = np.unravel_index(num, self.shape)
+        return idx
+
+    def lhsnumber_to_index(self, lhsnum):
+        idx = tuple(self.sampleindxs[lhsnum])
+        return idx
+
+    def index_to_number(self, idx):
+        num = np.ravel_multi_index(idx, self.shape)
+        return num
+
+    def param_dict_for_number(self, num):
+        idx = self.number_to_index(num)
+        pars = self.param_grid[idx]
+        rv = {nn: pp for nn, pp in zip(self.names, pars)}
+        return rv
+
+    def param_dict_for_lhsnumber(self, lhsnum):
+        idx = self.lhsnumber_to_index(lhsnum)
+        pars = self.param_grid[idx]
+        rv = {nn: pp for nn, pp in zip(self.names, pars)}
+        return rv
+
+    def params_for_number(self, num):
+        idx = self.number_to_index(num)
+        pars = self.param_grid[idx]
+        return pars
+
+    def params_for_lhsnumber(self, lhsnum):
+        idx = self.lhsnumber_to_index(lhsnum)
+        pars = self.param_grid[idx]
+        return pars
+
+    @abc.abstractmethod
+    def sam_for_number(self, num):
+        return
+
+    @abc.abstractmethod
+    def sam_for_lhsnumber(self, lhsnum):
+        return
 
 
 def sam_lib_combine(path_output, log, debug=False):
