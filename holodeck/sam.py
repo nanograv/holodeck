@@ -686,6 +686,11 @@ class Semi_Analytic_Model:
         # (M, Q, Z, X) units: [] unitless, i.e. number
         dnum = dnum[..., np.newaxis] * tau
 
+        bads = ~np.isfinite(tau)
+        if np.any(bads):
+            log.warning(f"Found {utils.frac_str(bads)} invalid hardening timescales.  Setting to zero densities.")
+            dnum[bads] = 0.0
+
         return edges, dnum
 
     def gwb(self, fobs_gw_edges, hard=holo.evolution.Hard_GW, realize=False):
@@ -733,6 +738,11 @@ class Semi_Analytic_Model:
         edges[-1] = fobs_orb_edges
         log.debug(f"{utils.stats(dnum)=}")
 
+        if np.any(np.isnan(dnum)):
+            err = f"Found nan `dnum` values!"
+            log.exception(err)
+            raise ValueError(err)
+
         # "integrate" within each bin (i.e. multiply by bin volume)
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
         #       after poisson calculation, need to convert back to dN/dlogf
@@ -743,6 +753,13 @@ class Semi_Analytic_Model:
         number = number * np.diff(np.log(fobs_gw_edges))
         log.debug(f"{utils.stats(number)=}")
         log.debug(f"{number.sum()=:.4e}")
+
+        if np.any(np.isnan(number)):
+            print(f"{np.any(np.isnan(dnum))=}")
+            err = f"Found nan `number` values!"
+            log.exception(err)
+            raise ValueError(err)
+
 
         # ---- Get the GWB spectrum from number of binaries over grid
         hc = gravwaves._gws_from_number_grid_integrated(edges, number, realize)
