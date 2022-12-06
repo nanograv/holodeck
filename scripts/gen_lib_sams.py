@@ -27,7 +27,7 @@ To-Do
 
 """
 
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 
 import argparse
 import os
@@ -53,9 +53,8 @@ from holodeck import log as _log     #: import the default holodeck log just so 
 # silence default holodeck log
 _log.setLevel(_log.WARNING)
 
-SAM_SHAPE = 50
-
 # Default argparse parameters
+DEF_SAM_SHAPE = 50
 DEF_NUM_REALS = 100
 DEF_NUM_FBINS = 40
 DEF_PTA_DUR = 16.03     # [yrs]
@@ -141,7 +140,7 @@ class Parameter_Space_Hard01(holo.librarian._Parameter_Space):
         return sam, hard
 
 
-class Parameter_Space_Hard02(holo.librarian._Parameter_Space):
+class Parameter_Space_Hard02_BAD(holo.librarian._Parameter_Space):
 
     _PARAM_NAMES = [
         'hard_time',
@@ -170,7 +169,7 @@ class Parameter_Space_Hard02(holo.librarian._Parameter_Space):
         time = (10.0 ** time) * GYR
         rchar = (10.0 ** rchar) * PC
         mmb_amp = mmb_amp*MSOL
-        
+
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
@@ -187,36 +186,95 @@ class Parameter_Space_Hard02(holo.librarian._Parameter_Space):
         return sam, hard
 
 
-SPACE = Parameter_Space_Hard02
+class Parameter_Space_Hard03(holo.librarian._Parameter_Space):
+
+    _PARAM_NAMES = [
+        'hard_time',
+        'hard_gamma_inner',
+        'hard_gamma_outer',
+        'hard_rchar',
+        'gsmf_phi0',
+        'mmb_amp',
+    ]
+
+    def __init__(self, log, nsamples, sam_shape):
+        super().__init__(
+            log, nsamples, sam_shape,
+            hard_time=[-1.0, +1.0, 5],   # [log10(Gyr)]
+            hard_gamma_inner=[-1.5, -0.5, 5],
+            hard_gamma_outer=[+2.0, +3.0, 5],
+            hard_rchar=[1.0, 3.0, 5],
+            gsmf_phi0=[-3.06, -2.5, 3],
+            mmb_amp=[0.39e9, 0.61e9, 3],
+        )
+
+    def sam_for_lhsnumber(self, lhsnum):
+        param_grid = self.params_for_lhsnumber(lhsnum)
+
+        time, gamma_inner, gamma_outer, rchar, gsmf_phi0, mmb_amp = param_grid
+        time = (10.0 ** time) * GYR
+        rchar = (10.0 ** rchar) * PC
+        mmb_amp = mmb_amp*MSOL
+
+        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gpf = holo.sam.GPF_Power_Law()
+        gmt = holo.sam.GMT_Power_Law()
+        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
+
+        sam = holo.sam.Semi_Analytic_Model(
+            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            shape=self.sam_shape
+        )
+        hard = holo.evolution.Fixed_Time.from_sam(
+            sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
+            exact=True, progress=False
+        )
+        return sam, hard
+
+
+SPACE = Parameter_Space_Hard03
 
 comm = MPI.COMM_WORLD
 
-# ---- Setup ArgParse
 
-parser = argparse.ArgumentParser()
-parser.add_argument('output', metavar='output', type=str,
-                    help='output path [created if doesnt exist]')
-parser.add_argument('-n', '--nsamples', action='store', dest='nsamples', type=int, default=25,
-                    help='number of parameter space samples, must be square of prime')
-parser.add_argument('-r', '--reals', action='store', dest='reals', type=int,
-                    help='number of realizations', default=DEF_NUM_REALS)
-parser.add_argument('-d', '--dur', action='store', dest='pta_dur', type=float,
-                    help='PTA observing duration [yrs]', default=DEF_PTA_DUR)
-parser.add_argument('-f', '--freqs', action='store', dest='freqs', type=int,
-                    help='Number of frequency bins', default=DEF_NUM_FBINS)
-parser.add_argument('-t', '--test', action='store_true', default=False, dest='test',
-                    help='Do not actually run, just output what parameters would have been done.')
-parser.add_argument('-c', '--concatenate', action='store_true', default=False, dest='concatenateoutput',
-                    help='Concatenate output into single hdf5 file.')
-parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
-                    help='verbose output [INFO]')
+# ---- setup argparse
 
-args = parser.parse_args()
+def setup_argparse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('output', metavar='output', type=str,
+                        help='output path [created if doesnt exist]')
 
-if args.test:
-    args.verbose = True
+    parser.add_argument('-n', '--nsamples', action='store', dest='nsamples', type=int, default=25,
+                        help='number of parameter space samples, must be square of prime')
+    parser.add_argument('-r', '--nreals', action='store', dest='nreals', type=int,
+                        help='number of realizations', default=DEF_NUM_REALS)
+    parser.add_argument('-d', '--dur', action='store', dest='pta_dur', type=float,
+                        help='PTA observing duration [yrs]', default=DEF_PTA_DUR)
+    parser.add_argument('-f', '--nfreqs', action='store', dest='nfreqs', type=int,
+                        help='Number of frequency bins', default=DEF_NUM_FBINS)
+    parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
+                        help='Shape of SAM grid', default=DEF_SAM_SHAPE)
 
-# ---- Setup outputs
+    parser.add_argument('-t', '--test', action='store_true', default=False, dest='test',
+                        help='Do not actually run, just output what parameters would have been done.')
+    parser.add_argument('-c', '--concatenate', action='store_true', default=False, dest='concatenateoutput',
+                        help='Concatenate output into single hdf5 file.')
+    parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
+                        help='verbose output [INFO]')
+
+    args = parser.parse_args()
+
+    if args.test:
+        args.verbose = True
+
+    return args
+
+
+args = setup_argparse() if comm.rank == 0 else None
+args = comm.bcast(args, root=0)
+
+
+# ---- setup outputs
 
 BEG = datetime.now()
 BEG = comm.bcast(BEG, root=0)
@@ -251,19 +309,23 @@ log.info(head)
 log.info(f"Output path: {PATH_OUTPUT}")
 log.info(f"        log: {fname}")
 
-log.info(f"samples={args.nsamples}, nreals={args.reals}, nfreqs={args.freqs}")
-
 if comm.rank == 0:
     src_file = Path(this_fname)
     dst_file = PATH_OUTPUT.joinpath(src_file.name)
+    dst_file = dst_file.parent / ("runtime_" + dst_file.name)
     shutil.copyfile(src_file, dst_file)
     log.info(f"Copied {__file__} to {dst_file}")
 
 # ---- setup Parameter_Space instance
 
 log.warning(f"SPACE = {SPACE}")
-space = SPACE(log, args.nsamples, SAM_SHAPE) if comm.rank == 0 else None
+space = SPACE(log, args.nsamples, args.sam_shape) if comm.rank == 0 else None
 space = comm.bcast(space, root=0)
+
+log.info(
+    f"samples={args.nsamples}, sam_shape={args.sam_shape}, nreals={args.reals}\n"
+    f"nfreqs={args.freqs}, pta_dur={args.pta_dur} [yr]"
+)
 
 # ------------------------------------------------------------------------------
 # ----    Methods
