@@ -323,8 +323,8 @@ space = SPACE(log, args.nsamples, args.sam_shape) if comm.rank == 0 else None
 space = comm.bcast(space, root=0)
 
 log.info(
-    f"samples={args.nsamples}, sam_shape={args.sam_shape}, nreals={args.reals}\n"
-    f"nfreqs={args.freqs}, pta_dur={args.pta_dur} [yr]"
+    f"samples={args.nsamples}, sam_shape={args.sam_shape}, nreals={args.nreals}\n"
+    f"nfreqs={args.nfreqs}, pta_dur={args.pta_dur} [yr]"
 )
 
 # ------------------------------------------------------------------------------
@@ -394,7 +394,7 @@ def run_sam(pnum, path_output):
         log.warning(f"File {fname} already exists.")
 
     pta_dur = args.pta_dur * YR
-    nfreqs = args.freqs
+    nfreqs = args.nfreqs
     hifr = nfreqs/pta_dur
     pta_cad = 1.0 / (2 * hifr)
     fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
@@ -406,8 +406,8 @@ def run_sam(pnum, path_output):
 
     log.debug("Selecting `sam` and `hard` instances")
     sam, hard = space.sam_for_lhsnumber(pnum)
-    log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.reals})")
-    gwb = sam.gwb(fobs_edges, realize=args.reals, hard=hard)
+    log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.nreals})")
+    gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
     log.debug(f"{holo.utils.stats(gwb)=}")
     legend = space.param_dict_for_lhsnumber(pnum)
     log.debug(f"Saving {pnum} to file")
