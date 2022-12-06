@@ -822,7 +822,7 @@ class Semi_Analytic_Model:
         edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents)
         # edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb_edges)
         edges[-1] = fobs_orb_edges
-        log.debug(f"{utils.stats(dnum)=}")
+        log.debug(f"dnum: {utils.stats(dnum)}")
 
         if np.any(np.isnan(dnum)):
             err = f"Found nan `dnum` values!"
@@ -837,8 +837,8 @@ class Semi_Analytic_Model:
         # number = utils._integrate_grid_differential_number(edges, dnum, freq=True)
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
         number = number * np.diff(np.log(fobs_gw_edges))
-        log.debug(f"{utils.stats(number)=}")
-        log.debug(f"{number.sum()=:.4e}")
+        log.debug(f"number: {utils.stats(number)}")
+        log.debug(f"number.sum(): {number.sum():.4e}")
 
         if np.any(np.isnan(number)):
             print(f"{np.any(np.isnan(dnum))=}")
