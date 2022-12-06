@@ -57,7 +57,7 @@ SAM_SHAPE = 50
 
 # Default argparse parameters
 DEF_NUM_REALS = 100
-DEF_NUM_FBINS = 50
+DEF_NUM_FBINS = 40
 DEF_PTA_DUR = 16.03     # [yrs]
 
 
@@ -159,21 +159,22 @@ class Parameter_Space_Hard02(holo.librarian._Parameter_Space):
             hard_gamma_inner=[-1.5, -0.5, 7],
             hard_gamma_outer=[+1.0, +3.0, 7],
             hard_rchar=[1.0, 3.0, 5],
-            gsmf_phi0=[-3.06, -2.5, 5],
-            mmb_amp=[0.39e9, 0.61e9, 5],
+            gsmf_phi0=[-3.06, -2.5, 3],
+            mmb_amp=[0.39e9, 0.61e9, 3],
         )
 
     def sam_for_lhsnumber(self, lhsnum):
         param_grid = self.params_for_lhsnumber(lhsnum)
 
-        time, gamma_inner, gamma_outer, rchar = param_grid
+        time, gamma_inner, gamma_outer, rchar, gsmf_phi0, mmb_amp = param_grid
         time = (10.0 ** time) * GYR
         rchar = (10.0 ** rchar) * PC
-
-        gsmf = holo.sam.GSMF_Schechter()
+        mmb_amp = mmb_amp*MSOL
+        
+        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013()
+        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
 
         sam = holo.sam.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
@@ -343,7 +344,7 @@ def run_sam(pnum, path_output):
 
     log.debug("Selecting `sam` and `hard` instances")
     sam, hard = space.sam_for_lhsnumber(pnum)
-    log.debug("Calculating GWB for shape ({fobs_cents.size}, {args.reals})")
+    log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.reals})")
     gwb = sam.gwb(fobs_edges, realize=args.reals, hard=hard)
     log.debug(f"{holo.utils.stats(gwb)=}")
     legend = space.param_dict_for_lhsnumber(pnum)
