@@ -149,6 +149,121 @@ class _Parameter_Space(abc.ABC):
     def sam_for_lhsnumber(self, lhsnum):
         return
 
+class _LHS_Parameter_Space(abc.ABC):
+
+    _PARAM_NAMES = []
+
+    def __init__(self, log, nsamples, sam_shape, lhs_sampler='scipy', seed=None, **kwargs):
+
+        self.log = log
+        self.nsamples = nsamples
+        self.sam_shape = sam_shape
+        self.lhs_sampler = lhs_sampler
+        self.seed = seed
+
+        names = []
+        param_ranges = []
+
+        log.debug(f"Loading parameters: {self._PARAM_NAMES}")
+        for par in self._PARAM_NAMES:
+            if par not in kwargs:
+                err = f"Parameter '{par}' missing from kwargs={kwargs}!"
+                log.exception(err)
+                raise ValueError(err)
+
+            vv = kwargs.pop(par)
+            msg = f"{par}: {vv}"
+            log.debug(f"\t{msg}")            
+            if len(vv) > 3 or len(vv) < 2:
+                err = f"Wanted 2 arguments in {par}, but got {len(vv)}: {vv}"
+                log.exception(err)
+                raise ValueError(err)
+            elif len(vv) == 3:
+                msg = f"Wanted 2 arguments in {par}, but got {len(vv)}: {vv}. I will assume you are using the NON-LHS initialization scheme. Bad scientist!  For LHS, give min and max values, not grid size."
+                log.warning(msg)
+                vv = vv[0:2]
+
+            names.append(par)
+            param_ranges.append(vv)
+
+        '''
+        self.gsmf_phi0 = np.linspace(*gsmf_phi0)
+        self.times = np.logspace(*np.log10(times[:2]), times[2])
+        self.gpf_qgamma = np.linspace(*gpf_qgamma)
+        self.hard_gamma_inner = np.linspace(*hard_gamma_inner)
+        self.mmb_amp = np.linspace(*mmb_amp)
+        self.mmb_plaw = np.linspace(*mmb_plaw)
+        params = [
+            self.gsmf_phi0,
+            self.times,   # [Gyr]
+            self.gpf_qgamma,
+            self.hard_gamma_inner,
+            self.mmb_amp,
+            self.mmb_plaw
+        ]
+        self.names = [
+            'gsmf_phi0',
+            'times',
+            'gpf_qgamma',
+            'hard_gamma_inner',
+            'mmb_amp',
+            'mmb_plaw'
+        ]
+        '''
+
+        self.paramdimen = len(param_ranges)
+        self.param_ranges = np.array(param_ranges)
+        self.names = names
+        self.params = np.zeros((self.nsamples,self.paramdimen))
+        # Below are done out of laziness and backwards compatibility but should be deprecated
+        self.sampleindxs = 0
+        
+        if self.seed is not None:
+            log.info(f"Generated with random seed: {self.seed}")
+        else:
+            log.info(f"Did not use seed. Initializing random state explicitly for reproducibility.")
+            np.random.seed(None)
+            st0 = np.random.get_state()
+            log.info(f"Random state is:\n{st0}")
+            
+        
+        # do scipy LHS
+        if self.lhs_sampler == 'scipy':
+            LHS = qmc.LatinHypercube(d=self.paramdimen, centered=False, strength=1, seed=self.seed)
+            # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
+            sample_rvs = LHS.random(n=nsamples)
+        elif self.lhs_sampler == 'pydoe': # do pyDOE LHS
+            sample_rvs = pyDOE.lhs(n=self.paramdimen, samples=nsamples, criterion='m')
+        else:
+            err = f"unknown LHS sampler: {self.lhs_sampler}"
+            log.exception(err)
+            raise ValueError(err)
+
+        for i in range(self.paramdimen):
+            # Assume uniform sampling from min to max of each parameter
+            self.params[:, i] = sample_rvs[:, i] * (self.param_ranges[i][1] - self.param_ranges[i][0]) + self.param_ranges[i][0]
+
+    def param_dict_for_lhsnumber(self, num):
+        rv = {nn: pp for nn, pp in zip(self.names, self.params[num, :])}
+        return rv
+
+    def params_for_lhsnumber(self, num):
+        pars = self.params[num, :]
+        return pars
+
+    # Below are done out of laziness and backwards compatibility but should be deprecated
+    def lhsnumber_to_index(self, pnum):
+        return pnum
+
+    # @abc.abstractmethod
+    def sam_for_number(self, num):
+        raise
+        return
+
+    @abc.abstractmethod
+    def sam_for_lhsnumber(self, lhsnum):
+        return
+
 
 def sam_lib_combine(path_output, log, debug=False):
     log.info(f"Path output = {path_output}")
