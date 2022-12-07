@@ -181,7 +181,7 @@ def sam_lib_combine(path_output, log, debug=False):
     nfreqs = fobs.size
     temp_gwb = data['gwb'][:]
     nreals = temp_gwb.shape[1]
-    test_params = data['params']
+    param_vals = data['params']
     param_names = data['names']
     lhs_grid = data['lhs_grid']
     try:
@@ -207,7 +207,7 @@ def sam_lib_combine(path_output, log, debug=False):
     gwb_shape = [num_files, nfreqs, nreals]
     shape_names = list(param_names[:]) + ['freqs', 'reals']
     gwb = np.zeros(gwb_shape)
-    params = np.zeros((num_files, pdim))
+    sample_params = np.zeros((num_files, pdim))
     grid_idx = np.zeros((num_files, pdim), dtype=int)
 
     log.info(f"Collecting data from {len(files)} files")
@@ -218,7 +218,7 @@ def sam_lib_combine(path_output, log, debug=False):
         assert np.allclose(fobs_edges, temp['fobs_edges'])
         pars = [temp[nn][()] for nn in param_names]
         for jj, (pp, nn) in enumerate(zip(temp['params'], temp['names'])):
-            assert np.allclose(pp, test_params[jj])
+            assert np.allclose(pp, param_vals[jj])
             assert nn == param_names[jj]
 
         assert np.all(lhs_grid == temp['lhs_grid'])
@@ -226,7 +226,7 @@ def sam_lib_combine(path_output, log, debug=False):
         tt = temp['gwb'][:]
         assert np.shape(tt) == (nfreqs, nreals)
         gwb[ii] = tt
-        params[ii, :] = pars
+        sample_params[ii, :] = pars
         grid_idx[ii, :] = temp['lhs_grid_idx']
         if debug:
             break
@@ -237,11 +237,14 @@ def sam_lib_combine(path_output, log, debug=False):
         h5.create_dataset('fobs', data=fobs)
         h5.create_dataset('fobs_edges', data=fobs_edges)
         h5.create_dataset('gwb', data=gwb)
-        h5.create_dataset('params', data=params)
+        h5.create_dataset('sample_params', data=sample_params)
         h5.create_dataset('lhs_grid', data=lhs_grid)
         h5.create_dataset('lhs_grid_indices', data=grid_idx)
         h5.attrs['param_names'] = np.array(param_names).astype('S')
         h5.attrs['shape_names'] = np.array(shape_names).astype('S')
+        group = h5.create_group('parameters')
+        for pname, pvals in zip(param_names, param_vals):
+            group.create_dataset(pname, data=pvals)
 
     log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
     return
