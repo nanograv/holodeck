@@ -232,7 +232,53 @@ class Parameter_Space_Hard03(holo.librarian._Parameter_Space):
         return sam, hard
 
 
-SPACE = Parameter_Space_Hard03
+class Parameter_Space_Hard04(holo.librarian._Parameter_Space):
+
+    _PARAM_NAMES = [
+        'hard_time',
+        'hard_gamma_inner',
+        'hard_gamma_outer',
+        'hard_rchar',
+        'gsmf_phi0',
+        'mmb_amp',
+    ]
+
+    def __init__(self, log, nsamples, sam_shape):
+        super().__init__(
+            log, nsamples, sam_shape,
+            hard_time=[-1.0, +1.0, 5],   # [log10(Gyr)]
+            hard_gamma_inner=[-1.5, -0.5, 5],
+            hard_gamma_outer=[+2.0, +3.0, 5],
+            hard_rchar=[1.0, 3.0, 5],
+            gsmf_phi0=[-3.0, -2.0, 5],
+            mmb_amp=[0.1e9, 1.0e9, 5],
+        )
+
+    def sam_for_lhsnumber(self, lhsnum):
+        param_grid = self.params_for_lhsnumber(lhsnum)
+
+        time, gamma_inner, gamma_outer, rchar, gsmf_phi0, mmb_amp = param_grid
+        time = (10.0 ** time) * GYR
+        rchar = (10.0 ** rchar) * PC
+        mmb_amp = mmb_amp*MSOL
+
+        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gpf = holo.sam.GPF_Power_Law()
+        gmt = holo.sam.GMT_Power_Law()
+        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
+
+        sam = holo.sam.Semi_Analytic_Model(
+            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            shape=self.sam_shape
+        )
+        hard = holo.evolution.Fixed_Time.from_sam(
+            sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
+            exact=True, progress=False
+        )
+        return sam, hard
+
+
+SPACE = Parameter_Space_Hard04
 
 comm = MPI.COMM_WORLD
 
