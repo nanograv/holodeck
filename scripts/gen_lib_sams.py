@@ -278,7 +278,47 @@ class Parameter_Space_Hard04(holo.librarian._Parameter_Space):
         return sam, hard
 
 
-SPACE = Parameter_Space_Hard04
+class Parameter_Space_Simple01(holo.librarian._Parameter_Space):
+
+    _PARAM_NAMES = [
+        'hard_time',
+        'hard_rchar',
+        'gsmf_phi0',
+        'mmb_amp',
+    ]
+
+    def __init__(self, log, nsamples, sam_shape):
+        super().__init__(
+            log, nsamples, sam_shape,
+            hard_time=[-0.5, +1.0, 9],   # [log10(Gyr)]
+            hard_rchar=[1.0, 2.5, 7],
+            gsmf_phi0=[-3.0, -1.5, 7],
+        )
+
+    def sam_for_lhsnumber(self, lhsnum):
+        param_grid = self.params_for_lhsnumber(lhsnum)
+
+        time, rchar, gsmf_phi0 = param_grid
+        time = (10.0 ** time) * GYR
+        rchar = (10.0 ** rchar) * PC
+
+        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gpf = holo.sam.GPF_Power_Law()
+        gmt = holo.sam.GMT_Power_Law()
+        mmbulge = holo.relations.MMBulge_KH2013()
+
+        sam = holo.sam.Semi_Analytic_Model(
+            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            shape=self.sam_shape
+        )
+        hard = holo.evolution.Fixed_Time.from_sam(
+            sam, time, rchar=rchar,
+            exact=True, progress=False
+        )
+        return sam, hard
+
+
+SPACE = Parameter_Space_Simple01
 
 comm = MPI.COMM_WORLD
 
