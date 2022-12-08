@@ -149,7 +149,7 @@ class _Parameter_Space(abc.ABC):
     def sam_for_lhsnumber(self, lhsnum):
         return
 
-class _LHS_Parameter_Space(abc.ABC):
+class _LHS_Parameter_Space(_Parameter_Space):
 
     _PARAM_NAMES = []
 
@@ -179,44 +179,19 @@ class _LHS_Parameter_Space(abc.ABC):
                 log.exception(err)
                 raise ValueError(err)
             elif len(vv) == 3:
-                msg = f"Wanted 2 arguments in {par}, but got {len(vv)}: {vv}. I will assume you are using the NON-LHS initialization scheme. Bad scientist!  For LHS, give min and max values, not grid size."
+                msg = f"Wanted 2 arguments in {par}, but got {len(vv)}: {vv}. I will assume you are using the NON-LHS initialization scheme. Bad scientist!  For LHS, give min and max values, not grid size. I will guess that the first two values are min and max values and ignore the third."
                 log.warning(msg)
                 vv = vv[0:2]
 
             names.append(par)
             param_ranges.append(vv)
 
-        '''
-        self.gsmf_phi0 = np.linspace(*gsmf_phi0)
-        self.times = np.logspace(*np.log10(times[:2]), times[2])
-        self.gpf_qgamma = np.linspace(*gpf_qgamma)
-        self.hard_gamma_inner = np.linspace(*hard_gamma_inner)
-        self.mmb_amp = np.linspace(*mmb_amp)
-        self.mmb_plaw = np.linspace(*mmb_plaw)
-        params = [
-            self.gsmf_phi0,
-            self.times,   # [Gyr]
-            self.gpf_qgamma,
-            self.hard_gamma_inner,
-            self.mmb_amp,
-            self.mmb_plaw
-        ]
-        self.names = [
-            'gsmf_phi0',
-            'times',
-            'gpf_qgamma',
-            'hard_gamma_inner',
-            'mmb_amp',
-            'mmb_plaw'
-        ]
-        '''
-
         self.paramdimen = len(param_ranges)
         self.param_ranges = np.array(param_ranges)
         self.names = names
         self.params = np.zeros((self.nsamples,self.paramdimen))
-        # Below are done out of laziness and backwards compatibility but should be deprecated
-        self.sampleindxs = 0
+        # Below is done out of laziness and backwards compatibility but should be deprecated
+        self.sampleindxs = -1
         
         if self.seed is not None:
             log.info(f"Generated with random seed: {self.seed}")
