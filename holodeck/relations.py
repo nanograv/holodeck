@@ -384,7 +384,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         fbulge = self._bulge_mfrac
         mbulge = mstar * fbulge
         mbh = self.mbh_from_mbulge(mbulge, scatter=False)
-        deriv = mbulge / (fbulge * plaw * mbh)
+        deriv = mstar / (plaw * mbh)
         return deriv
 
 
