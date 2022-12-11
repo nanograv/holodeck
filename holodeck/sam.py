@@ -58,10 +58,18 @@ _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 REDZ_SCALE_LOG = True
 REDZ_SAMPLE_VOLUME = True
 
+GSMF_USES_MTOT = False
+GPF_USES_MTOT = False
+GMT_USES_MTOT = False
 
 # ==============================
 # ====    SAM Components    ====
 # ==============================
+
+
+#! ---------------------------------------------------------
+log.error("SHOULD THE STRAINS BE CALCULATED A REDZ-PRIME?!")
+#! ---------------------------------------------------------
 
 
 # ----    Galaxy Stellar-Mass Function    ----
@@ -106,7 +114,7 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
 
     """
 
-    def __init__(self, phi0=-2.77, phiz=-0.27, mref0=1.74e11*MSOL, mrefz=0.0, alpha0=-1.24, alphaz=-0.03):
+    def __init__(self, phi0=-2.77, phiz=-0.27, mref0=1.737801e11*MSOL, mrefz=0.0, alpha0=-1.24, alphaz=-0.03):
         self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]  [1/Mpc^3]
         self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]  [1/Mpc^3]
         self._mref0 = mref0       # +11.24  +/- [-0.17, +0.20]  Msol
@@ -490,7 +498,6 @@ class Semi_Analytic_Model:
 
         """
         if self._density is None:
-            dens = np.zeros(self.shape)
 
             # ---- convert from MBH ===> mstar
 
@@ -505,44 +512,90 @@ class Semi_Analytic_Model:
             # Convert to shape (M, Q, Z)
             mstar_pri, mstar_rat, mstar_tot, redz = np.broadcast_arrays(*args)
 
+            # GMT returns `-1.0` for values beyond age of universe
             zprime = self._gmt.zprime(mstar_tot, mstar_rat, redz)
             # find valid entries (M, Q, Z)
-            idx = (zprime > 0.0)
-            if ~np.any(idx):
+            bads = (zprime < 0.0)
+            if np.all(bads):
                 utils.print_stats(stack=False, print_func=log.error,
                                   mstar_tot=mstar_tot, mstar_rat=mstar_rat, redz=redz)
-                raise RuntimeError("No `zprime` values are greater than zero!")
+                err = "No `zprime` values are greater than zero!"
+                log.exception(err)
+                raise RuntimeError(err)
 
             # these are now 1D arrays of the valid indices
-            mstar_pri, mstar_rat, mstar_tot, redz = [ee[idx] for ee in [mstar_pri, mstar_rat, mstar_tot, redz]]
+            # mstar_pri, mstar_rat, mstar_tot, redz = [ee[idx] for ee in [mstar_pri, mstar_rat, mstar_tot, redz]]
 
             # ---- Get Galaxy Merger Rate  [Chen2019] Eq.5
-            # ! BUG: CHECK Whether primary vs total-mass is being used correctly !
+
+            if GSMF_USES_MTOT:
+                mass_gsmf = mstar_tot
+                # convert from  1/dM_star-tot  to  1/dlog10(M_star-tot)
+                dmdm = 1.0 / (mstar_tot * np.log(10.0))
+            else:
+                mass_gsmf = mstar_pri
+                # convert from  1/dM_star-pri  to  1/dlog10(M_star-tot)
+                # note that  ``M_tot = M_pri * (1 + q)``  &&  ``1/dlog10(M) = M*ln(10) * 1/dM``
+                #     1/dlt(Mtot) = ( 1/[Mtot ln(10)] )*( 1/dMtot )
+                #                 = ( 1/[Mtot ln(10)] )*( 1/[1+q] )*( 1/dMpri )
+                dmdm = (1.0 / (mstar_tot * np.log(10.0))) * (1.0/(1.0 + mstar_rat))
+
+            mass_gpf = mstar_tot if GPF_USES_MTOT else mstar_pri
+            mass_gmt = mstar_tot if GMT_USES_MTOT else mstar_pri
+
             # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]
-            dens[idx] = self._gsmf(mstar_pri, redz) * self._gpf(mstar_tot, mstar_rat, redz) * cosmo.dtdz(redz)
-            # convert from 1/dlog10(M_star-pri) to 1/dM_star-tot
-            dlogten_mstar_pri__dmstar_tot = 1.0 / (mstar_tot * np.log(10.0) * (1.0 + mstar_rat))
+            dens = self._gsmf(mass_gsmf, redz) * self._gpf(mass_gpf, mstar_rat, redz) * cosmo.dtdz(redz)
             # `gmt` returns [sec]
-            dens[idx] *= dlogten_mstar_pri__dmstar_tot / self._gmt(mstar_tot, mstar_rat, redz)
+            dens *= dmdm / self._gmt(mass_gmt, mstar_rat, redz)
             # now `dens` is  ``dn_gal / [dMstar_tot dq_gal dz]``  with units of [Mpc^-3 gram^-1]
 
             # ---- Convert to MBH Binary density
 
             # so far we have ``dn_gal / [dM_gal dq_gal dz]``
             # dn / [dM dq dz] = (dn_gal / [dM_gal dq_gal dz]) * (dM_gal/dM_bh) * (dq_gal / dq_bh)
-            dqgal_dqbh = 1.0     # conversion from galaxy mrat to MBH mrat
+            mplaw = self._mmbulge._mplaw
+            dqbh_dqgal = mplaw * np.power(mstar_rat, mplaw - 1.0)
+
             # dMs/dMbh
-            # dmstar_dmbh = 1.0 / self._mmbulge.dmbh_dmstar(mstar_tot)   # [unitless]
             dmstar_dmbh = self._mmbulge.dmstar_dmbh(mstar_tot)   # [unitless]
             mbh_tot = self._mmbulge.mbh_from_mstar(mstar_tot, scatter=False)  # [gram]
             # Eq.21, now [gram^-1 Mpc^-3]
-            dens[idx] *= dqgal_dqbh * dmstar_dmbh
+            dens *= dmstar_dmbh / dqbh_dqgal
             # Convert from 1/dM to 1/dlog10(M), units are now [Mpc^-3] {lose [1/gram] because now 1/dlog10(M)}
-            dens[idx] *= mbh_tot * np.log(10.0)
+            dens *= mbh_tot * np.log(10.0)
+
+            # set values after redshift zero to have zero density
+            # dens[bads] = 0.0
+            log.warning("_NOT_ SETTING BADS TO ZERO!")
 
             self._density = dens
 
         return self._density
+
+    def _ndens_gal(self, mass_gal, mrat_gal, redz):
+        nd = self._gsmf(mass_gal, redz) * self._gpf(mass_gal, mrat_gal, redz)
+        nd = nd * cosmo.dtdz(redz) / self._gmt(mass_gal, mrat_gal, redz) / MPC**3
+        nd = nd / (np.log(10.0) * mass_gal) / (1.0 + mrat_gal)
+        return nd
+
+    def _ndens_mbh(self, mass_gal, mrat_gal, redz, dlog10=False):
+        nd_gal = self._ndens_gal(mass_gal, mrat_gal, redz)
+
+        # so far we have ``dn_gal / [dM_gal dq_gal dz]``
+        # dn / [dM dq dz] = (dn_gal / [dM_gal dq_gal dz]) * (dM_gal/dM_bh) * (dq_gal / dq_bh)
+        mplaw = self._mmbulge._mplaw
+        dqbh_dqgal = mplaw * np.power(mrat_gal, mplaw - 1.0)
+
+        # dMs/dMbh
+        dmstar_dmbh = self._mmbulge.dmstar_dmbh(mass_gal)   # [unitless]
+        mbh_tot = self._mmbulge.mbh_from_mstar(mass_gal, scatter=False)  # [gram]
+        # Eq.21, now [gram^-1 Mpc^-3]
+        dens = nd_gal * dmstar_dmbh / dqbh_dqgal
+        # Convert from 1/dM to 1/dlog10(M), units are now [Mpc^-3] {lose [1/gram] because now 1/dlog10(M)}
+        if dlog10:
+            dens *= mbh_tot * np.log(10.0)
+
+        return dens
 
     def dynamic_binary_number(self, hard, fobs_orb=None, sepa=None, limit_merger_time=None):
         """Calculate the differential number of binaries (per bin-volume, per log-freq interval).
