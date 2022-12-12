@@ -15,6 +15,7 @@ TEST_NOTEBOOK_NAMES = [
     'host-relations',
     'relations',
     'semi-analytic-models',
+    'sam-check',
     'utils',
 ]
 
