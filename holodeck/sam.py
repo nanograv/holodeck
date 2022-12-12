@@ -54,8 +54,8 @@ from holodeck.constants import GYR, SPLC, MSOL, MPC, NWTG
 from holodeck import relations, gravwaves
 
 _DEBUG = True
-# _DEBUG_LVL = log.DEBUG
-_DEBUG_LVL = log.WARNING
+_DEBUG_LVL = log.DEBUG
+# _DEBUG_LVL = log.WARNING
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
@@ -528,36 +528,19 @@ class Semi_Analytic_Model:
                     log.exception(err)
                     raise RuntimeError(err)
 
-            # these are now 1D arrays of the valid indices
-            # mstar_pri, mstar_rat, mstar_tot, redz = [ee[idx] for ee in [mstar_pri, mstar_rat, mstar_tot, redz]]
-
             # ---- Get Galaxy Merger Rate  [Chen2019] Eq.5
             log.debug(f"GSMF_USES_MTOT={GSMF_USES_MTOT}")
             log.debug(f"GPF_USES_MTOT ={GPF_USES_MTOT}")
             log.debug(f"GMT_USES_MTOT ={GMT_USES_MTOT}")
 
-            if GSMF_USES_MTOT:
-                mass_gsmf = mstar_tot
-                # convert from  1/dM_star-tot  to  1/dlog10(M_star-tot)
-                # dmdm = 1.0 / (mstar_tot * np.log(10.0))
-                # dmdm = (mstar_tot * np.log(10.0))
-                dmdm = 1.0
-            else:
-                mass_gsmf = mstar_pri
-                dmdm = 1.0
-                # convert from  1/dM_star-pri  to  1/dlog10(M_star-tot)
-                # note that  ``M_tot = M_pri * (1 + q)``  &&  ``1/dlog10(M) = M*ln(10) * 1/dM``
-                #     1/dlt(Mtot) = ( [Mtot ln(10)] )*( 1/dMtot )
-                #                 = ( [Mtot ln(10)] )*( 1/[1+q] )*( 1/dMpri )
-                # dmdm = (mstar_tot * np.log(10.0)) / (1.0 + mstar_rat)
-
+            mass_gsmf = mstar_tot if GSMF_USES_MTOT else mstar_pri
             mass_gpf = mstar_tot if GPF_USES_MTOT else mstar_pri
             mass_gmt = mstar_tot if GMT_USES_MTOT else mstar_pri
 
             # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]
             dens = self._gsmf(mass_gsmf, redz) * self._gpf(mass_gpf, mstar_rat, redz) * cosmo.dtdz(redz)
             # `gmt` returns [sec]
-            dens *= dmdm / self._gmt(mass_gmt, mstar_rat, redz)
+            dens /= self._gmt(mass_gmt, mstar_rat, redz)
             # now `dens` is  ``dn_gal / [dlog10(Mstar) dq_gal dz]``  with units of [Mpc^-3]
 
             if _DEBUG:
@@ -590,10 +573,7 @@ class Semi_Analytic_Model:
             qterm = (1.0 + mstar_rat) / (1.0 + self.mrat[np.newaxis, :, np.newaxis])
             dmstar_dmbh = dmstar_dmbh_pri * qterm
 
-            # Eq.21, now [Mpc^-3]
-            mom = self.mtot[:, np.newaxis, np.newaxis] / mstar_tot
-            # mom = self.mtot[:, np.newaxis, np.newaxis] / (1.0 + self.mrat[np.newaxis, :, np.newaxis]) / mstar_pri
-            dens *= mom * dmstar_dmbh / dqbh_dqgal
+            dens *= self.mtot[:, np.newaxis, np.newaxis] * dmstar_dmbh / dqbh_dqgal / mstar_tot
 
             if _DEBUG:
                 dens_check = self._ndens_mbh(mass_gsmf, mstar_rat, redz)
@@ -623,15 +603,9 @@ class Semi_Analytic_Model:
         if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
             log.warning("{self.__class__}._ndens_gal assumes that primary mass is used for GSMF, GPF and GMT!")
 
+        # NOTE: dlog10(M_1) / dlog10(M) = (M/M_1) * (dM_1/dM) = 1
         nd = self._gsmf(mass_gal, redz) * self._gpf(mass_gal, mrat_gal, redz)
         nd = nd * cosmo.dtdz(redz) / self._gmt(mass_gal, mrat_gal, redz)
-        # NOTE: dlog10(M_1) / dlog10(M) = (M/M_1) * (dM_1/dM) = 1
-
-        # convert from  d^3 n / [dM_pri dq dz]  ==>  d^3 n / [dlog10(M_tot) dq dz]
-        # dn/dlog10(M_tot) = M_tot ln(10) * (dn/dM_pri) * (dM_pri/dM_tot)
-        #                  = M_tot ln(10) * (dn/dM_pri) / (1+q)
-        #                  = M_pri ln(10) * (dn/dM_pri)
-        # nd = nd * (np.log(10.0) * mass_gal)
         return nd
 
     def _ndens_mbh(self, mass_gal, mrat_gal, redz):
@@ -644,8 +618,6 @@ class Semi_Analytic_Model:
         mplaw = self._mmbulge._mplaw
         dqbh_dqgal = mplaw * np.power(mrat_gal, mplaw - 1.0)
 
-        # dMs/dMbh
-        # mgal_tot = mass_gal * (1.0 + mrat_gal)
         dmstar_dmbh__pri = self._mmbulge.dmstar_dmbh(mass_gal)   # [unitless]
         mbh_pri = self._mmbulge.mbh_from_mstar(mass_gal, scatter=False)
         mbh_sec = self._mmbulge.mbh_from_mstar(mass_gal * mrat_gal, scatter=False)
@@ -653,9 +625,7 @@ class Semi_Analytic_Model:
         mrat_mbh = mbh_sec / mbh_pri
 
         dlm_dlm = (mbh / mass_gal) * dmstar_dmbh__pri / (1.0 + mrat_mbh)
-        # Eq.21, now [Mpc^-3]
         dens = nd_gal * dlm_dlm / dqbh_dqgal
-
         return dens
 
     def dynamic_binary_number(self, hard, fobs_orb=None, sepa=None, limit_merger_time=None):
@@ -873,7 +843,6 @@ class Semi_Analytic_Model:
             err = f"Found nan `number` values!"
             log.exception(err)
             raise ValueError(err)
-
 
         # ---- Get the GWB spectrum from number of binaries over grid
         hc = gravwaves._gws_from_number_grid_integrated(edges, number, realize)
