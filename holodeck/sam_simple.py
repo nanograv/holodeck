@@ -2,7 +2,6 @@
 """
 
 import numpy as np
-# import holodeck as holo
 from holodeck import cosmo, utils
 from holodeck.constants import MSOL, GYR, MPC, SPLC, NWTG
 
@@ -13,11 +12,11 @@ class Simple_SAM:
         self,
         size=100,
         # Galaxy Stellar-Mass Function (GSMF)
-        gsmf_phi0_const=-2.77,          # normalization [Phi_0]
-        gsmf_phiz=-0.27,          # norm redshift dependence [Phi_I]
-        gsmf_log10m0=11.24,       # log10 of reference mass/Msol [log10(M0)]
-        gsmf_alpha0_const=-1.24,          # mass exponent constant [alpha_0]
-        gsmf_alphaz=-0.03,          # mass exponent redshift dependent [alpha_I]
+        gsmf_phi0_const=-2.77,    # normalization [Phi_0]   -2.77, -0.29, +0.27
+        gsmf_phiz=-0.27,          # norm redshift dependence [Phi_I]  -0.27, -0.21, +0.23
+        gsmf_log10m0=11.24,       # log10 of reference mass/Msol [log10(M0)]  11.24, -0.17, +0.20
+        gsmf_alpha0_const=-1.24,          # mass exponent constant [alpha_0]   -1.24, -0.16, +0.16
+        gsmf_alphaz=-0.03,          # mass exponent redshift dependent [alpha_I]  -0.03, -0.14, +0.16
         # Galaxy Pair Fraction (GPF)
         gpf_norm=0.025,     # normalization over all mass-ratios (f0)  [0.02, 0.03]
         gpf_alpha=0.0,            # mass index (alpha_f)  [-0.2, +0.2]
@@ -30,8 +29,8 @@ class Simple_SAM:
         gmt_gamma=0.0,        # redshift index (gamma_tau) [-0.2, +0.2]
 
         # Galaxy--Black-hole Relation
-        mbh_star_log10=8.17,
-        alpha_mbh_star=1.01,
+        mbh_star_log10=8.17,   # 8.17, -0.32, +0.35
+        alpha_mbh_star=1.01,   # 1.01, -0.10, +0.08
     ):
         mass_gal = np.logspace(6, 15, size) * MSOL
         mrat_gal = np.logspace(-4, 0, 41)
@@ -146,9 +145,8 @@ class Simple_SAM:
 
         return gwb
 
-    def gwb(self, fobs_gw, dlog10=True):
+    def gwb_ideal(self, fobs_gw, dlog10=True):
         # NOTE: dlog10M performs MUCH better than dM
-        # mg, qg, rz = np.broadcast_arrays(self.mass_gal, self.mrat_gal, self.redz)
         mg = self.mass_gal[:, np.newaxis, np.newaxis]
         qg = self.mrat_gal[np.newaxis, :, np.newaxis]
         rz = self.redz[np.newaxis, np.newaxis, :]
@@ -157,22 +155,6 @@ class Simple_SAM:
 
         ndens = self.ndens_mbh(mg, qg, rz, dlog10=dlog10) / (MPC**3)
         gwb = gwb_ideal(fobs_gw, ndens, mtot, mrat, rz, dlog10=dlog10)
-
-        ndens = self.ndens_mbh(mg, qg, rz, dlog10=(not dlog10)) / (MPC**3)
-        if dlog10:
-            # ndens is dn/dM, convert to dn/dlog10(M)
-            other_ndens = ndens * mtot * np.log(10.0)
-        else:
-            # ndens is dn/dlog10(M), convert to dn/dM
-            other_ndens = ndens / (mtot * np.log(10.0))
-
-        print(f"{utils.stats(ndens, prec=4)}")
-        print(f"{utils.stats(other_ndens, prec=4)}")
-        other_gwb = gwb_ideal(fobs_gw, other_ndens, mtot, mrat, rz, dlog10=dlog10)
-        print(f"{self.__class__}.gwb({dlog10=})")
-        print(f"{gwb:.4e}")
-        print(f"{other_gwb:.4e}")
-
         return gwb
 
     def ndens_mbh(self, mass_gal, mrat_gal, redz, dlog10=True):
@@ -196,8 +178,6 @@ class Simple_SAM:
             mbh_pri = self.mgal_to_mbh(mass_gal)
             mbh = mbh_pri * (1.0 + mrat_mbh)
             nd = (mbh / mass_gal) * nd
-        # else:
-        #     nd = nd / (1.0 + mrat_mbh)
 
         return nd
 
@@ -241,10 +221,6 @@ class Simple_SAM:
         # convert from 1/dM ==> 1/dlog10(M) = ln(10) * M * 1/dM
         if dlog10:
             nd = nd * mass_gal * np.log(10.0)
-        # convert from dM_pri to dM=dM_tot  ::  ``dM_tot = (1+q)*dM_pri``
-        else:
-            # nd = nd / (1.0 + mrat_gal)
-            pass
 
         return nd
 
@@ -311,24 +287,3 @@ def gwb_ideal(fobs_gw, ndens, mtot, mrat, redz, dlog10=False):
     gwb = const * fogw * np.sum(integ)
     gwb = np.sqrt(gwb)
     return gwb
-
-
-# def gwb_ideal_dlog10m(fobs_gw, ndens_dlog10m, mtot, mrat, redz):
-
-#     const = ((4.0 * np.pi) / (3 * SPLC**2))
-#     mc = utils.chirp_mass_mtmr(mtot, mrat)
-#     mc = np.power(NWTG * mc, 5.0/3.0)
-#     rz = np.power(1 + redz, -1.0/3.0)
-#     fogw = np.power(np.pi * fobs_gw, -4.0/3.0)
-
-#     integ = ndens_dlog10m * mc * rz
-#     for ax, xx in enumerate([np.log10(mtot), mrat, redz]):
-#         integ = np.moveaxis(integ, ax, 0)
-#         xx = np.moveaxis(xx, ax, 0)
-#         integ = 0.5 * (integ[:-1] + integ[1:]) * np.diff(xx, axis=0)
-#         integ = np.moveaxis(integ, 0, ax)
-
-#     gwb = const * fogw * np.sum(integ)
-#     gwb = np.sqrt(gwb)
-#     return gwb
-
