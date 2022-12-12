@@ -59,7 +59,7 @@ _DEBUG_LVL = log.DEBUG
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
-REDZ_SCALE_LOG = True
+REDZ_SCALE_LOG = False       # NOTE: False seems to perform better, but this deserved closer inspection!
 REDZ_SAMPLE_VOLUME = True
 
 GSMF_USES_MTOT = False
@@ -181,22 +181,24 @@ class _Galaxy_Pair_Fraction(abc.ABC):
         return
 
     @abc.abstractmethod
-    def __call__(self, mtot, mrat, redz):
+    def __call__(self, mass, mrat, redz):
         """Return the fraction of galaxies in pairs of the given parameters.
 
         Parameters
         ----------
-        mtot : scalar or ndarray,
-            Total-mass of combined system, units of [grams].
-        mrat : scalar or ndarray,
+        mass : array_like,
+            Mass of the system, units of [grams].
+            NOTE: the definition of mass is ambiguous, i.e. whether it is the primary mass, or the
+            combined system mass.
+        mrat : array_like,
             Mass-ratio of the system (m2/m1 <= 1.0), dimensionless.
-        redz : scalar or ndarray,
+        redz : array_like,
             Redshift.
 
         Returns
         -------
         rv : scalar or ndarray,
-            Galaxy pair fraction, in dimensionless units.
+            Galaxy pair fraction, dimensionless.
 
         """
         return
@@ -227,32 +229,32 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
         self._mref = mref   # NOTE: this is `a * M_0 = 1e11 Msol` in papers
         return
 
-    def __call__(self, mtot, mrat, redz):
+    def __call__(self, mass, mrat, redz):
         """Return the fraction of galaxies in pairs of the given parameters.
 
         Parameters
         ----------
-        mtot : scalar or ndarray,
-            Total-mass of combined system, units of [grams].
-        mrat : scalar or ndarray,
+        mass : array_like,
+            Mass of the system, units of [grams].
+            NOTE: the definition of mass is ambiguous, i.e. whether it is the primary mass, or the
+            combined system mass.
+        mrat : array_like,
             Mass-ratio of the system (m2/m1 <= 1.0), dimensionless.
-        redz : scalar or ndarray,
+        redz : array_like,
             Redshift.
 
         Returns
         -------
         rv : scalar or ndarray,
-            Galaxy pair fraction, in dimensionless units.
+            Galaxy pair fraction, dimensionless.
 
         """
-        # convert from total-mass to primary-mass
-        mpri = utils.m1m2_from_mtmr(mtot, mrat)[0]
         f0p = self._frac_norm
         am0 = self._mref
         aa = self._malpha
         bb = self._zbeta
         gg = self._qgamma
-        rv = f0p * np.power(mpri/am0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
+        rv = f0p * np.power(mass/am0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
         return rv
 
 
@@ -372,7 +374,7 @@ class Semi_Analytic_Model:
     """
 
     def __init__(
-        self, mtot=[2.75e5*MSOL, 1.0e11*MSOL, 46], mrat=[0.02, 1.0, 50], redz=[0.01, 6.0, 61],
+        self, mtot=[1.0e4*MSOL, 1.0e12*MSOL, 61], mrat=[1e-3, 1.0, 81], redz=[1e-3, 6.0, 101],
         shape=None,
         gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013
     ):
@@ -399,8 +401,8 @@ class Semi_Analytic_Model:
 
         # NOTE: Create a copy of input args to make sure they aren't overwritten (in-place)
         mtot = [mt for mt in mtot]
-        mrat = [mt for mt in mrat]
-        redz = [mt for mt in redz]
+        mrat = [mr for mr in mrat]
+        redz = [rz for rz in redz]
 
         # Redefine shape of grid (i.e. number of bins in each parameter)
         if shape is not None:
