@@ -11,6 +11,7 @@ class Simple_SAM:
     def __init__(
         self,
         size=100,
+
         # Galaxy Stellar-Mass Function (GSMF)
         gsmf_phi0_const=-2.77,    # normalization [Phi_0]   -2.77, -0.29, +0.27
         gsmf_phiz=-0.27,          # norm redshift dependence [Phi_I]  -0.27, -0.21, +0.23
