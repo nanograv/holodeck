@@ -53,6 +53,10 @@ from holodeck import cosmo, utils, log
 from holodeck.constants import GYR, SPLC, MSOL, MPC, NWTG
 from holodeck import relations, gravwaves
 
+_DEBUG = True
+# _DEBUG_LVL = log.DEBUG
+_DEBUG_LVL = log.WARNING
+
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
 REDZ_SCALE_LOG = True
@@ -516,29 +520,36 @@ class Semi_Analytic_Model:
             zprime = self._gmt.zprime(mstar_tot, mstar_rat, redz)
             # find valid entries (M, Q, Z)
             bads = (zprime < 0.0)
-            if np.all(bads):
-                utils.print_stats(stack=False, print_func=log.error,
-                                  mstar_tot=mstar_tot, mstar_rat=mstar_rat, redz=redz)
-                err = "No `zprime` values are greater than zero!"
-                log.exception(err)
-                raise RuntimeError(err)
+            if _DEBUG:
+                if np.all(bads):
+                    utils.print_stats(stack=False, print_func=log.error,
+                                      mstar_tot=mstar_tot, mstar_rat=mstar_rat, redz=redz)
+                    err = "No `zprime` values are greater than zero!"
+                    log.exception(err)
+                    raise RuntimeError(err)
 
             # these are now 1D arrays of the valid indices
             # mstar_pri, mstar_rat, mstar_tot, redz = [ee[idx] for ee in [mstar_pri, mstar_rat, mstar_tot, redz]]
 
             # ---- Get Galaxy Merger Rate  [Chen2019] Eq.5
+            log.debug(f"GSMF_USES_MTOT={GSMF_USES_MTOT}")
+            log.debug(f"GPF_USES_MTOT ={GPF_USES_MTOT}")
+            log.debug(f"GMT_USES_MTOT ={GMT_USES_MTOT}")
 
             if GSMF_USES_MTOT:
                 mass_gsmf = mstar_tot
                 # convert from  1/dM_star-tot  to  1/dlog10(M_star-tot)
-                dmdm = 1.0 / (mstar_tot * np.log(10.0))
+                # dmdm = 1.0 / (mstar_tot * np.log(10.0))
+                # dmdm = (mstar_tot * np.log(10.0))
+                dmdm = 1.0
             else:
                 mass_gsmf = mstar_pri
+                dmdm = 1.0
                 # convert from  1/dM_star-pri  to  1/dlog10(M_star-tot)
                 # note that  ``M_tot = M_pri * (1 + q)``  &&  ``1/dlog10(M) = M*ln(10) * 1/dM``
-                #     1/dlt(Mtot) = ( 1/[Mtot ln(10)] )*( 1/dMtot )
-                #                 = ( 1/[Mtot ln(10)] )*( 1/[1+q] )*( 1/dMpri )
-                dmdm = (1.0 / (mstar_tot * np.log(10.0))) * (1.0/(1.0 + mstar_rat))
+                #     1/dlt(Mtot) = ( [Mtot ln(10)] )*( 1/dMtot )
+                #                 = ( [Mtot ln(10)] )*( 1/[1+q] )*( 1/dMpri )
+                # dmdm = (mstar_tot * np.log(10.0)) / (1.0 + mstar_rat)
 
             mass_gpf = mstar_tot if GPF_USES_MTOT else mstar_pri
             mass_gmt = mstar_tot if GMT_USES_MTOT else mstar_pri
@@ -547,22 +558,58 @@ class Semi_Analytic_Model:
             dens = self._gsmf(mass_gsmf, redz) * self._gpf(mass_gpf, mstar_rat, redz) * cosmo.dtdz(redz)
             # `gmt` returns [sec]
             dens *= dmdm / self._gmt(mass_gmt, mstar_rat, redz)
-            # now `dens` is  ``dn_gal / [dMstar_tot dq_gal dz]``  with units of [Mpc^-3 gram^-1]
+            # now `dens` is  ``dn_gal / [dlog10(Mstar) dq_gal dz]``  with units of [Mpc^-3]
+
+            if _DEBUG:
+                dens_check = self._ndens_gal(mass_gsmf, mstar_rat, redz)
+                log.log(_DEBUG_LVL, f"checking galaxy merger densities...")
+                log.log(_DEBUG_LVL, f"dens_check = {utils.stats(dens_check)}")
+                log.log(_DEBUG_LVL, f"dens       = {utils.stats(dens)}")
+                err = (dens - dens_check) / dens_check
+                log.log(_DEBUG_LVL, f"       err = {utils.stats(err)}")
+                bads = ~np.isclose(dens, dens_check, rtol=1e-6, atol=1e-100)
+                if np.any(bads):
+                    err_msg = f"Galaxy ndens check failed!"
+                    log.exception(err_msg)
+                    bads = np.where(bads)
+                    log.error(f"check bads = {utils.stats(dens_check[bads])}")
+                    log.error(f"      bads = {utils.stats(dens[bads])}")
+                    raise ValueError(err_msg)
 
             # ---- Convert to MBH Binary density
 
-            # so far we have ``dn_gal / [dM_gal dq_gal dz]``
+            # so far we have ``dn_gal / [dlog10(M_gal) dq_gal dz]``
             # dn / [dM dq dz] = (dn_gal / [dM_gal dq_gal dz]) * (dM_gal/dM_bh) * (dq_gal / dq_bh)
             mplaw = self._mmbulge._mplaw
             dqbh_dqgal = mplaw * np.power(mstar_rat, mplaw - 1.0)
+            # (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) = (dMstar-pri / dMstar-tot) * (dMstar-tot/dMbh-tot)
+            # ==> (dMstar-tot/dMbh-tot) = (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) / (dMstar-pri / dMstar-tot)
+            #                           = (dMstar-pri / dMbh-pri) * (1 / (1+q_bh)) / (1 / (1+q_star))
+            #                           = (dMstar-pri / dMbh-pri) * ((1+q_star) / (1+q_bh))
+            dmstar_dmbh_pri = self._mmbulge.dmstar_dmbh(mstar_pri)   # [unitless]
+            qterm = (1.0 + mstar_rat) / (1.0 + self.mrat[np.newaxis, :, np.newaxis])
+            dmstar_dmbh = dmstar_dmbh_pri * qterm
 
-            # dMs/dMbh
-            dmstar_dmbh = self._mmbulge.dmstar_dmbh(mstar_tot)   # [unitless]
-            mbh_tot = self._mmbulge.mbh_from_mstar(mstar_tot, scatter=False)  # [gram]
-            # Eq.21, now [gram^-1 Mpc^-3]
-            dens *= dmstar_dmbh / dqbh_dqgal
-            # Convert from 1/dM to 1/dlog10(M), units are now [Mpc^-3] {lose [1/gram] because now 1/dlog10(M)}
-            dens *= mbh_tot * np.log(10.0)
+            # Eq.21, now [Mpc^-3]
+            mom = self.mtot[:, np.newaxis, np.newaxis] / mstar_tot
+            # mom = self.mtot[:, np.newaxis, np.newaxis] / (1.0 + self.mrat[np.newaxis, :, np.newaxis]) / mstar_pri
+            dens *= mom * dmstar_dmbh / dqbh_dqgal
+
+            if _DEBUG:
+                dens_check = self._ndens_mbh(mass_gsmf, mstar_rat, redz)
+                log.log(_DEBUG_LVL, f"checking MBH merger densities...")
+                log.log(_DEBUG_LVL, f"dens_check = {utils.stats(dens_check)}")
+                log.log(_DEBUG_LVL, f"dens       = {utils.stats(dens)}")
+                err = (dens - dens_check) / dens_check
+                log.log(_DEBUG_LVL, f"       err = {utils.stats(err)}")
+                bads = ~np.isclose(dens, dens_check, rtol=1e-6, atol=1e-100)
+                if np.any(bads):
+                    err_msg = f"MBH ndens check failed!"
+                    log.exception(err_msg)
+                    bads = np.where(bads)
+                    log.error(f"check bads = {utils.stats(dens_check[bads])}")
+                    log.error(f"      bads = {utils.stats(dens[bads])}")
+                    raise ValueError(err_msg)
 
             # set values after redshift zero to have zero density
             # dens[bads] = 0.0
@@ -573,27 +620,41 @@ class Semi_Analytic_Model:
         return self._density
 
     def _ndens_gal(self, mass_gal, mrat_gal, redz):
+        if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
+            log.warning("{self.__class__}._ndens_gal assumes that primary mass is used for GSMF, GPF and GMT!")
+
         nd = self._gsmf(mass_gal, redz) * self._gpf(mass_gal, mrat_gal, redz)
-        nd = nd * cosmo.dtdz(redz) / self._gmt(mass_gal, mrat_gal, redz) / MPC**3
-        nd = nd / (np.log(10.0) * mass_gal) / (1.0 + mrat_gal)
+        nd = nd * cosmo.dtdz(redz) / self._gmt(mass_gal, mrat_gal, redz)
+        # NOTE: dlog10(M_1) / dlog10(M) = (M/M_1) * (dM_1/dM) = 1
+
+        # convert from  d^3 n / [dM_pri dq dz]  ==>  d^3 n / [dlog10(M_tot) dq dz]
+        # dn/dlog10(M_tot) = M_tot ln(10) * (dn/dM_pri) * (dM_pri/dM_tot)
+        #                  = M_tot ln(10) * (dn/dM_pri) / (1+q)
+        #                  = M_pri ln(10) * (dn/dM_pri)
+        # nd = nd * (np.log(10.0) * mass_gal)
         return nd
 
-    def _ndens_mbh(self, mass_gal, mrat_gal, redz, dlog10=False):
+    def _ndens_mbh(self, mass_gal, mrat_gal, redz):
+        if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
+            log.warning("{self.__class__}._ndens_mbh assumes that primary mass is used for GSMF, GPF and GMT!")
+
+        # this is  d^3 n / [dlog10(M_gal-pri) dq_gal dz]
         nd_gal = self._ndens_gal(mass_gal, mrat_gal, redz)
 
-        # so far we have ``dn_gal / [dM_gal dq_gal dz]``
-        # dn / [dM dq dz] = (dn_gal / [dM_gal dq_gal dz]) * (dM_gal/dM_bh) * (dq_gal / dq_bh)
         mplaw = self._mmbulge._mplaw
         dqbh_dqgal = mplaw * np.power(mrat_gal, mplaw - 1.0)
 
         # dMs/dMbh
-        dmstar_dmbh = self._mmbulge.dmstar_dmbh(mass_gal)   # [unitless]
-        mbh_tot = self._mmbulge.mbh_from_mstar(mass_gal, scatter=False)  # [gram]
-        # Eq.21, now [gram^-1 Mpc^-3]
-        dens = nd_gal * dmstar_dmbh / dqbh_dqgal
-        # Convert from 1/dM to 1/dlog10(M), units are now [Mpc^-3] {lose [1/gram] because now 1/dlog10(M)}
-        if dlog10:
-            dens *= mbh_tot * np.log(10.0)
+        # mgal_tot = mass_gal * (1.0 + mrat_gal)
+        dmstar_dmbh__pri = self._mmbulge.dmstar_dmbh(mass_gal)   # [unitless]
+        mbh_pri = self._mmbulge.mbh_from_mstar(mass_gal, scatter=False)
+        mbh_sec = self._mmbulge.mbh_from_mstar(mass_gal * mrat_gal, scatter=False)
+        mbh = mbh_pri + mbh_sec
+        mrat_mbh = mbh_sec / mbh_pri
+
+        dlm_dlm = (mbh / mass_gal) * dmstar_dmbh__pri / (1.0 + mrat_mbh)
+        # Eq.21, now [Mpc^-3]
+        dens = nd_gal * dlm_dlm / dqbh_dqgal
 
         return dens
 
