@@ -43,7 +43,6 @@ References
 
 import abc
 
-# import numba
 import numpy as np
 
 import kalepy as kale
@@ -59,7 +58,6 @@ _DEBUG_LVL = log.DEBUG
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
-REDZ_SCALE_LOG = False       # NOTE: False seems to perform better, but this deserved closer inspection!
 REDZ_SAMPLE_VOLUME = True
 
 GSMF_USES_MTOT = False
@@ -374,7 +372,7 @@ class Semi_Analytic_Model:
     """
 
     def __init__(
-        self, mtot=[1.0e4*MSOL, 1.0e12*MSOL, 61], mrat=[1e-3, 1.0, 81], redz=[1e-3, 6.0, 101],
+        self, mtot=(1.0e4*MSOL, 1.0e11*MSOL, 61), mrat=(1e-3, 1.0, 81), redz=(1e-3, 6.0, 101),
         shape=None,
         gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013
     ):
@@ -399,42 +397,68 @@ class Semi_Analytic_Model:
         gmt = utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
         mmbulge = utils._get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
 
-        # NOTE: Create a copy of input args to make sure they aren't overwritten (in-place)
-        mtot = [mt for mt in mtot]
-        mrat = [mr for mr in mrat]
-        redz = [rz for rz in redz]
+        # Process grid specifications
+        param_names = ['mtot', 'mrat', 'redz']
+        params = [mtot, mrat, redz]
+        for ii, (par, name) in enumerate(zip(params, param_names)):
+            log.debug(f"{name}: {par}")
+            if isinstance(par, tuple) and (len(par) == 3):
+                continue
+            elif isinstance(par, np.ndarray):
+                continue
+            else:
+                err = (
+                    f"{name} (type={type(par)}, len={len(par)}) must be a (3,) tuple specifying a log-spacing, "
+                    "or ndarray of grid edges!"
+                )
+                log.exception(err)
+                raise ValueError(err)
 
-        # Redefine shape of grid (i.e. number of bins in each parameter)
+        # Determine shape of grid (i.e. number of bins in each parameter)
         if shape is not None:
             if np.isscalar(shape):
-                shape = [shape+ii for ii in range(3)]
+                shape = [shape for ii in range(3)]
 
             shape = np.asarray(shape)
-            if not kale.utils.isinteger(shape) or (shape.size != 3) or np.any(shape <= 1):
+            if not np.issubdtype(shape.dtype, int) or (shape.size != 3) or np.any(shape <= 1):
                 raise ValueError(f"`shape` ({shape}) must be an integer, or (3,) iterable of integers, larger than 1!")
 
             # mtot
-            if shape[0] is not None:
-                mtot[2] = shape[0]
-            # mrat
-            if shape[1] is not None:
-                mrat[2] = shape[1]
-            # redz
-            if shape[2] is not None:
-                redz[2] = shape[2]
+            for ii, par in enumerate(params):
+                if shape[ii] is not None:
+                    log.debug(f"{param_names[ii]}: resetting grid shape to {shape[ii]}")
+                    if not isinstance(par, tuple) or len(par) != 3:
+                        err = (
+                            f"Cannot set shape ({shape[ii]}) for {param_names[ii]} which is not a (3,) tuple "
+                            "specifying a log-spacing!"
+                        )
+                        log.exception(err)
+                        raise ValueError(err)
 
-        # NOTE: the spacing (log vs lin) is important.  e.g. in integrating from differential-number to (total) number
-        self.mtot = np.logspace(*np.log10(mtot[:2]), mtot[2])
-        self.mrat = np.linspace(*mrat)
+                    par = [pp for pp in par]
+                    par[2] = shape[ii]
+                    par = tuple(par)
+                    params[ii] = par
 
-        if REDZ_SCALE_LOG:
-            if redz[0] <= 0.0:
-                err = f"With `REDZ_SCALE_LOG={REDZ_SCALE_LOG}` redshift lower bound must be non-zero ({redz})!"
+        # Set grid-spacing for each parameter
+        for ii, (par, name) in enumerate(zip(params, param_names)):
+            log.debug(f"{name}: {par}")
+            if isinstance(par, tuple) and (len(par) == 3):
+                par = np.logspace(*np.log10(par[:2]), par[2])
+            elif isinstance(par, np.ndarray):
+                par = np.copy(par)
+            else:
+                err = f"{name} must be a (3,) tuple specifying a log-spacing; or ndarray of grid edges!  ({par})"
                 log.exception(err)
                 raise ValueError(err)
-            self.redz = np.logspace(*np.log10(redz[:2]), redz[2])
-        else:
-            self.redz = np.linspace(*redz)
+
+            log.debug(f"{name}: [{par[0]}, {par[-1]}] {par.size}")
+            params[ii] = par
+
+        mtot, mrat, redz = params
+        self.mtot = mtot
+        self.mrat = mrat
+        self.redz = redz
 
         self._gsmf = gsmf             #: Galaxy Stellar-Mass Function (`_Galaxy_Stellar_Mass_Function` instance)
         self._gpf = gpf               #: Galaxy Pair Fraction (`_Galaxy_Pair_Fraction` instance)
