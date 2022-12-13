@@ -299,6 +299,17 @@ def sam_lib_combine(path_output, log, debug=False):
     gwb = np.zeros(gwb_shape)
     sample_params = np.zeros((num_files, pdim))
     grid_idx = np.zeros((num_files, pdim), dtype=int)
+    if lhs_grid.shape == (): # not a gridded lhs parameter space
+        if lhs_grid[()] == -1: # using scipy LHS direct sampling
+            log.info(f"Parameter Space Type is direct LHS")
+            pspacetype = 'ungriddedlhs'
+        else:
+            err = f"Uknown parameter space type: {lhs_grid[()]}"
+            log.exception(err)
+            raise ValueError(err)
+    else:
+        log.info(f"Parameter Space Type is Gridded LHS")
+        pspacetype = 'griddedlhs'
 
     log.info(f"Collecting data from {len(files)} files")
     for ii, file in enumerate(tqdm.tqdm(files)):
@@ -327,15 +338,18 @@ def sam_lib_combine(path_output, log, debug=False):
         h5.create_dataset('fobs', data=fobs)
         h5.create_dataset('fobs_edges', data=fobs_edges)
         h5.create_dataset('gwb', data=gwb)
-        h5.create_dataset('sample_params', data=sample_params)
-        h5.create_dataset('lhs_grid', data=lhs_grid)
-        h5.create_dataset('lhs_grid_indices', data=grid_idx)
+        pars_dataset = h5.create_dataset('sample_params', data=sample_params)
         h5.attrs['param_names'] = np.array(param_names).astype('S')
         h5.attrs['shape_names'] = np.array(shape_names).astype('S')
-        group = h5.create_group('parameters')
-        for pname, pvals in zip(param_names, param_vals):
-            group.create_dataset(pname, data=pvals)
+        h5.attrs['parameter_space_type'] = pspacetype
+        if pspacetype == 'griddedlhs':
+            h5.create_dataset('lhs_grid', data=lhs_grid)
+            h5.create_dataset('lhs_grid_indices', data=grid_idx)
+            group = h5.create_group('parameters')
+            for pname, pvals in zip(param_names, param_vals):
+                group.create_dataset(pname, data=pvals)
 
     log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
     return
+
 
