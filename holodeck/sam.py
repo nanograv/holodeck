@@ -372,7 +372,7 @@ class Semi_Analytic_Model:
     """
 
     def __init__(
-        self, mtot=(1.0e4*MSOL, 1.0e11*MSOL, 61), mrat=(1e-3, 1.0, 81), redz=(1e-3, 6.0, 101),
+        self, mtot=(1.0e4*MSOL, 1.0e11*MSOL, 61), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
         shape=None,
         gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013
     ):
@@ -396,6 +396,13 @@ class Semi_Analytic_Model:
         gpf = utils._get_subclass_instance(gpf, None, _Galaxy_Pair_Fraction)
         gmt = utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
         mmbulge = utils._get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
+
+        # nl = 3
+        # nh = 30 - nl
+        # mix = 0.1
+        # lo = zmath.spacing([extr[0], mix], 'log', nl)
+        # hi = zmath.spacing([mix, extr[1]], 'lin', nh+1)[1:]
+        # redz = np.concatenate([lo, hi])
 
         # Process grid specifications
         param_names = ['mtot', 'mrat', 'redz']
@@ -654,6 +661,16 @@ class Semi_Analytic_Model:
         dens = nd_gal * dlm_dlm / dqbh_dqgal
         return dens
 
+    def _integrated_binary_density(self, sum=True):
+        # d^3 n / [dlog10M dq dz]
+        ndens = self.static_binary_density
+        integ = utils.trapz(ndens, np.log10(self.mtot), axis=0, cumsum=False)
+        integ = utils.trapz(integ, self.mrat, axis=1, cumsum=False)
+        integ = utils.trapz(integ, self.redz, axis=2, cumsum=False)
+        if sum:
+            integ = integ.sum()
+        return integ
+
     def dynamic_binary_number(self, hard, fobs_orb=None, sepa=None, limit_merger_time=None):
         """Calculate the differential number of binaries (per bin-volume, per log-freq interval).
 
@@ -877,7 +894,7 @@ class Semi_Analytic_Model:
 
         return hc
 
-    def gwb_ideal(self, fobs_gw):
+    def gwb_ideal(self, fobs_gw, sum=True):
         """Calculate the idealized, continuous GWB amplitude.
 
         Calculation follows [Phinney2001]_ (Eq.5) or equivalently [Enoki+Nagashima-2007] (Eq.3.6).
@@ -905,7 +922,8 @@ class Semi_Analytic_Model:
         integ = utils.trapz(integ, self.mrat, axis=1, cumsum=False)
         integ = utils.trapz(integ, self.redz, axis=2, cumsum=False)
 
-        gwb = const * fogw * np.sum(integ)
+        gwb = const * fogw
+        gwb = gwb * np.sum(integ) if sum else gwb * integ
         gwb = np.sqrt(gwb)
 
         return gwb
