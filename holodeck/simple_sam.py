@@ -10,7 +10,7 @@ class Simple_SAM:
 
     def __init__(
         self,
-        size=100,
+        size=61,
 
         # Galaxy Stellar-Mass Function (GSMF)
         gsmf_phi0_const=-2.77,    # normalization [Phi_0]   -2.77, -0.29, +0.27
@@ -32,10 +32,21 @@ class Simple_SAM:
         # Galaxy--Black-hole Relation
         mbh_star_log10=8.17,   # 8.17, -0.32, +0.35
         alpha_mbh_star=1.01,   # 1.01, -0.10, +0.08
+
+        mass_gal=None,
+        mrat_gal=None,
+        redz=None,
     ):
-        mass_gal = np.logspace(6, 15, size) * MSOL
-        mrat_gal = np.logspace(-4, 0, 41)
-        redz = np.linspace(0.0, 5.0, 42)
+        if mass_gal is None:
+            # mass_gal = np.logspace(7.1, 14, size) * MSOL
+            mass_gal = np.logspace(6.78438, 13.71506, size) * MSOL
+        if mrat_gal is None:
+            # mrat_gal = np.logspace(-4, 0, 41)
+            # mtot=(1.0e4*MSOL, 1.0e11*MSOL, 61), mrat=(1e-3, 1.0, 81)
+            mrat_gal = np.logspace(-3, 0, 81)
+        if redz is None:
+            # redz = np.linspace(0.0, 5.0, 42)
+            redz = np.logspace(*np.log10([1e-3, 10.0]), 101)
         self._size = size
 
         # Convert input quantities
@@ -157,6 +168,26 @@ class Simple_SAM:
         ndens = self.ndens_mbh(mg, qg, rz, dlog10=dlog10) / (MPC**3)
         gwb = gwb_ideal(fobs_gw, ndens, mtot, mrat, rz, dlog10=dlog10)
         return gwb
+
+    def _integrated_ndens_mbh(self):
+        mg = self.mass_gal[:, np.newaxis, np.newaxis]
+        qg = self.mrat_gal[np.newaxis, :, np.newaxis]
+        rz = self.redz[np.newaxis, np.newaxis, :]
+        mtot = self.mbh[:, :, np.newaxis]
+        mrat = self.qbh[np.newaxis, :, np.newaxis]
+
+        # this is [1/Mpc^3]
+        integ = self.ndens_mbh(mg, qg, rz, dlog10=True)
+        arguments = [np.log10(mtot), mrat, rz]
+
+        for ax, xx in enumerate(arguments):
+            integ = np.moveaxis(integ, ax, 0)
+            xx = np.moveaxis(xx, ax, 0)
+            integ = 0.5 * (integ[:-1] + integ[1:]) * np.diff(xx, axis=0)
+            integ = np.moveaxis(integ, 0, ax)
+
+        integ = integ.sum()
+        return integ
 
     def ndens_mbh(self, mass_gal, mrat_gal, redz, dlog10=True):
         """Number density of MBH mergers [Chen+2019] Eq. 21
