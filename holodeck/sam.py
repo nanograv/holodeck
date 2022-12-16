@@ -116,7 +116,14 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
 
     """
 
-    def __init__(self, phi0=-2.77, phiz=-0.27, mref0=1.737801e11*MSOL, mrefz=0.0, alpha0=-1.24, alphaz=-0.03):
+    def __init__(self, phi0=-2.77, phiz=-0.27, mref0_log10=11.24, mref0=None, mrefz=0.0, alpha0=-1.24, alphaz=-0.03):
+        if (mref0_log10 is not None) == (mref0 is not None):
+            err = f"One of `mref0` OR `mref0_log10` must be provided!  mref0={mref0}, mref0_log10={mref0_log10}"
+            log.exception(err)
+            raise ValueError(err)
+        if mref0 is None:
+            mref0 = MSOL * np.power(10.0, mref0_log10)
+
         self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]  [1/Mpc^3]
         self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]  [1/Mpc^3]
         self._mref0 = mref0       # +11.24  +/- [-0.17, +0.20]  Msol
@@ -206,7 +213,7 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
     """Galaxy Pair Fraction - Single Power-Law
     """
 
-    def __init__(self, frac_norm_allq=0.025, frac_norm=None, mref=1.0e11*MSOL,
+    def __init__(self, frac_norm_allq=0.025, frac_norm=None, mref=1.0e11*MSOL, mref_log10
                  malpha=0.0, zbeta=0.8, qgamma=0.0, obs_conv_qlo=0.25):
         # If the pair-fraction integrated over all mass-ratios is given (f0), convert to regular (f0-prime)
         if frac_norm is None:
@@ -217,6 +224,8 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
             qhi = 1.00
             pair_norm = (qhi**pow - qlo**pow) / pow
             frac_norm = frac_norm_allq / pair_norm
+
+
 
         # normalization corresponds to f0-prime in [Chen2019]_
         self._frac_norm = frac_norm   # f0 = 0.025 b/t [+0.02, +0.03]  [+0.01, +0.05]

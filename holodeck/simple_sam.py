@@ -137,7 +137,7 @@ class Simple_SAM:
         rv = rv * np.power(1.0 + redz, self._gmt_beta) * np.power(qgal, self._gmt_gamma)
         return rv
 
-    def gwb_sam(self, fobs_gw, sam, dlog10=True):
+    def gwb_sam(self, fobs_gw, sam, dlog10=True, sum=True):
         # NOTE: dlog10M performs MUCH better than dM
         # mg, qg, rz = np.broadcast_arrays(self.mass_gal, self.mrat_gal, self.redz)
         mg = self.mass_gal[:, np.newaxis, np.newaxis]
@@ -152,12 +152,12 @@ class Simple_SAM:
         if not dlog10:
             ndens = ndens / (np.log(10.0) * mtot)
 
-        gwb = gwb_ideal(fobs_gw, ndens, mtot, mrat, rz, dlog10=dlog10)
+        gwb = gwb_ideal(fobs_gw, ndens, mtot, mrat, rz, dlog10=dlog10, sum=sum)
         # gwb = gwb_ideal_dlog10m(fobs_gw, ndens_dlog10m, mtot, mrat, rz)
 
         return gwb
 
-    def gwb_ideal(self, fobs_gw, dlog10=True):
+    def gwb_ideal(self, fobs_gw, dlog10=True, sum=True):
         # NOTE: dlog10M performs MUCH better than dM
         mg = self.mass_gal[:, np.newaxis, np.newaxis]
         qg = self.mrat_gal[np.newaxis, :, np.newaxis]
@@ -166,7 +166,7 @@ class Simple_SAM:
         mrat = self.qbh[np.newaxis, :, np.newaxis]
 
         ndens = self.ndens_mbh(mg, qg, rz, dlog10=dlog10) / (MPC**3)
-        gwb = gwb_ideal(fobs_gw, ndens, mtot, mrat, rz, dlog10=dlog10)
+        gwb = gwb_ideal(fobs_gw, ndens, mtot, mrat, rz, dlog10=dlog10, sum=sum)
         return gwb
 
     def _integrated_ndens_mbh(self):
@@ -297,7 +297,7 @@ class Simple_SAM:
         return qbh
 
 
-def gwb_ideal(fobs_gw, ndens, mtot, mrat, redz, dlog10=False):
+def gwb_ideal(fobs_gw, ndens, mtot, mrat, redz, dlog10, sum=True):
 
     const = ((4.0 * np.pi) / (3 * SPLC**2))
     mc = utils.chirp_mass_mtmr(mtot, mrat)
@@ -316,6 +316,7 @@ def gwb_ideal(fobs_gw, ndens, mtot, mrat, redz, dlog10=False):
         integ = 0.5 * (integ[:-1] + integ[1:]) * np.diff(xx, axis=0)
         integ = np.moveaxis(integ, 0, ax)
 
-    gwb = const * fogw * np.sum(integ)
+    gwb = const * fogw
+    gwb = gwb * np.sum(integ) if sum else gwb * integ
     gwb = np.sqrt(gwb)
     return gwb
