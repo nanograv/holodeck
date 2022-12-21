@@ -277,13 +277,15 @@ class _Galaxy_Merger_Time(abc.ABC):
         return
 
     @abc.abstractmethod
-    def __call__(self, mtot, mrat, redz):
+    def __call__(self, mass, mrat, redz):
         """Return the galaxy merger time for the given parameters.
 
         Parameters
         ----------
-        mtot : scalar or ndarray,
-            Total-mass of combined system, units of [grams].
+        mass : (N,) array_like[scalar]
+            Mass of the system, units of [grams].
+            NOTE: the definition of mass is ambiguous, i.e. whether it is the primary mass, or the
+            combined system mass.
         mrat : scalar or ndarray,
             Mass-ratio of the system (m2/m1 <= 1.0), dimensionless.
         redz : scalar or ndarray,
@@ -297,10 +299,10 @@ class _Galaxy_Merger_Time(abc.ABC):
         """
         return
 
-    def zprime(self, mtot, mrat, redz, **kwargs):
+    def zprime(self, mass, mrat, redz, **kwargs):
         """Return the redshift after merger (i.e. input `redz` delayed by merger time).
         """
-        tau0 = self(mtot, mrat, redz)  # sec
+        tau0 = self(mass, mrat, redz)  # sec
         age = cosmo.age(redz).to('s').value
         new_age = age + tau0
 
@@ -322,7 +324,7 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
     """Galaxy Merger Time - simple power law prescription
     """
 
-    def __init__(self, time_norm=0.55*GYR, mref=7.2e10*MSOL, malpha=0.0, zbeta=-0.5, qgamma=0.0):
+    def __init__(self, time_norm=0.55*GYR, mref0=1.0e11*MSOL, malpha=0.0, zbeta=-0.5, qgamma=0.0):
         # tau0  [sec]
         self._time_norm = time_norm   # +0.55  b/t [+0.1, +2.0]  [+0.1, +10.0]  values for [Gyr]
         self._malpha = malpha         # +0.0   b/t [-0.2, +0.2]  [-0.2, +0.2 ]
@@ -330,16 +332,20 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
         self._qgamma = qgamma         # +0.0   b/t [-0.2, +0.2]  [-0.2, +0.2 ]
 
         # [Msol]  NOTE: this is `b * M_0 = 0.4e11 Msol / h0` in [Chen2019]_
+        # 7.2e10*MSOL
+        mref = mref0 * (0.4 / cosmo.h)
         self._mref = mref
         return
 
-    def __call__(self, mtot, mrat, redz):
+    def __call__(self, mass, mrat, redz):
         """Return the galaxy merger time for the given parameters.
 
         Parameters
         ----------
-        mtot : (N,) array_like[scalar]
-            Total mass of each binary, converted to primary-mass (used in literature equations).
+        mass : (N,) array_like[scalar]
+            Mass of the system, units of [grams].
+            NOTE: the definition of mass is ambiguous, i.e. whether it is the primary mass, or the
+            combined system mass.
         mrat : (N,) array_like[scalar]
             Mass ratio of each binary.
         redz : (N,) array_like[scalar]
@@ -352,13 +358,13 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
 
         """
         # convert to primary mass
-        mpri = utils.m1m2_from_mtmr(mtot, mrat)[0]   # [grams]
+        # mpri = utils.m1m2_from_mtmr(mtot, mrat)[0]   # [grams]
         tau0 = self._time_norm                       # [sec]
         bm0 = self._mref                             # [grams]
         aa = self._malpha
         bb = self._zbeta
         gg = self._qgamma
-        mtime = tau0 * np.power(mpri/bm0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
+        mtime = tau0 * np.power(mass/bm0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
         mtime = mtime
         return mtime
 
