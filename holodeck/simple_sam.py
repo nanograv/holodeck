@@ -5,6 +5,8 @@ import numpy as np
 from holodeck import cosmo, utils
 from holodeck.constants import MSOL, GYR, MPC, SPLC, NWTG
 
+_AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
+
 
 class Simple_SAM:
 
@@ -24,7 +26,7 @@ class Simple_SAM:
         gpf_beta=0.8,             # redshift index (beta_f)  [0.6, 1.0]
         gpf_gamma=0.0,            # mass-ratio index (gamma_f)  [-0.2, +0.2]
         # Galaxy Merger Time (GMT)
-        gmt_norm=0.55,        # time normalization [Gyr]  (tau_0)  [0.1, 2.0]
+        gmt_norm=0.55 * GYR,        # time normalization [Gyr]  (tau_0)  [0.1, 2.0]
         gmt_alpha=0.0,        # mass index (alpha_tau) [-0.2, +0.2]
         gmt_beta=-0.5,        # mass-ratio index (beta_tau) [-2, +1]
         gmt_gamma=0.0,        # redshift index (gamma_tau) [-0.2, +0.2]
@@ -51,7 +53,7 @@ class Simple_SAM:
 
         # Convert input quantities
         gsmf_m0 = (10.0 ** gsmf_log10m0) * MSOL
-        gmt_norm = gmt_norm * GYR
+        # gmt_norm = gmt_norm * GYR
         mbh_star = (10.0 ** mbh_star_log10) * MSOL
 
         # Convert between GPF normalization over all mass-ratios, to normalization at each mass-ratio
@@ -71,6 +73,7 @@ class Simple_SAM:
         self._gamma_eff = gamma_eff
         self._gsmf_m0 = gsmf_m0
         self._mbh_star = mbh_star
+        self._mbh_star_log10 = mbh_star_log10
         self._alpha_mbh_star = alpha_mbh_star
 
         self._gsmf_phi0_const = gsmf_phi0_const
@@ -137,6 +140,23 @@ class Simple_SAM:
         rv = rv * np.power(1.0 + redz, self._gmt_beta) * np.power(qgal, self._gmt_gamma)
         return rv
 
+    def _zprime(self, mgal, qgal, redz):
+        print(f"{self}._zprime")
+        tau0 = self.gmt(mgal, qgal, redz)  # sec
+        print(f"{utils.stats(tau0/GYR)=}")
+        age = cosmo.age(redz).to('s').value
+        print(f"{utils.stats(age/GYR)=}")
+        new_age = age + tau0
+        print(f"{utils.stats(new_age/GYR)=}")
+
+        redz_prime = -1.0 * np.ones_like(new_age)
+        idx = (new_age < _AGE_UNIVERSE_GYR * GYR)
+        redz_prime[idx] = cosmo.tage_to_z(new_age[idx])
+        print(f"{utils.stats(redz)=}")
+        print(f"{utils.stats(redz_prime)=}")
+        print(f"{redz.shape=}, {new_age.shape=}, {redz_prime.shape=}")
+        return redz_prime
+
     def gwb_sam(self, fobs_gw, sam, dlog10=True, sum=True):
         # NOTE: dlog10M performs MUCH better than dM
         # mg, qg, rz = np.broadcast_arrays(self.mass_gal, self.mrat_gal, self.redz)
@@ -162,10 +182,15 @@ class Simple_SAM:
         mg = self.mass_gal[:, np.newaxis, np.newaxis]
         qg = self.mrat_gal[np.newaxis, :, np.newaxis]
         rz = self.redz[np.newaxis, np.newaxis, :]
+        # if redz_prime:
+        # convert from initial galaxy-merger redshift, to after galaxy merger-time
+        rz = self._zprime(mg, qg, rz)
+
         mtot = self.mbh[:, :, np.newaxis]
         mrat = self.qbh[np.newaxis, :, np.newaxis]
 
         ndens = self.ndens_mbh(mg, qg, rz, dlog10=dlog10) / (MPC**3)
+
         gwb = gwb_ideal(fobs_gw, ndens, mtot, mrat, rz, dlog10=dlog10, sum=sum)
         return gwb
 
@@ -306,6 +331,9 @@ def gwb_ideal(fobs_gw, ndens, mtot, mrat, redz, dlog10, sum=True):
     fogw = np.power(np.pi * fobs_gw, -4.0/3.0)
 
     integ = ndens * mc * rz
+    redz = redz * np.ones_like(integ)
+    integ[redz <= 0.0] = 0.0
+
     arguments = [mtot, mrat, redz]
     if dlog10:
         arguments[0] = np.log10(arguments[0])
@@ -313,7 +341,26 @@ def gwb_ideal(fobs_gw, ndens, mtot, mrat, redz, dlog10, sum=True):
     for ax, xx in enumerate(arguments):
         integ = np.moveaxis(integ, ax, 0)
         xx = np.moveaxis(xx, ax, 0)
-        integ = 0.5 * (integ[:-1] + integ[1:]) * np.diff(xx, axis=0)
+
+        # if integ is (X, A, B) and xx is (X, 1, 1), then this is fine
+        try:
+            integ = 0.5 * (integ[:-1] + integ[1:]) * np.diff(xx, axis=0)
+        # BUT if integ is (X, A, B) and xx is (X, A+1, B+1), then need to average xx values down
+        except ValueError:
+            # average other dimensions as needed
+            for jj in range(1, len(arguments)):
+                sh = np.shape(xx)[jj]
+                if (sh == 1) or (sh == np.shape(integ)[jj]):
+                    continue
+
+                xx = np.moveaxis(xx, jj, 0)
+                xx = 0.5 * (xx[:-1] + xx[1:])
+                xx = np.moveaxis(xx, 0, jj)
+
+            # try integration step again
+            integ = 0.5 * (integ[:-1] + integ[1:]) * np.diff(xx, axis=0)
+
+        # return integ to the correct shape (axis order)
         integ = np.moveaxis(integ, 0, ax)
 
     gwb = const * fogw
