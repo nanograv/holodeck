@@ -302,7 +302,7 @@ class _Galaxy_Merger_Time(abc.ABC):
     def zprime(self, mass, mrat, redz, **kwargs):
         """Return the redshift after merger (i.e. input `redz` delayed by merger time).
         """
-        tau0 = self(mass, mrat, redz)  # sec
+        tau0 = self(mass, mrat, redz, **kwargs)  # sec
         age = cosmo.age(redz).to('s').value
         new_age = age + tau0
 
@@ -935,22 +935,49 @@ class Semi_Analytic_Model:
         # (M, Q)
         mc = utils.chirp_mass_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
         mc = np.power(NWTG * mc, 5.0/3.0)
-        # (Z,)
-        rz = np.power(1 + self.redz, -1.0/3.0)
         # (F,)
         fogw = np.power(np.pi * fobs_gw, -4.0/3.0)
+
+        # (Z,)
+        rz = self.redz
+
+        mstar_pri, mstar_tot = self.mass_stellar()
+        # q = m2 / m1
+        mstar_rat = mstar_tot / mstar_pri
+        # M = m1 + m2
+        mstar_tot = mstar_pri + mstar_tot
+        rz = rz[np.newaxis, np.newaxis, :]
+        args = [mstar_pri[..., np.newaxis], mstar_rat[..., np.newaxis], mstar_tot[..., np.newaxis], rz]
+        # Convert to shape (M, Q, Z)
+        mstar_pri, mstar_rat, mstar_tot, rz = np.broadcast_arrays(*args)
+
+        # rz = np.power(1 + rz, -1.0/3.0)
+        gmt_mass = mstar_tot if GMT_USES_MTOT else mstar_pri
+
+        rz = self._gmt.zprime(gmt_mass, mstar_rat, rz)
 
         # d^3 n / [dlog10(M) dq dz] in units of [Mpc^-3]
         ndens = self.static_binary_density / (MPC**3)
 
-        integ = ndens * mc[..., np.newaxis] * rz[np.newaxis, np.newaxis, :]
-        integ = utils.trapz(integ, np.log10(self.mtot), axis=0, cumsum=False)
-        integ = utils.trapz(integ, self.mrat, axis=1, cumsum=False)
-        integ = utils.trapz(integ, self.redz, axis=2, cumsum=False)
+        import holodeck.simple_sam
 
-        gwb = const * fogw
-        gwb = gwb * np.sum(integ) if sum else gwb * integ
-        gwb = np.sqrt(gwb)
+        mt = self.mtot[:, np.newaxis, np.newaxis]
+        mr = self.mrat[np.newaxis, :, np.newaxis]
+        return holo.simple_sam.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
+
+        # ndens[rz <= 0.0] = 0.0
+
+        # rz_term = np.power(1.0 + rz, -1.0/3.0)
+        # integ = ndens * mc[..., np.newaxis] * rz_term
+        # integ = utils.trapz(integ, np.log10(self.mtot), axis=0, cumsum=False)
+        # integ = utils.trapz(integ, self.mrat, axis=1, cumsum=False)
+        # # integ = utils.trapz(integ, self.redz, axis=2, cumsum=False)
+        # print(f"{self.redz.shape=}, {rz.shape=}")
+        # integ = utils.trapz(integ, rz, axis=2, cumsum=False)
+
+        # gwb = const * fogw
+        # gwb = gwb * np.sum(integ) if sum else gwb * integ
+        # gwb = np.sqrt(gwb)
 
         return gwb
 
