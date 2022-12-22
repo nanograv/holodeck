@@ -49,7 +49,7 @@ import kalepy as kale
 
 import holodeck as holo
 from holodeck import cosmo, utils, log
-from holodeck.constants import GYR, SPLC, MSOL, MPC, NWTG
+from holodeck.constants import GYR, SPLC, MSOL, MPC
 from holodeck import relations, gravwaves
 
 _DEBUG = True
@@ -67,11 +67,6 @@ GMT_USES_MTOT = False
 # ==============================
 # ====    SAM Components    ====
 # ==============================
-
-
-#! ---------------------------------------------------------
-log.error("SHOULD THE STRAINS BE CALCULATED A REDZ-PRIME?!")
-#! ---------------------------------------------------------
 
 
 # ----    Galaxy Stellar-Mass Function    ----
@@ -528,12 +523,6 @@ class Semi_Analytic_Model:
         return masses
 
     @property
-    def density(self):
-        err = "DEPRECATION `Semi_Analytic_Model.density` ==> `Semi_Analytic_Model.static_binary_density`"
-        log.exception(err)
-        raise AttributeError(err)
-
-    @property
     def static_binary_density(self):
         """The number-density of binaries in each bin, 'd^3 n / [dlog10M dq dz]' in units of [Mpc^-3].
 
@@ -640,9 +629,7 @@ class Semi_Analytic_Model:
                     raise ValueError(err_msg)
 
             # set values after redshift zero to have zero density
-            # dens[bads] = 0.0
-            log.warning("_NOT_ SETTING BADS TO ZERO!")
-
+            dens[bads] = 0.0
             self._density = dens
 
         return self._density
@@ -920,7 +907,7 @@ class Semi_Analytic_Model:
 
         return hc
 
-    def gwb_ideal(self, fobs_gw, sum=True):
+    def gwb_ideal(self, fobs_gw, sum=True, redz_prime=False):
         """Calculate the idealized, continuous GWB amplitude.
 
         Calculation follows [Phinney2001]_ (Eq.5) or equivalently [Enoki+Nagashima-2007] (Eq.3.6).
@@ -931,54 +918,29 @@ class Semi_Analytic_Model:
 
         """
 
-        const = ((4.0 * np.pi) / (3 * SPLC**2))
-        # (M, Q)
-        mc = utils.chirp_mass_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
-        mc = np.power(NWTG * mc, 5.0/3.0)
-        # (F,)
-        fogw = np.power(np.pi * fobs_gw, -4.0/3.0)
-
-        # (Z,)
-        rz = self.redz
-
         mstar_pri, mstar_tot = self.mass_stellar()
         # q = m2 / m1
         mstar_rat = mstar_tot / mstar_pri
         # M = m1 + m2
         mstar_tot = mstar_pri + mstar_tot
+
+        rz = self.redz
         rz = rz[np.newaxis, np.newaxis, :]
-        args = [mstar_pri[..., np.newaxis], mstar_rat[..., np.newaxis], mstar_tot[..., np.newaxis], rz]
-        # Convert to shape (M, Q, Z)
-        mstar_pri, mstar_rat, mstar_tot, rz = np.broadcast_arrays(*args)
+        if redz_prime:
+            args = [mstar_pri[..., np.newaxis], mstar_rat[..., np.newaxis], mstar_tot[..., np.newaxis], rz]
+            # Convert to shape (M, Q, Z)
+            mstar_pri, mstar_rat, mstar_tot, rz = np.broadcast_arrays(*args)
 
-        # rz = np.power(1 + rz, -1.0/3.0)
-        gmt_mass = mstar_tot if GMT_USES_MTOT else mstar_pri
-
-        rz = self._gmt.zprime(gmt_mass, mstar_rat, rz)
+            gmt_mass = mstar_tot if GMT_USES_MTOT else mstar_pri
+            rz = self._gmt.zprime(gmt_mass, mstar_rat, rz)
+            print(f"{self} :: {utils.stats(rz)=}")
 
         # d^3 n / [dlog10(M) dq dz] in units of [Mpc^-3]
         ndens = self.static_binary_density / (MPC**3)
 
-        import holodeck.simple_sam
-
         mt = self.mtot[:, np.newaxis, np.newaxis]
         mr = self.mrat[np.newaxis, :, np.newaxis]
-        return holo.simple_sam.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
-
-        # ndens[rz <= 0.0] = 0.0
-
-        # rz_term = np.power(1.0 + rz, -1.0/3.0)
-        # integ = ndens * mc[..., np.newaxis] * rz_term
-        # integ = utils.trapz(integ, np.log10(self.mtot), axis=0, cumsum=False)
-        # integ = utils.trapz(integ, self.mrat, axis=1, cumsum=False)
-        # # integ = utils.trapz(integ, self.redz, axis=2, cumsum=False)
-        # print(f"{self.redz.shape=}, {rz.shape=}")
-        # integ = utils.trapz(integ, rz, axis=2, cumsum=False)
-
-        # gwb = const * fogw
-        # gwb = gwb * np.sum(integ) if sum else gwb * integ
-        # gwb = np.sqrt(gwb)
-
+        gwb = gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
         return gwb
 
 
