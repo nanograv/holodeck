@@ -149,7 +149,7 @@ class Simple_SAM:
         redz_prime[idx] = cosmo.tage_to_z(new_age[idx])
         return redz_prime
 
-    def gwb_sam(self, fobs_gw, sam, dlog10=True, sum=True):
+    def gwb_sam(self, fobs_gw, sam, dlog10=True, sum=True, redz_prime=True):
         # NOTE: dlog10M performs MUCH better than dM
         # mg, qg, rz = np.broadcast_arrays(self.mass_gal, self.mrat_gal, self.redz)
         mg = self.mass_gal[:, np.newaxis, np.newaxis]
@@ -159,6 +159,11 @@ class Simple_SAM:
         mtot = self.mbh[:, :, np.newaxis]
         mrat = self.qbh[np.newaxis, :, np.newaxis]
         ndens = sam._ndens_mbh(mg, qg, rz) / (MPC**3)
+
+        # convert from initial galaxy-merger redshift, to after galaxy merger-time
+        if redz_prime:
+            rz = self._zprime(mg, qg, rz)
+            print(f"{self} :: {utils.stats(rz)=}")
 
         # convert from dn/dlog10(M) ==> dn/dM
         if not dlog10:
