@@ -896,7 +896,7 @@ class Semi_Analytic_Model:
 
         return hc
 
-    def gwb_ideal(self, fobs_gw, sum=True, redz_prime=False):
+    def gwb_ideal(self, fobs_gw, sum=True, redz_prime=True):
         """Calculate the idealized, continuous GWB amplitude.
 
         Calculation follows [Phinney2001]_ (Eq.5) or equivalently [Enoki+Nagashima-2007] (Eq.3.6).
