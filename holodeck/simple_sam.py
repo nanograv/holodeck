@@ -35,8 +35,8 @@ class Simple_SAM:
         mbh_star_log10=8.17,   # 8.17, -0.32, +0.35
         alpha_mbh_star=1.01,   # 1.01, -0.10, +0.08
 
-        mass_gal=None,
-        mrat_gal=None,
+        mass_gal=None,         # stellar-mass of the _primary_ galaxy (NOT the total M1+M2 mass)
+        mrat_gal=None,         # stellar-mass ratio between galaxies
         redz=None,
     ):
         if mass_gal is None:
@@ -71,7 +71,6 @@ class Simple_SAM:
         # self._alpha_eff = alpha_eff
         self._beta_eff = beta_eff
         self._gamma_eff = gamma_eff
-        self._gsmf_m0 = gsmf_m0
         self._mbh_star = mbh_star
         self._mbh_star_log10 = mbh_star_log10
         self._alpha_mbh_star = alpha_mbh_star
@@ -97,7 +96,7 @@ class Simple_SAM:
         qbh = self.qgal_to_qbh(mrat_gal)
         mbh = mbh_pri[:, np.newaxis] * (1.0 + qbh[np.newaxis, :])
 
-        self.mass_gal = mass_gal
+        self.mass_gal = mass_gal    #: primary-galaxy stellar-mass
         self.mrat_gal = mrat_gal
         self.mbh = mbh
         self.qbh = qbh
@@ -152,7 +151,8 @@ class Simple_SAM:
     def gwb_sam(self, fobs_gw, sam, dlog10=True, sum=True, redz_prime=True):
         # NOTE: dlog10M performs MUCH better than dM
         # mg, qg, rz = np.broadcast_arrays(self.mass_gal, self.mrat_gal, self.redz)
-        mg = self.mass_gal[:, np.newaxis, np.newaxis]
+
+        mg = self.mass_gal[:, np.newaxis, np.newaxis]    # this is _primary_ galaxy
         qg = self.mrat_gal[np.newaxis, :, np.newaxis]
         rz = self.redz[np.newaxis, np.newaxis, :]
 
@@ -175,7 +175,7 @@ class Simple_SAM:
 
     def gwb_ideal(self, fobs_gw, dlog10=True, sum=True, redz_prime=True):
         # NOTE: dlog10M performs MUCH better than dM
-        mg = self.mass_gal[:, np.newaxis, np.newaxis]
+        mg = self.mass_gal[:, np.newaxis, np.newaxis]    #: this is primary galaxy stellar mass
         qg = self.mrat_gal[np.newaxis, :, np.newaxis]
         redz = self.redz[np.newaxis, np.newaxis, :]
         ndens = self.ndens_mbh(mg, qg, redz, dlog10=dlog10) / (MPC**3)
@@ -212,6 +212,8 @@ class Simple_SAM:
 
     def ndens_mbh(self, mass_gal, mrat_gal, redz, dlog10=True):
         """Number density of MBH mergers [Chen+2019] Eq. 21
+
+        mass_gal : primary galaxy stellar mass
 
         (d^3 n_mbh / [dlog10(M_bh) dq_bh dz']) =
             (d^3 n_gal / [dlog10(M_gal) dq_gal dz'])
@@ -253,6 +255,10 @@ class Simple_SAM:
 
     def ndens_galaxy(self, mass_gal, mrat_gal, redz, dlog10=True):
         """Number density of galaxy mergers [Chen+2019] Eq. 17
+
+        Parameters
+        ----------
+        mass_gal : primary galaxy stellar mass
 
         This is  ``d^3 n_gal / [dlog10(M) dq dz']``   [Mpc^-3]
 

@@ -553,8 +553,12 @@ class Semi_Analytic_Model:
             # Convert to shape (M, Q, Z)
             mstar_pri, mstar_rat, mstar_tot, redz = np.broadcast_arrays(*args)
 
+            mass_gsmf = mstar_tot if GSMF_USES_MTOT else mstar_pri
+            mass_gpf = mstar_tot if GPF_USES_MTOT else mstar_pri
+            mass_gmt = mstar_tot if GMT_USES_MTOT else mstar_pri
+
             # GMT returns `-1.0` for values beyond age of universe
-            zprime = self._gmt.zprime(mstar_tot, mstar_rat, redz)
+            zprime = self._gmt.zprime(mass_gmt, mstar_rat, redz)
             # find valid entries (M, Q, Z)
             bads = (zprime < 0.0)
             if _DEBUG:
@@ -569,10 +573,6 @@ class Semi_Analytic_Model:
             log.debug(f"GSMF_USES_MTOT={GSMF_USES_MTOT}")
             log.debug(f"GPF_USES_MTOT ={GPF_USES_MTOT}")
             log.debug(f"GMT_USES_MTOT ={GMT_USES_MTOT}")
-
-            mass_gsmf = mstar_tot if GSMF_USES_MTOT else mstar_pri
-            mass_gpf = mstar_tot if GPF_USES_MTOT else mstar_pri
-            mass_gmt = mstar_tot if GMT_USES_MTOT else mstar_pri
 
             # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]
             dens = self._gsmf(mass_gsmf, redz) * self._gpf(mass_gpf, mstar_rat, redz) * cosmo.dtdz(redz)
