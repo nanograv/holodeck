@@ -407,13 +407,6 @@ class Semi_Analytic_Model:
         gmt = utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
         mmbulge = utils._get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
 
-        # nl = 3
-        # nh = 30 - nl
-        # mix = 0.1
-        # lo = zmath.spacing([extr[0], mix], 'log', nl)
-        # hi = zmath.spacing([mix, extr[1]], 'lin', nh+1)[1:]
-        # redz = np.concatenate([lo, hi])
-
         # Process grid specifications
         param_names = ['mtot', 'mrat', 'redz']
         params = [mtot, mrat, redz]
