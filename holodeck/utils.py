@@ -591,9 +591,9 @@ def nyquist_freqs_edges(
     fmin = 1.0 / dur
     fmax = 1.0 / cad * 0.5
     # df = fmin / sample
-    df = fmin # bin width
-    freqs = np.arange(fmin, fmax + df/10.0, df) # centers
-    freqs_edges = freqs-df/2. # shift to edges
+    df = fmin    # bin width
+    freqs = np.arange(fmin, fmax + df/10.0, df)   # centers
+    freqs_edges = freqs - df/2.0    # shift to edges
     freqs_edges = np.concatenate([freqs_edges, [fmax + df]])
 
     if trim is not None:
@@ -936,6 +936,47 @@ def _parse_log_norm_pars(vals, size, default=None):
         raise ValueError(err)
 
     return vals
+
+
+def _parse_val_log10_val_pars(val, val_log10, val_units=1.0, name='value', only_one=True):
+    """Given either a parameter value, or the log10 of the value, ensure that both are set.
+
+    Parameters
+    ----------
+    val : array_like or None,
+        The parameter value itself in the desired units (specified by `val_units`).
+    val_log10 : array_like or None,
+        The log10 of the parameter value in natural units.
+    val_units : array_like,
+        The conversion factor from natural units (used in `val_log10`) to the desired units (used in `val`).
+    name : str,
+        The name of the variable for use in error messages.
+    only_one : bool,
+        Whether one, and only one, of `val` and `val_log10` should be provided (i.e. not `None`).
+
+    Returns
+    -------
+    val : array_like,
+        The parameter value itself in desired units.
+        e.g. mass in grams, s.t. mass = Msol * 10^{mass_log10}
+    val_log10 : array_like,
+        The log10 of the parameter value in natural units.
+        e.g. log10 of mass in solar-masses, s.t. mass = Msol * 10^{mass_log10}
+
+    """
+    both_or_neither = ((val_log10 is not None) == (val is not None))
+    if only_one and both_or_neither:
+        err = f"One of {name} OR {name}_log10 must be provided!  {name}={val}, {name}_log10={val_log10}"
+        log.exception(err)
+        raise ValueError(err)
+
+    if val is None:
+        val = val_units * np.power(10.0, val_log10)
+
+    if val_log10 is None:
+        val_log10 = np.log10(val / val_units)
+
+    return val, val_log10
 
 
 def _integrate_grid_differential_number(edges, dnum, freq=False):

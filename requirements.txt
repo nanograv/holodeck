@@ -6,4 +6,5 @@ kalepy
 matplotlib
 numpy
 scipy
+pydoe
 tqdm
