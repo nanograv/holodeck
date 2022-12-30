@@ -89,7 +89,7 @@ class _Parameter_Space(abc.ABC):
             sampleindxs[:, i] = np.floor(maxints[i] * sampleindxs[:, i])
 
         sampleindxs = sampleindxs.astype(int)
-        log.debug(f"d={len(params)} samplelims={maxints} {nsamples=}")
+        log.debug(f"d={len(params)} samplelims={maxints} nsamples={nsamples}")
         self.sampleindxs = sampleindxs
 
         self.param_grid = np.meshgrid(*params, indexing='ij')
