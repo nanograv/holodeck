@@ -72,7 +72,7 @@ for cp in _check_paths:
 # ---- Load logger
 
 from . import logger   # noqa
-log = logger.get_logger(__name__, logging.DEBUG)       #: global root logger from `holodeck.logger`
+log = logger.get_logger(__name__, logging.INFO)       #: global root logger from `holodeck.logger`
 
 # ---- Load cosmology instance
 
@@ -89,6 +89,7 @@ del cosmopy
 
 from . import constants   # noqa
 from . import evolution   # noqa
+from . import librarian   # noqa
 from . import relations   # noqa
 from . import population  # noqa
 from . import utils       # noqa
