@@ -1647,7 +1647,7 @@ class Fixed_Time(_Hardening):
         # ---- Calculate normalization parameter
         mtot, mrat, time, sepa = np.broadcast_arrays(mtot, mrat, time, sepa)
         if mtot.ndim != 1:
-            err = f"Error in input shapes (`mtot.shpae={np.shape(mtot)})"
+            err = f"Error in input shapes (`mtot.shape={np.shape(mtot)})"
             log.exception(err)
             raise ValueError(err)
 
