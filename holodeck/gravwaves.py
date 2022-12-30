@@ -13,7 +13,7 @@ import kalepy as kale
 
 import holodeck as holo
 from holodeck import utils, cosmo, log
-# from holodeck.constants import MPC, MSOL
+from holodeck.constants import SPLC, NWTG
 
 
 _CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen']
@@ -381,7 +381,7 @@ def sampled_gws_from_sam(sam, fobs_gw, hard=holo.evolution.Hard_GW, **kwargs):
     return gff, gwf, gwb
 
 
-def _gws_from_number_grid_centroids(edges, number, realize):
+def _gws_from_number_grid_centroids(edges, dnum, number, realize):
     """Calculate GWs based on a grid of number-of-binaries.
 
     # ! BUG: THIS ASSUMES THAT FREQUENCIES ARE NYQUIST SAMPLED !
@@ -533,7 +533,15 @@ def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
         hc = hc * number
     elif utils.isinteger(realize):
         shape = number.shape + (realize,)
-        hc = hc[..., np.newaxis] * np.random.poisson(number[..., np.newaxis], size=shape)
+        try:
+            hc = hc[..., np.newaxis] * np.random.poisson(number[..., np.newaxis], size=shape)
+        except ValueError as err:
+            log.error(str(err))
+            print(f"{utils.stats(number)=}")
+            print(f"{number.max()=:.8e}")
+            print(f"{number.dtype=}")
+            raise
+
     else:
         err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
         log.error(err)
@@ -548,6 +556,53 @@ def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
     hc = np.sqrt(hc)
 
     return hc
+
+
+def gwb_ideal(fobs_gw, ndens, mtot, mrat, redz, dlog10, sum=True):
+
+    const = ((4.0 * np.pi) / (3 * SPLC**2))
+    mc = utils.chirp_mass_mtmr(mtot, mrat)
+    mc = np.power(NWTG * mc, 5.0/3.0)
+    rz = np.power(1 + redz, -1.0/3.0)
+    fogw = np.power(np.pi * fobs_gw, -4.0/3.0)
+
+    integ = ndens * mc * rz
+    redz = redz * np.ones_like(integ)
+    integ[redz <= 0.0] = 0.0
+
+    arguments = [mtot, mrat, redz]
+    if dlog10:
+        arguments[0] = np.log10(arguments[0])
+
+    for ax, xx in enumerate(arguments):
+        integ = np.moveaxis(integ, ax, 0)
+        xx = np.moveaxis(xx, ax, 0)
+
+        # if integ is (X, A, B) and xx is (X, 1, 1), then this is fine
+        try:
+            integ = 0.5 * (integ[:-1] + integ[1:]) * np.diff(xx, axis=0)
+        # BUT if integ is (X, A, B) and xx is (X, A+1, B+1), then need to average xx values down
+        except ValueError:
+            # average other dimensions as needed
+            for jj in range(1, len(arguments)):
+                sh = np.shape(xx)[jj]
+                if (sh == 1) or (sh == np.shape(integ)[jj]):
+                    continue
+
+                xx = np.moveaxis(xx, jj, 0)
+                xx = 0.5 * (xx[:-1] + xx[1:])
+                xx = np.moveaxis(xx, 0, jj)
+
+            # try integration step again
+            integ = 0.5 * (integ[:-1] + integ[1:]) * np.diff(xx, axis=0)
+
+        # return integ to the correct shape (axis order)
+        integ = np.moveaxis(integ, 0, ax)
+
+    gwb = const * fogw
+    gwb = gwb * np.sum(integ) if sum else gwb * integ
+    gwb = np.sqrt(gwb)
+    return gwb
 
 
 # ==============================================================================
