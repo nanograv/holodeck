@@ -52,17 +52,18 @@ from holodeck import cosmo, utils, log
 from holodeck.constants import GYR, SPLC, MSOL, MPC
 from holodeck import relations, gravwaves
 
-_DEBUG = True
+_DEBUG = False
 _DEBUG_LVL = log.DEBUG
 # _DEBUG_LVL = log.WARNING
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
-REDZ_SAMPLE_VOLUME = True
+REDZ_SAMPLE_VOLUME = True    #: get redshifts by sampling uniformly in 3D spatial volume, and converting
 
-GSMF_USES_MTOT = False
-GPF_USES_MTOT = False
-GMT_USES_MTOT = False
+GSMF_USES_MTOT = False       #: the mass used in the GSMF is interpretted as M=m1+m2, otherwise use primary m1
+GPF_USES_MTOT = False        #: the mass used in the GPF  is interpretted as M=m1+m2, otherwise use primary m1
+GMT_USES_MTOT = False        #: the mass used in the GMT  is interpretted as M=m1+m2, otherwise use primary m1
+
 
 # ==============================
 # ====    SAM Components    ====
@@ -528,7 +529,8 @@ class Semi_Analytic_Model:
 
         Notes
         -----
-        This function effectively calculates Eq.21 & 5 of [Chen2019]_; or equivalently, Eq. 6 of [Sesana2008]_.
+        * This function effectively calculates Eq.21 & 5 of [Chen2019]_; or equivalently, Eq. 6 of [Sesana2008]_.
+        * Bins which 'merge' after redshift zero are set to zero density (using the `self._gmt` instance).
 
         """
         if self._density is None:
