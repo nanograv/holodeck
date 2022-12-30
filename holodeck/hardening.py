@@ -1,50 +1,7 @@
-"""Module for binary evolution from the time of formation/galaxy-merger until BH coalescence.
-
-In `holodeck`, initial binary populations are typically defined near the time of galaxy-galaxy
-merger, when two MBHs come together at roughly kiloparsec scales.  Environmental 'hardening'
-mechanisms are required to dissipate orbital energy and angular momentum, allowing the binary
-separation to shrink ('harden'). Typically *dynamical friction (DF)* is most important at large
-scales ($\\sim \\mathrm{kpc}$).  Near where the pair of MBHs become a gravitationally-bound binary,
-the DF approximations break down, and individual *stellar scattering* events (from stars in the
-'loss cone' of parameter space) need to be considered.  In the presence of significant gas (i.e.
-from accretion), a circumbinary accretion disk (CBD) may form, and gravitational
-*circumbinary disk torques* from the gas distribution (typically spiral waves) may become important.
-Finally, at the smaller separations, *GW emission* takes over.  The classic work describing the
-overall process of binary evolution in its different stages is [BBR1980]_.  [Kelley2017a]_ goes
-into significant detail on implementations and properties of each component of binary evolution
-also.  Triple MBH interactions, and perturbations from other massive objects (e.g. molecular
-clouds) can also be important.
-
-The :mod:`holodeck.evolution` submodule provides tools for modeling the binary evolution from the
-time of binary 'formation' (i.e. galaxy merger) until coalescence.  Models for binary evolutionary
-can range tremendously in complexity.  In the simplest models, binaries are assumed to coalesce
-instantaneously (in that the age of the universe is the same at formation and coalescence), and are
-also assumed to evolve purely due to GW emission (in that the time spent in any range of orbital
-frequencies can be calculated from the GW hardening timescale).  Note that these two assumptions
-are contradictory, but commonly employed in the literature.  The ideal, self-consistent approach,
-is to model binary evolution using self-consistently derived environments (e.g. gas and stellar
-mass distributions), and applying the same time-evolution prescription to both the redshift
-evolution of each binary, and also the GW calculation.  Note that GWs can only be calculated based
-on some sort of model for binary evolution.  The model may be extremely simple, in which case it is
-sometimes glanced over.
-
-The core component of the evolution module is the :class:`Evolution` class.  This class combines a
-population of initial binary parameters (i.e. from the :class:`holodeck.population.Pop_Illustris`
-class), along with a specific binary hardening model (:class:`_Hardening` subclass), and performs
-the numerical integration of each binary over time - from large separations to coalescence.  The
-:class:`Evolution` class also acts to store the binary evolution histories ('trajectories' or
-'tracks'), which are then used to calculate GW signals (e.g. the GWB).  To facilitate GW and
-similar calculations, :class:`Evolution` also provides interpolation functionality along binary
-trajectories.
+"""
 
 To-Do
 -----
-*   General
-
-    *   evolution modifiers should act at each step, instead of after all steps?  This would be
-        a way to implement a changing accretion rate, for example; or set a max/min hardening rate.
-    *   re-implement "magic" hardening models that coalesce in zero change-of-redshift or fixed
-        amounts of time.
 
 *   Dynamical_Friction_NFW
 
@@ -89,12 +46,6 @@ References
 
 """
 from __future__ import annotations
-
-# ! ===============================================================================================!
-# ! -- UPDATE `_take_next_step` -- !
-# ! -- write a function to set right-edge values, call it with estimate from left edge -- !
-# ! -- then call it again with a revision to the estimate, using right-edge values -- !
-# ! ===============================================================================================!
 
 import abc
 import json
