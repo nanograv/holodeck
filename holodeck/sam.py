@@ -867,7 +867,12 @@ class Semi_Analytic_Model:
         edges[-1] = fobs_orb_edges
         log.debug(f"dnum: {utils.stats(dnum)}")
 
-        if np.any(np.isnan(dnum)):
+        if _DEBUG and np.any(np.isnan(dnum)):
+            err = f"Found nan `dnum` values!"
+            log.exception(err)
+            raise ValueError(err)
+
+        if _DEBUG and np.any(np.isnan(dnum)):
             err = f"Found nan `dnum` values!"
             log.exception(err)
             raise ValueError(err)
@@ -882,6 +887,12 @@ class Semi_Analytic_Model:
         number = number * np.diff(np.log(fobs_gw_edges))
         log.debug(f"number: {utils.stats(number)}")
         log.debug(f"number.sum(): {number.sum():.4e}")
+
+        if np.any(np.isnan(number)):
+            print(f"{np.any(np.isnan(dnum))=}")
+            err = f"Found nan `number` values!"
+            log.exception(err)
+            raise ValueError(err)
 
         if np.any(np.isnan(number)):
             print(f"{np.any(np.isnan(dnum))=}")
