@@ -18,15 +18,15 @@ class Simple_SAM:
         gsmf_phi0_const=-2.77,    # normalization [Phi_0]   -2.77, -0.29, +0.27
         gsmf_phiz=-0.27,          # norm redshift dependence [Phi_I]  -0.27, -0.21, +0.23
         gsmf_log10m0=11.24,       # log10 of reference mass/Msol [log10(M0)]  11.24, -0.17, +0.20
-        gsmf_alpha0_const=-1.24,          # mass exponent constant [alpha_0]   -1.24, -0.16, +0.16
-        gsmf_alphaz=-0.03,          # mass exponent redshift dependent [alpha_I]  -0.03, -0.14, +0.16
+        gsmf_alpha0_const=-1.24,  # mass exponent constant [alpha_0]   -1.24, -0.16, +0.16
+        gsmf_alphaz=-0.03,        # mass exponent redshift dependent [alpha_I]  -0.03, -0.14, +0.16
         # Galaxy Pair Fraction (GPF)
-        gpf_norm=0.025,     # normalization over all mass-ratios (f0)  [0.02, 0.03]
+        gpf_norm=0.025,           # normalization over all mass-ratios (f0)  [0.02, 0.03]
         gpf_alpha=0.0,            # mass index (alpha_f)  [-0.2, +0.2]
         gpf_beta=0.8,             # redshift index (beta_f)  [0.6, 1.0]
         gpf_gamma=0.0,            # mass-ratio index (gamma_f)  [-0.2, +0.2]
         # Galaxy Merger Time (GMT)
-        gmt_norm=0.55 * GYR,        # time normalization [Gyr]  (tau_0)  [0.1, 2.0]
+        gmt_norm=0.55 * GYR,  # time normalization [Gyr]  (tau_0)  [0.1, 2.0]
         gmt_alpha=0.0,        # mass index (alpha_tau) [-0.2, +0.2]
         gmt_beta=-0.5,        # mass-ratio index (beta_tau) [-2, +1]
         gmt_gamma=0.0,        # redshift index (gamma_tau) [-0.2, +0.2]
