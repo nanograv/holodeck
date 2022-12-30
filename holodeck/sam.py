@@ -888,13 +888,13 @@ class Semi_Analytic_Model:
         log.debug(f"number: {utils.stats(number)}")
         log.debug(f"number.sum(): {number.sum():.4e}")
 
-        if np.any(np.isnan(number)):
+        if _DEBUG and np.any(np.isnan(number)):
             print(f"{np.any(np.isnan(dnum))=}")
             err = f"Found nan `number` values!"
             log.exception(err)
             raise ValueError(err)
 
-        if np.any(np.isnan(number)):
+        if _DEBUG and np.any(np.isnan(number)):
             print(f"{np.any(np.isnan(dnum))=}")
             err = f"Found nan `number` values!"
             log.exception(err)
