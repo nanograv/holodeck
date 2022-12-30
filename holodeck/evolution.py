@@ -109,8 +109,8 @@ _MAX_ECCEN_ONE_MINUS = 1.0e-6
 # Pop = TypeVar('Pop', bound=holo.population._Population_Discrete)  # Must be exactly str or bytes
 # A = TypeVar('A', str, bytes)  # Must be exactly str or bytes
 # S = TypeVar('S', bound=str)  # Can be any subtype of str
-# Hard = TypeVar('Hard', bound=holo.evolution._Hardening)  # Can be any subtype of str
-# Hard = TypeVar('Hard', holo.evolution._Hardening, list[holo.evolution._Hardening])  # Can be any subtype of str
+# Hard = TypeVar('Hard', bound=holo.hardening._Hardening)  # Can be any subtype of str
+# Hard = TypeVar('Hard', holo.hardening._Hardening, list[holo.hardening._Hardening])  # Can be any subtype of str
 # AliasType = Union[list[dict[tuple[int, str], set[int]]], tuple[str, list[str]]]
 # Hard_list = Union[list[Hard], Hard]
 
