@@ -1,5 +1,8 @@
 """Module for binary evolution from the time of formation/galaxy-merger until BH coalescence.
 
+#!NOTE: much of this documentation needs to be updated to reflect that much of the material in this
+#!      file was moved to `holodeck.hardening`.
+
 In `holodeck`, initial binary populations are typically defined near the time of galaxy-galaxy
 merger, when two MBHs come together at roughly kiloparsec scales.  Environmental 'hardening'
 mechanisms are required to dissipate orbital energy and angular momentum, allowing the binary
@@ -46,37 +49,9 @@ To-Do
     *   re-implement "magic" hardening models that coalesce in zero change-of-redshift or fixed
         amounts of time.
 
-*   Dynamical_Friction_NFW
-
-    *   Allow stellar-density profiles to also be specified (instead of using a hard-coded
-        Dehnen profile)
-    *   Generalize calculation of stellar characteristic radius.  Make self-consistent with
-        stellar-profile, and user-specifiable.
-
 *   Evolution
 
     *   `_sample_universe()` : sample in comoving-volume instead of redshift
-
-*   Sesana_Scattering
-
-    *   Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
-        and flexible.  Currently hard-coded to Dehnen profile estimate.
-
-*   _SHM06
-
-    *   Interpolants of hardening parameters return 2D arrays which we then take the diagonal
-        of, but there should be a better way of doing this.
-
-*   Fixed_Time
-
-    *   Handle `rchar` better with respect to interpolation.  Currently not an interpolation
-        variable, which restricts it's usage.
-    *   This class should be separated into a generic `_Fixed_Time` class that can use any
-        functional form, and then a 2-power-law functional form that requires a specified
-        normalization.  When they're combined, it will produce the same effect.  Another good
-        functional form to implement would be GW + log-uniform hardening time, the same as the
-        current phenomenological model but with both power-laws set to 0.
-
 
 References
 ----------
