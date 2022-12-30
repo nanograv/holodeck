@@ -248,4 +248,3 @@ def sam_lib_combine(path_output, log, debug=False):
 
     log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
     return
-

@@ -240,7 +240,7 @@ class MMBulge_Standard(_MMBulge_Relation):
 
     def __init__(self, mamp=None, mamp_log10=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None):
         if (self.MASS_AMP_LOG10 is not None) == (self.MASS_AMP is not None):
-            err = f"One of `MASS_AMP_LOG10` _or_ `MASS_AMP` must be set!"
+            err = "One of `MASS_AMP_LOG10` _or_ `MASS_AMP` must be set!"
             log.exception(err)
             raise ValueError(err)
 

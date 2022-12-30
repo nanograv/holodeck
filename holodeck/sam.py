@@ -575,14 +575,14 @@ class Semi_Analytic_Model:
 
             if _DEBUG:
                 dens_check = self._ndens_gal(mass_gsmf, mstar_rat, redz)
-                log.log(_DEBUG_LVL, f"checking galaxy merger densities...")
+                log.log(_DEBUG_LVL, "checking galaxy merger densities...")
                 log.log(_DEBUG_LVL, f"dens_check = {utils.stats(dens_check)}")
                 log.log(_DEBUG_LVL, f"dens       = {utils.stats(dens)}")
                 err = (dens - dens_check) / dens_check
                 log.log(_DEBUG_LVL, f"       err = {utils.stats(err)}")
                 bads = ~np.isclose(dens, dens_check, rtol=1e-6, atol=1e-100)
                 if np.any(bads):
-                    err_msg = f"Galaxy ndens check failed!"
+                    err_msg = "Galaxy ndens check failed!"
                     log.exception(err_msg)
                     bads = np.where(bads)
                     log.error(f"check bads = {utils.stats(dens_check[bads])}")
@@ -607,14 +607,14 @@ class Semi_Analytic_Model:
 
             if _DEBUG:
                 dens_check = self._ndens_mbh(mass_gsmf, mstar_rat, redz)
-                log.log(_DEBUG_LVL, f"checking MBH merger densities...")
+                log.log(_DEBUG_LVL, "checking MBH merger densities...")
                 log.log(_DEBUG_LVL, f"dens_check = {utils.stats(dens_check)}")
                 log.log(_DEBUG_LVL, f"dens       = {utils.stats(dens)}")
                 err = (dens - dens_check) / dens_check
                 log.log(_DEBUG_LVL, f"       err = {utils.stats(err)}")
                 bads = ~np.isclose(dens, dens_check, rtol=1e-6, atol=1e-100)
                 if np.any(bads):
-                    err_msg = f"MBH ndens check failed!"
+                    err_msg = "MBH ndens check failed!"
                     log.exception(err_msg)
                     bads = np.where(bads)
                     log.error(f"check bads = {utils.stats(dens_check[bads])}")
@@ -861,12 +861,12 @@ class Semi_Analytic_Model:
         log.debug(f"dnum: {utils.stats(dnum)}")
 
         if _DEBUG and np.any(np.isnan(dnum)):
-            err = f"Found nan `dnum` values!"
+            err = "Found nan `dnum` values!"
             log.exception(err)
             raise ValueError(err)
 
         if _DEBUG and np.any(np.isnan(dnum)):
-            err = f"Found nan `dnum` values!"
+            err = "Found nan `dnum` values!"
             log.exception(err)
             raise ValueError(err)
 
@@ -883,13 +883,13 @@ class Semi_Analytic_Model:
 
         if _DEBUG and np.any(np.isnan(number)):
             print(f"{np.any(np.isnan(dnum))=}")
-            err = f"Found nan `number` values!"
+            err = "Found nan `number` values!"
             log.exception(err)
             raise ValueError(err)
 
         if _DEBUG and np.any(np.isnan(number)):
             print(f"{np.any(np.isnan(dnum))=}")
-            err = f"Found nan `number` values!"
+            err = "Found nan `number` values!"
             log.exception(err)
             raise ValueError(err)
 

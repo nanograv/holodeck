@@ -591,9 +591,9 @@ def nyquist_freqs_edges(
     fmin = 1.0 / dur
     fmax = 1.0 / cad * 0.5
     # df = fmin / sample
-    df = fmin # bin width
-    freqs = np.arange(fmin, fmax + df/10.0, df) # centers
-    freqs_edges = freqs-df/2. # shift to edges
+    df = fmin    # bin width
+    freqs = np.arange(fmin, fmax + df/10.0, df)   # centers
+    freqs_edges = freqs - df/2.0    # shift to edges
     freqs_edges = np.concatenate([freqs_edges, [fmax + df]])
 
     if trim is not None:

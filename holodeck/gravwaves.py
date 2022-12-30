@@ -381,7 +381,7 @@ def sampled_gws_from_sam(sam, fobs_gw, hard=holo.evolution.Hard_GW, **kwargs):
     return gff, gwf, gwb
 
 
-def _gws_from_number_grid_centroids(edges, number, realize):
+def _gws_from_number_grid_centroids(edges, dnum, number, realize):
     """Calculate GWs based on a grid of number-of-binaries.
 
     # ! BUG: THIS ASSUMES THAT FREQUENCIES ARE NYQUIST SAMPLED !
