@@ -232,21 +232,28 @@ class MMBulge_Standard(_MMBulge_Relation):
 
     """
 
-    MASS_AMP = 3.0e8 * MSOL
+    MASS_AMP = None
     MASS_AMP_LOG10 = 8.17   # log10(M/Msol)
     MASS_PLAW = 1.01
     MASS_REF = 1.0e11 * MSOL
     SCATTER_DEX = 0.3
 
     def __init__(self, mamp=None, mamp_log10=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None):
+        if (self.MASS_AMP_LOG10 is not None) == (self.MASS_AMP is not None):
+            err = f"One of `MASS_AMP_LOG10` _or_ `MASS_AMP` must be set!"
+            log.exception(err)
+            raise ValueError(err)
+
         if (mamp is None) and (mamp_log10 is None):
             mamp_log10 = self.MASS_AMP_LOG10
+            mamp = self.MASS_AMP
         if mplaw is None:
             mplaw = self.MASS_PLAW
         if mref is None:
             mref = self.MASS_REF
         if scatter_dex is None:
             scatter_dex = self.SCATTER_DEX
+
         mamp, _ = utils._parse_val_log10_val_pars(mamp, mamp_log10, MSOL, 'mamp', only_one=True)
 
         self._mamp = mamp     #: Mass-Amplitude [grams]
@@ -397,6 +404,7 @@ class MMBulge_KH2013(MMBulge_Standard):
 
     """
     MASS_AMP = 0.49 * 1e9 * MSOL      # 0.49 + 0.06 - 0.05   in units of [Msol]
+    MASS_AMP_LOG10 = None
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.17                  # 1.17 ± 0.08
     SCATTER_DEX = 0.28                # scatter stdev in dex
@@ -408,7 +416,8 @@ class MMBulge_MM2013(MMBulge_Standard):
     [MM2013]_ Eq. 2, with values taken from Table 2 ("Dynamical masses", first row, "MPFITEXY")
 
     """
-    MASS_AMP = MSOL * 10.0 ** 8.46    # 8.46 ± 0.08   in units of [Msol]
+    MASS_AMP = None
+    MASS_AMP_LOG10 = 8.46    # 8.46 ± 0.08   in units of [Msol]
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.05                  # 1.05 ± 0.11
     SCATTER_DEX = 0.34
@@ -430,6 +439,7 @@ class MMBulge_Redshift(MMBulge_Standard):
     """
 
     MASS_AMP = 3.0e8 * MSOL
+    MASS_AMP_LOG10 = None
     MASS_PLAW = 1.0
     MASS_REF = 1.0e11 * MSOL
     SCATTER_DEX = 0.0
@@ -503,7 +513,8 @@ class MMBulge_Redshift_MM2013(MMBulge_Redshift):
     [MM2013]_ Eq. 2, with values taken from Table 2 ("Dynamical masses", first row, "MPFITEXY")
 
     """
-    MASS_AMP = MSOL * 10.0 ** 8.46    # 8.46 ± 0.08   in units of [Msol]
+    MASS_AMP_LOG10 = 8.46    # 8.46 ± 0.08   in units of [Msol]
+    MASS_AMP = None
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.05                  # 1.05 ± 0.11
     SCATTER_DEX = 0.34
@@ -518,6 +529,7 @@ class MMBulge_Redshift_KH2013(MMBulge_Redshift):
     Values taken from [KH2013] Eq.10 (pg. 61 of PDF, "571" of ARAA)
     """
     MASS_AMP = 0.49 * 1e9 * MSOL   # 0.49 + 0.06 - 0.05   in units of [Msol]
+    MASS_AMP_LOG10 = None
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.17                  # 1.17 ± 0.08
     SCATTER_DEX = 0.28
