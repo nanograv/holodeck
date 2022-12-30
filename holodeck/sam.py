@@ -817,7 +817,7 @@ class Semi_Analytic_Model:
 
         return edges, dnum
 
-    def gwb(self, fobs_gw_edges, hard=holo.evolution.Hard_GW, realize=False):
+    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=False):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
         Parameters
