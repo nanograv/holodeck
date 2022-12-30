@@ -447,23 +447,12 @@ class MMBulge_Redshift(MMBulge_Standard):
 
     _PROPERTIES = ['mbulge', 'redz']
 
-    def __init__(self, mamp=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None, zplaw=None):
-        if mamp is None:
-            mamp = self.MASS_AMP
-        if mplaw is None:
-            mplaw = self.MASS_PLAW
-        if mref is None:
-            mref = self.MASS_REF
-        if scatter_dex is None:
-            scatter_dex = self.SCATTER_DEX
+    def __init__(self, *args, zplaw=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
         if zplaw is None:
             zplaw = self.Z_PLAW
 
-        self._mamp = mamp   # Mass-Amplitude [grams]
-        self._mplaw = mplaw   # Mass Power-law index
-        self._mref = mref   # Reference Mass (argument normalization)
-        self._bulge_mfrac = bulge_mfrac
-        self._scatter_dex = scatter_dex
         self._zplaw = zplaw
         return
 
