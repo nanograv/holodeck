@@ -13,7 +13,7 @@ import kalepy as kale
 
 import holodeck as holo
 from holodeck import utils, cosmo, log
-# from holodeck.constants import MPC, MSOL
+from holodeck.constants import SPLC, NWTG
 
 
 _CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen']
@@ -198,7 +198,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     return both, fore, back, loud
 
 
-def _gws_from_samples(vals, weights, fobs_gw):
+def _gws_from_samples(vals, weights, fobs_gw_edges):
     """Calculate GW signals at the given frequencies, from weighted samples of a binary population.
 
     Parameters
@@ -208,9 +208,9 @@ def _gws_from_samples(vals, weights, fobs_gw):
         * vals[0] : mtot [grams]
         * vals[1] : mrat []
         * vals[2] : redz []
-        * vals[3] : *observer*-frame binary *orbital*-frequency [1/sec]
+        * vals[3] : *observer*-frame *orbital*-frequency of binaries [1/sec]
     weights : (N,) array of scalar,
-    fobs_gw : (F,) array of scalar,
+    fobs_gw_edges : (F,) array of scalar,
         Target observer-frame GW-frequencies to calculate GWs at.  Units of [1/sec].
 
     Returns
@@ -224,9 +224,9 @@ def _gws_from_samples(vals, weights, fobs_gw):
         Does not include the strain from the loudest binary in each bin (`gwf`).
 
     """
-    # `fo` is observer-frame GW-frequencies of binary samples
-    hs, fo = _strains_from_samples(vals)
-    gff, gwf, gwb = gws_from_sampled_strains(fobs_gw, fo, hs, weights)
+    # `fogw` is observer-frame GW-frequencies of binary samples
+    hs, fogw = _strains_from_samples(vals)
+    gff, gwf, gwb = gws_from_sampled_strains(fobs_gw_edges, fogw, hs, weights)
     return gff, gwf, gwb
 
 
@@ -240,7 +240,7 @@ def _strains_from_samples(vals):
         * 0) total binary mass [grams]
         * 1) binary mass-ratio [],
         * 2) redshift at this frequency [],
-        * 3) *observer*-frame binary *orbital*-frequency [1/sec].
+        * 3) *observer*-frame *orbital*-frequency [1/sec].
 
     Returns
     -------
@@ -265,13 +265,13 @@ def _strains_from_samples(vals):
 
 
 @numba.njit
-def gws_from_sampled_strains(fobs_gw_bins, fo, hs, weights):
+def gws_from_sampled_strains(fobs_gw_edges, fo, hs, weights):
     """Calculate GW background/foreground from sampled GW strains.
 
     Parameters
     ----------
-    fobs_gw_bins : (F,) array_like of scalar
-        Observer-frame GW-frequency bins.
+    fobs_gw_edges : (F,) array_like of scalar
+        Observer-frame GW-frequency bin edges.
     fo : (S,) array_like of scalar
         Observer-frame GW-frequency of each binary sample.  Units of [1/sec]
     hs : (S,) array_like of scalar
@@ -294,7 +294,7 @@ def gws_from_sampled_strains(fobs_gw_bins, fo, hs, weights):
 
     # ---- Initialize
     num_samp = fo.size                 # number of binaries/samples
-    num_freq = fobs_gw_bins.size - 1           # number of frequency bins (edges - 1)
+    num_freq = fobs_gw_edges.size - 1           # number of frequency bins (edges - 1)
     gwback = np.zeros(num_freq)        # store GWB characteristic strain
     gwfore = np.zeros(num_freq)        # store loudest binary characteristic strain, for each bin
     gwf_freqs = np.zeros(num_freq)     # store frequency of loudest binary, for each bin
@@ -307,37 +307,40 @@ def gws_from_sampled_strains(fobs_gw_bins, fo, hs, weights):
 
     # ---- Calculate GW background and foreground in each frequency bin
     ii = 0
-    lo = fobs_gw_bins[ii]
+    lo = fobs_gw_edges[0]
     for ff in range(num_freq):
         # upper-bound to this frequency bin
-        hi = fobs_gw_bins[ff+1]
+        hi = fobs_gw_edges[ff+1]
         # number of GW cycles (1/dlnf), for conversion to characteristic strain
-        dlnf = (np.log(hi) - np.log(lo))
+        # dlnf = (np.log(hi) - np.log(lo))
+        df = (hi - lo)
         # amplitude and frequency of the loudest source in this bin
         hmax = 0.0
         fmax = 0.0
+
         # iterate over all sources with frequencies below this bin's limit (right edge)
-        while (fo[ii] < hi) and (ii < num_samp):
+        while (ii < num_samp) and (fo[ii] < hi):
             # Store the amplitude and frequency of loudest source
             #    NOTE: loudest source could be a single-sample (weight==1) or from a weighted-bin (weight > 1)
             #          the max
             if (weights[ii] >= 1) and (hs[ii] > hmax):
                 hmax = hs[ii]
                 fmax = fo[ii]
-            # if (weights[ii] > 1.0) and poisson:
-            #     h2temp *= np.random.poisson(weights[ii])
-            h2temp = weights[ii] * (hs[ii] ** 2)
+
+            h2temp = weights[ii] * (hs[ii] ** 2) * fo[ii]
             gwback[ff] += h2temp
 
-            # increment binary/sample index
+            # increment binary index
             ii += 1
 
         # subtract foreground source from background
         gwf_freqs[ff] = fmax
-        gwback[ff] -= hmax**2
+        gwback[ff] -= ((hmax**2) * fmax)
         # Convert to *characteristic* strain
-        gwback[ff] = gwback[ff] / dlnf      # hs^2 ==> hc^2  (squared, so dlnf^-1)
-        gwfore[ff] = hmax / np.sqrt(dlnf)   # hs ==> hc (not squared, so sqrt of 1/dlnf)
+        # gwback[ff] = gwback[ff] / dlnf      # hs^2 ==> hc^2  (squared, so dlnf^-1)
+        # gwfore[ff] = hmax / np.sqrt(dlnf)   # hs ==> hc (not squared, so sqrt of 1/dlnf)
+        gwback[ff] = gwback[ff] / df      # hs^2 ==> hc^2  (squared, so df^-1)
+        gwfore[ff] = hmax * np.sqrt(fmax / df)   # hs ==> hc (not squared, so sqrt of 1/df)
         lo = hi
 
     gwback = np.sqrt(gwback)
@@ -475,44 +478,131 @@ def _gws_from_number_grid_centroids(edges, dnum, number, realize):
     return hc
 
 
-def _gws_from_number_grid_integrated(edges, dnum, number, realize, integrate=True):
+def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
     """
 
-    # ! BUG: THIS ASSUMES THAT FREQUENCIES ARE NYQUIST SAMPLED !
-    # ! otherwise the conversion from hs to hc doesnt work !
+    Parameters
+    ----------
+    edges : (4,) list of 1darrays
+        A list containing the edges along each dimension.  The four dimensions correspond to
+        total mass, mass ratio, redshift, and observer-frame orbital frequency.
+        The length of each of the four arrays is M, Q, Z, F.
+    number : (M-1, Q-1, Z-1, F-1) ndarray
+        The number of binaries in each bin of parameter space.  This is calculated by integrating
+        `dnum` over each bin.
+    realize : bool or int,
+        Specification of how to construct one or more discrete realizations.
+        If a `bool` value, then whether or not to construct a realization.
+        If an `int` value, then how many discrete realizations to construct.
+    sum : bool,
+        Whether or not to sum over axes {0, 1, 2}.
+
+    Returns
+    -------
+    hc : ndarray
+        Characteristic strain of the GWB.
+        The shape depends on whether `sum` is true or false.
+        sum = True:  shape is (F-1,)
+        sum = False: shape is (M-1, Q-1, Z-1, F-1)
 
     """
-    grid = np.meshgrid(*edges, indexing='ij')
 
-    # ---- calculate GW strain at bin centroids
-    mc = utils.chirp_mass(*utils.m1m2_from_mtmr(grid[0], grid[1]))
-    dc = cosmo.comoving_distance(grid[2]).cgs.value
-    # These should be *orbital*-frequencies
-    fr = utils.frst_from_fobs(grid[3], grid[2])
+    foo = edges[-1]                   #: should be observer-frame orbital-frequencies
+    df = np.diff(foo)                 #: frequency bin widths
+    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+
+    # ---- calculate GW strain ----
+    mt = kale.utils.midpoints(edges[0])
+    mr = kale.utils.midpoints(edges[1])
+    rz = kale.utils.midpoints(edges[2])
+    mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
+    mc = mc[:, :, np.newaxis, np.newaxis]
+    dc = cosmo.comoving_distance(rz).cgs.value
+    dc = dc[np.newaxis, np.newaxis, :, np.newaxis]
+
+    # convert from observer-frame to rest-frame; still using frequency-bin centers
+    fr = utils.frst_from_fobs(fc[np.newaxis, :], rz[:, np.newaxis])
+    fr = fr[np.newaxis, np.newaxis, :, :]
+
     hs = utils.gw_strain_source(mc, dc, fr)
-
-    dlnf = np.diff(np.log(edges[-1]))[np.newaxis, np.newaxis, np.newaxis, :]
-    integrand = dnum * (hs ** 2)
-    hc = utils._integrate_grid_differential_number(edges, integrand, freq=True)
-    hc = hc / dlnf
+    hc = (hs ** 2) * (fc / df)
 
     if realize is True:
-        number = np.random.poisson(number) / number
+        hc = hc * np.random.poisson(number)
     elif realize in [None, False]:
-        pass
+        hc = hc * number
     elif utils.isinteger(realize):
         shape = number.shape + (realize,)
-        number = np.random.poisson(number[..., np.newaxis], size=shape) / number[..., np.newaxis]
-        hc = hc[..., np.newaxis] * np.nan_to_num(number)
+        try:
+            hc = hc[..., np.newaxis] * np.random.poisson(number[..., np.newaxis], size=shape)
+        except ValueError as err:
+            log.error(str(err))
+            print(f"{utils.stats(number)=}")
+            print(f"{number.max()=:.8e}")
+            print(f"{number.dtype=}")
+            raise
+
     else:
         err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
+        log.error(err)
         raise ValueError(err)
 
-    # (M',Q',Z',F) ==> (F,)
-    if integrate:
-        hc = np.sqrt(np.sum(hc, axis=(0, 1, 2)))
+    # Sum over M, Q, Z bins
+    # (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])
+    if sum:
+        hc = np.sum(hc, axis=(0, 1, 2))
+
+    # convert from hc^2 to hc
+    hc = np.sqrt(hc)
 
     return hc
+
+
+def gwb_ideal(fobs_gw, ndens, mtot, mrat, redz, dlog10, sum=True):
+
+    const = ((4.0 * np.pi) / (3 * SPLC**2))
+    mc = utils.chirp_mass_mtmr(mtot, mrat)
+    mc = np.power(NWTG * mc, 5.0/3.0)
+    rz = np.power(1 + redz, -1.0/3.0)
+    fogw = np.power(np.pi * fobs_gw, -4.0/3.0)
+
+    integ = ndens * mc * rz
+    redz = redz * np.ones_like(integ)
+    integ[redz <= 0.0] = 0.0
+
+    arguments = [mtot, mrat, redz]
+    if dlog10:
+        arguments[0] = np.log10(arguments[0])
+
+    for ax, xx in enumerate(arguments):
+        integ = np.moveaxis(integ, ax, 0)
+        xx = np.moveaxis(xx, ax, 0)
+
+        # if integ is (X, A, B) and xx is (X, 1, 1), then this is fine
+        try:
+            integ = 0.5 * (integ[:-1] + integ[1:]) * np.diff(xx, axis=0)
+        # BUT if integ is (X, A, B) and xx is (X, A+1, B+1), then need to average xx values down
+        except ValueError:
+            # average other dimensions as needed
+            for jj in range(1, len(arguments)):
+                sh = np.shape(xx)[jj]
+                if (sh == 1) or (sh == np.shape(integ)[jj]):
+                    continue
+
+                xx = np.moveaxis(xx, jj, 0)
+                xx = 0.5 * (xx[:-1] + xx[1:])
+                xx = np.moveaxis(xx, 0, jj)
+
+            # try integration step again
+            integ = 0.5 * (integ[:-1] + integ[1:]) * np.diff(xx, axis=0)
+
+        # return integ to the correct shape (axis order)
+        integ = np.moveaxis(integ, 0, ax)
+
+    gwb = const * fogw
+    gwb = gwb * np.sum(integ) if sum else gwb * integ
+    gwb = np.sqrt(gwb)
+    return gwb
 
 
 # ==============================================================================

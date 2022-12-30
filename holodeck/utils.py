@@ -551,7 +551,7 @@ def nyquist_freqs(
 
     """
     fmin = 1.0 / dur
-    fmax = 1.0 / cad
+    fmax = 1.0 / cad * 0.5
     # df = fmin / sample
     df = fmin
     freqs = np.arange(fmin, fmax + df/10.0, df)
@@ -564,6 +564,47 @@ def nyquist_freqs(
             freqs = freqs[freqs < trim[1]]
 
     return freqs
+
+
+def nyquist_freqs_edges(
+    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
+) -> np.ndarray:
+    """Calculate Nyquist frequencies for the given timing parameters.
+
+    Parameters
+    ----------
+    dur : float,
+        Duration of observations
+    cad : float,
+        Cadence of observations
+    trim : (2,) or None,
+        Specification of minimum and maximum frequencies outside of which to remove values.
+        `None` can be used in place of either boundary, e.g. [0.1, None] would mean removing
+        frequencies below `0.1` (and not trimming values above a certain limit).
+
+    Returns
+    -------
+    freqs : ndarray,
+        edges of Nyquist frequency bins
+
+    """
+    fmin = 1.0 / dur
+    fmax = 1.0 / cad * 0.5
+    # df = fmin / sample
+    df = fmin    # bin width
+    freqs = np.arange(fmin, fmax + df/10.0, df)   # centers
+    freqs_edges = freqs - df/2.0    # shift to edges
+    freqs_edges = np.concatenate([freqs_edges, [fmax + df]])
+
+    if trim is not None:
+        if np.shape(trim) != (2,):
+            raise ValueError("`trim` (shape: {}) must be (2,) of float!".format(np.shape(trim)))
+        if trim[0] is not None:
+            freqs_edges = freqs_edges[freqs_edges > trim[0]]
+        if trim[1] is not None:
+            freqs_edges = freqs_edges[freqs_edges < trim[1]]
+
+    return freqs_edges
 
 
 def quantile_filtered(values, percs, axis, func=np.isfinite):
@@ -895,6 +936,47 @@ def _parse_log_norm_pars(vals, size, default=None):
         raise ValueError(err)
 
     return vals
+
+
+def _parse_val_log10_val_pars(val, val_log10, val_units=1.0, name='value', only_one=True):
+    """Given either a parameter value, or the log10 of the value, ensure that both are set.
+
+    Parameters
+    ----------
+    val : array_like or None,
+        The parameter value itself in the desired units (specified by `val_units`).
+    val_log10 : array_like or None,
+        The log10 of the parameter value in natural units.
+    val_units : array_like,
+        The conversion factor from natural units (used in `val_log10`) to the desired units (used in `val`).
+    name : str,
+        The name of the variable for use in error messages.
+    only_one : bool,
+        Whether one, and only one, of `val` and `val_log10` should be provided (i.e. not `None`).
+
+    Returns
+    -------
+    val : array_like,
+        The parameter value itself in desired units.
+        e.g. mass in grams, s.t. mass = Msol * 10^{mass_log10}
+    val_log10 : array_like,
+        The log10 of the parameter value in natural units.
+        e.g. log10 of mass in solar-masses, s.t. mass = Msol * 10^{mass_log10}
+
+    """
+    both_or_neither = ((val_log10 is not None) == (val is not None))
+    if only_one and both_or_neither:
+        err = f"One of {name} OR {name}_log10 must be provided!  {name}={val}, {name}_log10={val_log10}"
+        log.exception(err)
+        raise ValueError(err)
+
+    if val is None:
+        val = val_units * np.power(10.0, val_log10)
+
+    if val_log10 is None:
+        val_log10 = np.log10(val / val_units)
+
+    return val, val_log10
 
 
 def _integrate_grid_differential_number(edges, dnum, freq=False):
@@ -1251,6 +1333,28 @@ def chirp_mass(m1, m2=None):
     if m2 is None:
         m1, m2 = np.moveaxis(m1, -1, 0)
     mc = np.power(m1 * m2, 3.0/5.0)/np.power(m1 + m2, 1.0/5.0)
+    return mc
+
+
+def chirp_mass_mtmr(mt, mr):
+    """Calculate the chirp-mass of a binary.
+
+    Parameters
+    ----------
+    mt : array_like,
+        Total mass [grams].  This is ``M = m1+m2``.
+    mr : array_like,
+        Mass ratio.  ``q = m2/m1 <= 1``.
+        This is defined as the secondary (smaller) divided by the primary (larger) mass.
+
+    Returns
+    -------
+    mc : array_like,
+        Chirp mass [grams] of the binary.
+
+    """
+    mt, mr = _array_args(mt, mr)
+    mc = mt * np.power(mr, 3.0/5.0) / np.power(1 + mr, 6.0/5.0)
     return mc
 
 

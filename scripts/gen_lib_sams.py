@@ -1,136 +1,368 @@
+"""Library Generation Script for Semi-Analytic Models.
+
+Usage
+-----
+
+mpirun -n <NPROCS> python ./scripts/gen_lib_sams.py <PATH> -n <SAMPS> -r <REALS> -f <FREQS>
+
+    <NPROCS> : number of processors to run on
+    <PATH> : output directory to save data to
+    <SAMPS> : number of parameter-space samples for latin hyper-cube
+    <REALS> : number of realizations at each parameter-space location
+    <FREQS> : number of frequencies (multiples of PTA observing baseline)
+
+Example:
+
+    mpirun -n 8 python ./scripts/gen_lib_sams.py output/2022-12-05_01 -n 32 -r 10 -f 20
+
+
+To-Do
+-----
+* LHS (at least with pydoe) is not deterministic (i.e. not reproducible).  Find a way to make reproducible.
+* Use LHS to choose parameters themselves, instead of grid-points.  Also remove usage of grid entirely.
+    * Does this resolve irregularities between different LHS implementations?
+* Use subclassing to cleanup `Parameter_Space` object.  e.g. implement LHS as subclass of generic Parameter_Space class.
+* BUG: `lhs_grid` and `lhs_grid_idx` are currently storing the same thing
+
+
 """
 
-
-mpirun -n 14 --use-hwthread-cpus python ./scripts/gen_lib_sams.py output/test_2022-06-27
-
-
-"""
+__version__ = '0.1.4'
 
 import argparse
 import os
 import logging
+import shutil
 import sys
 import warnings
 from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-# import h5py
 from mpi4py import MPI
 
 import holodeck as holo
 import holodeck.sam
 import holodeck.logger
-from holodeck.constants import YR, MSOL, GYR  # noqa
+from holodeck.constants import YR, MSOL, GYR, PC
+from holodeck import log as _log     #: import the default holodeck log just so that we can silence it
+
+# from scipy.stats import qmc
+# import pyDOE
+
+# silence default holodeck log
+_log.setLevel(_log.WARNING)
+
+# Default argparse parameters
+DEF_SAM_SHAPE = 50
+DEF_NUM_REALS = 100
+DEF_NUM_FBINS = 40
+DEF_PTA_DUR = 16.03     # [yrs]
 
 
-class Parameter_Space:
+class Parameter_Space_Mix01(holo.librarian._Parameter_Space):
 
-    def __init__(
-        self,
-        gsmf_phi0=[-3.35, -2.23, 7],
-        # gsmf_alpha0=[-1.56, -0.92, 5],
-        mmb_amp=[0.39e9, 0.61e9, 11], mmb_plaw=[1.01, 1.33, 13]
-    ):
+    _PARAM_NAMES = [
+        'gsmf_phi0',
+        'time',
+        'gpf_qgamma',
+        'hard_gamma_inner',
+        'mmb_amp',
+        'mmb_plaw'
+    ]
 
-        self.gsmf_phi0 = np.linspace(*gsmf_phi0)
-        # self.gsmf_alpha0 = np.linspace(*gsmf_alpha0)
-        self.mmb_amp = np.linspace(*mmb_amp)
-        self.mmb_plaw = np.linspace(*mmb_plaw)
-        pars = [
-            self.gsmf_phi0,
-            # self.gsmf_alpha0,
-            self.mmb_amp,
-            self.mmb_plaw
-        ]
-        self.names = [
-            'gsmf_phi0',
-            # 'gsmf_alpha0',
-            'mmb_amp',
-            'mmb_plaw'
-        ]
-        self.params = np.meshgrid(*pars, indexing='ij')
-        self.shape = self.params[0].shape
-        self.size = np.product(self.shape)
-        self.params = np.moveaxis(self.params, 0, -1)
+    def __init__(self, log, nsamples, sam_shape):
+        super().__init__(
+            log, nsamples, sam_shape,
+            gsmf_phi0=[-3.28, -2.16, 5],
+            time=[-2.0, +1.0, 7],   # [log10(Gyr)]
+            gpf_qgamma=[-0.4, +0.4, 5],
+            hard_gamma_inner=[-1.5, -0.5, 5],
+            mmb_amp=[0.1e9, 1.0e9, 9],
+            mmb_plaw=[0.8, 1.5, 11],
+        )
 
-        pass
+    def sam_for_lhsnumber(self, lhsnum):
+        param_grid = self.params_for_lhsnumber(lhsnum)
 
-    def number_to_index(self, num):
-        idx = np.unravel_index(num, self.shape)
-        return idx
+        gsmf_phi0, time, gpf_qgamma, hard_gamma_inner, mmb_amp, mmb_plaw = param_grid
+        time = (10.0 ** time) * GYR
+        mmb_amp = mmb_amp*MSOL
 
-    def index_to_number(self, idx):
-        num = np.ravel_multi_index(idx, self.shape)
-        return num
+        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gpf = holo.sam.GPF_Power_Law(qgamma=gpf_qgamma)
+        gmt = holo.sam.GMT_Power_Law()
+        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
 
-    def param_dict_for_number(self, num):
-        idx = self.number_to_index(num)
-        pars = self.params[idx]
-        rv = {nn: pp for nn, pp in zip(self.names, pars)}
-        return rv
+        sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge, shape=self.sam_shape)
+        hard = holo.evolution.Fixed_Time.from_sam(sam, time, gamma_sc=hard_gamma_inner, exact=True, progress=False)
+        return sam, hard
 
-    def params_for_number(self, num):
-        idx = self.number_to_index(num)
-        pars = self.params[idx]
-        return pars
 
-    def sam_for_number(self, num):
-        params = self.params_for_number(num)
+class Parameter_Space_Hard01(holo.librarian._Parameter_Space):
 
-        gsmf_phi0, mmb_amp, mmb_plaw = params
+    _PARAM_NAMES = [
+        'hard_time',
+        'hard_gamma_inner',
+        'hard_gamma_outer',
+        'hard_rchar',
+    ]
+
+    def __init__(self, log, nsamples, sam_shape):
+        super().__init__(
+            log, nsamples, sam_shape,
+            hard_time=[-1.0, +1.0, 7],   # [log10(Gyr)]
+            hard_gamma_inner=[-1.5, -0.5, 7],
+            hard_gamma_outer=[+1.0, +3.0, 7],
+            hard_rchar=[1.0, 3.0, 5],
+        )
+
+    def sam_for_lhsnumber(self, lhsnum):
+        param_grid = self.params_for_lhsnumber(lhsnum)
+
+        time, gamma_inner, gamma_outer, rchar = param_grid
+        time = (10.0 ** time) * GYR
+        rchar = (10.0 ** rchar) * PC
+
+        gsmf = holo.sam.GSMF_Schechter()
+        gpf = holo.sam.GPF_Power_Law()
+        gmt = holo.sam.GMT_Power_Law()
+        mmbulge = holo.relations.MMBulge_KH2013()
+
+        sam = holo.sam.Semi_Analytic_Model(
+            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            shape=self.sam_shape
+        )
+        hard = holo.evolution.Fixed_Time.from_sam(
+            sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
+            exact=True, progress=False
+        )
+        return sam, hard
+
+
+class Parameter_Space_Hard02_BAD(holo.librarian._Parameter_Space):
+
+    _PARAM_NAMES = [
+        'hard_time',
+        'hard_gamma_inner',
+        'hard_gamma_outer',
+        'hard_rchar',
+        'gsmf_phi0',
+        'mmb_amp',
+    ]
+
+    def __init__(self, log, nsamples, sam_shape):
+        super().__init__(
+            log, nsamples, sam_shape,
+            hard_time=[-1.0, +1.0, 7],   # [log10(Gyr)]
+            hard_gamma_inner=[-1.5, -0.5, 7],
+            hard_gamma_outer=[+1.0, +3.0, 7],
+            hard_rchar=[1.0, 3.0, 5],
+            gsmf_phi0=[-3.06, -2.5, 3],
+            mmb_amp=[0.39e9, 0.61e9, 3],
+        )
+
+    def sam_for_lhsnumber(self, lhsnum):
+        param_grid = self.params_for_lhsnumber(lhsnum)
+
+        time, gamma_inner, gamma_outer, rchar, gsmf_phi0, mmb_amp = param_grid
+        time = (10.0 ** time) * GYR
+        rchar = (10.0 ** rchar) * PC
+        mmb_amp = mmb_amp*MSOL
 
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp*MSOL, mplaw=mmb_plaw)
+        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
 
-        sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge)
-        return sam
+        sam = holo.sam.Semi_Analytic_Model(
+            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            shape=self.sam_shape
+        )
+        hard = holo.evolution.Fixed_Time.from_sam(
+            sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
+            exact=True, progress=False
+        )
+        return sam, hard
 
+
+class Parameter_Space_Hard03(holo.librarian._Parameter_Space):
+
+    _PARAM_NAMES = [
+        'hard_time',
+        'hard_gamma_inner',
+        'hard_gamma_outer',
+        'hard_rchar',
+        'gsmf_phi0',
+        'mmb_amp',
+    ]
+
+    def __init__(self, log, nsamples, sam_shape):
+        super().__init__(
+            log, nsamples, sam_shape,
+            hard_time=[-1.0, +1.0, 5],   # [log10(Gyr)]
+            hard_gamma_inner=[-1.5, -0.5, 5],
+            hard_gamma_outer=[+2.0, +3.0, 5],
+            hard_rchar=[1.0, 3.0, 5],
+            gsmf_phi0=[-3.06, -2.5, 3],
+            mmb_amp=[0.39e9, 0.61e9, 3],
+        )
+
+    def sam_for_lhsnumber(self, lhsnum):
+        param_grid = self.params_for_lhsnumber(lhsnum)
+
+        time, gamma_inner, gamma_outer, rchar, gsmf_phi0, mmb_amp = param_grid
+        time = (10.0 ** time) * GYR
+        rchar = (10.0 ** rchar) * PC
+        mmb_amp = mmb_amp*MSOL
+
+        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gpf = holo.sam.GPF_Power_Law()
+        gmt = holo.sam.GMT_Power_Law()
+        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
+
+        sam = holo.sam.Semi_Analytic_Model(
+            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            shape=self.sam_shape
+        )
+        hard = holo.evolution.Fixed_Time.from_sam(
+            sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
+            exact=True, progress=False
+        )
+        return sam, hard
+
+
+class Parameter_Space_Hard04(holo.librarian._Parameter_Space):
+
+    _PARAM_NAMES = [
+        'hard_time',
+        'hard_gamma_inner',
+        'hard_gamma_outer',
+        'hard_rchar',
+        'gsmf_phi0',
+        'mmb_amp',
+    ]
+
+    def __init__(self, log, nsamples, sam_shape):
+        super().__init__(
+            log, nsamples, sam_shape,
+            hard_time=[-1.0, +1.0, 5],   # [log10(Gyr)]
+            hard_gamma_inner=[-1.5, -0.5, 5],
+            hard_gamma_outer=[+2.0, +3.0, 5],
+            hard_rchar=[1.0, 3.0, 5],
+            gsmf_phi0=[-3.0, -2.0, 5],
+            mmb_amp=[0.1e9, 1.0e9, 5],
+        )
+
+    def sam_for_lhsnumber(self, lhsnum):
+        param_grid = self.params_for_lhsnumber(lhsnum)
+
+        time, gamma_inner, gamma_outer, rchar, gsmf_phi0, mmb_amp = param_grid
+        time = (10.0 ** time) * GYR
+        rchar = (10.0 ** rchar) * PC
+        mmb_amp = mmb_amp*MSOL
+
+        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gpf = holo.sam.GPF_Power_Law()
+        gmt = holo.sam.GMT_Power_Law()
+        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
+
+        sam = holo.sam.Semi_Analytic_Model(
+            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            shape=self.sam_shape
+        )
+        hard = holo.evolution.Fixed_Time.from_sam(
+            sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
+            exact=True, progress=False
+        )
+        return sam, hard
+
+
+class Parameter_Space_Simple01(holo.librarian._Parameter_Space):
+
+    _PARAM_NAMES = [
+        'hard_time',
+        'hard_rchar',
+        'gsmf_phi0',
+        'mmb_amp',
+    ]
+
+    def __init__(self, log, nsamples, sam_shape):
+        super().__init__(
+            log, nsamples, sam_shape,
+            hard_time=[-0.5, +1.0, 9],   # [log10(Gyr)]
+            hard_rchar=[1.0, 2.5, 7],
+            gsmf_phi0=[-3.0, -1.5, 7],
+        )
+
+    def sam_for_lhsnumber(self, lhsnum):
+        param_grid = self.params_for_lhsnumber(lhsnum)
+
+        time, rchar, gsmf_phi0 = param_grid
+        time = (10.0 ** time) * GYR
+        rchar = (10.0 ** rchar) * PC
+
+        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gpf = holo.sam.GPF_Power_Law()
+        gmt = holo.sam.GMT_Power_Law()
+        mmbulge = holo.relations.MMBulge_KH2013()
+
+        sam = holo.sam.Semi_Analytic_Model(
+            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            shape=self.sam_shape
+        )
+        hard = holo.evolution.Fixed_Time.from_sam(
+            sam, time, rchar=rchar,
+            exact=True, progress=False
+        )
+        return sam, hard
+
+
+SPACE = Parameter_Space_Simple01
 
 comm = MPI.COMM_WORLD
 
+
+# ---- setup argparse
+
+def setup_argparse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('output', metavar='output', type=str,
+                        help='output path [created if doesnt exist]')
+
+    parser.add_argument('-n', '--nsamples', action='store', dest='nsamples', type=int, default=25,
+                        help='number of parameter space samples, must be square of prime')
+    parser.add_argument('-r', '--nreals', action='store', dest='nreals', type=int,
+                        help='number of realizations', default=DEF_NUM_REALS)
+    parser.add_argument('-d', '--dur', action='store', dest='pta_dur', type=float,
+                        help='PTA observing duration [yrs]', default=DEF_PTA_DUR)
+    parser.add_argument('-f', '--nfreqs', action='store', dest='nfreqs', type=int,
+                        help='Number of frequency bins', default=DEF_NUM_FBINS)
+    parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
+                        help='Shape of SAM grid', default=DEF_SAM_SHAPE)
+
+    parser.add_argument('-t', '--test', action='store_true', default=False, dest='test',
+                        help='Do not actually run, just output what parameters would have been done.')
+    parser.add_argument('-c', '--concatenate', action='store_true', default=False, dest='concatenateoutput',
+                        help='Concatenate output into single hdf5 file.')
+    parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
+                        help='verbose output [INFO]')
+
+    args = parser.parse_args()
+
+    if args.test:
+        args.verbose = True
+
+    return args
+
+
+args = setup_argparse() if comm.rank == 0 else None
+args = comm.bcast(args, root=0)
+
+
+# ---- setup outputs
+
 BEG = datetime.now()
-
-# DEBUG = False
-
-# ---- Fail on warnings
-# # err = 'ignore'
-# err = 'raise'
-# np.seterr(divide=err, invalid=err, over=err)
-# warn_err = 'error'
-# # warnings.filterwarnings(warn_err, category=UserWarning)
-# warnings.filterwarnings(warn_err)
-
-# ---- Setup ArgParse
-
-parser = argparse.ArgumentParser()
-parser.add_argument('output', metavar='output', type=str,
-                    help='output path [created if doesnt exist')
-
-# parser.add_argument('-r', '--reals', action='store', dest='reals', type=int,
-#                     help='number of realizations', default=10)
-# parser.add_argument('-s', '--shape', action='store', dest='shape', type=int,
-#                     help='shape of SAM grid', default=50)
-# parser.add_argument('-t', '--threshold', action='store', dest='threshold', type=float,
-#                     help='sample threshold', default=100.0)
-# parser.add_argument('-d', '--dur', action='store', dest='dur', type=float,
-#                     help='PTA observing duration [yrs]', default=20.0)
-# parser.add_argument('-c', '--cad', action='store', dest='cad', type=float,
-#                     help='PTA observing cadence [yrs]', default=0.1)
-# parser.add_argument('-d', '--debug', action='store_true', default=False, dest='debug',
-#                     help='run in DEBUG mode')
-parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
-                    help='verbose output [INFO]')
-# parser.add_argument('--version', action='version', version='%(prog)s 1.0')
-
-args = parser.parse_args()
-args.NUM_REALS = 30
-args.PTA_DUR = 15.0 * YR
-args.PTA_CAD = 0.1 * YR
-
-
 BEG = comm.bcast(BEG, root=0)
 
 this_fname = os.path.abspath(__file__)
@@ -138,10 +370,6 @@ head = f"holodeck :: {this_fname} : {str(BEG)} - rank: {comm.rank}/{comm.size}"
 head = "\n" + head + "\n" + "=" * len(head) + "\n"
 if comm.rank == 0:
     print(head)
-
-log_name = f"holodeck__gen_lib_sams_{BEG.strftime('%Y%m%d-%H%M%S')}"
-if comm.rank > 0:
-    log_name = f"_{log_name}_r{comm.rank}"
 
 PATH_OUTPUT = Path(args.output).resolve()
 if not PATH_OUTPUT.is_absolute:
@@ -153,18 +381,37 @@ if comm.rank == 0:
 
 comm.barrier()
 
-# ---- Setup Logger ----
+# ---- setup logger ----
+
+log_name = f"holodeck__gen_lib_sams_{BEG.strftime('%Y%m%d-%H%M%S')}"
+if comm.rank > 0:
+    log_name = f"_{log_name}_r{comm.rank}"
 
 fname = f"{PATH_OUTPUT.joinpath(log_name)}.log"
 log_lvl = holo.logger.INFO if args.verbose else holo.logger.WARNING
-tostr = sys.stdout if comm.rank == 0 else None
-LOG = holo.logger.get_logger(name=log_name, level_stream=log_lvl, tofile=fname, tostr=tostr)
-LOG.info(head)
-LOG.info(f"Output path: {PATH_OUTPUT}")
-LOG.info(f"        log: {fname}")
+tostr = sys.stdout if comm.rank == 0 else False
+log = holo.logger.get_logger(name=log_name, level_stream=log_lvl, tofile=fname, tostr=tostr)
+log.info(head)
+log.info(f"Output path: {PATH_OUTPUT}")
+log.info(f"        log: {fname}")
 
-SPACE = Parameter_Space() if comm.rank == 0 else None
-SPACE = comm.bcast(SPACE, root=0)
+if comm.rank == 0:
+    src_file = Path(this_fname)
+    dst_file = PATH_OUTPUT.joinpath(src_file.name)
+    dst_file = dst_file.parent / ("runtime_" + dst_file.name)
+    shutil.copyfile(src_file, dst_file)
+    log.info(f"Copied {__file__} to {dst_file}")
+
+# ---- setup Parameter_Space instance
+
+log.warning(f"SPACE = {SPACE}")
+space = SPACE(log, args.nsamples, args.sam_shape) if comm.rank == 0 else None
+space = comm.bcast(space, root=0)
+
+log.info(
+    f"samples={args.nsamples}, sam_shape={args.sam_shape}, nreals={args.nreals}\n"
+    f"nfreqs={args.nfreqs}, pta_dur={args.pta_dur} [yr]"
+)
 
 # ------------------------------------------------------------------------------
 # ----    Methods
@@ -173,123 +420,95 @@ SPACE = comm.bcast(SPACE, root=0)
 
 def main():
     bnum = 0
-    LOG.info(f"{SPACE=}, {id(SPACE)=}")
-    npars = SPACE.size
-    nreals = args.NUM_REALS
+    npars = args.nsamples
 
-    # # -- Load Parameters from Input File
-    # params = None
-    # if comm.rank == 0:
-    #     input_file = os.path.abspath(input_file)
-    #     if not os.path.isfile(input_file):
-    #         raise ValueError(f"input_file '{input_file}' does not exist!")
-
-    #     if not os.path.isdir(output_path):
-    #         raise ValueError(f"output_path '{output_path}' does not exist!")
-
-    #     params = _parse_params_file(input_file)
-
-    #     # Copy input file to output directory
-    #     fname_input_copy = os.path.join(output_path, "input_params.txt")
-    #     # If file already exists, rename it to backup
-    #     fname_backup = zio.modify_exists(fname_input_copy)
-    #     if fname_input_copy != fname_backup:
-    #         print(f"Moving previous parameters file '{fname_input_copy}' ==> '{fname_backup}'")
-    #         shutil.move(fname_input_copy, fname_backup)
-    #     print(f"Saving copy of input parameters file to '{fname_input_copy}'")
-    #     shutil.copy2(input_file, fname_input_copy)
-
-    # Distribute all parameters to all processes
-    # params = comm.bcast(params, root=0)
     bnum = _barrier(bnum)
 
     # Split and distribute index numbers to all processes
     if comm.rank == 0:
-        # indices = range(npars*nreals)
         indices = range(npars)
         indices = np.random.permutation(indices)
         indices = np.array_split(indices, comm.size)
         num_ind_per_proc = [len(ii) for ii in indices]
-        # LOG.info(f"{npars=}, {nreals=}, total={npars*nreals} || ave runs per core = {np.mean(num_ind_per_proc)}")
-        LOG.info(f"{npars=}, {nreals=} || ave runs per core = {np.mean(num_ind_per_proc)}")
+        log.info(f"{npars=} cores={comm.size} || max runs per core = {np.max(num_ind_per_proc)}")
     else:
         indices = None
+
     indices = comm.scatter(indices, root=0)
+
     bnum = _barrier(bnum)
-    # prog_flag = (comm.rank == 0)
     iterator = holo.utils.tqdm(indices) if comm.rank == 0 else np.atleast_1d(indices)
+
+    if args.test:
+        log.info("Running in testing mode. Outputting parameters:")
 
     for ind in iterator:
         # Convert from 1D index into 2D (param, real) specification
         # param, real = np.unravel_index(ind, (npars, nreals))
-        # LOG.info(f"rank:{comm.rank} index:{ind} => {param=} {real=}")
-        param = ind
+        # log.info(f"rank:{comm.rank} index:{ind} => {param=} {real=}")
+        lhsparam = ind
 
-        # # - Check if all output files already exist, if so skip
-        # key = pipeline(progress=prog_flag, key_only=True, **pars)
-        # if number_output:
-        #     digits = int(np.floor(np.log10(999))) + 1
-        #     key = f"{ind:0{digits:d}d}" + "__" + key
-
-        # fname_plot_all, fname_plot_gwb = _save_plots_fnames(output_path, key)
-        # fname_data = _save_data_fname(output_path, key)
-        # fnames = [fname_plot_all, fname_plot_gwb, fname_data]
-        # if np.all([os.path.exists(fn) and (os.path.getsize(fn) > 0) for fn in fnames]):
-        #     print(f"\tkey: '{key}' already complete")
-        #     continue
+        log.info(f"{comm.rank=} {ind=} {space.param_dict_for_lhsnumber(lhsparam)}")
+        if args.test:
+            continue
 
         try:
-            run_sam(param, None, PATH_OUTPUT)
+            run_sam(lhsparam, PATH_OUTPUT)
         except Exception as err:
             logging.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{ind}")
             logging.warning(err)
+            log.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{ind}")
+            log.warning(err)
             import traceback
             traceback.print_exc()
             print("\n\n")
 
     end = datetime.now()
-    print(f"\t{comm.rank} done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}")
+    # print(f"\t{comm.rank} done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}")
+    log.info(f"\t{comm.rank} done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}")
     bnum = _barrier(bnum)
-    if comm.rank == 0:
-        end = datetime.now()
-        tail = f"Done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}"
-        print("\n" + "=" * len(tail) + "\n" + tail + "\n")
 
     return
 
 
-def run_sam(pnum, real, path_output):
+def run_sam(pnum, path_output):
 
-    iterator = range(args.NUM_REALS)
-    if comm.rank == 0:
-        iterator = holo.utils.tqdm(iterator, leave=False)
+    fname = f"lib_sams__p{pnum:06d}.npz"
+    fname = os.path.join(path_output, fname)
+    log.debug(f"{pnum=} :: {fname=}")
+    if os.path.exists(fname):
+        log.warning(f"File {fname} already exists.")
 
-    for real in iterator:
+    pta_dur = args.pta_dur * YR
+    nfreqs = args.nfreqs
+    hifr = nfreqs/pta_dur
+    pta_cad = 1.0 / (2 * hifr)
+    fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
+    fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
+    log.info(f"Created {fobs_cents.size} frequency bins")
+    log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
+    log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
+    assert nfreqs == fobs_cents.size
 
-        fname = f"lib_sams__p{pnum:06d}_r{real:03d}.npz"
-        fname = os.path.join(path_output, fname)
-        if os.path.exists(fname):
-            LOG.warning(f"File {fname} already exists.")
-            continue
+    log.debug("Selecting `sam` and `hard` instances")
+    sam, hard = space.sam_for_lhsnumber(pnum)
+    log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.nreals})")
+    gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
+    log.debug(f"{holo.utils.stats(gwb)=}")
+    legend = space.param_dict_for_lhsnumber(pnum)
+    log.debug(f"Saving {pnum} to file")
+    np.savez(fname, fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb,
+             pnum=pnum, pdim=space.paramdimen, nsamples=args.nsamples,
+             lhs_grid=space.sampleindxs, lhs_grid_idx=space.lhsnumber_to_index(pnum),
+             params=space.params, names=space.names, version=__version__, **legend)
 
-        fobs = holo.utils.nyquist_freqs(args.PTA_DUR, args.PTA_CAD)
-
-        sam = SPACE.sam_for_number(pnum)
-
-        gff, gwf, gwb = holo.sam.sampled_gws_from_sam(
-            sam, fobs, sample_threshold=10.0,
-            # cut_below_mass=1e7*MSOL, limit_merger_time=4*GYR
-        )
-
-        legend = SPACE.param_dict_for_number(pnum)
-        np.savez(fname, fobs=fobs, gff=gff, gwb=gwb, gwf=gwf, pnum=pnum, real=real, **legend)
-        LOG.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
+    log.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
 
     return
 
 
 def _barrier(bnum):
-    LOG.debug(f"barrier {bnum}")
+    log.debug(f"barrier {bnum}")
     comm.barrier()
     bnum += 1
     return bnum
@@ -299,5 +518,17 @@ if __name__ == "__main__":
     np.seterr(divide='ignore', invalid='ignore', over='ignore')
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    main()
+    if not args.concatenateoutput:
+        main()
+
+    if (comm.rank == 0) and (not args.test):
+        log.info("Concatenating outputs into single file")
+        holo.librarian.sam_lib_combine(PATH_OUTPUT, log)
+        log.info("Concatenating completed")
+
+    if comm.rank == 0:
+        end = datetime.now()
+        tail = f"Done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}"
+        print("\n" + "=" * len(tail) + "\n" + tail + "\n")
+
     sys.exit(0)
