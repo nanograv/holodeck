@@ -128,6 +128,8 @@ class Hard_GW(_Hardening):
     def dadt(mtot, mrat, sepa, eccen=None):
         """Calculate GW Hardening rate of semi-major-axis vs. time.
 
+        See [Peters1964]_, Eq. 5.6
+
         Parameters
         ----------
         mtot : array_like
@@ -152,6 +154,8 @@ class Hard_GW(_Hardening):
     @staticmethod
     def dedt(mtot, mrat, sepa, eccen=None):
         """Calculate GW Hardening rate of eccentricity vs. time.
+
+        See [Peters1964]_, Eq. 5.7
 
         If `eccen` is `None`, zeros are returned.
 
@@ -178,6 +182,32 @@ class Hard_GW(_Hardening):
         m1, m2 = utils.m1m2_from_mtmr(mtot, mrat)
         dedt = utils.gw_dedt(m1, m2, sepa, eccen=eccen)
         return dedt
+
+    @staticmethod
+    def deda(sepa, eccen):
+        """Rate of eccentricity change versus separation change.
+
+        See [Peters1964]_, Eq. 5.8
+
+        Parameters
+        ----------
+        sepa : array_like,
+            Binary semi-major axis (i.e. separation) [cm].
+        eccen : array_like,
+            Binary orbital eccentricity.
+
+        Returns
+        -------
+        rv : array_like,
+            Binary deda rate [1/cm] due to GW emission.
+            Values are always positive.
+
+        """
+        # fe = utils._gw_ecc_func(eccen)
+        # rv = 19 * eccen * (1.0 + (121/304)*eccen*eccen)   # numerator
+        # rv = rv / (12 * sepa * fe)
+        rv = 1.0 / utils.gw_dade(sepa, eccen)
+        return rv
 
 
 class Sesana_Scattering(_Hardening):

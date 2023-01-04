@@ -1435,7 +1435,7 @@ def gw_dedt(m1, m2, sepa, eccen):
     return dedt
 
 
-def gw_dade(m1, m2, sepa, eccen):
+def gw_dade(sepa, eccen):
     """Rate of semi-major axis evolution versus eccentricity, due to GW emission (da/de).
 
     NOTE: returned value is positive (e and a go in same direction).
@@ -1443,10 +1443,6 @@ def gw_dade(m1, m2, sepa, eccen):
 
     Parameters
     ----------
-    m1 : array_like
-        Mass of one component of the binary [grams].
-    m2 : array_like
-        Mass of other component of the binary [grams].
     sepa : array_like
         Binary semi-major axis (separation) [grams].
     eccen : array_like
@@ -1459,7 +1455,7 @@ def gw_dade(m1, m2, sepa, eccen):
         NOTE: returned value is positive.
 
     """
-    m1, m2, sepa, eccen = _array_args(m1, m2, sepa, eccen)
+    sepa, eccen = _array_args(sepa, eccen)
     e2 = eccen**2
     num = (1 + (73.0/24.0)*e2 + (37.0/96.0)*e2*e2)
     den = (1 - e2) * (1.0 + (121.0/304.0)*e2)
