@@ -1463,13 +1463,15 @@ def gw_dade(sepa, eccen):
     return dade
 
 
-def gw_freq_dist_func(nn, ee=0.0):
+def gw_freq_dist_func(nn, ee=0.0, recursive=True):
     """GW frequency distribution function.
 
     See [EN2007]_ Eq. 2.4; this function gives g(n,e).
 
-    BUG: use recursion relation when possible,
-         J_{n-1}(x) + J_{n+1}(x) = (2n/x) J_n(x)
+    NOTE: recursive relation fails for zero eccentricities!
+    TODO: could choose to use non-recursive when zero eccentricities are found?
+
+    TODO: replace `ee` variable with `eccen`
 
     Parameters
     ----------
@@ -1495,9 +1497,14 @@ def gw_freq_dist_func(nn, ee=0.0):
     jn_m1 = bessel(nn-1, ne)
 
     # Use recursion relation:
-    jn = (2*(nn-1) / ne) * jn_m1 - jn_m2
-    jn_p1 = (2*nn / ne) * jn - jn_m1
-    jn_p2 = (2*(nn+1) / ne) * jn_p1 - jn
+    if recursive:
+        jn = (2*(nn-1) / ne) * jn_m1 - jn_m2
+        jn_p1 = (2*nn / ne) * jn - jn_m1
+        jn_p2 = (2*(nn+1) / ne) * jn_p1 - jn
+    else:
+        jn = bessel(nn, ne)
+        jn_p1 = bessel(nn+1, ne)
+        jn_p2 = bessel(nn+2, ne)
 
     aa = np.square(jn_m2 - 2.0*ee*jn_m1 + (2/nn)*jn + 2*ee*jn_p1 - jn_p2)
     bb = (1 - ee*ee)*np.square(jn_m2 - 2*ee*jn + jn_p2)
