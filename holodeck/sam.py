@@ -930,7 +930,7 @@ class Semi_Analytic_Model:
             rz = self._gmt.zprime(gmt_mass, mstar_rat, rz)
             print(f"{self} :: {utils.stats(rz)=}")
 
-        # d^3 n / [dlog10(M) dq dz] in units of [Mpc^-3]
+        # d^3 n / [dlog10(M) dq dz] in units of [Mpc^-3], convert to [cm^-3]
         ndens = self.static_binary_density / (MPC**3)
 
         mt = self.mtot[:, np.newaxis, np.newaxis]
