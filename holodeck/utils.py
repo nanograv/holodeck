@@ -1086,7 +1086,7 @@ def mtmr_from_m1m2(m1, m2=None):
     return np.array([mtot, mrat])
 
 
-def m1m2_from_mtmr(mt, mr):
+def m1m2_from_mtmr(mt: npt.ArrayLike, mr: npt.ArrayLike) -> npt.ArrayLike:
     """Convert from total-mass and mass-ratio to individual masses.
 
     Parameters
