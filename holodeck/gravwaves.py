@@ -768,9 +768,10 @@ def sam_calc_gwb_1(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, n
 
     # (F, H)
     # gwfobs_harms = gwfobs[:, np.newaxis] / harm_nums[np.newaxis, :]
-    nfreqs = gwfobs.size
+    nfreqs = len(gwfobs)
     gwfobs_harms = np.zeros((nfreqs, nharms))
-    for ii, gwfo in enumerate(gwfobs):
+    for ii in range(nfreqs):
+        gwfo = gwfobs[ii]
         for nh in range(1, nharms+1):
             gwfobs_harms[ii, nh] = gwfo / nh
 
@@ -781,7 +782,7 @@ def sam_calc_gwb_1(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, n
     # gw_frst ==> frst_orb_harms
     # gw_frst = gwfobs_harms[np.newaxis, :, :] * (1.0 * sam.redz[:, np.newaxis, np.newaxis])
 
-    shape = (mtot.size, mrat.size, redz.size, nfreqs, nharms)
+    shape = (len(mtot), len(mrat), len(redz), nfreqs, nharms)
     # setup output arrays with shape (M, Q, Z, F, H)
     hc2 = np.zeros(shape)
     hs2 = np.zeros(shape)
@@ -827,7 +828,11 @@ def sam_calc_gwb_1(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, n
                 ecc = np.interp(gwfr, frst_evo, eccen_evo)
 
                 # da/dt values are negative, get a positive rate
-                tau = -utils.gw_hardening_rate_dadt(m1, m2, sa, ecc)
+                # tau = -utils.gw_hardening_rate_dadt(m1, m2, sa, ecc)
+                const = utils._GW_DADT_SEP_CONST
+                tau = const * m1 * m2 * (m1 + m2) / np.power(sa, 3)
+                tau = tau * utils._gw_ecc_func(ecc)
+
                 # convert to timescale
                 tau = sa / tau
                 # print(f"{m1.shape")

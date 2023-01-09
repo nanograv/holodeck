@@ -19,10 +19,12 @@ from typing import Optional, Tuple, Union, List  # , Sequence,
 import warnings
 
 import h5py
+import numba
 import numpy as np
 import numpy.typing as npt
 import scipy as sp
-import scipy.stats
+import scipy.stats    # noqa
+import scipy.special  # noqa
 
 from holodeck import log, cosmo
 from holodeck.constants import NWTG, SCHW, SPLC, YR
@@ -1463,6 +1465,7 @@ def gw_dade(sepa, eccen):
     return dade
 
 
+@numba.njit
 def gw_freq_dist_func(nn, ee=0.0, recursive=True):
     """GW frequency distribution function.
 
@@ -1486,11 +1489,10 @@ def gw_freq_dist_func(nn, ee=0.0, recursive=True):
         GW Frequency distribution function g(n,e).
 
     """
-    import scipy as sp
-    import scipy.special  # noqa
 
     # Calculate with non-zero eccentrictiy
-    bessel = sp.special.jn
+    # bessel = sp.special.jn
+    bessel = sp.special.jv
     ne = nn*ee
     n2 = np.square(nn)
     jn_m2 = bessel(nn-2, ne)
@@ -1701,6 +1703,7 @@ def time_to_merge_at_sep(m1, m2, sepa):
     return delta_sep/(GW_CONST*m1*m2*(m1+m2))
 
 
+@numba.njit
 def _gw_ecc_func(eccen):
     """GW Hardening rate eccentricitiy dependence F(e).
 
