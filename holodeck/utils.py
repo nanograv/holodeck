@@ -1465,7 +1465,6 @@ def gw_dade(sepa, eccen):
     return dade
 
 
-@numba.njit
 def gw_freq_dist_func(nn, ee=0.0, recursive=True):
     """GW frequency distribution function.
 
@@ -1491,8 +1490,7 @@ def gw_freq_dist_func(nn, ee=0.0, recursive=True):
     """
 
     # Calculate with non-zero eccentrictiy
-    # bessel = sp.special.jn
-    bessel = sp.special.jv
+    bessel = sp.special.jn
     ne = nn*ee
     n2 = np.square(nn)
     jn_m2 = bessel(nn-2, ne)

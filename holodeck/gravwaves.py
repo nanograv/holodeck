@@ -8,6 +8,8 @@ and not the semi-analytic or observational population models.
 
 import numba
 import numpy as np
+import scipy as sp
+import scipy.integrate  # noqa
 
 import kalepy as kale
 
@@ -730,6 +732,20 @@ def sam_calc_gwb_0(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
     return gwfobs_harms, hc2, ecc_out, tau_out
 
 
+# ==============================================================================
+
+import pyximport   # noqa
+pyximport.install(language_level=3)
+import holodeck.cyutils  # noqa
+
+import ctypes
+from numba.extending import get_cython_function_address
+
+addr = get_cython_function_address("holodeck.cyutils", "gw_freq_dist_func__scalar_scalar")
+functype = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_int, ctypes.c_double)
+cython__gw_freq_dist_func__scalar_scalar = functype(addr)
+
+
 @numba.jit
 def sam_calc_gwb_1(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms=100):
     """
@@ -842,9 +858,10 @@ def sam_calc_gwb_1(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, n
                 # Calculate the GW spectral strain at each harmonic
                 #    see: [Amaro-seoane+2010 Eq.9]
                 # ()
-                temp = 4.0 * utils.gw_freq_dist_func(nh, ee=ecc, recursive=False) / (nh ** 2)
+                # temp = 4.0 * utils.gw_freq_dist_func(nh, ee=ecc, recursive=False) / (nh ** 2)
+                temp = 4.0 * cython__gw_freq_dist_func__scalar_scalar(nh, ecc) / (nh ** 2)
                 # (Q,)
-                hs2[ii, :, kk, aa, bb] = utils.gw_strain_source(mchirp, dc*MPC, gwfr) ** 2
+                hs2[ii, :, kk, aa, bb] = np.square(utils._GW_SRC_CONST * mchirp * np.power(2*mchirp*gwfr, 2/3) / (dc*MPC))
                 hsn2[ii, :, kk, aa, bb] = temp * hs2[ii, :, kk, aa, bb]
 
                 # (Q,)
@@ -853,10 +870,11 @@ def sam_calc_gwb_1(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, n
     # integrate
     args = [np.log10(mtot), mrat, redz]
     for ii, xx in enumerate(args):
-        hc2 = np.moveaxis(hc2, ii, 0)
-        dx = np.diff(xx)
-        hc2 = dx * 0.5 * np.moveaxis(hc2[1:] + hc2[:-1], 0, -1)
-        hc2 = np.moveaxis(hc2, -1, ii)
+        hc2 = sp.integrate.trapezoid(hc2, x=xx, axis=ii)
+        # hc2 = np.moveaxis(hc2, ii, 0)
+        # dx = np.diff(xx)
+        # hc2 = dx * 0.5 * np.moveaxis(hc2[1:] + hc2[:-1], 0, -1)
+        # hc2 = np.moveaxis(hc2, -1, ii)
 
     hc2 = np.sum(hc2, axis=(0, 1, 2))
 
