@@ -719,86 +719,81 @@ def sam_calc_gwb_0(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
                 hc2[ii, :, kk, aa, bb] = ndens[ii, :, kk] * dc_term * zterm * tau * hsn2[ii, :, kk, aa, bb]
 
     # integrate
+    gwb = hc2.copy()
     args = [np.log10(sam.mtot), sam.mrat, sam.redz]
     for ii, xx in enumerate(args):
-        hc2 = np.moveaxis(hc2, ii, 0)
+        gwb = np.moveaxis(gwb, ii, 0)
         dx = np.diff(xx)
-        hc2 = dx * 0.5 * np.moveaxis(hc2[1:] + hc2[:-1], 0, -1)
-        hc2 = np.moveaxis(hc2, -1, ii)
+        gwb = dx * 0.5 * np.moveaxis(gwb[1:] + gwb[:-1], 0, -1)
+        gwb = np.moveaxis(gwb, -1, ii)
 
-    hc2 = np.sum(hc2, axis=(0, 1, 2))
+    gwb = np.sum(gwb, axis=(0, 1, 2))
 
-    # return gwfobs_harms, gwfr_check, hc2, hsn2, hs2, ecc_out, tau_out
-    return gwfobs_harms, hc2, ecc_out, tau_out
+    # return gwfobs_harms, gwfr_check, gwb, hsn2, hs2, ecc_out, tau_out
+    # return gwfobs_harms, gwb, ecc_out, tau_out
+    return gwfobs_harms, gwb, ecc_out, tau_out
 
 
 # ==============================================================================
 
+import faulthandler; faulthandler.enable()
+
 import pyximport   # noqa
-pyximport.install(language_level=3)
+pyximport.install(language_level=3, setup_args={"include_dirs": np.get_include()}, reload_support=True)
 import holodeck.cyutils  # noqa
 
 import ctypes
 from numba.extending import get_cython_function_address
 
-addr = get_cython_function_address("holodeck.cyutils", "gw_freq_dist_func__scalar_scalar")
-functype = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_int, ctypes.c_double)
-cython__gw_freq_dist_func__scalar_scalar = functype(addr)
 
-
-@numba.jit
 def sam_calc_gwb_1(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms=100):
-    """
+    return holo.cyutils.sam_calc_gwb_1(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms)
 
-    Parameters
-    ----------
-    gwfobs : (F,) array_like
-        Observer-frame frequencies at which to calculate GWB.
-    sam : `Semi_Analytic_Model` instance
-    forb_rst_evo : (M, E) array_like
-        Rest-frame orbital frequencies of binaries, for each total-mass M and evolution step E.
-    eccen_evo : (E,) array_like
-        Eccentricities at each evolution step.  The same for all binaries, corresponding to fixed
-        binary separations for all binaries.
-    nharms : int
-        Number of harmonics to use in calculating GWB.
 
-    """
+# addr = get_cython_function_address('holodeck.cyutils', 'gw_freq_dist_func__scalar_scalar')
+# functype = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_int, ctypes.c_double)
+# cython__gw_freq_dist_func__scalar_scalar = functype(addr)
 
-    # NOTE: need to check for coalescences and set to zero
-    # NOTE: need to check for frequencies below starting separation and set to zero
+# array_1d_double = np.ctypeslib.ndpointer(dtype=np.double, ndim=1, flags='CONTIGUOUS')
+# addr = get_cython_function_address('holodeck.cyutils', 'trapz_grid_weight')
+# functype = ctypes.CFUNCTYPE(array_1d_double, ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_double))
+# cython__trapz_grid_weight = functype(addr)
 
-    # frst_orb_evo = utils.kepler_freq_from_sepa(mtot[:, np.newaxis], sepa_evo[np.newaxis, :])
-    # frst_orb_evo = (1.0/(2.0*np.pi))*np.sqrt(NWTG*mtot[:, np.newaxis])/np.power(sepa_evo[np.newaxis, :], 1.5)
 
-    # assert np.ndim(gwfobs) == 1
-    # assert np.ndim(frst_orb_evo) == 2
-    # assert np.ndim(eccen_evo) == 1
-    # assert np.shape(frst_orb_evo) == (mtot.size, eccen_evo.size)
+# @numba.njit
+# def _tester_1(vv, size):
+#     return cython__trapz_grid_weight(vv, size)
 
-    # harm_nums = np.arange(1, nharms+1)
-    # two_over_nh_sq = (2.0 / harm_nums) ** 2
 
-    # (M, Q, Z) units of [Mpc^-3]
-    # ndens = sam.static_binary_density
+# def tester_1():
+#     nn = 3
 
-    # (F, H)
-    # gwfobs_harms = gwfobs[:, np.newaxis] / harm_nums[np.newaxis, :]
+#     print(f"{nn=}")
+#     for ii in np.random.randint(0, nn+2, 10):
+#         print(f"\t{ii=}, {str((ii==0)|(ii==nn-1)):5s} - rv={_tester_1(ii, nn)}")
+
+#     return
+
+
+# @numba.njit
+'''def sam_calc_gwb_1(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms=100):
+
     nfreqs = len(gwfobs)
     gwfobs_harms = np.zeros((nfreqs, nharms))
     for ii in range(nfreqs):
         gwfo = gwfobs[ii]
         for nh in range(1, nharms+1):
-            gwfobs_harms[ii, nh] = gwfo / nh
+            gwfobs_harms[ii, nh-1] = gwfo / nh
 
-    # (Z,)
-    # dcom = cosmo.comoving_distance(redz).to('Mpc').value
+    n_mtot = len(mtot)
+    n_mrat = len(mrat)
+    n_redz = len(redz)
 
-    # (Z, F, H)
-    # gw_frst ==> frst_orb_harms
-    # gw_frst = gwfobs_harms[np.newaxis, :, :] * (1.0 * sam.redz[:, np.newaxis, np.newaxis])
+    assert len(dcom) == n_redz
+    assert ndens.shape == (n_mtot, n_mrat, n_redz)
+    assert sepa_evo.shape == eccen_evo.shape
 
-    shape = (len(mtot), len(mrat), len(redz), nfreqs, nharms)
+    shape = (n_mtot, n_mrat, n_redz, nfreqs, nharms)
     # setup output arrays with shape (M, Q, Z, F, H)
     hc2 = np.zeros(shape)
     hs2 = np.zeros(shape)
@@ -821,7 +816,6 @@ def sam_calc_gwb_1(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, n
             mchirp = mt * np.power(mrat, 3.0/5.0) / np.power(1 + mrat, 6.0/5.0)
 
             # (E,) rest-frame orbital frequencies for this total-mass bin
-            # frst_evo = frst_orb_evo[ii]
             frst_evo = (1.0/(2.0*np.pi))*np.sqrt(NWTG*mt)/np.power(sepa_evo, 1.5)
 
             # iterate over redshifts Z
@@ -840,7 +834,6 @@ def sam_calc_gwb_1(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, n
                 # interpolate to target (rest-frame) frequency
                 # this is the same for all mass-ratios
                 # () scalar
-                # ecc = np.interp(gwfr, frst_evo, eccen_evo, left=np.nan, right=np.nan)
                 ecc = np.interp(gwfr, frst_evo, eccen_evo)
 
                 # da/dt values are negative, get a positive rate
@@ -851,7 +844,7 @@ def sam_calc_gwb_1(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, n
 
                 # convert to timescale
                 tau = sa / tau
-                # print(f"{m1.shape")
+
                 tau_out[ii, :, kk, aa, bb] = tau
                 ecc_out[ii, :, kk, aa, bb] = ecc
 
@@ -863,23 +856,41 @@ def sam_calc_gwb_1(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, n
                 # (Q,)
                 hs2[ii, :, kk, aa, bb] = np.square(utils._GW_SRC_CONST * mchirp * np.power(2*mchirp*gwfr, 2/3) / (dc*MPC))
                 hsn2[ii, :, kk, aa, bb] = temp * hs2[ii, :, kk, aa, bb]
-
-                # (Q,)
                 hc2[ii, :, kk, aa, bb] = ndens[ii, :, kk] * dc_term * zterm * tau * hsn2[ii, :, kk, aa, bb]
 
-    # integrate
-    args = [np.log10(mtot), mrat, redz]
-    for ii, xx in enumerate(args):
-        hc2 = sp.integrate.trapezoid(hc2, x=xx, axis=ii)
-        # hc2 = np.moveaxis(hc2, ii, 0)
-        # dx = np.diff(xx)
-        # hc2 = dx * 0.5 * np.moveaxis(hc2[1:] + hc2[:-1], 0, -1)
-        # hc2 = np.moveaxis(hc2, -1, ii)
+    gwb_shape = (nfreqs, nharms)
+    gwb = np.zeros(gwb_shape)
 
-    hc2 = np.sum(hc2, axis=(0, 1, 2))
+    import ctypes
+
+    n_mtot = len(mtot)
+    n_mrat = len(mrat)
+    n_redz = len(redz)
+    for aa, bb in np.ndindex(gwfobs_harms.shape):
+        for ii, jj, kk in np.ndindex((n_mtot, n_mrat, n_redz)):
+            ival = cython__trapz_grid_weight(ii, n_mtot, mtot.ctypes.data_as(ctypes.POINTER(ctypes.c_double)))
+            # ival = cython__trapz_grid_weight(ii, n_mtot, mtot)
+            # jval = cython__trapz_grid_weight(jj, n_mrat, mrat)
+            # kval = cython__trapz_grid_weight(kk, n_redz, redz)
+            jval = [1.0, 2.0]
+            kval = [1.0, 2.0]
+            weight = 1.0 / (ival[0] * jval[0] * kval[0])
+            volume = ival[1] * jval[2] * kval[1]
+            gwb[aa, bb] += hc2 * weight * volume
+
+    # # integrate
+    # args = [np.log10(mtot), mrat, redz]
+    # for ii, xx in enumerate(args):
+    #     hc2 = sp.integrate.trapezoid(hc2, x=xx, axis=ii)
+    #     # hc2 = np.moveaxis(hc2, ii, 0)
+    #     # dx = np.diff(xx)
+    #     # hc2 = dx * 0.5 * np.moveaxis(hc2[1:] + hc2[:-1], 0, -1)
+    #     # hc2 = np.moveaxis(hc2, -1, ii)
+
+    # hc2 = np.sum(hc2, axis=(0, 1, 2))
 
     # return gwfobs_harms, gwfr_check, hc2, hsn2, hs2, ecc_out, tau_out
-    return gwfobs_harms, hc2, ecc_out, tau_out
+    return gwfobs_harms, gwb, ecc_out, tau_out'''
 
 
 def sam_calc_gwb_2(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
