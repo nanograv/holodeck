@@ -18,13 +18,33 @@ from holodeck.constants import PC, YR
 
 import zcode.math as zmath
 
-# NHARMS = 23
-# SAM_SHAPE = (10, 11, 12)
-NHARMS = 7
-SAM_SHAPE = (4, 5, 6)
+import numpy as np
+import pyximport   # noqa
+pyximport.install(language_level=3, setup_args={"include_dirs": np.get_include()}, reload_support=True)
+
+import holodeck.cyutils
+
+NHARMS = 30
+SAM_SHAPE = (10, 11, 12)
+# NHARMS = 7
+# SAM_SHAPE = (4, 5, 6)
 
 INIT_ECCEN = 0.999
 INIT_SEPA = 10.0 * PC
+
+
+def check_against(val, ref):
+    print()
+    print(val.shape, ref.shape)
+    retval = np.allclose(val, ref, atol=0.0)
+    print(f"{str(retval):5s}, {np.median(val):.8e}, {np.median(ref):.8e}")
+
+    # if not retval:
+    #     for idx, rr in np.ndenumerate(ref):
+    #         vv = val[idx]
+    #         print(idx, rr, vv, np.isclose(rr, vv, atol=0.0))
+
+    return
 
 
 def sam_evolve_eccen_uniform_single(sam, eccen_init, sepa_init, nsteps=300):
@@ -60,7 +80,19 @@ sepa_evo, eccen_evo = sam_evolve_eccen_uniform_single(sam, INIT_ECCEN, INIT_SEPA
 print("interp and gwb")
 gwfobs = np.logspace(-2, 1, 10) / YR
 
-# gwfobs_harms, hc2, ecc_out, tau_out
+# ---- Reference GWB
+
+dur = datetime.now()
+rv_0 = holo.gravwaves.sam_calc_gwb_0(gwfobs, sam, sepa_evo, eccen_evo, nharms=NHARMS)
+dur = datetime.now() - dur
+print("0: ", dur.total_seconds())
+
+gwb_0 = rv_0[1]
+gwb_0 = np.sqrt(gwb_0)
+
+
+# ---- Calculation 1 ----
+
 edges = [np.log10(sam.mtot), sam.mrat, sam.redz]
 
 dur = datetime.now()
@@ -70,28 +102,65 @@ rv_1 = holo.gravwaves.sam_calc_gwb_1(
 )
 dur = datetime.now() - dur
 print("1: ", dur.total_seconds())
-
 gwb_1 = rv_1
+gwb_1 = np.sqrt(gwb_1)
+
+check_against(gwb_1, gwb_0)
+
+
+# ---- Calculation 2 ----
+
+edges = [np.log10(sam.mtot), sam.mrat, sam.redz]
 
 dur = datetime.now()
-rv_0 = holo.gravwaves.sam_calc_gwb_0(gwfobs, sam, sepa_evo, eccen_evo, nharms=NHARMS)
+rv_2 = holodeck.cyutils.sam_calc_gwb_2(
+    sam.static_binary_density, *edges, dcom,
+    gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
+)
 dur = datetime.now() - dur
-print("0: ", dur.total_seconds())
+print("2: ", dur.total_seconds())
+gwb_2 = rv_2
+gwb_2 = np.sqrt(gwb_2)
 
-gwb_0 = rv_0[1]
-# gwb_0 = rv_0[3]
+check_against(gwb_2, gwb_0)
 
-gwb_0 = np.sqrt(gwb_0)
-gwb_1 = np.sqrt(gwb_1)
-print(gwb_0.shape, gwb_1.shape)
 
-retval = np.allclose(gwb_0, gwb_1, atol=0.0)
-print(retval, np.median(gwb_0), np.median(gwb_1))
+# ---- Calculation 3 ----
 
-if not retval:
-    for idx, ref in np.ndenumerate(gwb_0):
-        check = gwb_1[idx]
-        print(idx, ref, check, np.isclose(ref, check))
+edges = [np.log10(sam.mtot), sam.mrat, sam.redz]
+
+dur = datetime.now()
+rv_3 = holodeck.cyutils.sam_calc_gwb_3(
+    sam.static_binary_density, *edges, dcom,
+    gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
+)
+dur = datetime.now() - dur
+print("3: ", dur.total_seconds())
+gwb_3 = rv_3
+gwb_3 = np.sqrt(gwb_3)
+
+check_against(gwb_3, gwb_0)
+
+
+# ---- Calculation 4 ----
+
+edges = [np.log10(sam.mtot), sam.mrat, sam.redz]
+
+dur = datetime.now()
+rv_4 = holodeck.cyutils.sam_calc_gwb_4(
+    sam.static_binary_density, *edges, dcom,
+    gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
+)
+dur = datetime.now() - dur
+print("4: ", dur.total_seconds())
+gwb_4 = rv_4
+gwb_4 = np.sqrt(gwb_4)
+
+check_against(gwb_4, gwb_0)
+
+
+
+
 
 
 

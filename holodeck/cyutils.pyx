@@ -204,7 +204,7 @@ cdef np.ndarray[np.double_t] _sam_calc_gwb_1(
 
 
 def sam_calc_gwb_2(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms=100):
-    return _sam_calc_gwb_1(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms)
+    return _sam_calc_gwb_2(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms)
 
 
 cdef np.ndarray[np.double_t] _sam_calc_gwb_2(
@@ -227,94 +227,279 @@ cdef np.ndarray[np.double_t] _sam_calc_gwb_2(
     n_redz = len(redz)
     n_eccs = len(sepa_evo)
 
-    cdef np.ndarray[DTYPE_t, ndim=2] gwfobs_harms = np.zeros((nfreqs, nharms))
-    cdef int ii
-    for ii in range(nfreqs):
-        gwfo = gwfobs[ii]
-        for nh in range(1, nharms+1):
-            gwfobs_harms[ii, nh-1] = gwfo / nh
-
-    shape = (n_mtot, n_mrat, n_redz, nfreqs, nharms)
-    # setup output arrays with shape (M, Q, Z, F, H)
-    hc2 = np.zeros(shape)
-    hs2 = np.zeros(shape)
-    hsn2 = np.zeros(shape)
-    tau_out = np.zeros(shape)
-    ecc_out = np.zeros(shape)
+    cdef (int, int) gwb_shape = (nfreqs, nharms)
+    # cdef np.ndarray[DTYPE_t, ndim=2] gwfobs_harms = np.zeros(gwb_shape)
+    cdef int ii, nh
+    cdef double gwfo
+    # for ii in range(nfreqs):
+    #     gwfo = gwfobs[ii]
+    #     for nh in range(1, nharms+1):
+    #         gwfobs_harms[ii, nh-1] = gwfo / nh
 
     # NOTE: should sort `gwfobs_harms` into an ascending 1D array to speed up processes
 
-    cdef int jj, kk, aa, bb, nh
+    cdef int jj, kk, aa, bb
     cdef double m1, m2, mchirp, mt, mr, zz
-    cdef double gwfo, gwfr, zterm, dc_term
+    cdef double gwfr, zterm, dc, dc_term, gne, hterm
     cdef np.ndarray[DTYPE_t, ndim=1] frst_evo = np.empty(n_eccs, dtype=DTYPE)
 
-    for (aa, bb), gwfo in np.ndenumerate(gwfobs_harms):
-        nh = bb + 1
-        # iterate over mtot M
-        for ii, mt in enumerate(mtot):
-            mt = 10.0 ** mt
-
-            # (E,) rest-frame orbital frequencies for this total-mass bin
-            # frst_evo = (1.0/(2.0*np.pi))*np.sqrt(NWTG*mt)/np.power(sepa_evo, 1.5)
-
-            # iterate over redshifts Z
-            for kk, zz in enumerate(redz):
-                # () scalar
-                zterm = (1.0 + zz)
-                dc_term = dcom[kk]   # this is still in units of [Mpc]
-                dc_term = 4*np.pi*(SPLC/MPC) * (dc_term**2)
-                # rest-frame frequency corresponding to target observer-frame frequency of GW observations
-                gwfr = gwfo * zterm
-                sa = np.power(NWTG*mt/np.square(2.0*np.pi*gwfr), 1.0/3.0)
-
-                for jj, qq in enumerate(mrat):
-                    m1 = mt / (1.0 + qq)
-                    m2 = mt - m1
-                    mchirp = mt * np.power(qq, 3.0/5.0) / np.power(1 + qq, 6.0/5.0)
-
-
-
-                # interpolate to target (rest-frame) frequency
-                # this is the same for all mass-ratios
-                # () scalar
-                ecc = np.interp(gwfr, frst_evo, eccen_evo)
-
-                # da/dt values are negative, get a positive rate
-                const = holo.utils._GW_DADT_SEP_CONST
-                tau = const * m1 * m2 * (m1 + m2) / np.power(sa, 3)
-                tau = tau * holo.utils._gw_ecc_func(ecc)
-
-                # convert to timescale
-                tau = sa / - tau
-
-                tau_out[ii, :, kk, aa, bb] = tau
-                ecc_out[ii, :, kk, aa, bb] = ecc
-
-                # Calculate the GW spectral strain at each harmonic
-                #    see: [Amaro-seoane+2010 Eq.9]
-                # ()
-                temp = 4.0 * gw_freq_dist_func__scalar_scalar(nh, ecc) / (nh ** 2)
-                # (Q,)
-                hs2[ii, :, kk, aa, bb] = np.square(holo.utils._GW_SRC_CONST * mchirp * np.power(2*mchirp*gwfr, 2/3) / (dc*MPC))
-                hsn2[ii, :, kk, aa, bb] = temp * hs2[ii, :, kk, aa, bb]
-                hc2[ii, :, kk, aa, bb] = ndens[ii, :, kk] * dc_term * zterm * tau * hsn2[ii, :, kk, aa, bb]
-
-    gwb_shape = (nfreqs, nharms)
     cdef np.ndarray[np.double_t, ndim=2] gwb
     gwb = np.zeros(gwb_shape)
 
     cdef np.ndarray[np.double_t, ndim=1] ival, jval, kval
     cdef double weight, volume
 
-    for aa, bb in np.ndindex(gwfobs_harms.shape):
-        for ii, jj, kk in np.ndindex((n_mtot, n_mrat, n_redz)):
-            ival = trapz_grid_weight(ii, n_mtot, mtot)
-            jval = trapz_grid_weight(jj, n_mrat, mrat)
-            kval = trapz_grid_weight(kk, n_redz, redz)
-            weight = 1.0 / (ival[0] * jval[0] * kval[0])
-            volume = ival[1] * jval[1] * kval[1]
-            gwb[aa, bb] += hc2[ii, jj, kk, aa, bb] * weight * volume
+    for aa, bb in np.ndindex(gwb_shape):
+        nh = bb + 1
+        gwfo = gwfobs[aa] / nh
+        # iterate over mtot M
+        for ii, mt in enumerate(mtot):
+            mt = 10.0 ** mt
+
+            # (E,) rest-frame orbital frequencies for this total-mass bin
+            frst_evo[:] = (1.0/(2.0*np.pi))*np.sqrt(NWTG*mt)/np.power(sepa_evo, 1.5)
+
+            # iterate over redshifts Z
+            for kk, zz in enumerate(redz):
+                # () scalar
+                zterm = (1.0 + zz)
+                dc = dcom[kk]   # this is still in units of [Mpc]
+                dc_term = 4*np.pi*(SPLC/MPC) * (dc**2)
+                # rest-frame frequency corresponding to target observer-frame frequency of GW observations
+                gwfr = gwfo * zterm
+                sa = np.power(NWTG*mt/np.square(2.0*np.pi*gwfr), 1.0/3.0)
+
+                # () scalar
+                ecc = np.interp(gwfr, frst_evo, eccen_evo)
+
+                for jj, qq in enumerate(mrat):
+                    m1 = mt / (1.0 + qq)
+                    m2 = mt - m1
+                    mchirp = mt * np.power(qq, 3.0/5.0) / np.power(1 + qq, 6.0/5.0)
+
+                    # da/dt values are negative, get a positive rate
+                    const = holo.utils._GW_DADT_SEP_CONST
+                    tau = const * m1 * m2 * (m1 + m2) / np.power(sa, 3)
+                    tau = tau * holo.utils._gw_ecc_func(ecc)
+
+                    # convert to timescale
+                    tau = sa / - tau
+
+                    # Calculate the GW spectral strain at each harmonic
+                    #    see: [Amaro-seoane+2010 Eq.9]
+                    # ()
+                    gne = 4.0 * gw_freq_dist_func__scalar_scalar(nh, ecc) / (nh ** 2)
+                    # (Q,)
+                    hterm = np.square(holo.utils._GW_SRC_CONST * mchirp * np.power(2*mchirp*gwfr, 2/3) / (dc*MPC))
+                    hterm = ndens[ii, jj, kk] * dc_term * zterm * tau * gne * hterm
+
+                    ival = trapz_grid_weight(ii, n_mtot, mtot)
+                    jval = trapz_grid_weight(jj, n_mrat, mrat)
+                    kval = trapz_grid_weight(kk, n_redz, redz)
+                    weight = 1.0 / (ival[0] * jval[0] * kval[0])
+                    volume = ival[1] * jval[1] * kval[1]
+                    gwb[aa, bb] += hterm * weight * volume
+
+    return gwb
+
+
+def sam_calc_gwb_3(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms=100):
+    return _sam_calc_gwb_3(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms)
+
+
+cdef np.ndarray[np.double_t] _sam_calc_gwb_3(
+    np.ndarray[np.double_t, ndim=3] ndens,
+    np.ndarray[np.double_t, ndim=1] mtot_log10,
+    np.ndarray[np.double_t, ndim=1] mrat,
+    np.ndarray[np.double_t, ndim=1] redz,
+    np.ndarray[np.double_t, ndim=1] dcom,
+    np.ndarray[np.double_t, ndim=1] gwfobs,
+    np.ndarray[np.double_t, ndim=1] sepa_evo,
+    np.ndarray[np.double_t, ndim=1] eccen_evo,
+    int nharms
+):
+    printf("_sam_calc_gwb_3()")
+
+    cdef int nfreqs, n_mtot, n_mrat, n_redz
+    nfreqs = len(gwfobs)
+    n_mtot = len(mtot_log10)
+    n_mrat = len(mrat)
+    n_redz = len(redz)
+    n_eccs = len(sepa_evo)
+
+    cdef np.ndarray[np.double_t, ndim=1] mtot = 10.0 ** mtot_log10
+    cdef (int, int) gwb_shape = (nfreqs, nharms)
+    cdef int ii, nh
+    cdef double gwfo
+
+    cdef int jj, kk, aa, bb
+    cdef double m1, m2, mchirp, mt, mr, zz
+    cdef double gwfr, zterm, dc, dc_term, gne, hterm
+
+    cdef np.ndarray[np.double_t, ndim=2] gwb = np.zeros(gwb_shape)
+    cdef np.ndarray[np.double_t, ndim=1] ival, jval, kval
+    cdef double weight, volume
+
+    cdef double tau_const = holo.utils._GW_DADT_SEP_CONST
+    cdef double four_pi_c_mpc = 4*np.pi * (SPLC/MPC)
+
+    cdef np.ndarray[DTYPE_t, ndim=1] frst_evo_pref = np.empty(n_eccs, dtype=DTYPE)
+    frst_evo_pref[:] = (1.0/(2.0*np.pi))*np.sqrt(NWTG)/np.power(sepa_evo, 1.5)
+    cdef double kep_sa_term = NWTG / np.square(2.0*np.pi)
+    cdef double one_third = 1.0 / 3.0
+    cdef double two_third = 2.0 / 3.0
+    cdef double three_fifths = 3.0 / 5.0
+    cdef double six_fifths = 6.0 / 5.0
+    cdef double four_over_nh_squared, sa_inverse_cubed
+    cdef double fe_ecc
+
+    for aa, bb in np.ndindex(gwb_shape):
+        nh = bb + 1
+        four_over_nh_squared = 4.0 / (nh * nh)
+        gwfo = gwfobs[aa] / nh
+        # iterate over mtot M
+        for ii, mt in enumerate(mtot):
+            ival = trapz_grid_weight(ii, n_mtot, mtot_log10)
+
+            # iterate over redshifts Z
+            for kk, zz in enumerate(redz):
+                kval = trapz_grid_weight(kk, n_redz, redz)
+                # () scalar
+                zterm = (1.0 + zz)
+                dc = dcom[kk]   # this is still in units of [Mpc]
+                dc_term = four_pi_c_mpc * (dc*dc)
+                # rest-frame frequency corresponding to target observer-frame frequency of GW observations
+                gwfr = gwfo * zterm
+                sa = np.power(kep_sa_term*mt/np.square(gwfr), one_third)
+                sa_inverse_cubed = np.power(sa, -3.0)
+
+                # () scalar
+                ecc = np.interp(gwfr, frst_evo_pref*np.sqrt(mt), eccen_evo)
+                gne = gw_freq_dist_func__scalar_scalar(nh, ecc) * four_over_nh_squared
+                fe_ecc = holo.utils._gw_ecc_func(ecc)
+
+                weight = ival[1] * kval[1] / (ival[0] * kval[0])
+                for jj, qq in enumerate(mrat):
+                    jval = trapz_grid_weight(jj, n_mrat, mrat)
+                    m1 = mt / (1.0 + qq)
+                    m2 = mt - m1
+                    mchirp = mt * np.power(qq, three_fifths) / np.power(1 + qq, six_fifths)
+
+                    # da/dt values are negative, get a positive rate
+                    tau = tau_const * fe_ecc * m1 * m2 * (m1 + m2) * sa_inverse_cubed
+                    # convert to timescale
+                    tau = sa / - tau
+
+                    # Calculate the GW spectral strain at each harmonic
+                    #    see: [Amaro-seoane+2010 Eq.9]
+                    hterm = np.square(holo.utils._GW_SRC_CONST * mchirp * np.power(2*mchirp*gwfr, two_third) / (dc*MPC))
+                    hterm = ndens[ii, jj, kk] * dc_term * zterm * tau * gne * hterm
+
+                    # weight = 1.0 / (ival[0] * jval[0] * kval[0])
+                    # volume = ival[1] * jval[1] * kval[1]
+                    gwb[aa, bb] += hterm * weight * (jval[1] / jval[0])
+
+    return gwb
+
+
+def sam_calc_gwb_4(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms=100):
+    return _sam_calc_gwb_4(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms)
+
+
+cdef np.ndarray[np.double_t] _sam_calc_gwb_4(
+    np.ndarray[np.double_t, ndim=3] ndens,
+    np.ndarray[np.double_t, ndim=1] mtot_log10,
+    np.ndarray[np.double_t, ndim=1] mrat,
+    np.ndarray[np.double_t, ndim=1] redz,
+    np.ndarray[np.double_t, ndim=1] dcom,
+    np.ndarray[np.double_t, ndim=1] gwfobs,
+    np.ndarray[np.double_t, ndim=1] sepa_evo,
+    np.ndarray[np.double_t, ndim=1] eccen_evo,
+    int nharms
+):
+    printf("_sam_calc_gwb_4()")
+
+    cdef int nfreqs, n_mtot, n_mrat, n_redz
+    nfreqs = len(gwfobs)
+    n_mtot = len(mtot_log10)
+    n_mrat = len(mrat)
+    n_redz = len(redz)
+    n_eccs = len(sepa_evo)
+
+    cdef np.ndarray[np.double_t, ndim=1] mtot = 10.0 ** mtot_log10
+    cdef (int, int) gwb_shape = (nfreqs, nharms)
+    cdef int ii, nh
+    cdef double gwfo
+
+    cdef int jj, kk, aa, bb
+    cdef double m1, m2, mchirp, mt, mr, zz
+    cdef double gwfr, zterm, dc, dc_term, gne, hterm
+
+    cdef np.ndarray[np.double_t, ndim=2] gwb = np.zeros(gwb_shape)
+    cdef np.ndarray[np.double_t, ndim=1] ival, jval, kval
+    cdef double weight_ik, weight
+
+    cdef double tau_const = holo.utils._GW_DADT_SEP_CONST
+    cdef double four_pi_c_mpc = 4*np.pi * (SPLC/MPC)
+
+    cdef np.ndarray[DTYPE_t, ndim=1] frst_evo_pref = np.empty(n_eccs, dtype=DTYPE)
+    frst_evo_pref[:] = (1.0/(2.0*np.pi))*np.sqrt(NWTG)/np.power(sepa_evo, 1.5)
+    cdef double kep_sa_term = NWTG / np.square(2.0*np.pi)
+    cdef double one_third = 1.0 / 3.0
+    cdef double two_third = 2.0 / 3.0
+    cdef double three_fifths = 3.0 / 5.0
+    cdef double six_fifths = 6.0 / 5.0
+    cdef double four_over_nh_squared, sa_inverse_cubed
+    cdef double fe_ecc
+
+    # iterate over redshifts Z
+    for kk, zz in enumerate(redz):
+        kval = trapz_grid_weight(kk, n_redz, redz)
+        zterm = (1.0 + zz)
+        dc = dcom[kk]   # this is still in units of [Mpc]
+        dc_term = four_pi_c_mpc * (dc*dc)
+
+        # iterate over mtot M
+        for ii, mt in enumerate(mtot):
+            ival = trapz_grid_weight(ii, n_mtot, mtot_log10)
+
+            weight_ik = ival[1] * kval[1] / (ival[0] * kval[0])
+
+            for jj, qq in enumerate(mrat):
+                jval = trapz_grid_weight(jj, n_mrat, mrat)
+                weight = weight_ik * (jval[1] / jval[0])
+                m1 = mt / (1.0 + qq)
+                m2 = mt - m1
+                mchirp = mt * np.power(qq, three_fifths) / np.power(1 + qq, six_fifths)
+
+                for aa, gwfo in enumerate(gwfobs):
+                    for bb in range(nharms):
+                        nh = bb + 1
+                        four_over_nh_squared = 4.0 / (nh * nh)
+                        gwfr = gwfo / nh * zterm
+
+                        # rest-frame frequency corresponding to target observer-frame frequency of GW observations
+                        sa = np.power(kep_sa_term*mt/np.square(gwfr), one_third)
+                        sa_inverse_cubed = np.power(sa, -3.0)
+
+                        # () scalar
+                        # ecc = np.interp(gwfr, frst_evo_pref*np.sqrt(mt), eccen_evo)
+                        # gne = gw_freq_dist_func__scalar_scalar(nh, ecc) * four_over_nh_squared
+                        ecc = 0.5
+                        gne = 0.25
+                        fe_ecc = holo.utils._gw_ecc_func(ecc)
+
+                        # da/dt values are negative, get a positive rate
+                        tau = tau_const * fe_ecc * m1 * m2 * (m1 + m2) * sa_inverse_cubed
+                        # convert to timescale
+                        tau = sa / - tau
+
+                        # Calculate the GW spectral strain at each harmonic
+                        #    see: [Amaro-seoane+2010 Eq.9]
+                        hterm = np.square(holo.utils._GW_SRC_CONST * mchirp * np.power(2*mchirp*gwfr, two_third) / (dc*MPC))
+                        hterm = ndens[ii, jj, kk] * dc_term * zterm * tau * gne * hterm
+
+                        gwb[aa, bb] += hterm * weight
 
     return gwb
 
