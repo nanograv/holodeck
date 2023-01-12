@@ -24,6 +24,8 @@ pyximport.install(language_level=3, setup_args={"include_dirs": np.get_include()
 
 import holodeck.cyutils
 
+NSTEPS = 30
+
 # NHARMS = 60
 # SAM_SHAPE = 20
 # NHARMS = 30
@@ -41,17 +43,17 @@ def check_against(val, ref):
     retval = np.allclose(val, ref, atol=0.0)
     print(f"{str(retval):5s}, {np.median(val):.8e}, {np.median(ref):.8e}")
 
-    if not retval:
-        for idx, rr in np.ndenumerate(ref):
-            vv = val[idx]
-            retval = np.isclose(rr, vv, atol=0.0)
-            if not retval:
-                print(idx, rr, vv, retval)
+    # if not retval:
+    #     for idx, rr in np.ndenumerate(ref):
+    #         vv = val[idx]
+    #         retval = np.isclose(rr, vv, atol=0.0)
+    #         if not retval:
+    #             print(idx, rr, vv, retval)
 
     return
 
 
-def sam_evolve_eccen_uniform_single(sam, eccen_init, sepa_init, nsteps=300):
+def sam_evolve_eccen_uniform_single(sam, eccen_init, sepa_init, nsteps):
     assert (0.0 <= eccen_init) and (eccen_init <= 1.0)
 
     eccen = np.zeros(nsteps)
@@ -79,10 +81,12 @@ def sam_evolve_eccen_uniform_single(sam, eccen_init, sepa_init, nsteps=300):
 sam = holo.sam.Semi_Analytic_Model(shape=SAM_SHAPE)
 dcom = cosmo.comoving_distance(sam.redz).to('Mpc').value
 print("evolve")
-sepa_evo, eccen_evo = sam_evolve_eccen_uniform_single(sam, INIT_ECCEN, INIT_SEPA)
+sepa_evo, eccen_evo = sam_evolve_eccen_uniform_single(sam, INIT_ECCEN, INIT_SEPA, NSTEPS)
 
 print("interp and gwb")
 gwfobs = np.logspace(-2, 1, 10) / YR
+
+
 
 # ---- Reference GWB
 
@@ -110,6 +114,10 @@ gwb_1 = rv_1
 gwb_1 = np.sqrt(gwb_1)
 
 check_against(gwb_1, gwb_0)
+
+
+
+
 
 '''
 # ---- Calculation 2 ----
@@ -146,6 +154,9 @@ gwb_3 = np.sqrt(gwb_3)
 check_against(gwb_3, gwb_0)
 '''
 
+
+
+
 # ---- Calculation 4 ----
 
 edges = [np.log10(sam.mtot), sam.mrat, sam.redz]
@@ -162,14 +173,11 @@ gwb_4 = np.sqrt(gwb_4)
 
 check_against(gwb_4, gwb_0)
 
-
 # ---- Calculation 5 ----
-
-edges = [np.log10(sam.mtot), sam.mrat, sam.redz]
 
 dur = datetime.now()
 rv_5 = holodeck.cyutils.sam_calc_gwb_5(
-    sam.static_binary_density, *edges, dcom,
+    sam.static_binary_density, np.log10(sam.mtot), sam.mrat, sam.redz, dcom,
     gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
 )
 dur = datetime.now() - dur
