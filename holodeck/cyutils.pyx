@@ -1,5 +1,6 @@
 """
 """
+cimport cython
 
 import numpy as np
 cimport numpy as np
@@ -8,6 +9,8 @@ np.import_array()
 cimport scipy.special.cython_special as sp_special
 
 from libc.stdio cimport printf
+from libc.stdlib cimport malloc, free
+from libc.math cimport pow, sqrt, abs, M_PI
 
 DTYPE = np.float64
 ctypedef np.float64_t DTYPE_t
@@ -16,6 +19,12 @@ cdef double ECCEN_ZERO_LIMIT = 1.0e-12
 
 import holodeck as holo
 from holodeck.constants import NWTG, SPLC, MPC
+
+cdef double MY_NWTG = 6.6742999e-08
+cdef double MY_SPLC = 29979245800.0
+cdef double MY_MPC = 3.08567758e+24
+cdef double GW_DADT_SEP_CONST = - 64.0 * pow(MY_NWTG, 3) / 5.0 / pow(MY_SPLC, 5)
+cdef double GW_SRC_CONST = 8.0 * pow(MY_NWTG, 5.0/3.0) * pow(M_PI, 2.0/3.0) / sqrt(10.0) / pow(MY_SPLC, 4.0)
 
 
 cdef double bessel_recursive(int nn, double ne, double jn_m1, double jn_m2):
@@ -42,11 +51,25 @@ cdef api np.ndarray[np.double_t, ndim=1] trapz_grid_weight(int index, int size, 
     # same as average of both dx values:     0.5 * ((vals[index] - vals[index-1]) + (vals[index+1] - vals[index]))
     rv[1] = 0.5 * (vals[index+1] - vals[index-1])
     return rv
-    # return
 
-    # cdef int rv = <int>((index == 0) | (index == size-1))
-    # rv += 1
-    # return rv
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef void my_trapz_grid_weight(int index, int size, double[:] vals, double *rv):
+    if index == 0:
+        rv[0] = 2.0
+        rv[1] = <double>(vals[1] - vals[0])   # i.e. vals[index+1] - vals[index]
+        return
+
+    if index == size - 1:
+        rv[0] = 2.0
+        rv[1] = <double>(vals[index] - vals[index-1])
+        return
+
+    rv[0] = 1.0
+    # same as average of both dx values:     0.5 * ((vals[index] - vals[index-1]) + (vals[index+1] - vals[index]))
+    rv[1] = 0.5 * <double>(vals[index+1] - vals[index-1])
+    return
 
 
 cdef api double gw_freq_dist_func__scalar_scalar(int nn, double ee):
@@ -417,7 +440,7 @@ cdef np.ndarray[np.double_t] _sam_calc_gwb_4(
     np.ndarray[np.double_t, ndim=1] eccen_evo,
     int nharms
 ):
-    printf("_sam_calc_gwb_4()")
+    printf("\n_sam_calc_gwb_4()\n")
 
     cdef int nfreqs, n_mtot, n_mrat, n_redz
     nfreqs = len(gwfobs)
@@ -432,7 +455,7 @@ cdef np.ndarray[np.double_t] _sam_calc_gwb_4(
     cdef double gwfo
 
     cdef int jj, kk, aa, bb
-    cdef double m1, m2, mchirp, mt, mr, zz
+    cdef double m1, m2, mchirp, mt, mr, zz, sa, qq, tau
     cdef double gwfr, zterm, dc, dc_term, gne, hterm
 
     cdef np.ndarray[np.double_t, ndim=2] gwb = np.zeros(gwb_shape)
@@ -458,6 +481,7 @@ cdef np.ndarray[np.double_t] _sam_calc_gwb_4(
         zterm = (1.0 + zz)
         dc = dcom[kk]   # this is still in units of [Mpc]
         dc_term = four_pi_c_mpc * (dc*dc)
+
 
         # iterate over mtot M
         for ii, mt in enumerate(mtot):
@@ -501,6 +525,132 @@ cdef np.ndarray[np.double_t] _sam_calc_gwb_4(
 
                         gwb[aa, bb] += hterm * weight
 
+    return gwb
+
+
+cdef double _gw_ecc_func(double eccen):
+    cdef double e2 = eccen*eccen
+    cdef double fe = (1.0 + (73.0/24.0)*e2 + (37.0/96.0)*e2*e2) / pow(1.0 - e2, 7.0/2.0)
+    return fe
+
+
+def sam_calc_gwb_5(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms=100):
+    return _sam_calc_gwb_5(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms)
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef double[:, :] _sam_calc_gwb_5(
+    double[:, :, :] ndens,
+    double[:] mtot_log10,
+    double[:] mrat,
+    double[:] redz,
+    double[:] dcom,
+    double[:] gwfobs,
+    double[:] sepa_evo,
+    double[:] eccen_evo,
+    int nharms
+):
+    printf("\n_sam_calc_gwb_5()\n")
+
+    cdef int nfreqs = len(gwfobs)
+    cdef int n_mtot = len(mtot_log10)
+    cdef int n_mrat = len(mrat)
+    cdef int n_redz = len(redz)
+    cdef int n_eccs = len(sepa_evo)
+
+    # cdef np.ndarray[np.double_t, ndim=1] mtot = 10.0 ** mtot_log10
+    cdef double *mtot = <double *>malloc(n_mtot * sizeof(double))
+    cdef int ii, nh
+
+    cdef int jj, kk, aa, bb
+    cdef double m1, m2, mchirp, sa, qq, tau
+    cdef double gwfr, zterm, dc_cm, dc_mpc, dc_term, gne, hterm
+
+    cdef np.ndarray[np.double_t, ndim=2] gwb = np.zeros((nfreqs, nharms))
+    # cdef np.ndarray[np.double_t, ndim=1] ival, jval, kval
+    cdef double *ival = <double *>malloc(2 * sizeof(double))
+    cdef double *jval = <double *>malloc(2 * sizeof(double))
+    cdef double *kval = <double *>malloc(2 * sizeof(double))
+    cdef double weight_ik, weight
+
+    cdef double four_pi_c_mpc = 4 * M_PI * (MY_SPLC / MY_MPC)
+
+    cdef double kep_sa_term = MY_NWTG / pow(2.0*M_PI, 2)
+    cdef double one_third = 1.0 / 3.0
+    cdef double two_third = 2.0 / 3.0
+    cdef double three_fifths = 3.0 / 5.0
+    cdef double six_fifths = 6.0 / 5.0
+    cdef double four_over_nh_squared, sa_inverse_cubed
+    cdef double fe_ecc
+    # cdef np.ndarray[DTYPE_t, ndim=1] frst_evo_pref = np.empty(n_eccs, dtype=DTYPE)
+    # frst_evo_pref[:] = (1.0/(2.0*M_PI))*sqrt(NWTG)/pow(sepa_evo, 1.5)
+    cdef double *frst_evo_pref = <double *>malloc(n_eccs * sizeof(double))
+    cdef double _freq_pref = (1.0/(2.0*M_PI)) * sqrt(MY_NWTG)
+    for ii in range(n_eccs):
+        frst_evo_pref[ii] = _freq_pref * pow(sepa_evo[ii], 1.5)
+
+    for ii in range(2):
+        kval[ii] = 0.0
+
+    # iterate over redshifts Z
+    for kk in range(n_redz):
+        my_trapz_grid_weight(kk, n_redz, redz, kval)
+        printf("%d %f %f\n", kk, kval[0], kval[1])
+        zterm = (1.0 + redz[kk])
+        dc_mpc = dcom[kk]   # this is still in units of [Mpc]
+        dc_cm = dc_mpc * MY_MPC
+        dc_term = four_pi_c_mpc * pow(dc_mpc, 2)
+
+        # iterate over mtot M
+        for ii in range(n_mtot):
+            break
+            ival = trapz_grid_weight(ii, n_mtot, mtot_log10)
+
+            weight_ik = ival[1] * kval[1] / (ival[0] * kval[0])
+
+            for jj in range(n_mrat):
+                jval = trapz_grid_weight(jj, n_mrat, mrat)
+                weight = weight_ik * (jval[1] / jval[0])
+                m1 = mtot[ii] / (1.0 + mrat[jj])
+                m2 = mtot[ii] - m1
+                mchirp = mtot[ii] * pow(mrat[jj], three_fifths) / pow(1 + mrat[jj], six_fifths)
+
+                for aa in range(nfreqs):
+                    for bb in range(nharms):
+                        nh = bb + 1
+                        four_over_nh_squared = 4.0 / (nh * nh)
+                        gwfr = gwfobs[aa] * zterm / nh
+
+                        # rest-frame frequency corresponding to target observer-frame frequency of GW observations
+                        sa = pow(kep_sa_term*mtot[ii] / pow(gwfr, 2), one_third)
+                        sa_inverse_cubed = pow(sa, -3)
+
+                        # () scalar
+                        # ecc = np.interp(gwfr, frst_evo_pref*np.sqrt(mt), eccen_evo)
+                        # gne = gw_freq_dist_func__scalar_scalar(nh, ecc) * four_over_nh_squared
+                        ecc = 0.5
+                        gne = 0.25
+                        fe_ecc = _gw_ecc_func(ecc)
+
+                        # da/dt values are negative, get a positive rate
+                        tau = GW_DADT_SEP_CONST * fe_ecc * m1 * m2 * (m1 + m2) * sa_inverse_cubed
+                        # convert to timescale
+                        tau = sa / - tau
+
+                        # Calculate the GW spectral strain at each harmonic
+                        #    see: [Amaro-seoane+2010 Eq.9]
+                        hterm = pow(GW_SRC_CONST * mchirp * pow(2*mchirp*gwfr, two_third) / dc_cm, 2)
+                        hterm = ndens[ii, jj, kk] * dc_term * zterm * tau * gne * hterm
+
+                        gwb[aa, bb] += hterm * weight
+
+    free(mtot)
+    free(ival)
+    free(jval)
+    free(kval)
+    free(frst_evo_pref)
     return gwb
 
 

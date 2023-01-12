@@ -24,10 +24,12 @@ pyximport.install(language_level=3, setup_args={"include_dirs": np.get_include()
 
 import holodeck.cyutils
 
-NHARMS = 30
-SAM_SHAPE = (10, 11, 12)
-# NHARMS = 7
-# SAM_SHAPE = (4, 5, 6)
+# NHARMS = 60
+# SAM_SHAPE = 20
+# NHARMS = 30
+# SAM_SHAPE = 10
+NHARMS = 10
+SAM_SHAPE = 4
 
 INIT_ECCEN = 0.999
 INIT_SEPA = 10.0 * PC
@@ -39,10 +41,12 @@ def check_against(val, ref):
     retval = np.allclose(val, ref, atol=0.0)
     print(f"{str(retval):5s}, {np.median(val):.8e}, {np.median(ref):.8e}")
 
-    # if not retval:
-    #     for idx, rr in np.ndenumerate(ref):
-    #         vv = val[idx]
-    #         print(idx, rr, vv, np.isclose(rr, vv, atol=0.0))
+    if not retval:
+        for idx, rr in np.ndenumerate(ref):
+            vv = val[idx]
+            retval = np.isclose(rr, vv, atol=0.0)
+            if not retval:
+                print(idx, rr, vv, retval)
 
     return
 
@@ -107,7 +111,7 @@ gwb_1 = np.sqrt(gwb_1)
 
 check_against(gwb_1, gwb_0)
 
-
+'''
 # ---- Calculation 2 ----
 
 edges = [np.log10(sam.mtot), sam.mrat, sam.redz]
@@ -140,7 +144,7 @@ gwb_3 = rv_3
 gwb_3 = np.sqrt(gwb_3)
 
 check_against(gwb_3, gwb_0)
-
+'''
 
 # ---- Calculation 4 ----
 
@@ -157,6 +161,23 @@ gwb_4 = rv_4
 gwb_4 = np.sqrt(gwb_4)
 
 check_against(gwb_4, gwb_0)
+
+
+# ---- Calculation 5 ----
+
+edges = [np.log10(sam.mtot), sam.mrat, sam.redz]
+
+dur = datetime.now()
+rv_5 = holodeck.cyutils.sam_calc_gwb_5(
+    sam.static_binary_density, *edges, dcom,
+    gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
+)
+dur = datetime.now() - dur
+print("5: ", dur.total_seconds())
+gwb_5 = rv_5
+gwb_5 = np.sqrt(gwb_5)
+
+check_against(gwb_5, gwb_0)
 
 
 
