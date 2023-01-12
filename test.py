@@ -9,7 +9,7 @@
 
 
 
-
+import sys
 from datetime import datetime
 import numpy as np
 import holodeck as holo
@@ -35,6 +35,10 @@ SAM_SHAPE = 4
 
 INIT_ECCEN = 0.999
 INIT_SEPA = 10.0 * PC
+
+
+# holodeck.cyutils.test_sorter()
+# sys.exit(1)
 
 
 def check_against(val, ref):
@@ -186,6 +190,21 @@ gwb_5 = rv_5
 gwb_5 = np.sqrt(gwb_5)
 
 check_against(gwb_5, gwb_0)
+
+
+# ---- Calculation 6 ----
+
+dur = datetime.now()
+rv_6 = holodeck.cyutils.sam_calc_gwb_6(
+    sam.static_binary_density, np.log10(sam.mtot), sam.mrat, sam.redz, dcom,
+    gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
+)
+dur = datetime.now() - dur
+print("6: ", dur.total_seconds())
+gwb_6 = rv_6
+gwb_6 = np.sqrt(gwb_6)
+
+check_against(gwb_6, gwb_0)
 
 
 
