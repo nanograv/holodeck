@@ -24,14 +24,14 @@ pyximport.install(language_level=3, setup_args={"include_dirs": np.get_include()
 
 import holodeck.cyutils
 
-NSTEPS = 30
+NSTEPS = 100
 
 # NHARMS = 60
 # SAM_SHAPE = 20
 # NHARMS = 30
 # SAM_SHAPE = 10
 NHARMS = 10
-SAM_SHAPE = 4
+SAM_SHAPE = 10
 
 INIT_ECCEN = 0.999
 INIT_SEPA = 10.0 * PC
@@ -42,7 +42,6 @@ INIT_SEPA = 10.0 * PC
 
 
 def check_against(val, ref):
-    print()
     print(val.shape, ref.shape)
     retval = np.allclose(val, ref, atol=0.0)
     print(f"{str(retval):5s}, {np.median(val):.8e}, {np.median(ref):.8e}")
@@ -103,21 +102,21 @@ gwb_0 = rv_0[1]
 gwb_0 = np.sqrt(gwb_0)
 
 
-# ---- Calculation 1 ----
+# # ---- Calculation 1 ----
 
-edges = [np.log10(sam.mtot), sam.mrat, sam.redz]
+# edges = [np.log10(sam.mtot), sam.mrat, sam.redz]
 
-dur = datetime.now()
-rv_1 = holo.gravwaves.sam_calc_gwb_1(
-    sam.static_binary_density, *edges, dcom,
-    gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
-)
-dur = datetime.now() - dur
-print("1: ", dur.total_seconds())
-gwb_1 = rv_1
-gwb_1 = np.sqrt(gwb_1)
+# dur = datetime.now()
+# rv_1 = holo.gravwaves.sam_calc_gwb_1(
+#     sam.static_binary_density, *edges, dcom,
+#     gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
+# )
+# dur = datetime.now() - dur
+# print("1: ", dur.total_seconds())
+# gwb_1 = rv_1
+# gwb_1 = np.sqrt(gwb_1)
 
-check_against(gwb_1, gwb_0)
+# check_against(gwb_1, gwb_0)
 
 
 
@@ -134,7 +133,7 @@ rv_2 = holodeck.cyutils.sam_calc_gwb_2(
     gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
 )
 dur = datetime.now() - dur
-print("2: ", dur.total_seconds())
+print("\n2: ", dur.total_seconds())
 gwb_2 = rv_2
 gwb_2 = np.sqrt(gwb_2)
 
@@ -151,7 +150,7 @@ rv_3 = holodeck.cyutils.sam_calc_gwb_3(
     gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
 )
 dur = datetime.now() - dur
-print("3: ", dur.total_seconds())
+print("\n3: ", dur.total_seconds())
 gwb_3 = rv_3
 gwb_3 = np.sqrt(gwb_3)
 
@@ -161,21 +160,21 @@ check_against(gwb_3, gwb_0)
 
 
 
-# ---- Calculation 4 ----
+# # ---- Calculation 4 ----
 
-edges = [np.log10(sam.mtot), sam.mrat, sam.redz]
+# edges = [np.log10(sam.mtot), sam.mrat, sam.redz]
 
-dur = datetime.now()
-rv_4 = holodeck.cyutils.sam_calc_gwb_4(
-    sam.static_binary_density, *edges, dcom,
-    gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
-)
-dur = datetime.now() - dur
-print("4: ", dur.total_seconds())
-gwb_4 = rv_4
-gwb_4 = np.sqrt(gwb_4)
+# dur = datetime.now()
+# rv_4 = holodeck.cyutils.sam_calc_gwb_4(
+#     sam.static_binary_density, *edges, dcom,
+#     gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
+# )
+# dur = datetime.now() - dur
+# print("\n4: ", dur.total_seconds())
+# gwb_4 = rv_4
+# gwb_4 = np.sqrt(gwb_4)
 
-check_against(gwb_4, gwb_0)
+# check_against(gwb_4, gwb_0)
 
 # ---- Calculation 5 ----
 
@@ -185,7 +184,7 @@ rv_5 = holodeck.cyutils.sam_calc_gwb_5(
     gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
 )
 dur = datetime.now() - dur
-print("5: ", dur.total_seconds())
+print("\n5: ", dur.total_seconds())
 gwb_5 = rv_5
 gwb_5 = np.sqrt(gwb_5)
 
@@ -200,11 +199,26 @@ rv_6 = holodeck.cyutils.sam_calc_gwb_6(
     gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
 )
 dur = datetime.now() - dur
-print("6: ", dur.total_seconds())
+print("\n6: ", dur.total_seconds())
 gwb_6 = rv_6
 gwb_6 = np.sqrt(gwb_6)
 
 check_against(gwb_6, gwb_0)
+
+
+# ---- Calculation 7 ----
+
+dur = datetime.now()
+rv_7 = holodeck.cyutils.sam_calc_gwb_7(
+    sam.static_binary_density, np.log10(sam.mtot), sam.mrat, sam.redz, dcom,
+    gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
+)
+dur = datetime.now() - dur
+print("\n7: ", dur.total_seconds())
+gwb_7 = rv_7
+gwb_7 = np.sqrt(gwb_7)
+
+check_against(gwb_7, gwb_0)
 
 
 

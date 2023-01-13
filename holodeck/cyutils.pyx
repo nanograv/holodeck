@@ -644,6 +644,8 @@ cdef double[:, :] _sam_calc_gwb_5(
                         gne = gw_freq_dist_func__scalar_scalar(nh, ecc) * four_over_nh_squared
                         # ecc = 0.5
                         # gne = 0.25
+                        if ii == 3 and jj == 3 and kk == 7 and bb == 0:
+                            printf("aa=%d - gwfr=%.8e, sa=%.8e, ecc=%.8e\n", aa, gwfr*MY_YR, sa, <double>ecc)
 
                         fe_ecc = _gw_ecc_func(ecc)
 
@@ -654,8 +656,11 @@ cdef double[:, :] _sam_calc_gwb_5(
 
                         # Calculate the GW spectral strain at each harmonic
                         #    see: [Amaro-seoane+2010 Eq.9]
-                        hterm = pow(GW_SRC_CONST * mchirp * pow(2*mchirp*gwfr, two_third) / dc_cm, 2)
-                        hterm = ndens[ii, jj, kk] * dc_term * zterm * tau * gne * hterm
+                        hterm_temp = pow(GW_SRC_CONST * mchirp * pow(2*mchirp*gwfr, two_third) / dc_cm, 2)
+                        hterm = ndens[ii, jj, kk] * dc_term * zterm * tau * gne * hterm_temp
+                        if ii == 3 and jj == 3 and kk == 7 and bb == 0:
+                            printf("     - tau=%.8e, gne=%.8e, hterm=%.8e, temp=%.8e\n", tau, gne, hterm, hterm_temp)
+                            printf("     - ndens=%.8e\n, nd*dc=%.8e, dc_term=%.8e", ndens[ii, jj, kk], ndens[ii,jj,kk]*dc_term, dc_term)
 
                         gwb[aa, bb] += hterm * weight
 
@@ -766,6 +771,13 @@ def test_sorter():
     return
 
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef double interp_at_index(idx, xnew, xold, yold):
+    cdef double ynew = yold[idx] + (yold[idx+1] - yold[idx])/(xold[idx+1] - xold[idx]) * (xnew - xold[idx])
+    return ynew
 
 
 def sam_calc_gwb_6(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms=100):
@@ -786,7 +798,6 @@ cdef double[:, :] _sam_calc_gwb_6(
     double[:] eccen_evo,
     int nharms
 ):
-    printf("\n_sam_calc_gwb_6()\n")
 
     cdef int nfreqs = len(gwfobs)
     cdef int n_mtot = len(mtot_log10)
@@ -794,7 +805,6 @@ cdef double[:, :] _sam_calc_gwb_6(
     cdef int n_redz = len(redz)
     cdef int n_eccs = len(sepa_evo)
 
-    # cdef np.ndarray[np.double_t, ndim=1] mtot = 10.0 ** mtot_log10
     cdef double *mtot = <double *>malloc(n_mtot * sizeof(double))
     cdef int ii, nh
 
@@ -803,7 +813,6 @@ cdef double[:, :] _sam_calc_gwb_6(
     cdef double gwfr, zterm, dc_cm, dc_mpc, dc_term, gne, hterm
 
     cdef np.ndarray[np.double_t, ndim=2] gwb = np.zeros((nfreqs, nharms))
-    # cdef np.ndarray[np.double_t, ndim=1] ival, jval, kval
     cdef double *ival = <double *>malloc(2 * sizeof(double))
     cdef double *jval = <double *>malloc(2 * sizeof(double))
     cdef double *kval = <double *>malloc(2 * sizeof(double))
@@ -816,16 +825,14 @@ cdef double[:, :] _sam_calc_gwb_6(
     cdef double two_third = 2.0 / 3.0
     cdef double three_fifths = 3.0 / 5.0
     cdef double six_fifths = 6.0 / 5.0
-    cdef double four_over_nh_squared, sa_inverse_cubed
-    cdef double fe_ecc, mt, nd, hterm_pref, frst_evo
+    cdef double four_over_nh_squared, sa_inverse_cubed, kep_sa_mass_term
+    cdef double fe_ecc, mt, mt_sqrt, nd, hterm_pref, frst_evo_lo, frst_evo_hi
 
     cdef np.ndarray[DTYPE_t, ndim=1] frst_evo_pref = np.empty(n_eccs, dtype=DTYPE)
-    # cdef double *frst_evo_pref = <double *>malloc(n_eccs * sizeof(double))
 
     cdef double _freq_pref = (1.0/(2.0*M_PI)) * sqrt(MY_NWTG)
     for ii in range(n_eccs):
         frst_evo_pref[ii] = _freq_pref / pow(sepa_evo[ii], 1.5)
-        # frst_evo_pref[ii] = (1.0/(2.0*M_PI))*sqrt(NWTG)/pow(sepa_evo, 1.5)
 
     cdef int num_freq_harm = nfreqs * nharms
     cdef (int *)shape = <int *>malloc(2 * sizeof(int))
@@ -855,6 +862,7 @@ cdef double[:, :] _sam_calc_gwb_6(
             else:
                 mt = mtot[ii]
 
+            mt_sqrt = sqrt(mt)
             my_trapz_grid_weight(ii, n_mtot, mtot_log10, ival)
 
             weight_ik = ival[1] * kval[1] / (ival[0] * kval[0])
@@ -880,20 +888,38 @@ cdef double[:, :] _sam_calc_gwb_6(
                     sa = pow(kep_sa_term*mt / pow(gwfr, 2), one_third)
                     sa_inverse_cubed = pow(sa, -3)
 
-                    # ecc = np.interp(gwfr, frst_evo_pref*sqrt(mt), eccen_evo)
+                    # ---- Interpolate eccentricity to this frequency
 
-                    frst_evo = frst_evo_pref[ecc_idx+1] * sqrt(mt)
-                    while (gwfr > frst_evo) & (ecc_idx < n_eccs - 2):
+                    # try to get `ecc_idx` such that   frst[idx] < gwfr < frst[idx+1]
+                    frst_evo_lo = frst_evo_pref[ecc_idx] * mt_sqrt
+                    frst_evo_hi = frst_evo_pref[ecc_idx+1] * mt_sqrt
+                    while (gwfr > frst_evo_hi) & (ecc_idx < n_eccs - 2):
+                        frst_evo_lo = frst_evo_hi
                         ecc_idx += 1
-                        frst_evo = frst_evo_pref[ecc_idx+1] * sqrt(mt)
+                        frst_evo_hi = frst_evo_pref[ecc_idx+1] * mt_sqrt
 
-                    printf("\n%d - %d %d - %d - %e %e %e\n", ff, aa, bb, ecc_idx, gwfr*MY_YR, frst_evo_pref[ecc_idx] * sqrt(mt)*MY_YR, frst_evo*MY_YR)
-                    raise ValueError
+                    # if `gwfr` is lower than lowest evolution point, continue to next frequency
+                    if (gwfr < frst_evo_lo):
+                        printf("\nLO: %d - %d %d - %d - %e %e %e\n", ff, aa, bb, ecc_idx, gwfr*MY_YR, frst_evo_lo*MY_YR, frst_evo_hi*MY_YR)
+                        continue
+
+                    # if `gwfr` is > highest evolution point, also be true for all following frequencies, so break
+                    if (gwfr > frst_evo_hi):
+                        printf("\nHI: %d - %d %d - %d - %e %e %e\n", ff, aa, bb, ecc_idx, gwfr*MY_YR, frst_evo_lo*MY_YR, frst_evo_hi*MY_YR)
+                        break
+
+                    # calculate slope M
+                    ecc = ((eccen_evo[ecc_idx+1] - eccen_evo[ecc_idx])/(frst_evo_hi - frst_evo_lo))
+                    # dy = M * dx
+                    ecc = (gwfr - frst_evo_lo) * ecc
+                    # y = y_0 + dy
+                    ecc = eccen_evo[ecc_idx] + ecc
+                    if ii == 3 and jj == 3 and kk == 7 and bb == 0:
+                        printf("aa=%d - gwfr=%.8e, sa=%.8e, ecc=%.8e\n", aa, gwfr*MY_YR, sa, <double>ecc)
+
+                    # ---- Calculate GWB contribution with this eccentricity
 
                     gne = gw_freq_dist_func__scalar_scalar(nh, ecc) * four_over_nh_squared
-                    # ecc = 0.5
-                    # gne = 0.25
-
                     fe_ecc = _gw_ecc_func(ecc)
 
                     # da/dt values are negative, get a positive rate
@@ -903,8 +929,11 @@ cdef double[:, :] _sam_calc_gwb_6(
 
                     # Calculate the GW spectral strain at each harmonic
                     #    see: [Amaro-seoane+2010 Eq.9]
-                    hterm = pow(GW_SRC_CONST * mchirp * pow(2*mchirp*gwfr, two_third) / dc_cm, 2)
-                    hterm = hterm_pref * zterm * tau * gne * hterm
+                    hterm_temp = pow(GW_SRC_CONST * mchirp * pow(2*mchirp*gwfr, two_third) / dc_cm, 2)
+                    hterm = hterm_pref * zterm * tau * gne * hterm_temp
+                    if ii == 3 and jj == 3 and kk == 7 and bb == 0:
+                        printf("     - tau=%.8e, gne=%.8e, hterm=%.8e, temp=%.8e\n", tau, gne, hterm, hterm_temp)
+                        printf("     - ndens=%.8e, pref=%.8e, dc_term=%.8e\n", ndens[ii, jj, kk], hterm_pref, dc_term)
 
                     gwb[aa, bb] += hterm * weight
 
@@ -913,6 +942,169 @@ cdef double[:, :] _sam_calc_gwb_6(
     free(jval)
     free(kval)
     # free(frst_evo_pref)
+    return gwb
+
+
+
+def sam_calc_gwb_7(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms=100):
+    return _sam_calc_gwb_7(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms)
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef double[:, :] _sam_calc_gwb_7(
+    double[:, :, :] ndens,
+    double[:] mtot_log10,
+    double[:] mrat,
+    double[:] redz,
+    double[:] dcom,
+    double[:] gwfobs,
+    double[:] sepa_evo,
+    double[:] eccen_evo,
+    int nharms
+):
+
+    cdef int nfreqs = len(gwfobs)
+    cdef int n_mtot = len(mtot_log10)
+    cdef int n_mrat = len(mrat)
+    cdef int n_redz = len(redz)
+    cdef int n_eccs = len(sepa_evo)
+
+    cdef double *mtot = <double *>malloc(n_mtot * sizeof(double))
+    cdef int ii, nh
+
+    cdef int jj, kk, aa, bb, ff, ecc_idx
+    cdef double m1, m2, mchirp, sa, qq, tau
+    cdef double gwfr, zterm, dc_cm, dc_mpc, dc_term, gne, hterm
+
+    cdef np.ndarray[np.double_t, ndim=2] gwb = np.zeros((nfreqs, nharms))
+    cdef double *ival = <double *>malloc(2 * sizeof(double))
+    cdef double *jval = <double *>malloc(2 * sizeof(double))
+    cdef double *kval = <double *>malloc(2 * sizeof(double))
+    cdef double weight_ik, weight
+
+    cdef double four_pi_c_mpc = 4 * M_PI * (MY_SPLC / MY_MPC)
+
+    cdef double kep_sa_term = MY_NWTG / pow(2.0*M_PI, 2)
+    cdef double one_third = 1.0 / 3.0
+    cdef double two_third = 2.0 / 3.0
+    cdef double four_third = 4.0 / 3.0
+    cdef double three_fifths = 3.0 / 5.0
+    cdef double six_fifths = 6.0 / 5.0
+    cdef double four_over_nh_squared, sa_inverse_cubed
+    cdef double fe_ecc, mt, mt_sqrt, nd, hterm_pref, frst_evo_lo, frst_evo_hi
+
+    # cdef np.ndarray[DTYPE_t, ndim=1] frst_evo_pref = np.empty(n_eccs, dtype=DTYPE)
+    cdef double _freq_pref = (1.0/(2.0*M_PI)) * sqrt(MY_NWTG)
+    cdef double *frst_evo_pref = <double *>malloc(n_eccs * sizeof(double))
+    for ii in range(n_eccs):
+        frst_evo_pref[ii] = _freq_pref / pow(sepa_evo[ii], 1.5)
+
+    cdef int num_freq_harm = nfreqs * nharms
+    cdef (int *)shape = <int *>malloc(2 * sizeof(int))
+    shape[0] = nfreqs
+    shape[1] = nharms
+    cdef (double *)freq_harms = <double *>malloc(num_freq_harm * sizeof(double))
+    for ii in range(num_freq_harm):
+        unravel(ii, shape, &aa, &bb)
+        freq_harms[ii] = gwfobs[aa] / (bb + 1)
+
+    cdef (int *)sorted_index = <int *>malloc(num_freq_harm * sizeof(int))
+    argsort(freq_harms, num_freq_harm, &sorted_index)
+
+    # iterate over redshifts Z
+    for kk in range(n_redz):
+        my_trapz_grid_weight(kk, n_redz, redz, kval)
+        zterm = (1.0 + redz[kk])
+        dc_mpc = dcom[kk]   # this is still in units of [Mpc]
+        dc_cm = dc_mpc * MY_MPC
+        dc_term = four_pi_c_mpc * pow(dc_mpc, 2)
+
+        # iterate over mtot M
+        for ii in range(n_mtot):
+            if kk == 0:
+                mt = pow(10.0, mtot_log10[ii])
+                mtot[ii] = mt
+            else:
+                mt = mtot[ii]
+
+            mt_sqrt = sqrt(mt)
+            my_trapz_grid_weight(ii, n_mtot, mtot_log10, ival)
+            kep_sa_mass_term = kep_sa_term * mt
+
+            weight_ik = ival[1] * kval[1] / (ival[0] * kval[0])
+
+            for jj in range(n_mrat):
+                my_trapz_grid_weight(jj, n_mrat, mrat, jval)
+                weight = weight_ik * (jval[1] / jval[0])
+                m1 = mt / (1.0 + mrat[jj])
+                m2 = mt - m1
+                mchirp = mt * pow(mrat[jj], three_fifths) / pow(1 + mrat[jj], six_fifths)
+
+                hterm_pref = ndens[ii, jj, kk] * dc_term * zterm
+                hterm_pref *= pow(GW_SRC_CONST * mchirp * pow(2.0*mchirp, two_third) / dc_cm, 2)
+
+                ecc_idx = 0
+                for ff in range(num_freq_harm):
+                    unravel(sorted_index[ff], shape, &aa, &bb)
+
+                    nh = bb + 1
+                    four_over_nh_squared = 4.0 / (nh * nh)
+                    gwfr = gwfobs[aa] * zterm / nh
+
+                    # rest-frame frequency corresponding to target observer-frame frequency of GW observations
+                    sa = pow(kep_sa_mass_term / pow(gwfr, 2), one_third)
+                    sa_inverse_cubed = pow(sa, -3)
+
+                    # ---- Interpolate eccentricity to this frequency
+
+                    # try to get `ecc_idx` such that   frst[idx] < gwfr < frst[idx+1]
+                    frst_evo_lo = frst_evo_pref[ecc_idx] * mt_sqrt
+                    frst_evo_hi = frst_evo_pref[ecc_idx+1] * mt_sqrt
+                    while (gwfr > frst_evo_hi) & (ecc_idx < n_eccs - 2):
+                        frst_evo_lo = frst_evo_hi
+                        ecc_idx += 1
+                        frst_evo_hi = frst_evo_pref[ecc_idx+1] * mt_sqrt
+
+                    # if `gwfr` is lower than lowest evolution point, continue to next frequency
+                    if (gwfr < frst_evo_lo):
+                        printf("\nLO: %d - %d %d - %d - %e %e %e\n", ff, aa, bb, ecc_idx, gwfr*MY_YR, frst_evo_lo*MY_YR, frst_evo_hi*MY_YR)
+                        continue
+
+                    # if `gwfr` is > highest evolution point, also be true for all following frequencies, so break
+                    if (gwfr > frst_evo_hi):
+                        printf("\nHI: %d - %d %d - %d - %e %e %e\n", ff, aa, bb, ecc_idx, gwfr*MY_YR, frst_evo_lo*MY_YR, frst_evo_hi*MY_YR)
+                        break
+
+                    # calculate slope M
+                    ecc = ((eccen_evo[ecc_idx+1] - eccen_evo[ecc_idx])/(frst_evo_hi - frst_evo_lo))
+                    # dy = M * dx
+                    ecc = (gwfr - frst_evo_lo) * ecc
+                    # y = y_0 + dy
+                    ecc = eccen_evo[ecc_idx] + ecc
+
+                    # ---- Calculate GWB contribution with this eccentricity
+
+                    gne = gw_freq_dist_func__scalar_scalar(nh, ecc) * four_over_nh_squared
+                    fe_ecc = _gw_ecc_func(ecc)
+
+                    # da/dt values are negative, get a positive rate
+                    tau = GW_DADT_SEP_CONST * fe_ecc * m1 * m2 * mt * sa_inverse_cubed
+                    # convert to timescale
+                    tau = sa / - tau
+
+                    # Calculate the GW spectral strain at each harmonic
+                    #    see: [Amaro-seoane+2010 Eq.9]
+                    hterm = hterm_pref * tau * gne * pow(gwfr, four_third)
+
+                    gwb[aa, bb] += hterm * weight
+
+    free(mtot)
+    free(ival)
+    free(jval)
+    free(kval)
+    free(frst_evo_pref)
     return gwb
 
 
