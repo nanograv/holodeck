@@ -642,11 +642,6 @@ cdef double[:, :] _sam_calc_gwb_5(
                         # () scalar
                         ecc = np.interp(gwfr, frst_evo_pref*sqrt(mt), eccen_evo)
                         gne = gw_freq_dist_func__scalar_scalar(nh, ecc) * four_over_nh_squared
-                        # ecc = 0.5
-                        # gne = 0.25
-                        if ii == 3 and jj == 3 and kk == 7 and bb == 0:
-                            printf("aa=%d - gwfr=%.8e, sa=%.8e, ecc=%.8e\n", aa, gwfr*MY_YR, sa, <double>ecc)
-
                         fe_ecc = _gw_ecc_func(ecc)
 
                         # da/dt values are negative, get a positive rate
@@ -658,9 +653,6 @@ cdef double[:, :] _sam_calc_gwb_5(
                         #    see: [Amaro-seoane+2010 Eq.9]
                         hterm_temp = pow(GW_SRC_CONST * mchirp * pow(2*mchirp*gwfr, two_third) / dc_cm, 2)
                         hterm = ndens[ii, jj, kk] * dc_term * zterm * tau * gne * hterm_temp
-                        if ii == 3 and jj == 3 and kk == 7 and bb == 0:
-                            printf("     - tau=%.8e, gne=%.8e, hterm=%.8e, temp=%.8e\n", tau, gne, hterm, hterm_temp)
-                            printf("     - ndens=%.8e\n, nd*dc=%.8e, dc_term=%.8e", ndens[ii, jj, kk], ndens[ii,jj,kk]*dc_term, dc_term)
 
                         gwb[aa, bb] += hterm * weight
 
@@ -914,8 +906,6 @@ cdef double[:, :] _sam_calc_gwb_6(
                     ecc = (gwfr - frst_evo_lo) * ecc
                     # y = y_0 + dy
                     ecc = eccen_evo[ecc_idx] + ecc
-                    if ii == 3 and jj == 3 and kk == 7 and bb == 0:
-                        printf("aa=%d - gwfr=%.8e, sa=%.8e, ecc=%.8e\n", aa, gwfr*MY_YR, sa, <double>ecc)
 
                     # ---- Calculate GWB contribution with this eccentricity
 
@@ -931,9 +921,6 @@ cdef double[:, :] _sam_calc_gwb_6(
                     #    see: [Amaro-seoane+2010 Eq.9]
                     hterm_temp = pow(GW_SRC_CONST * mchirp * pow(2*mchirp*gwfr, two_third) / dc_cm, 2)
                     hterm = hterm_pref * zterm * tau * gne * hterm_temp
-                    if ii == 3 and jj == 3 and kk == 7 and bb == 0:
-                        printf("     - tau=%.8e, gne=%.8e, hterm=%.8e, temp=%.8e\n", tau, gne, hterm, hterm_temp)
-                        printf("     - ndens=%.8e, pref=%.8e, dc_term=%.8e\n", ndens[ii, jj, kk], hterm_pref, dc_term)
 
                     gwb[aa, bb] += hterm * weight
 
@@ -960,8 +947,8 @@ cdef double[:, :] _sam_calc_gwb_7(
     double[:] redz,
     double[:] dcom,
     double[:] gwfobs,
-    double[:] sepa_evo,
-    double[:] eccen_evo,
+    double[:] sepa_evo_in,
+    double[:] eccen_evo_in,
     int nharms
 ):
 
@@ -969,42 +956,36 @@ cdef double[:, :] _sam_calc_gwb_7(
     cdef int n_mtot = len(mtot_log10)
     cdef int n_mrat = len(mrat)
     cdef int n_redz = len(redz)
-    cdef int n_eccs = len(sepa_evo)
+    cdef int n_eccs = len(sepa_evo_in)
 
-    cdef double *mtot = <double *>malloc(n_mtot * sizeof(double))
-    cdef int ii, nh
+    cdef int num_freq_harm = nfreqs * nharms
+    cdef (int *)shape = <int *>malloc(2 * sizeof(int))
+    shape[0] = nfreqs
+    shape[1] = nharms
 
-    cdef int jj, kk, aa, bb, ff, ecc_idx
+    cdef int ii, nh, jj, kk, aa, bb, ff, ecc_idx, ecc_idx_beg, ii_mm, kk_zz
     cdef double m1, m2, mchirp, sa, qq, tau
     cdef double gwfr, zterm, dc_cm, dc_mpc, dc_term, gne, hterm
-
-    cdef np.ndarray[np.double_t, ndim=2] gwb = np.zeros((nfreqs, nharms))
-    cdef double *ival = <double *>malloc(2 * sizeof(double))
-    cdef double *jval = <double *>malloc(2 * sizeof(double))
-    cdef double *kval = <double *>malloc(2 * sizeof(double))
-    cdef double weight_ik, weight
+    cdef double weight_ik, weight, four_over_nh_squared, sa_fourth
+    cdef double fe_ecc, mt, mt_sqrt, nd, hterm_pref, frst_evo_lo, frst_evo_hi
 
     cdef double four_pi_c_mpc = 4 * M_PI * (MY_SPLC / MY_MPC)
-
     cdef double kep_sa_term = MY_NWTG / pow(2.0*M_PI, 2)
     cdef double one_third = 1.0 / 3.0
     cdef double two_third = 2.0 / 3.0
     cdef double four_third = 4.0 / 3.0
     cdef double three_fifths = 3.0 / 5.0
     cdef double six_fifths = 6.0 / 5.0
-    cdef double four_over_nh_squared, sa_inverse_cubed
-    cdef double fe_ecc, mt, mt_sqrt, nd, hterm_pref, frst_evo_lo, frst_evo_hi
 
-    # cdef np.ndarray[DTYPE_t, ndim=1] frst_evo_pref = np.empty(n_eccs, dtype=DTYPE)
+    cdef double *sepa_evo = <double *>malloc(n_eccs * sizeof(double))
+    cdef double *eccen_evo = <double *>malloc(n_eccs * sizeof(double))
     cdef double _freq_pref = (1.0/(2.0*M_PI)) * sqrt(MY_NWTG)
     cdef double *frst_evo_pref = <double *>malloc(n_eccs * sizeof(double))
     for ii in range(n_eccs):
+        sepa_evo[ii] = <double>sepa_evo_in[ii]
+        eccen_evo[ii] = <double>eccen_evo_in[ii]
         frst_evo_pref[ii] = _freq_pref / pow(sepa_evo[ii], 1.5)
 
-    cdef int num_freq_harm = nfreqs * nharms
-    cdef (int *)shape = <int *>malloc(2 * sizeof(int))
-    shape[0] = nfreqs
-    shape[1] = nharms
     cdef (double *)freq_harms = <double *>malloc(num_freq_harm * sizeof(double))
     for ii in range(num_freq_harm):
         unravel(ii, shape, &aa, &bb)
@@ -1012,6 +993,12 @@ cdef double[:, :] _sam_calc_gwb_7(
 
     cdef (int *)sorted_index = <int *>malloc(num_freq_harm * sizeof(int))
     argsort(freq_harms, num_freq_harm, &sorted_index)
+
+    cdef np.ndarray[np.double_t, ndim=2] gwb = np.zeros((nfreqs, nharms))
+    cdef double *mtot = <double *>malloc(n_mtot * sizeof(double))
+    cdef double *ival = <double *>malloc(2 * sizeof(double))
+    cdef double *jval = <double *>malloc(2 * sizeof(double))
+    cdef double *kval = <double *>malloc(2 * sizeof(double))
 
     # iterate over redshifts Z
     for kk in range(n_redz):
@@ -1022,7 +1009,10 @@ cdef double[:, :] _sam_calc_gwb_7(
         dc_term = four_pi_c_mpc * pow(dc_mpc, 2)
 
         # iterate over mtot M
-        for ii in range(n_mtot):
+        ecc_idx_beg = 0
+        for ii_mm in range(n_mtot):
+            ii = n_mtot - 1 - ii_mm
+
             if kk == 0:
                 mt = pow(10.0, mtot_log10[ii])
                 mtot[ii] = mt
@@ -1045,7 +1035,7 @@ cdef double[:, :] _sam_calc_gwb_7(
                 hterm_pref = ndens[ii, jj, kk] * dc_term * zterm
                 hterm_pref *= pow(GW_SRC_CONST * mchirp * pow(2.0*mchirp, two_third) / dc_cm, 2)
 
-                ecc_idx = 0
+                ecc_idx = ecc_idx_beg
                 for ff in range(num_freq_harm):
                     unravel(sorted_index[ff], shape, &aa, &bb)
 
@@ -1055,7 +1045,7 @@ cdef double[:, :] _sam_calc_gwb_7(
 
                     # rest-frame frequency corresponding to target observer-frame frequency of GW observations
                     sa = pow(kep_sa_mass_term / pow(gwfr, 2), one_third)
-                    sa_inverse_cubed = pow(sa, -3)
+                    sa_fourth = pow(sa, 4)
 
                     # ---- Interpolate eccentricity to this frequency
 
@@ -1067,37 +1057,41 @@ cdef double[:, :] _sam_calc_gwb_7(
                         ecc_idx += 1
                         frst_evo_hi = frst_evo_pref[ecc_idx+1] * mt_sqrt
 
+                    if jj == 0 and ff == 0:
+                        ecc_idx_beg = ecc_idx
+
                     # if `gwfr` is lower than lowest evolution point, continue to next frequency
                     if (gwfr < frst_evo_lo):
-                        printf("\nLO: %d - %d %d - %d - %e %e %e\n", ff, aa, bb, ecc_idx, gwfr*MY_YR, frst_evo_lo*MY_YR, frst_evo_hi*MY_YR)
+                        printf(
+                            "\nLO: %d - %d %d - %d - %e %e %e\n",
+                            ff, aa, bb, ecc_idx, gwfr*MY_YR, frst_evo_lo*MY_YR, frst_evo_hi*MY_YR
+                        )
                         continue
 
                     # if `gwfr` is > highest evolution point, also be true for all following frequencies, so break
                     if (gwfr > frst_evo_hi):
-                        printf("\nHI: %d - %d %d - %d - %e %e %e\n", ff, aa, bb, ecc_idx, gwfr*MY_YR, frst_evo_lo*MY_YR, frst_evo_hi*MY_YR)
+                        printf(
+                            "\nHI: %d - %d %d - %d - %e %e %e\n",
+                            ff, aa, bb, ecc_idx, gwfr*MY_YR, frst_evo_lo*MY_YR, frst_evo_hi*MY_YR
+                        )
                         break
 
                     # calculate slope M
                     ecc = ((eccen_evo[ecc_idx+1] - eccen_evo[ecc_idx])/(frst_evo_hi - frst_evo_lo))
-                    # dy = M * dx
-                    ecc = (gwfr - frst_evo_lo) * ecc
-                    # y = y_0 + dy
-                    ecc = eccen_evo[ecc_idx] + ecc
+                    # y = y_0 + M * dx
+                    ecc = eccen_evo[ecc_idx] + (gwfr - frst_evo_lo) * ecc
 
                     # ---- Calculate GWB contribution with this eccentricity
 
                     gne = gw_freq_dist_func__scalar_scalar(nh, ecc) * four_over_nh_squared
                     fe_ecc = _gw_ecc_func(ecc)
 
-                    # da/dt values are negative, get a positive rate
-                    tau = GW_DADT_SEP_CONST * fe_ecc * m1 * m2 * mt * sa_inverse_cubed
-                    # convert to timescale
-                    tau = sa / - tau
+                    # da/dt values are negative, convert to a positive timescale
+                    tau = - sa_fourth / (GW_DADT_SEP_CONST * fe_ecc * m1 * m2 * mt)
 
                     # Calculate the GW spectral strain at each harmonic
                     #    see: [Amaro-seoane+2010 Eq.9]
                     hterm = hterm_pref * tau * gne * pow(gwfr, four_third)
-
                     gwb[aa, bb] += hterm * weight
 
     free(mtot)
