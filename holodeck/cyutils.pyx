@@ -1062,18 +1062,18 @@ cdef double[:, :] _sam_calc_gwb_7(
 
                     # if `gwfr` is lower than lowest evolution point, continue to next frequency
                     if (gwfr < frst_evo_lo):
-                        printf(
-                            "\nLO: %d - %d %d - %d - %e %e %e\n",
-                            ff, aa, bb, ecc_idx, gwfr*MY_YR, frst_evo_lo*MY_YR, frst_evo_hi*MY_YR
-                        )
+                        # printf(
+                        #     "\nLO: %d - %d %d - %d - %e %e %e\n",
+                        #     ff, aa, bb, ecc_idx, gwfr*MY_YR, frst_evo_lo*MY_YR, frst_evo_hi*MY_YR
+                        # )
                         continue
 
                     # if `gwfr` is > highest evolution point, also be true for all following frequencies, so break
                     if (gwfr > frst_evo_hi):
-                        printf(
-                            "\nHI: %d - %d %d - %d - %e %e %e\n",
-                            ff, aa, bb, ecc_idx, gwfr*MY_YR, frst_evo_lo*MY_YR, frst_evo_hi*MY_YR
-                        )
+                        # printf(
+                        #     "\nHI: %d - %d %d - %d - %e %e %e\n",
+                        #     ff, aa, bb, ecc_idx, gwfr*MY_YR, frst_evo_lo*MY_YR, frst_evo_hi*MY_YR
+                        # )
                         break
 
                     # calculate slope M
