@@ -1,5 +1,8 @@
 """Observational Data
 
+This module provides interfaces to access observational data and constraints, primarily for use
+in calibration and diagnostics of models.
+
 To-Do
 -----
 
@@ -7,17 +10,14 @@ To-Do
 import os
 
 import numpy as np
-# import scipy as sp
 
 import holodeck as holo
-# from holodeck import log, cosmo, utils
-# from holodeck.constants import MSOL, NWTG
 
-FNAME_MM13 = "mcconnell+ma-2013_1211.2816.txt"
+FNAME_MM2013 = "mcconnell+ma-2013_1211.2816.txt"
 
 
 def load_mcconnell_ma_2013():
-    fname = os.path.join(holo._PATH_DATA, FNAME_MM13)
+    fname = os.path.join(holo._PATH_DATA, FNAME_MM2013)
     header = []
     data_raw = []
     hcnt = 0

@@ -2,8 +2,7 @@
 
 To-Do
 -----
-* [ ] Use only `cosmo` (instead of other astropy.cosmology utils e.g. `Planck15`)
-
+* Use only `cosmo` (instead of other astropy.cosmology utils e.g. `Planck15`)
 
 """
 # This code is reproduced and modified from the original repository
@@ -92,10 +91,9 @@ class BP_Observational(holo.population._Population_Discrete):
 
 
 def pipeline(freq_min=1e-9):
-    """
+    """Full calculation pipeline.
 
     freq_min : [Hz], minimum PTA frequency
-
     """
 
     # Main Part of Code
@@ -202,8 +200,7 @@ def quasar_formation_rate(log_mass, z, log_formation_rate_normalization=-3.830,
                           high_mass_slope_normalization=2.86,
                           high_mass_slope_k_1=1.80, high_mass_slope_k_2=-1.13,
                           z_ref=2):
-    """
-    Compute the differential quasar formation rate density.
+    """Compute the differential quasar formation rate density.
 
     Differential quasar formation rate density computed per unit
     redshift and logarithmic mass, as a function of redshift and
@@ -298,8 +295,7 @@ def quasar_formation_rate(log_mass, z, log_formation_rate_normalization=-3.830,
 def continuous_pop(num_local_binaries, log_m_min_local, log_m_max_local,
                    log_m_min=7, log_m_max=11, z_max=1.5, q_min=.25, mu_log_q=0,
                    std_log_q=.5, shape=(50, 51, 52)):
-    """
-    Continuous differential number density of SMBHBs.
+    """Continuous differential number density of SMBHBs.
 
     Taken with respect to unit logarithmic mass, redshift, and mass ratio,
     computed over a range of the same parameters.
@@ -367,8 +363,7 @@ def continuous_pop(num_local_binaries, log_m_min_local, log_m_max_local,
 
 
 def i_prob_Illustris(Mstar, Mtot, q, min_freq):
-    """
-    Probability that this galaxy contains a binary in the PTA band
+    """Probability that this galaxy contains a binary in the PTA band
     """
     chirpMass = mchirp_q(q, Mtot)/S_MASS  # in solar mass units
     M1 = Mtot/(1+q)
@@ -413,8 +408,7 @@ def mchirp(m1, m2):
 
 
 def mchirp_q(q, Mtot):
-    """
-    chirp mass in terms of q and M_tot. Answer in seconds.
+    """Chirp mass in terms of q and M_tot. Answer in seconds.
     """
     ans = (q/(1+q)**2)**(3/5)*Mtot*S_MASS
     return ans
@@ -427,22 +421,23 @@ def parsec2sec(d):
 # Functions related to galaxy catalogue
 
 def Mk2mStar(mag):
-    """
-    converting from k-band luminosity to M* using Eq.2 from Ma et al. (2014)
-    valid for early-type galaxies
+    """Converting from k-band luminosity to M*
+
+    Eq.2 from Ma et al. (2014), valid for early-type galaxies
     """
     Mstar = 10.58-0.44*(mag + 23)
     return 10**(Mstar)
 
 
 def Mbh2Mbulge(Mbulge):
-    """
-    M_BH-M_bulge. Bulge mass to black hole mass (note that M_bulge = Mstar; assume these are the same)
+    """M_BH - M_bulge relationship.
+
+    Bulge mass to black hole mass (note that M_bulge = Mstar; assume these are the same)
     McConnell and Ma (2013) relation below Figure 3
     Includes scatter in the relation, epsilon = 0.34
     Answer in solar masses.
     """
-    # MM13
+    # MM2013
     exponent = 8.46+1.05*log10(Mbulge/1e11)
     ans_w_scatter = np.random.normal(exponent, 0.34)
     return 10**ans_w_scatter
@@ -452,8 +447,9 @@ def Mbh2Mbulge(Mbulge):
 
 
 def strain(mass, dist, freq):
-    """
-    Eq. 4 from Schutz and Ma, strain for an equal mass binary
+    """Strain for an equal mass binary
+
+    Eq. 4 from Schutz and Ma,
     mass in solar masses, freq in Hz, distance in Mpc
     I think this is off by a factor of 2**(-1/3)
     """
@@ -472,8 +468,8 @@ def generic_strain_wMc(chirp_mass, dist, freq):
 
 
 def freq_gw(q, Mtot, tc):
-    """
-    GW frquency as a function of time to coalescence in years, total mass and mass ratio
+    """GW frquency as a function of time to coalescence in years
+
     Result from integration of standard df/dt for GWs
     """
     ans = mchirp_q(q, Mtot)**(-5/8)/pi*(256/5*tc*31556926)**(-3/8)
@@ -481,8 +477,8 @@ def freq_gw(q, Mtot, tc):
 
 
 def freq_gw_wMc(chirp_mass, tc):
-    """
-    GW frquency as a function of time to coalescence in years and chirp mass (directly)
+    """GW frquency as a function of time to coalescence in years and chirp mass (directly)
+
     Result from integration of standard df/dt for GWs
     """
     ans = (chirp_mass*S_MASS)**(-5/8)/pi*(256/5*tc*31556926)**(-3/8)
@@ -490,33 +486,30 @@ def freq_gw_wMc(chirp_mass, tc):
 
 
 def time_to_c(q, Mtot, freq):
-    """
-    time to coalescence of a binary in years
+    """Time to coalescence of a binary in years
     """
     ans = (pi*freq)**(-8/3)*mchirp_q(q, Mtot)**(-5/3)*5/256
     return (ans/31556926)
 
 
 def time_to_c_wMc(chirp_mass, freq):
-    """
-    freq. in Hz, input chirp mass in solar masses, answer in years
+    """Freq. in Hz, input chirp mass in solar masses, answer in years
     """
     ans = (pi*freq)**(-8/3)*(chirp_mass*S_MASS)**(-5/3)*5/256
     return (ans/31556926)
 
 
 def i_prob(q, Mtot, min_freq, total_T):
-    """
-    input time in years, Mtot in solar masses
+    """Input time in years, Mtot in solar masses
     """
     ans = time_to_c(q, Mtot, min_freq)/total_T
     return ans
 
 
 def i_prob_wMc(chirpMass, min_freq, total_T):
-    """
+    """Probability that this galaxy contains a binary in the PTA band
+
     input time in years, Mtot in solar masses
-    Probability that this galaxy contains a binary in the PTA band
     """
     ans = time_to_c_wMc(chirpMass, min_freq)/total_T
     return ans
@@ -530,8 +523,8 @@ def i_prob_wMc(chirpMass, min_freq, total_T):
 
 
 def R_eff(Mstar):
-    """
-    Effective radius, Dabringhausen, Hilker & Kroupa (2008) Eq. 4
+    """Effective radius, Dabringhausen, Hilker & Kroupa (2008) Eq. 4
+
     Answer in units of parsecs (pc)
     """
     ans = np.maximum(2.95*(Mstar/1e6)**0.596, 34.8*(Mstar/1e6)**0.399)
@@ -539,8 +532,8 @@ def R_eff(Mstar):
 
 
 def r0_sol(Mstar, gamma):
-    """
-    r0 solution obtained by equating XX with YY (as in Sesana & Khan 2015)
+    """R0 solution obtained by equating XX with YY (as in Sesana & Khan 2015)
+
     answer in parsecs
     """
     ans = R_eff(Mstar)/0.75*(2**(1/(3-gamma))-1)
@@ -548,7 +541,8 @@ def r0_sol(Mstar, gamma):
 
 
 def sigmaVel(Mstar):
-    """
+    """Velocity dispersion.
+
     from Zahid et al. 2016 Eq 5 and Table 1 fits; assume massive galaxies with Mb > 10.3
     answer in km/s
     """
@@ -561,7 +555,8 @@ def sigmaVel(Mstar):
 
 
 def tfric(Mstar, M2):
-    """
+    """Dynamical Friction timescale
+
     Final eq from https://webhome.weizmann.ac.il/home/iair/astrocourse/tutorial8.pdf
     returns timescale in Gyr
     Mbh should be mass of primary
@@ -575,7 +570,8 @@ def tfric(Mstar, M2):
 
 
 def rho_r(Mstar, gamma, r_var):
-    """
+    """Stellar density as a function of radius.
+
     gamma for Dehen profiles; Sesana & Khan 2015, Eq. 1
     r_const = r_0 or "a" in Dehen 1993
     r_var = "r" in Dehen 1993
@@ -590,8 +586,8 @@ def rho_r(Mstar, gamma, r_var):
 
 
 def r_inf(Mstar, gamma, Mtot):
-    """
-    influence radius, r_inf, from Sesana & Khan 2015
+    """Influence radius, r_inf, from Sesana & Khan 2015
+
     answer in parsecs
     """
     num = r0_sol(Mstar, gamma)
@@ -601,7 +597,8 @@ def r_inf(Mstar, gamma, Mtot):
 
 
 def a_StarGW(Mstar, q, Mtot, gamma, H):
-    """
+    """Characteristic Stellar Radius (??)
+
     Eq. 6, Sesana & Khan 2015. Assume no eccentricity.
     Answer in seconds
     """
@@ -615,8 +612,8 @@ def a_StarGW(Mstar, q, Mtot, gamma, H):
 
 
 def t_hard(Mstar, q, gamma, Mtot):
-    """
-    Hardening timescale with stars, Eq. 7 Sesana & Khan 2015
+    """Hardening timescale with stars, Eq. 7 Sesana & Khan 2015
+
     Answer in Gyrs
     """
     # a_val = parsec2sec(r0_sol(Mstar, gamma))
@@ -665,8 +662,8 @@ def delta(z):
 
 
 def MzMnow(mu, sigma):
-    """
-    Scale the value of M* to its value at z=0.3.
+    """Scale the value of M* to its value at z=0.3.
+
     Here mu, sigma = 0.75, 0.05
     This is from de Lucia and Blaizot 2007, Figure 7.
     """
@@ -675,8 +672,8 @@ def MzMnow(mu, sigma):
 
 
 def illus_merg(mustar, Mstar, z):
-    """
-    Galaxy-galaxy merger rate from Illustris simulation.
+    """Galaxy-galaxy merger rate from Illustris simulation.
+
     This is dN_mergers/dmu dt (M, mu*), in units of Gyr^-1
     Table 1 of Rodriguez-Gomez et al. (2016).
     """
@@ -686,8 +683,8 @@ def illus_merg(mustar, Mstar, z):
 
 
 def cumulative_merg_ill(mu_min, mu_max, Mstar, z):
-    """
-    Cumulative merger probability over a range of mu^*.
+    """Cumulative merger probability over a range of mu^*.
+
     For major mergers, this is 0.25 to 1.0
     """
     ans, err = quad(illus_merg, mu_min, mu_max, args=(Mstar, z))

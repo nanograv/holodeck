@@ -1,45 +1,64 @@
-"""
+"""Utility functions and tools.
 
 References
 ----------
-- Peters-1964 : [Peters 1964](https://ui.adsabs.harvard.edu/abs/1964PhRv..136.1224P/abstract)
-- EN07 : [Enoki & Nagashima 2007](https://ui.adsabs.harvard.edu/abs/2007PThPh.117..241E/abstract)
-- Enoki+2004 : [Enoki et al. 2004](https://ui.adsabs.harvard.edu/abs/2004ApJ...615...19E/abstract)
-- Sesana+2004 : [Sesana+2004](http://adsabs.harvard.edu/abs/2004ApJ...611..623S)
+* [Peters1964]_ Peters 1964
+* [Enoki2004]_ Enoki, Inoue, Nagashima, & Sugiyama 2004
+* [Sesana2004]_ Sesana, Haardt, Madau, & Volonteri 2004
+* [EN2007]_ Enoki & Nagashima 2007
 
 """
 
 import abc
 import copy
+import functools
+import inspect
 import numbers
 import os
 from typing import Optional, Tuple, Union, List  # , Sequence,
+import warnings
 
+import h5py
 import numpy as np
 import numpy.typing as npt
 import scipy as sp
 import scipy.stats
-import h5py
 
-from holodeck import log
+from holodeck import log, cosmo
 from holodeck.constants import NWTG, SCHW, SPLC, YR
 
-# e.g. Sesana+2004 Eq.36
+# [Sesana2004]_ Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
 _GW_DADT_SEP_CONST = - 64 * np.power(NWTG, 3) / 5 / np.power(SPLC, 5)
 _GW_DEDT_ECC_CONST = - 304 * np.power(NWTG, 3) / 15 / np.power(SPLC, 5)
-# EN07, Eq.2.2
+# [EN2007]_, Eq.2.2
 _GW_LUM_CONST = (32.0 / 5.0) * np.power(NWTG, 7.0/3.0) * np.power(SPLC, -5.0)
 
 
 class _Modifier(abc.ABC):
+    """Base class for all types of post-processing modifiers.
+
+    Notes
+    -----
+    * Must be subclassed for use.
+    * ``__call__(base)`` ==> ``modify(base)``
+
+    """
 
     def __call__(self, base):
         self.modify(base)
         return
 
     @abc.abstractmethod
-    def modify(self, base):
+    def modify(self, base: object):
+        """Perform an in-place modification on the passed object instance.
+
+        Parameters
+        ----------
+        base: object
+            The object instance to be modified.
+
+        """
         pass
 
 
@@ -48,12 +67,82 @@ class _Modifier(abc.ABC):
 # =================================================================================================
 
 
-def error(msg, etype=ValueError):
-    log.exception(msg, exc_info=True)
-    raise etype(msg)
+def deprecated_pass(new_func, msg="", exc_info=True):
+    """Decorator for functions that have been deprecated, warn and pass arguments to new function.
+    """
+
+    def decorator(func):
+        nonlocal msg
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            nonlocal msg
+            old_name = func.__name__
+            try:
+                new_name = new_func.__name__
+            except AttributeError:
+                new_name = str(new_func)
+            _frame = inspect.currentframe().f_back
+            file_name = inspect.getfile(_frame.f_code)
+            fline = _frame.f_lineno
+            msg = f"{file_name}({fline}):{old_name} ==> {new_name}" + (len(msg) > 0) * " | " + msg
+            warnings.warn_explicit(msg, category=DeprecationWarning, filename=file_name, lineno=fline)
+            log.warning(f"DEPRECATION: {msg}", exc_info=exc_info)
+            return new_func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def deprecated_fail(new_func, msg="", exc_info=True):
+    """Decorator for functions that have been deprecated, warn and raise error.
+    """
+
+    def decorator(func):
+        nonlocal msg
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            nonlocal msg
+            old_name = func.__name__
+            try:
+                new_name = new_func.__name__
+            except AttributeError:
+                new_name = str(new_func)
+            _frame = inspect.currentframe().f_back
+            file_name = inspect.getfile(_frame.f_code)
+            fline = _frame.f_lineno
+            msg = f"{file_name}({fline}):{old_name} ==> {new_name}" + (len(msg) > 0) * " | " + msg
+            warnings.warn_explicit(msg, category=DeprecationWarning, filename=file_name, lineno=fline)
+            log.exception(f"DEPRECATION: {msg}", exc_info=exc_info)
+            raise RuntimeError
+
+        return wrapper
+
+    return decorator
 
 
 def load_hdf5(fname, keys=None):
+    """Load data and header information from HDF5 files into dictionaries.
+
+    Parameters
+    ----------
+    fname : str
+        Filename to load (must be an `hdf5` file).
+    keys : None or (list of str)
+        Specific keys to load from the top-level of the HDF5 file.
+        `None`: load all top-level keys.
+
+    Returns
+    -------
+    header : dict,
+        All entries from `hdf5.File.attrs`, typically used for meta-data.
+    data : dict,
+        All top level datasets from the hdf5 file,
+        specifically everything returned from `hdf5.File.keys()`.
+
+    """
     squeeze = False
     if (keys is not None) and np.isscalar(keys):
         keys = [keys]
@@ -80,11 +169,17 @@ def load_hdf5(fname, keys=None):
 
 def python_environment():
     """Tries to determine the current python environment, one of: 'jupyter', 'ipython', 'terminal'.
+
+    Returns
+    -------
+    str
+        Description of the current python environment, one of ['jupter', 'ipython', 'terminal'].
+
     """
     try:
-        # NOTE: `get_ipython` should not be explicitly imported from anything
+        # NOTE: `get_ipython` should *not* be explicitly imported from anything
+        #       it will be defined if this is called from a jupyter or ipython environment
         ipy_str = str(type(get_ipython())).lower()  # noqa
-        # print("ipy_str = '{}'".format(ipy_str))
         if 'zmqshell' in ipy_str:
             return 'jupyter'
         if 'terminal' in ipy_str:
@@ -92,8 +187,22 @@ def python_environment():
     except:
         return 'terminal'
 
+    raise RuntimeError(f"unexpected result from `get_ipython()`: '{ipy_str}'!")
+
 
 def tqdm(*args, **kwargs):
+    """Construct a progress bar appropriately based on the current environment (script vs. notebook)
+
+    Parameters
+    ----------
+    *args, **kwargs : All arguments are passed directory to the `tqdm` constructor.
+
+    Returns
+    -------
+    `tqdm.tqdm_gui`
+        Decorated iterator that shows a progress bar.
+
+    """
     if python_environment().lower().startswith('jupyter'):
         import tqdm.notebook
         tqdm_method = tqdm.notebook.tqdm
@@ -107,8 +216,8 @@ def tqdm(*args, **kwargs):
 def get_file_size(fnames, precision=1):
     """Return a human-readable size of a file or set of files.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     fnames : str or list
         Paths to target file(s)
     precisions : int,
@@ -145,14 +254,43 @@ def get_file_size(fnames, precision=1):
 
 
 def _get_subclass_instance(value, default, superclass):
+    """Convert the given `value` into a subclass instance.
+
+    `None` ==> instance from `default` class
+    Class ==> instance from that class
+    instance ==> check that this is an instance of a subclass of `superclass`, error if not
+
+    Parameters
+    ----------
+    value : object,
+        Object to convert into a class instance.
+    default : class,
+        Default class constructor to use if `value` is None.
+    superclass : class,
+        Super/parent class to compare against the class instance from `value` or `default`.
+        If the class instance is not a subclass of `superclass`, a ValueError is raised.
+
+    Returns
+    -------
+    value : object,
+        Class instance that is a subclass of `superclass`.
+
+    Raises
+    ------
+    ValueError : if the class instance is not a subclass of `superclass`.
+
+    """
     import inspect
 
-    if value is None:
+    # Set `value` to a default, if needed and it is given
+    if (value is None) and (default is not None):
         value = default
 
+    # If `value` is a class (constructor), then construct an instance from it
     if inspect.isclass(value):
         value = value()
 
+    # Raise an error if `value` is not a subclass of `superclass`
     if not isinstance(value, superclass):
         err = f"argument ({value}) must be an instance or subclass of `{superclass}`!"
         log.error(err)
@@ -166,30 +304,39 @@ def _get_subclass_instance(value, default, superclass):
 # =================================================================================================
 
 
-def broadcastable(*args):
-    """Expand N, 1D arrays be able to be broadcasted into N, ND arrays.
+def eccen_func(cent: float, width: float, size: int) -> np.ndarray:
+    """Draw random values between [0.0, 1.0] with a given center and width.
 
-    e.g. from arrays of len `3`,`4`,`2`, returns arrays with shapes: `3,1,1`, `1,4,1` and `1,1,2`.
+    This function is a bit contrived, but the `norm` defines the center-point of the distribution,
+    and the `std` parameter determines the width of the distribution.  In all cases the resulting
+    values are only between [0.0, 1.0].  This function is typically used to draw initial random
+    eccentricities.
+
+    Parameters
+    ----------
+    cent : float,
+        Specification of the center-point of the distribution.  Range: positive numbers.
+        Values `norm << 1` correspond to small eccentricities, while `norm >> 1` are large
+        eccentricities, with the distribution symmetric around `norm=1.0` (and eccens of 0.5).
+    width : float,
+        Specification of the width of the distribution.  Specifically how near or far values tend
+        to be from the given central value (`norm`).  Range: positive numbers.
+        Note that the 'width' of the distribution depends on the `norm` value, in addition to `std`.
+        Smaller values (typically `std << 1`) produce narrower distributions.
+    size : int,
+        Number of samples to draw.
+
+    Returns
+    -------
+    eccen : ndarray,
+        Values between [0.0, 1.0] with shape given by the `size` parameter.
+
     """
-    ndim = len(args)
-    assert np.all([1 == np.ndim(aa) for aa in args]), "Each array in `args` must be 1D!"
-
-    cut_ref = [slice(None)] + [np.newaxis for ii in range(ndim-1)]
-    cuts = [np.roll(cut_ref, ii).tolist() for ii in range(ndim)]
-    outs = [aa[tuple(cc)] for aa, cc in zip(args, cuts)]
-    return outs
-
-
-def expand_broadcastable(*args):
-    try:
-        vals = np.array(args, dtype=object)    # avoid VisibleDeprecationWarning from ragged array creation
-        shape = np.shape(np.product(vals, axis=0))
-    except ValueError:
-        shapes = [np.shape(aa) for aa in args]
-        raise ValueError("Argument arrays are not broadcastable!  shapes={}".format(shapes))
-
-    vals = [aa * np.ones(shape) for aa in args]
-    return vals
+    assert np.shape(cent) == () and cent > 0.0
+    assert np.shape(width) == () and width > 0.0
+    eccen = log_normal_base_10(1.0/cent, width, size=size)
+    eccen = 1.0 / (eccen + 1.0)
+    return eccen
 
 
 def frac_str(vals: npt.ArrayLike, prec: int = 2) -> str:
@@ -197,8 +344,8 @@ def frac_str(vals: npt.ArrayLike, prec: int = 2) -> str:
 
     e.g. [0, 1, 2, 0, 0] ==> "2/5 = 4.0e-1"
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     vals : (N,) array_like,
         Input array to find non-zero elements of.
     prec : int
@@ -211,7 +358,7 @@ def frac_str(vals: npt.ArrayLike, prec: int = 2) -> str:
 
     """
     num = np.count_nonzero(vals)
-    den = vals.size
+    den = np.size(vals)
     frc = num / den
     rv = f"{num:.{prec}e}/{den:.{prec}e} = {frc:.{prec}e}"
     return rv
@@ -266,12 +413,13 @@ def interp(
     return y1
 
 
-def isnumeric(val) -> bool:
+def isnumeric(val: object) -> bool:
     """Test if the input value can successfully be cast to a float.
 
     Parameters
     ----------
-    val : [type]
+    val : object
+        Value to test.
 
     Returns
     -------
@@ -280,23 +428,25 @@ def isnumeric(val) -> bool:
 
     """
     try:
-        float(str(val))
+        float(str(val))   # ! FIX: Why does this need to cast to `str` first?
     except ValueError:
         return False
 
     return True
 
 
-def isinteger(val) -> bool:
+def isinteger(val: object) -> bool:
     """Test if the input value is an integral (integer) number.
 
     Parameters
     ----------
-    val : [type]
+    val : object
+        Value to test.
 
     Returns
     -------
     bool
+        True if the input value is an integer number.
 
     """
     rv = isnumeric(val) and isinstance(val, numbers.Integral)
@@ -305,7 +455,7 @@ def isinteger(val) -> bool:
 
 def log_normal_base_10(
     mu: float, sigma: float, size: Union[int, List[int]] = None, shift: float = 0.0,
-) -> npt.ArrayLike:
+) -> np.ndarray:
     """Draw from a log-normal distribution using base-10 standard-deviation.
 
     i.e. the `sigma` argument is in "dex", or powers of ten.
@@ -349,6 +499,7 @@ def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
 
     """
     if filter:
+        vals = np.asarray(vals)
         vv = vals[np.isfinite(vals)]
     else:
         vv = vals
@@ -357,6 +508,18 @@ def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
 
 
 def print_stats(stack=True, print_func=print, **kwargs):
+    """Print out basic properties and statistics on the input key-value array_like values.
+
+    Parameters
+    ----------
+    stack : bool,
+        Whether or not to print a backtrace to stdout.
+    print_func : callable,
+        Function to use for returning/printing output.
+    kwargs : dict,
+        Key-value pairs where values are array_like for the shape/stats to be printed.
+
+    """
     if stack:
         import traceback
         traceback.print_stack()
@@ -370,8 +533,8 @@ def nyquist_freqs(
 ) -> np.ndarray:
     """Calculate Nyquist frequencies for the given timing parameters.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     dur : float,
         Duration of observations
     cad : float,
@@ -388,7 +551,7 @@ def nyquist_freqs(
 
     """
     fmin = 1.0 / dur
-    fmax = 1.0 / cad
+    fmax = 1.0 / cad * 0.5
     # df = fmin / sample
     df = fmin
     freqs = np.arange(fmin, fmax + df/10.0, df)
@@ -403,6 +566,53 @@ def nyquist_freqs(
     return freqs
 
 
+def nyquist_freqs_edges(
+    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
+) -> np.ndarray:
+    """Calculate Nyquist frequencies for the given timing parameters.
+
+    Parameters
+    ----------
+    dur : float,
+        Duration of observations
+    cad : float,
+        Cadence of observations
+    trim : (2,) or None,
+        Specification of minimum and maximum frequencies outside of which to remove values.
+        `None` can be used in place of either boundary, e.g. [0.1, None] would mean removing
+        frequencies below `0.1` (and not trimming values above a certain limit).
+
+    Returns
+    -------
+    freqs : ndarray,
+        edges of Nyquist frequency bins
+
+    """
+    fmin = 1.0 / dur
+    fmax = 1.0 / cad * 0.5
+    # df = fmin / sample
+    df = fmin    # bin width
+    freqs = np.arange(fmin, fmax + df/10.0, df)   # centers
+    freqs_edges = freqs - df/2.0    # shift to edges
+    freqs_edges = np.concatenate([freqs_edges, [fmax + df]])
+
+    if trim is not None:
+        if np.shape(trim) != (2,):
+            raise ValueError("`trim` (shape: {}) must be (2,) of float!".format(np.shape(trim)))
+        if trim[0] is not None:
+            freqs_edges = freqs_edges[freqs_edges > trim[0]]
+        if trim[1] is not None:
+            freqs_edges = freqs_edges[freqs_edges < trim[1]]
+
+    return freqs_edges
+
+
+def quantile_filtered(values, percs, axis, func=np.isfinite):
+    percs = np.asarray(percs)
+    assert np.all((percs > 0.0) & (percs < 1.0))
+    return np.apply_along_axis(lambda xx: np.percentile(np.asarray(xx)[func(xx)], percs*100), axis, values)
+
+
 def quantiles(
     values: npt.ArrayLike,
     percs: Optional[npt.ArrayLike] = None,
@@ -410,17 +620,18 @@ def quantiles(
     weights: Optional[npt.ArrayLike] = None,
     axis: Optional[int] = None,
     values_sorted: bool = False,
-) -> np.ndarray:
+    filter: Optional[str] = None,
+) -> Union[np.ndarray, np.ma.masked_array]:
     """Compute weighted percentiles.
 
     NOTE: if `values` is a masked array, then only unmasked values are used!
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     values: (N,)
         input data
-    percs: (M,) scalar [0.0, 1.0]
-        Desired quantiles of the data.
+    percs: (M,) scalar
+        Desired quantiles of the data.  Within range of [0.0, 1.0].
     weights: (N,) or `None`
         Weights for each input data point in `values`.
     axis: int or `None`,
@@ -454,10 +665,12 @@ def quantiles(
 
     percs = np.array(percs)
     if weights is None:
-        weights = np.ones_like(values)
-    weights = np.array(weights)
+        ww = np.ones_like(values)
+    else:
+        ww = np.array(weights)
+
     try:
-        weights = np.ma.masked_array(weights, mask=values.mask)
+        ww = np.ma.masked_array(ww, mask=values.mask)  # type: ignore
     except AttributeError:
         pass
 
@@ -466,19 +679,19 @@ def quantiles(
     if not values_sorted:
         sorter = np.argsort(values, axis=axis)
         values = np.take_along_axis(values, sorter, axis=axis)
-        weights = np.take_along_axis(weights, sorter, axis=axis)
+        ww = np.take_along_axis(ww, sorter, axis=axis)
 
     if axis is None:
-        weighted_quantiles = np.cumsum(weights) - 0.5 * weights
-        weighted_quantiles /= np.sum(weights)
+        weighted_quantiles = np.cumsum(ww) - 0.5 * ww
+        weighted_quantiles /= np.sum(ww)
         percs = np.interp(percs, weighted_quantiles, values)
         return percs
 
-    weights = np.moveaxis(weights, axis, -1)
+    ww = np.moveaxis(ww, axis, -1)
     values = np.moveaxis(values, axis, -1)
 
-    weighted_quantiles = np.cumsum(weights, axis=-1) - 0.5 * weights
-    weighted_quantiles /= np.sum(weights, axis=-1)[..., np.newaxis]
+    weighted_quantiles = np.cumsum(ww, axis=-1) - 0.5 * ww
+    weighted_quantiles /= np.sum(ww, axis=-1)[..., np.newaxis]
     percs = [np.interp(percs, weighted_quantiles[idx], values[idx])
              for idx in np.ndindex(values.shape[:-1])]
     percs = np.array(percs)
@@ -508,7 +721,7 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
 
     """
     try:
-        if len(vals) == 0:
+        if len(vals) == 0:        # type: ignore
             raise TypeError
     except TypeError:
         raise TypeError(f"`vals` (shape={np.shape(vals)}) is not iterable!")
@@ -520,9 +733,49 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
 
     # stats = np.percentile(vals, percs*100)
     stats = quantiles(vals, percs)
-    rv = ["{val:.{prec}e}".format(prec=prec, val=ss) for ss in stats]
-    rv = ", ".join(rv)
+    _rv = ["{val:.{prec}e}".format(prec=prec, val=ss) for ss in stats]
+    rv = ", ".join(_rv)
     return rv
+
+
+def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = True):
+    """Perform a cumulative integration along the given axis.
+
+    Parameters
+    ----------
+    yy : ArrayLike of scalar,
+        Input to be integrated.
+    xx : ArrayLike of scalar,
+        The sample points corresponding to the `yy` values.
+        This must be either be shaped as
+        * the same number of dimensions as `yy`, with the same length along the `axis` dimension, or
+        * 1D with length matching `yy[axis]`
+    axis : int,
+        The axis over which to integrate.
+
+    Returns
+    -------
+    ct : ndarray of scalar,
+        Cumulative trapezoid rule integration.
+
+    """
+    xx = np.asarray(xx)
+    if np.ndim(xx) == 1:
+        pass
+    elif np.ndim(xx) == np.ndim(yy):
+        xx = xx[axis]
+    else:
+        err = f"Bad shape for `xx` (xx.shape={np.shape(xx)}, yy.shape={np.shape(yy)})!"
+        log.error(err)
+        raise ValueError(err)
+    ct = np.moveaxis(yy, axis, 0)   # type: ignore
+    ct = 0.5 * (ct[1:] + ct[:-1])
+    ct = np.moveaxis(ct, 0, -1)
+    ct = ct * np.diff(xx)
+    if cumsum:
+        ct = np.cumsum(ct, axis=-1)
+    ct = np.moveaxis(ct, -1, axis)
+    return ct
 
 
 def trapz_loglog(
@@ -544,8 +797,8 @@ def trapz_loglog(
     For each interval (x[i+1], x[i]), calculate the integral assuming that y is of the form,
         `y = a * x^gamma`
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     yy : ndarray
     xx : (X,) array_like of scalar,
     bounds : (2,) array_like of scalar,
@@ -584,7 +837,7 @@ def trapz_loglog(
         xx = np.insert(xx, ii, bounds, axis=axis)
         yy = np.insert(yy, ii, newy, axis=axis)
         ii = np.array([ii[0], ii[1]+1])
-        assert np.alltrue(xx[ii] == bounds), "FAILED!"
+        assert np.all(xx[ii] == bounds), "FAILED!"   # type: ignore
 
     if np.ndim(yy) != np.ndim(xx):
         if np.ndim(xx) != 1:
@@ -645,49 +898,28 @@ def trapz_loglog(
     return integ
 
 
-def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = True):
-    """Perform a cumulative integration along the given axis.
+def _parse_log_norm_pars(vals, size, default=None):
+    """Parse/Sanitize the parameters for a log-normal distribution.
 
-    Arguments
-    ---------
-    yy : ArrayLike of scalar,
-        Input to be integrated.
-    xx : ArrayLike of scalar,
-        The sample points corresponding to the `yy` values.
-        This must be either be shaped as
-        * the same number of dimensions as `yy`, with the same length along the `axis` dimension, or
-        * 1D with length matching `yy[axis]`
-    axis : int,
-        The axis over which to integrate.
+    * ()   ==> (N,)
+    * (2,) ==> (N,) log_normal(vals)
+    * (N,) ==> (N,)
+
+    BUG: this function should probably be deprecated / removed !
+
+    Parameters
+    ----------
+    vals : object,
+        Input can be a single value, (2,) array_like, of array_like of size `size`:
+            * scalar : this value is broadcast to an ndarray of size `size`
+            * (2,) array_like : these two arguments are passed to `log_normal_base_10` and `size` samples
+              are drawn
+            * (N,) array_like : if `N` matches `size`, these values are returned.
 
     Returns
     -------
-    ct : ndarray of scalar,
-        Cumulative trapezoid rule integration.
-
-    """
-    if np.ndim(xx) == 1:
-        pass
-    elif np.ndim(xx) == np.ndim(yy):
-        xx = xx[axis]
-    else:
-        error(f"Bad shape for `xx` (xx.shape={np.shape(xx)}, yy.shape={np.shape(yy)})!")
-    ct = np.moveaxis(yy, axis, 0)
-    ct = 0.5 * (ct[1:] + ct[:-1])
-    ct = np.moveaxis(ct, 0, -1)
-    ct = ct * np.diff(xx)
-    if cumsum:
-        ct = np.cumsum(ct, axis=-1)
-    ct = np.moveaxis(ct, -1, axis)
-    return ct
-
-
-def _parse_log_norm_pars(vals, size, default=None):
-    """
-    vals:
-        ()   ==> (N,)
-        (2,) ==> (N,) log_normal(vals)
-        (N,) ==> (N,)
+    vals : ndarray
+        Returned values.
 
     """
     if (vals is None):
@@ -706,44 +938,143 @@ def _parse_log_norm_pars(vals, size, default=None):
     return vals
 
 
+def _parse_val_log10_val_pars(val, val_log10, val_units=1.0, name='value', only_one=True):
+    """Given either a parameter value, or the log10 of the value, ensure that both are set.
+
+    Parameters
+    ----------
+    val : array_like or None,
+        The parameter value itself in the desired units (specified by `val_units`).
+    val_log10 : array_like or None,
+        The log10 of the parameter value in natural units.
+    val_units : array_like,
+        The conversion factor from natural units (used in `val_log10`) to the desired units (used in `val`).
+    name : str,
+        The name of the variable for use in error messages.
+    only_one : bool,
+        Whether one, and only one, of `val` and `val_log10` should be provided (i.e. not `None`).
+
+    Returns
+    -------
+    val : array_like,
+        The parameter value itself in desired units.
+        e.g. mass in grams, s.t. mass = Msol * 10^{mass_log10}
+    val_log10 : array_like,
+        The log10 of the parameter value in natural units.
+        e.g. log10 of mass in solar-masses, s.t. mass = Msol * 10^{mass_log10}
+
+    """
+    both_or_neither = ((val_log10 is not None) == (val is not None))
+    if only_one and both_or_neither:
+        err = f"One of {name} OR {name}_log10 must be provided!  {name}={val}, {name}_log10={val_log10}"
+        log.exception(err)
+        raise ValueError(err)
+
+    if val is None:
+        val = val_units * np.power(10.0, val_log10)
+
+    if val_log10 is None:
+        val_log10 = np.log10(val / val_units)
+
+    return val, val_log10
+
+
+def _integrate_grid_differential_number(edges, dnum, freq=False):
+    """Integrate the differential number-density of binaries over the given grid (edges).
+
+    NOTE: the `edges` provided MUST all be in linear space, mass is converted to ``log10(M)``
+    and frequency is converted to ``ln(f)``.
+    NOTE: the density `dnum` MUST correspond to `dn/ [dlog10(M) dq dz dln(f)]`
+
+    Parameters
+    ----------
+    edges : (4,) iterable of ArrayLike
+    dnum : ndarray
+    freq : bool
+        Whether or not to also integrate the frequency dimension.
+
+    Returns
+    -------
+    number : ndarray
+        Number of binaries in each bin of mass, mass-ratio, redshift, frequency.
+        NOTE: if `freq=False`, then `number` corresponds to `dN/dln(f)`, the number of binaries
+        per log-interval of frequency.
+
+    """
+    # ---- integrate from differential-number to number per bin
+    # integrate over dlog10(M)
+    number = trapz(dnum, np.log10(edges[0]), axis=0, cumsum=False)
+    # integrate over mass-ratio
+    number = trapz(number, edges[1], axis=1, cumsum=False)
+    # integrate over redshift
+    number = trapz(number, edges[2], axis=2, cumsum=False)
+    # integrate over frequency (if desired)
+    if freq:
+        number = trapz(number, np.log(edges[3]), axis=3, cumsum=False)
+
+    return number
+
+
 # =================================================================================================
 # ====    General Astronomy    ====
 # =================================================================================================
 
 
-def dfdt_from_dadt(dadt, sepa, mtot=None, freq_orb=None):
+def dfdt_from_dadt(dadt, sepa, mtot=None, frst_orb=None):
     """Convert from hardening rate in separation to hardening rate in frequency.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     dadt : array_like
         Hardening rate in terms of binary separation.
     sepa : array_like
         Binary separations.
     mtot : None or array_like
-        Either `mtot` or `freq_orb` must be provided.
-    freq_orb : None or array_like
-        Either `mtot` or `freq_orb` must be provided.
+        Binary total-mass in units of [gram].
+        Either `mtot` or `frst_orb` must be provided.
+    frst_orb : None or array_like
+        Binary rest-frame orbital-frequency in units of [1/sec].
+        Either `mtot` or `frst_orb` must be provided.
 
     Returns
     -------
     dfdt :
-        Hardening rate in terms of frequency.
+        Hardening rate in terms of rest-frame frequency.  [1/sec^2]
         NOTE: Has the opposite sign as `dadt`.
-    freq_orb :
-        Orbital frequency, in the rest-frame
+    frst_orb :
+        Orbital frequency, in the rest-frame.  [1/sec]
 
     """
-    if (mtot is None) and (freq_orb is None):
-        error("Either `mtot` or `freq_orb` must be provided!")
-    if freq_orb is None:
-        freq_orb = kepler_freq_from_sepa(mtot, sepa)
+    if (mtot is None) and (frst_orb is None):
+        err = "Either `mtot` or `frst_orb` must be provided!"
+        log.exception(err)
+        raise ValueError(err)
+    if frst_orb is None:
+        frst_orb = kepler_freq_from_sepa(mtot, sepa)
 
-    dfdt = - 1.5 * (freq_orb / sepa) * dadt
-    return dfdt, freq_orb
+    dfdt = - 1.5 * (frst_orb / sepa) * dadt
+    return dfdt, frst_orb
 
 
 def mtmr_from_m1m2(m1, m2=None):
+    """Convert from primary and secondary masses into total-mass and mass-ratio.
+
+    NOTE: it doesn't matter if `m1` or `m2` is the primary or secondary.
+
+    Parameters
+    ----------
+    m1 : array_like,
+        Mass.  If this is a single value, or a 1D array, it denotes the mass of one component of
+        a binary.  It can also be shaped, (N,2) where the two elements are the two component masses.
+    m2 : None or array_like,
+        If array_like, it must match the shape of `m1`, and corresponds to the companion mass.
+
+    Returns
+    -------
+    (2,N) ndarray
+        Total mass and mass-ratio.  If the input values are floats, this is just shaped (2,).
+
+    """
     if m2 is not None:
         masses = np.stack([m1, m2], axis=-1)
     else:
@@ -757,6 +1088,21 @@ def mtmr_from_m1m2(m1, m2=None):
 
 def m1m2_from_mtmr(mt, mr):
     """Convert from total-mass and mass-ratio to individual masses.
+
+    Parameters
+    ----------
+    mt : array_like
+        Total mass of the binary.
+    mr : array_like
+        Mass ratio of the binary.
+
+    Returns
+    -------
+    (2,N) ndarray
+        Primary and secondary masses respectively.
+        0-primary (more massive component),
+        1-secondary (less massive component)
+
     """
     mt = np.asarray(mt)
     mr = np.asarray(mr)
@@ -767,6 +1113,19 @@ def m1m2_from_mtmr(mt, mr):
 
 def frst_from_fobs(fobs, redz):
     """Calculate rest-frame frequency from observed frequency and redshift.
+
+    Parameters
+    ----------
+    fobs : array_like
+        Observer-frame frequencies.
+    redz : array_like
+        Redshifts.
+
+    Returns
+    -------
+    fobs : array_like
+        Rest-frame frequencies.
+
     """
     frst = fobs * (1.0 + redz)
     return frst
@@ -774,32 +1133,175 @@ def frst_from_fobs(fobs, redz):
 
 def fobs_from_frst(frst, redz):
     """Calculate observed frequency from rest-frame frequency and redshift.
+
+    Parameters
+    ----------
+    frst : array_like
+        Rest-frame frequencies.
+    redz : array_like
+        Redshifts.
+
+    Returns
+    -------
+    fobs : array_like
+        Observer-frame frequencies.
+
     """
     fobs = frst / (1.0 + redz)
     return fobs
 
 
-def kepler_freq_from_sepa(mass, sep):
-    freq = (1.0/(2.0*np.pi))*np.sqrt(NWTG*mass)/np.power(sep, 1.5)
+def kepler_freq_from_sepa(mass, sepa):
+    """Calculate binary orbital frequency using Kepler's law.
+
+    Parameters
+    ----------
+    mass : array_like
+        Binary total mass [grams].
+    sepa : array_like
+        Binary semi-major axis or separation [cm].
+
+    Returns
+    -------
+    freq : array_like
+        Binary orbital frequency [1/s].
+
+    """
+    freq = (1.0/(2.0*np.pi))*np.sqrt(NWTG*mass)/np.power(sepa, 1.5)
     return freq
 
 
 def kepler_sepa_from_freq(mass, freq):
+    """Calculate binary separation using Kepler's law.
+
+    Parameters
+    ----------
+    mass : array_like
+        Binary total mass [grams]
+    freq : array_like
+        Binary orbital frequency [1/s].
+
+    Returns
+    -------
+    sepa : array_like
+        Binary semi-major axis (i.e. separation) [cm].
+
+    """
     mass = np.asarray(mass)
     freq = np.asarray(freq)
-    sep = np.power(NWTG*mass/np.square(2.0*np.pi*freq), 1.0/3.0)
-    return sep
+    sepa = np.power(NWTG*mass/np.square(2.0*np.pi*freq), 1.0/3.0)
+    return sepa
 
 
 def rad_isco(m1, m2, factor=3.0):
     """Inner-most Stable Circular Orbit, radius at which binaries 'merge'.
+
+    ENH: allow single (total) mass argument.
+    ENH: add function to calculate factor as a function of BH spin.
+
+    Parameters
+    ----------
+    m1 : array_like,
+        Mass of first (either) component of binary [grams].
+    m2 : array_like,
+        Mass of second (other) component of binary [grams].
+    factor : float,
+        Factor by which to multiple the Schwarzschild radius to define the ISCO.
+        3.0 for a non-spinning black-hole.
+
+    Returns
+    -------
+    rs : array_like,
+        Radius of the inner-most stable circular orbit [cm].
+
     """
     return factor * schwarzschild_radius(m1+m2)
 
 
 def schwarzschild_radius(mass):
+    """Return the Schwarschild radius [cm] for the given mass [grams].
+
+    Parameters
+    ----------
+    m1 : array_like
+        Mass [grams]
+
+    Returns
+    -------
+    rs : array_like,
+        Schwzrschild radius for this mass.
+
+    """
     rs = SCHW * mass
     return rs
+
+
+def velocity_orbital(mt, mr, per=None, sepa=None):
+    sepa, per = _get_sepa_freq(mt, sepa, per)
+    v2 = np.power(NWTG*mt/sepa, 1.0/2.0) / (1 + mr)
+    # v2 = np.power(2*np.pi*NWTG*mt/per, 1.0/3.0) / (1 + mr)
+    v1 = v2 * mr
+    vels = np.moveaxis([v1, v2], 0, -1)
+    return vels
+
+
+def _get_sepa_freq(mt, sepa, freq):
+    if (freq is None) and (sepa is None):
+        raise ValueError("Either `freq` or `sepa` must be provided!")
+    if (freq is not None) and (sepa is not None):
+        raise ValueError("Only one of `freq` or `sepa` should be provided!")
+
+    if freq is None:
+        freq = kepler_freq_from_sepa(mt, sepa)
+
+    if sepa is None:
+        sepa = kepler_sepa_from_freq(mt, freq)
+
+    return sepa, freq
+
+
+def lambda_factor_dlnf(frst, dfdt, redz, dcom=None):
+    """Account for the universe's differential space-time volume for a given hardening rate.
+
+    For each binary, calculate the factor: $$\\Lambda \\equiv (dVc/dz) * (dz/dt) * [dt/dln(f)]$$,
+    which has units of [Mpc^3].  When multiplied by a number-density [Mpc^-3], it gives the number
+    of binaries in the Universe *per log-frequency interval*.  This value must still be multiplied
+    by $\\Delta \\ln(f)$ to get a number of binaries across a frequency in.
+
+    Parameters
+    ----------
+    frst : ArrayLike
+        Binary frequency (typically rest-frame orbital frequency; but it just needs to match what's
+        provided in the `dfdt` term.  Units of [1/sec].
+    dfdt : ArrayLike
+        Binary hardening rate in terms of frequency (typically rest-frame orbital frequency, but it
+        just needs to match what's provided in `frst`).  Units of [1/sec^2].
+    redz : ArrayLike
+        Binary redshift.  Dimensionless.
+    dcom : ArrayLike
+        Comoving distance to binaries (for the corresponding redshift, `redz`).  Units of [cm].
+        If not provided, calculated from given `redz`.
+
+    Returns
+    -------
+    lambda_fact : ArrayLike
+        The differential comoving volume of the universe per log interval of binary frequency.
+
+    """
+    zp1 = redz + 1
+    if dcom is None:
+        dcom = cosmo.z_to_dcom(redz)
+
+    # Volume-factor
+    # this is `(dVc/dz) * (dz/dt)`,  units of [Mpc^3/s]
+    vfac = 4.0 * np.pi * SPLC * zp1 * (dcom**2)
+    # Time-factor
+    # this is `f / (df/dt) = dt/d ln(f)`,  units of [sec]
+    tfac = frst / dfdt
+
+    # Calculate weighting
+    lambda_fact = vfac * tfac
+    return lambda_fact
 
 
 # =================================================================================================
@@ -808,6 +1310,25 @@ def schwarzschild_radius(mass):
 
 
 def chirp_mass(m1, m2=None):
+    """Calculate the chirp-mass of a binary.
+
+    Parameters
+    ----------
+    m1 : array_like,
+        Mass [grams]
+        This can either be the mass of the primary component, if scalar or 1D array_like,
+        or the mass of both components, if 2D array_like, shaped (N, 2).
+    m2 : None or array_like,
+        Mass [grams] of the other component of the binary.  If given, the shape must be
+        broadcastable against `m1`.
+
+    Returns
+    -------
+    mc : array_like,
+        Chirp mass [grams] of the binary.
+
+    """
+    m1, m2 = _array_args(m1, m2)
     # (N, 2)  ==>  (N,), (N,)
     if m2 is None:
         m1, m2 = np.moveaxis(m1, -1, 0)
@@ -815,33 +1336,98 @@ def chirp_mass(m1, m2=None):
     return mc
 
 
-def gw_char_strain(hs, dur_obs, freq_orb_obs, freq_orb_rst, dfdt):
+def chirp_mass_mtmr(mt, mr):
+    """Calculate the chirp-mass of a binary.
+
+    Parameters
+    ----------
+    mt : array_like,
+        Total mass [grams].  This is ``M = m1+m2``.
+    mr : array_like,
+        Mass ratio.  ``q = m2/m1 <= 1``.
+        This is defined as the secondary (smaller) divided by the primary (larger) mass.
+
+    Returns
+    -------
+    mc : array_like,
+        Chirp mass [grams] of the binary.
+
     """
-    See, e.g., Sesana+2004, Eq.35
+    mt, mr = _array_args(mt, mr)
+    mc = mt * np.power(mr, 3.0/5.0) / np.power(1 + mr, 6.0/5.0)
+    return mc
 
-    Arguments
-    ---------
-    hs : array_like scalar
-        Strain amplitude (e.g. `gw_strain()`, sky- and polarization- averaged)
-    dur_obs : array_like scalar
-        Duration of observations, in the observer frame
+
+def gw_char_strain_nyquist(dur_obs, hs, frst_orb, redz, dfdt_rst):
+    """GW Characteristic Strain assuming frequency bins are Nyquist sampled.
+
+    Nyquist assumption: the bin-width is equal to 1/T, for T the total observing duration.
+
+    See, e.g., [Sesana2004]_, Eq.35, and surrounding text.
+    NOTE: make sure this is the correct definition of "characteristic" strain for your application!
+
+    # ! THIS FUNCTION MAY NOT BE CORRECT [LZK:2022-08-25] ! #
+
+    Parameters
+    ----------
+    dur_obs : array_like,
+        Duration of observations, in the observer frame, in units of [sec].
+        Typically this is a single float value.
+    hs : array_like,
+        Strain amplitude of the source.  Dimensionless.
+    frst_orb : array_like,
+        Observer-frame orbital frequency, units of [1/sec].
+    redz : array_like,
+        Redshift of the binary.  Dimensionless.
+    dfdt_rst : array_like,
+        Rate of orbital-frequency evolution of the binary, in the rest-frame.  Units of [1/sec^2].
+
+    Returns
+    -------
+    hc : array_like,
+        Characteristic strain of the binary.
 
     """
+    log.warning("`holodeck.utils.gw_char_strain_nyquist` may not be correct!", exc_info=True)
 
-    ncycles = freq_orb_rst**2 / dfdt
-    ncycles = np.clip(ncycles, None, dur_obs * freq_orb_obs)
+    fobs_gw = fobs_from_frst(frst_orb, redz) * 2.0
+    # Calculate the time each binary spends within the band
+    dfdt_obs = dfdt_rst * (1 + redz)**2
+    bandwidth = (1.0 / dur_obs)   # I think this is right
+    # bandwidth = fobs_gw           # I think this is wrong
+    tband = bandwidth / dfdt_obs
+
+    ncycles = fobs_gw * np.minimum(dur_obs, tband)
     hc = hs * np.sqrt(ncycles)
     return hc
 
 
 def gw_dedt(m1, m2, sepa, eccen):
-    """GW Eccentricity Evolution rate (de/dt).
+    """GW Eccentricity Evolution rate (de/dt) due to GW emission.
 
-    returned value is negative.
+    NOTE: returned value is negative.
 
-    See Peters 1964, Eq. 5.8
-    http://adsabs.harvard.edu/abs/1964PhRv..136.1224P
+    See [Peters1964]_, Eq. 5.8
+
+    Parameters
+    ----------
+    m1 : array_like,
+        Mass of one component of the binary [grams].
+    m2 : array_like,
+        Mass of other component of the binary [grams].
+    sepa : array_like,
+        Binary semi-major axis (i.e. separation) [cm].
+    eccen : array_like,
+        Binary orbital eccentricity.
+
+    Returns
+    -------
+    dedt : array_like
+        Rate of eccentricity change of the binary.
+        NOTE: returned value is negative or zero.
+
     """
+    m1, m2, sepa, eccen = _array_args(m1, m2, sepa, eccen)
     cc = _GW_DEDT_ECC_CONST
     e2 = eccen**2
     dedt = cc * m1 * m2 * (m1 + m2) / np.power(sepa, 4)
@@ -850,13 +1436,30 @@ def gw_dedt(m1, m2, sepa, eccen):
 
 
 def gw_dade(m1, m2, sepa, eccen):
-    """GW Eccentricity Evolution rate (de/dt).
+    """Rate of semi-major axis evolution versus eccentricity, due to GW emission (da/de).
 
-    returned value is positive (e and a go in same direction).
+    NOTE: returned value is positive (e and a go in same direction).
+    See [Peters1964]_, Eq. 5.7
 
-    See Peters 1964, Eq. 5.7
-    http://adsabs.harvard.edu/abs/1964PhRv..136.1224P
+    Parameters
+    ----------
+    m1 : array_like
+        Mass of one component of the binary [grams].
+    m2 : array_like
+        Mass of other component of the binary [grams].
+    sepa : array_like
+        Binary semi-major axis (separation) [grams].
+    eccen : array_like
+        Binary eccentricity [grams].
+
+    Returns
+    -------
+    dade : array_like
+        Rate of change of semi-major axis versus eccentricity [cm].
+        NOTE: returned value is positive.
+
     """
+    m1, m2, sepa, eccen = _array_args(m1, m2, sepa, eccen)
     e2 = eccen**2
     num = (1 + (73.0/24.0)*e2 + (37.0/96.0)*e2*e2)
     den = (1 - e2) * (1.0 + (121.0/304.0)*e2)
@@ -865,13 +1468,25 @@ def gw_dade(m1, m2, sepa, eccen):
 
 
 def gw_freq_dist_func(nn, ee=0.0):
-    """Frequency Distribution Function.
+    """GW frequency distribution function.
 
-    See [Enoki & Nagashima 2007](astro-ph/0609377) Eq. 2.4.
-    This function gives g(n,e)
+    See [EN2007]_ Eq. 2.4; this function gives g(n,e).
 
-    FIX: use recursion relation when possible,
-        J_{n-1}(x) + J_{n+1}(x) = (2n/x) J_n(x)
+    BUG: use recursion relation when possible,
+         J_{n-1}(x) + J_{n+1}(x) = (2n/x) J_n(x)
+
+    Parameters
+    ----------
+    nn : int,
+        Number of frequency harmonic to calculate.
+    ee : array_like,
+        Binary eccentricity.
+
+    Returns
+    -------
+    gg : array_like,
+        GW Frequency distribution function g(n,e).
+
     """
     import scipy as sp
     import scipy.special  # noqa
@@ -898,11 +1513,28 @@ def gw_freq_dist_func(nn, ee=0.0):
 def gw_hardening_rate_dadt(m1, m2, sepa, eccen=None):
     """GW Hardening rate in separation (da/dt).
 
-    returned value is negative.
+    NOTE: returned value is negative.
 
-    See Peters 1964, Eq. 5.6
-    http://adsabs.harvard.edu/abs/1964PhRv..136.1224P
+    See [Peters1964]_, Eq. 5.6
+
+    Parameters
+    ----------
+    m1 : array_like,
+        Mass of one component of the binary [grams].
+    m2 : array_like,
+        Mass of other component of the binary [grams].
+    sepa : array_like,
+        Binary semi-major axis (i.e. separation) [cm].
+    eccen : None or array_like,
+        Binary orbital eccentricity.  Treated as zero if `None`.
+
+    Returns
+    -------
+    dadt : array_like,
+        Binary hardening rate [cm/s] due to GW emission.
+
     """
+    m1, m2, sepa, eccen = _array_args(m1, m2, sepa, eccen)
     cc = _GW_DADT_SEP_CONST
     dadt = cc * m1 * m2 * (m1 + m2) / np.power(sepa, 3)
     if eccen is not None:
@@ -911,103 +1543,186 @@ def gw_hardening_rate_dadt(m1, m2, sepa, eccen=None):
     return dadt
 
 
-def gw_hardening_rate_dfdt(m1, m2, freq_orb, eccen=None):
+def gw_hardening_rate_dfdt(m1, m2, frst_orb, eccen=None):
     """GW Hardening rate in frequency (df/dt).
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     m1 : array_like
-        Mass of one component of each binary.
+        Mass of one component of each binary [grams].
     m2 : array_like
-        Mass of other component of each binary.
+        Mass of other component of each binary [grams].
     freq_orb : array_like
-        Rest frame orbital frequency of each binary.
+        Rest frame orbital frequency of each binary [1/s].
     eccen : array_like, optional
         Eccentricity of each binary.
 
     Returns
     -------
     dfdt : array_like,
-        Hardening rate in terms of frequency for each binary.
+        Hardening rate in terms of frequency for each binary [1/s^2].
 
     """
-    sepa = kepler_sepa_from_freq(m1+m2, freq_orb)
+    m1, m2, frst_orb, eccen = _array_args(m1, m2, frst_orb, eccen)
+    sepa = kepler_sepa_from_freq(m1+m2, frst_orb)
     dfdt = gw_hardening_rate_dadt(m1, m2, sepa, eccen=eccen)
     # dfdt, _ = dfdt_from_dadt(dfdt, sepa, mtot=m1+m2)
-    dfdt, _ = dfdt_from_dadt(dfdt, sepa, freq_orb=freq_orb)
-    return dfdt, freq_orb
+    dfdt, _ = dfdt_from_dadt(dfdt, sepa, frst_orb=frst_orb)
+    return dfdt, frst_orb
 
 
 def gw_hardening_timescale_freq(mchirp, frst):
-    """tau = f_r / (df_r / dt)
+    """GW Hardening timescale in terms of frequency (not separation).
 
-    e.g. [EN07] Eq.2.9
+    ``tau = f_r / (df_r / dt)``, e.g. [EN2007]_ Eq.2.9
 
-    Arguments
-    ---------
-    mchirp : scalar  or  array_like of scalar
+    Parameters
+    ----------
+    mchirp : array_like,
         Chirp mass in [grams]
-    frst : scalar  or  array_like of scalar
-        Rest-frame orbital frequency
+    frst : array_like,
+        Rest-frame orbital frequency [1/s].
 
     Returns
     -------
-    tau : float  or  array_like of float
-        GW hardening timescale defined w.r.t. orbital frequency.
+    tau : array_like,
+        GW hardening timescale defined w.r.t. orbital frequency [sec].
 
     """
+    mchirp, frst = _array_args(mchirp, frst)
     tau = (5.0 / 96.0) * np.power(NWTG*mchirp/SPLC**3, -5.0/3.0) * np.power(2*np.pi*frst, -8.0/3.0)
     return tau
 
 
 def gw_lum_circ(mchirp, freq_orb_rest):
+    """Calculate the GW luminosity of a circular binary.
+
+    [EN2007]_ Eq. 2.2
+
+    Parameters
+    ----------
+    mchirp : array_like,
+        Binary chirp mass [grams].
+    freq_orb_rest : array_like,
+        Rest-frame binary orbital frequency [1/s].
+
+    Returns
+    -------
+    lgw_circ : array_like,
+        GW Luminosity [erg/s].
+
     """
-    EN07: Eq. 2.2
-    """
+    mchirp, freq_orb_rest = _array_args(mchirp, freq_orb_rest)
     lgw_circ = _GW_LUM_CONST * np.power(2.0*np.pi*freq_orb_rest*mchirp, 10.0/3.0)
     return lgw_circ
 
 
-def gw_strain_source(mchirp, dcom, freq_orb_rest):
+def gw_strain_source(mchirp, dcom, freq_rest_orb):
     """GW Strain from a single source in a circular orbit.
 
-    e.g. Sesana+2004 Eq.36
-    e.g. Enoki+2004 Eq.5
+    For reference, see:
+    *   [Sesana2004]_ Eq.36 : they use `f_r` to denote rest-frame GW-frequency.
+    *   [Enoki2004]_ Eq.5.
+
+    Parameters
+    ----------
+    mchirp : array_like,
+        Binary chirp mass [grams].
+    dcom : array_like,
+        Comoving distance to source [cm].
+    freq_orb_rest : array_like,
+        Rest-frame binary orbital frequency [1/s].
+
+    Returns
+    -------
+    hs : array_like,
+        GW Strain (*not* characteristic strain).
+
     """
-    #
-    hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_orb_rest, 2/3) / dcom
+    mchirp, dcom, freq_rest_orb = _array_args(mchirp, dcom, freq_rest_orb)
+    # The factor of 2 below is to convert from orbital-frequency to GW-frequency
+    hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_rest_orb, 2/3) / dcom
     return hs
 
 
 def sep_to_merge_in_time(m1, m2, time):
     """The initial separation required to merge within the given time.
 
-    See: [Peters 1964].
+    See: [Peters1964]_
+
+    Parameters
+    ----------
+    m1 : array_like,
+        Mass of one component of the binary [grams].
+    m2 : array_like,
+        Mass of other component of the binary [grams].
+    time : array_like,
+        The duration of time of interest [sec].
+
+    Returns
+    -------
+    array_like
+        Initial binary separation [cm].
+
     """
+    m1, m2, time = _array_args(m1, m2, time)
     GW_CONST = 64*np.power(NWTG, 3.0)/(5.0*np.power(SPLC, 5.0))
     a1 = rad_isco(m1, m2)
     return np.power(GW_CONST*m1*m2*(m1+m2)*time - np.power(a1, 4.0), 1./4.)
 
 
-def time_to_merge_at_sep(m1, m2, sep):
+def time_to_merge_at_sep(m1, m2, sepa):
     """The time required to merge starting from the given initial separation.
 
-    See: [Peters 1964].
+    See: [Peters1964]_.
+
+    Parameters
+    ----------
+    m1 : array_like,
+        Mass of one component of the binary [grams].
+    m2 : array_like,
+        Mass of other component of the binary [grams].
+    sepa : array_like,
+        Binary semi-major axis (i.e. separation) [cm].
+
+    Returns
+    -------
+    array_like
+        Duration of time for binary to coalesce [sec].
+
     """
+    m1, m2, sepa = _array_args(m1, m2, sepa)
     GW_CONST = 64*np.power(NWTG, 3.0)/(5.0*np.power(SPLC, 5.0))
     a1 = rad_isco(m1, m2)
-    delta_sep = np.power(sep, 4.0) - np.power(a1, 4.0)
+    delta_sep = np.power(sepa, 4.0) - np.power(a1, 4.0)
     return delta_sep/(GW_CONST*m1*m2*(m1+m2))
 
 
 def _gw_ecc_func(eccen):
     """GW Hardening rate eccentricitiy dependence F(e).
 
-    See Peters 1964, Eq. 5.6
-    EN07: Eq. 2.3
+    See [Peters1964]_ Eq. 5.6, or [EN2007]_ Eq. 2.3
+
+    Parameters
+    ----------
+    eccen : array_like,
+        Binary orbital eccentricity [].
+
+    Returns
+    -------
+    fe : array_like
+        Eccentricity-dependence term of GW emission [].
+
     """
     e2 = eccen*eccen
     num = 1 + (73/24)*e2 + (37/96)*e2*e2
     den = np.power(1 - e2, 7/2)
     fe = num / den
     return fe
+
+
+def _array_args(*args):
+    # args = [np.atleast_1d(aa) for aa in args]
+    args = [np.asarray(aa) if aa is not None else None
+            for aa in args]
+    return args

@@ -1,53 +1,62 @@
-"""Holodeck - Scaling Relations
+"""Empirical and phenomenological scaling relationships.
 
-References
-----------
--   Kormendy+Ho-2013 (1304.7762) = [KH13]
-    Coevolution (Or Not) of Supermassive Black Holes and Host Galaxies
-    https://ui.adsabs.harvard.edu/abs/2013ARA%26A..51..511K/abstract
+This module defines numerous classes and accessor methods to implement scaling relationships between
+different empirical quantities, for example BH-Galaxy relations, or Stellar-Mass vs Halo-Mass
+relations.  `abc` base classes are used to implement generic functionality, and define APIs while
+subclasses are left to perform specific implementations.  In general most classes implement both
+the forward and reverse versions of relationships (e.g. stellar-mass to halo-mass, and also
+halo-mass to stellar-mass).  Reverse relationships are often interpolated over a grid.
 
--   McConnell+Ma-2013 (1211.2816) = [MM13]
-    Revisiting the Scaling Relations of Black Hole Masses and Host Galaxy Properties
-    https://ui.adsabs.harvard.edu/abs/2013ApJ...764..184M/abstract
+Most of the relationships currently implemented are among three groups (and corresponding base
+classes):
 
-* [NFW-97] : Navarro, Frenk & White 1997
-    A Universal Density Profile from Hierarchical Clustering
-    https://ui.adsabs.harvard.edu/abs/1997ApJ...490..493N/abstract
+* **BH-Host Relations** (`_Host_Relation`): These produce mappings between host galaxy properties
+  (e.g. bulge mass) and the properties of their black holes (i.e. BH mass).
 
-* [Guo-2010] : Guo, White, Li & Boylan-Kolchin 2010
-    How do galaxies populate dark matter haloes?
-    https://ui.adsabs.harvard.edu/abs/2010MNRAS.404.1111G/abstract
+  * **Mbh-Mbulge relations** ("M-Mbulge"; `_MMBulge_Relation`): mapping from host galaxy stellar
+    bulge mass to black-hole mass.
+  * **Mbh-Sigma relations** ("M-Sigma"; `_MSigma_Relation`): mapping from host galaxy velocity
+    dispersion (sigma) to black-hole mass.
 
-* [Behroozi+2013] : Behroozi, Wechsler & Conroy 2013
-    The Average Star Formation Histories of Galaxies in Dark Matter Halos from z = 0-8
-    https://ui.adsabs.harvard.edu/abs/2013ApJ...770...57B/abstract
-
-* [Klypin+2016] : Klypin et al. 2016
-    MultiDark simulations: the story of dark matter halo concentrations and density profiles
-    https://ui.adsabs.harvard.edu/abs/2016MNRAS.457.4340K/abstract
-
+* **Density Profiles** (`_Density_Profile`): matter density as a function of spherical radius.
+* **Stellar-Mass vs. Halo-Mass Relations** (`_StellarMass_HaloMass`): mapping from halo-mass to
+  stellar-mass.
 
 To-Do
 -----
-*[ ]Pass concentration-relation (or other method to calculate) to NFW classes on instantiation
-*[ ]
+* Pass concentration-relation (or other method to calculate) to NFW classes on instantiation
+* For redshift-dependent extensions to relations, use multiple-inheritance instead of repeating
+  attributes.
+
+References
+----------
+* [Behroozi2013]_ : Behroozi, Wechsler & Conroy 2013.
+* [Guo2010]_ Guo, White, Li & Boylan-Kolchin 2010.
+* [Klypin2016]_ Klypin et al. 2016.
+* [KH2013]_ Kormendy & Ho 2013.
+* [MM2013]_ McConnell & Ma 2013.
+* [NFW1997]_ Navarro, Frenk & White 1997.
 
 """
 
 import abc
+from typing import Type, Union
 
 import numpy as np
+from numpy.typing import ArrayLike
 import scipy as sp
 
 from holodeck import cosmo, utils, log
 from holodeck.constants import MSOL, NWTG, KMPERSEC
 
 
-class _MHost_Relation(abc.ABC):
+class _Host_Relation(abc.ABC):
+    """Base class for general relationships between MBHs and their host galaxies.
+    """
 
-    _PROPERTIES = []
+    _PROPERTIES = []    #: list of property names to retrieve from population instances.
 
-    def get_host_properties(self, pop, copy=True):
+    def get_host_properties(self, pop, copy=True) -> dict:
         """Get the host properties specified in the `_PROPERTIES` list of variable names.
 
         NOTE: if the `copy` flag is False, then values are returned by reference and the original
@@ -85,12 +94,24 @@ class _MHost_Relation(abc.ABC):
         return
 
     @abc.abstractmethod
-    def mbh_from_host(self, host):
-        """Convert from host galaxy properties to blackhole mass.
+    def mbh_from_host(self, pop, *args, **kwargs) -> np.ndarray:
+        """Convert from abstract host galaxy properties to blackhole mass.
 
-        Units of [grams].
+        The `pop` instance must contain the attributes required for this class's scaling relations.
+        The required properties are stored in this class's `_PROPERTIES` attribute.
+
+        Parameters
+        ----------
+        pop : `_Discrete_Population`,
+            Population instance having the attributes required by this particular scaling relation.
+
+        Returns
+        -------
+        mbh : ArrayLike
+            Black hole mass.  [grams]
+
         """
-        return
+        pass
 
 
 # -----------------------------------------
@@ -98,49 +119,133 @@ class _MHost_Relation(abc.ABC):
 # -----------------------------------------
 
 
-class _MMBulge_Relation(_MHost_Relation):
+class _MMBulge_Relation(_Host_Relation):
+    """Base class for implementing Mbh--Mbulge relationships, between MBH and their host galaxies.
+    """
 
     _PROPERTIES = ['mbulge']
 
     def mbulge_from_mstar(self, mstar):
+        """Calculate stellar bulge-mass given the total galaxy stellar mass.
+
+        Multiplies `mstar` by the result of `self.bulge_mass_frac(mstar)`.
+
+        Parameters
+        ----------
+        mstar : array_like,
+            Galaxy total stellar mass.
+
+        Returns
+        -------
+        array_like,
+            Stellar bulge mass.
+
+        """
         return self.bulge_mass_frac(mstar) * mstar
 
     # ---- Abstract Methods : must be overridden in subclasses  ----
 
     @abc.abstractmethod
-    def dmstar_dmbh(self, pop):
+    def dmstar_dmbh(self, mstar):
+        """The partial derivative of stellar mass versus black-hole mass.
+
+        Parameters
+        ----------
+        mstar : array_like,
+            Host stellar-mass.
+
+        Returns
+        -------
+        array_like,
+            Jacobian term.
+
+        """
         return
 
     @abc.abstractmethod
     def bulge_mass_frac(self, mstar):
-        return
+        """Return the stellar-bulge mass fraction (M_bulge / M_star).
 
-    @abc.abstractmethod
-    def mbh_from_host(self, host):
+        Parameters
+        ----------
+        mstar : array_like,
+            Host stellar-mass.
+
+        Returns
+        -------
+        array_like,
+            Bulge mass fraction.
+
+        """
         return
 
     @abc.abstractmethod
     def mstar_from_mbulge(self, mbulge):
+        """Convert from stellar-bulge mass to total stellar-mass.
+
+        Parameters
+        ----------
+        mbulge : array_like
+            Mass of the stellar bulge.  [grams]
+
+        Returns
+        -------
+        mstar : array_like,
+            Galaxy stellar mass.  [grams]
+
+        """
+        return
+
+    @abc.abstractmethod
+    def mbh_from_mbulge(self, *args, **kwargs) -> ArrayLike:
+        """Convert from stellar-bulge mass to black-hole mass.
+
+        Returns
+        -------
+        mbh : array_like,
+            Mass of black hole.  [grams]
+
+        """
+        return
+
+    def mbulge_from_mbh(self, *args, **kwargs) -> ArrayLike:
+        """Convert from black-hole mass to stellar-bulge mass.
+
+        Returns
+        -------
+        mbulge : array_like,
+            Mass of stellar bulge.  [grams]
+
+        """
         return
 
 
 class MMBulge_Standard(_MMBulge_Relation):
-    """
+    """Simple Mbh-Mbulge relation as a single power-law.
 
+    Notes
+    -----
     * Single power-law relationship between BH mass and Stellar-bulge mass.
-        .. math::  Mbh = M0 * (M_bulge/Mref)^plaw * 10^Normal(0, eps)
+      :math:`Mbh = M0 * (M_bulge/Mref)^plaw * 10^Normal(0, eps)`
     * Constant bulge mass-fraction relative to total stellar mass.
-        .. math::  M_bulge = f_bulge * M_star
+      :math:`M_bulge = f_bulge * M_star`
 
     """
 
-    MASS_AMP = 3.0e8 * MSOL
-    MASS_PLAW = 1.0
+    MASS_AMP = None
+    MASS_AMP_LOG10 = 8.17   # log10(M/Msol)
+    MASS_PLAW = 1.01
     MASS_REF = 1.0e11 * MSOL
     SCATTER_DEX = 0.3
 
-    def __init__(self, mamp=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None):
-        if mamp is None:
+    def __init__(self, mamp=None, mamp_log10=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None):
+        if (self.MASS_AMP_LOG10 is not None) == (self.MASS_AMP is not None):
+            err = "One of `MASS_AMP_LOG10` _or_ `MASS_AMP` must be set!"
+            log.exception(err)
+            raise ValueError(err)
+
+        if (mamp is None) and (mamp_log10 is None):
+            mamp_log10 = self.MASS_AMP_LOG10
             mamp = self.MASS_AMP
         if mplaw is None:
             mplaw = self.MASS_PLAW
@@ -149,9 +254,11 @@ class MMBulge_Standard(_MMBulge_Relation):
         if scatter_dex is None:
             scatter_dex = self.SCATTER_DEX
 
-        self._mamp = mamp   # Mass-Amplitude [grams]
-        self._mplaw = mplaw   # Mass Power-law index
-        self._mref = mref   # Reference Mass (argument normalization)
+        mamp, _ = utils._parse_val_log10_val_pars(mamp, mamp_log10, MSOL, 'mamp', only_one=True)
+
+        self._mamp = mamp     #: Mass-Amplitude [grams]
+        self._mplaw = mplaw   #: Mass Power-law index
+        self._mref = mref     #: Reference Mass (argument normalization)
         self._bulge_mfrac = bulge_mfrac
         self._scatter_dex = scatter_dex
         return
@@ -159,80 +266,158 @@ class MMBulge_Standard(_MMBulge_Relation):
     def bulge_mass_frac(self, mstar):
         return self._bulge_mfrac
 
-    def mbh_from_host(self, pop, scatter):
-        """Convert from stellar bulge-mass to blackhole mass.
-
-        Units of [grams].
-        """
+    def mbh_from_host(self, pop, scatter) -> ArrayLike:
         host = self.get_host_properties(pop)
         mbulge = host['mbulge']
         return self.mbh_from_mbulge(mbulge, scatter=scatter)
 
     def mbh_from_mbulge(self, mbulge, scatter):
-        """Convert from stellar bulge-mass to blackhole mass.
+        """Convert from stellar-bulge mass to black-hole mass.
 
-        Units of [grams].
+        Parameters
+        ----------
+        mbulge : array_like,
+            Stellar bulge-mass of host galaxy.  [grams]
+        scatter : bool,
+            Whether or not to include scatter in scaling relationship.
+            Uses `self._scatter_dex` attribute.
+
+        Returns
+        -------
+        mbh : array_like,
+            Mass of black hole.  [grams]
+
         """
         scatter_dex = self._scatter_dex if scatter else None
         mbh = _log10_relation(mbulge, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
 
     def mbulge_from_mbh(self, mbh, scatter):
-        """Convert from blackhole mass to stellar bulge-mass.
+        """Convert from black-hole mass to stellar-bulge mass.
 
-        Units of [grams].
+        Parameters
+        ----------
+        mbh : array_like,
+            Mass of black hole.  [grams]
+        scatter : bool,
+            Whether or not to include scatter in scaling relationship.
+            Uses `self._scatter_dex` attribute.
+
+        Returns
+        -------
+        mbulge : array_like,
+            Mass of stellar bulge.  [grams]
         """
         scatter_dex = self._scatter_dex if scatter else None
         mbulge = _log10_relation_reverse(mbh, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbulge
 
     def mstar_from_mbulge(self, mbulge):
+        """Convert from stellar bulge-mass to black-hole mass.
+
+        Parameters
+        ----------
+        mbulge : array_like,
+            Stellar bulge-mass of host galaxy.  [grams]
+        scatter : bool,
+            Whether or not to include scatter in scaling relationship.
+            Uses `self._scatter_dex` attribute.
+
+        Returns
+        -------
+        mbh : array_like,
+            Mass of black hole.  [grams]
+
+        """
         return mbulge / self._bulge_mfrac
 
     def mbh_from_mstar(self, mstar, scatter):
+        """Convert from total stellar mass to black-hole mass.
+
+        Parameters
+        ----------
+        mstar : array_like,
+            Total stellar mass of host galaxy.  [grams]
+        scatter : bool,
+            Whether or not to include scatter in scaling relationship.
+            Uses `self._scatter_dex` attribute.
+
+        Returns
+        -------
+        mbh : array_like,
+            Mass of black hole.  [grams]
+
+        """
         mbulge = self.mbulge_from_mstar(mstar)
         return self.mbh_from_mbulge(mbulge, scatter)
 
     def mstar_from_mbh(self, mbh, scatter):
+        """Convert from black-hole mass to total stellar mass.
+
+        Parameters
+        ----------
+        mbh : array_like,
+            Mass of black hole.  [grams]
+        scatter : bool,
+            Whether or not to include scatter in scaling relationship.
+            Uses `self._scatter_dex` attribute.
+
+        Returns
+        -------
+        array_like,
+            Total stellar mass of host galaxy.  [grams]
+
+        """
         mbulge = self.mbulge_from_mbh(mbh, scatter)
         return self.mstar_from_mbulge(mbulge)
 
     def dmstar_dmbh(self, mstar):
-        """Calculate the partial derivative of stellar mass versus BH mass `d M_star / d M_bh`
+        """Calculate the partial derivative of stellar mass versus BH mass :math:`d M_star / d M_bh`.
 
         .. math::
-
-            d M_star / d M_bh  =  [d M_star / d M_bulge] * [d M_bulge / d M_bh]
+            d M_star / d M_bh  =  [d M_star / d M_bulge] * [d M_bulge / d M_bh] \\
                                =  [1/f_bulge] * [M_bulge / (plaw * M_bh)]
+
+        Parameters
+        ----------
+        mstar : array_like,
+            Total stellar mass of galaxy.  [grams]
+
+        Returns
+        -------
+        deriv : array_like,
+            Jacobian term.
 
         """
         plaw = self._mplaw
         fbulge = self._bulge_mfrac
         mbulge = mstar * fbulge
         mbh = self.mbh_from_mbulge(mbulge, scatter=False)
-        deriv = mbulge / (fbulge * plaw * mbh)
+        deriv = mstar / (plaw * mbh)
         return deriv
 
 
-class MMBulge_KH13(MMBulge_Standard):
-    """Mbh-MBulge Relation from Kormendy & Ho 2013.
+class MMBulge_KH2013(MMBulge_Standard):
+    """Mbh-MBulge Relation, single power-law, from Kormendy & Ho 2013.
 
-    Values taken from [KH13] Eq.10 (pg. 61 of PDF, "571" of ARAA)
+    Values taken from [KH2013]_ Eq.10.
+
     """
-
-    MASS_AMP = 0.49 * 1e9 * MSOL   # 0.49 + 0.06 - 0.05   in units of [Msol]
+    MASS_AMP = 0.49 * 1e9 * MSOL      # 0.49 + 0.06 - 0.05   in units of [Msol]
+    MASS_AMP_LOG10 = None
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.17                  # 1.17 ± 0.08
-    SCATTER_DEX = 0.28
+    SCATTER_DEX = 0.28                # scatter stdev in dex
 
 
-class MMBulge_MM13(MMBulge_Standard):
+class MMBulge_MM2013(MMBulge_Standard):
     """Mbh-MBulge Relation from McConnell & Ma 2013
 
-    [MM13] Eq. 2, with values taken from Table 2 ("Dynamical masses", first row, "MPFITEXY")
-    """
+    [MM2013]_ Eq. 2, with values taken from Table 2 ("Dynamical masses", first row, "MPFITEXY")
 
-    MASS_AMP = MSOL * 10.0 ** 8.46    # 8.46 ± 0.08   in units of [Msol]
+    """
+    MASS_AMP = None
+    MASS_AMP_LOG10 = 8.46    # 8.46 ± 0.08   in units of [Msol]
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.05                  # 1.05 ± 0.11
     SCATTER_DEX = 0.34
@@ -242,17 +427,19 @@ class MMBulge_MM13(MMBulge_Standard):
 
 
 class MMBulge_Redshift(MMBulge_Standard):
-    """
+    """Mbh-Mbulge relation with an additional redshift power-law dependence.
+
     Provides black hole mass as a function of galaxy bulge mass and redshift with a normalization
     that depends on redshift. zplaw=0 (default) is identical to MMBulge_Standard.
     mamp = mamp0 * (1 + z)**zplaw
 
-    TODO: make sure the all of the inherited methods from `MMBulge_Standard` are appropriate for
+    TODO: make sure all of the inherited methods from `MMBulge_Standard` are appropriate for
           redshift dependencies!!  In particular, check `dmstar_dmbh`
 
     """
 
     MASS_AMP = 3.0e8 * MSOL
+    MASS_AMP_LOG10 = None
     MASS_PLAW = 1.0
     MASS_REF = 1.0e11 * MSOL
     SCATTER_DEX = 0.0
@@ -260,23 +447,12 @@ class MMBulge_Redshift(MMBulge_Standard):
 
     _PROPERTIES = ['mbulge', 'redz']
 
-    def __init__(self, mamp=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None, zplaw=None):
-        if mamp is None:
-            mamp = self.MASS_AMP
-        if mplaw is None:
-            mplaw = self.MASS_PLAW
-        if mref is None:
-            mref = self.MASS_REF
-        if scatter_dex is None:
-            scatter_dex = self.SCATTER_DEX
+    def __init__(self, *args, zplaw=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
         if zplaw is None:
             zplaw = self.Z_PLAW
 
-        self._mamp = mamp   # Mass-Amplitude [grams]
-        self._mplaw = mplaw   # Mass Power-law index
-        self._mref = mref   # Reference Mass (argument normalization)
-        self._bulge_mfrac = bulge_mfrac
-        self._scatter_dex = scatter_dex
         self._zplaw = zplaw
         return
 
@@ -287,10 +463,6 @@ class MMBulge_Redshift(MMBulge_Standard):
         return self.mbh_from_mbulge(mbulge, redz, scatter=scatter)
 
     def mbh_from_mbulge(self, mbulge, redz, scatter):
-        """Convert from stellar bulge-mass and redshift ==> blackhole mass.
-
-        Units of [grams].
-        """
         scatter_dex = self._scatter_dex if scatter else None
         # Broadcast `redz` to match shape of `mbulge`, if needed
         # NOTE: this will work for (N,) ==> (N,)    or   (N,) ==> (N,X)
@@ -300,10 +472,6 @@ class MMBulge_Redshift(MMBulge_Standard):
         return mbh
 
     def mbulge_from_mbh(self, mbh, redz, scatter):
-        """Convert from blackhole mass to stellar bulge-mass.
-
-        Units of [grams].
-        """
         scatter_dex = self._scatter_dex if scatter else None
         zmamp = self._mamp * (1.0 + redz)**self._zplaw
         mbulge = _log10_relation_reverse(mbh, zmamp, self._mplaw, scatter_dex, x0=self._mref)
@@ -318,14 +486,6 @@ class MMBulge_Redshift(MMBulge_Standard):
         return self.mstar_from_mbulge(mbulge)
 
     def dmstar_dmbh(self, mstar, redz):
-        """Calculate the partial derivative of stellar mass versus BH mass `d M_star / d M_bh`
-
-        .. math::
-
-            d M_star / d M_bh  =  [d M_star / d M_bulge] * [d M_bulge / d M_bh]
-                               =  [1/f_bulge] * [M_bulge / (plaw * M_bh)]
-
-        """
         plaw = self._mplaw
         fbulge = self._bulge_mfrac
         mbulge = mstar * fbulge
@@ -334,21 +494,53 @@ class MMBulge_Redshift(MMBulge_Standard):
         return deriv
 
 
-class MMBulge_Redshift_MM13(MMBulge_Redshift):
+class MMBulge_Redshift_MM2013(MMBulge_Redshift):
     """Mbh-MBulge Relation from McConnell & Ma 2013 for z=0 plus redshift evolution of the normalization
 
-    [MM13] Eq. 2, with values taken from Table 2 ("Dynamical masses", first row, "MPFITEXY")
-    """
+    BUG/FIX: use multiple-inheritance for this
 
-    MASS_AMP = MSOL * 10.0 ** 8.46    # 8.46 ± 0.08   in units of [Msol]
+    [MM2013]_ Eq. 2, with values taken from Table 2 ("Dynamical masses", first row, "MPFITEXY")
+
+    """
+    MASS_AMP_LOG10 = 8.46    # 8.46 ± 0.08   in units of [Msol]
+    MASS_AMP = None
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.05                  # 1.05 ± 0.11
     SCATTER_DEX = 0.34
     Z_PLAW = 0.0
 
 
-def get_mmbulge_relation(mmbulge=None):
-    return utils._get_subclass_instance(mmbulge, MMBulge_MM13, _MMBulge_Relation)
+class MMBulge_Redshift_KH2013(MMBulge_Redshift):
+    """Mbh-MBulge Relation from Kormendy & Ho 2013, w/ optional redshift evolution of normalization.
+
+    BUG/FIX: use multiple-inheritance for this
+
+    Values taken from [KH2013] Eq.10 (pg. 61 of PDF, "571" of ARAA)
+    """
+    MASS_AMP = 0.49 * 1e9 * MSOL   # 0.49 + 0.06 - 0.05   in units of [Msol]
+    MASS_AMP_LOG10 = None
+    MASS_REF = MSOL * 1e11            # 1e11 Msol
+    MASS_PLAW = 1.17                  # 1.17 ± 0.08
+    SCATTER_DEX = 0.28
+    Z_PLAW = 0.0
+
+
+def get_mmbulge_relation(mmbulge: Union[_MMBulge_Relation, Type[_MMBulge_Relation]] = None) -> _MMBulge_Relation:
+    """Return a valid Mbh-Mbulge instance.
+
+    Parameters
+    ----------
+    mmbulge : None or (type or instance of `_MMBulge_Relation`),
+        If `None`, then a default M-Mbulge relation is returned.  Otherwise, the type is checked
+        to make sure it is a valid instance of an `_MMBulge_Relation`.
+
+    Returns
+    -------
+    _MMBulge_Relation
+        Instance of an Mbh-Mbulge relationship.
+
+    """
+    return utils._get_subclass_instance(mmbulge, MMBulge_KH2013, _MMBulge_Relation)
 
 
 # ----------------------------------------
@@ -356,20 +548,33 @@ def get_mmbulge_relation(mmbulge=None):
 # ----------------------------------------
 
 
-class _MSigma_Relation(_MHost_Relation):
+class _MSigma_Relation(_Host_Relation):
+    """Base class for 'M-Sigma relations' between BH mass and host velocity dispersion.
+    """
 
     _PROPERTIES = ['vdisp']
 
-    # ---- Abstract Methods : must be overridden in subclasses  ----
-    @abc.abstractmethod
-    def dmbh_dsigma(self, sigma):
-        return
+    # @abc.abstractmethod
+    # def dmbh_dsigma(self, sigma):
+    #     pass
 
-    # ---- Internal Methods ----
+    @abc.abstractmethod
+    def mbh_from_vdisp(self, vdisp, scatter):
+        pass
+
+    @abc.abstractmethod
+    def vdisp_from_mbh(self, mbh, scatter):
+        pass
 
 
 class MSigma_Standard(_MSigma_Relation):
-    """
+    """Simple M-sigma relation (BH mass vs. host velocity dispersion) as a single power-law.
+
+    Notes
+    -----
+    * Single power-law relationship between BH mass and Stellar-bulge mass.
+      :math:`Mbh = M0 * (sigma/sigma_ref)^plaw * 10^Normal(0, eps)`
+
     """
 
     MASS_AMP = 1.0e8 * MSOL
@@ -399,30 +604,56 @@ class MSigma_Standard(_MSigma_Relation):
         return self.mbh_from_vdisp(vdisp, scatter=scatter)
 
     def mbh_from_vdisp(self, vdisp, scatter):
-        """Convert from stellar velocity dispersion to blackhole mass.
+        """Convert from host galaxy stellar velocity dispersion to black-hole mass.
 
-        Units of [grams].
+        Parameters
+        ----------
+        vdisp : array_like,
+            Host-galaxy velocity dispersion.  [cm/s].
+        scatter : bool,
+            Whether or not to include scatter in scaling relationship.
+            Uses `self._scatter_dex` attribute.
+
+        Returns
+        -------
+        mbh : array_like,
+            Mass of black hole.  [grams]
+
         """
         scatter_dex = self._scatter_dex if scatter else None
         mbh = _log10_relation(vdisp, self._mamp, self._mplaw, scatter_dex, x0=self._sigmaref)
         return mbh
 
     def vdisp_from_mbh(self, mbh, scatter):
-        """
+        """Convert from black-hole mass to host galaxy stellar velocity dispersion.
+
+        Parameters
+        ----------
+        mbh : array_like,
+            Mass of black hole.  [grams]
+        scatter : bool,
+            Whether or not to include scatter in scaling relationship.
+            Uses `self._scatter_dex` attribute.
+
+        Returns
+        -------
+        vdisp : array_like,
+            Host-galaxy velocity dispersion.  [cm/s].
+
         """
         scatter_dex = self._scatter_dex if scatter else None
         vdisp = _log10_relation_reverse(mbh, self._mamp, self._mplaw, scatter_dex, x0=self._sigmaref)
         return vdisp
 
-    def dmbh_dsigma(self, sigma):
-        # Is this needed? I don't know
-        return None
+    # def dmbh_dsigma(self, sigma):
+    #     # Is this needed? I don't know
+    #     return None
 
 
-class MSigma_MM13(MSigma_Standard):
-    """Mbh-Sigma Relation from McConnell & Ma 2013
+class MSigma_MM2013(MSigma_Standard):
+    """Mbh-Sigma Relation from McConnell & Ma 2013.
 
-    [MM13] Eq. 2, with values taken from Table 2 ("M-sigma all galaxies", first row, "MPFITEXY")
+    [MM2013]_ Eq. 2, with values taken from Table 2 ("M-sigma all galaxies", first row, "MPFITEXY")
     """
 
     MASS_AMP = MSOL * 10.0 ** 8.32    # 8.32 ± 0.05   in units of [Msol]
@@ -431,10 +662,10 @@ class MSigma_MM13(MSigma_Standard):
     SCATTER_DEX = 0.38
 
 
-class MSigma_KH13(MSigma_Standard):
-    """Mbh-Sigma Relation from Kormendy & Ho 2013
+class MSigma_KH2013(MSigma_Standard):
+    """Mbh-Sigma Relation from Kormendy & Ho 2013.
 
-    [KH13] Eq. 10, (pg. 65 of PDF, "575" of ARAA)
+    [KH2013]_ Eq. 10, (pg. 65 of PDF, "575" of ARAA)
     """
 
     MASS_AMP = MSOL * 10.0 ** 8.46    # 8.46 ± 0.07   in units of [Msol]
@@ -443,36 +674,67 @@ class MSigma_KH13(MSigma_Standard):
     SCATTER_DEX = 0.30
 
 
-def get_msigma_relation(msigma=None):
-    return utils._get_subclass_instance(msigma, MSigma_MM13, _MSigma_Relation)
+def get_msigma_relation(msigma: Union[_MSigma_Relation, Type[_MSigma_Relation]] = None) -> _MSigma_Relation:
+    """Return a valid M-sigma (BH Mass vs. host galaxy velocity dispersion) instance.
 
+    Parameters
+    ----------
+    msigma : None or (class or instance of `_MSigma_Relation`),
+        If `None`, then a default M-sigma relation is returned.  Otherwise, the type is checked
+        to make sure it is a valid instance of an `_MSigma_Relation`.
 
-def _add_scatter(vals, eps_dex):
-    """Add scatter to array values.
+    Returns
+    -------
+    _MSigma_Relation
+        Instance of an Mbh-sigma relationship.
+
     """
-    eps_dex = None if (eps_dex is False) else eps_dex
-    if (eps_dex is not None):
+    return utils._get_subclass_instance(msigma, MSigma_KH2013, _MSigma_Relation)
+
+
+def _add_scatter(vals: ArrayLike, eps: ArrayLike) -> ArrayLike:
+    """Add scatter to the input values with a given standard deviation.
+
+    Parameters
+    ----------
+    vals : ArrayLike
+        Values that scatter should be added to.
+    eps : ArrayLike
+        Standard deviation of the scatter that should be added.
+        This must either be a single `float` value, or an ArrayLike broadcastable against `vals`.
+
+    Returns
+    -------
+    vals : ArrayLike
+        Values with added scatter.
+
+    """
+    eps = None if (eps is False) else eps
+    if (eps is not None):
         shp = np.shape(vals)
-        # for a scalar value of `eps_dex` draw from a zero-averaged normal distribution with that stdev
-        if np.isscalar(eps_dex):
-            eps_dex = np.random.normal(0.0, eps_dex, size=shp)
+        # for a scalar value of `eps` draw from a zero-averaged normal distribution with that stdev
+        if np.isscalar(eps):
+            eps = np.random.normal(0.0, eps, size=shp)
+        else:
+            eps = np.random.normal(0.0, eps)
 
-        if not np.all(shp == np.shape(eps_dex)):
-            err = f"Shape of `eps_dex` ({np.shape(eps_dex)}) does not match input values ({shp})!"
-            utils.error(err, TypeError)
+        # else:
+        #     err = f"Shape of `eps` ({np.shape(eps)}) does not match input values ({shp})!"
+        #     log.exception(err)
+        #     raise TypeError(err)
 
-        vals = vals + eps_dex
+        vals = vals + eps
 
     return vals
 
 
 def _log10_relation(xx, amp, plaw, eps_dex, x0=1.0):
-    """
+    """Calculate the forward output of a standard base-10 power-law scaling relationship.
 
-    y = amp * (xx/x0)^plaw * 10^Normal(0, e)
+    :math:`y = amp * (xx/x0)^plaw * 10^Normal(0, e)`
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     xx : scalar or array_like,
         Input arguments for scaling relationship.
     amp : scalar or array_like,
@@ -502,7 +764,32 @@ def _log10_relation(xx, amp, plaw, eps_dex, x0=1.0):
 
 
 def _log10_relation_reverse(yy, amp, plaw, eps_dex, x0=1.0):
-    """
+    """Calculate the reverse of a standard base-10 power-law scaling relationship.
+
+    From the standard expression, take as input `y` and return `x`:
+    :math:`y = amp * (xx/x0)^plaw * 10^Normal(0, e)`
+
+    NOTE: the scatter (`eps_dex`) adds *additional* variance, instead of removing it.
+
+    Parameters
+    ----------
+    yy : scalar or array_like,
+        Arguments to be reversed.  This would be the 'output' of the standard forward relation.
+    amp : scalar or array_like,
+        Amplitude (in linear space) of scaling relationship, in desired units (e.g. grams).
+    plaw : scalar or array_like,
+        Power-law index of scaling relationship.
+    eps_dex : `None` or `False` or scalar or array_like,
+        Scatter (in dex, i.e. log10 space) for the relationship.
+        If `False` or `None`, no scatter is added (the same as a value of 0.0).
+    x0 : scalar or array_like,
+        Units/normalization of input values.
+
+    Returns
+    -------
+    xx : array_like,
+        Values that would be the 'inputs' for the standard forward relationship.
+
     """
     xx = np.log10(yy/amp)
 
@@ -515,95 +802,20 @@ def _log10_relation_reverse(yy, amp, plaw, eps_dex, x0=1.0):
     return xx
 
 
-'''
-class MMBulge_Strawman(_MMBulge_Relation):
-    """
-    Provides a broken M_BH--M_bulge relation to test error checking.
-    Do not use this for any purpose other than error testing.
-
-    """
-
-    MASS_AMP = 3.0e8 * MSOL
-    MASS_PLAW = 1.0
-    MASS_REF = 1.0e11 * MSOL
-    SCATTER_DEX = 0.0
-    Z_PLAW = 0.0
-
-    def __init__(self, mamp=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None, zplaw=None):
-        if mamp is None:
-            mamp = self.MASS_AMP
-        if mplaw is None:
-            mplaw = self.MASS_PLAW
-        if mref is None:
-            mref = self.MASS_REF
-        if scatter_dex is None:
-            scatter_dex = self.SCATTER_DEX
-        if zplaw is None:
-            zplaw = self.Z_PLAW
-
-        self._mamp = mamp   # Mass-Amplitude [grams]
-        self._mplaw = mplaw   # Mass Power-law index
-        self._mref = mref   # Reference Mass (argument normalization)
-        self._bulge_mfrac = bulge_mfrac
-        self._scatter_dex = scatter_dex
-        self._zplaw = zplaw
-        print(f"WARNING: Using MMBulge_Strawman(). This should only be used for testing purposes.")
-        return
-
-    def bulge_mass_frac(self, mstar):
-        return self._bulge_mfrac
-
-    def mbh_from_host(self, host, scatter):
-        """Convert from stellar bulge-mass to blackhole mass.
-
-        Units of [grams].
-        """
-        if scatter:
-            scatter_dex = self._scatter_dex
-        else:
-            scatter_dex = None
-
-        zmamp = self._mamp * (1.0 + host['redz'])**self._zplaw
-        mbh = _log10_relation(host['mbulge'], zmamp, self._mplaw, scatter_dex, x0=self._mref)
-        return mbh
-
-    def mbulge_from_mbh(self, mbh, redz, scatter):
-        """Convert from blackhole mass to stellar bulge-mass.
-
-        Units of [grams].
-        """
-        if scatter:
-            scatter_dex = self._scatter_dex
-        else:
-            scatter_dex = None
-
-        zmamp = self._mamp * (1.0 + redz)**self._zplaw
-        mbulge = _log10_relation_reverse(mbh, zmamp, self._mplaw, scatter_dex, x0=self._mref)
-        return mbulge
-
-    def dmbh_dmbulge(self, mbulge):
-        # NOTE: scatter should never be used in the differential relation
-        dmdm = self.mbh_from_mbulge(mbulge, scatter=False)
-        dmdm = dmdm * self._mplaw / mbulge
-        return dmdm
-
-    def dmbulge_dmstar(self, mstar):
-        # NOTE: this only works for a constant value, do *not* return `self.bulge_mass_frac()`
-        return self._bulge_mfrac
-
-    def requirements(self):
-        return ['mbulge', 'redz', 'fairydust', 'Santa Claus']
-'''
-
 # =================================================================================================
 # ====                              Density Profiles & Relations                               ====
 # =================================================================================================
 
 
 class Klypin_2016:
-    """Interpolate between redshifts and masses to find DM halo concentrations.
+    """Class to calculate dark matter halo 'concentration' parameters based on [Klypin2016]_.
 
-    Eq. 24 & Table 2
+    This class does not need to be instantiated, all methods are class methods, simply call
+    ``Klypin_2016.concentration()``.
+
+    Interpolate between redshifts and masses to find DM halo concentrations.
+    [Klypin2016]_ Eq. 24 & Table 2.
+
     """
     _redz = [0.00e+00, 3.50e-01, 5.00e-01, 1.00e+00, 1.44e+00,
              2.15e+00, 2.50e+00, 2.90e+00, 4.10e+00, 5.40e+00]
@@ -639,31 +851,84 @@ class Klypin_2016:
         return yy
 
     @classmethod
-    def concentration(cls, mass, redz):
+    def concentration(cls, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
+        """Return the halo concentration for the given halo mass and redshift.
+
+        Parameters
+        ----------
+        mhalo : ArrayLike
+            Halo mass.  [grams]
+        redz : ArrayLike
+            Redshift.
+
+        Returns
+        -------
+        conc : ArrayLike
+            Halo concentration parameters.  []
+
+        """
         c0 = cls._c0(redz)
         gamma = cls._gamma(redz)
         mass0 = cls._mass0(redz)
-        f1 = np.power(mass/(1e12*MSOL/cosmo.h), -gamma)
-        f2 = 1 + np.power(mass/mass0, 0.4)
+        f1 = np.power(mhalo/(1e12*MSOL/cosmo.h), -gamma)
+        f2 = 1 + np.power(mhalo/mass0, 0.4)
         conc = c0 * f1 * f2
         return conc
 
 
 class _Density_Profile(abc.ABC):
+    """Base class for implementing an arbitrary radial density profile (typically of galaxies).
+    """
 
     @abc.abstractmethod
-    def density(self, rads, *args, **kwargs):
-        pass
+    def density(self, rads: ArrayLike, *args, **kwargs) -> ArrayLike:
+        """Return the density at the given radii.
+
+        Parameters
+        ----------
+        rads : ArrayLike
+            Desired radial distances.  [cm]
+
+        Returns
+        -------
+        density : ArrayLike
+            Densities at the given radii.  [g/cm^3]
+
+        """
 
     @classmethod
     def time_dynamical(cls, rads, *args, **kwargs):
-        """Dynamical time, defined as (G M_enc / r^3) ^ -1/2 = r / v_circ
+        """Return the dynamical time, defined as :math:`(G M_enc / r^3) ^ -1/2 = r / v_circ`.
+
+        Parameters
+        ----------
+        rads : ArrayLike
+            Desired radial distances.  [cm]
+
+        Returns
+        -------
+        tden : ArrayLike
+            Dynamical times at the given radii.  [sec]
+
         """
         tdyn = rads / cls.velocity_circular(rads, *args, **kwargs)
         return tdyn
 
     @abc.abstractmethod
     def mass(cls, rads, *args, **kwargs):
+        """Calculate the mass enclosed out to the given radii.
+
+        Parameters
+        ----------
+        rads : ArrayLike
+            Desired radial distances.  [cm]
+
+        Returns
+        -------
+        mass : ArrayLike
+            Enclosed masses at the given radii.  [gram]
+
+        """
         pass
 
     '''
@@ -679,7 +944,18 @@ class _Density_Profile(abc.ABC):
 
     @classmethod
     def velocity_circular(cls, rads, *args, **kwargs):
-        """Circular velocity, defined as (G M_enc / r) ^ 1/2
+        """Circular velocity, defined as :math:`(G M_enc / r) ^ 1/2`.
+
+        Parameters
+        ----------
+        rads : ArrayLike
+            Desired radial distances.  [cm]
+
+        Returns
+        -------
+        velo : ArrayLike
+            Velocities at the given radii.  [cm/s]
+
         """
         mass = cls.mass(rads, *args, **kwargs)
         velo = NWTG * mass / rads
@@ -688,23 +964,56 @@ class _Density_Profile(abc.ABC):
 
 
 class NFW(_Density_Profile):
+    """Navarro, Frank & White dark-matter density profile from [NFW1997]_.
+    """
 
-    @classmethod
-    def density(cls, rads, mhalo, redz):
+    @staticmethod
+    def density(rads: ArrayLike, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
         """NFW DM Density profile.
-        [NFW-97]
+
+        Parameters
+        ----------
+        rads : ArrayLike
+            Target radial distances.  [cm]
+        mhalo : ArrayLike
+            Halo mass.  [grams]
+        redz : ArrayLike
+            Redshift.    []
+
+        Returns
+        -------
+        dens : ArrayLike
+            Densities at the given radii.  [g/cm^3]
+
         """
-        rho_s, rs = cls._nfw_rho_rad(mhalo, redz)
+        rho_s, rs = NFW._nfw_rho_rad(mhalo, redz)
         dens = rads / rs
         dens = dens * np.square(1 + dens)
         dens = rho_s / dens
         return dens
 
-    @classmethod
-    def mass(cls, rads, mhalo, redz):
+    @staticmethod
+    def mass(rads: ArrayLike, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
+        """DM mass enclosed at the given radii from an NFW profile.
+
+        Parameters
+        ----------
+        rads : ArrayLike
+            Target radial distances.  [cm]
+        mhalo : ArrayLike
+            Halo mass.  [gram]
+        redz : ArrayLike
+            Redshift.    []
+
+        Returns
+        -------
+        mass : ArrayLike
+            Mass enclosed within the given radii.  [gram]
+
+        """
         rads, mhalo, redz = np.broadcast_arrays(rads, mhalo, redz)
         # Get Halo concentration
-        rho_s, rs = cls._nfw_rho_rad(mhalo, redz)
+        rho_s, rs = NFW._nfw_rho_rad(mhalo, redz)
         # NOTE: Expression causes numerical problems for rads/rs <~ 1e-8
         # only use proper analytic expression in safe regime ("hi")
         # use small radius approximation for unsafe regime ("lo")
@@ -721,9 +1030,26 @@ class NFW(_Density_Profile):
     def _concentration(mhalo, redz):
         return Klypin_2016.concentration(mhalo, redz)
 
-    @classmethod
-    def _nfw_rho_rad(cls, mhalo, redz):
-        conc = cls._concentration(mhalo, redz)
+    @staticmethod
+    def _nfw_rho_rad(mhalo, redz):
+        """Return the DM halo parameters for characteristic density and halo scale radius.
+
+        Parameters
+        ----------
+        mhalo : ArrayLike
+            Halo mass.  [grams]
+        redz : ArrayLike
+            Redshift.
+
+        Returns
+        -------
+        rho_s : ArrayLike
+            DM halo characteristic density.   [g/cm^3]
+        rs : ArrayLike
+            Scale radius of the DM halo.  [cm]
+
+        """
+        conc = NFW._concentration(mhalo, redz)
         log_c_term = np.log(1 + conc) - conc/(1+conc)
 
         # Critical over-density
@@ -735,14 +1061,44 @@ class NFW(_Density_Profile):
         rs = np.power(rs, 1.0/3.0)
         return rho_s, rs
 
-    @classmethod
-    def radius_scale(cls, mhalo, redz):
-        rs = cls._nfw_rho_rad(mhalo, redz)[1]
+    @staticmethod
+    def radius_scale(mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
+        """Return the DM-halo scale radius.
+
+        Parameters
+        ----------
+        mhalo : ArrayLike
+            Halo mass.  [grams]
+        redz : ArrayLike
+            Redshift.
+
+        Returns
+        -------
+        rs : ArrayLike
+            Scale radius of the DM halo.  [cm]
+
+        """
+        rs = NFW._nfw_rho_rad(mhalo, redz)[1]
         return rs
 
-    @classmethod
-    def density_critical(cls, mhalo, redz):
-        rs = cls._nfw_rho_rad(mhalo, redz)[0]
+    @staticmethod
+    def density_characteristic(mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
+        """Return the DM halo parameters for characteristic density.
+
+        Parameters
+        ----------
+        mhalo : ArrayLike
+            Halo mass.  [grams]
+        redz : ArrayLike
+            Redshift.
+
+        Returns
+        -------
+        rho_s : ArrayLike
+            DM halo characteristic density.   [g/cm^3]
+
+        """
+        rs = NFW._nfw_rho_rad(mhalo, redz)[0]
         return rs
 
 
@@ -752,9 +1108,14 @@ class NFW(_Density_Profile):
 
 
 class _StellarMass_HaloMass(abc.ABC):
+    """Base class for a general one-parameter Stellar-Mass vs Halo-Mass relation.
 
-    _NUM_GRID = 200
-    _MHALO_GRID_EXTR = [9, 16]
+    Uses log-linear interpolation of a pre-calculated grid to calculate halo mass from stellar mass.
+
+    """
+
+    _NUM_GRID = 200              #: grid size
+    _MHALO_GRID_EXTR = [7, 20]   #: extrema for the halo mass grid [log10(M/Msol)]
 
     def __init__(self):
         self._mhalo_grid = np.logspace(*self._MHALO_GRID_EXTR, self._NUM_GRID) * MSOL
@@ -766,62 +1127,100 @@ class _StellarMass_HaloMass(abc.ABC):
         return
 
     @abc.abstractmethod
-    def stellar_mass(self, mhalo):
+    def stellar_mass(self, *args, **kwargs) -> np.ndarray:
+        """Calculate the stellar-mass for the given halo mass.
+
+        Parameters
+        ----------
+        mhalo : ArrayLike
+            Halo mass.  [gram]
+
+        Returns
+        -------
+        mstar : ArrayLike
+            Stellar mass.  [gram]
+
+        """
         pass
 
-    def halo_mass(self, mstar):
+    def halo_mass(self, mstar: ArrayLike) -> np.ndarray:
+        """Calculate the stellar-mass for the given halo mass.
+
+        Parameters
+        ----------
+        mstar : ArrayLike
+            Stellar mass.  [gram]
+
+        Returns
+        -------
+        mhalo : ArrayLike
+            Halo mass.  [gram]
+
+        """
         ynew = MSOL * 10.0 ** self._mhalo_from_mstar(np.log10(mstar/MSOL))
         return ynew
 
 
 class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
+    """Base class for a Stellar-Mass vs Halo-Mass relation including redshift dependence.
 
-    _REDZ_GRID_EXTR = [0.0, 9.0]
-    _MSTAR_GRID_EXTR = [5.0, 12.0]
+    Uses interpolation of a pre-calculated grid to calculate halo mass from stellar mass and redz.
+
+    """
+
+    _REDZ_GRID_EXTR = [0.0, 10.0]     #: edges of the parameter space in redshift
+    _MSTAR_GRID_EXTR = [5.0, 14.0]    #: edges of the parameter space in stellar-mass [log10(M/Msol)]
 
     def __init__(self, extend_nearest=True):
-        self._mhalo_grid = np.logspace(*self._MHALO_GRID_EXTR, self._NUM_GRID) * MSOL
-        self._redz_grid = np.linspace(*self._REDZ_GRID_EXTR, self._NUM_GRID+2)
+        self._mhalo_grid = np.logspace(*self._MHALO_GRID_EXTR, self._NUM_GRID) * MSOL   # shape (H,)
+        self._redz_grid = np.linspace(*self._REDZ_GRID_EXTR, self._NUM_GRID+2)          # shape (Z,)
         mhalo = self._mhalo_grid[:, np.newaxis]
         redz = self._redz_grid[np.newaxis, :]
-        self._mstar = self.stellar_mass(mhalo, redz)  # should be units of [Msol]
+        # Calculate stellar-mass given the grid of halo-mass and redshift
+        # Shape (H, Z)
+        self._mstar = self.stellar_mass(mhalo, redz)  # units of [gram]
 
         # ---- Construct interpolator to go from (mstar, redz) ==> (mhalo)
+
         # first: convert data to grid of (mstar, redz) ==> (mhalo)
         mstar = np.log10(self._mstar / MSOL)
+        # store the normal shape (H, Z)
+        shape = mstar.shape
+        # convert from (H, Z) ==> (H*Z,)
+        mstar_rav = mstar.ravel()
+        # Get grids for halo-mass and redshift, (H, Z) ==> (H*Z,)
         redz = self._redz_grid
         mhalo = np.log10(self._mhalo_grid / MSOL)
-        aa = mstar.ravel()
-        cc, bb = np.meshgrid(mhalo, redz, indexing='ij')
-        bb, cc = [bc.ravel() for bc in [bb, cc]]
+        mhalo_ravel, redz_ravel = np.meshgrid(mhalo, redz, indexing='ij')
+        redz_ravel, mhalo_ravel = [bc.ravel() for bc in [redz_ravel, mhalo_ravel]]
 
-        shape = self._mstar.shape
-        aextr = [aa.min(), aa.max()]
+        mstar_out_extr = [mstar_rav.min(), mstar_rav.max()]
         if self._MSTAR_GRID_EXTR is not None:
             extr = self._MSTAR_GRID_EXTR
-            if extr[0] < aextr[0] or extr[1] > aextr[1]:
-                log.info("using wider range of stellar-mass than calculated from halo-mass grid!")
-                log.debug(f"\tmstar(mhalo) = [{aextr[0]:.2e}, {aextr[1]:.2e}]")
+            if extr[0] < mstar_out_extr[0] or extr[1] > mstar_out_extr[1]:
+                log.debug("using wider range of stellar-mass than calculated from halo-mass grid!")
+                log.debug(f"\tmstar(mhalo) = [{mstar_out_extr[0]:.2e}, {mstar_out_extr[1]:.2e}]")
                 log.debug(f"\tmstar grid   = [{extr[0]:.2e}, {extr[1]:.2e}]")
 
-            aextr = extr
+            mstar_out_extr = extr
 
-        xx = np.linspace(*aextr, shape[0])
+        xx = np.linspace(*mstar_out_extr, shape[0])
 
-        self._mstar_grid = MSOL * 10.0 ** xx
-        self._mhalo = MSOL * 10.0 ** cc.reshape(self._mstar.shape)
+        self._mstar_grid = MSOL * (10.0 ** xx)
+        self._mhalo = MSOL * (10.0 ** mhalo_ravel.reshape(shape))
         yy = redz
         xg, yg = np.meshgrid(xx, yy, indexing='ij')
-        self._aa = aa    # NOTE: these are being stored for debugging/diagnostics
-        self._bb = bb    # NOTE: these are being stored for debugging/diagnostics
-        self._cc = cc    # NOTE: these are being stored for debugging/diagnostics
-        # grid = sp.interpolate.LinearNDInterpolator((aa, bb), cc)((xg, yg))
-        # grid = sp.interpolate.NearestNDInterpolator((aa, bb), cc)((xg, yg))
-        grid = sp.interpolate.griddata((aa, bb), cc, (xg, yg))
+        self._xx = xx    # NOTE: these are being stored for debugging/diagnostics
+        self._yy = yy    # NOTE: these are being stored for debugging/diagnostics
+        self._aa = mstar_rav    # NOTE: these are being stored for debugging/diagnostics
+        self._bb = redz_ravel    # NOTE: these are being stored for debugging/diagnostics
+        self._cc = mhalo_ravel    # NOTE: these are being stored for debugging/diagnostics
+
+        grid = sp.interpolate.griddata((mstar_rav, redz_ravel), mhalo_ravel, (xg, yg))
         bads = ~np.isfinite(grid)
         if np.any(bads):
             if extend_nearest:
-                backup = sp.interpolate.NearestNDInterpolator((aa, bb), cc)((xg, yg))
+                backup = sp.interpolate.NearestNDInterpolator((mstar_rav, redz_ravel), mhalo_ravel)((xg, yg))
                 grid[bads] = backup[bads]
             else:
                 log.warning(f"Non-finite values ({utils.frac_str(bads)}) in mhalo interpolation grid!")
@@ -834,33 +1233,67 @@ class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
         return
 
     @abc.abstractmethod
-    def stellar_mass(self, mhalo, redz):
+    def stellar_mass(self, mhalo: ArrayLike, redz: ArrayLike) -> np.ndarray:
+        """Calculate the stellar-mass for the given halo mass and redshift.
+
+        Parameters
+        ----------
+        mhalo : ArrayLike
+            Halo mass.  [gram]
+        redz : ArrayLike
+            Redshift.
+
+        Returns
+        -------
+        mstar : ArrayLike
+            Stellar mass.  [gram]
+
+        """
         pass
 
-    def halo_mass(self, mstar, redz, clip=False):
+    def halo_mass(self, mstar: ArrayLike, redz: ArrayLike, clip: bool = False) -> np.ndarray:
+        """Calculate the halo-mass for the given stellar mass and redshift.
+
+        Parameters
+        ----------
+        mstar : ArrayLike
+            Stellar mass.  [gram]
+        redz : ArrayLike
+            Redshift.
+        clip : bool
+            Whether or not to clip the input `mstar` values to the extrema of the predefined grid
+            of stellar-masses (`_mstar_grid`).
+
+        Returns
+        -------
+        mhalo : ArrayLike
+            Halo mass.  [gram]
+
+        """
         if (np.ndim(mstar) not in [0, 1]) or np.any(np.shape(mstar) != np.shape(redz)):
             err = f"both `mstar` ({np.shape(mstar)}) and `redz` ({np.shape(redz)}) must be 1D and same length!"
             log.error(err)
             raise ValueError(err)
 
         squeeze = np.isscalar(mstar)
-        mstar = np.log10(mstar/MSOL)
+        mstar_log10 = np.log10(mstar/MSOL)
         if clip:
             bounds = np.array([self._mstar_grid[0], self._mstar_grid[-1]])
             bounds = np.log10(bounds / MSOL)
-            idx = (mstar < bounds[0]) | (bounds[1] < mstar)
+            idx = (mstar_log10 < bounds[0]) | (bounds[1] < mstar_log10)
             if np.any(idx):
-                log.info(f"clipping {utils.frac_str(idx)} `mstar` values outside bounds ({bounds})!")
-                mstar[idx] = np.clip(mstar[idx], *bounds)
+                log.debug(f"clipping {utils.frac_str(idx)} `mstar` values outside bounds ({bounds})!")
+                mstar_log10[idx] = np.clip(mstar_log10[idx], *bounds)
 
-        vals = np.array([mstar, redz])
+        vals = np.array([mstar_log10, redz])
         try:
             ynew = MSOL * 10.0 ** self._mhalo_from_mstar_redz(vals.T)
         except ValueError as err:
-            log.error("Interplation (mstar, redz) ==> mhalo failed!")
+            log.exception("Interplation (mstar, redz) ==> mhalo failed!")
             log.error(err)
-            for vv, nn in zip(vals, ['log10(mstar/Msol)', 'redz']):
-                log.error(f"{nn} : {utils.stats(vv)}")
+            extr = [utils.minmax(xx) for xx in [self._xx, self._yy]]
+            for vv, nn, ee in zip(vals, ['log10(mstar/Msol)', 'redz'], extr):
+                log.error(f"{nn} (extrema = {ee}): {utils.stats(vv)}")
 
             raise
 
@@ -871,9 +1304,10 @@ class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
 
 
 class Guo_2010(_StellarMass_HaloMass):
-    """
-    Guo+2010 : Eq.3
-    https://ui.adsabs.harvard.edu/abs/2010MNRAS.404.1111G/abstract
+    """Stellar-Mass - Halo-Mass relation from Guo et al. 2010.
+
+    [Guo2010]_ Eq.3
+
     """
 
     _NORM = 0.129
@@ -892,8 +1326,10 @@ class Guo_2010(_StellarMass_HaloMass):
 
 
 class Behroozi_2013(_StellarMass_HaloMass_Redshift):
-    """
-    [Behroozi+2013] best fit values are at the beginning of Section 5 (pg.9), uncertainties are 1-sigma
+    """Redshift-dependent Stellar-Mass - Halo-Mass relation based on Behroozi et al. 2013.
+
+    [Behroozi2013]_ best fit values are at the beginning of Section 5 (pg.9), uncertainties are 1-sigma.
+
     """
 
     def __init__(self, *args, **kwargs):
@@ -901,13 +1337,21 @@ class Behroozi_2013(_StellarMass_HaloMass_Redshift):
         super().__init__(*args, **kwargs)
         return
 
+    def stellar_mass(self, mhalo, redz):
+        """This is [Behroozi2013]_ Eq.3 (upper)"""
+        eps = self._eps(redz)
+        m1 = self._m1(redz)
+        mstar = np.log10(eps*m1/MSOL) + self._f_func(np.log10(mhalo/m1), redz) - self._f0
+        mstar = np.power(10.0, mstar) * MSOL
+        return mstar
+
     def _nu_func(sca):
-        """[Behroozi+2013] Eq. 4"""
+        """[Behroozi2013]_ Eq. 4"""
         return np.exp(-4.0 * sca*sca)
 
     @classmethod
     def _param_func(cls, redz, v0, va, vz, va2=None):
-        """[Behroozi+2013] Eq. 4"""
+        """[Behroozi2013]_ Eq. 4"""
         rv = v0
         sca = cosmo.z_to_a(redz)
         rv = rv + cls._nu_func(sca) * (va * (sca - 1.0) + vz * redz)
@@ -982,14 +1426,22 @@ class Behroozi_2013(_StellarMass_HaloMass_Redshift):
         ff = t1 + delta * t2 / t3
         return ff
 
-    def stellar_mass(self, mhalo, redz):
-        """[Behroozi+2013] Eq.3 (upper)"""
-        eps = self._eps(redz)
-        m1 = self._m1(redz)
-        mstar = np.log10(eps*m1/MSOL) + self._f_func(np.log10(mhalo/m1), redz) - self._f0
-        mstar = np.power(10.0, mstar) * MSOL
-        return mstar
 
+def get_stellar_mass_halo_mass_relation(
+    smhm: Union[_StellarMass_HaloMass, Type[_StellarMass_HaloMass]] = None
+) -> _StellarMass_HaloMass:
+    """Return a valid Stellar-Mass vs. Halo-Mass relation instance.
 
-def get_stellar_mass_halo_mass_relation(smhm=None):
+    Parameters
+    ----------
+    smhm : None or (type or instance of `_StellarMass_HaloMass`),
+        If `None`, then a default relation is returned.  Otherwise, the type is checked
+        to make sure it is a valid instance of an `_StellarMass_HaloMass`.
+
+    Returns
+    -------
+    _StellarMass_HaloMass
+        Instance of an Mbh-Mbulge relationship.
+
+    """
     return utils._get_subclass_instance(smhm, Behroozi_2013, _StellarMass_HaloMass)

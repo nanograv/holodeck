@@ -1,12 +1,10 @@
-"""holodeck
-
-Massive black hole (MBH) binary simulator for pulsar timing array (and associated) signals.
-
+"""holodeck: Massive black hole (MBH) binary simulator for pulsar timing array signals.
 """
 
 from setuptools import setup, find_packages
 
-short_description = __doc__.strip()
+# NOTE: `short_description` gets first line of `__doc__` only (linebreaks not allowed by setuptools)
+short_description = __doc__.strip().split('\n')[0]
 
 with open("README.md", "r") as handle:
     long_description = handle.read()
@@ -43,6 +41,6 @@ setup(
 
     # Additional entries you may want simply uncomment the lines you want and fill in the data
     # url='http://www.my_package.com',  # Website
-    python_requires=">=3.7",          # Python version restrictions
+    python_requires=">=3.8",          # Python version restrictions
 
 )

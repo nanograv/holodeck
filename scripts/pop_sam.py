@@ -74,7 +74,7 @@ def main():
     _type_
 
     """
-    fobs = holo.utils.nyquist_freqs(args.dur * YR, args.cad * YR)
+    fobs = holo.utils.nyquist_freqs_edges(args.dur * YR, args.cad * YR)
     if args.debug:
         log.warning("!RUNNING IN 'DEBUG' MODE!")
         args.shape = 20 if (20 < args.shape) else args.shape
@@ -91,7 +91,7 @@ def main():
 
     # ---- Calculate Number of Binaries
 
-    edges, dnum = sam.diff_num_from_hardening(hard, fobs=fobs)
+    edges, dnum = sam.dynamic_binary_number(hard, fobs=fobs/2.)
 
     edges_integrate = [np.copy(ee) for ee in edges]
     edges_sample = [np.log10(edges[0]), edges[1], edges[2], np.log(edges[3])]
@@ -114,7 +114,7 @@ def main():
 
     # Find the 'mass' (total number of binaries in each bin) by multiplying each bin by its volume
     # NOTE: this needs to be done manually, instead of within kalepy, because of log-spacings
-    mass = holo.sam._integrate_differential_number(edges_integrate, dnum, freq=True)
+    mass = holo.utils._integrate_grid_differential_number(edges_integrate, dnum, freq=True)
 
     # ---- Prepare filenames
 
@@ -187,11 +187,9 @@ def main():
 
 
 if __name__ == "__main__":
-    header = "holodeck :: pop_sam"
+    header = f"holodeck :: {__file__}"
     print(header)
     print("=" * len(header) + "\n")
-    print(f"{args=}")
+    print(f"args={args}")
 
     main()
-
-    pass

@@ -113,3 +113,7 @@ output/*
 *.png
 *.pdf
 analysis
+docs/source/apidoc_modules
+hostfile
+readthedocs.html
+data/

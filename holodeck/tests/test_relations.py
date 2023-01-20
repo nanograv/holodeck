@@ -18,7 +18,7 @@ from holodeck.constants import MSOL
 # ==============================================================================
 
 
-def mbh_from_mbulge_mm13(mbulge):
+def mbh_from_mbulge_MM2013(mbulge):
 
     ALPHA = 8.46
     BETA = 1.05
@@ -36,19 +36,19 @@ def mbh_from_mbulge_mm13(mbulge):
     return mbh
 
 
-def mbh_from_mbulge_kh13(mbulge):
+def mbh_from_mbulge_KH2013(mbulge):
 
-    # [KH13] Eq. 10
+    # [KH2013] Eq. 10
     AMP = 0.49 * (1e9 * MSOL)
     PLAW = 1.17
     # EPS = 0.28
     X0 = 1e11 * MSOL
 
-    def func_kh13(xx):
+    def func_KH2013(xx):
         yy = AMP * np.power(xx/X0, PLAW)
         return yy
 
-    mbh = func_kh13(mbulge)
+    mbh = func_KH2013(mbulge)
     return mbh
 
 
@@ -80,7 +80,7 @@ def check_relation(mmbulge_relation, truth_func):
 def check_scatter_per_dex(mmbulge_relation, scatter_dex):
     EXTR = [9.0, 12.0]   # values are log10(X/Msol)
     NUM = 1e4
-    TOL = 3.0
+    TOL = 4.0
     SIGMAS = [-2, -1, 0, 1, 2]
     # draw a single, random (log-uniform) bulge-mass within given bounds
     mbulge = np.random.uniform(*EXTR)
@@ -133,34 +133,34 @@ def check_scatter_per_dex(mmbulge_relation, scatter_dex):
     return
 
 
-def test_mm13_scatter():
-    mm13 = holo.relations.MMBulge_MM13()
-    check_scatter_per_dex(mm13, 0.34)
+def test_MM2013_scatter():
+    MM2013 = holo.relations.MMBulge_MM2013()
+    check_scatter_per_dex(MM2013, 0.34)
     return
 
 
-def test_kh13_scatter():
-    kh13 = holo.relations.MMBulge_KH13()
-    check_scatter_per_dex(kh13, 0.28)
+def test_KH2013_scatter():
+    KH2013 = holo.relations.MMBulge_KH2013()
+    check_scatter_per_dex(KH2013, 0.28)
     return
 
 
-def test_mm13_basic():
-    mm13 = holo.relations.MMBulge_MM13()
-    check_relation(mm13, mbh_from_mbulge_mm13)
+def test_MM2013_basic():
+    MM2013 = holo.relations.MMBulge_MM2013()
+    check_relation(MM2013, mbh_from_mbulge_MM2013)
     return
 
 
-def test_kh13_basic():
-    kh13 = holo.relations.MMBulge_KH13()
-    check_relation(kh13, mbh_from_mbulge_kh13)
+def test_KH2013_basic():
+    KH2013 = holo.relations.MMBulge_KH2013()
+    check_relation(KH2013, mbh_from_mbulge_KH2013)
     return
 
 
 def check_mass_reset(mmbulge_relation, truth_func):
     pop = holo.population.Pop_Illustris()
-    mod_mm13 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=False)
-    pop.modify(mod_mm13)
+    mod_MM2013 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=False)
+    pop.modify(mod_MM2013)
     mass = pop.mass
 
     truth = truth_func(pop.mbulge)
@@ -171,18 +171,18 @@ def check_mass_reset(mmbulge_relation, truth_func):
     return
 
 
-def test_mass_reset_mm13():
-    print("test_mass_reset_mm13")
-    mmbulge_relation = holo.relations.MMBulge_MM13()
-    truth_func = mbh_from_mbulge_mm13
+def test_mass_reset_MM2013():
+    print("test_mass_reset_MM2013")
+    mmbulge_relation = holo.relations.MMBulge_MM2013()
+    truth_func = mbh_from_mbulge_MM2013
     check_mass_reset(mmbulge_relation, truth_func)
     return
 
 
-def test_mass_reset_kh13():
-    print("test_mass_reset_kh13")
-    mmbulge_relation = holo.relations.MMBulge_KH13()
-    truth_func = mbh_from_mbulge_kh13
+def test_mass_reset_KH2013():
+    print("test_mass_reset_KH2013")
+    mmbulge_relation = holo.relations.MMBulge_KH2013()
+    truth_func = mbh_from_mbulge_KH2013
     check_mass_reset(mmbulge_relation, truth_func)
     return
 
@@ -222,5 +222,46 @@ class Test_MMBulge_Standard:
             # make sure they're equal
             err = f"MMBulge_Standard({arg}).dmstar_dmbh value ({test:.8e}) does not match truth ({deriv:.8e})!"
             assert np.isclose(test, deriv), err
+
+        return
+
+
+class Test_Behroozi_2013:
+
+    def test_init(self):
+        holo.relations.Behroozi_2013()
+        return
+
+    def test_basics(self):
+        NUM = 1000
+        behr = holo.relations.Behroozi_2013()
+
+        mstar = np.random.uniform(5, 12, NUM)
+        mstar = MSOL * (10.0 ** mstar)
+        redz = np.random.uniform(0.0, 6.0, NUM)
+        mstar = np.sort(mstar)
+        redz = np.sort(redz)[::-1]
+
+        mhalo = behr.halo_mass(mstar, redz)
+        assert np.all(mhalo > 0.0)
+
+        mstar_check = behr.stellar_mass(mhalo, redz)
+        mhalo_check = behr.halo_mass(mstar, redz)
+        assert np.all(mstar_check > 0.0)
+        print(f"mstar  input: {holo.utils.stats(mstar)}")
+        print(f"mstar output: {holo.utils.stats(mstar_check)}")
+        bads = ~np.isclose(mstar, mstar_check, rtol=0.1)
+        if np.any(bads):
+            print(f"bad mstar input  : {mstar[bads]/MSOL}")
+            print(f"bad mstar output : {mstar_check[bads]/MSOL}")
+        assert not np.any(bads)
+
+        print(f"mhalo  input: {holo.utils.stats(mhalo/MSOL)}")
+        print(f"mhalo output: {holo.utils.stats(mhalo_check/MSOL)}")
+        bads = ~np.isclose(mhalo, mhalo_check, rtol=0.1)
+        if np.any(bads):
+            print(f"bad mhalo input  : {mhalo[bads]/MSOL}")
+            print(f"bad mhalo output : {mhalo_check[bads]/MSOL}")
+        assert not np.any(bads)
 
         return

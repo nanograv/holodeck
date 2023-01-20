@@ -1,4 +1,7 @@
 """Plotting module.
+
+Provides convenience methods for generating standard plots and components using `matplotlib`.
+
 """
 
 import numpy as np
@@ -59,7 +62,8 @@ def figax(figsize=[10, 4], ncols=1, nrows=1, sharex=False, sharey=False, squeeze
           widths=None, heights=None, grid=True, **kwargs):
     """Create matplotlib figure and axes instances.
 
-    Convenience function to create fig/axes using `plt.subplots`, and set default parameters.
+    Convenience function to create fig/axes using `plt.subplots`, and quickly modify standard
+    parameters.
 
     Parameters
     ----------
@@ -76,7 +80,7 @@ def figax(figsize=[10, 4], ncols=1, nrows=1, sharex=False, sharey=False, squeeze
     squeeze : bool, optional
         Remove dimensions of length (1,) in the `axes` object.
     scale : [type], optional
-        Axes scaling to be applied to all x/y axes ['log', 'lin'].
+        Axes scaling to be applied to all x/y axes.  One of ['log', 'lin'].
     xscale : str, optional
         Axes scaling for xaxes ['log', 'lin'].
     xlabel : str, optional
@@ -184,8 +188,8 @@ def smap(args=[0.0, 1.0], cmap=None, log=False, norm=None, midpoint=None,
          under='0.8', over='0.8', left=None, right=None):
     """Create a colormap from a scalar range to a set of colors.
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     args : scalar or array_like of scalar
         Range of valid scalar values to normalize with
     cmap : None, str, or ``matplotlib.colors.Colormap`` object
@@ -253,6 +257,56 @@ def smap(args=[0.0, 1.0], cmap=None, log=False, norm=None, midpoint=None,
     return smap
 
 
+def set_axis_color(ax, axis='y', fs=None, color='k', side='right'):
+    # Set tick colors and font-sizes
+    kw = dict(labelsize=fs) if (fs is not None) else {}
+    ax.tick_params(axis=axis, which='both', colors=color, **kw)
+
+    if axis == 'x':
+        ax.xaxis.label.set_color(color)
+        offt = ax.get_xaxis().get_offset_text()
+    else:
+        ax.yaxis.label.set_color(color)
+        offt = ax.get_yaxis().get_offset_text()
+
+    # Set Spine colors
+    if side is not None:
+        ax.spines[side].set_color(color)
+    offt.set_color(color)
+    return ax
+
+
+def set_axis_pos(ax, axis, pos, side):
+    axis = axis.lower()
+
+    if axis == 'x':
+        offt = ax.get_xaxis().get_offset_text()
+
+        offt.set_y(pos)
+        ax.xaxis.set_label_position(side)
+        ax.xaxis.set_ticks_position(side)
+
+    elif axis == 'y':
+        offt = ax.get_yaxis().get_offset_text()
+
+        offt.set_x(pos)
+        ax.yaxis.set_label_position(side)
+        ax.yaxis.set_ticks_position(side)
+
+    else:
+        err = f"`axis` argument should be ['x', 'y'], got '{axis}'!"
+        log.exception(err)
+        raise ValueError(err)
+
+    # Set Spine colors
+    ax.set_frame_on(True)
+    ax.spines[side].set_position(('axes', pos))
+    ax.spines[side].set_visible(True)
+    ax.patch.set_visible(False)
+
+    return ax
+
+
 def _get_norm(data, midpoint=None, log=False):
     """
     """
@@ -266,7 +320,9 @@ def _get_norm(data, midpoint=None, log=False):
         try:
             min, max = utils.minmax(data, filter=log)
         except:
-            utils.error(f"Input `data` ({type(data)}) must be an integer, (2,) of scalar, or ndarray of scalar!")
+            err = f"Input `data` ({type(data)}) must be an integer, (2,) of scalar, or ndarray of scalar!"
+            log.exception(err)
+            raise ValueError(err)
 
     # print(f"{min=}, {max=}")
 
@@ -310,7 +366,7 @@ def _get_cmap(cmap):
         raise
 
 
-def _get_hist_steps(xx, yy):
+def _get_hist_steps(xx, yy, yfilter=None):
     """Convert from
 
     Parameters
@@ -322,22 +378,37 @@ def _get_hist_steps(xx, yy):
 
     Returns
     -------
-    aa : array (N,)
+    xnew : array (N,)
         x-values
-    bb : array (N,)
+    ynew : array (N,)
         y-values
 
     """
     size = len(xx) - 1
     if size != len(yy):
         err = f"Length of `xx` ({len(xx)}) should be length of `yy` ({len(yy)}) + 1!"
-        utils.error(err)
+        log.exception(err)
+        raise ValueError(err)
 
-    aa = [[xx[ii], xx[ii+1]] for ii in range(xx.size-1)]
-    bb = [[yy[ii], yy[ii]] for ii in range(xx.size-1)]
-    aa = np.array(aa).flatten()
-    bb = np.array(bb).flatten()
-    return aa, bb
+    xnew = [[xx[ii], xx[ii+1]] for ii in range(xx.size-1)]
+    ynew = [[yy[ii], yy[ii]] for ii in range(xx.size-1)]
+    xnew = np.array(xnew).flatten()
+    ynew = np.array(ynew).flatten()
+
+    if yfilter is not None:
+        if yfilter is True:
+            idx = (ynew > 0.0)
+        else:
+            idx = yfilter(ynew)
+
+        xnew = xnew[idx]
+        ynew = ynew[idx]
+
+    return xnew, ynew
+
+
+def draw_hist_steps(ax, xx, yy, yfilter=None, **kwargs):
+    return ax.plot(*_get_hist_steps(xx, yy, yfilter=yfilter), **kwargs)
 
 
 # =================================================================================================
@@ -366,13 +437,15 @@ def plot_bin_pop(pop):
 
 
 def plot_mbh_scaling_relations(pop, fname=None, color='r'):
+    units = r"$[\log_{10}(M/M_\odot)]$"
     fig, ax = plt.subplots(figsize=[8, 5])
+    ax.set(xlabel=f'Stellar Mass {units}', ylabel=f'BH Mass {units}')
 
     #   ====    Plot McConnell+Ma-2013 Data    ====
     handles = []
     names = []
     if fname is not None:
-        hh = _draw_mm13_data(ax, fname)
+        hh = _draw_MM2013_data(ax, fname)
         handles.append(hh)
         names.append('McConnell+Ma')
 
@@ -385,7 +458,7 @@ def plot_mbh_scaling_relations(pop, fname=None, color='r'):
     return fig
 
 
-def _draw_mm13_data(ax):
+def _draw_MM2013_data(ax):
     data = observations.load_mcconnell_ma_2013()
     data = {kk: data[kk] if kk == 'name' else np.log10(data[kk]) for kk in data.keys()}
     key = 'mbulge'
@@ -464,8 +537,8 @@ def plot_gwb(gwb, color=None, uniform=False, nreals=5):
 
     Plots samples, confidence intervals, power-law, and adds twin-Hz axis (x2).
 
-    Arguments
-    ---------
+    Parameters
+    ----------
     gwb : `gravwaves.Grav_Waves` (subclass) instance
 
     Returns
@@ -556,8 +629,33 @@ def _draw_plaw(ax, freqs, amp=1e-15, f0=1/YR, **kwargs):
     kwargs.setdefault('alpha', 0.25)
     kwargs.setdefault('color', 'k')
     kwargs.setdefault('ls', '--')
-    plaw = amp * np.power(freqs/f0, -2/3)
+    plaw = amp * np.power(np.asarray(freqs)/f0, -2/3)
     return ax.plot(freqs, plaw, **kwargs)
+
+
+def draw_med_conf(ax, xx, vals, percs=[25, 75], axis=-1, yfilter=None, **kwargs):
+    kwargs.setdefault('alpha', 0.5)
+    assert len(percs) == 2
+    med, *conf = np.percentile(vals, [50, percs[0], percs[1]], axis=-1)
+    if (xx.size,) == med.shape:
+        hist_flag = False
+    elif (xx.size-1,) == med.shape:
+        hist_flag = True
+    else:
+        raise ValueError(f"Bad shapes!  {np.shape(xx)=}, {np.shape(vals)=}")
+
+    if hist_flag:
+        hh, = draw_hist_steps(ax, xx, med, yfilter=yfilter, **kwargs)
+        _xx, lo = _get_hist_steps(xx, conf[0])
+        _xx, hi = _get_hist_steps(xx, conf[1])
+    else:
+        hh, = ax.plot(xx, med, **kwargs)
+        _xx = xx
+        lo = conf[0]
+        hi = conf[1]
+
+    fill = ax.fill_between(_xx, lo, hi, alpha=0.2, color=hh.get_color())
+    return (hh, fill)
 
 
 '''
@@ -603,9 +701,11 @@ def plot_evo(evo, freqs):
 '''
 
 
-def plot_evo(evo, freqs=None, sepa=None):
+def plot_evo(evo, freqs=None, sepa=None, ax=None):
     if (freqs is None) and (sepa is None):
-        utils.error("Either `freqs` or `sepa` must be provided!")
+        err = "Either `freqs` or `sepa` must be provided!"
+        log.exception(err)
+        raise ValueError(err)
 
     if freqs is not None:
         data = evo.at('fobs', freqs)
@@ -616,7 +716,10 @@ def plot_evo(evo, freqs=None, sepa=None):
         xx = sepa / PC
         xlabel = 'Binary Separation [pc]'
 
-    fig, ax = figax(xlabel=xlabel)
+    if ax is None:
+        fig, ax = figax(xlabel=xlabel)
+    else:
+        fig = ax.get_figure()
 
     def _draw_vals_conf(ax, xx, vals, color=None, label=None):
         if color is None:

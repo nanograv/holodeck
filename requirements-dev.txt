@@ -5,3 +5,4 @@ nbconvert
 pytest
 pytest-cov
 tox
+tox-conda
