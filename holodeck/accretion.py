@@ -38,7 +38,9 @@ class Accretion:
         m2 = evol.mass[:, step-1, 1]
 
         if self.accmod == 'Siwek22':
+            """ Calculate the mass ratio"""
             q_b = m2/m1
+            """ secondary and primary can swap indices. need to account for that and reverse the mass ratio """
             inds_rev = q_b > 1
             q_b[inds_rev] = 1./q_b[inds_rev]
             #if evol has eccen, then do below, if not, set e_b = 0.
@@ -69,6 +71,9 @@ class Accretion:
             mdot_1 = 1./(np.array(lamb_qe) + 1.) * mdot
             mdot_2 = np.array(lamb_qe)/(np.array(lamb_qe) + 1.) * mdot
 
+            """ After calculating the primary and secondary accretion rates,
+                need to place them at the correct index into mdot_arr, to account
+                for primary/secondary being at 0-th OR 1-st index """
             mdot_arr = np.zeros(np.shape(evol.mass[:, step-1, :]))
             inds_m1_primary = m1 >= m2 #where first mass is actually primary
             inds_m2_primary = m2 >= m1 #where second mass is actually primary
@@ -76,8 +81,7 @@ class Accretion:
             mdot_arr[:, 0][~inds_m1_primary] = mdot_2[~inds_m1_primary]
             mdot_arr[:, 1][inds_m2_primary] = mdot_1[inds_m2_primary]
             mdot_arr[:, 1][~inds_m2_primary] = mdot_2[~inds_m2_primary]
-
-            #mdot_arr = np.array([mdot_1, mdot_2]).T
+            """ mdot_arr is then passed to _take_next_step() function in evolution.py """
             return(mdot_arr)
 
 
