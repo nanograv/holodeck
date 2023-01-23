@@ -893,6 +893,24 @@ class Evolution:
                     log.exception(err)
                     raise ValueError(err)
 
+        if self._acc is not None:
+            """ An instance of the accretion class has been supplied,
+                and we will evolve the binary masses through accretion
+                First, get total accretion rates """
+            if self._acc.mdot_ext is not None:
+                """ accretion rates have been supplied externally """
+                mdot_total = self._acc.mdot_ext[:,step-1]
+            else:
+                """ Get accretion rates as a fraction (f_edd in self._acc) of the
+                    Eddington limit from current BH masses """
+                total_bh_masses = np.sum(self.mass[:, step-1, :], axis=1)
+                mdot_total = self._acc.mdot_eddington(total_bh_masses)
+
+            """ Calculate individual accretion rates """
+            self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_total, self, step)
+            self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:,step-1,0]
+            self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:,step-1,1]
+
         return
 
     def _hardening_rate(self, step, store_debug=True):
@@ -958,26 +976,6 @@ class Evolution:
                     # Store individual hardening rates
                     if store_debug:
                         getattr(self, f"_dedt_{ii}")[:, step] = _ecc[...]
-
-            if self._acc is not None:
-                """ An instance of the accretion class has been supplied,
-                    and we will evolve the binary masses through accretion
-                    First, get total accretion rates """
-                if self._acc.mdot_ext is not None:
-                    """ accretion rates have been supplied externally """
-                    mdot_total = self._acc.mdot_ext[:,step-1]
-                else:
-                    """ Get accretion rates as a fraction (f_edd in self._acc) of the
-                        Eddington limit from current BH masses """
-                    total_bh_masses = np.sum(self.mass[:, step-1, :], axis=1)
-                    mdot_total = self._acc.mdot_eddington(total_bh_masses)
-
-                """ Calculate individual accretion rates """
-                self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_total, self, step)
-
-                self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:,step-1,0]
-                self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:,step-1,1]
-
 
         return dadt, dedt
 
