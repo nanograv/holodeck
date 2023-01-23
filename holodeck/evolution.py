@@ -907,6 +907,16 @@ class Evolution:
                 mdot_total = self._acc.mdot_eddington(total_bh_masses)
 
             """ Calculate individual accretion rates """
+            if self._acc.subpc:
+                """ Indices where separation is less than or equal to a parsec """
+                ind_sepa = self.sepa[:, step] <= PC
+            else:
+                """ Indices where separation is less than or equal to 10 kilo-parsec """
+                ind_sepa = self.sepa[:, step] <= 10**4 * PC
+
+            """ Set total accretion rates to 0 when separation is larger than 1pc or 10kpc,
+                depending on subpc switch applied to accretion instance """
+            mdot_total[~ind_sepa] = 0
             self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_total, self, step)
             self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:,step-1,0]
             self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:,step-1,1]

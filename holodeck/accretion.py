@@ -11,11 +11,13 @@ class Accretion:
     ----------------
 
     """
-    def __init__(self, accmod = 'Basic', f_edd = 0.01, mdot_ext=None, **kwargs):
+    def __init__(self, accmod = 'Basic', f_edd = 0.01, mdot_ext=None, eccen=0.0, subpc=True, **kwargs):
         """ First sum masses to get total mass of MBHB """
         self.accmod = accmod
         self.f_edd = f_edd
         self.mdot_ext = mdot_ext
+        self.eccen = eccen
+        self.subpc = subpc
 
     def mdot_eddington(self, mass):
         """ Calculate the total accretion rate based on masses and a
@@ -37,9 +39,11 @@ class Accretion:
 
         if self.accmod == 'Siwek22':
             q_b = m2/m1
+            inds_rev = q_b > 1
+            q_b[inds_rev] = 1./q_b[inds_rev]
             #if evol has eccen, then do below, if not, set e_b = 0.
             #e_b = evol.eccen[:, step-1]
-            e_b = 0.0
+            e_b = self.eccen
             """ Now interpolate to get lambda at [q,e] """
             def lambda_qe_interp_2d(fp="data/preferential_accretion/siwek+22/", es=[0.0,0.2,0.4,0.6,0.8]):
                 all_lambdas = []
@@ -64,7 +68,16 @@ class Accretion:
             lamb_qe = lamb_interp(q_b, e_b)
             mdot_1 = 1./(np.array(lamb_qe) + 1.) * mdot
             mdot_2 = np.array(lamb_qe)/(np.array(lamb_qe) + 1.) * mdot
-            mdot_arr = np.array([mdot_1, mdot_2]).T
+
+            mdot_arr = np.zeros(np.shape(evol.mass[:, step-1, :]))
+            inds_m1_primary = m1 >= m2 #where first mass is actually primary
+            inds_m2_primary = m2 >= m1 #where second mass is actually primary
+            mdot_arr[:, 0][inds_m1_primary] = mdot_1[inds_m1_primary]
+            mdot_arr[:, 0][~inds_m1_primary] = mdot_2[~inds_m1_primary]
+            mdot_arr[:, 1][inds_m2_primary] = mdot_1[inds_m2_primary]
+            mdot_arr[:, 1][~inds_m2_primary] = mdot_2[~inds_m2_primary]
+
+            #mdot_arr = np.array([mdot_1, mdot_2]).T
             return(mdot_arr)
 
 
