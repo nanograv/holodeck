@@ -1,6 +1,8 @@
 """ MBHB ACCRETION MODELS TO EVOLVE INDIVIDUAL MBH MASSES USING ILLUSTRIS ACCRETION RATES """
 import numpy as np
 import os
+from holodeck import utils, cosmo, log, _PATH_DATA
+from scipy import interpolate
 
 class Accretion:
     """
@@ -60,9 +62,8 @@ class Accretion:
 
             lamb_interp = lambda_qe_interp_2d()
             lamb_qe = lamb_interp(q_b, e_b)
-            print("q = %.3f, e = %.3f, lamb_qe = %.3f" %(q_b, e_b, lamb_qe))
-            mdot_1 = 1./(lamb_interp + 1.) * mdot
-            mdot_2 = lamb_interp/(lamb_interp + 1.) * mdot
+            mdot_1 = 1./(np.array(lamb_qe) + 1.) * mdot
+            mdot_2 = np.array(lamb_qe)/(np.array(lamb_qe) + 1.) * mdot
             mdot_arr = np.array([mdot_1, mdot_2]).T
             return(mdot_arr)
 
