@@ -340,10 +340,10 @@ cdef double interp_at_index(int idx, double xnew, double[:] xold, double[:] yold
     return ynew
 
 
-def sam_calc_gwb_single_eccen(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms=100):
+def sam_calc_gwb_single_eccen(ndens, mtot_log10, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms=100):
     """Pure-python wrapper for the SAM eccentric GWB calculation method.  See: `_sam_calc_gwb_single_eccen()`.
     """
-    return _sam_calc_gwb_single_eccen(ndens, mtot, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms)
+    return _sam_calc_gwb_single_eccen(ndens, mtot_log10, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms)
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
