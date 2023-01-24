@@ -92,8 +92,9 @@ class _Parameter_Space(abc.ABC):
         log.debug(f"d={len(params)} samplelims={maxints} {nsamples=}")
         self.sampleindxs = sampleindxs
 
-        self.param_grid = np.meshgrid(*params, indexing='ij')
-        self.shape = self.param_grid[0].shape
+        # self.param_grid = np.meshgrid(*params, indexing='ij')
+        # self.shape = self.param_grid[0].shape
+        self.shape = tuple([len(pp) for pp in params])
         self.size = np.product(self.shape)
         if self.size < nsamples:
             err = (
@@ -102,7 +103,7 @@ class _Parameter_Space(abc.ABC):
             )
             log.warning(err)
 
-        self.param_grid = np.moveaxis(self.param_grid, 0, -1)
+        # self.param_grid = np.moveaxis(self.param_grid, 0, -1)
 
         pass
 
@@ -118,26 +119,35 @@ class _Parameter_Space(abc.ABC):
         num = np.ravel_multi_index(idx, self.shape)
         return num
 
+    def params_at_index(self, index):
+        assert len(index) == len(self.params)
+        pars = [pp[ii] for pp, ii in zip(self.params, index)]
+        return pars
+
     def param_dict_for_number(self, num):
         idx = self.number_to_index(num)
-        pars = self.param_grid[idx]
+        # pars = self.param_grid[idx]
+        pars = self.params_at_index(idx)
         rv = {nn: pp for nn, pp in zip(self.names, pars)}
         return rv
 
     def param_dict_for_lhsnumber(self, lhsnum):
         idx = self.lhsnumber_to_index(lhsnum)
-        pars = self.param_grid[idx]
+        # pars = self.param_grid[idx]
+        pars = self.params_at_index(idx)
         rv = {nn: pp for nn, pp in zip(self.names, pars)}
         return rv
 
     def params_for_number(self, num):
         idx = self.number_to_index(num)
-        pars = self.param_grid[idx]
+        # pars = self.param_grid[idx]
+        pars = self.params_at_index(idx)
         return pars
 
     def params_for_lhsnumber(self, lhsnum):
         idx = self.lhsnumber_to_index(lhsnum)
-        pars = self.param_grid[idx]
+        # pars = self.param_grid[idx]
+        pars = self.params_at_index(idx)
         return pars
 
     # @abc.abstractmethod
@@ -173,7 +183,7 @@ class _LHS_Parameter_Space(_Parameter_Space):
 
             vv = kwargs.pop(par)
             msg = f"{par}: {vv}"
-            log.debug(f"\t{msg}")            
+            log.debug(f"\t{msg}")
             if len(vv) > 3 or len(vv) < 2:
                 err = f"Wanted 2 arguments in {par}, but got {len(vv)}: {vv}"
                 log.exception(err)
@@ -192,7 +202,7 @@ class _LHS_Parameter_Space(_Parameter_Space):
         self.params = np.zeros((self.nsamples,self.paramdimen))
         # Below is done out of laziness and backwards compatibility but should be deprecated
         self.sampleindxs = -1
-        
+
         if self.seed is not None:
             log.info(f"Generated with random seed: {self.seed}")
         else:
@@ -200,8 +210,8 @@ class _LHS_Parameter_Space(_Parameter_Space):
             np.random.seed(None)
             st0 = np.random.get_state()
             log.info(f"Random state is:\n{st0}")
-            
-        
+
+
         # do scipy LHS
         if self.lhs_sampler == 'scipy':
             LHS = qmc.LatinHypercube(d=self.paramdimen, centered=False, strength=1, seed=self.seed)
@@ -351,5 +361,4 @@ def sam_lib_combine(path_output, log, debug=False):
 
     log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
     return
-
 
