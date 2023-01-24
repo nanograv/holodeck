@@ -27,7 +27,7 @@ To-Do
 
 """
 
-__version__ = '0.1.5'
+__version__ = '0.1.6'
 
 import argparse
 import os
@@ -333,9 +333,52 @@ class Parameter_Space_Simple01(holo.librarian._Parameter_Space):
         return sam, hard
 
 
-# SPACE = Parameter_Space_Simple01
-SPACE = Parameter_Space_Hard04b
+class LHS_Parameter_Space_Hard04(holo.librarian._LHS_Parameter_Space):
 
+    _PARAM_NAMES = [
+        'hard_time',
+        'hard_gamma_inner',
+        'hard_gamma_outer',
+        'hard_rchar',
+        'gsmf_phi0',
+        'mmb_amp',
+    ]
+
+    def __init__(self, log, nsamples, sam_shape, lhs_sampler, seed):
+        super().__init__(
+            log, nsamples, sam_shape, lhs_sampler, seed,
+            hard_time=[-1.0, +1.0],   # [log10(Gyr)]
+            hard_gamma_inner=[-1.5, -0.5],
+            hard_gamma_outer=[+2.0, +3.0],
+            hard_rchar=[1.0, 3.0],
+            gsmf_phi0=[-3.0, -2.0],
+            mmb_amp=[0.1e9, 1.0e9],
+        )
+
+    def sam_for_lhsnumber(self, lhsnum):
+        param_grid = self.params_for_lhsnumber(lhsnum)
+
+        time, gamma_inner, gamma_outer, rchar, gsmf_phi0, mmb_amp = param_grid
+        time = (10.0 ** time) * GYR
+        rchar = (10.0 ** rchar) * PC
+        mmb_amp = mmb_amp*MSOL
+
+        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gpf = holo.sam.GPF_Power_Law()
+        gmt = holo.sam.GMT_Power_Law()
+        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
+
+        sam = holo.sam.Semi_Analytic_Model(
+            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            shape=self.sam_shape
+        )
+        hard = holo.evolution.Fixed_Time.from_sam(
+            sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
+            exact=True, progress=False
+        )
+        return sam, hard
+
+SPACE = LHS_Parameter_Space_Hard04
 comm = MPI.COMM_WORLD
 
 
@@ -356,7 +399,10 @@ def setup_argparse():
                         help='Number of frequency bins', default=DEF_NUM_FBINS)
     parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
                         help='Shape of SAM grid', default=DEF_SAM_SHAPE)
-
+    parser.add_argument('-l', '--lhs', action='store', choices=['scipy', 'pydoe'], default='scipy',
+                        help='Latin Hyper Cube sampling implementation to use (scipy or pydoe)')
+    parser.add_argument('--seed', action='store', type=int, default=None,
+                        help='Random seed to use')
     parser.add_argument('-t', '--test', action='store_true', default=False, dest='test',
                         help='Do not actually run, just output what parameters would have been done.')
     parser.add_argument('-c', '--concatenate', action='store_true', default=False, dest='concatenateoutput',
@@ -421,7 +467,10 @@ if comm.rank == 0:
 # ---- setup Parameter_Space instance
 
 log.warning(f"SPACE = {SPACE}")
-space = SPACE(log, args.nsamples, args.sam_shape) if comm.rank == 0 else None
+if issubclass(SPACE, holo.librarian._LHS_Parameter_Space):
+    space = SPACE(log, args.nsamples, args.sam_shape, args.lhs, args.seed) if comm.rank == 0 else None
+else:
+    space = SPACE(log, args.nsamples, args.sam_shape) if comm.rank == 0 else None
 space = comm.bcast(space, root=0)
 
 log.info(

@@ -1685,6 +1685,12 @@ class Fixed_Time(_Hardening):
             log.info("calculating normalization exactly")
             norm = self._get_norm_chunk(time, mtot, mrat, rchar, gamma_sc, gamma_df, sepa, progress=progress)
 
+        # bads = ~np.isfinite(norm)
+        # if np.any(bads):
+        #     err = f"Found non-finite normalizations in {utils.frac_str(bads)} cases!"
+        #     log.exception(err)
+        #     raise ValueError(err)
+
         self._gamma_sc = gamma_sc
         self._gamma_df = gamma_df
         self._norm = norm
