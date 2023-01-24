@@ -92,8 +92,9 @@ class _Parameter_Space(abc.ABC):
         log.debug(f"d={len(params)} samplelims={maxints} {nsamples=}")
         self.sampleindxs = sampleindxs
 
-        self.param_grid = np.meshgrid(*params, indexing='ij')
-        self.shape = self.param_grid[0].shape
+        # self.param_grid = np.meshgrid(*params, indexing='ij')
+        # self.shape = self.param_grid[0].shape
+        self.shape = tuple([len(pp) for pp in params])
         self.size = np.product(self.shape)
         if self.size < nsamples:
             err = (
@@ -102,7 +103,7 @@ class _Parameter_Space(abc.ABC):
             )
             log.warning(err)
 
-        self.param_grid = np.moveaxis(self.param_grid, 0, -1)
+        # self.param_grid = np.moveaxis(self.param_grid, 0, -1)
 
         pass
 
@@ -118,26 +119,35 @@ class _Parameter_Space(abc.ABC):
         num = np.ravel_multi_index(idx, self.shape)
         return num
 
+    def params_at_index(self, index):
+        assert len(idx) == len(self.params)
+        pars = [pp[ii] for pp, ii in zip(self.params, idx)]
+        return pars
+
     def param_dict_for_number(self, num):
         idx = self.number_to_index(num)
-        pars = self.param_grid[idx]
+        # pars = self.param_grid[idx]
+        pars = self.params_at_index(idx)
         rv = {nn: pp for nn, pp in zip(self.names, pars)}
         return rv
 
     def param_dict_for_lhsnumber(self, lhsnum):
         idx = self.lhsnumber_to_index(lhsnum)
-        pars = self.param_grid[idx]
+        # pars = self.param_grid[idx]
+        pars = self.params_at_index(idx)
         rv = {nn: pp for nn, pp in zip(self.names, pars)}
         return rv
 
     def params_for_number(self, num):
         idx = self.number_to_index(num)
-        pars = self.param_grid[idx]
+        # pars = self.param_grid[idx]
+        pars = self.params_at_index(idx)
         return pars
 
     def params_for_lhsnumber(self, lhsnum):
         idx = self.lhsnumber_to_index(lhsnum)
-        pars = self.param_grid[idx]
+        # pars = self.param_grid[idx]
+        pars = self.params_at_index(idx)
         return pars
 
     # @abc.abstractmethod
