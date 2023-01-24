@@ -27,7 +27,7 @@ To-Do
 
 """
 
-__version__ = '0.1.4'
+__version__ = '0.1.5'
 
 import argparse
 import os
@@ -95,7 +95,7 @@ class Parameter_Space_Mix01(holo.librarian._Parameter_Space):
         mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
 
         sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge, shape=self.sam_shape)
-        hard = holo.hardening.Fixed_Time.from_sam(sam, time, gamma_sc=hard_gamma_inner, exact=True, progress=False)
+        hard = holo.evolution.Fixed_Time.from_sam(sam, time, gamma_sc=hard_gamma_inner, exact=True, progress=False)
         return sam, hard
 
 
@@ -133,7 +133,7 @@ class Parameter_Space_Hard01(holo.librarian._Parameter_Space):
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
             shape=self.sam_shape
         )
-        hard = holo.hardening.Fixed_Time.from_sam(
+        hard = holo.evolution.Fixed_Time.from_sam(
             sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
             exact=True, progress=False
         )
@@ -179,7 +179,7 @@ class Parameter_Space_Hard02_BAD(holo.librarian._Parameter_Space):
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
             shape=self.sam_shape
         )
-        hard = holo.hardening.Fixed_Time.from_sam(
+        hard = holo.evolution.Fixed_Time.from_sam(
             sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
             exact=True, progress=False
         )
@@ -225,7 +225,7 @@ class Parameter_Space_Hard03(holo.librarian._Parameter_Space):
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
             shape=self.sam_shape
         )
-        hard = holo.hardening.Fixed_Time.from_sam(
+        hard = holo.evolution.Fixed_Time.from_sam(
             sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
             exact=True, progress=False
         )
@@ -271,7 +271,7 @@ class Parameter_Space_Hard04(holo.librarian._Parameter_Space):
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
             shape=self.sam_shape
         )
-        hard = holo.hardening.Fixed_Time.from_sam(
+        hard = holo.evolution.Fixed_Time.from_sam(
             sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
             exact=True, progress=False
         )
@@ -326,7 +326,7 @@ class Parameter_Space_Simple01(holo.librarian._Parameter_Space):
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
             shape=self.sam_shape
         )
-        hard = holo.hardening.Fixed_Time.from_sam(
+        hard = holo.evolution.Fixed_Time.from_sam(
             sam, time, rchar=rchar,
             exact=True, progress=False
         )
@@ -429,8 +429,6 @@ log.info(
     f"nfreqs={args.nfreqs}, pta_dur={args.pta_dur} [yr]\n"
     f"space.shape={space.shape}"
 )
-
-raise
 
 # ------------------------------------------------------------------------------
 # ----    Methods
