@@ -752,8 +752,8 @@ def sam_calc_gwb_single_eccen(sam, gwfobs, sepa_evo, eccen_evo, nharms=100):
     mr = sam.mrat
     rz = sam.redz
     dc = cosmo.comoving_distance(sam.redz).to('Mpc').value
-    return holo.cyutils.sam_calc_gwb_single_eccen(ndens, mt_l10, mr, rz, dc, gwfobs, sepa_evo, eccen_evo, nharms)
-
+    gwb = holo.cyutils.sam_calc_gwb_single_eccen(ndens, mt_l10, mr, rz, dc, gwfobs, sepa_evo, eccen_evo, nharms)
+    return np.asarray(gwb)
 
 
 # ==============================================================================
