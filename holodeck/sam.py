@@ -939,9 +939,9 @@ class Semi_Analytic_Model:
         return gwb
 
 
-# ===============================
-# ====    Utility Methods    ====
-# ===============================
+# =================================
+# ====    Evolution Methods    ====
+# =================================
 
 
 def sample_sam_with_hardening(
@@ -1058,3 +1058,32 @@ def sample_sam_with_hardening(
         weights = weights[~bads]
 
     return vals, weights, edges, dnum, mass
+
+
+def evolve_eccen_uniform_single(sam, eccen_init, sepa_init, nsteps):
+    assert (0.0 <= eccen_init) and (eccen_init <= 1.0)
+
+    #! CHECK FOR COALESCENCE !#
+
+    eccen = np.zeros(nsteps)
+    eccen[0] = eccen_init
+
+    sepa_max = sepa_init
+    sepa_coal = holo.utils.schwarzschild_radius(sam.mtot) * 3
+    # frst_coal = utils.kepler_freq_from_sepa(sam.mtot, sepa_coal)
+    sepa_min = sepa_coal.min()
+    sepa = np.logspace(*np.log10([sepa_max, sepa_min]), nsteps)
+
+    for step in range(1, nsteps):
+        a0 = sepa[step-1]
+        a1 = sepa[step]
+        da = (a1 - a0)
+        e0 = eccen[step-1]
+
+        _, e1 = holo.utils.rk4_step(holo.hardening.Hard_GW.deda, x0=a0, y0=e0, dx=da)
+        e1 = np.clip(e1, 0.0, None)
+        eccen[step] = e1
+
+    return sepa, eccen
+
+

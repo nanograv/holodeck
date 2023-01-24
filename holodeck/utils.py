@@ -700,6 +700,34 @@ def quantiles(
     return percs
 
 
+def rk4_step(func, x0, y0, dx, args=None, check_nan=0, check_nan_max=5):
+    """Perform a single 4th-order Runge-Kutta integration step.
+    """
+    if args is None:
+        k1 = dx * func(x0, y0)
+        k2 = dx * func(x0 + dx/2.0, y0 + k1/2.0)
+        k3 = dx * func(x0 + dx/2.0, y0 + k2/2.0)
+        k4 = dx * func(x0 + dx, y0 + k3)
+    else:
+        k1 = dx * func(x0, y0, *args)
+        k2 = dx * func(x0 + dx/2.0, y0 + k1/2.0, *args)
+        k3 = dx * func(x0 + dx/2.0, y0 + k2/2.0, *args)
+        k4 = dx * func(x0 + dx, y0 + k3, *args)
+
+    y1 = y0 + (1.0/6.0) * (k1 + 2*k2 + 2*k3 + k4)
+    x1 = x0 + dx
+
+    # Try recursively decreasing step-size until finite-value is reached
+    if check_nan > 0 and not np.isfinite(y1):
+        if check_nan > check_nan_max:
+            err = "Failed to find finite step!  `check_nan` = {}!".format(check_nan)
+            raise RuntimeError(err)
+        # Note that `True+1 = 2`
+        rk4_step(func, x0, y0, dx/2.0, check_nan=check_nan+1, check_nan_max=check_nan_max)
+
+    return x1, y1
+
+
 def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int = 2) -> str:
     """Return a string giving quantiles of the given input data.
 
