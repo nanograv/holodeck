@@ -27,7 +27,7 @@ To-Do
 
 """
 
-__version__ = '0.1.4'
+__version__ = '0.1.6'
 
 import argparse
 import os
@@ -278,6 +278,21 @@ class Parameter_Space_Hard04(holo.librarian._Parameter_Space):
         return sam, hard
 
 
+class Parameter_Space_Hard04b(Parameter_Space_Hard04):
+
+    def __init__(self, log, nsamples, sam_shape):
+        grid_size = 100
+        super(Parameter_Space_Hard04, self).__init__(
+            log, nsamples, sam_shape,
+            hard_time=[-1.0, +1.0, grid_size],   # [log10(Gyr)]
+            hard_gamma_inner=[-1.5, -0.5, grid_size],
+            hard_gamma_outer=[+2.0, +3.0, grid_size],
+            hard_rchar=[1.0, 3.0, grid_size],
+            gsmf_phi0=[-3.0, -2.0, grid_size],
+            mmb_amp=[0.1e9, 1.0e9, grid_size],
+        )
+
+
 class Parameter_Space_Simple01(holo.librarian._Parameter_Space):
 
     _PARAM_NAMES = [
@@ -407,8 +422,6 @@ args = setup_argparse() if comm.rank == 0 else None
 args = comm.bcast(args, root=0)
 
 
-
-
 # ---- setup outputs
 
 BEG = datetime.now()
@@ -462,7 +475,8 @@ space = comm.bcast(space, root=0)
 
 log.info(
     f"samples={args.nsamples}, sam_shape={args.sam_shape}, nreals={args.nreals}\n"
-    f"nfreqs={args.nfreqs}, pta_dur={args.pta_dur} [yr]"
+    f"nfreqs={args.nfreqs}, pta_dur={args.pta_dur} [yr]\n"
+    f"space.shape={space.shape}"
 )
 
 # ------------------------------------------------------------------------------

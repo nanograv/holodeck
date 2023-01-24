@@ -233,19 +233,21 @@ class MMBulge_Standard(_MMBulge_Relation):
     """
 
     MASS_AMP = 3.0e8 * MSOL
-    MASS_PLAW = 1.0
+    MASS_AMP_LOG10 = 8.17   # log10(M/Msol)
+    MASS_PLAW = 1.01
     MASS_REF = 1.0e11 * MSOL
     SCATTER_DEX = 0.3
 
-    def __init__(self, mamp=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None):
-        if mamp is None:
-            mamp = self.MASS_AMP
+    def __init__(self, mamp=None, mamp_log10=None, mplaw=None, mref=None, bulge_mfrac=0.615, scatter_dex=None):
+        if (mamp is None) and (mamp_log10 is None):
+            mamp_log10 = self.MASS_AMP_LOG10
         if mplaw is None:
             mplaw = self.MASS_PLAW
         if mref is None:
             mref = self.MASS_REF
         if scatter_dex is None:
             scatter_dex = self.SCATTER_DEX
+        mamp, _ = utils._parse_val_log10_val_pars(mamp, mamp_log10, MSOL, 'mamp', only_one=True)
 
         self._mamp = mamp     #: Mass-Amplitude [grams]
         self._mplaw = mplaw   #: Mass Power-law index
@@ -384,7 +386,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         fbulge = self._bulge_mfrac
         mbulge = mstar * fbulge
         mbh = self.mbh_from_mbulge(mbulge, scatter=False)
-        deriv = mbulge / (fbulge * plaw * mbh)
+        deriv = mstar / (plaw * mbh)
         return deriv
 
 
