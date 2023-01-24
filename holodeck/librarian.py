@@ -120,8 +120,8 @@ class _Parameter_Space(abc.ABC):
         return num
 
     def params_at_index(self, index):
-        assert len(idx) == len(self.params)
-        pars = [pp[ii] for pp, ii in zip(self.params, idx)]
+        assert len(index) == len(self.params)
+        pars = [pp[ii] for pp, ii in zip(self.params, index)]
         return pars
 
     def param_dict_for_number(self, num):
