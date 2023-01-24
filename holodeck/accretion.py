@@ -7,7 +7,7 @@ from scipy import interpolate
 class Accretion:
     """
 
-    Additional Notes
+    Preferential Accretion prescription
     ----------------
 
     """
