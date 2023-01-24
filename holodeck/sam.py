@@ -870,6 +870,11 @@ class Semi_Analytic_Model:
             log.exception(err)
             raise ValueError(err)
 
+        if np.any(np.isnan(dnum)):
+            err = f"Found nan `dnum` values!"
+            log.exception(err)
+            raise ValueError(err)
+
         # "integrate" within each bin (i.e. multiply by bin volume)
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
         #       after poisson calculation, need to convert back to dN/dlogf
@@ -892,6 +897,13 @@ class Semi_Analytic_Model:
             err = "Found nan `number` values!"
             log.exception(err)
             raise ValueError(err)
+
+        if np.any(np.isnan(number)):
+            print(f"{np.any(np.isnan(dnum))=}")
+            err = f"Found nan `number` values!"
+            log.exception(err)
+            raise ValueError(err)
+
 
         # ---- Get the GWB spectrum from number of binaries over grid
         hc = gravwaves._gws_from_number_grid_integrated(edges, number, realize)

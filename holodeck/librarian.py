@@ -92,8 +92,9 @@ class _Parameter_Space(abc.ABC):
         log.debug(f"d={len(params)} samplelims={maxints} nsamples={nsamples}")
         self.sampleindxs = sampleindxs
 
-        self.param_grid = np.meshgrid(*params, indexing='ij')
-        self.shape = self.param_grid[0].shape
+        # self.param_grid = np.meshgrid(*params, indexing='ij')
+        # self.shape = self.param_grid[0].shape
+        self.shape = tuple([len(pp) for pp in params])
         self.size = np.product(self.shape)
         if self.size < nsamples:
             err = (
@@ -102,7 +103,7 @@ class _Parameter_Space(abc.ABC):
             )
             log.warning(err)
 
-        self.param_grid = np.moveaxis(self.param_grid, 0, -1)
+        # self.param_grid = np.moveaxis(self.param_grid, 0, -1)
 
         pass
 
@@ -118,27 +119,126 @@ class _Parameter_Space(abc.ABC):
         num = np.ravel_multi_index(idx, self.shape)
         return num
 
+    def params_at_index(self, index):
+        assert len(index) == len(self.params)
+        pars = [pp[ii] for pp, ii in zip(self.params, index)]
+        return pars
+
     def param_dict_for_number(self, num):
         idx = self.number_to_index(num)
-        pars = self.param_grid[idx]
+        # pars = self.param_grid[idx]
+        pars = self.params_at_index(idx)
         rv = {nn: pp for nn, pp in zip(self.names, pars)}
         return rv
 
     def param_dict_for_lhsnumber(self, lhsnum):
         idx = self.lhsnumber_to_index(lhsnum)
-        pars = self.param_grid[idx]
+        # pars = self.param_grid[idx]
+        pars = self.params_at_index(idx)
         rv = {nn: pp for nn, pp in zip(self.names, pars)}
         return rv
 
     def params_for_number(self, num):
         idx = self.number_to_index(num)
-        pars = self.param_grid[idx]
+        # pars = self.param_grid[idx]
+        pars = self.params_at_index(idx)
         return pars
 
     def params_for_lhsnumber(self, lhsnum):
         idx = self.lhsnumber_to_index(lhsnum)
-        pars = self.param_grid[idx]
+        # pars = self.param_grid[idx]
+        pars = self.params_at_index(idx)
         return pars
+
+    # @abc.abstractmethod
+    def sam_for_number(self, num):
+        raise
+        return
+
+    @abc.abstractmethod
+    def sam_for_lhsnumber(self, lhsnum):
+        return
+
+class _LHS_Parameter_Space(_Parameter_Space):
+
+    _PARAM_NAMES = []
+
+    def __init__(self, log, nsamples, sam_shape, lhs_sampler='scipy', seed=None, **kwargs):
+
+        self.log = log
+        self.nsamples = nsamples
+        self.sam_shape = sam_shape
+        self.lhs_sampler = lhs_sampler
+        self.seed = seed
+
+        names = []
+        param_ranges = []
+
+        log.debug(f"Loading parameters: {self._PARAM_NAMES}")
+        for par in self._PARAM_NAMES:
+            if par not in kwargs:
+                err = f"Parameter '{par}' missing from kwargs={kwargs}!"
+                log.exception(err)
+                raise ValueError(err)
+
+            vv = kwargs.pop(par)
+            msg = f"{par}: {vv}"
+            log.debug(f"\t{msg}")
+            if len(vv) > 3 or len(vv) < 2:
+                err = f"Wanted 2 arguments in {par}, but got {len(vv)}: {vv}"
+                log.exception(err)
+                raise ValueError(err)
+            elif len(vv) == 3:
+                msg = f"Wanted 2 arguments in {par}, but got {len(vv)}: {vv}. I will assume you are using the NON-LHS initialization scheme. Bad scientist!  For LHS, give min and max values, not grid size. I will guess that the first two values are min and max values and ignore the third."
+                log.warning(msg)
+                vv = vv[0:2]
+
+            names.append(par)
+            param_ranges.append(vv)
+
+        self.paramdimen = len(param_ranges)
+        self.param_ranges = np.array(param_ranges)
+        self.names = names
+        self.params = np.zeros((self.nsamples,self.paramdimen))
+        # Below is done out of laziness and backwards compatibility but should be deprecated
+        self.sampleindxs = -1
+
+        if self.seed is not None:
+            log.info(f"Generated with random seed: {self.seed}")
+        else:
+            log.info(f"Did not use seed. Initializing random state explicitly for reproducibility.")
+            np.random.seed(None)
+            st0 = np.random.get_state()
+            log.info(f"Random state is:\n{st0}")
+
+
+        # do scipy LHS
+        if self.lhs_sampler == 'scipy':
+            LHS = qmc.LatinHypercube(d=self.paramdimen, centered=False, strength=1, seed=self.seed)
+            # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
+            sample_rvs = LHS.random(n=nsamples)
+        elif self.lhs_sampler == 'pydoe': # do pyDOE LHS
+            sample_rvs = pyDOE.lhs(n=self.paramdimen, samples=nsamples, criterion='m')
+        else:
+            err = f"unknown LHS sampler: {self.lhs_sampler}"
+            log.exception(err)
+            raise ValueError(err)
+
+        for i in range(self.paramdimen):
+            # Assume uniform sampling from min to max of each parameter
+            self.params[:, i] = sample_rvs[:, i] * (self.param_ranges[i][1] - self.param_ranges[i][0]) + self.param_ranges[i][0]
+
+    def param_dict_for_lhsnumber(self, num):
+        rv = {nn: pp for nn, pp in zip(self.names, self.params[num, :])}
+        return rv
+
+    def params_for_lhsnumber(self, num):
+        pars = self.params[num, :]
+        return pars
+
+    # Below are done out of laziness and backwards compatibility but should be deprecated
+    def lhsnumber_to_index(self, pnum):
+        return pnum
 
     # @abc.abstractmethod
     def sam_for_number(self, num):
@@ -209,6 +309,17 @@ def sam_lib_combine(path_output, log, debug=False):
     gwb = np.zeros(gwb_shape)
     sample_params = np.zeros((num_files, pdim))
     grid_idx = np.zeros((num_files, pdim), dtype=int)
+    if lhs_grid.shape == (): # not a gridded lhs parameter space
+        if lhs_grid[()] == -1: # using scipy LHS direct sampling
+            log.info(f"Parameter Space Type is direct LHS")
+            pspacetype = 'ungriddedlhs'
+        else:
+            err = f"Uknown parameter space type: {lhs_grid[()]}"
+            log.exception(err)
+            raise ValueError(err)
+    else:
+        log.info(f"Parameter Space Type is Gridded LHS")
+        pspacetype = 'griddedlhs'
 
     log.info(f"Collecting data from {len(files)} files")
     for ii, file in enumerate(tqdm.tqdm(files)):
@@ -237,14 +348,16 @@ def sam_lib_combine(path_output, log, debug=False):
         h5.create_dataset('fobs', data=fobs)
         h5.create_dataset('fobs_edges', data=fobs_edges)
         h5.create_dataset('gwb', data=gwb)
-        h5.create_dataset('sample_params', data=sample_params)
-        h5.create_dataset('lhs_grid', data=lhs_grid)
-        h5.create_dataset('lhs_grid_indices', data=grid_idx)
+        pars_dataset = h5.create_dataset('sample_params', data=sample_params)
         h5.attrs['param_names'] = np.array(param_names).astype('S')
         h5.attrs['shape_names'] = np.array(shape_names).astype('S')
-        group = h5.create_group('parameters')
-        for pname, pvals in zip(param_names, param_vals):
-            group.create_dataset(pname, data=pvals)
+        h5.attrs['parameter_space_type'] = pspacetype
+        if pspacetype == 'griddedlhs':
+            h5.create_dataset('lhs_grid', data=lhs_grid)
+            h5.create_dataset('lhs_grid_indices', data=grid_idx)
+            group = h5.create_group('parameters')
+            for pname, pvals in zip(param_names, param_vals):
+                group.create_dataset(pname, data=pvals)
 
     log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
     return
