@@ -64,8 +64,7 @@ To-Do
 
 *   _SHM06
 
-    *   Interpolants of hardening parameters return 2D arrays which we then take the diagonal
-        of, but there should be a better way of doing this.
+    *   Interpolants of hardening parameters return 1D arrays.
 
 *   Fixed_Time
 
@@ -111,7 +110,8 @@ import kalepy as kale
 
 import holodeck as holo
 from holodeck import utils, cosmo, log, _PATH_DATA
-from holodeck.constants import GYR, NWTG, PC, MSOL
+from holodeck.constants import GYR, NWTG, PC, MSOL, YR
+from holodeck import accretion
 
 _MAX_ECCEN_ONE_MINUS = 1.0e-6
 #: number of influence radii to set minimum radius for dens calculation
@@ -160,6 +160,18 @@ class Evolution:
     NOTE: whenever `frequencies` are used (rest-frame or observer-frame), they refer to **orbital**
     frequencies, not GW frequencies.  For circular binaries, GW-freq = 2 * orb-freq.
 
+    Additional Notes
+    ----------------
+    acc: Instance of accretion class. This supplies the method by which total accretion
+         rates are divided into individual accretion rates for each BH.
+         By default, accretion rates are calculated at every step as a fraction of
+         the Eddington limit.
+         If acc contains a path to an accretion rate file which already stores
+         total accretion rates at every timestep, then we omit the step where we
+         calculate mdot_total as a fraction of the Eddington limit.
+         This gives the flexibility to include accretion rates motivated by e.g. Illustris
+         or other cosmological simulations.
+
     """
 
     _EVO_PARS = ['mass', 'sepa', 'eccen', 'scafa', 'tlook', 'dadt', 'dedt']
@@ -167,7 +179,7 @@ class Evolution:
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
 
-    def __init__(self, pop, hard, nsteps: int = 100, mods=None, debug: bool = False):
+    def __init__(self, pop, hard, nsteps: int = 100, mods=None, debug: bool = False, acc=None):
         """Initialize a new Evolution instance.
 
         Parameters
@@ -189,6 +201,7 @@ class Evolution:
         self._debug = debug                   #: debug flag for performing extra diagnostics and output
         self._nsteps = nsteps                 #: number of integration steps for each binary
         self._mods = mods                     #: modifiers to be applied after evolution is completed
+        self._acc = acc
 
         # Store hardening instances as a list
         if not np.iterable(hard):
@@ -754,7 +767,10 @@ class Evolution:
         tlook = cosmo.z_to_tlbk(redz)
         self.tlook[:, 0] = tlook
         # `pop.mass` has shape (N, 2), broadcast to (N, S, 2) for `S` steps
-        self.mass[:, :, :] = pop.mass[:, np.newaxis, :]
+        #self.mass[:, :, :] = pop.mass[:, np.newaxis, :]
+        self.mass[:, 0, :] = pop.mass
+        #HERE INITIAL MASSES ARE COPIED FOR EVERY STEP
+        self.mass[:, :, :] = self.mass[:, 0, np.newaxis, :]
 
         if self._debug:    # nocov
             for ii, hard in enumerate(self._hard):
@@ -875,6 +891,34 @@ class Evolution:
                     err = f"Non-finite changes in eccentricity found in step {step}!"
                     log.exception(err)
                     raise ValueError(err)
+
+        if self._acc is not None:
+            """ An instance of the accretion class has been supplied,
+                and we will evolve the binary masses through accretion
+                First, get total accretion rates """
+            if self._acc.mdot_ext is not None:
+                """ accretion rates have been supplied externally """
+                mdot_total = self._acc.mdot_ext[:,step-1]
+            else:
+                """ Get accretion rates as a fraction (f_edd in self._acc) of the
+                    Eddington limit from current BH masses """
+                total_bh_masses = np.sum(self.mass[:, step-1, :], axis=1)
+                mdot_total = self._acc.mdot_eddington(total_bh_masses)
+
+            """ Calculate individual accretion rates """
+            if self._acc.subpc:
+                """ Indices where separation is less than or equal to a parsec """
+                ind_sepa = self.sepa[:, step] <= PC
+            else:
+                """ Indices where separation is less than or equal to 10 kilo-parsec """
+                ind_sepa = self.sepa[:, step] <= 10**4 * PC
+
+            """ Set total accretion rates to 0 when separation is larger than 1pc or 10kpc,
+                depending on subpc switch applied to accretion instance """
+            mdot_total[~ind_sepa] = 0
+            self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_total, self, step)
+            self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:,step-1,0]
+            self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:,step-1,1]
 
         return
 
@@ -2282,13 +2326,6 @@ class _SHM06:
         g = self._K_g(mrat, ecc)
         B = self._K_B(mrat, ecc)
 
-        # `interp2d` return a matrix of X x Y results... want diagonal of that
-        # NOTE: FIX: this could be improved!!
-        use_a = use_a.diagonal()
-        A = A.diagonal()
-        g = g.diagonal()
-        B = B.diagonal()
-
         kk = A * np.power((1 + use_a), g) + B
         kk = np.clip(kk, *self._bound_K)
         return kk
@@ -2299,6 +2336,8 @@ class _SHM06:
         data = self._data['K']
         # Get all of the mass ratios (ignore other keys)
         _kq_keys = list(data.keys())
+        """ Need to reverse _kq_keys into descending order for later interpolation """
+        _kq_keys.reverse()
         kq_keys = []
         for kq in _kq_keys:
             try:
@@ -2310,7 +2349,9 @@ class _SHM06:
         nq = len(kq_keys)
         if nq < 2:
             raise ValueError("Something is wrong... `kq_keys` = '{}'\ndata:\n{}".format(kq_keys, data))
-        k_mass_ratios = 1.0/np.array(sorted([int(kq) for kq in kq_keys]))
+        #k_mass_ratios = 1.0/np.array(sorted([int(kq) for kq in kq_keys]))
+        """ should not use sorted() on inverse mass ratios, as we want ascending order in q for interpolation """
+        k_mass_ratios = 1.0/np.array([int(kq) for kq in kq_keys])
         k_eccen = np.array(data[kq_keys[0]]['e'])
         ne = len(k_eccen)
         k_A = np.zeros((ne, nq))
@@ -2325,10 +2366,20 @@ class _SHM06:
             k_g[:, ii] = _dat['g']
             k_B[:, ii] = _dat['B']
 
-        self._K_A = sp.interpolate.interp2d(k_mass_ratios, k_eccen, k_A, kind='linear')
-        self._K_a0 = sp.interpolate.interp2d(k_mass_ratios, k_eccen, k_a0, kind='linear')
-        self._K_g = sp.interpolate.interp2d(k_mass_ratios, k_eccen, k_g, kind='linear')
-        self._K_B = sp.interpolate.interp2d(k_mass_ratios, k_eccen, k_B, kind='linear')
+        """
+            Interpolate using RectBivariateSpline
+            the interpolation functions below are assigned
+            RectBivariateSpline().ev
+            to evaluate the interpolation at individual points,
+            allowing q_b and e_b in future calls of the function
+            to be in non-ascending order
+        """
+        from scipy.interpolate import RectBivariateSpline
+        self._K_A = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_A).T, kx=1, ky=1).ev
+        self._K_a0 = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_a0).T, kx=1, ky=1).ev
+        self._K_g = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_g).T, kx=1, ky=1).ev
+        self._K_B = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_B).T, kx=1, ky=1).ev
+
         return
 
     def _init_h(self):
