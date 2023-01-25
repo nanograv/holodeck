@@ -64,8 +64,7 @@ To-Do
 
 *   _SHM06
 
-    *   Interpolants of hardening parameters return 2D arrays which we then take the diagonal
-        of, but there should be a better way of doing this.
+    *   Interpolants of hardening parameters return 1D arrays.
 
 *   Fixed_Time
 
@@ -2321,13 +2320,6 @@ class _SHM06:
         g = self._K_g(mrat, ecc)
         B = self._K_B(mrat, ecc)
 
-        # `interp2d` return a matrix of X x Y results... want diagonal of that
-        # NOTE: FIX: this could be improved!!
-        use_a = use_a.diagonal()
-        A = A.diagonal()
-        g = g.diagonal()
-        B = B.diagonal()
-
         kk = A * np.power((1 + use_a), g) + B
         kk = np.clip(kk, *self._bound_K)
         return kk
@@ -2368,7 +2360,14 @@ class _SHM06:
             k_g[:, ii] = _dat['g']
             k_B[:, ii] = _dat['B']
 
-        """ Interpolate using RectBivariateSpline """
+        """
+            Interpolate using RectBivariateSpline
+            the interpolation functions below are assigned
+            RectBivariateSpline().ev
+            to evaluate the interpolation at individual points,
+            allowing q_b and e_b in future calls of the function
+            to be in non-ascending order
+        """
         from scipy.interpolate import RectBivariateSpline
         self._K_A = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_A).T).ev
         self._K_a0 = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_a0).T).ev
