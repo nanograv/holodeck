@@ -742,7 +742,7 @@ def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=1
 # import holodeck.cyutils  # noqa
 
 
-def sam_calc_gwb_single_eccen(sam, gwfobs, sepa_evo, eccen_evo, nharms=100):
+def sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
     import pyximport   # noqa
     pyximport.install(language_level=3, setup_args={"include_dirs": np.get_include()}, reload_support=True)
     import holodeck.cyutils  # noqa
