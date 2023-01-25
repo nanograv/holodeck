@@ -30,7 +30,7 @@ class Realizer:
             mt, _ = holo.utils.mtmr_from_m1m2(pop.mass)
             log.debug(f"mass aft = {holo.utils.stats(mt/MSOL)}")
 
-        fixed = holo.evolution.Fixed_Time.from_pop(pop, lifetime)
+        fixed = holo.hardening.Fixed_Time.from_pop(pop, lifetime)
         evo = holo.evolution.Evolution(pop, fixed)
         evo.evolve()
 
