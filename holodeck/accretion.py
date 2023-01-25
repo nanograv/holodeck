@@ -20,7 +20,6 @@ class Accretion:
         self.mdot_ext = mdot_ext
         self.eccen = eccen
         self.subpc = subpc
-        self.int2d = int2d
 
     def mdot_eddington(self, mass):
         """ Calculate the total accretion rate based on masses and a
