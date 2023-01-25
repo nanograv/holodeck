@@ -64,7 +64,8 @@ To-Do
 
 *   _SHM06
 
-    *   Interpolants of hardening parameters return 1D arrays.
+    *   Interpolants of hardening parameters return 2D arrays which we then take the diagonal
+        of, but there should be a better way of doing this.
 
 *   Fixed_Time
 
@@ -1129,6 +1130,43 @@ class _Hardening(abc.ABC):
         _dadt, rv_dedt = self.dadt_dedt(*args, **kwargs)
         return rv_dedt
 
+class CBD_Torques(_Hardening):
+    """ Binary Hardening driven by gas torques from CBD.
+        Using numerical results in Figure 2 & 3 from Siwek+23 """
+
+    @staticmethod
+    def dadt_dedt(evo, step):
+        """Calculate CBD driven binary evolution (hardening rate) in semi-major-axis and eccentricity.
+
+        Parameters
+        ----------
+        evo : `Evolution`
+            Evolution instance providing the binary parameters for calculating hardening rates.
+        step : int
+            Evolution integration step index from which to load binary parameters.
+            e.g. separations are loaded as ``evo.sepa[:, step]``.
+
+        Returns
+        -------
+        dadt : np.ndarray
+            Hardening rate in semi-major-axis, returns negative value, units [cm/s].
+        dedt : np.ndarray
+            Hardening rate in eccentricity, returns negative value, units [1/s].
+
+        """
+        m1, m2 = evo.mass[:, step, :].T    # (Binaries, Steps, 2) ==> (2, Binaries)
+        sepa = evo.sepa[:, step]
+        eccen = evo.eccen[:, step] if (evo.eccen is not None) else None
+        dadt = utils.cbd_hardening_rate_dadt(m1, m2, sepa, eccen=eccen)
+
+        if eccen is None:
+            dedt = None
+        else:
+            dedt = utils.cbd_dedt(m1, m2, sepa, eccen)
+
+        return dadt, dedt
+
+
 
 class Hard_GW(_Hardening):
     """Gravitational-wave driven binary hardening.
@@ -1231,7 +1269,7 @@ class Sesana_Scattering(_Hardening):
 
     """
 
-    def __init__(self, gamma_dehnen=1.0, mmbulge=None, msigma=None):
+    def __init__(self, gamma_dehnen=1.0, mmbulge=None, msigma=None, int2d = False):
         """Construct an `Stellar_Scattering` instance with the given MBH-Host relations.
 
         Parameters
@@ -1247,10 +1285,11 @@ class Sesana_Scattering(_Hardening):
             If `None` a default relationship is used.
 
         """
+        self.int2d = int2d
         self._mmbulge = holo.relations.get_mmbulge_relation(mmbulge)
         self._msigma = holo.relations.get_msigma_relation(msigma)
         self._gamma_dehnen = gamma_dehnen
-        self._shm06 = _SHM06()
+        self._shm06 = _SHM06(int2d = self.int2d)
         return
 
     def dadt_dedt(self, evo, step):
@@ -2256,9 +2295,10 @@ class _SHM06:
 
     """
 
-    def __init__(self):
+    def __init__(self, int2d = False):
         self._bound_H = [0.0, 40.0]    # See [Sesana2006]_ Fig.3
         self._bound_K = [0.0, 0.4]     # See [Sesana2006]_ Fig.4
+        self.int2d = int2d
 
         # Get the data filename
         fname = os.path.join(_PATH_DATA, _SCATTERING_DATA_FILENAME)
@@ -2320,6 +2360,14 @@ class _SHM06:
         g = self._K_g(mrat, ecc)
         B = self._K_B(mrat, ecc)
 
+        if self.int2d:
+            # `interp2d` return a matrix of X x Y results... want diagonal of that
+            # NOTE: FIX: this could be improved!!
+            use_a = use_a.diagonal()
+            A = A.diagonal()
+            g = g.diagonal()
+            B = B.diagonal()
+
         kk = A * np.power((1 + use_a), g) + B
         kk = np.clip(kk, *self._bound_K)
         return kk
@@ -2344,7 +2392,6 @@ class _SHM06:
         if nq < 2:
             raise ValueError("Something is wrong... `kq_keys` = '{}'\ndata:\n{}".format(kq_keys, data))
         #k_mass_ratios = 1.0/np.array(sorted([int(kq) for kq in kq_keys]))
-        """ should not use sorted() on inverse mass ratios, as we want ascending order in q for interpolation """
         k_mass_ratios = 1.0/np.array([int(kq) for kq in kq_keys])
         k_eccen = np.array(data[kq_keys[0]]['e'])
         ne = len(k_eccen)
@@ -2353,6 +2400,8 @@ class _SHM06:
         k_g = np.zeros((ne, nq))
         k_B = np.zeros((ne, nq))
 
+        print("kq_keys = ", kq_keys)
+
         for ii, kq in enumerate(kq_keys):
             _dat = data[kq]
             k_A[:, ii] = _dat['A']
@@ -2360,20 +2409,29 @@ class _SHM06:
             k_g[:, ii] = _dat['g']
             k_B[:, ii] = _dat['B']
 
-        """
-            Interpolate using RectBivariateSpline
-            the interpolation functions below are assigned
-            RectBivariateSpline().ev
-            to evaluate the interpolation at individual points,
-            allowing q_b and e_b in future calls of the function
-            to be in non-ascending order
-        """
-        from scipy.interpolate import RectBivariateSpline
-        self._K_A = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_A).T, kx=1, ky=1).ev
-        self._K_a0 = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_a0).T, kx=1, ky=1).ev
-        self._K_g = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_g).T, kx=1, ky=1).ev
-        self._K_B = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_B).T, kx=1, ky=1).ev
-
+        if not self.int2d:
+            """ Interpolate using RectBivariateSpline """
+            from scipy.interpolate import RectBivariateSpline
+            print("NOT using interp2d")
+            """
+                Interpolate using RectBivariateSpline
+                the interpolation functions below are assigned
+                RectBivariateSpline().ev
+                to evaluate the interpolation at individual points,
+                allowing q_b and e_b in future calls of the function
+                to be in non-ascending order
+            """
+            from scipy.interpolate import RectBivariateSpline
+            self._K_A = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_A).T, kx=1, ky=1).ev
+            self._K_a0 = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_a0).T, kx=1, ky=1).ev
+            self._K_g = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_g).T, kx=1, ky=1).ev
+            self._K_B = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_B).T, kx=1, ky=1).ev
+        if self.int2d:
+            print("using interp2d")
+            self._K_A = sp.interpolate.interp2d(k_mass_ratios, k_eccen, k_A, kind='linear')
+            self._K_a0 = sp.interpolate.interp2d(k_mass_ratios, k_eccen, k_a0, kind='linear')
+            self._K_g = sp.interpolate.interp2d(k_mass_ratios, k_eccen, k_g, kind='linear')
+            self._K_B = sp.interpolate.interp2d(k_mass_ratios, k_eccen, k_B, kind='linear')
         return
 
     def _init_h(self):
