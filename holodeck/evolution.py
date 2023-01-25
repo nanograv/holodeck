@@ -2338,6 +2338,8 @@ class _SHM06:
         data = self._data['K']
         # Get all of the mass ratios (ignore other keys)
         _kq_keys = list(data.keys())
+        """ Need to reverse _kq_keys into descending order for later interpolation """
+        _kq_keys.reverse()
         kq_keys = []
         for kq in _kq_keys:
             try:
@@ -2349,7 +2351,9 @@ class _SHM06:
         nq = len(kq_keys)
         if nq < 2:
             raise ValueError("Something is wrong... `kq_keys` = '{}'\ndata:\n{}".format(kq_keys, data))
-        k_mass_ratios = 1.0/np.array(sorted([int(kq) for kq in kq_keys]))
+        #k_mass_ratios = 1.0/np.array(sorted([int(kq) for kq in kq_keys]))
+        """ should not use sorted() on inverse mass ratios, as we want ascending order in q for interpolation """
+        k_mass_ratios = 1.0/np.array([int(kq) for kq in kq_keys])
         k_eccen = np.array(data[kq_keys[0]]['e'])
         ne = len(k_eccen)
         k_A = np.zeros((ne, nq))
@@ -2364,10 +2368,13 @@ class _SHM06:
             k_g[:, ii] = _dat['g']
             k_B[:, ii] = _dat['B']
 
-        self._K_A = sp.interpolate.interp2d(k_mass_ratios, k_eccen, k_A, kind='linear')
-        self._K_a0 = sp.interpolate.interp2d(k_mass_ratios, k_eccen, k_a0, kind='linear')
-        self._K_g = sp.interpolate.interp2d(k_mass_ratios, k_eccen, k_g, kind='linear')
-        self._K_B = sp.interpolate.interp2d(k_mass_ratios, k_eccen, k_B, kind='linear')
+        """ Interpolate using RectBivariateSpline """
+        from scipy.interpolate import RectBivariateSpline
+        self._K_A = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_A).T).ev
+        self._K_a0 = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_a0).T).ev
+        self._K_g = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_g).T).ev
+        self._K_B = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_B).T).ev
+
         return
 
     def _init_h(self):
