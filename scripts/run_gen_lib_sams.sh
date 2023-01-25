@@ -4,7 +4,8 @@
 # Setup for running on the `minos` computer
 # --------------------------------------------------------------------------------------------------
 
-OUTPUT="output/simple01_2022-12-07_01"
+OUTPUT="output/debug01b_2023-01-24_01_n1000_g1000_s40_r100_f10"
+#OUTPUT=$OUTPUT"__TEST"
 SCRIPT="scripts/gen_lib_sams.py"
 LOG_NAME="job_log"
 mkdir -p $OUTPUT
@@ -14,7 +15,6 @@ cp $0 "$OUTPUT/"
 LOG_OUT="$LOG_NAME.out"
 LOG_ERR="$LOG_NAME.err"
 
-mpirun -n 18  python $SCRIPT $OUTPUT -n 200 -s 50 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR &
+mpirun -n 19  python $SCRIPT $OUTPUT -n 1000 -s 40 -r 100 -f 10  1> $LOG_OUT 2> $LOG_ERR &
+# mpirun -n 2  python $SCRIPT $OUTPUT -n 4 -s 40 -r 100 -f 10  1> $LOG_OUT 2> $LOG_ERR &
 
-cp $LOG_OUT "$OUTPUT/"
-cp $LOG_ERR "$OUTPUT/"
