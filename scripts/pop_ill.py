@@ -74,7 +74,7 @@ def main():
     mod_MM2013 = holo.population.PM_Mass_Reset(mmbulge, scatter=True)
     pop.modify(mod_MM2013)
 
-    fixed = holo.evolution.Fixed_Time.from_pop(pop, 2.0 * GYR)
+    fixed = holo.hardening.Fixed_Time.from_pop(pop, 2.0 * GYR)
     evo = holo.evolution.Evolution(pop, fixed)
     evo.evolve()
 
