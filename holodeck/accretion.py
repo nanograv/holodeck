@@ -3,6 +3,8 @@ import numpy as np
 import os
 from holodeck import utils, cosmo, log, _PATH_DATA
 from scipy import interpolate
+from scipy.interpolate import RectBivariateSpline
+
 
 class Accretion:
     """
@@ -18,6 +20,7 @@ class Accretion:
         self.mdot_ext = mdot_ext
         self.eccen = eccen
         self.subpc = subpc
+        self.int2d = int2d
 
     def mdot_eddington(self, mass):
         """ Calculate the total accretion rate based on masses and a
@@ -62,12 +65,17 @@ class Accretion:
                 """ True values of q, e in a meshgrid """
                 X, Y = np.meshgrid(x, y)
                 Z = all_lambdas
-                """ Interpolation function in 2D grid, should extrapolate outside domain by default """
-                lamb_qe_interp = interpolate.interp2d(x, y, Z, kind='linear')
+
+                """ Need to use RectBivariateSpline since interp2d is deprecated
+                    in SciPy 1.10 and will be removed in SciPy 1.12.0,
+                    causing an issue when merging into the dev branch """
+                lamb_qe_interp = RectBivariateSpline(np.array(x), np.array(y), np.array(Z).T, kx = 1, ky = 1)
                 return(lamb_qe_interp)
 
             lamb_interp = lambda_qe_interp_2d()
-            lamb_qe = lamb_interp(q_b, e_b)
+            """ Need to use RectBivariateSpline.ev to evaluate the interpolation at points,
+                allowing q_b and e_b to be in non-ascending order """
+            lamb_qe = lamb_interp.ev(q_b, e_b)
             mdot_1 = 1./(np.array(lamb_qe) + 1.) * mdot
             mdot_2 = np.array(lamb_qe)/(np.array(lamb_qe) + 1.) * mdot
 
