@@ -2369,10 +2369,10 @@ class _SHM06:
             to be in non-ascending order
         """
         from scipy.interpolate import RectBivariateSpline
-        self._K_A = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_A).T).ev
-        self._K_a0 = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_a0).T).ev
-        self._K_g = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_g).T).ev
-        self._K_B = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_B).T).ev
+        self._K_A = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_A).T, kx=1, ky=1).ev
+        self._K_a0 = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_a0).T, kx=1, ky=1).ev
+        self._K_g = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_g).T, kx=1, ky=1).ev
+        self._K_B = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_B).T, kx=1, ky=1).ev
 
         return
 
