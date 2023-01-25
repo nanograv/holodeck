@@ -253,6 +253,7 @@ class MMBulge_Standard(_MMBulge_Relation):
             mref = self.MASS_REF
         if scatter_dex is None:
             scatter_dex = self.SCATTER_DEX
+        mamp, _ = utils._parse_val_log10_val_pars(mamp, mamp_log10, MSOL, 'mamp', only_one=True)
 
         mamp, _ = utils._parse_val_log10_val_pars(mamp, mamp_log10, MSOL, 'mamp', only_one=True)
 

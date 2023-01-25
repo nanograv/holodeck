@@ -407,6 +407,13 @@ class Semi_Analytic_Model:
         gmt = utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
         mmbulge = utils._get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
 
+        # nl = 3
+        # nh = 30 - nl
+        # mix = 0.1
+        # lo = zmath.spacing([extr[0], mix], 'log', nl)
+        # hi = zmath.spacing([mix, extr[1]], 'lin', nh+1)[1:]
+        # redz = np.concatenate([lo, hi])
+
         # Process grid specifications
         param_names = ['mtot', 'mrat', 'redz']
         params = [mtot, mrat, redz]
@@ -875,6 +882,11 @@ class Semi_Analytic_Model:
             log.exception(err)
             raise ValueError(err)
 
+        if np.any(np.isnan(dnum)):
+            err = f"Found nan `dnum` values!"
+            log.exception(err)
+            raise ValueError(err)
+
         # "integrate" within each bin (i.e. multiply by bin volume)
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
         #       after poisson calculation, need to convert back to dN/dlogf
@@ -904,6 +916,11 @@ class Semi_Analytic_Model:
             log.exception(err)
             raise ValueError(err)
 
+        if np.any(np.isnan(number)):
+            print(f"{np.any(np.isnan(dnum))=}")
+            err = f"Found nan `number` values!"
+            log.exception(err)
+            raise ValueError(err)
 
         # ---- Get the GWB spectrum from number of binaries over grid
         hc = gravwaves._gws_from_number_grid_integrated(edges, number, realize)
