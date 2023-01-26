@@ -99,12 +99,14 @@ import abc
 # import inspect
 import json
 import os
+import pickle as pkl
 # from typing import Union, TypeVar  # , Callable, Iterator
 import warnings
 
 import numpy as np
 import scipy as sp
 import scipy.interpolate   # noqa
+from scipy.interpolate import RectBivariateSpline
 
 import kalepy as kale
 
@@ -894,29 +896,13 @@ class Evolution:
 
         if self._acc is not None:
             """ An instance of the accretion class has been supplied,
-                and we will evolve the binary masses through accretion
+                and binary masses are evolved through accretion
                 First, get total accretion rates """
-            if self._acc.mdot_ext is not None:
-                """ accretion rates have been supplied externally """
-                mdot_total = self._acc.mdot_ext[:,step-1]
-            else:
-                """ Get accretion rates as a fraction (f_edd in self._acc) of the
-                    Eddington limit from current BH masses """
-                total_bh_masses = np.sum(self.mass[:, step-1, :], axis=1)
-                mdot_total = self._acc.mdot_eddington(total_bh_masses)
-
-            """ Calculate individual accretion rates """
-            if self._acc.subpc:
-                """ Indices where separation is less than or equal to a parsec """
-                ind_sepa = self.sepa[:, step] <= PC
-            else:
-                """ Indices where separation is less than or equal to 10 kilo-parsec """
-                ind_sepa = self.sepa[:, step] <= 10**4 * PC
-
-            """ Set total accretion rates to 0 when separation is larger than 1pc or 10kpc,
-                depending on subpc switch applied to accretion instance """
-            mdot_total[~ind_sepa] = 0
-            self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_total, self, step)
+            mdot_t = self._acc.mdot_total(self, step)
+            """ A preferential accretion model is called to divide up
+                total accretion rates into primary and secondary accretion rates """
+            self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_t, self, step)
+            """ Accreted mass is calculated and added to primary and secondary masses """
             self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:,step-1,0]
             self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:,step-1,1]
 
@@ -952,6 +938,7 @@ class Evolution:
         dedt = None if self.eccen is None else np.zeros_like(dadt)
 
         for ii, hard in enumerate(self._hard):
+            print("hard = ", hard)
             _hard_dadt, _ecc = hard.dadt_dedt(self, step)
             dadt[:] += _hard_dadt
             if self._debug:    # nocov
@@ -1220,6 +1207,114 @@ class Hard_GW(_Hardening):
         m1, m2 = utils.m1m2_from_mtmr(mtot, mrat)
         dedt = utils.gw_dedt(m1, m2, sepa, eccen=eccen)
         return dedt
+
+
+class CBD_Torques(_Hardening):
+    """Binary Orbital Evolution based on Hydrodynamic Simulations by Siwek+23.
+
+    This module uses data from Siwek+23, which supplies rates of change of
+    binary semi-major axis a_b
+    and
+    binary eccentricity e_b.
+    The calculation of a_b and e_b versus time requires accretion rates (for scale).
+    """
+
+    def __init__(self, f_edd = 0.10, subpc = True):
+        """Construct a CBD-Torque instance.
+
+        Parameters
+        ----------
+
+        """
+
+        self.f_edd = f_edd
+        self.subpc = subpc
+
+        return
+
+    def dadt_dedt(self, evo, step):
+        """Circumbinary Disk Torque hardening rate.
+
+        Parameters
+        ----------
+        evo : `Evolution`
+            Evolution instance providing binary parameters at the given intergration step.
+        step : int
+            Integration step at which to calculate hardening rates.
+
+        Returns
+        -------
+        dadt : array_like
+            Binary hardening rates in units of [cm/s], defined to be negative.
+        dedt : array_like
+            Binary rate-of-change of eccentricity in units of [1/sec].
+
+        """
+        mass = evo.mass[:, step, :]
+        sepa = evo.sepa[:, step]
+        eccen = evo.eccen[:, step] if evo.eccen is not None else None
+
+        if evo._acc is None:
+            """ If no accretion modules is supplied, use an Eddington fraction for now """
+            total_mass = mass[:,step,0] + mass[:,step,1]
+            accretion_instance = holo.accretion.Accretion(f_edd = self.f_edd, subpc=self.subpc)
+            mdot = accretion_instance.mdot_eddington(total_mass)
+        if evo._acc is not None:
+            """ An instance of the accretion class has been supplied,
+                and binary masses are evolved through accretion
+                Get total accretion rates """
+            mdot = evo._acc.mdot_total(evo, step)
+
+        dadt, dedt = self._dadt_dedt(mass, sepa, eccen, mdot)
+
+        inds_dadt_pos = dadt > 0
+        dadt[inds_dadt_pos] = 0.0
+
+        return dadt, dedt
+
+    def _dadt_dedt(self, mass, sepa, eccen, mdot):
+        """Circumbinary Disk Torque hardening rate from Siwek+23.
+
+        Parameters
+        ----------
+        mass : (N,2) array_like
+            Masses of each MBH component (0-primary, 1-secondary) in units of [gram].
+        sepa : (N,) array_like
+            Binary separation in units of [cm].
+        eccen : (N,) array_like or `None`
+            Binary eccentricity.  `None` if eccentricity is not being evolved.
+
+        Returns
+        -------
+        dadt : (N,) array-like of scalar
+            Binary hardening rates in units of [cm/s], defined to be negative.
+        dedt : (N,) array-like of scalar  or  `None`
+            Binary rate-of-change of eccentricity in units of [1/sec].
+            If eccentricity is not being evolved (i.e. `eccen==None`) then `None` is returned.
+
+        """
+        mass = np.atleast_2d(mass)
+        sepa = np.atleast_1d(sepa)
+        eccen = np.atleast_1d(eccen) if eccen is not None else None
+        mtot, mrat = utils.mtmr_from_m1m2(mass)
+
+        semimajor_axis = sepa #for now? we don't resolve the orbit in time (ever?) so this approximation should do?
+
+        """ dadt and dedt from Siwek+23 are parameterized
+            by the semimajor axis, mass and accretion rate
+            of the accreting binary systems. Below dadt and dedt
+            are converted into physical quantities:
+            [dadt] = cm/s
+            [dedt] = 1/s
+            which depend on the physical scale
+            and accretion rate of the system """
+        dadt = _Siwek2023.dadt(mrat, eccen) * semimajor_axis * (mdot/mtot)
+        if eccen is not None:
+            dedt =  _Siwek2023.dedt(mrat, eccen) * (mdot/mtot)
+        else:
+            dedt = np.zeros_like(sepa)
+
+        return dadt, dedt
 
 
 class Sesana_Scattering(_Hardening):
@@ -2184,6 +2279,93 @@ class Fixed_Time(_Hardening):
 # ====    Utility Classes and Functions    ====
 # =================================================================================================
 
+class _Siwek2023:
+    """ Hardening rates from circumbinary disk simulations as in [Siwek2023]_.
+
+        Mass ratios and eccentricities must be provided.
+
+        The lookup tables (in form of a dictionary) are located here:
+        data/cbd_torques/siwek+23/ebdot_abdot_tmin3000Pb_tmax10000Pb.pkl
+        and contain \dot{e} and \dot{a} as a function of q,e
+    """
+
+    @staticmethod
+    def dadt(mrat, eccen):
+        """Binary hardening rate from circumbinary disk torques.
+
+        [Siwek2023]_ Table 2
+
+        Parameters
+        ----------
+        sepa : (N,) array-like of scalar
+            Binary separation in units of [cm].
+
+        Returns
+        -------
+        dadt : (N,) np.ndarray of scalar
+            Binary hardening rate in units of [cm/s].
+
+        """
+        fp_dadt_dedt_pkl = 'cbd_torques/siwek+23/ebdot_abdot_tmin3000Pb_tmax10000Pb.pkl'
+        fp_dadt_dedt_pkl = os.path.join(_PATH_DATA, fp_dadt_dedt_pkl)
+        fp_mean_ebdot_abdot = open(fp_dadt_dedt_pkl, 'rb')
+        mean_ebdot_abdot = pkl.load(fp_mean_ebdot_abdot)
+        all_es = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8]
+        all_qs = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+        torque_contribution = 'sum_grav_acc'
+
+        mean_abdot_arr = np.zeros((len(all_qs),len(all_es)))
+        mean_ebdot_arr = np.zeros((len(all_qs),len(all_es)))
+        for i,q in enumerate(all_qs):
+            for j,e in enumerate(all_es):
+                this_key_ab = 'e=%.2f_q=%.2f_ab_dot_ab_%s' %(e,q,torque_contribution)
+                mean_abdot_arr[i][j] = mean_ebdot_abdot[this_key_ab]
+
+        dadt_qe_interp = RectBivariateSpline(np.array(all_qs), np.array(all_es), np.array(mean_abdot_arr), kx = 1, ky = 1)
+        dadt = dadt_qe_interp.ev(mrat, eccen)
+        return dadt
+
+    @staticmethod
+    def dedt(mrat, eccen):
+        """Binary eccentricity rate of change from circumbinary disk torques.
+
+        [Siwek2023]_ Table 3
+
+        Parameters
+        ----------
+        sepa : (N,) array-like of scalar
+            Binary separation in units of [cm].
+
+        Returns
+        -------
+        dedt : (N,) np.ndarray of scalar
+            Binary eccentricity rate of change in units of [cm/s].
+
+        """
+
+        fp_dadt_dedt_pkl = 'cbd_torques/siwek+23/ebdot_abdot_tmin3000Pb_tmax10000Pb.pkl'
+        fp_dadt_dedt_pkl = os.path.join(_PATH_DATA, fp_dadt_dedt_pkl)
+        fp_mean_ebdot_abdot = open(fp_dadt_dedt_pkl, 'rb')
+        mean_ebdot_abdot = pkl.load(fp_mean_ebdot_abdot)
+        all_es = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8]
+        all_qs = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+        torque_contribution = 'sum_grav_acc'
+        print("eccen = ", eccen)
+
+        mean_ebdot_arr = np.zeros((len(all_qs),len(all_es)))
+        for i,q in enumerate(all_qs):
+            for j,e in enumerate(all_es):
+                this_key_eb = 'e=%.2f_q=%.2f_eb_dot_%s' %(e,q,torque_contribution)
+                mean_ebdot_arr[i][j] = mean_ebdot_abdot[this_key_eb]
+
+        dedt_qe_interp = RectBivariateSpline(np.array(all_qs), np.array(all_es), np.array(mean_ebdot_arr), kx = 1, ky = 1)
+        dedt = dedt_qe_interp.ev(mrat, eccen)
+        import random
+        n = random.randint(0,100)
+        if mrat[n] > 0.1:
+            print("mrat[n] = %.2f, eccen[n] = %.2f, dedt[n] = %.2f" %(mrat[n], eccen[n], dedt[n]))
+        return dedt
+
 
 class _Quinlan1996:
     """Hardening rates from stellar scattering parametrized as in [Quinlan1996]_.
@@ -2374,7 +2556,6 @@ class _SHM06:
             allowing q_b and e_b in future calls of the function
             to be in non-ascending order
         """
-        from scipy.interpolate import RectBivariateSpline
         self._K_A = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_A).T, kx=1, ky=1).ev
         self._K_a0 = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_a0).T, kx=1, ky=1).ev
         self._K_g = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_g).T, kx=1, ky=1).ev
