@@ -89,6 +89,7 @@ del cosmopy
 
 from . import constants   # noqa
 from . import evolution   # noqa
+from . import gravwaves   # noqa
 from . import hardening   # noqa
 from . import librarian   # noqa
 from . import relations   # noqa

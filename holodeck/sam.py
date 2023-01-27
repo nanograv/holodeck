@@ -1090,7 +1090,36 @@ def sample_sam_with_hardening(
 
 
 def evolve_eccen_uniform_single(sam, eccen_init, sepa_init, nsteps):
-    assert (0.0 <= eccen_init) and (eccen_init <= 1.0)
+    """Evolve binary eccentricity from an initial value along a range of separations.
+
+    Parameters
+    ----------
+    sam : `holodeck.sam.Semi_Analytic_Model` instance
+        The input semi-analytic model.  All this does is provide the range of total-masses to
+        determine the minimum ISCO radius, which then determines the smallest separations to
+        evolve until.
+    eccen_init : float,
+        Initial eccentricity of binaries at the given initial separation `sepa_init`.
+        Must be between [0.0, 1.0).
+    sepa_init : float,
+        Initial binary separation at which evolution begins.  Units of [cm].
+    nsteps : int,
+        Number of (log-spaced) steps in separation between the initial separation `sepa_init`,
+        and the final separation which is determined as the minimum ISCO radius based on the
+        smallest total-mass of binaries in the `sam` instance.
+
+    Returns
+    -------
+    sepa : (E,) ndarray of float
+        The separations at which the eccentricity evolution is defined over.  This is the
+        independent variable of the evolution.
+        The shape `E` is the value of the `nsteps` parameter.
+    eccen : (E,)
+        The eccentricity of the binaries at each location in separation given by `sepa`.
+        The shape `E` is the value of the `nsteps` parameter.
+
+    """
+    assert (0.0 <= eccen_init) and (eccen_init < 1.0)
 
     #! CHECK FOR COALESCENCE !#
 
