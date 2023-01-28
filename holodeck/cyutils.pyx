@@ -399,23 +399,25 @@ cdef double[:, :] _sam_calc_gwb_single_eccen(
 
     """
 
+    # Initialize sizes and shapes
     cdef int nfreqs = len(gwfobs)
     cdef int n_mtot = len(mtot_log10)
     cdef int n_mrat = len(mrat)
     cdef int n_redz = len(redz)
     cdef int n_eccs = len(sepa_evo_in)
-
     cdef int num_freq_harm = nfreqs * nharms
     cdef (int *)shape = <int *>malloc(2 * sizeof(int))
     shape[0] = nfreqs
     shape[1] = nharms
 
+    # Declare variables used later
     cdef int ii, nh, jj, kk, aa, bb, ff, ecc_idx, ecc_idx_beg, ii_mm, kk_zz
     cdef double m1, m2, mchirp, sa, qq, tau
     cdef double gwfr, zterm, dc_cm, dc_mpc, dc_term, gne, hterm
     cdef double weight_ik, weight, four_over_nh_squared, sa_fourth
     cdef double fe_ecc, mt, mt_sqrt, nd, hterm_pref, frst_evo_lo, frst_evo_hi
 
+    # Initialize constants
     cdef double four_pi_c_mpc = 4 * M_PI * (MY_SPLC / MY_MPC)
     cdef double kep_sa_term = MY_NWTG / pow(2.0*M_PI, 2)
     cdef double one_third = 1.0 / 3.0
@@ -424,61 +426,81 @@ cdef double[:, :] _sam_calc_gwb_single_eccen(
     cdef double three_fifths = 3.0 / 5.0
     cdef double six_fifths = 6.0 / 5.0
 
-    cdef double *sepa_evo = <double *>malloc(n_eccs * sizeof(double))
-    cdef double *eccen_evo = <double *>malloc(n_eccs * sizeof(double))
-    cdef double _freq_pref = (1.0/(2.0*M_PI)) * sqrt(MY_NWTG)
-    cdef double *frst_evo_pref = <double *>malloc(n_eccs * sizeof(double))
-    for ii in range(n_eccs):
-        sepa_evo[ii] = <double>sepa_evo_in[ii]
-        eccen_evo[ii] = <double>eccen_evo_in[ii]
-        frst_evo_pref[ii] = _freq_pref / pow(sepa_evo[ii], 1.5)
-
-    cdef (double *)freq_harms = <double *>malloc(num_freq_harm * sizeof(double))
-    for ii in range(num_freq_harm):
-        unravel(ii, shape, &aa, &bb)
-        freq_harms[ii] = gwfobs[aa] / (bb + 1)
-
-    cdef (int *)sorted_index = <int *>malloc(num_freq_harm * sizeof(int))
-    argsort(freq_harms, num_freq_harm, &sorted_index)
-
+    # Initialize arrays
     cdef np.ndarray[np.double_t, ndim=2] gwb = np.zeros((nfreqs, nharms))
     cdef double *mtot = <double *>malloc(n_mtot * sizeof(double))
     cdef double *ival = <double *>malloc(2 * sizeof(double))
     cdef double *jval = <double *>malloc(2 * sizeof(double))
     cdef double *kval = <double *>malloc(2 * sizeof(double))
+    cdef double *sepa_evo = <double *>malloc(n_eccs * sizeof(double))
+    cdef double *eccen_evo = <double *>malloc(n_eccs * sizeof(double))
+    cdef double _freq_pref = (1.0/(2.0*M_PI)) * sqrt(MY_NWTG)
+    cdef double *frst_evo_pref = <double *>malloc(n_eccs * sizeof(double))
+    # Convert from numpy arrays to c-arrays (for possible speed improvements)
+    for ii in range(n_eccs):
+        sepa_evo[ii] = <double>sepa_evo_in[ii]
+        eccen_evo[ii] = <double>eccen_evo_in[ii]
+        # calculate the prefactor (i.e. everything except the mass) for kepler's law
+        frst_evo_pref[ii] = _freq_pref / pow(sepa_evo[ii], 1.5)
+
+    # Calculate all of the frequency harmonics (flattened) that are needed
+    cdef (double *)freq_harms = <double *>malloc(num_freq_harm * sizeof(double))
+    for ii in range(num_freq_harm):
+        # convert from 1D index to 2D grid of (F, H) frequencies and harmonics
+        unravel(ii, shape, &aa, &bb)
+        # calculate the n = bb+1 harmonic
+        freq_harms[ii] = gwfobs[aa] / (bb + 1)
+
+    # Find the indices by which to sort the frequency harmonics (flattened)
+    cdef (int *)sorted_index = <int *>malloc(num_freq_harm * sizeof(int))
+    argsort(freq_harms, num_freq_harm, &sorted_index)
 
     # iterate over redshifts Z
     for kk in range(n_redz):
+        # fill `kval` with the weight of this grid point (kval[0]), and the grid-width (kval[1])
         my_trapz_grid_weight(kk, n_redz, redz, kval)
         zterm = (1.0 + redz[kk])
         dc_mpc = dcom[kk]   # this is still in units of [Mpc]
-        dc_cm = dc_mpc * MY_MPC
+        dc_cm = dc_mpc * MY_MPC  # convert to [cm]
         dc_term = four_pi_c_mpc * pow(dc_mpc, 2)
 
         # iterate over mtot M
-        ecc_idx_beg = 0
+        ecc_idx_beg = 0   # we will keep track of evolution/eccentricity indices for our target
+                          # frequencies to make suring the arrays faster
+        # iterate over total masses in reverse, so that's we're always going to increasing frequencies
         for ii_mm in range(n_mtot):
+            # convert from forward to backward indices
             ii = n_mtot - 1 - ii_mm
 
+            # convert from log10 to regular total masses, only the first time through the loop
             if kk == 0:
                 mt = pow(10.0, mtot_log10[ii])
                 mtot[ii] = mt
             else:
                 mt = mtot[ii]
 
+            # calculate some needed quantities
             mt_sqrt = sqrt(mt)
-            my_trapz_grid_weight(ii, n_mtot, mtot_log10, ival)
             kep_sa_mass_term = kep_sa_term * mt
+            # fill `ival` with weight and grid-width in the mtot dimension
+            my_trapz_grid_weight(ii, n_mtot, mtot_log10, ival)
 
+            # precalculate some of the weighting factors over the 2D we have so far
             weight_ik = ival[1] * kval[1] / (ival[0] * kval[0])
 
+            # iterate over mass ratios
             for jj in range(n_mrat):
+                # fill `jval` with weight and grid-width in the mrat dimension
                 my_trapz_grid_weight(jj, n_mrat, mrat, jval)
+                # calculate the weight factor for this grid-cell
                 weight = weight_ik * (jval[1] / jval[0])
+                # convert for mtot, mrat to m1, m2 s.t. m2 <= m1    [grams]
                 m1 = mt / (1.0 + mrat[jj])
                 m2 = mt - m1
+                # calculate chirp-mass [grams]
                 mchirp = mt * pow(mrat[jj], three_fifths) / pow(1 + mrat[jj], six_fifths)
 
+                #
                 hterm_pref = ndens[ii, jj, kk] * dc_term * zterm
                 hterm_pref *= pow(GW_SRC_CONST * mchirp * pow(2.0*mchirp, two_third) / dc_cm, 2)
 

@@ -97,6 +97,40 @@
 
     \subsection{Source Distributions and Gravitational Wave Calculations}
 
+        It was shown by \citet[][Eq.~5]{Phinney-2001} that the GWB spectrum, can be expressed in terms of the GW characteristic strain ($\hc$),
+        \begin{equation}
+            % \label{eq:}
+            \hc^2(f) = \frac{4G}{\pi c^2 f} \int dz \; \frac{d\ndens}{dz} \, \scale{d\egw}{d f_p} \bigg|_{f_p=f\lr{1+z}}.
+        \end{equation}
+        We can convert from the GW energy-spectrum ($\frac{d\egw}{d f_p}$) to GW spectral strain using Eq.~\ref{eq:gw_energy_spectrum}~\&~\ref{eq:strain_lum}, and rewrite this as,
+        \begin{equation}
+            \label{eq:gwb_sa}
+            \hc^2(f) = \int_0^\infty \!\! dz \, \sum_n^\infty \; \frac{d\ndens}{dz} \, \hsn^2\lr{f_p} \cdot 4\pi c \, d_c^2 \cdot \lr{1+z} \cdot \thard(f_p) \, \bigg|_{f_p = f(1+z)/n}.
+        \end{equation}
+        In the case of purely GW-driven binary hardening, and circular binary orbits, this can be simplified to \citep[][Eq.~11]{Phinney-2001},
+        \begin{equation}
+            \label{eq:gwb_ideal}
+            \hc^2(f) = \frac{4 \pi}{3 c^2} \, \lr[-4/3]{2\pi f} \int_0^\infty \!\! dz \; \frac{d\ndens}{dz}  \, \frac{\lr[5/3]{G \mchirp}}{\lr[1/3]{1+z}}.
+        \end{equation}
+        This ideal, power-law GWB is often expressed as, \mbox{$\hc(f) = A_{\yr} \cdot \lr[-2/3]{f \cdot \yr}$}.
+
+        The redshift evolution of the comoving number density of sources ($\ndens \equiv dN/dV_c$) can be related to the number of sources in a given frequency interval as \citep[][Eq.~6]{Sesana+2008},
+        \begin{equation}
+            \label{eq:number_density_to_number_frequency}
+            \frac{d\ndens}{dz} = \frac{d^2N}{dz \, dV_c} = \frac{d^2N}{dz \, d\ln f_p} \frac{d \ln f_p}{dt_r} \frac{dt_r}{dz} \frac{dz}{dV_c}.
+        \end{equation}
+        Plugging \eqref{eq:number_density_to_number_frequency} into \eqref{eq:gwb_sa}, and utilizing the expressions from Eqs.~\ref{eq:gw_hard},~\ref{eq:hard_time},~\ref{eq:comvol}~\&~\ref{eq:redshift_time}, to write:
+        \begin{equation}
+            \label{eq:gwb_mc}
+                \hc^2(f) = \int dz \sum_n^\infty \frac{d^2 N}{dz \, d\ln f_p} \, \hsn^2(f_p).
+        \end{equation}
+
+        While Eq.~\ref{eq:gwb_sa} and Eq.~\ref{eq:gwb_mc} are formally equal, how they are used in practice can produce important differences.  In particular, as pointed out by \citep[][Eq.~6]{Sesana+2008}, `monte-carlo' calculations that explicitly use Eq.~\ref{eq:gwb_mc} encode the intrinsic discreteness of binary sources.  The `semi-analytic' calculation using Eq.~\ref{eq:gwb_sa}, naively implemented, assumes a smooth, continuous distribution of binary sources without taking into account their quantization.  The effect of binary quantization on the GWB is to produce a steeping of the GWB spectrum relative to the idealized power-law \eqref{eq:gwb_ideal}.  The frequency at which this becomes important is model dependent, but typically at \mbox{$f \gtrsim 1 - 10 \, \pyr$}.
+
+    \subsection{Discretization and Cosmic Variance}
+
+    \subsection{??Other??}
+
         Let $N(M,q,z,\frst)$ denote the number of binaries up to a total mass $M$, mass ratio $q$, redshift $z$, and rest-frame orbital-frequency $\frst$.
         We can calculate the characteristic strain from an ensemble of GW sources as \citep[][Eqs.~5/8]{Phinney-2001},
             \begin{align}
@@ -263,7 +297,7 @@
 \section*{Acknowledgments}
 	I am very thankful to.
 
-    This research made use of \texttt{astropy}, a community-developed core Python package for Astronomy \citep{astropy2013}, in addition to \texttt{Scipy}~\citep{scipy}, \texttt{ipython}~\citep{ipython}, \texttt{jupyter}~notebook~\citep{jupyter}, \texttt{Numpy}~\citep{numpy2011} \& \texttt{SymPy}~\citep{sympy2017}.  All figures were generated using \texttt{matplotlib}~\citep{matplotlib2007}.  Kernel density estimation was performed using the \texttt{kalepy}{} package (\href{https://github.com/lzkelley/kalepy}{github.com/lzkelley/kalepy}) \citep{kalepy2020}.
+    This research made use of \texttt{astropy}, a community-developed core Python package for Astronomy \citep{astropy2013}, in addition to \texttt{Scipy}~\citep{scipy}, \texttt{ipython}~\citep{ipython}, \texttt{jupyter}~notebook~\citep{jupyter}, \texttt{Numpy}~\citep{numpy2011} \& \texttt{SymPy}~\citep{sympy2017}.  All figures were generated using \texttt{matplotlib}~\citep{matplotlib2007}.  Kernel density estimation was performed using the \texttt{kalepy}{} package (\href{https://github.com/lzkelley/kalepy}{github.com/lzkelley/kalepy}) \citep{kalepy2021}.
 
     The Illustris data is available online at \href{https://www.illustris-project.org/}{www.illustris-project.org} \citep{Nelson+2015}, and Illustris-TNG data at \href{https://www.tng-project.org/}{www.tng-project.org} \citep{Nelson+2019}.
 
@@ -288,28 +322,84 @@
 
 \section{Additional Equations}
     \label{sec:app_eqs}
-    A binary is described by its total mass $M$, mass ratio $q \equiv m_2 / m_1$ (s.t.~$q\leq1$), (proper) semi-major axis $a$, and rest-frame orbital frequency $f_r$.  The characteristic gravitational wave mass is the chirp mass, $\mchirp \equiv M \, q^{3/5} \, \lr[-6/5]{1+q}$.
 
-    The GW strain from a circular binary is \citep[][Eq.~7; sky and polarization averaged]{Sesana+2008},
+    \subsection{Binaries and Gravitational Waves}
+
+        A binary is described by its total mass $M$, mass ratio $q \equiv m_2 / m_1$ (s.t.~$q\leq1$), (proper) semi-major axis $a$, and rest-frame orbital frequency $f_r$.  The characteristic gravitational wave mass is the chirp mass, $\mchirp \equiv M \, q^{3/5} \, \lr[-6/5]{1+q}$.
+
+        The time evolution of a binary's orbit due to the loss of energy and angular momentum through gravitational waves was calculated by \citep[][Eq.~5.6--5.8]{Peters1964}:
+        \begin{subequations}
+        \label{eq:gw_hard}
+        \begin{align}
+            \frac{da}{dt} = & -\frac{64 \, G^3}{5 \, c^5} \frac{M_1 \, M_2 \, M}{a^3} F(e), \\
+            \frac{de}{dt} = & -\frac{304 \, G^3}{15 \, c^5} \frac{M_1 \, M_2 \, M}{a^4} \lr{e + \frac{121}{304}e^3},
+        \end{align}
+        \end{subequations}
+        where the GW eccentricity function is,
         \begin{equation}
-        \label{eq:source_strain}
-        h_s = \frac{8}{10^{1/2}} \frac{\left(G\mchirp\right)^{5/3}}{c^4 \, d_L}
-            \left(2 \pi f_r \right)^{2/3},
+            \label{eq:ecc_func}
+            F(e) \equiv \frac{1 + \frac{73}{24} e^2 + \frac{37}{96} e^4}{\left( 1 - e^2\right)^{7/2}}.
         \end{equation}
-    for a luminosity distance $d_L$.  Recall that the luminosity distance and comoving distance are related as $d_L = d_c \, (1+z)$, that the comoving volume of the Universe is given by \citep{Hogg-1999},
-    \begin{equation}
-        \frac{d V_c}{dz} = 4\pi \frac{c}{H_0} \frac{d_c^2}{E(z)},
-    \end{equation}
-    and that redshift can be related to time (or age of the universe) as,
-    \begin{align}
-        \frac{dz}{dt} = H_0 \lr{1+z} E(z).
-    \end{align}
-    The evolution of the Hubble parameter over redshift can be calculated from the matter-energy constituents of the universe as,
-    \begin{align}
-        H(z) & = H_0(z) E(z), \\
-        E(z) & \equiv \lrs[1/2]{\Omega_R \lr[4]{1+z} + \Omega_m \lr[3]{1+z} + \Omega_k \lr[2]{1+z} + \Omega_\Lambda}.
-    \end{align}
-    The $\Omega$ terms are the usual redshift-zero fractions of the critical density for radiation, non-relativistic matter, curvature, and dark energy.  We adopt the results of WMAP9 \citep{Hinshaw+2013} for our fiducial cosmology, assuming zero curvature: $H_0 = 69.33 \textrm{ km/s/Mpc}$, $\Omega_m = 0.2880$, $\Omega_\Lambda = 0.7120$.
+        We define the binary `hardening' timescale with respect to frequency, instead of separation, as:
+        \begin{equation}
+            \label{eq:hard_time}
+            \thard \equiv dt/d\ln \frst = \frst / (d\frst/dt) = - \frac{2}{3} a / (da/dt).
+        \end{equation}
+        In general, the hardening rate can be driven by other mechanisms in addition to gravitational wave emission.
+
+        GW power is emitted at integer harmonics of the orbital frequency, $\frstn = n \cdot \frstorb$, which is also redshifted to reach the observer-frame, $\fobsn = n \cdot \frstorb / (1+z)$.  The energy spectrum emitted in GWs is \citet[][Eq.~3.10]{enoki2007a},
+        \begin{subequations}
+        \begin{align}
+            \label{eq:gw_energy_spectrum}
+            \frac{d \egw}{d \frst} & = \int \frac{dt_r}{df_p} \, \sum_{n=1}^\infty \, \lgwn(f_p) \; \delta(\frst - n f_p) \; d f_p \\
+                & = \sum_{n=1}^\infty \left[ \lgwn(f_p) \cdot \frac{\thard(f_p)}{n f_p} \right]_{f_p = \frst/n},
+        \end{align}
+        \end{subequations}
+        where the power-radiated at each harmonic can be expressed as is \citep[][Eq.~2.2]{enoki2007a},
+        \begin{align}
+            \label{eq:lum_gw}
+            \lgw & = \sum_n \lgwn = \lgwc \sum_n g(n,e) = \lgwc \cdot F(e), \\
+            \lgwc & = \frac{32}{5 G c^5} \left(G\mchirp\right)^{10/3} \left( 2\pi \frstorb \right)^{10/3}.
+        \end{align}
+        Here, the GW frequency distribution function is,
+        \begin{equation}
+        \begin{split}
+            \label{eq:freq_dist_func}
+            g(n,e) \equiv \frac{n^4}{32} \Biggl(& \left[ J_{n-2}(ne) - 2eJ_{n-1}(ne) + \frac{2}{n} J_n (ne) + 2e J_{n+1} (ne) - J_{n+2} (ne) \vphantom{\frac{2}{n}}\right]^2 \\
+            &+ \left(1-e^2\right) \Bigl[J_{n-2}(ne) - 2eJ_n(ne) + J_{n+2}(ne)\Bigr]^2 + \frac{4}{3n^2}\Bigl[J_n(ne)\Bigr]^2 \Biggr).
+        \end{split}
+        \end{equation}
+        The GW spectral strain amplitude at a given harmonic can be related to the (rest-frame) luminosity as \citep[][Eq.~2.1]{Finn+Thorne-2000},
+        \begin{align}
+            \label{eq:strain_lum}
+            \hsn^2 & = \frac{G}{c^3} \, \scale[2]{2}{n} \, \frac{\lgwn}{\lr[2]{2 \pi \, \frstorb} \, \distcom^2}, \\
+                & = \frac{32}{5 c^8} \, \scale[2]{2}{n} \, \frac{\left(G\mchirp\right)^{10/3}}{\distcom^2} \lr[4/3]{2\pi\frstorb} \cdot g(n,e).
+        \end{align}
+        We always take the chirp mass to be an intrinsic (rest-frame) property of the binary, however an `observer-frame' chirp-mass can also be used.  For example, in the case of a circular binary, the spectral strain is,
+        \begin{equation}
+            \label{eq:gw_strain_amp_circ}
+            \hscirc
+                = \frac{8}{10^{1/2}} \frac{\left(G\mchirp\right)^{5/3}}{c^4 \, \distcom} \left(2 \pi \frstorb \right)^{2/3}
+                = \frac{8}{10^{1/2}} \frac{\left(G\mchirp_o\right)^{5/3}}{c^4 \, \distlum} \left(2 \pi \fobsorb \right)^{2/3}.
+        \end{equation}
+
+
+    \subsection{Cosmology}
+        Some useful cosmographic relations are reproduced here \citep{Hogg-1999}.  Recall that luminosity distance and comoving distance are related as $\distlum = (1+z) \distcom$.  The differential comoving volume of the Universe is,
+        \begin{equation}
+            \label{eq:comvol}
+            \frac{d V_c}{dz} = 4\pi \, d_c^2 \, \frac{c}{H(z)},
+        \end{equation}
+        and time (or age of the universe) can be related to redshift through,
+        \begin{align}
+            \label{eq:redshift_time}
+            \frac{dz}{dt} = \lr{1+z} \; H(z).
+        \end{align}
+        The Hubble parameter can be calculated from the matter-energy constituents of the universe as,
+        \begin{align}
+            H(z) & = H_0(z) \cdot \lrs[1/2]{\Omega_R \lr[4]{1+z} + \Omega_m \lr[3]{1+z} + \Omega_k \lr[2]{1+z} + \Omega_\Lambda}.
+        \end{align}
+        The $\Omega$ terms are the usual redshift-zero fractions of the critical density for radiation, non-relativistic matter, curvature, and dark energy.  We adopt the results of WMAP9 \citep{Hinshaw+2013} for our fiducial cosmology, assuming zero curvature: $H_0 = 69.33 \textrm{ km/s/Mpc}$, $\Omega_m = 0.2880$, $\Omega_\Lambda = 0.7120$.
 
 
 \section{Additional Material}
