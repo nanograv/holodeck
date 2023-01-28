@@ -1,5 +1,6 @@
 \usepackage{xifthen}
 
+\newcommand{\thard}{\tau}
 \newcommand{\thardf}{\tau_f}
 \newcommand{\holodeck}{\texttt{holodeck}}
 \newcommand{\python}{\texttt{python}}
@@ -19,6 +20,11 @@
     }
 }
 
+\newcommand{\tr}[1]{\textrm{#1}}
+\newcommand{\trt}[1]{\textrm{\tiny{#1}}}
+\newcommand{\trf}[1]{\textrm{\footnotesize{#1}}}
+
+
 % ==============================================================================
 % ====    Units and General Astronomy Symbols
 % ==============================================================================
@@ -36,6 +42,10 @@
 
 % ---- Symbols
 
+% \newcommand{\ndens}{n_c}
+\newcommand{\ndens}{\eta_c}
+% \newcommand{\number}{N}
+
 \newcommand{\ayr}{A_{\trt{yr}^{-1}}}        % GWB amplitude normalization at 1/yr
 \newcommand{\mbh}{M_\bullet}
 \newcommand{\mstar}{M_\star}
@@ -46,7 +56,7 @@
 
 \newcommand{\hc}{h_\trt{c}}
 \newcommand{\hs}{h_\trt{s}}
-\newcommand{\hsc}{h_\trt{s,circ}}
+\newcommand{\hsn}{h_\tr{s,n}}
 \newcommand{\hscirc}{h_\trt{s,circ}}
 
 \newcommand{\mdot}{\dot{M}}
@@ -58,13 +68,27 @@
 \newcommand{\fedd}{f_\trt{Edd}}    % Mdot-eddington factor for limiting
 \newcommand{\mchirp}{\mathcal{M}}     % Chirp-mass
 
-\newcommand{\dl}{d_\trt{L}}   % luminosity distance
-\newcommand{\dc}{d_c}   % comoving distance
+\newcommand{\distlum}{d_\trt{L}}   % luminosity distance
+\newcommand{\distcom}{d_c}   % comoving distance
 
 \newcommand{\fobs}{f_\tr{obs}}   % observer-frame orbital-frequency
 \newcommand{\fobsgw}{f_\tr{GW,obs}}   % observer-frame GW-frequency
 \newcommand{\frst}{f_\tr{rst}}   % rest-frame orbital-frequency
 \newcommand{\frstgw}{f_\tr{GW,rst}}   % rest-frame GW-frequency
+\newcommand{\frstorb}{f_{\trt{orb},r}}
+\newcommand{\fobsorb}{f_{\trt{orb},o}}
+\newcommand{\frstn}{f_\trt{n,r}}
+\newcommand{\fobsn}{f_\trt{n,o}}
+
+\newcommand\erfc[1]{\mathrm{erfc}\left(#1\right)}
+\newcommand\erfcinv[1]{\mathrm{erfc}^{-1}\left(#1\right)}
+
+\newcommand{\lgw}{L_\trt{GW}}
+\newcommand{\lgwn}{L_{\trt{GW},n}}
+\newcommand{\lgwc}{L_\trt{GW,circ}}
+\newcommand{\egw}{\varepsilon_\trt{GW}}   % energy in GW
+
+
 
 
 % ==============================================================================
@@ -75,9 +99,6 @@
 \newcommand{\ls}{\lesssim}
 \newcommand{\gs}{\gtrsim}
 \newcommand{\logten}[1]{\log_{10}\!\lr{#1}}
-\newcommand{\tr}[1]{\textrm{#1}}
-\newcommand{\trt}[1]{\textrm{\tiny{#1}}}
-\newcommand{\trf}[1]{\textrm{\footnotesize{#1}}}
 
 \newcommand{\sinpar}[2][]{\sin^{#1}\!\lr{#2}}
 \newcommand{\cospar}[2][]{\cos^{#1}\!\lr{#2}}
