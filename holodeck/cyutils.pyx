@@ -837,7 +837,7 @@ cdef double[:, :, :] _sam_calc_gwb_single_eccen_discrete(
 
                         # GW_SRC_CONST^2 * 2^(4/3) * Mc^(10/3) * gne * (2/n)^2 * forb_r^(4/3) * dc^-2 *
                         #     n_c * (4*pi*c*d_c^2) * (1 + z) * tau * dM*dq*dz * trapz-weight
-                        gwb[aa, bb, rr] += hterm * num_pois * weight
+                        gwb[aa, bb, rr] += hterm * num_pois / weight
 
     free(shape)
     free(sepa_evo)
