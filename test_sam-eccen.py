@@ -19,9 +19,10 @@ from holodeck.constants import PC, YR
 import zcode.math as zmath
 
 import numpy as np
-import pyximport   # noqa
-pyximport.install(language_level=3, setup_args={"include_dirs": np.get_include()}, reload_support=True)
+# import pyximport   # noqa
+# pyximport.install(language_level=3, setup_args={"include_dirs": np.get_include()}, reload_support=True)
 
+import holodeck as holo
 import holodeck.cyutils
 
 NSTEPS = 100
@@ -93,6 +94,20 @@ gwb_7 = rv_7
 gwb_7 = np.sqrt(gwb_7)
 
 check_against(gwb_7, gwb_0)
+
+
+# DISCRETIZED
+
+dur = datetime.now()
+rv_7b = holo.cyutils.sam_calc_gwb_single_eccen_discrete(
+    sam.static_binary_density, np.log10(sam.mtot), sam.mrat, sam.redz, dcom,
+    gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
+)
+dur = datetime.now() - dur
+print("\n7b: ", dur.total_seconds())
+gwb_7b = np.sqrt(rv_7b)
+check_against(gwb_7b, gwb_0)
+check_against(gwb_7b, gwb_7)
 
 
 
