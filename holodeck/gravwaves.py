@@ -6,6 +6,8 @@ and not the semi-analytic or observational population models.
 
 """
 
+from pathlib import Path
+
 import numba
 import numpy as np
 import scipy as sp
@@ -14,6 +16,7 @@ import scipy.integrate  # noqa
 import kalepy as kale
 
 import holodeck as holo
+import holodeck.cyutils  # noqa
 from holodeck import utils, cosmo, log
 from holodeck.constants import SPLC, NWTG, MPC
 
@@ -735,17 +738,7 @@ def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=1
     return gwfobs_harms, gwb, ecc_out, tau_out
 
 
-# ==============================================================================
-
-import pyximport   # noqa
-pyximport.install(language_level=3, setup_args={"include_dirs": np.get_include()}, reload_support=True)
-import holodeck.cyutils  # noqa
-
-
 def sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
-    import pyximport   # noqa
-    pyximport.install(language_level=3, setup_args={"include_dirs": np.get_include()}, reload_support=True)
-    import holodeck.cyutils  # noqa
 
     ndens = sam.static_binary_density
     mt_l10 = np.log10(sam.mtot)
@@ -753,6 +746,27 @@ def sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
     rz = sam.redz
     dc = cosmo.comoving_distance(sam.redz).to('Mpc').value
     gwb = holo.cyutils.sam_calc_gwb_single_eccen(ndens, mt_l10, mr, rz, dc, gwfobs, sepa_evo, eccen_evo, nharms)
+    return np.asarray(gwb)
+
+
+def sam_calc_gwb_single_eccen_discrete(gwfobs, sam, sepa_evo, eccen_evo, nharms=100, nreals=None):
+
+    ndens = sam.static_binary_density
+    mt_l10 = np.log10(sam.mtot)
+    mr = sam.mrat
+    rz = sam.redz
+    dc = cosmo.comoving_distance(sam.redz).to('Mpc').value
+    if nreals is None:
+        nreals = 1
+        squeeze = True
+    else:
+        squeeze = False
+
+    gwb = holo.cyutils.sam_calc_gwb_single_eccen_discrete(ndens, mt_l10, mr, rz, dc, gwfobs, sepa_evo, eccen_evo, nharms, nreals)
+
+    if squeeze:
+        gwb = gwb.squeeze()
+
     return np.asarray(gwb)
 
 
