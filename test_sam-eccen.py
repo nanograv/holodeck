@@ -97,15 +97,15 @@ check_against(gwb_7, gwb_0)
 
 
 # DISCRETIZED
-
+NREALS = 1
 dur = datetime.now()
 rv_7b = holo.cyutils.sam_calc_gwb_single_eccen_discrete(
     sam.static_binary_density, np.log10(sam.mtot), sam.mrat, sam.redz, dcom,
-    gwfobs, sepa_evo, eccen_evo, nharms=NHARMS
+    gwfobs, sepa_evo, eccen_evo, nharms=NHARMS, nreals=NREALS
 )
 dur = datetime.now() - dur
 print("\n7b: ", dur.total_seconds())
-gwb_7b = np.sqrt(rv_7b)
+gwb_7b = np.sqrt(rv_7b).squeeze()
 check_against(gwb_7b, gwb_0)
 check_against(gwb_7b, gwb_7)
 
