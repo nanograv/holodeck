@@ -76,7 +76,7 @@
 
     As in the case of high-frequency GWs detected by LIGO-Virgo \needcite{}, tremendous uncertainties exist in the physics of the formation and evolution of the binary sources.  For individual MBHs, there are numerous, well-known scaling relationships between their properties and those of their host galaxies \needcite{MBH-Host relations}, but numerous questions remain such as where or not the observed sample of MBHs (i.e.~quasars and active galactic nuclei, AGN) accurately reflect the full population \needcite{MBH bias}, and how reliably these relationships extend to different host galaxies and redshift ranges.
 
-    For binary MBHs in particular, a variety of physical processes are required for the two MBHs to find the center of the post-merger host galaxy and eventually become gravitationally bound \needcite{BBR1990}.  In particular, the two MBHs must interact with their host galaxy environments through dynamical friction, stellar scattering, accretion disk torques, and possibly three-body interactions with a third MBH component \needcite{}, before reaching small enough binary separations for GW emission to eventually dominate the final coalescence of the binary.  Besides GW emission, none of these processes can be modeled exactly, necessitating the usage of simplified prescriptions which each containing numerous parametric uncertainties.  The resolution of cosmological hydrodynamic simulations is far too coarse to resolve the MBH binary phase, with some simulations instantaneously merging nearby MBHs \needcite{illustris}, and others using sub-grid models to `resolve' down to the scale of $\sim kpc$ \needcite{Romulus/Tremmel, Ma+Hopkins}.
+    For binary MBHs in particular, a variety of physical processes are required for the two MBHs to find the center of the post-merger host galaxy and eventually become gravitationally bound \needcite{BBR1980}.  In particular, the two MBHs must interact with their host galaxy environments through dynamical friction, stellar scattering, accretion disk torques, and possibly three-body interactions with a third MBH component \needcite{}, before reaching small enough binary separations for GW emission to eventually dominate the final coalescence of the binary.  Besides GW emission, none of these processes can be modeled exactly, necessitating the usage of simplified prescriptions which each containing numerous parametric uncertainties.  The resolution of cosmological hydrodynamic simulations is far too coarse to resolve the MBH binary phase, with some simulations instantaneously merging nearby MBHs \needcite{illustris}, and others using sub-grid models to `resolve' down to the scale of $\sim kpc$ \needcite{Romulus/Tremmel, Ma+Hopkins}.
 
     In addition to the theoretical uncertainties, there exists a substantial dearth of observational constraints.  A growing number of \textit{candidate} MBHB systems have been identified through varying electromagnetic (EM) indicators in AGN \needcite{}, but a substantial fraction may be false positives \needcite{}.  To date, no gravitationally bound MBH binary has yet to be confirmed, although examples exist of dual AGN at close projected separation \needcite{Rodriguez et al. 2007}, and single AGN showing time-variability highly suggestive of a binary companion \needcite{OJ~287}.
 
@@ -129,117 +129,125 @@
 
     \subsection{Discretization and Cosmic Variance}
 
-    \subsection{??Other??}
-
-        Let $N(M,q,z,\frst)$ denote the number of binaries up to a total mass $M$, mass ratio $q$, redshift $z$, and rest-frame orbital-frequency $\frst$.
-        We can calculate the characteristic strain from an ensemble of GW sources as \citep[][Eqs.~5/8]{Phinney-2001},
-            \begin{align}
-                h_c^2 = \int_0^\infty \!\! dz \; \frac{d^4 N}{dM \, dq \, dz \, d\ln\!\frst} \; \hs^2\lr{\frst}.
-            \end{align}
-        In practice, the total number of sources in the Universe is calculated from the number-density, $n \equiv dN / dV_c$, for some comoving volume $V_c$, extrapolated into an observer's entire past light-cone.  These can be related as \citep[][Eq.~6]{Sesana+2008},
-            \begin{align}
-                \label{eq:num_num_dens}
-                \frac{d^4 N}{dM \, dq \, dz \, d\ln\!\frst} = \frac{d^3 n_c}{dM \, dq \, dz} \frac{dz}{dt} \frac{dt}{d\ln\!\frst} \frac{d V_c}{dz}.
-            \end{align}
-        Note that the total number of binaries in a given frequency interval depends not only on the number density, but also their rate of frequency-evolution.  The faster binaries evolve through a given frequency interval, the fewer binaries will occupy that interval on average.  This is typically described by the binary `hardening' timescale (or `residence time'), given by the expression,
+        The conversion from a continuous number-density of sources, to a discrete population of binaries is given by \eqref{eq:number_density_to_number_frequency}.  This can also clearly be seen by comparing Eq.~\ref{eq:gwb_mc} with Eq.~\ref{eq:gwb_sa}, to identify:
         \begin{equation}
-            \label{eq:hardening}
-            \thardf \equiv - \diffp{t}{{\ln\!\frst}} = - \frac{\frst}{\partial \frst / \partial t}.
+            \label{eq:pop_discrete_from_continuous}
+            \frac{d^2 N}{dz \, d\ln\!f_p} =
+                \frac{d \ndens}{dz} \, 4\pi c \, d_c^2 \lr{1+z} \, \thardf(f_p).
         \end{equation}
 
-        % Plugging in the relevant cosmographic relationships (see \secref{sec:app_eqs}) we have,
-        %     \begin{align}
-            %         h_c^2(f) & = \int_0^\infty \!\! dz \; \frac{dn_c}{dz} \, h^2\lr{f_r} \, 4\pi c \, d_c^2 \lr{1+z} \, \thardf.
-            %     \end{align}
-            % The challenge in modeling astrophysical sources of GWs is in calculating their number density.  Numerous approaches are possible, described in the following sections.
+        In general, implementations of binary populations will be described over some finite grid, often in a parameter space of total mass, mass ratio, redshift, and orbital frequency.  In this case the derivative over redshift in \eqref{eq:pop_discrete_from_continuous}, should be replaced with one over all parameters of interest, e.g.~\mbox{$d\ndens / dz \rightarrow d^3\ndens / dM \, dq \, dz$}.  All additional parameters are treated the same in this context, so for brevity we will only explicitly include redshift.
 
-        Plugging in \eqref{eq:hardening} along with the relevant cosmographic relationships (see \secref{sec:app_eqs}) into \eqref{eq:num_num_dens} we have,
+        Eventually the end goal of binary modeling is often to determine the number of binaries over some range of parameters.  When calculating gravitational wave signals, for example, the number of binaries across a target frequency interval is desired.  The discreteness of binary sources can be enforced by converting the differential value of \eqref{eq:pop_discrete_from_continuous} into a number of sources over a small bin, i.e., \mbox{$\Delta N \approx \lr{d^2 N / dz \, d\ln\!f_p} \, \cdot \Delta z \cdot \Delta \ln\!f_p$}.
+
+        In general, the properties of \textit{every} binary in the Universe are not known, and thus the MC calculation cannot be performed directly.  The typical solution is to use some version of \eqref{eq:number_density_to_number_frequency} to convert from a number-density (e.g.~$d\ndens/dz$) into a discrete distribution of individual sources (e.g.~$d^2 N / dz \, d\ln f_r$).  The number-density is often constructed from either (semi-)analytic models which specify $\ndens(M,q,z,\dots)$ explicitly, or from simulations/observations of sources in a finite volume.  In the latter case, the number-density will be calculated as $\ndens \equiv N_\trt{finite}/V_\trt{c,finite}$, often over bins in some parameter space (e.g.~$\{M, q, z, \dots\}$). \\
+
+        For a finite population of binaries, the GWB spectrum is only defined over finite bins of frequency.  The definition of characteristic strain is related to the GW energy across a logarithmic frequency bin, so \eqref{eq:gwb_mc} should really be written as,
         \begin{equation}
-            \frac{d^4 N}{dM \, dq \, dz \, d\ln\!\frst} =
-                \frac{d^3 n_c}{dM \, dq \, dz} \, 4\pi c \, d_c^2 \lr{1+z} \, \thardf.
+            \label{eq:gwb_discrete}
+            \hc^2(\Delta \ln f) = \sum_\textrm{bins} \sum_n^\infty \frac{\Delta N(f_p,M_a,q_b,z_c,\dots)}{\Delta \ln f_p} \, \hsn^2(f_p,M_a,q_b,z_c,\dots).
         \end{equation}
+        Here we have written out explicitly that the number of binaries, $\Delta N(f_p,M_a,q_b,z_c,\dots)$, is the number sources with frequencies inside $\Delta \ln f_p$, typically over bins of mass, mass-ratio, redshift, etc.  Discretizing and plugging into Eq.~\ref{eq:number_density_to_number_frequency} (or by examining Eq.~\ref{eq:gwb_sa}), we can then write,
+        \begin{equation}
+            \label{eq:expectation_number_of_binaries}
+            \langle \Delta N \rangle = \Delta \ndens \cdot 4\pi c \, \distcom^2 \cdot (1+z) \cdot \thard \cdot \Delta \ln f_p.
+        \end{equation}
+        Note that we have again dropped the written dependence on bin values $(M_a, q_b, \dots)$, but they are still implicitly present.  This expression represents an \textit{expectation value} based on extrapolating the given number-density of binaries.  It also will not give an integer, discrete number of binaries.  To address this, we construct discrete realizations by drawing from a Poisson distribution: $\Delta N \in \poisson(\langle \Delta N \rangle)$. \\
+
+        The way \eqref{eq:expectation_number_of_binaries} is handled in practice will still vary somewhat depending on how $\ndens$ is specified.  If a semi-analytic model is being used, then often
+        $\Delta \ndens = \left[ d^3 \ndens(M,q,z) / dM \, dq \, dz \right] \cdot \Delta M \, \Delta q \, \Delta z$.  In the case of a finite volume population, the procedure can be simplified.  An analogous exercise would amount to a binning and un-binning of the sources, i.e.~$\Delta \ndens \big|_\textrm{finite} = \left[ \Delta N_\textrm{finite}(M,q,z) / \Delta M \, \Delta q \, \Delta z \, \Delta V_c \right] \cdot \Delta M \, \Delta q \, \Delta z$, which unnecessarily reduces accuracy.  Instead, we can imagine shrinking each of our parameter-space bins such that each one captures a single source, in which case we can write,
+        \begin{equation}
+            \label{eq:expectation_number_of_single_binary}
+            \langle \Delta N \rangle_\textrm{source} = \frac{4\pi c \, \distcom^2 \, \thard}{V_c} \cdot (1+z) \cdot \Delta \ln f_p.
+        \end{equation}
+        In this case, $\thard$ and $\hsn$ in \eqref{eq:gwb_discrete}, are the hardening time and strain amplitude for each source, and $\langle \Delta N \rangle_\textrm{source}$ represents the expectation number of binaries in the Universe implied by each source in the finite volume.
+
+    % \subsection{??Other??}
+
+    %     Let $N(M,q,z,\frst)$ denote the number of binaries up to a total mass $M$, mass ratio $q$, redshift $z$, and rest-frame orbital-frequency $\frst$.
+    %     We can calculate the characteristic strain from an ensemble of GW sources as \citep[][Eqs.~5/8]{Phinney-2001},
+    %         \begin{align}
+    %             h_c^2 = \int_0^\infty \!\! dz \; \frac{d^4 N}{dM \, dq \, dz \, d\ln\!\frst} \; \hs^2\lr{\frst}.
+    %         \end{align}
+    %     In practice, the total number of sources in the Universe is calculated from the number-density, $n \equiv dN / dV_c$, for some comoving volume $V_c$, extrapolated into an observer's entire past light-cone.  These can be related as \citep[][Eq.~6]{Sesana+2008},
+    %         \begin{align}
+    %             \label{eq:num_num_dens}
+    %             \frac{d^4 N}{dM \, dq \, dz \, d\ln\!\frst} = \frac{d^3 n_c}{dM \, dq \, dz} \frac{dz}{dt} \frac{dt}{d\ln\!\frst} \frac{d V_c}{dz}.
+    %         \end{align}
+    %     Note that the total number of binaries in a given frequency interval depends not only on the number density, but also their rate of frequency-evolution.  The faster binaries evolve through a given frequency interval, the fewer binaries will occupy that interval on average.  This is typically described by the binary `hardening' timescale (or `residence time'), given by the expression,
+    %     \begin{equation}
+    %         \label{eq:hardening}
+    %         \thardf \equiv - \diffp{t}{{\ln\!\frst}} = - \frac{\frst}{\partial \frst / \partial t}.
+    %     \end{equation}
+
+    %     % Plugging in the relevant cosmographic relationships (see \secref{sec:app_eqs}) we have,
+    %     %     \begin{align}
+    %         %         h_c^2(f) & = \int_0^\infty \!\! dz \; \frac{dn_c}{dz} \, h^2\lr{f_r} \, 4\pi c \, d_c^2 \lr{1+z} \, \thardf.
+    %         %     \end{align}
+    %         % The challenge in modeling astrophysical sources of GWs is in calculating their number density.  Numerous approaches are possible, described in the following sections.
+
+    %     Plugging in \eqref{eq:hardening} along with the relevant cosmographic relationships (see \secref{sec:app_eqs}) into \eqref{eq:num_num_dens} we have,
+    %     \begin{equation}
+    %         \frac{d^4 N}{dM \, dq \, dz \, d\ln\!\frst} =
+    %             \frac{d^3 n_c}{dM \, dq \, dz} \, 4\pi c \, d_c^2 \lr{1+z} \, \thardf.
+    %     \end{equation}
 
 
     \subsection{Semi-Analytic Modeling}
 
-    Define the distribution function of sources as $F(M,q,a,z) = d^2 n(M,q,a,z) / dM dq$.  Here $M$ is the total mass of each systems, the mass-ratio is $q\equiv m_2/m_1 \leq 1$, $a$ is the binary separation, and $z$ is the redshift.
-    % Define the distribution function of sources as $F(M,q,f_r,z) = d^2 n(M,q,f_r,z) / dM dq$.  Here $M$ is the total mass of each systems, the mass-ratio is $q\equiv m_2/m_1 \leq 1$, $f_r$ is the binary orbital frequency in the rest frame, and $z$ is the redshift.
-    We can write the conservation equation for binaries as of function of redshift as,
-    \begin{equation}
-        \label{eq:conservation}
-        \diffp{F}{z} +
-            \diffp{}{M} \lrs{F \diffp{M}{z}} +
-            \diffp{}{q} \lrs{F \diffp{q}{z}} +
-            \diffp{}{a} \lrs{F \diffp{a}{z}} = S_{\!F}(M, q, a, z).
-    \end{equation}
-    Here $S_{\!F}$ is a source/sink function that can account for the creation or destruction of binaries.
+        Define the distribution function of sources as $F(M,q,a,z) = d^2 n(M,q,a,z) / dM dq$.  Here $M$ is the total mass of each systems, the mass-ratio is $q\equiv m_2/m_1 \leq 1$, $a$ is the binary separation, and $z$ is the redshift.
+        % Define the distribution function of sources as $F(M,q,f_r,z) = d^2 n(M,q,f_r,z) / dM dq$.  Here $M$ is the total mass of each systems, the mass-ratio is $q\equiv m_2/m_1 \leq 1$, $f_r$ is the binary orbital frequency in the rest frame, and $z$ is the redshift.
+        We can write the conservation equation for binaries as of function of redshift as,
+        \begin{equation}
+            \label{eq:conservation}
+            \diffp{F}{z} +
+                \diffp{}{M} \lrs{F \diffp{M}{z}} +
+                \diffp{}{q} \lrs{F \diffp{q}{z}} +
+                \diffp{}{a} \lrs{F \diffp{a}{z}} = S_{\!F}(M, q, a, z).
+        \end{equation}
+        Here $S_{\!F}$ is a source/sink function that can account for the creation or destruction of binaries.
 
-    We consider the standard semi-analytic model (SAM) formalism of MBH binary populations \citep[e.g.~][]{Sesana+2008, Chen+2019}.  In this style of calculation, $F$ is determined in a region of parameter space that can be observed/estimated, and this is evolved to find the distribution in a different region of parameter space that is of interest.  In practice, the observed parameter space is galaxies and galaxy mergers, and the parameter space of interest is closely separated MBH binaries that could be GW detectable.  Thus we assume that all binary `formation' is encapsulated from binaries moving from one part of parameter space (i.e.~large separations and redshifts) to other parts of parameter space (i.e.~smaller separations and redshifts), and we set $S_{\!F} = 0$.
+        We consider the standard semi-analytic model (SAM) formalism of MBH binary populations \citep[e.g.~][]{Sesana+2008, Chen+2019}.  In this style of calculation, $F$ is determined in a region of parameter space that can be observed/estimated, and this is evolved to find the distribution in a different region of parameter space that is of interest.  In practice, the observed parameter space is galaxies and galaxy mergers, and the parameter space of interest is closely separated MBH binaries that could be GW detectable.  Thus we assume that all binary `formation' is encapsulated from binaries moving from one part of parameter space (i.e.~large separations and redshifts) to other parts of parameter space (i.e.~smaller separations and redshifts), and we set $S_{\!F} = 0$.
 
-    We will express the distribution function as a product of a mass function, and a pair fraction:
-    \begin{equation}
-        \label{eq:dist_func}
-        F(M,q,z) = \frac{\Phi(M, z)}{M \ln\!10} \cdot P(M,q,z),
-    \end{equation}
-    where the mass function, $\Phi(M, q, z) \equiv \diffp{n_g}{{\logten{M}}}$, is calculated based on the number density of galaxies ($n_g$).  We assume that there is a one-to-one mapping from galaxy mass to MBH mass, such that the galaxy mass-function can still be used to uniquely define the mass distribution of MBHs.  Typically the MBH--galaxy relation is given in terms of an `$M_\trt{BH}$--$M_\trt{bulge}$' relation \citep[e.g.][]{Kormendy+Ho-2013}, which is an observationally derived relation between the mass of MBHs and the mass of the stellar bulge component of their host galaxy.
-    In \citet{Chen+2019}, the pair fraction is measured over some range of separations, and the separation-dependence is suppressed, i.e.~$P = \int_{a_0}^{a_1} P_a \, da$.
+        We will express the distribution function as a product of a mass function, and a pair fraction:
+        \begin{equation}
+            \label{eq:dist_func}
+            F(M,q,z) = \frac{\Phi(M, z)}{M \ln\!10} \cdot P(M,q,z),
+        \end{equation}
+        where the mass function, $\Phi(M, q, z) \equiv \diffp{n_g}{{\logten{M}}}$, is calculated based on the number density of galaxies ($n_g$).  We assume that there is a one-to-one mapping from galaxy mass to MBH mass, such that the galaxy mass-function can still be used to uniquely define the mass distribution of MBHs.  Typically the MBH--galaxy relation is given in terms of an `$M_\trt{BH}$--$M_\trt{bulge}$' relation \citep[e.g.][]{Kormendy+Ho-2013}, which is an observationally derived relation between the mass of MBHs and the mass of the stellar bulge component of their host galaxy.
+        In \citet{Chen+2019}, the pair fraction is measured over some range of separations, and the separation-dependence is suppressed, i.e.~$P = \int_{a_0}^{a_1} P_a \, da$.
 
-    From $\eqref{eq:conservation}$, we use the chain rule to mix time and redshift evolution, and assume that the mass-change of binaries is negligible, i.e.~$\diffp{m}{t} = 0$ and $\diffp{q}{t} = 0$, giving:
-    \begin{equation}
-        \diffp{F}{z} = - \diffp{t}{z} \diffp{}{a} \lrs{F \diffp{a}{t}}.
-    \end{equation}
+        From $\eqref{eq:conservation}$, we use the chain rule to mix time and redshift evolution, and assume that the mass-change of binaries is negligible, i.e.~$\diffp{m}{t} = 0$ and $\diffp{q}{t} = 0$, giving:
+        \begin{equation}
+            \diffp{F}{z} = - \diffp{t}{z} \diffp{}{a} \lrs{F \diffp{a}{t}}.
+        \end{equation}
 
-    The binary population is assumed to be changing only in separation and redshift, which are related by $\partial a / \partial z = (\partial a / \partial t) (\partial t / \partial z)$.  Because the overall number-density is conserved, we can take a finite step in separation and time/redshift, $a\rightarrow a'$ and $z\rightarrow z'$.  Here the time it takes for a binary to go from $a \rightarrow a'$ is $T(M,q,a,z|a')$, which leads to a redshift at the later time of $z' = z'(t + T)$.  So far, we have left the binary separation $a$ as implicit in the expression for F.  To obtain the standard expression \citep[e.g.][~Eq.~5]{Chen+2019}, we make the approximation that,
-    \begin{equation}
-        \diffp{}{a} \lrs{F(M,q,z) \diffp{a}{t}} \approx \frac{F}{T(M,q,a,z|a')}.
-    \end{equation}
-    Thus giving,
-    \begin{equation}
-        \label{eq:cont_eq_result}
-        \diffp{F(M,q,a',z')}{{z'}} = \diffp{n}{{M}{q}{z'}} = - \diffp{t}{z} \frac{\Phi(M,z) \, P(M,q,z)}{T(M,q,a,z|a')}.
-    \end{equation}
+        The binary population is assumed to be changing only in separation and redshift, which are related by $\partial a / \partial z = (\partial a / \partial t) (\partial t / \partial z)$.  Because the overall number-density is conserved, we can take a finite step in separation and time/redshift, $a\rightarrow a'$ and $z\rightarrow z'$.  Here the time it takes for a binary to go from $a \rightarrow a'$ is $T(M,q,a,z|a')$, which leads to a redshift at the later time of $z' = z'(t + T)$.  So far, we have left the binary separation $a$ as implicit in the expression for F.  To obtain the standard expression \citep[e.g.][~Eq.~5]{Chen+2019}, we make the approximation that,
+        \begin{equation}
+            \diffp{}{a} \lrs{F(M,q,z) \diffp{a}{t}} \approx \frac{F}{T(M,q,a,z|a')}.
+        \end{equation}
+        Thus giving,
+        \begin{equation}
+            \label{eq:cont_eq_result}
+            \diffp{F(M,q,a',z')}{{z'}} = \diffp{n}{{M}{q}{z'}} = - \diffp{t}{z} \frac{\Phi(M,z) \, P(M,q,z)}{T(M,q,a,z|a')}.
+        \end{equation}
 
-    Combining \eqref{eq:cont_eq_result} with \eqref{eq:num_num_dens}, we can finally write,
-    \begin{equation}
-        \label{eq:sam_final}
-        \diffp{N}{{M}{q}{z}{\ln\!f_r}} = \frac{\Phi(M,z) \, P(M,q,z)}{T(M,q,a,z|a')} \, \thardf \, \diffp{V_c}{z}.
-    \end{equation}
+        Combining \eqref{eq:cont_eq_result} with \eqref{eq:num_num_dens}, we can finally write,
+        \begin{equation}
+            \label{eq:sam_final}
+            \diffp{N}{{M}{q}{z}{\ln\!f_r}} = \frac{\Phi(M,z) \, P(M,q,z)}{T(M,q,a,z|a')} \, \thardf \, \diffp{V_c}{z}.
+        \end{equation}
 
-    % From the SAM formalism, the number of binaries in each bin is calculated by `integrating' each finite element of \eqref{eq:sam_final}, i.e.,
-    % \begin{equation}
-    %     \diffp{N_{ijk}(f_r)}{{\ln\!f_r}} \equiv \diffp{N(M_i, q_j, z_k, {f_r})}{{M}{q}{z}{\ln\!f_r}} \, \Delta M \,\Delta q \, \Delta z.
-    % \end{equation}
-    % The characteristic strain of the GWB can then be calculated
+        From the SAM formalism, the number of binaries in each bin is calculated by `integrating' each finite element of \eqref{eq:sam_final}, i.e.,
+        \begin{equation}
+            \diffp{N_{ijk}(f_r)}{{\ln\!f_r}} \equiv \diffp{N(M_i, q_j, z_k, {f_r})}{{M}{q}{z}{\ln\!f_r}} \, \Delta M \,\Delta q \, \Delta z.
+        \end{equation}
+        The characteristic strain of the GWB can then be calculated
 
-    % % Fig -
-    % \begin{figure}
-    %     \centering
-    %     \includegraphics[width=1\columnwidth]{{{example-image-c}}}
-    %     \caption{\textbf{header.} body.}
-    %     \label{fig:fig1}
-    % \end{figure}
-    %
-    %
-    % \begin{equation}\begin{split}
-    %     \label{eq:eq1}
-    %     2+2 & = 4 \\
-    %         & = 10 - 6
-    % \end{split}\end{equation}
-    %
-    % % Fig -
-    % \begin{figure*}
-	% 	\centering
-    %     \subfloat[first]{{
-    %         \includegraphics[width=1.75\columnwidth]{{{example-image-a}}}
-    %     }}
-	% 	\\
-    %     % \qquad
-    %     \subfloat[second]{{
-    %     	\includegraphics[width=1.75\columnwidth]{{{example-image-b}}}
-    %     }}
-    %     \caption{\textbf{Head.}  Body.}
-    %     \label{fig:fig2}
-    % \end{figure*}
+    \subsection{Finite Volume Populations: the Illustris simulations}
+
+        \todo{Describe illustris models.}
+
 
 
 \section{Implementation}
@@ -249,10 +257,6 @@
 
     \subsection{Semi-Analytic Models}
         \label{sec:imp_sam}
-
-
-
-
 
         The core of the semi-analytic modeling framework in \holodeck{} is implementing \eqref{eq:sam_final}.  There are classes for each of the key components: The galaxy stellar-mass function (GSMF, $\Phi$), the galaxy pair fraction \(F\), the merger timescale ($\tau$), and additional a scaling relation for mapping host galaxies via to MBH properties --- typically via an \mmbulge{} relation.  Each component class is implemented generically via basic API methods (e.g.~a GSMF that returns the number density of galaxies at a given stellar-mass and redshift), and can be subclassed to provide a particular implementation (e.g.~an analytic Schechter-function GSMF).  The number (or number density) of binaries is specified over a grid of parameters, typically in a four dimensional space of total mass ($M$), mass ratio ($q$), redshift ($z$), and binary rest-frame orbital frequency ($f_r$).
 
