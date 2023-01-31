@@ -19,7 +19,7 @@ np.import_array()
 # There is a special implementation of `scipy.special` for use with cython
 cimport scipy.special.cython_special as sp_special
 
-from libc.stdio cimport printf
+# from libc.stdio cimport printf
 from libc.stdlib cimport malloc, free, qsort
 # make sure to use c-native math functions instead of python/numpy
 from libc.math cimport pow, sqrt, abs, M_PI
@@ -27,10 +27,7 @@ from libc.math cimport pow, sqrt, abs, M_PI
 from cpython.pycapsule cimport PyCapsule_IsValid, PyCapsule_GetPointer
 from numpy.random cimport bitgen_t
 from numpy.random import PCG64
-from numpy.random.c_distributions cimport (
-    random_standard_uniform_fill, random_standard_uniform_fill_f, random_poisson
-)
-
+from numpy.random.c_distributions cimport random_poisson
 
 
 # DTYPE = np.float64
@@ -518,8 +515,9 @@ cdef double[:, :] _sam_calc_gwb_single_eccen(
                 # calculate chirp-mass [grams]
                 mchirp = mt * pow(mrat[jj], three_fifths) / pow(1 + mrat[jj], six_fifths)
 
-                # n_c * (4*pi*d_c^2) * (1 + z)
+                # n_c * (4*pi*c*d_c^2) * (1 + z)
                 hterm_pref = ndens[ii, jj, kk] * dc_term * zterm
+                # GW_SRC_CONST^2 * 2^(4/3) * Mc^(10/3) * dc^-2 * n_c * (4*pi*d_c^2) * (1 + z)
                 hterm_pref *= pow(GW_SRC_CONST * mchirp * pow(2.0*mchirp, two_third) / dc_cm, 2)
 
                 ecc_idx = ecc_idx_beg
@@ -549,18 +547,10 @@ cdef double[:, :] _sam_calc_gwb_single_eccen(
 
                     # if `gwfr` is lower than lowest evolution point, continue to next frequency
                     if (gwfr < frst_evo_lo):
-                        # printf(
-                        #     "\nLO: %d - %d %d - %d - %e %e %e\n",
-                        #     ff, aa, bb, ecc_idx, gwfr*MY_YR, frst_evo_lo*MY_YR, frst_evo_hi*MY_YR
-                        # )
                         continue
 
                     # if `gwfr` is > highest evolution point, also be true for all following frequencies, so break
                     if (gwfr > frst_evo_hi):
-                        # printf(
-                        #     "\nHI: %d - %d %d - %d - %e %e %e\n",
-                        #     ff, aa, bb, ecc_idx, gwfr*MY_YR, frst_evo_lo*MY_YR, frst_evo_hi*MY_YR
-                        # )
                         break
 
                     # calculate slope M
@@ -570,15 +560,17 @@ cdef double[:, :] _sam_calc_gwb_single_eccen(
 
                     # ---- Calculate GWB contribution with this eccentricity
 
-                    gne = gw_freq_dist_func__scalar_scalar(nh, ecc) * four_over_nh_squared
-                    fe_ecc = _gw_ecc_func(ecc)
+                    gne = gw_freq_dist_func__scalar_scalar(nh, ecc)
 
+                    fe_ecc = _gw_ecc_func(ecc)
                     # da/dt values are negative, convert to a positive timescale
                     tau = - sa_fourth / (GW_DADT_SEP_CONST * fe_ecc * m1 * m2 * mt)
 
                     # Calculate the GW spectral strain at each harmonic
                     #    see: [Amaro-seoane+2010 Eq.9]
-                    hterm = hterm_pref * tau * gne * pow(gwfr, four_third)
+                    # GW_SRC_CONST^2 * 2^(4/3) * Mc^(10/3) * dc^-2 * n_c * (4*pi*c*d_c^2) * (1 + z)
+                    #     tau * gne * (2/n)^2 * forb_r^(4/3)
+                    hterm = hterm_pref * tau * gne * four_over_nh_squared * pow(gwfr, four_third)
                     gwb[aa, bb] += hterm * weight
 
     free(shape)
@@ -686,7 +678,7 @@ cdef double[:, :, :] _sam_calc_gwb_single_eccen_discrete(
     # Declare variables used later
     cdef int ii, nh, jj, kk, aa, bb, ff, rr, ecc_idx, ecc_idx_beg, ii_mm, kk_zz
     cdef double m1, m2, mchirp, sa, qq, tau
-    cdef double gwfr, zterm, dc_cm, dc_mpc, dc_term, gne_n_over_2_sq, hterm, number_term
+    cdef double gwfr, zterm, dc_cm, dc_mpc, dc_term, gne, hterm, number_term
     cdef double weight_ik, weight, four_over_nh_squared, sa_fourth
     cdef double fe_ecc, mt, mt_sqrt, nd, hterm_pref, frst_evo_lo, frst_evo_hi
 
@@ -823,24 +815,28 @@ cdef double[:, :, :] _sam_calc_gwb_single_eccen_discrete(
 
                     # ---- Calculate GWB contribution with this eccentricity
 
-                    gne_n_over_2_sq = gw_freq_dist_func__scalar_scalar(nh, ecc) * four_over_nh_squared
-                    fe_ecc = _gw_ecc_func(ecc)
+                    gne = gw_freq_dist_func__scalar_scalar(nh, ecc)
 
+                    fe_ecc = _gw_ecc_func(ecc)
                     # da/dt values are negative, convert to a positive timescale
                     tau = - sa_fourth / (GW_DADT_SEP_CONST * fe_ecc * m1 * m2 * mt)
 
                     # Calculate the GW spectral strain at each harmonic
                     #    see: [Amaro-seoane+2010 Eq.9]
 
-                    # n_c * (4*pi*c*d_c^2) * (1 + z) * tau
+                    # n_c * (4*pi*c*d_c^2) * (1 + z) * tau * dM*dq*dz
                     number_term = number_term_pref * tau * volume
 
                     # GW_SRC_CONST^2 * 2^(4/3) * Mc^(10/3) * gne * (2/n)^2 * forb_r^(4/3) * dc^-2
-                    hterm = hterm_pref * gne_n_over_2_sq * pow(gwfr, four_third)
+                    hterm = hterm_pref * gne * four_over_nh_squared * pow(gwfr, four_third)
 
                     for rr in range(nreals):
                         # npy_int64 random_poisson(bitgen_t *bitgen_state, double lam)
-                        num_pois = <double>random_poisson(rng, number_term)
+                        # num_pois = <double>random_poisson(rng, number_term)
+                        num_pois = number_term
+
+                        # GW_SRC_CONST^2 * 2^(4/3) * Mc^(10/3) * gne * (2/n)^2 * forb_r^(4/3) * dc^-2 *
+                        #     n_c * (4*pi*c*d_c^2) * (1 + z) * tau * dM*dq*dz * trapz-weight
                         gwb[aa, bb, rr] += hterm * num_pois * weight
 
     free(shape)
