@@ -141,7 +141,7 @@ cdef void my_trapz_grid_weight(int index, int size, double[:] grid, double *rv):
     return
 
 
-cdef api double gw_freq_dist_func__scalar_scalar(int nn, double ee):
+cdef double gw_freq_dist_func__scalar_scalar(int nn, double ee):
     """Calculate the GW frequency distribution function at the given harmonic and eccentricity, g(n,e).
 
     See [EN2007]_ Eq. 2.4
@@ -832,8 +832,7 @@ cdef double[:, :, :] _sam_calc_gwb_single_eccen_discrete(
 
                     for rr in range(nreals):
                         # npy_int64 random_poisson(bitgen_t *bitgen_state, double lam)
-                        # num_pois = <double>random_poisson(rng, number_term)
-                        num_pois = number_term
+                        num_pois = <double>random_poisson(rng, number_term)
 
                         # GW_SRC_CONST^2 * 2^(4/3) * Mc^(10/3) * gne * (2/n)^2 * forb_r^(4/3) * dc^-2 *
                         #     n_c * (4*pi*c*d_c^2) * (1 + z) * tau * dM*dq*dz * trapz-weight
