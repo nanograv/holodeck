@@ -502,6 +502,12 @@ class LHS_PSpace_Eccen_02(holo.librarian._LHS_Parameter_Space):
             eccen_init=[0.0, +1.0],
             gsmf_phi0=[-3.0, -2.0],
             gsmf_phiz=[-0.7, 0.0],
+            gpf_malpha=[-0.5, 0.5],
+            gpf_zbeta=[0.0, 2.0],
+            gpf_qgamma=[-0.5, 0.5],
+            gmt_malpha=[-0.5, +0.5],
+            gmt_zbeta=[-3.0, +2.0],
+            gmt_qgamma=[-0.5, +0.5],
             mmb_amp=[0.1e9, 1.0e9],
             mmb_plaw=[0.5, 1.5],
         )
@@ -509,15 +515,18 @@ class LHS_PSpace_Eccen_02(holo.librarian._LHS_Parameter_Space):
     def sam_for_lhsnumber(self, lhsnum):
         param_grid = self.params_for_lhsnumber(lhsnum)
 
-        eccen, gsmf_phi0, gsmf_phiz, mmb_amp, mmb_plaw = param_grid
+        eccen, gsmf_phi0, gsmf_phiz, \
+            gpf_malpha, gpf_zbeta, gpf_qgamma, \
+            gmt_malpha, gmt_zbeta, gmt_qgamma, \
+            mmb_amp, mmb_plaw = param_grid
         mmb_amp = mmb_amp*MSOL
 
         # favor higher values of eccentricity instead of uniformly distributed
         eccen = eccen ** (1.0/5.0)
 
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0, phiz=gsmf_phiz)
-        gpf = holo.sam.GPF_Power_Law()
-        gmt = holo.sam.GMT_Power_Law()
+        gpf = holo.sam.GPF_Power_Law(malpha=gpf_malpha, qgamma=gpf_qgamma, zbeta=gpf_zbeta)
+        gmt = holo.sam.GMT_Power_Law(malpha=gmt_malpha, qgamma=gmt_qgamma, zbeta=gmt_zbeta)
         mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
 
         sam = holo.sam.Semi_Analytic_Model(
