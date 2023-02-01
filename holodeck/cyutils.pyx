@@ -657,23 +657,12 @@ cdef double[:, :, :] _sam_calc_gwb_single_eccen_discrete(
     shape[0] = nfreqs
     shape[1] = nharms
 
-
-
-    # cdef Py_ssize_t i
+    # Setup random number generator from numpy library
     cdef bitgen_t *rng
     cdef const char *capsule_name = "BitGenerator"
-    # cdef double[::1] random_values
-
-    # x = PCG64()
-    # capsule = x.capsule
     capsule = PCG64().capsule
-    # Optional check that the capsule if from a BitGenerator
-    if not PyCapsule_IsValid(capsule, capsule_name):
-        raise ValueError("Invalid pointer to anon_func_state")
     # Cast the pointer
     rng = <bitgen_t *> PyCapsule_GetPointer(capsule, capsule_name)
-
-
 
     # Declare variables used later
     cdef int ii, nh, jj, kk, aa, bb, ff, rr, ecc_idx, ecc_idx_beg, ii_mm, kk_zz

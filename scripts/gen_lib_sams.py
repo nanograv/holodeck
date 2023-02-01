@@ -27,7 +27,7 @@ To-Do
 
 """
 
-__version__ = '0.1.6'
+__version__ = '0.2.0'
 
 import argparse
 import os
@@ -58,6 +58,9 @@ DEF_SAM_SHAPE = 50
 DEF_NUM_REALS = 100
 DEF_NUM_FBINS = 40
 DEF_PTA_DUR = 16.03     # [yrs]
+
+DEF_ECCEN_NUM_STEPS = 123
+DEF_ECCEN_NHARMS = 100
 
 
 class Parameter_Space_Mix01(holo.librarian._Parameter_Space):
@@ -335,7 +338,7 @@ class Parameter_Space_Debug01(holo.librarian._Parameter_Space):
         )
         return sam, hard
 
-    
+
 class Parameter_Space_Debug01b(Parameter_Space_Debug01):
 
     _PARAM_NAMES = [
@@ -438,9 +441,47 @@ class LHS_Parameter_Space_Hard04(holo.librarian._LHS_Parameter_Space):
         )
         return sam, hard
 
-# SPACE = LHS_Parameter_Space_Hard04
-SPACE = Parameter_Space_Debug01
-comm = MPI.COMM_WORLD
+
+class LHS_PSpace_Eccen_01(holo.librarian._LHS_Parameter_Space):
+
+    _PARAM_NAMES = [
+        'eccen_init',
+        'gsmf_phi0',
+        'mmb_amp',
+    ]
+
+    SEPA_INIT = 1.0 * PC
+
+    def __init__(self, log, nsamples, sam_shape, lhs_sampler, seed):
+        super().__init__(
+            log, nsamples, sam_shape, lhs_sampler, seed,
+            eccen_init=[0.0, +1.0],
+            gsmf_phi0=[-3.0, -2.0],
+            mmb_amp=[0.1e9, 1.0e9],
+        )
+
+    def sam_for_lhsnumber(self, lhsnum):
+        param_grid = self.params_for_lhsnumber(lhsnum)
+
+        eccen, gsmf_phi0, mmb_amp = param_grid
+        mmb_amp = mmb_amp*MSOL
+
+        # favor higher values of eccentricity instead of uniformly distributed
+        eccen = eccen ** (1.0/5.0)
+
+        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gpf = holo.sam.GPF_Power_Law()
+        gmt = holo.sam.GMT_Power_Law()
+        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
+
+        sam = holo.sam.Semi_Analytic_Model(
+            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            shape=self.sam_shape
+        )
+
+        sepa_evo, eccen_evo = holo.sam.evolve_eccen_uniform_single(sam, eccen, self.SEPA_INIT, DEF_ECCEN_NUM_STEPS)
+
+        return sam, sepa_evo, eccen_evo
 
 
 # ---- setup argparse
@@ -479,9 +520,11 @@ def setup_argparse():
     return args
 
 
+SPACE = LHS_PSpace_Eccen_01
+comm = MPI.COMM_WORLD
+
 args = setup_argparse() if comm.rank == 0 else None
 args = comm.bcast(args, root=0)
-
 
 # ---- setup outputs
 
@@ -537,7 +580,7 @@ space = comm.bcast(space, root=0)
 log.info(
     f"samples={args.nsamples}, sam_shape={args.sam_shape}, nreals={args.nreals}\n"
     f"nfreqs={args.nfreqs}, pta_dur={args.pta_dur} [yr]\n"
-    f"space.shape={space.shape}"
+    # f"space.shape={space.shape}"
 )
 
 # ------------------------------------------------------------------------------
@@ -580,7 +623,8 @@ def main():
             continue
 
         try:
-            run_sam(lhsparam, PATH_OUTPUT)
+            # run_sam(lhsparam, PATH_OUTPUT)
+            run_sam_eccen(lhsparam, PATH_OUTPUT)
         except Exception as err:
             logging.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{ind}")
             logging.warning(err)
@@ -589,6 +633,7 @@ def main():
             import traceback
             traceback.print_exc()
             print("\n\n")
+            raise
 
     end = datetime.now()
     # print(f"\t{comm.rank} done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}")
@@ -598,8 +643,41 @@ def main():
     return
 
 
-def run_sam(pnum, path_output):
+# def run_sam(pnum, path_output):
+#     fname = f"lib_sams__p{pnum:06d}.npz"
+#     fname = os.path.join(path_output, fname)
+#     log.debug(f"{pnum=} :: {fname=}")
+#     if os.path.exists(fname):
+#         log.warning(f"File {fname} already exists.")
 
+#     pta_dur = args.pta_dur * YR
+#     nfreqs = args.nfreqs
+#     hifr = nfreqs/pta_dur
+#     pta_cad = 1.0 / (2 * hifr)
+#     fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
+#     fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
+#     log.info(f"Created {fobs_cents.size} frequency bins")
+#     log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
+#     log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
+#     assert nfreqs == fobs_cents.size
+
+#     log.debug("Selecting `sam` and `hard` instances")
+#     sam, hard = space.sam_for_lhsnumber(pnum)
+#     log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.nreals})")
+#     gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
+#     log.debug(f"{holo.utils.stats(gwb)=}")
+#     legend = space.param_dict_for_lhsnumber(pnum)
+#     log.debug(f"Saving {pnum} to file")
+#     np.savez(fname, fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb,
+#              pnum=pnum, pdim=space.paramdimen, nsamples=args.nsamples,
+#              lhs_grid=space.sampleindxs, lhs_grid_idx=space.lhsnumber_to_index(pnum),
+#              params=space.params, names=space.names, version=__version__, **legend)
+
+#     log.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
+#     return
+
+
+def run_sam_eccen(pnum, path_output):
     fname = f"lib_sams__p{pnum:06d}.npz"
     fname = os.path.join(path_output, fname)
     log.debug(f"{pnum=} :: {fname=}")
@@ -618,9 +696,15 @@ def run_sam(pnum, path_output):
     assert nfreqs == fobs_cents.size
 
     log.debug("Selecting `sam` and `hard` instances")
-    sam, hard = space.sam_for_lhsnumber(pnum)
+    sam, sepa_evo, eccen_evo = space.sam_for_lhsnumber(pnum)
     log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.nreals})")
-    gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
+
+    # gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
+    gwb = holo.gravwaves.sam_calc_gwb_single_eccen_discrete(
+        fobs_cents, sam, sepa_evo, eccen_evo, nharms=DEF_ECCEN_NHARMS, nreals=DEF_NUM_REALS,
+    )
+    gwb = np.sqrt(np.sum(gwb, axis=1))
+
     log.debug(f"{holo.utils.stats(gwb)=}")
     legend = space.param_dict_for_lhsnumber(pnum)
     log.debug(f"Saving {pnum} to file")
@@ -630,7 +714,6 @@ def run_sam(pnum, path_output):
              params=space.params, names=space.names, version=__version__, **legend)
 
     log.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
-
     return
 
 
