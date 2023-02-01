@@ -226,34 +226,34 @@ cdef void unravel(int idx, int[] shape, int *ii_out, int *jj_out):
     return
 
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
-@cython.nonecheck(False)
-@cython.cdivision(True)
-cdef void ravel(int ii, int jj, int[] shape, int *idx_out):
-    """Convert from a 2D pair of indices into a 1D (raveled) index.
+# @cython.boundscheck(False)
+# @cython.wraparound(False)
+# @cython.nonecheck(False)
+# @cython.cdivision(True)
+# cdef void ravel(int ii, int jj, int[] shape, int *idx_out):
+#     """Convert from a 2D pair of indices into a 1D (raveled) index.
 
-    NOTE: row-major / c-style ordering is assumed.  This is the numpy default.
+#     NOTE: row-major / c-style ordering is assumed.  This is the numpy default.
 
-    Parameters
-    ----------
-    ii : int,
-        0th dimension index (i.e. x).
-    jj : int,
-        1th dimension index (i.e. y).
-    shape : int *,
-        Array specifying the 2D shape of the array being indexed.
-    idx_out : int *,
-        Pointer to the memory location to store the 1D/flattened index.
+#     Parameters
+#     ----------
+#     ii : int,
+#         0th dimension index (i.e. x).
+#     jj : int,
+#         1th dimension index (i.e. y).
+#     shape : int *,
+#         Array specifying the 2D shape of the array being indexed.
+#     idx_out : int *,
+#         Pointer to the memory location to store the 1D/flattened index.
 
-    Returns
-    -------
-    None
-        NOTE: return values are set to the `idx_out` parameter.
+#     Returns
+#     -------
+#     None
+#         NOTE: return values are set to the `idx_out` parameter.
 
-    """
-    idx_out[0] = ii * shape[1] + jj
-    return
+#     """
+#     idx_out[0] = ii * shape[1] + jj
+#     return
 
 
 """Structure that stores both the index and value of a given array element to use in sorting.
