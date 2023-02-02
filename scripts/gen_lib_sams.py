@@ -23,7 +23,7 @@ To-Do
     * Does this resolve irregularities between different LHS implementations?
 * Use subclassing to cleanup `Parameter_Space` object.  e.g. implement LHS as subclass of generic Parameter_Space class.
 * BUG: `lhs_grid` and `lhs_grid_idx` are currently storing the same thing
-
+* #! IMPORTANT: mark output directories as incomplete until all runs have been finished.  Merged libraries from incomplete directories should also get some sort of flag! !#
 
 """
 
@@ -492,6 +492,13 @@ class LHS_PSpace_Eccen_02(holo.librarian._LHS_Parameter_Space):
         'eccen_init',
         'gsmf_phi0',
         'gsmf_phiz',
+        'gpf_malpha',
+        'gpf_zbeta',
+        'gpf_qgamma',
+
+        'gmt_malpha',
+        'gmt_zbeta',
+        'gmt_qgamma',
         'mmb_amp',
         'mmb_plaw',
     ]
@@ -577,7 +584,7 @@ def setup_argparse():
     return args
 
 
-SPACE = LHS_PSpace_Eccen_01
+SPACE = LHS_PSpace_Eccen_02
 comm = MPI.COMM_WORLD
 
 args = setup_argparse() if comm.rank == 0 else None
