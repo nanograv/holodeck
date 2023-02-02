@@ -447,6 +447,7 @@ class LHS_PSpace_Eccen_01(holo.librarian._LHS_Parameter_Space):
     _PARAM_NAMES = [
         'eccen_init',
         'gsmf_phi0',
+        'gpf_zbeta',
         'mmb_amp',
     ]
 
@@ -455,22 +456,23 @@ class LHS_PSpace_Eccen_01(holo.librarian._LHS_Parameter_Space):
     def __init__(self, log, nsamples, sam_shape, lhs_sampler, seed):
         super().__init__(
             log, nsamples, sam_shape, lhs_sampler, seed,
-            eccen_init=[0.0, +1.0],
+            eccen_init=[0.0, +0.975],
             gsmf_phi0=[-3.0, -2.0],
+            gpf_zbeta=[+0.0, +2.0],
             mmb_amp=[0.1e9, 1.0e9],
         )
 
     def sam_for_lhsnumber(self, lhsnum):
         param_grid = self.params_for_lhsnumber(lhsnum)
 
-        eccen, gsmf_phi0, mmb_amp = param_grid
+        eccen, gsmf_phi0, gpf_zbeta, mmb_amp = param_grid
         mmb_amp = mmb_amp*MSOL
 
         # favor higher values of eccentricity instead of uniformly distributed
         eccen = eccen ** (1.0/5.0)
 
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
-        gpf = holo.sam.GPF_Power_Law()
+        gpf = holo.sam.GPF_Power_Law(zbeta=gpf_zbeta)
         gmt = holo.sam.GMT_Power_Law()
         mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
 
