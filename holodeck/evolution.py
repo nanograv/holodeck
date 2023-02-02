@@ -1,5 +1,8 @@
 """Module for binary evolution from the time of formation/galaxy-merger until BH coalescence.
 
+#!NOTE: much of this documentation needs to be updated to reflect that much of the material in this
+#!      file was moved to `holodeck.hardening`.
+
 In `holodeck`, initial binary populations are typically defined near the time of galaxy-galaxy
 merger, when two MBHs come together at roughly kiloparsec scales.  Environmental 'hardening'
 mechanisms are required to dissipate orbital energy and angular momentum, allowing the binary
@@ -45,6 +48,10 @@ To-Do
         a way to implement a changing accretion rate, for example; or set a max/min hardening rate.
     *   re-implement "magic" hardening models that coalesce in zero change-of-redshift or fixed
         amounts of time.
+
+*   Evolution
+
+    *   `_sample_universe()` : sample in comoving-volume instead of redshift
 
 References
 ----------
@@ -1024,7 +1031,7 @@ class Evolution:
         mt : np.ndarray
             Total mass ($M = m_1 + m_2$) in [gram].
         mr : np.ndarray
-            Mass ratio ($q = m_2/m_1 \leq 1.0$).
+            Mass ratio ($q = m_2/m_1 \\leq 1.0$).
 
         """
         mass = np.moveaxis(self.mass, -1, 0)   # (N, M, 2) ==> (2, N, M)

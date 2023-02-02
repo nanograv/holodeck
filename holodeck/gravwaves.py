@@ -6,14 +6,19 @@ and not the semi-analytic or observational population models.
 
 """
 
+from pathlib import Path
+
 import numba
 import numpy as np
+import scipy as sp
+import scipy.integrate  # noqa
 
 import kalepy as kale
 
 import holodeck as holo
+import holodeck.cyutils  # noqa
 from holodeck import utils, cosmo, log
-from holodeck.constants import SPLC, NWTG
+from holodeck.constants import SPLC, NWTG, MPC
 
 
 _CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen']
@@ -347,7 +352,7 @@ def gws_from_sampled_strains(fobs_gw_edges, fo, hs, weights):
     return gwf_freqs, gwfore, gwback
 
 
-def sampled_gws_from_sam(sam, fobs_gw, hard=holo.evolution.Hard_GW, **kwargs):
+def sampled_gws_from_sam(sam, fobs_gw, hard=holo.hardening.Hard_GW, **kwargs):
     """Sample the given binary population between the target frequencies, and calculate GW signals.
 
     NOTE: the input `fobs` are interpretted as bin edges, and GW signals are calculate within the
@@ -603,6 +608,166 @@ def gwb_ideal(fobs_gw, ndens, mtot, mrat, redz, dlog10, sum=True):
     gwb = gwb * np.sum(integ) if sum else gwb * integ
     gwb = np.sqrt(gwb)
     return gwb
+
+
+# ==============================================================================
+# ====    SAM GW Functions    ====
+# ==============================================================================
+
+
+#! NOTE: THIS IS SLOW PYTHON IMPLEMENTATION FOR TESTING.  USE `holodeck.cytuls.sam_calc_gwb_single_eccen()` !#
+
+def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
+    """
+
+    Parameters
+    ----------
+    gwfobs : (F,) array_like
+        Observer-frame frequencies at which to calculate GWB.
+    sam : `Semi_Analytic_Model` instance
+    forb_rst_evo : (M, E) array_like
+        Rest-frame orbital frequencies of binaries, for each total-mass M and evolution step E.
+    eccen_evo : (E,) array_like
+        Eccentricities at each evolution step.  The same for all binaries, corresponding to fixed
+        binary separations for all binaries.
+    nharms : int
+        Number of harmonics to use in calculating GWB.
+
+    """
+
+    # NOTE: need to check for coalescences and set to zero
+    # NOTE: need to check for frequencies below starting separation and set to zero
+
+    frst_orb_evo = utils.kepler_freq_from_sepa(sam.mtot[:, np.newaxis], sepa_evo[np.newaxis, :])
+
+    assert np.ndim(gwfobs) == 1
+    assert np.ndim(frst_orb_evo) == 2
+    assert np.ndim(eccen_evo) == 1
+    assert np.shape(frst_orb_evo) == (sam.mtot.size, eccen_evo.size)
+
+    harm_nums = np.arange(1, nharms+1)
+    two_over_nh_sq = (2.0 / harm_nums) ** 2
+
+    # (M, Q, Z) units of [Mpc^-3]
+    ndens = sam.static_binary_density
+
+    # (F, H)
+    gwfobs_harms = gwfobs[:, np.newaxis] / harm_nums[np.newaxis, :]
+
+    # (Z,)
+    dcom = cosmo.comoving_distance(sam.redz).to('Mpc').value
+
+    # (Z, F, H)
+    # gw_frst ==> frst_orb_harms
+    # gw_frst = gwfobs_harms[np.newaxis, :, :] * (1.0 * sam.redz[:, np.newaxis, np.newaxis])
+
+    # shape will be a tuple of (M, Q, Z, F, H)
+    shape = sam.shape + np.shape(gwfobs_harms)
+    # setup output arrays with shape (M, Q, Z, F, H)
+    hc2 = np.zeros(shape)
+    hs2 = np.zeros(shape)
+    hsn2 = np.zeros(shape)
+    tau_out = np.zeros(shape)
+    ecc_out = np.zeros(shape)
+
+    gwfr_check = np.zeros(shape[2:])
+
+    # NOTE: should sort `gwfobs_harms` into an ascending 1D array to speed up processes
+
+    for (aa, bb), gwfo in np.ndenumerate(gwfobs_harms):
+        # iterate over mtot M
+        for ii, mt in enumerate(sam.mtot):
+            # (Q,) masses of each component for this total-mass, and all mass-ratios
+            m1, m2 = utils.m1m2_from_mtmr(mt, sam.mrat)
+            mchirp = utils.chirp_mass(m1, m2)
+
+            # (E,) rest-frame orbital frequencies for this total-mass bin
+            frst_evo = frst_orb_evo[ii]
+            # iterate over redshifts Z
+            for kk, zz in enumerate(sam.redz):
+                # () scalar
+                zterm = (1.0 + zz)
+                dc = dcom[kk]   # this is still in units of [Mpc]
+                dc_term = 4*np.pi*(SPLC/MPC) * (dc**2)
+                # rest-frame frequency corresponding to target observer-frame frequency of GW observations
+                gwfr = gwfo * zterm
+                if ii > 0:
+                    assert gwfr_check[kk, aa, bb] == gwfr
+                else:
+                    gwfr_check[kk, aa, bb] = gwfr
+                sa = utils.kepler_sepa_from_freq(mt, gwfr)
+
+                # interpolate to target (rest-frame) frequency
+                # this is the same for all mass-ratios
+                # () scalar
+                ecc = np.interp(gwfr, frst_evo, eccen_evo, left=np.nan, right=np.nan)
+                # ecc_2 = np.interp(sa, sepa[::-1], eccen_evo[::-1], left=np.nan, right=np.nan)
+
+                # da/dt values are negative, get a positive rate
+                tau = -utils.gw_hardening_rate_dadt(m1, m2, sa, ecc)
+                # convert to timescale
+                tau = sa / tau
+                # print(f"{m1.shape")
+                tau_out[ii, :, kk, aa, bb] = tau
+                ecc_out[ii, :, kk, aa, bb] = ecc
+
+                # Calculate the GW spectral strain at each harmonic
+                #    see: [Amaro-seoane+2010 Eq.9]
+                # ()
+                temp = two_over_nh_sq[bb] * utils.gw_freq_dist_func(harm_nums[bb], ee=ecc, recursive=False)
+                # (Q,)
+                hs2[ii, :, kk, aa, bb] = utils.gw_strain_source(mchirp, dc*MPC, gwfr) ** 2
+                hsn2[ii, :, kk, aa, bb] = temp * hs2[ii, :, kk, aa, bb]
+
+                # (Q,)
+                hc2[ii, :, kk, aa, bb] = ndens[ii, :, kk] * dc_term * zterm * tau * hsn2[ii, :, kk, aa, bb]
+
+    # integrate
+    gwb = hc2.copy()
+    args = [np.log10(sam.mtot), sam.mrat, sam.redz]
+    for ii, xx in enumerate(args):
+        gwb = np.moveaxis(gwb, ii, 0)
+        dx = np.diff(xx)
+        gwb = dx * 0.5 * np.moveaxis(gwb[1:] + gwb[:-1], 0, -1)
+        gwb = np.moveaxis(gwb, -1, ii)
+
+    gwb = np.sum(gwb, axis=(0, 1, 2))
+
+    # return gwfobs_harms, gwfr_check, gwb, hsn2, hs2, ecc_out, tau_out
+    # return gwfobs_harms, gwb, ecc_out, tau_out
+    return gwfobs_harms, gwb, ecc_out, tau_out
+
+
+def sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
+
+    ndens = sam.static_binary_density
+    mt_l10 = np.log10(sam.mtot)
+    mr = sam.mrat
+    rz = sam.redz
+    dc = cosmo.comoving_distance(sam.redz).to('Mpc').value
+    gwb = holo.cyutils.sam_calc_gwb_single_eccen(ndens, mt_l10, mr, rz, dc, gwfobs, sepa_evo, eccen_evo, nharms)
+    return np.asarray(gwb)
+
+
+def sam_calc_gwb_single_eccen_discrete(gwfobs, sam, sepa_evo, eccen_evo, nharms=100, nreals=None):
+
+    ndens = sam.static_binary_density
+    mt_l10 = np.log10(sam.mtot)
+    mr = sam.mrat
+    rz = sam.redz
+    dc = cosmo.comoving_distance(sam.redz).to('Mpc').value
+    if nreals is None:
+        nreals = 1
+        squeeze = True
+    else:
+        squeeze = False
+
+    gwb = holo.cyutils.sam_calc_gwb_single_eccen_discrete(ndens, mt_l10, mr, rz, dc, gwfobs, sepa_evo, eccen_evo, nharms, nreals)
+
+    if squeeze:
+        gwb = gwb.squeeze()
+
+    return np.asarray(gwb)
 
 
 # ==============================================================================

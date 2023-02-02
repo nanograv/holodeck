@@ -45,14 +45,7 @@ References
 """
 from __future__ import annotations
 
-# ! ===============================================================================================!
-# ! -- UPDATE `_take_next_step` -- !
-# ! -- write a function to set right-edge values, call it with estimate from left edge -- !
-# ! -- then call it again with a revision to the estimate, using right-edge values -- !
-# ! ===============================================================================================!
-
 import abc
-# import inspect
 import json
 import os
 # from typing import Union, TypeVar  # , Callable, Iterator
@@ -133,12 +126,14 @@ class Hard_GW(_Hardening):
     def dadt(mtot, mrat, sepa, eccen=None):
         """Calculate GW Hardening rate of semi-major-axis vs. time.
 
+        See [Peters1964]_, Eq. 5.6
+
         Parameters
         ----------
         mtot : array_like
             Total mass of each binary system.  Units of [gram].
         mrat : array_like
-            Mass ratio of each binary, defined as $q \equiv m_1/m_2 \leq 1.0$.
+            Mass ratio of each binary, defined as $q \\equiv m_1/m_2 \\leq 1.0$.
         sepa : array_like
             Binary semi-major axis (separation), in units of [cm].
         eccen : array_like or None
@@ -158,6 +153,8 @@ class Hard_GW(_Hardening):
     def dedt(mtot, mrat, sepa, eccen=None):
         """Calculate GW Hardening rate of eccentricity vs. time.
 
+        See [Peters1964]_, Eq. 5.7
+
         If `eccen` is `None`, zeros are returned.
 
         Parameters
@@ -165,7 +162,7 @@ class Hard_GW(_Hardening):
         mtot : array_like
             Total mass of each binary system.  Units of [gram].
         mrat : array_like
-            Mass ratio of each binary, defined as $q \equiv m_1/m_2 \leq 1.0$.
+            Mass ratio of each binary, defined as $q \\equiv m_1/m_2 \\leq 1.0$.
         sepa : array_like
             Binary semi-major axis (separation), in units of [cm].
         eccen : array_like or None
@@ -183,6 +180,32 @@ class Hard_GW(_Hardening):
         m1, m2 = utils.m1m2_from_mtmr(mtot, mrat)
         dedt = utils.gw_dedt(m1, m2, sepa, eccen=eccen)
         return dedt
+
+    @staticmethod
+    def deda(sepa, eccen):
+        """Rate of eccentricity change versus separation change.
+
+        See [Peters1964]_, Eq. 5.8
+
+        Parameters
+        ----------
+        sepa : array_like,
+            Binary semi-major axis (i.e. separation) [cm].
+        eccen : array_like,
+            Binary orbital eccentricity.
+
+        Returns
+        -------
+        rv : array_like,
+            Binary deda rate [1/cm] due to GW emission.
+            Values are always positive.
+
+        """
+        # fe = utils._gw_ecc_func(eccen)
+        # rv = 19 * eccen * (1.0 + (121/304)*eccen*eccen)   # numerator
+        # rv = rv / (12 * sepa * fe)
+        rv = 1.0 / utils.gw_dade(sepa, eccen)
+        return rv
 
 
 class Sesana_Scattering(_Hardening):
@@ -607,7 +630,7 @@ class Fixed_Time(_Hardening):
         mtot : array_like
             Binary total-mass [gram].
         mrat : array_like
-            Binary mass-ratio $q \equiv m_2 / m_1 \leq 1$.
+            Binary mass-ratio $q \\equiv m_2 / m_1 \\leq 1$.
         redz : array_like
             Binary Redshift.
             NOTE: this is only used as an argument to callable `rchar` and `time` values.
@@ -691,12 +714,6 @@ class Fixed_Time(_Hardening):
         else:
             log.info("calculating normalization exactly")
             norm = self._get_norm_chunk(time, mtot, mrat, rchar, gamma_sc, gamma_df, sepa, progress=progress)
-
-        # bads = ~np.isfinite(norm)
-        # if np.any(bads):
-        #     err = f"Found non-finite normalizations in {utils.frac_str(bads)} cases!"
-        #     log.exception(err)
-        #     raise ValueError(err)
 
         self._gamma_sc = gamma_sc
         self._gamma_df = gamma_df
