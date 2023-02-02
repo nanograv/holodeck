@@ -19,10 +19,12 @@ from typing import Optional, Tuple, Union, List  # , Sequence,
 import warnings
 
 import h5py
+import numba
 import numpy as np
 import numpy.typing as npt
 import scipy as sp
-import scipy.stats
+import scipy.stats    # noqa
+import scipy.special  # noqa
 
 from holodeck import log, cosmo
 from holodeck.constants import NWTG, SCHW, SPLC, YR
@@ -698,6 +700,34 @@ def quantiles(
     return percs
 
 
+def rk4_step(func, x0, y0, dx, args=None, check_nan=0, check_nan_max=5):
+    """Perform a single 4th-order Runge-Kutta integration step.
+    """
+    if args is None:
+        k1 = dx * func(x0, y0)
+        k2 = dx * func(x0 + dx/2.0, y0 + k1/2.0)
+        k3 = dx * func(x0 + dx/2.0, y0 + k2/2.0)
+        k4 = dx * func(x0 + dx, y0 + k3)
+    else:
+        k1 = dx * func(x0, y0, *args)
+        k2 = dx * func(x0 + dx/2.0, y0 + k1/2.0, *args)
+        k3 = dx * func(x0 + dx/2.0, y0 + k2/2.0, *args)
+        k4 = dx * func(x0 + dx, y0 + k3, *args)
+
+    y1 = y0 + (1.0/6.0) * (k1 + 2*k2 + 2*k3 + k4)
+    x1 = x0 + dx
+
+    # Try recursively decreasing step-size until finite-value is reached
+    if check_nan > 0 and not np.isfinite(y1):
+        if check_nan > check_nan_max:
+            err = "Failed to find finite step!  `check_nan` = {}!".format(check_nan)
+            raise RuntimeError(err)
+        # Note that `True+1 = 2`
+        rk4_step(func, x0, y0, dx/2.0, check_nan=check_nan+1, check_nan_max=check_nan_max)
+
+    return x1, y1
+
+
 def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int = 2) -> str:
     """Return a string giving quantiles of the given input data.
 
@@ -1086,7 +1116,7 @@ def mtmr_from_m1m2(m1, m2=None):
     return np.array([mtot, mrat])
 
 
-def m1m2_from_mtmr(mt, mr):
+def m1m2_from_mtmr(mt: npt.ArrayLike, mr: npt.ArrayLike) -> npt.ArrayLike:
     """Convert from total-mass and mass-ratio to individual masses.
 
     Parameters
@@ -1435,7 +1465,7 @@ def gw_dedt(m1, m2, sepa, eccen):
     return dedt
 
 
-def gw_dade(m1, m2, sepa, eccen):
+def gw_dade(sepa, eccen):
     """Rate of semi-major axis evolution versus eccentricity, due to GW emission (da/de).
 
     NOTE: returned value is positive (e and a go in same direction).
@@ -1443,10 +1473,6 @@ def gw_dade(m1, m2, sepa, eccen):
 
     Parameters
     ----------
-    m1 : array_like
-        Mass of one component of the binary [grams].
-    m2 : array_like
-        Mass of other component of the binary [grams].
     sepa : array_like
         Binary semi-major axis (separation) [grams].
     eccen : array_like
@@ -1459,7 +1485,7 @@ def gw_dade(m1, m2, sepa, eccen):
         NOTE: returned value is positive.
 
     """
-    m1, m2, sepa, eccen = _array_args(m1, m2, sepa, eccen)
+    sepa, eccen = _array_args(sepa, eccen)
     e2 = eccen**2
     num = (1 + (73.0/24.0)*e2 + (37.0/96.0)*e2*e2)
     den = (1 - e2) * (1.0 + (121.0/304.0)*e2)
@@ -1467,13 +1493,15 @@ def gw_dade(m1, m2, sepa, eccen):
     return dade
 
 
-def gw_freq_dist_func(nn, ee=0.0):
+def gw_freq_dist_func(nn, ee=0.0, recursive=True):
     """GW frequency distribution function.
 
     See [EN2007]_ Eq. 2.4; this function gives g(n,e).
 
-    BUG: use recursion relation when possible,
-         J_{n-1}(x) + J_{n+1}(x) = (2n/x) J_n(x)
+    NOTE: recursive relation fails for zero eccentricities!
+    TODO: could choose to use non-recursive when zero eccentricities are found?
+
+    TODO: replace `ee` variable with `eccen`
 
     Parameters
     ----------
@@ -1488,8 +1516,6 @@ def gw_freq_dist_func(nn, ee=0.0):
         GW Frequency distribution function g(n,e).
 
     """
-    import scipy as sp
-    import scipy.special  # noqa
 
     # Calculate with non-zero eccentrictiy
     bessel = sp.special.jn
@@ -1499,9 +1525,14 @@ def gw_freq_dist_func(nn, ee=0.0):
     jn_m1 = bessel(nn-1, ne)
 
     # Use recursion relation:
-    jn = (2*(nn-1) / ne) * jn_m1 - jn_m2
-    jn_p1 = (2*nn / ne) * jn - jn_m1
-    jn_p2 = (2*(nn+1) / ne) * jn_p1 - jn
+    if recursive:
+        jn = (2*(nn-1) / ne) * jn_m1 - jn_m2
+        jn_p1 = (2*nn / ne) * jn - jn_m1
+        jn_p2 = (2*(nn+1) / ne) * jn_p1 - jn
+    else:
+        jn = bessel(nn, ne)
+        jn_p1 = bessel(nn+1, ne)
+        jn_p2 = bessel(nn+2, ne)
 
     aa = np.square(jn_m2 - 2.0*ee*jn_m1 + (2/nn)*jn + 2*ee*jn_p1 - jn_p2)
     bb = (1 - ee*ee)*np.square(jn_m2 - 2*ee*jn + jn_p2)
@@ -1698,6 +1729,7 @@ def time_to_merge_at_sep(m1, m2, sepa):
     return delta_sep/(GW_CONST*m1*m2*(m1+m2))
 
 
+@numba.njit
 def _gw_ecc_func(eccen):
     """GW Hardening rate eccentricitiy dependence F(e).
 

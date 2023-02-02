@@ -85,7 +85,7 @@ def main():
     gpf = holo.sam.GPF_Power_Law()                 # Galaxy Pair Fraction         (GPF)
     gmt = holo.sam.GMT_Power_Law()                 # Galaxy Merger Time           (GMT)
     mmbulge = holo.relations.MMBulge_Standard()    # M-MBulge Relation            (MMB)
-    hard = holo.evolution.Hard_GW()
+    hard = holo.hardening.Hard_GW()
 
     sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge, shape=args.shape)
 

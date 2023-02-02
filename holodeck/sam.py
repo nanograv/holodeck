@@ -52,17 +52,18 @@ from holodeck import cosmo, utils, log
 from holodeck.constants import GYR, SPLC, MSOL, MPC
 from holodeck import relations, gravwaves
 
-_DEBUG = True
+_DEBUG = False
 _DEBUG_LVL = log.DEBUG
 # _DEBUG_LVL = log.WARNING
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
-REDZ_SAMPLE_VOLUME = True
+REDZ_SAMPLE_VOLUME = True    #: get redshifts by sampling uniformly in 3D spatial volume, and converting
 
-GSMF_USES_MTOT = False
-GPF_USES_MTOT = False
-GMT_USES_MTOT = False
+GSMF_USES_MTOT = False       #: the mass used in the GSMF is interpretted as M=m1+m2, otherwise use primary m1
+GPF_USES_MTOT = False        #: the mass used in the GPF  is interpretted as M=m1+m2, otherwise use primary m1
+GMT_USES_MTOT = False        #: the mass used in the GMT  is interpretted as M=m1+m2, otherwise use primary m1
+
 
 # ==============================
 # ====    SAM Components    ====
@@ -407,6 +408,13 @@ class Semi_Analytic_Model:
         gmt = utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
         mmbulge = utils._get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
 
+        # nl = 3
+        # nh = 30 - nl
+        # mix = 0.1
+        # lo = zmath.spacing([extr[0], mix], 'log', nl)
+        # hi = zmath.spacing([mix, extr[1]], 'lin', nh+1)[1:]
+        # redz = np.concatenate([lo, hi])
+
         # Process grid specifications
         param_names = ['mtot', 'mrat', 'redz']
         params = [mtot, mrat, redz]
@@ -528,7 +536,8 @@ class Semi_Analytic_Model:
 
         Notes
         -----
-        This function effectively calculates Eq.21 & 5 of [Chen2019]_; or equivalently, Eq. 6 of [Sesana2008]_.
+        * This function effectively calculates Eq.21 & 5 of [Chen2019]_; or equivalently, Eq. 6 of [Sesana2008]_.
+        * Bins which 'merge' after redshift zero are set to zero density (using the `self._gmt` instance).
 
         """
         if self._density is None:
@@ -815,7 +824,7 @@ class Semi_Analytic_Model:
 
         return edges, dnum
 
-    def gwb(self, fobs_gw_edges, hard=holo.evolution.Hard_GW, realize=False):
+    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=False):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
         Parameters
@@ -870,6 +879,16 @@ class Semi_Analytic_Model:
             log.exception(err)
             raise ValueError(err)
 
+        if np.any(np.isnan(dnum)):
+            err = f"Found nan `dnum` values!"
+            log.exception(err)
+            raise ValueError(err)
+
+        if np.any(np.isnan(dnum)):
+            err = f"Found nan `dnum` values!"
+            log.exception(err)
+            raise ValueError(err)
+
         # "integrate" within each bin (i.e. multiply by bin volume)
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
         #       after poisson calculation, need to convert back to dN/dlogf
@@ -890,6 +909,18 @@ class Semi_Analytic_Model:
         if _DEBUG and np.any(np.isnan(number)):
             print(f"{np.any(np.isnan(dnum))=}")
             err = "Found nan `number` values!"
+            log.exception(err)
+            raise ValueError(err)
+
+        if np.any(np.isnan(number)):
+            print(f"{np.any(np.isnan(dnum))=}")
+            err = f"Found nan `number` values!"
+            log.exception(err)
+            raise ValueError(err)
+
+        if np.any(np.isnan(number)):
+            print(f"{np.any(np.isnan(dnum))=}")
+            err = f"Found nan `number` values!"
             log.exception(err)
             raise ValueError(err)
 
@@ -928,7 +959,7 @@ class Semi_Analytic_Model:
             rz = self._gmt.zprime(gmt_mass, mstar_rat, rz)
             print(f"{self} :: {utils.stats(rz)=}")
 
-        # d^3 n / [dlog10(M) dq dz] in units of [Mpc^-3]
+        # d^3 n / [dlog10(M) dq dz] in units of [Mpc^-3], convert to [cm^-3]
         ndens = self.static_binary_density / (MPC**3)
 
         mt = self.mtot[:, np.newaxis, np.newaxis]
@@ -937,9 +968,9 @@ class Semi_Analytic_Model:
         return gwb
 
 
-# ===============================
-# ====    Utility Methods    ====
-# ===============================
+# =================================
+# ====    Evolution Methods    ====
+# =================================
 
 
 def sample_sam_with_hardening(
@@ -1056,3 +1087,61 @@ def sample_sam_with_hardening(
         weights = weights[~bads]
 
     return vals, weights, edges, dnum, mass
+
+
+def evolve_eccen_uniform_single(sam, eccen_init, sepa_init, nsteps):
+    """Evolve binary eccentricity from an initial value along a range of separations.
+
+    Parameters
+    ----------
+    sam : `holodeck.sam.Semi_Analytic_Model` instance
+        The input semi-analytic model.  All this does is provide the range of total-masses to
+        determine the minimum ISCO radius, which then determines the smallest separations to
+        evolve until.
+    eccen_init : float,
+        Initial eccentricity of binaries at the given initial separation `sepa_init`.
+        Must be between [0.0, 1.0).
+    sepa_init : float,
+        Initial binary separation at which evolution begins.  Units of [cm].
+    nsteps : int,
+        Number of (log-spaced) steps in separation between the initial separation `sepa_init`,
+        and the final separation which is determined as the minimum ISCO radius based on the
+        smallest total-mass of binaries in the `sam` instance.
+
+    Returns
+    -------
+    sepa : (E,) ndarray of float
+        The separations at which the eccentricity evolution is defined over.  This is the
+        independent variable of the evolution.
+        The shape `E` is the value of the `nsteps` parameter.
+    eccen : (E,)
+        The eccentricity of the binaries at each location in separation given by `sepa`.
+        The shape `E` is the value of the `nsteps` parameter.
+
+    """
+    assert (0.0 <= eccen_init) and (eccen_init < 1.0)
+
+    #! CHECK FOR COALESCENCE !#
+
+    eccen = np.zeros(nsteps)
+    eccen[0] = eccen_init
+
+    sepa_max = sepa_init
+    sepa_coal = holo.utils.schwarzschild_radius(sam.mtot) * 3
+    # frst_coal = utils.kepler_freq_from_sepa(sam.mtot, sepa_coal)
+    sepa_min = sepa_coal.min()
+    sepa = np.logspace(*np.log10([sepa_max, sepa_min]), nsteps)
+
+    for step in range(1, nsteps):
+        a0 = sepa[step-1]
+        a1 = sepa[step]
+        da = (a1 - a0)
+        e0 = eccen[step-1]
+
+        _, e1 = holo.utils.rk4_step(holo.hardening.Hard_GW.deda, x0=a0, y0=e0, dx=da)
+        e1 = np.clip(e1, 0.0, None)
+        eccen[step] = e1
+
+    return sepa, eccen
+
+

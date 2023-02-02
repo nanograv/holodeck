@@ -1,7 +1,18 @@
 """holodeck: Massive black hole (MBH) binary simulator for pulsar timing array signals.
+
+
+To build cython library in-place:
+    $ python setup.py build_ext -i
+
 """
 
+from os.path import abspath, join
 from setuptools import setup, find_packages
+from setuptools.extension import Extension
+from Cython.Build import cythonize
+import numpy as np
+
+# ---- Prepare Meta-Data ----
 
 # NOTE: `short_description` gets first line of `__doc__` only (linebreaks not allowed by setuptools)
 short_description = __doc__.strip().split('\n')[0]
@@ -14,6 +25,36 @@ with open("requirements.txt", "r") as handle:
 
 with open('holodeck/version.txt') as handle:
     version = handle.read().strip()
+
+
+# ---- Handle cython submodules ----
+
+ext_cyutils = Extension(
+    "holodeck.cyutils",    # specify the resulting name/location of compiled extension
+    sources=[join('.', 'holodeck', 'cyutils.pyx')],   # location of source code
+    # define parameters external libraries
+    include_dirs=[
+        np.get_include()
+    ],
+    library_dirs=[
+        abspath(join(np.get_include(), '..', '..', 'random', 'lib')),
+        abspath(join(np.get_include(), '..', 'lib'))
+    ],
+    libraries=['npyrandom', 'npymath'],
+
+    # Silence some undesired warnings
+    define_macros=[('NPY_NO_DEPRECATED_API', 0)],
+    extra_compile_args=['-Wno-unreachable-code-fallthrough', '-Wno-unused-function'],
+)
+
+cython_modules = cythonize(
+    [ext_cyutils],
+    compiler_directives={"language_level": "3"},
+    annotate=True,   # create html output about cython files
+)
+
+
+# ---- Perform Setup ----
 
 setup(
     name='holodeck',
@@ -43,4 +84,5 @@ setup(
     # url='http://www.my_package.com',  # Website
     python_requires=">=3.8",          # Python version restrictions
 
+    ext_modules=cython_modules,
 )

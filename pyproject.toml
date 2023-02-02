@@ -1,5 +1,6 @@
 [build-system]
-requires = ["setuptools >= 40.6.0", "wheel"]
+requires = ["setuptools >= 40.6.0", "wheel", "Cython"]
 build-backend = "setuptools.build_meta"
+
 [mypy]
 allow_redefinition = true
