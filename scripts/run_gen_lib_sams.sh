@@ -4,7 +4,7 @@
 # Setup for running on the `minos` computer
 # --------------------------------------------------------------------------------------------------
 
-OUTPUT="output/eccen-02_2023-01-31_02_n100_s30_r100_f20"
+OUTPUT="output/eccen-01_2023-01-31_01_n100_s30_r100_f20"
 #OUTPUT=$OUTPUT"__TEST"
 SCRIPT="scripts/gen_lib_sams.py"
 LOG_NAME="job_log"

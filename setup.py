@@ -6,11 +6,13 @@ To build cython library in-place:
 
 """
 
-from os.path import dirname, abspath, join
+from os.path import abspath, join
 from setuptools import setup, find_packages
 from setuptools.extension import Extension
 from Cython.Build import cythonize
 import numpy as np
+
+# ---- Prepare Meta-Data ----
 
 # NOTE: `short_description` gets first line of `__doc__` only (linebreaks not allowed by setuptools)
 short_description = __doc__.strip().split('\n')[0]
@@ -24,9 +26,13 @@ with open("requirements.txt", "r") as handle:
 with open('holodeck/version.txt') as handle:
     version = handle.read().strip()
 
+
+# ---- Handle cython submodules ----
+
 ext_cyutils = Extension(
-    "holodeck.cyutils",
-    sources=[join('.', 'holodeck', 'cyutils.pyx')],
+    "holodeck.cyutils",    # specify the resulting name/location of compiled extension
+    sources=[join('.', 'holodeck', 'cyutils.pyx')],   # location of source code
+    # define parameters external libraries
     include_dirs=[
         np.get_include()
     ],
@@ -35,7 +41,10 @@ ext_cyutils = Extension(
         abspath(join(np.get_include(), '..', 'lib'))
     ],
     libraries=['npyrandom', 'npymath'],
+
+    # Silence some undesired warnings
     define_macros=[('NPY_NO_DEPRECATED_API', 0)],
+    extra_compile_args=['-Wno-unreachable-code-fallthrough', '-Wno-unused-function'],
 )
 
 cython_modules = cythonize(
@@ -44,6 +53,8 @@ cython_modules = cythonize(
     annotate=True,   # create html output about cython files
 )
 
+
+# ---- Perform Setup ----
 
 setup(
     name='holodeck',
