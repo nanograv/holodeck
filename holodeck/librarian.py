@@ -356,6 +356,7 @@ def sam_lib_combine(path_output, log, debug=False):
             h5.create_dataset('lhs_grid', data=lhs_grid)
             h5.create_dataset('lhs_grid_indices', data=grid_idx)
             group = h5.create_group('parameters')
+            group.attrs['ordered_parameters'] = param_names
             for pname, pvals in zip(param_names, param_vals):
                 group.create_dataset(pname, data=pvals)
 
