@@ -18,16 +18,12 @@ Example:
 
 To-Do
 -----
-* LHS (at least with pydoe) is not deterministic (i.e. not reproducible).  Find a way to make reproducible.
-* Use LHS to choose parameters themselves, instead of grid-points.  Also remove usage of grid entirely.
-    * Does this resolve irregularities between different LHS implementations?
-* Use subclassing to cleanup `Parameter_Space` object.  e.g. implement LHS as subclass of generic Parameter_Space class.
-* BUG: `lhs_grid` and `lhs_grid_idx` are currently storing the same thing
 * #! IMPORTANT: mark output directories as incomplete until all runs have been finished.  Merged libraries from incomplete directories should also get some sort of flag! !#
+* Setting `_PARAM_NAMES` seems redundant to the arguments passed in super().__init__(), can these just be grabbed from kwargs?
 
 """
 
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 
 import argparse
 import os
@@ -202,8 +198,14 @@ class LHS_PSpace_Eccen_01(holo.librarian._LHS_Parameter_Space):
 class PSpace_Big_Circ_01(holo.librarian._LHS_Parameter_Space):
 
     _PARAM_NAMES = [
+        'hard_time',
+        'hard_rchar',
+        'hard_gamma_inner',
+        'hard_gamma_outer',
+
         'gsmf_phi0',
         'gsmf_phiz',
+        'gsmf_alpha0',
         'gpf_malpha',
         'gpf_zbeta',
         'gpf_qgamma',
@@ -231,6 +233,7 @@ class PSpace_Big_Circ_01(holo.librarian._LHS_Parameter_Space):
             gpf_malpha=[-1.0, +1.0],
             gpf_zbeta =[-0.5, +2.5],
             gpf_qgamma=[-1.0, +1.0],
+
             gmt_malpha=[-1.0, +1.0],
             gmt_zbeta =[-3.0, +2.0],
             gmt_qgamma=[-1.0, +1.0],
@@ -260,7 +263,7 @@ class PSpace_Big_Circ_01(holo.librarian._LHS_Parameter_Space):
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
             shape=self.sam_shape
         )
-        hard = holo.evolution.Fixed_Time.from_sam(
+        hard = holo.hardening.Fixed_Time.from_sam(
             sam, hard_time, rchar=hard_rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
             exact=True, progress=False
         )
