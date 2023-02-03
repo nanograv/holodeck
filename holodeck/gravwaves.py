@@ -542,10 +542,12 @@ def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
             hc = hc[..., np.newaxis] * np.random.poisson(number[..., np.newaxis], size=shape)
         except ValueError as err:
             log.error(str(err))
-            print(f"{utils.stats(number)=}")
-            print(f"{number.max()=:.8e}")
-            print(f"{number.dtype=}")
-            raise
+            log.error("Falling back to normal approximation for poisson")
+            log.info(f"{utils.stats(number)=}")
+            log.info(f"{number.max()=:.8e}")
+            log.info(f"{number.dtype=}")
+            _num = number[..., np.newaxis]
+            hc = hc[..., np.newaxis] * np.floor(np.random.normal(_num, np.sqrt(_num), size=shape))
 
     else:
         err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
