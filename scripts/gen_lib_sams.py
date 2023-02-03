@@ -63,178 +63,6 @@ DEF_ECCEN_NUM_STEPS = 123
 DEF_ECCEN_NHARMS = 100
 
 
-class Parameter_Space_Mix01(holo.librarian._Parameter_Space):
-
-    _PARAM_NAMES = [
-        'gsmf_phi0',
-        'time',
-        'gpf_qgamma',
-        'hard_gamma_inner',
-        'mmb_amp',
-        'mmb_plaw'
-    ]
-
-    def __init__(self, log, nsamples, sam_shape):
-        super().__init__(
-            log, nsamples, sam_shape,
-            gsmf_phi0=[-3.28, -2.16, 5],
-            time=[-2.0, +1.0, 7],   # [log10(Gyr)]
-            gpf_qgamma=[-0.4, +0.4, 5],
-            hard_gamma_inner=[-1.5, -0.5, 5],
-            mmb_amp=[0.1e9, 1.0e9, 9],
-            mmb_plaw=[0.8, 1.5, 11],
-        )
-
-    def sam_for_lhsnumber(self, lhsnum):
-        param_grid = self.params_for_lhsnumber(lhsnum)
-
-        gsmf_phi0, time, gpf_qgamma, hard_gamma_inner, mmb_amp, mmb_plaw = param_grid
-        time = (10.0 ** time) * GYR
-        mmb_amp = mmb_amp*MSOL
-
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
-        gpf = holo.sam.GPF_Power_Law(qgamma=gpf_qgamma)
-        gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
-
-        sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge, shape=self.sam_shape)
-        hard = holo.hardening.Fixed_Time.from_sam(sam, time, gamma_sc=hard_gamma_inner, exact=True, progress=False)
-        return sam, hard
-
-
-class Parameter_Space_Hard01(holo.librarian._Parameter_Space):
-
-    _PARAM_NAMES = [
-        'hard_time',
-        'hard_gamma_inner',
-        'hard_gamma_outer',
-        'hard_rchar',
-    ]
-
-    def __init__(self, log, nsamples, sam_shape):
-        super().__init__(
-            log, nsamples, sam_shape,
-            hard_time=[-1.0, +1.0, 7],   # [log10(Gyr)]
-            hard_gamma_inner=[-1.5, -0.5, 7],
-            hard_gamma_outer=[+1.0, +3.0, 7],
-            hard_rchar=[1.0, 3.0, 5],
-        )
-
-    def sam_for_lhsnumber(self, lhsnum):
-        param_grid = self.params_for_lhsnumber(lhsnum)
-
-        time, gamma_inner, gamma_outer, rchar = param_grid
-        time = (10.0 ** time) * GYR
-        rchar = (10.0 ** rchar) * PC
-
-        gsmf = holo.sam.GSMF_Schechter()
-        gpf = holo.sam.GPF_Power_Law()
-        gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013()
-
-        sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
-            shape=self.sam_shape
-        )
-        hard = holo.hardening.Fixed_Time.from_sam(
-            sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
-            exact=True, progress=False
-        )
-        return sam, hard
-
-
-class Parameter_Space_Hard02_BAD(holo.librarian._Parameter_Space):
-
-    _PARAM_NAMES = [
-        'hard_time',
-        'hard_gamma_inner',
-        'hard_gamma_outer',
-        'hard_rchar',
-        'gsmf_phi0',
-        'mmb_amp',
-    ]
-
-    def __init__(self, log, nsamples, sam_shape):
-        super().__init__(
-            log, nsamples, sam_shape,
-            hard_time=[-1.0, +1.0, 7],   # [log10(Gyr)]
-            hard_gamma_inner=[-1.5, -0.5, 7],
-            hard_gamma_outer=[+1.0, +3.0, 7],
-            hard_rchar=[1.0, 3.0, 5],
-            gsmf_phi0=[-3.06, -2.5, 3],
-            mmb_amp=[0.39e9, 0.61e9, 3],
-        )
-
-    def sam_for_lhsnumber(self, lhsnum):
-        param_grid = self.params_for_lhsnumber(lhsnum)
-
-        time, gamma_inner, gamma_outer, rchar, gsmf_phi0, mmb_amp = param_grid
-        time = (10.0 ** time) * GYR
-        rchar = (10.0 ** rchar) * PC
-        mmb_amp = mmb_amp*MSOL
-
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
-        gpf = holo.sam.GPF_Power_Law()
-        gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
-
-        sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
-            shape=self.sam_shape
-        )
-        hard = holo.hardening.Fixed_Time.from_sam(
-            sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
-            exact=True, progress=False
-        )
-        return sam, hard
-
-
-class Parameter_Space_Hard03(holo.librarian._Parameter_Space):
-
-    _PARAM_NAMES = [
-        'hard_time',
-        'hard_gamma_inner',
-        'hard_gamma_outer',
-        'hard_rchar',
-        'gsmf_phi0',
-        'mmb_amp',
-    ]
-
-    def __init__(self, log, nsamples, sam_shape):
-        super().__init__(
-            log, nsamples, sam_shape,
-            hard_time=[-1.0, +1.0, 5],   # [log10(Gyr)]
-            hard_gamma_inner=[-1.5, -0.5, 5],
-            hard_gamma_outer=[+2.0, +3.0, 5],
-            hard_rchar=[1.0, 3.0, 5],
-            gsmf_phi0=[-3.06, -2.5, 3],
-            mmb_amp=[0.39e9, 0.61e9, 3],
-        )
-
-    def sam_for_lhsnumber(self, lhsnum):
-        param_grid = self.params_for_lhsnumber(lhsnum)
-
-        time, gamma_inner, gamma_outer, rchar, gsmf_phi0, mmb_amp = param_grid
-        time = (10.0 ** time) * GYR
-        rchar = (10.0 ** rchar) * PC
-        mmb_amp = mmb_amp*MSOL
-
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
-        gpf = holo.sam.GPF_Power_Law()
-        gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
-
-        sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
-            shape=self.sam_shape
-        )
-        hard = holo.hardening.Fixed_Time.from_sam(
-            sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
-            exact=True, progress=False
-        )
-        return sam, hard
-
-
 class Parameter_Space_Hard04(holo.librarian._Parameter_Space):
 
     _PARAM_NAMES = [
@@ -276,121 +104,6 @@ class Parameter_Space_Hard04(holo.librarian._Parameter_Space):
         )
         hard = holo.hardening.Fixed_Time.from_sam(
             sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
-            exact=True, progress=False
-        )
-        return sam, hard
-
-
-class Parameter_Space_Hard04b(Parameter_Space_Hard04):
-
-    def __init__(self, log, nsamples, sam_shape):
-        grid_size = 100
-        super(Parameter_Space_Hard04, self).__init__(
-            log, nsamples, sam_shape,
-            hard_time=[-1.0, +1.0, grid_size],   # [log10(Gyr)]
-            hard_gamma_inner=[-1.5, -0.5, grid_size],
-            hard_gamma_outer=[+2.0, +3.0, grid_size],
-            hard_rchar=[1.0, 3.0, grid_size],
-            gsmf_phi0=[-3.0, -2.0, grid_size],
-            mmb_amp=[0.1e9, 1.0e9, grid_size],
-        )
-
-
-class Parameter_Space_Debug01(holo.librarian._Parameter_Space):
-
-    _PARAM_NAMES = [
-        'hard_time',
-        'hard_rchar',
-        'mmb_amp',
-    ]
-
-    def __init__(self, log, nsamples, sam_shape):
-        super().__init__(
-            log, nsamples, sam_shape,
-            hard_time=[-1.0, +1.0, 3],   # [log10(Gyr)]
-            hard_rchar=[1.0, 3.0, 3],
-            mmb_amp=[0.1e9, 1.0e9, 100],
-        )
-
-    def sam_for_lhsnumber(self, lhsnum):
-        param_grid = self.params_for_lhsnumber(lhsnum)
-
-        time, rchar, mmb_amp = param_grid
-        time = (10.0 ** time) * GYR
-        rchar = (10.0 ** rchar) * PC
-        mmb_amp = mmb_amp*MSOL
-
-        gsmf_phi0 = -2.0
-        gamma_inner = -1.0
-        gamma_outer = +2.5
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
-        gpf = holo.sam.GPF_Power_Law()
-        gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
-
-        sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
-            shape=self.sam_shape
-        )
-        hard = holo.hardening.Fixed_Time.from_sam(
-            sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
-            exact=True, progress=False
-        )
-        return sam, hard
-
-
-class Parameter_Space_Debug01b(Parameter_Space_Debug01):
-
-    _PARAM_NAMES = [
-        'hard_time',
-        'hard_rchar',
-        'mmb_amp',
-    ]
-
-    def __init__(self, log, nsamples, sam_shape):
-        super(Parameter_Space_Debug01).__init__(
-            log, nsamples, sam_shape,
-            hard_time=[-1.0, +1.0, 3],   # [log10(Gyr)]
-            hard_rchar=[1.0, 3.0, 3],
-            mmb_amp=[0.1e9, 1.0e9, 1000],
-        )
-
-
-class Parameter_Space_Simple01(holo.librarian._Parameter_Space):
-
-    _PARAM_NAMES = [
-        'hard_time',
-        'hard_rchar',
-        'gsmf_phi0',
-        'mmb_amp',
-    ]
-
-    def __init__(self, log, nsamples, sam_shape):
-        super().__init__(
-            log, nsamples, sam_shape,
-            hard_time=[-0.5, +1.0, 9],   # [log10(Gyr)]
-            hard_rchar=[1.0, 2.5, 7],
-            gsmf_phi0=[-3.0, -1.5, 7],
-        )
-
-    def sam_for_lhsnumber(self, lhsnum):
-        param_grid = self.params_for_lhsnumber(lhsnum)
-
-        time, rchar, gsmf_phi0 = param_grid
-        time = (10.0 ** time) * GYR
-        rchar = (10.0 ** rchar) * PC
-
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
-        gpf = holo.sam.GPF_Power_Law()
-        gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013()
-
-        sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
-            shape=self.sam_shape
-        )
-        hard = holo.hardening.Fixed_Time.from_sam(
-            sam, time, rchar=rchar,
             exact=True, progress=False
         )
         return sam, hard
@@ -486,10 +199,9 @@ class LHS_PSpace_Eccen_01(holo.librarian._LHS_Parameter_Space):
         return sam, sepa_evo, eccen_evo
 
 
-class LHS_PSpace_Eccen_02(holo.librarian._LHS_Parameter_Space):
+class PSpace_Big_Circ_01(holo.librarian._LHS_Parameter_Space):
 
     _PARAM_NAMES = [
-        'eccen_init',
         'gsmf_phi0',
         'gsmf_phiz',
         'gpf_malpha',
@@ -508,32 +220,38 @@ class LHS_PSpace_Eccen_02(holo.librarian._LHS_Parameter_Space):
     def __init__(self, log, nsamples, sam_shape, lhs_sampler, seed):
         super().__init__(
             log, nsamples, sam_shape, lhs_sampler, seed,
-            eccen_init=[0.0, +1.0],
-            gsmf_phi0=[-3.0, -2.0],
-            gsmf_phiz=[-0.7, 0.0],
-            gpf_malpha=[-0.5, 0.5],
-            gpf_zbeta=[0.0, 2.0],
-            gpf_qgamma=[-0.5, 0.5],
-            gmt_malpha=[-0.5, +0.5],
-            gmt_zbeta=[-3.0, +2.0],
-            gmt_qgamma=[-0.5, +0.5],
-            mmb_amp=[0.1e9, 1.0e9],
-            mmb_plaw=[0.5, 1.5],
+            hard_time =[-2.0, +2.0],   # [log10(Gyr)]
+            hard_rchar=[+0.0, +4.0],   # [log10(pc)]
+            hard_gamma_inner=[-1.5, +0.0],
+            hard_gamma_outer=[+2.0, +3.0],
+
+            gsmf_phi0 =[-3.5, -1.5],
+            gsmf_phiz =[-1.5, +0.5],
+            gsmf_alpha0=[-2.5, -0.5],
+            gpf_malpha=[-1.0, +1.0],
+            gpf_zbeta =[-0.5, +2.5],
+            gpf_qgamma=[-1.0, +1.0],
+            gmt_malpha=[-1.0, +1.0],
+            gmt_zbeta =[-3.0, +2.0],
+            gmt_qgamma=[-1.0, +1.0],
+            mmb_amp   =[+7.0, +10.0],   # [log10(Msol)]
+            mmb_plaw  =[+0.25, +2.5],
         )
 
     def sam_for_lhsnumber(self, lhsnum):
         param_grid = self.params_for_lhsnumber(lhsnum)
 
-        eccen, gsmf_phi0, gsmf_phiz, \
+        hard_time, hard_rchar, gamma_inner, gamma_outer, \
+            gsmf_phi0, gsmf_phiz, gsmf_alpha0, \
             gpf_malpha, gpf_zbeta, gpf_qgamma, \
             gmt_malpha, gmt_zbeta, gmt_qgamma, \
             mmb_amp, mmb_plaw = param_grid
-        mmb_amp = mmb_amp*MSOL
 
-        # favor higher values of eccentricity instead of uniformly distributed
-        eccen = eccen ** (1.0/5.0)
+        mmb_amp = (10.0 ** mmb_amp) * MSOL
+        hard_time = (10.0 ** hard_time) * GYR
+        hard_rchar = (10.0 ** hard_rchar) * PC
 
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0, phiz=gsmf_phiz)
+        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0, phiz=gsmf_phiz, alpha0=gsmf_alpha0)
         gpf = holo.sam.GPF_Power_Law(malpha=gpf_malpha, qgamma=gpf_qgamma, zbeta=gpf_zbeta)
         gmt = holo.sam.GMT_Power_Law(malpha=gmt_malpha, qgamma=gmt_qgamma, zbeta=gmt_zbeta)
         mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
@@ -542,10 +260,11 @@ class LHS_PSpace_Eccen_02(holo.librarian._LHS_Parameter_Space):
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
             shape=self.sam_shape
         )
-
-        sepa_evo, eccen_evo = holo.sam.evolve_eccen_uniform_single(sam, eccen, self.SEPA_INIT, DEF_ECCEN_NUM_STEPS)
-
-        return sam, sepa_evo, eccen_evo
+        hard = holo.evolution.Fixed_Time.from_sam(
+            sam, hard_time, rchar=hard_rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
+            exact=True, progress=False
+        )
+        return sam, hard
 
 
 # ---- setup argparse
@@ -584,7 +303,7 @@ def setup_argparse():
     return args
 
 
-SPACE = LHS_PSpace_Eccen_02
+SPACE = PSpace_Big_Circ_01
 comm = MPI.COMM_WORLD
 
 args = setup_argparse() if comm.rank == 0 else None
@@ -677,18 +396,13 @@ def main():
         log.info("Running in testing mode. Outputting parameters:")
 
     for ind in iterator:
-        # Convert from 1D index into 2D (param, real) specification
-        # param, real = np.unravel_index(ind, (npars, nreals))
-        # log.info(f"rank:{comm.rank} index:{ind} => {param=} {real=}")
         lhsparam = ind
-
         log.info(f"{comm.rank=} {ind=} {space.param_dict_for_lhsnumber(lhsparam)}")
         if args.test:
             continue
 
         try:
-            # run_sam(lhsparam, PATH_OUTPUT)
-            run_sam_eccen(lhsparam, PATH_OUTPUT)
+            run_sam(lhsparam, PATH_OUTPUT)
         except Exception as err:
             logging.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{ind}")
             logging.warning(err)
@@ -700,48 +414,13 @@ def main():
             raise
 
     end = datetime.now()
-    # print(f"\t{comm.rank} done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}")
     log.info(f"\t{comm.rank} done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}")
     bnum = _barrier(bnum)
 
     return
 
 
-# def run_sam(pnum, path_output):
-#     fname = f"lib_sams__p{pnum:06d}.npz"
-#     fname = os.path.join(path_output, fname)
-#     log.debug(f"{pnum=} :: {fname=}")
-#     if os.path.exists(fname):
-#         log.warning(f"File {fname} already exists.")
-
-#     pta_dur = args.pta_dur * YR
-#     nfreqs = args.nfreqs
-#     hifr = nfreqs/pta_dur
-#     pta_cad = 1.0 / (2 * hifr)
-#     fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
-#     fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
-#     log.info(f"Created {fobs_cents.size} frequency bins")
-#     log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
-#     log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
-#     assert nfreqs == fobs_cents.size
-
-#     log.debug("Selecting `sam` and `hard` instances")
-#     sam, hard = space.sam_for_lhsnumber(pnum)
-#     log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.nreals})")
-#     gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
-#     log.debug(f"{holo.utils.stats(gwb)=}")
-#     legend = space.param_dict_for_lhsnumber(pnum)
-#     log.debug(f"Saving {pnum} to file")
-#     np.savez(fname, fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb,
-#              pnum=pnum, pdim=space.paramdimen, nsamples=args.nsamples,
-#              lhs_grid=space.sampleindxs, lhs_grid_idx=space.lhsnumber_to_index(pnum),
-#              params=space.params, names=space.names, version=__version__, **legend)
-
-#     log.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
-#     return
-
-
-def run_sam_eccen(pnum, path_output):
+def run_sam(pnum, path_output):
     fname = f"lib_sams__p{pnum:06d}.npz"
     fname = os.path.join(path_output, fname)
     log.debug(f"{pnum=} :: {fname=}")
@@ -760,15 +439,9 @@ def run_sam_eccen(pnum, path_output):
     assert nfreqs == fobs_cents.size
 
     log.debug("Selecting `sam` and `hard` instances")
-    sam, sepa_evo, eccen_evo = space.sam_for_lhsnumber(pnum)
+    sam, hard = space.sam_for_lhsnumber(pnum)
     log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.nreals})")
-
-    # gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
-    gwb = holo.gravwaves.sam_calc_gwb_single_eccen_discrete(
-        fobs_cents, sam, sepa_evo, eccen_evo, nharms=DEF_ECCEN_NHARMS, nreals=DEF_NUM_REALS,
-    )
-    gwb = np.sqrt(np.sum(gwb, axis=1))
-
+    gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
     log.debug(f"{holo.utils.stats(gwb)=}")
     legend = space.param_dict_for_lhsnumber(pnum)
     log.debug(f"Saving {pnum} to file")
