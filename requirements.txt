@@ -7,5 +7,6 @@ matplotlib
 numpy
 scipy
 pydoe
+psutil
 tqdm
 cython

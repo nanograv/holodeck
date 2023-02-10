@@ -28,6 +28,8 @@ __version__ = '0.2.1'
 import argparse
 import os
 import logging
+import psutil
+import resource
 import shutil
 import sys
 import warnings
@@ -430,6 +432,14 @@ def run_sam(pnum, path_output):
     if os.path.exists(fname):
         log.warning(f"File {fname} already exists.")
 
+    def log_mem():
+        # results.ru_maxrss is KB on Linux, B on macos
+        mem_max = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 2)
+        process = psutil.Process(os.getpid())
+        mem_rss = process.memory_info().rss / 1024**3
+        mem_vms = process.memory_info().vms / 1024**3
+        log.info(f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB")
+        
     pta_dur = args.pta_dur * YR
     nfreqs = args.nfreqs
     hifr = nfreqs/pta_dur
@@ -439,12 +449,17 @@ def run_sam(pnum, path_output):
     log.info(f"Created {fobs_cents.size} frequency bins")
     log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
     log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
+    log_mem()
     assert nfreqs == fobs_cents.size
 
     log.debug("Selecting `sam` and `hard` instances")
     sam, hard = space.sam_for_lhsnumber(pnum)
+    mem = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 3)
+    log_mem()
     log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.nreals})")
     gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
+    mem = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 3)
+    log_mem()
     log.debug(f"{holo.utils.stats(gwb)=}")
     legend = space.param_dict_for_lhsnumber(pnum)
     log.debug(f"Saving {pnum} to file")
