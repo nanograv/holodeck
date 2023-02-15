@@ -117,10 +117,10 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
             mref0, mref0_log10, val_units=MSOL, name='mref0', only_one=True
         )
 
-        self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]  [1/Mpc^3]
-        self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]  [1/Mpc^3]
-        self._mref0 = mref0       # +11.24  +/- [-0.17, +0.20]  Msol
-        self._mrefz = mrefz       #  0.0                        Msol    # noqa
+        self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]  [log10(1/Mpc^3)]
+        self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]  [log10(1/Mpc^3)]
+        self._mref0 = mref0       # +11.24  +/- [-0.17, +0.20]  [log10(Msol)]
+        self._mrefz = mrefz       #  0.0                        [log10(Msol)]    # noqa
         self._alpha0 = alpha0     # -1.24   +/- [-0.16, +0.16]
         self._alphaz = alphaz     # -0.03   +/- [-0.14, +0.16]
         return
@@ -140,7 +140,8 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
         Returns
         -------
         rv : scalar or ndarray
-            Number-density of galaxies in units of [Mpc^-3]
+            Number-density of galaxies per log-interval of mass in units of [Mpc^-3]
+            i.e.  ``Phi = dn / d\\log_{10}(M)``
 
         """
         phi = self._phi_func(redz)
@@ -513,8 +514,8 @@ class Semi_Analytic_Model:
 
         Returns
         -------
-        masses : (N, 2) ndarray of scalar,
-            Galaxy total stellar masses for all MBH. [:, 0] is primary, [:, 1] is secondary [grams].
+        masses : (2, N) ndarray of scalar,
+            Galaxy total stellar masses for all MBH. [0, :] is primary, [1, :] is secondary [grams].
 
         """
         # total-mass, mass-ratio ==> (M1, M2)
