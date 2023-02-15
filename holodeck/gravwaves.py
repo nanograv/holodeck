@@ -16,7 +16,7 @@ import scipy.integrate  # noqa
 import kalepy as kale
 
 import holodeck as holo
-import holodeck.cyutils  # noqa
+# import holodeck.cyutils  # noqa
 from holodeck import utils, cosmo, log
 from holodeck.constants import SPLC, NWTG, MPC
 
@@ -535,6 +535,9 @@ def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
     if realize is True:
         hc = hc * np.random.poisson(number)
     elif realize in [None, False]:
+        # print('err here')
+        # print('hc:\n', hc, '\nhc shape:', hc.shape)
+        # print('number:\n', number, '\nnumber shape', number.shape)
         hc = hc * number
     elif utils.isinteger(realize):
         shape = number.shape + (realize,)

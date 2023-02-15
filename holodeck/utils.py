@@ -596,7 +596,7 @@ def nyquist_freqs_edges(
     df = fmin    # bin width
     freqs = np.arange(fmin, fmax + df/10.0, df)   # centers
     freqs_edges = freqs - df/2.0    # shift to edges
-    freqs_edges = np.concatenate([freqs_edges, [fmax + df]])
+    freqs_edges = np.concatenate([freqs_edges, [fmax + df]]) #BUG? should this be df/2?
 
     if trim is not None:
         if np.shape(trim) != (2,):

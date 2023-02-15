@@ -361,7 +361,7 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
         bb = self._zbeta
         gg = self._qgamma
         mtime = tau0 * np.power(mass/bm0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
-        mtime = mtime
+        mtime = mtime # why
         return mtime
 
 
@@ -925,6 +925,9 @@ class Semi_Analytic_Model:
             raise ValueError(err)
 
         # ---- Get the GWB spectrum from number of binaries over grid
+        # print('before calling hc here is edges:\n', edges)
+        # print('and here is number:\n', number.shape,'\n',number)
+        # print('and realize:\n', realize)
         hc = gravwaves._gws_from_number_grid_integrated(edges, number, realize)
         if squeeze:
             hc = hc.squeeze()
