@@ -484,6 +484,13 @@ def log_normal_base_10(
     return dist
 
 
+def midpoints(vals, axis=-1):
+    mm = np.moveaxis(vals, axis, 0)
+    mm = 0.5 * (mm[1:] + mm[:-1])
+    mm = np.moveaxis(mm, 0, axis)
+    return mm
+
+
 def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
     """Find the minimum and maximum values in the given array.
 
@@ -507,27 +514,6 @@ def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
         vv = vals
     extr = np.array([np.min(vv), np.max(vv)])
     return extr
-
-
-def print_stats(stack=True, print_func=print, **kwargs):
-    """Print out basic properties and statistics on the input key-value array_like values.
-
-    Parameters
-    ----------
-    stack : bool,
-        Whether or not to print a backtrace to stdout.
-    print_func : callable,
-        Function to use for returning/printing output.
-    kwargs : dict,
-        Key-value pairs where values are array_like for the shape/stats to be printed.
-
-    """
-    if stack:
-        import traceback
-        traceback.print_stack()
-    for kk, vv in kwargs.items():
-        print_func(f"{kk} = shape: {np.shape(vv)}, stats: {stats(vv)}")
-    return
 
 
 def nyquist_freqs(
@@ -596,7 +582,7 @@ def nyquist_freqs_edges(
     df = fmin    # bin width
     freqs = np.arange(fmin, fmax + df/10.0, df)   # centers
     freqs_edges = freqs - df/2.0    # shift to edges
-    freqs_edges = np.concatenate([freqs_edges, [fmax + df]])
+    freqs_edges = np.concatenate([freqs_edges, [fmax + df/2.0]])
 
     if trim is not None:
         if np.shape(trim) != (2,):
@@ -607,6 +593,27 @@ def nyquist_freqs_edges(
             freqs_edges = freqs_edges[freqs_edges < trim[1]]
 
     return freqs_edges
+
+
+def print_stats(stack=True, print_func=print, **kwargs):
+    """Print out basic properties and statistics on the input key-value array_like values.
+
+    Parameters
+    ----------
+    stack : bool,
+        Whether or not to print a backtrace to stdout.
+    print_func : callable,
+        Function to use for returning/printing output.
+    kwargs : dict,
+        Key-value pairs where values are array_like for the shape/stats to be printed.
+
+    """
+    if stack:
+        import traceback
+        traceback.print_stack()
+    for kk, vv in kwargs.items():
+        print_func(f"{kk} = shape: {np.shape(vv)}, stats: {stats(vv)}")
+    return
 
 
 def quantile_filtered(values, percs, axis, func=np.isfinite):
