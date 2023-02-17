@@ -484,9 +484,13 @@ def log_normal_base_10(
     return dist
 
 
-def midpoints(vals, axis=-1):
+def midpoints(vals, axis=-1, log=False):
     mm = np.moveaxis(vals, axis, 0)
+    if log:
+        mm = np.log10(mm)
     mm = 0.5 * (mm[1:] + mm[:-1])
+    if log:
+        mm = 10.0 ** mm
     mm = np.moveaxis(mm, 0, axis)
     return mm
 

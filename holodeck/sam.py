@@ -409,13 +409,6 @@ class Semi_Analytic_Model:
         gmt = utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
         mmbulge = utils._get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
 
-        # nl = 3
-        # nh = 30 - nl
-        # mix = 0.1
-        # lo = zmath.spacing([extr[0], mix], 'log', nl)
-        # hi = zmath.spacing([mix, extr[1]], 'lin', nh+1)[1:]
-        # redz = np.concatenate([lo, hi])
-
         # Process grid specifications
         param_names = ['mtot', 'mrat', 'redz']
         params = [mtot, mrat, redz]
@@ -486,6 +479,7 @@ class Semi_Analytic_Model:
 
         self._density = None          #: Binary comoving number-density
         self._grid = None             #: Domain of population: total-mass, mass-ratio, and redshift
+        self._shape = None
         return
 
     @property
@@ -506,8 +500,9 @@ class Semi_Analytic_Model:
     def shape(self):
         """Shape of the parameter space domain (number of edges in each dimension), (3,) tuple
         """
-        shape = [len(ee) for ee in self.edges]
-        return tuple(shape)
+        if self._shape is None:
+            self._shape = tuple([len(ee) for ee in self.edges])
+        return self._shape
 
     def mass_stellar(self):
         """Calculate stellar masses for each MBH based on the M-MBulge relation.
