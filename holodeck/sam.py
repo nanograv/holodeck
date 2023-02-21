@@ -42,8 +42,11 @@ References
 """
 
 import abc
+from datetime import datetime
 
 import numpy as np
+import scipy as sp
+import scipy.interpolate  # noqa
 
 import kalepy as kale
 
@@ -117,10 +120,10 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
             mref0, mref0_log10, val_units=MSOL, name='mref0', only_one=True
         )
 
-        self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]  [1/Mpc^3]
-        self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]  [1/Mpc^3]
-        self._mref0 = mref0       # +11.24  +/- [-0.17, +0.20]  Msol
-        self._mrefz = mrefz       #  0.0                        Msol    # noqa
+        self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]  [log10(1/Mpc^3)]
+        self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]  [log10(1/Mpc^3)]
+        self._mref0 = mref0       # +11.24  +/- [-0.17, +0.20]  [log10(Msol)]
+        self._mrefz = mrefz       #  0.0                        [log10(Msol)]    # noqa
         self._alpha0 = alpha0     # -1.24   +/- [-0.16, +0.16]
         self._alphaz = alphaz     # -0.03   +/- [-0.14, +0.16]
         return
@@ -140,7 +143,8 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
         Returns
         -------
         rv : scalar or ndarray
-            Number-density of galaxies in units of [Mpc^-3]
+            Number-density of galaxies per log-interval of mass in units of [Mpc^-3]
+            i.e.  ``Phi = dn / d\\log_{10}(M)``
 
         """
         phi = self._phi_func(redz)
@@ -408,13 +412,6 @@ class Semi_Analytic_Model:
         gmt = utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
         mmbulge = utils._get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
 
-        # nl = 3
-        # nh = 30 - nl
-        # mix = 0.1
-        # lo = zmath.spacing([extr[0], mix], 'log', nl)
-        # hi = zmath.spacing([mix, extr[1]], 'lin', nh+1)[1:]
-        # redz = np.concatenate([lo, hi])
-
         # Process grid specifications
         param_names = ['mtot', 'mrat', 'redz']
         params = [mtot, mrat, redz]
@@ -483,8 +480,10 @@ class Semi_Analytic_Model:
         self._gmt = gmt               #: Galaxy Merger Time (`_Galaxy_Merger_Time` instance)
         self._mmbulge = mmbulge       #: Mbh-Mbulge relation (`relations._MMBulge_Relation` instance)
 
+        # These values are calculated as needed by the class when the corresponding methods are called
         self._density = None          #: Binary comoving number-density
         self._grid = None             #: Domain of population: total-mass, mass-ratio, and redshift
+        self._shape = None            #: Shape of the parameter-space domain (mtot, mrat, redz)
         return
 
     @property
@@ -505,16 +504,17 @@ class Semi_Analytic_Model:
     def shape(self):
         """Shape of the parameter space domain (number of edges in each dimension), (3,) tuple
         """
-        shape = [len(ee) for ee in self.edges]
-        return tuple(shape)
+        if self._shape is None:
+            self._shape = tuple([len(ee) for ee in self.edges])
+        return self._shape
 
     def mass_stellar(self):
         """Calculate stellar masses for each MBH based on the M-MBulge relation.
 
         Returns
         -------
-        masses : (N, 2) ndarray of scalar,
-            Galaxy total stellar masses for all MBH. [:, 0] is primary, [:, 1] is secondary [grams].
+        masses : (2, N) ndarray of scalar,
+            Galaxy total stellar masses for all MBH. [0, :] is primary, [1, :] is secondary [grams].
 
         """
         # total-mass, mass-ratio ==> (M1, M2)
@@ -562,9 +562,10 @@ class Semi_Analytic_Model:
             # GMT returns `-1.0` for values beyond age of universe
             zprime = self._gmt.zprime(mass_gmt, mstar_rat, redz)
             # find valid entries (M, Q, Z)
-            bads = (zprime < 0.0)
+            idx_stalled = (zprime < 0.0)
+            log.info(f"Stalled SAM bins based on GMT: {utils.frac_str(idx_stalled)}")
             if _DEBUG:
-                if np.all(bads):
+                if np.all(idx_stalled):
                     utils.print_stats(stack=False, print_func=log.error,
                                       mstar_tot=mstar_tot, mstar_rat=mstar_rat, redz=redz)
                     err = "No `zprime` values are greater than zero!"
@@ -630,8 +631,27 @@ class Semi_Analytic_Model:
                     log.error(f"      bads = {utils.stats(dens[bads])}")
                     raise ValueError(err_msg)
 
+            # Add scatter from the M-Mbulge relation
+            scatter = self._mmbulge._scatter_dex
+            log.debug(f"mmbulge scatter = {scatter}")
+            if scatter > 0.0:
+                log.info(f"Adding MMbulge scatter ({scatter:.4e})")
+                log.info(f"\tdens bef: ({utils.stats(dens)})")
+                dur = datetime.now()
+                mass_bef = self._integrated_binary_density(dens, sum=True)
+                # for ii, rz in enumerate(self.redz):
+                #     dens[:, :, ii] = add_scatter_to_masses(self.mtot, self.mrat, dens[:, :, ii], scatter)
+                dens = add_scatter_to_masses(self.mtot, self.mrat, dens, scatter)
+
+                mass_aft = self._integrated_binary_density(dens, sum=True)
+                dur = datetime.now() - dur
+                dm = (mass_aft - mass_bef) / mass_bef
+                log.info(f"Scatter added after {dur.total_seconds()} sec")
+                log.info(f"\tdens aft: ({utils.stats(dens)})")
+                log.info(f"\tmass: {mass_bef:.2e} ==> {mass_aft:.2e} || change = {dm:.4e}")
+
             # set values after redshift zero to have zero density
-            dens[bads] = 0.0
+            dens[idx_stalled] = 0.0
             self._density = dens
 
         return self._density
@@ -665,9 +685,10 @@ class Semi_Analytic_Model:
         dens = nd_gal * dlm_dlm / dqbh_dqgal
         return dens
 
-    def _integrated_binary_density(self, sum=True):
+    def _integrated_binary_density(self, ndens=None, sum=True):
         # d^3 n / [dlog10M dq dz]
-        ndens = self.static_binary_density
+        if ndens is None:
+            ndens = self.static_binary_density
         integ = utils.trapz(ndens, np.log10(self.mtot), axis=0, cumsum=False)
         integ = utils.trapz(integ, self.mrat, axis=1, cumsum=False)
         integ = utils.trapz(integ, self.redz, axis=2, cumsum=False)
@@ -968,9 +989,9 @@ class Semi_Analytic_Model:
         return gwb
 
 
-# =================================
-# ====    Evolution Methods    ====
-# =================================
+# ===========================================
+# ====    Evolution & Utility Methods    ====
+# ===========================================
 
 
 def sample_sam_with_hardening(
@@ -1144,4 +1165,196 @@ def evolve_eccen_uniform_single(sam, eccen_init, sepa_init, nsteps):
 
     return sepa, eccen
 
+
+def _add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, linear_interp_backup=False, logspace_interp=True):
+    """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
+
+    The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
+    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.
+          A 2nd-order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
+          In-between, a 1st-order interpolant is used if `linear_interp_backup` is True.
+    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2) to
+          account for scatter.
+    * (3) The new density distribution is interpolated back to the original (mtot, mrat) grid.
+
+    Parameters
+    ----------
+    mtot : (M,) ndarray
+        Total masses in grams.
+    mrat : (Q,) ndarray
+        Mass ratios.
+    dens : (M, Q) ndarray
+        Density of binaries over the given mtot and mrat domain.
+    scatter : float
+        Amount of scatter in the M-MBulge relationship, in dex (i.e. over log10 of masses).
+    refine : int,
+        The increased density of grid-points used in the intermediate (m1, m2) domain, in step (1).
+    linear_interp_backup : bool,
+        Whether a linear interpolant is used to fill-in bad values after the 2nd order interpolant.
+        This generally doesn't seem to fix any values.
+    logspace_interp : bool,
+        Whether interpolation should be performed in the log-space of masses.
+        NOTE: strongly recommended.
+
+    Returns
+    -------
+    m1m2_dens : (M, Q) ndarray,
+        Binary density with scatter introduced.
+
+    """
+    assert np.shape(dens) == (mtot.size, mrat.size)
+
+    dist = sp.stats.norm(loc=0.0, scale=scatter)
+
+    # Get the primary and secondary masses corresponding to these total-mass and mass-ratios
+    m1, m2 = utils.m1m2_from_mtmr(mtot[:, np.newaxis], mrat[np.newaxis, :])
+    m1m2_on_mtmr_grid = (m1.flatten(), m2.flatten())
+
+    # Construct a symmetric rectilinear grid in (m1, m2) space
+    grid_size = m1.shape[0] * refine
+    # make sure the extrema will fully span the required domain
+    mextr = utils.minmax([0.9*mtot[0]*mrat[0]/(1.0 + mrat[0]), mtot[-1]*(1.0 + mrat[0])/mrat[0]])
+    mgrid = np.logspace(*np.log10(mextr), grid_size)
+
+    # Interpolate in log-space [recommended]
+    scatter_mgrid = mgrid.copy()
+    if logspace_interp:
+        mgrid = np.log10(mgrid)
+        m1m2_on_mtmr_grid = tuple([np.log10(mm) for mm in m1m2_on_mtmr_grid])
+
+    m1m2_grid = np.meshgrid(mgrid, mgrid, indexing='ij')
+    # Interpolate from irregular m1m2 space (based on mtmr space), into regular m1m2 grid
+    m1m2_dens = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='cubic')
+    # Fill in problematic values with first-order interpolant
+    if linear_interp_backup:
+        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+        temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='linear')
+        log.debug(f"After 2nd order interpolation, {utils.frac_str(bads)} bad values")
+        m1m2_dens[bads] = temp[bads]
+
+    # Fill in problematic values with zeroth-order interpolant
+    bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+    log.debug(f"After interpolation, {utils.frac_str(bads)} bad values exist")
+    if np.any(bads):
+        temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='nearest')
+        m1m2_dens[bads] = temp[bads]
+        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+        log.debug(f"After 0th order interpolation, {utils.frac_str(bads)} bad values exist")
+        if np.any(bads):
+            err = f"After 0th order interpolation, {utils.frac_str(bads)} remain!"
+            log.exception(err)
+            raise ValueError(err)
+
+    # Introduce scatter along both the 0th (primary) and 1th (secondary) axes
+    m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=0)
+    m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=1)
+
+    # Interpolate result back to mtmr grid
+    interp = sp.interpolate.RegularGridInterpolator((mgrid, mgrid), m1m2_dens)
+    m1m2_dens = interp(m1m2_on_mtmr_grid, method='linear').reshape(m1.shape)
+    return m1m2_dens
+
+
+def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4):
+    """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
+
+    The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
+    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.
+          A 2nd-order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
+          In-between, a 1st-order interpolant is used if `linear_interp_backup` is True.
+    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2) to
+          account for scatter.
+    * (3) The new density distribution is interpolated back to the original (mtot, mrat) grid.
+
+    Parameters
+    ----------
+    mtot : (M,) ndarray
+        Total masses in grams.
+    mrat : (Q,) ndarray
+        Mass ratios.
+    dens : (M, Q) ndarray
+        Density of binaries over the given mtot and mrat domain.
+    scatter : float
+        Amount of scatter in the M-MBulge relationship, in dex (i.e. over log10 of masses).
+    refine : int,
+        The increased density of grid-points used in the intermediate (m1, m2) domain, in step (1).
+    linear_interp_backup : bool,
+        Whether a linear interpolant is used to fill-in bad values after the 2nd order interpolant.
+        This generally doesn't seem to fix any values.
+    logspace_interp : bool,
+        Whether interpolation should be performed in the log-space of masses.
+        NOTE: strongly recommended.
+
+    Returns
+    -------
+    m1m2_dens : (M, Q) ndarray,
+        Binary density with scatter introduced.
+
+    """
+    assert np.ndim(dens) == 3
+    assert np.shape(dens)[:2] == (mtot.size, mrat.size)
+    dist = sp.stats.norm(loc=0.0, scale=scatter)
+    output = np.zeros_like(dens)
+
+    # Get the primary and secondary masses corresponding to these total-mass and mass-ratios
+    m1, m2 = utils.m1m2_from_mtmr(mtot[:, np.newaxis], mrat[np.newaxis, :])
+    m1m2_on_mtmr_grid = (m1.flatten(), m2.flatten())
+
+    # Construct a symmetric rectilinear grid in (m1, m2) space
+    grid_size = m1.shape[0] * refine
+    # make sure the extrema will fully span the required domain
+    mextr = utils.minmax([0.9*mtot[0]*mrat[0]/(1.0 + mrat[0]), mtot[-1]*(1.0 + mrat[0])/mrat[0]])
+    _mgrid = np.logspace(*np.log10(mextr), grid_size)
+
+    # Interpolate in log-space [recommended]
+    mgrid_log10 = np.log10(_mgrid)
+    m1m2_on_mtmr_grid = tuple([np.log10(mm) for mm in m1m2_on_mtmr_grid])
+
+    m1m2_grid = np.meshgrid(mgrid_log10, mgrid_log10, indexing='ij')
+
+    # Interpolate from irregular m1m2 space (based on mtmr space), into regular m1m2 grid
+    numz = np.shape(dens)[2]
+    dlay = None
+    weights = utils._get_rolled_weights(mgrid_log10, dist)
+
+    for ii in range(numz):
+        dens_redz = dens[:, :, ii]
+        # m1m2_dens = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='cubic')
+        # points = m1m2_on_mtmr_grid
+        if dlay is None:
+            points = m1m2_on_mtmr_grid
+        else:
+            points = dlay
+        interp = sp.interpolate.CloughTocher2DInterpolator(points, dens_redz.flatten())
+        m1m2_dens = interp(tuple(m1m2_grid))
+        if dlay is None:
+            dlay = interp.tri
+
+        # Fill in problematic values with zeroth-order interpolant
+        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+        log.debug(f"After interpolation, {utils.frac_str(bads)} bad values exist")
+        if np.any(bads):
+            # temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='nearest')
+            interp = sp.interpolate.NearestNDInterpolator(points, dens_redz.flatten())
+            temp = interp(tuple(m1m2_grid))
+            m1m2_dens[bads] = temp[bads]
+            bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+            log.debug(f"After 0th order interpolation, {utils.frac_str(bads)} bad values exist")
+            if np.any(bads):
+                err = f"After 0th order interpolation, {utils.frac_str(bads)} remain!"
+                log.exception(err)
+                raise ValueError(err)
+
+        # Introduce scatter along both the 0th (primary) and 1th (secondary) axes
+        # m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=0)
+        # m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=1)
+        m1m2_dens = utils._scatter_with_weights(m1m2_dens, weights, axis=0)
+        m1m2_dens = utils._scatter_with_weights(m1m2_dens, weights, axis=1)
+
+        # Interpolate result back to mtmr grid
+        interp = sp.interpolate.RegularGridInterpolator((mgrid_log10, mgrid_log10), m1m2_dens)
+        m1m2_dens = interp(m1m2_on_mtmr_grid, method='linear').reshape(m1.shape)
+        output[:, :, ii] = m1m2_dens[...]
+
+    return output
 
