@@ -843,22 +843,20 @@ class Semi_Analytic_Model:
             log.warning("WARNING: _coalesced_ binaries are not being accounted for in `dynamic_binary_number`!")
 
         # ---- Check that binaries reach each frequency bin before redshift zero
-        if zero_stalled:
-            # (M,) rest-frame orbital-frequency of ISCO in [1/sec]
-            fisco = self.fisco
-            # duplicate for all Q and Z  i.e. (M,) ==> (M,Q,Z)
-            fisco = fisco[:, np.newaxis, np.newaxis] * np.zeros(self.shape)
-            # (M,Q,Z) ==> (M*Q*Z)
-            fisco = fisco.flatten()
-            # `frst_orb` is shaped (X, M*Q*Z)
-            coal = (frst_orb > fisco[np.newaxis, :])
-            log.info(f"fraction of coalesced binaries: {utils.frac_str(coal)}")
-            dnum[coal] = 0.0
-            self._coal = coal
-        else:
-            log.warning("WARNING: _stalled_ binaries are not being accounted for in `dynamic_binary_number`!")
-
-
+        # if zero_stalled:
+        #     # (M,) rest-frame orbital-frequency of ISCO in [1/sec]
+        #     fisco = self.fisco
+        #     # duplicate for all Q and Z  i.e. (M,) ==> (M,Q,Z)
+        #     fisco = fisco[:, np.newaxis, np.newaxis] * np.zeros(self.shape)
+        #     # (M,Q,Z) ==> (M*Q*Z)
+        #     fisco = fisco.flatten()
+        #     # `frst_orb` is shaped (X, M*Q*Z)
+        #     coal = (frst_orb > fisco[np.newaxis, :])
+        #     log.info(f"fraction of coalesced binaries: {utils.frac_str(coal)}")
+        #     dnum[coal] = 0.0
+        #     self._coal = coal
+        # else:
+        #     log.warning("WARNING: _stalled_ binaries are not being accounted for in `dynamic_binary_number`!")
 
         self._dynamic_binary_number = dnum
 

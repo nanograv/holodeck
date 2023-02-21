@@ -675,6 +675,7 @@ class Fixed_Time(_Hardening):
             raise ValueError(err)
 
         # ---- Calculate normalization parameter
+        self._sepa_init = sepa
         mtot, mrat, time, sepa = np.broadcast_arrays(mtot, mrat, time, sepa)
         if mtot.ndim != 1:
             err = f"Error in input shapes (`mtot.shape={np.shape(mtot)})"
