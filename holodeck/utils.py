@@ -27,7 +27,7 @@ import scipy.stats    # noqa
 import scipy.special  # noqa
 
 from holodeck import log, cosmo
-from holodeck.constants import NWTG, SCHW, SPLC, YR
+from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR
 
 # [Sesana2004]_ Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
@@ -35,6 +35,8 @@ _GW_DADT_SEP_CONST = - 64 * np.power(NWTG, 3) / 5 / np.power(SPLC, 5)
 _GW_DEDT_ECC_CONST = - 304 * np.power(NWTG, 3) / 15 / np.power(SPLC, 5)
 # [EN2007]_, Eq.2.2
 _GW_LUM_CONST = (32.0 / 5.0) * np.power(NWTG, 7.0/3.0) * np.power(SPLC, -5.0)
+
+_AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
 
 class _Modifier(abc.ABC):
@@ -1374,7 +1376,7 @@ def kepler_sepa_from_freq(mass, freq):
     return sepa
 
 
-def rad_isco(m1, m2, factor=3.0):
+def rad_isco(m1, m2=0.0, factor=3.0):
     """Inner-most Stable Circular Orbit, radius at which binaries 'merge'.
 
     ENH: allow single (total) mass argument.
@@ -1398,6 +1400,44 @@ def rad_isco(m1, m2, factor=3.0):
     """
     return factor * schwarzschild_radius(m1+m2)
 
+
+def redz_after(time, redz=None, age=None):
+    """Calculate the redshift after the given amount of time has passed.
+
+    Parameters
+    ----------
+    time : array_like in units of [sec]
+        Amount of time to pass.
+    redz : None or array_like,
+        Redshift of starting point after which `time` is added.
+    age : None or array_like, in units of [sec]
+        Age of the Universe at the starting point, after which `time` is added.
+
+    Returns
+    -------
+    new_redz : array_like
+        Redshift of the Universe after the given amount of time.
+
+    """
+    if (redz is None) == (age is None):
+        raise ValueError("One of `redz` and `age` must be provided (and not both)!")
+
+    if redz is not None:
+        age = cosmo.age(redz).to('s').value
+    new_age = age + time
+
+    if np.isscalar(new_age):
+        if new_age < _AGE_UNIVERSE_GYR * GYR:
+            new_redz = cosmo.tage_to_z(new_age)
+        else:
+            new_redz = -1.0
+
+    else:
+        new_redz = -1.0 * np.ones_like(new_age)
+        idx = (new_age < _AGE_UNIVERSE_GYR * GYR)
+        new_redz[idx] = cosmo.tage_to_z(new_age[idx])
+
+    return new_redz
 
 def schwarzschild_radius(mass):
     """Return the Schwarschild radius [cm] for the given mass [grams].
