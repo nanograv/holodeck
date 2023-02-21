@@ -306,6 +306,146 @@ def _get_subclass_instance(value, default, superclass):
 # =================================================================================================
 
 
+def roll_rows(arr, roll_num):
+    """Roll each row (axis=0) of the given array by an amount specified.
+
+    Parameters
+    ----------
+    arr : (R, D) ndarray
+        Input data to be rolled.
+    roll_num : (R,) ndarray of int
+        Amount to roll each row.  Must match the number of rows (axis=0) in `arr`.
+
+    Returns
+    -------
+    result : (R, D) ndarray
+        Rolled version of the input data.
+
+    Example
+    -------
+    >>> a = np.arange(12).reshape(3, 4); b = [1, -1, 2]; utils.roll_rows(a, b)
+    array([[ 3,  0,  1,  2],
+           [ 5,  6,  7,  4],
+           [10, 11,  8,  9]])
+
+    """
+    roll = np.asarray(roll_num)
+    assert np.ndim(arr) == 2 and np.ndim(roll) == 1
+    nrows, ncols = arr.shape
+    assert roll.size == nrows
+    arr_roll = arr[:, [*range(ncols), *range(ncols-1)]].copy()
+    strd_0, strd_1 = arr_roll.strides
+    result = np.lib.stride_tricks.as_strided(arr_roll, (nrows, ncols, ncols), (strd_0, strd_1, strd_1))
+    result = result[np.arange(nrows), (ncols - roll)%ncols]
+    return result
+
+
+def get_scatter_weights(uniform_cents, dist):
+    """Get the weights (fractional mass) that should be transferred to each bin to introduce the given scatter.
+
+    Parameters
+    ----------
+    uniform_cents : (N,) ndarray
+        Uniformly spaced bin-centers specifying distances in the parameter of interest (e.g. mass).
+    dist : `scipy.stats._distn_infrastructure.rv_continuous_frozen` instance
+        Object providing a CDF function `cdf(x)` determining the weights for each bin.
+        e.g. ``dist = sp.stats.norm(loc=0.0, scale=0.1)``
+
+    Returns
+    -------
+    dm : (2*N - 1,) ndarray
+        Array of weights for bins with the given distances.
+        [-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
+
+    """
+    num = uniform_cents.size
+    # Get log-spacing between edges, this must be constant to work in this way!
+    dx = np.diff(uniform_cents)
+    # assert np.allclose(dx, dx[0]), "This method only works if `uniform_cents` are uniformly spaced!"
+    if not np.allclose(dx, dx[0]):
+        log.error(f"{dx[0]=} {dx=}")
+        log.error(f"{uniform_cents=}")
+        err = f"`get_scatter_weights` only works if `uniform_cents` are uniformly spaced!"
+        log.exception(err)
+        raise ValueError(err)
+
+    dx = dx[0]
+    # The bin edges are at distance [dx/2, 1.5*dx, 2.5*dx, ...]
+    dx = dx/2.0 + np.arange(num) * dx
+    # Convert to both sides:  [..., -1.5*dx, -0.5dx, +0.5dx, +1.5dx, ...]
+    dx = np.concatenate([-dx[::-1], dx])
+    # Get the mass across each interval by differencing the CDF at each edge location
+    dm = np.diff(dist.cdf(dx))
+    return dm
+
+
+def _scatter_with_weights(dens, weights, axis=0):
+    # Perform the convolution
+    dens = np.moveaxis(dens, axis, 0)
+    dens_new = np.einsum("j...,jk...", dens, weights)
+    dens_new = np.moveaxis(dens_new, 0, axis)
+    dens = np.moveaxis(dens, 0, axis)
+    return dens_new
+
+
+def _get_rolled_weights(log_cents, dist):
+    num = log_cents.size
+    # Get the fractional weights that this bin should be redistributed to
+    # (2*N - 1,)  giving the bins all the way to the left and the right
+    # e.g. [-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
+    weights = get_scatter_weights(log_cents, dist)
+
+    # Duplicate the weights into each row of an (N, N) matrix
+    # e.g. [[-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
+    #       [-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
+    #       [-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
+    #        ...
+    weights = weights[np.newaxis, :] * np.ones((num, weights.size))
+    # Need to "roll" each row of the matrix such that the central bin is at number index=row
+    #    rolls backward by default,
+    roll = 1 - num + np.arange(num)
+    # Roll each row
+    # e.g. [[ 0, +1, +2, ..., +N-2, +N-1, -N+1, -N+2, ..., -2, -1]
+    #       [-1,  0, +1, +2, ..., +N-2, +N-1, -N+1, -N+2, ..., -2]
+    #       [-2, -1,  0, +1, +2, ..., +N-2, +N-1, -N+1, -N+2, ..., -3]
+    #        ...
+    weights = roll_rows(weights, roll)
+    # Cutoff each row after N elements
+    weights = weights[:, :num]
+    return weights
+
+
+def scatter_redistribute(cents, dist, dens, axis=0):
+    """Redistribute `dens` across the target axis to account for scatter/variance.
+
+    Parameters
+    ----------
+    cents : (N,) ndarray
+        Locations of bin centers in the parameter of interest.
+    dist : `scipy.stats._distn_infrastructure.rv_continuous_frozen` instance
+        Object providing a CDF function `cdf(x)` determining the weights for each bin.
+        e.g. ``dist = sp.stats.norm(loc=0.0, scale=0.1)``
+    dens : ndarray
+        Input values to be redistributed.  Must match the size of `cents` along axis `axis`.
+
+    Returns
+    -------
+    dens_new : ndarray
+        Array with resitributed values.  Same shape as input `dens`.
+
+    """
+    log_cents = np.log10(cents)
+    num = log_cents.size
+    if np.shape(dens)[axis] != num:
+        err = f"The size of `dens` ({np.shape(dens)}) along `axis` ({axis}) must match `cents` ({num})!!"
+        log.exception(err)
+        raise ValueError(err)
+
+    weights = _get_rolled_weights(log_cents, dist)
+    dens_new = _scatter_with_weights(dens, weights, axis=0)
+    return dens_new
+
+
 def eccen_func(cent: float, width: float, size: int) -> np.ndarray:
     """Draw random values between [0.0, 1.0] with a given center and width.
 
@@ -484,6 +624,17 @@ def log_normal_base_10(
     return dist
 
 
+def midpoints(vals, axis=-1, log=False):
+    mm = np.moveaxis(vals, axis, 0)
+    if log:
+        mm = np.log10(mm)
+    mm = 0.5 * (mm[1:] + mm[:-1])
+    if log:
+        mm = 10.0 ** mm
+    mm = np.moveaxis(mm, 0, axis)
+    return mm
+
+
 def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
     """Find the minimum and maximum values in the given array.
 
@@ -507,27 +658,6 @@ def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
         vv = vals
     extr = np.array([np.min(vv), np.max(vv)])
     return extr
-
-
-def print_stats(stack=True, print_func=print, **kwargs):
-    """Print out basic properties and statistics on the input key-value array_like values.
-
-    Parameters
-    ----------
-    stack : bool,
-        Whether or not to print a backtrace to stdout.
-    print_func : callable,
-        Function to use for returning/printing output.
-    kwargs : dict,
-        Key-value pairs where values are array_like for the shape/stats to be printed.
-
-    """
-    if stack:
-        import traceback
-        traceback.print_stack()
-    for kk, vv in kwargs.items():
-        print_func(f"{kk} = shape: {np.shape(vv)}, stats: {stats(vv)}")
-    return
 
 
 def nyquist_freqs(
@@ -596,7 +726,7 @@ def nyquist_freqs_edges(
     df = fmin    # bin width
     freqs = np.arange(fmin, fmax + df/10.0, df)   # centers
     freqs_edges = freqs - df/2.0    # shift to edges
-    freqs_edges = np.concatenate([freqs_edges, [fmax + df]])
+    freqs_edges = np.concatenate([freqs_edges, [fmax + df/2.0]])
 
     if trim is not None:
         if np.shape(trim) != (2,):
@@ -607,6 +737,27 @@ def nyquist_freqs_edges(
             freqs_edges = freqs_edges[freqs_edges < trim[1]]
 
     return freqs_edges
+
+
+def print_stats(stack=True, print_func=print, **kwargs):
+    """Print out basic properties and statistics on the input key-value array_like values.
+
+    Parameters
+    ----------
+    stack : bool,
+        Whether or not to print a backtrace to stdout.
+    print_func : callable,
+        Function to use for returning/printing output.
+    kwargs : dict,
+        Key-value pairs where values are array_like for the shape/stats to be printed.
+
+    """
+    if stack:
+        import traceback
+        traceback.print_stack()
+    for kk, vv in kwargs.items():
+        print_func(f"{kk} = shape: {np.shape(vv)}, stats: {stats(vv)}")
+    return
 
 
 def quantile_filtered(values, percs, axis, func=np.isfinite):
