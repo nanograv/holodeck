@@ -13,6 +13,9 @@ import kalepy as kale
 from holodeck import cosmo, utils, observations, log
 from holodeck.constants import MSOL, PC, YR
 
+LABEL_GW_FREQUENCY_YR = "GW Frequency $[\mathrm{yr}^{-1}]$"
+LABEL_CHARACTERISTIC_STRAIN = "GW Characteristic Strain"
+
 
 class MidpointNormalize(mpl.colors.Normalize):
     """
@@ -56,7 +59,7 @@ class MidpointLogNormalize(mpl.colors.LogNorm):
         return vals
 
 
-def figax(figsize=[10, 4], ncols=1, nrows=1, sharex=False, sharey=False, squeeze=True,
+def figax(figsize=[7, 5], ncols=1, nrows=1, sharex=False, sharey=False, squeeze=True,
           scale=None, xscale='log', xlabel='', xlim=None, yscale='log', ylabel='', ylim=None,
           left=None, bottom=None, right=None, top=None, hspace=None, wspace=None,
           widths=None, heights=None, grid=True, **kwargs):
@@ -517,7 +520,7 @@ def _draw_pop_masses(ax, pop, color='r', nplot=3e3):
     return handles, names
 
 
-def _twin_hz(ax, nano=True, fs=12, **kw):
+def _twin_hz(ax, nano=True, fs=8, **kw):
     tw = ax.twiny()
     xlim = np.array(ax.get_xlim()) / YR
     if nano:
@@ -526,7 +529,7 @@ def _twin_hz(ax, nano=True, fs=12, **kw):
     else:
         label = "Hz"
 
-    label = fr"frequency $[\mathrm{{{label}}}]$"
+    label = fr"GW Frequency $[\mathrm{{{label}}}]$"
     tw.set(xlim=xlim, xscale='log')
     tw.set_xlabel(label, fontsize=fs, **kw)
     return
