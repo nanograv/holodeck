@@ -639,8 +639,9 @@ class Semi_Analytic_Model:
                 log.info(f"\tdens bef: ({utils.stats(dens)})")
                 dur = datetime.now()
                 mass_bef = self._integrated_binary_density(dens, sum=True)
-                for ii, rz in enumerate(self.redz):
-                    dens[:, :, ii] = add_scatter_to_masses(self.mtot, self.mrat, dens[:, :, ii], scatter)
+                # for ii, rz in enumerate(self.redz):
+                #     dens[:, :, ii] = add_scatter_to_masses(self.mtot, self.mrat, dens[:, :, ii], scatter)
+                dens = add_scatter_to_masses(self.mtot, self.mrat, dens, scatter)
 
                 mass_aft = self._integrated_binary_density(dens, sum=True)
                 dur = datetime.now() - dur
@@ -1165,7 +1166,7 @@ def evolve_eccen_uniform_single(sam, eccen_init, sepa_init, nsteps):
     return sepa, eccen
 
 
-def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, linear_interp_backup=False, logspace_interp=True):
+def _add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, linear_interp_backup=False, logspace_interp=True):
     """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
 
     The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
@@ -1252,4 +1253,108 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, linear_interp_bac
     interp = sp.interpolate.RegularGridInterpolator((mgrid, mgrid), m1m2_dens)
     m1m2_dens = interp(m1m2_on_mtmr_grid, method='linear').reshape(m1.shape)
     return m1m2_dens
+
+
+def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4):
+    """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
+
+    The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
+    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.
+          A 2nd-order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
+          In-between, a 1st-order interpolant is used if `linear_interp_backup` is True.
+    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2) to
+          account for scatter.
+    * (3) The new density distribution is interpolated back to the original (mtot, mrat) grid.
+
+    Parameters
+    ----------
+    mtot : (M,) ndarray
+        Total masses in grams.
+    mrat : (Q,) ndarray
+        Mass ratios.
+    dens : (M, Q) ndarray
+        Density of binaries over the given mtot and mrat domain.
+    scatter : float
+        Amount of scatter in the M-MBulge relationship, in dex (i.e. over log10 of masses).
+    refine : int,
+        The increased density of grid-points used in the intermediate (m1, m2) domain, in step (1).
+    linear_interp_backup : bool,
+        Whether a linear interpolant is used to fill-in bad values after the 2nd order interpolant.
+        This generally doesn't seem to fix any values.
+    logspace_interp : bool,
+        Whether interpolation should be performed in the log-space of masses.
+        NOTE: strongly recommended.
+
+    Returns
+    -------
+    m1m2_dens : (M, Q) ndarray,
+        Binary density with scatter introduced.
+
+    """
+    assert np.ndim(dens) == 3
+    assert np.shape(dens)[:2] == (mtot.size, mrat.size)
+    dist = sp.stats.norm(loc=0.0, scale=scatter)
+    output = np.zeros_like(dens)
+
+    # Get the primary and secondary masses corresponding to these total-mass and mass-ratios
+    m1, m2 = utils.m1m2_from_mtmr(mtot[:, np.newaxis], mrat[np.newaxis, :])
+    m1m2_on_mtmr_grid = (m1.flatten(), m2.flatten())
+
+    # Construct a symmetric rectilinear grid in (m1, m2) space
+    grid_size = m1.shape[0] * refine
+    # make sure the extrema will fully span the required domain
+    mextr = utils.minmax([0.9*mtot[0]*mrat[0]/(1.0 + mrat[0]), mtot[-1]*(1.0 + mrat[0])/mrat[0]])
+    _mgrid = np.logspace(*np.log10(mextr), grid_size)
+
+    # Interpolate in log-space [recommended]
+    mgrid_log10 = np.log10(_mgrid)
+    m1m2_on_mtmr_grid = tuple([np.log10(mm) for mm in m1m2_on_mtmr_grid])
+
+    m1m2_grid = np.meshgrid(mgrid_log10, mgrid_log10, indexing='ij')
+
+    # Interpolate from irregular m1m2 space (based on mtmr space), into regular m1m2 grid
+    numz = np.shape(dens)[2]
+    dlay = None
+    weights = utils._get_rolled_weights(mgrid_log10, dist)
+
+    for ii in range(numz):
+        dens_redz = dens[:, :, ii]
+        # m1m2_dens = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='cubic')
+        # points = m1m2_on_mtmr_grid
+        if dlay is None:
+            points = m1m2_on_mtmr_grid
+        else:
+            points = dlay
+        interp = sp.interpolate.CloughTocher2DInterpolator(points, dens_redz.flatten())
+        m1m2_dens = interp(tuple(m1m2_grid))
+        if dlay is None:
+            dlay = interp.tri
+
+        # Fill in problematic values with zeroth-order interpolant
+        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+        log.debug(f"After interpolation, {utils.frac_str(bads)} bad values exist")
+        if np.any(bads):
+            # temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='nearest')
+            interp = sp.interpolate.NearestNDInterpolator(points, dens_redz.flatten())
+            temp = interp(tuple(m1m2_grid))
+            m1m2_dens[bads] = temp[bads]
+            bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+            log.debug(f"After 0th order interpolation, {utils.frac_str(bads)} bad values exist")
+            if np.any(bads):
+                err = f"After 0th order interpolation, {utils.frac_str(bads)} remain!"
+                log.exception(err)
+                raise ValueError(err)
+
+        # Introduce scatter along both the 0th (primary) and 1th (secondary) axes
+        # m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=0)
+        # m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=1)
+        m1m2_dens = utils._scatter_with_weights(m1m2_dens, weights, axis=0)
+        m1m2_dens = utils._scatter_with_weights(m1m2_dens, weights, axis=1)
+
+        # Interpolate result back to mtmr grid
+        interp = sp.interpolate.RegularGridInterpolator((mgrid_log10, mgrid_log10), m1m2_dens)
+        m1m2_dens = interp(m1m2_on_mtmr_grid, method='linear').reshape(m1.shape)
+        output[:, :, ii] = m1m2_dens[...]
+
+    return output
 

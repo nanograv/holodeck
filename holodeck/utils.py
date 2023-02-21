@@ -379,6 +379,42 @@ def get_scatter_weights(uniform_cents, dist):
     return dm
 
 
+def _scatter_with_weights(dens, weights, axis=0):
+    # Perform the convolution
+    dens = np.moveaxis(dens, axis, 0)
+    dens_new = np.einsum("j...,jk...", dens, weights)
+    dens_new = np.moveaxis(dens_new, 0, axis)
+    dens = np.moveaxis(dens, 0, axis)
+    return dens_new
+
+
+def _get_rolled_weights(log_cents, dist):
+    num = log_cents.size
+    # Get the fractional weights that this bin should be redistributed to
+    # (2*N - 1,)  giving the bins all the way to the left and the right
+    # e.g. [-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
+    weights = get_scatter_weights(log_cents, dist)
+
+    # Duplicate the weights into each row of an (N, N) matrix
+    # e.g. [[-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
+    #       [-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
+    #       [-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
+    #        ...
+    weights = weights[np.newaxis, :] * np.ones((num, weights.size))
+    # Need to "roll" each row of the matrix such that the central bin is at number index=row
+    #    rolls backward by default,
+    roll = 1 - num + np.arange(num)
+    # Roll each row
+    # e.g. [[ 0, +1, +2, ..., +N-2, +N-1, -N+1, -N+2, ..., -2, -1]
+    #       [-1,  0, +1, +2, ..., +N-2, +N-1, -N+1, -N+2, ..., -2]
+    #       [-2, -1,  0, +1, +2, ..., +N-2, +N-1, -N+1, -N+2, ..., -3]
+    #        ...
+    weights = roll_rows(weights, roll)
+    # Cutoff each row after N elements
+    weights = weights[:, :num]
+    return weights
+
+
 def scatter_redistribute(cents, dist, dens, axis=0):
     """Redistribute `dens` across the target axis to account for scatter/variance.
 
@@ -405,34 +441,8 @@ def scatter_redistribute(cents, dist, dens, axis=0):
         log.exception(err)
         raise ValueError(err)
 
-    # Get the fractional weights that this bin should be redistributed to
-    # (2*N - 1,)  giving the bins all the way to the left and the right
-    # e.g. [-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
-    weights = get_scatter_weights(log_cents, dist)
-
-    # Duplicate the weights into each row of an (N, N) matrix
-    # e.g. [[-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
-    #       [-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
-    #       [-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
-    #        ...
-    weights = weights[np.newaxis, :] * np.ones((num, weights.size))
-    # Need to "roll" each row of the matrix such that the central bin is at number index=row
-    #    rolls backward by default,
-    roll = 1 - num + np.arange(num)
-    # Roll each row
-    # e.g. [[ 0, +1, +2, ..., +N-2, +N-1, -N+1, -N+2, ..., -2, -1]
-    #       [-1,  0, +1, +2, ..., +N-2, +N-1, -N+1, -N+2, ..., -2]
-    #       [-2, -1,  0, +1, +2, ..., +N-2, +N-1, -N+1, -N+2, ..., -3]
-    #        ...
-    weights = roll_rows(weights, roll)
-    # Cutoff each row after N elements
-    weights = weights[:, :num]
-
-    # Perform the convolution
-    dens = np.moveaxis(dens, axis, 0)
-    dens_new = np.einsum("j...,jk...", dens, weights)
-    dens_new = np.moveaxis(dens_new, 0, axis)
-    dens = np.moveaxis(dens, 0, axis)
+    weights = _get_rolled_weights(log_cents, dist)
+    dens_new = _scatter_with_weights(dens, weights, axis=0)
     return dens_new
 
 
