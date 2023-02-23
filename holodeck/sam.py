@@ -52,20 +52,22 @@ import kalepy as kale
 
 import holodeck as holo
 from holodeck import cosmo, utils, log
-from holodeck.constants import GYR, SPLC, MSOL, MPC
+from holodeck.constants import GYR, SPLC, MSOL, MPC, YR, PC
 from holodeck import relations, gravwaves
 
 _DEBUG = False
 _DEBUG_LVL = log.DEBUG
 # _DEBUG_LVL = log.WARNING
 
-_AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
+# _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
 REDZ_SAMPLE_VOLUME = True    #: get redshifts by sampling uniformly in 3D spatial volume, and converting
 
 GSMF_USES_MTOT = False       #: the mass used in the GSMF is interpretted as M=m1+m2, otherwise use primary m1
 GPF_USES_MTOT = False        #: the mass used in the GPF  is interpretted as M=m1+m2, otherwise use primary m1
 GMT_USES_MTOT = False        #: the mass used in the GMT  is interpretted as M=m1+m2, otherwise use primary m1
+
+ZERO_GMT_STALLED_SYSTEMS = False
 
 
 # ==============================
@@ -303,21 +305,9 @@ class _Galaxy_Merger_Time(abc.ABC):
         """Return the redshift after merger (i.e. input `redz` delayed by merger time).
         """
         tau0 = self(mass, mrat, redz, **kwargs)  # sec
-        age = cosmo.age(redz).to('s').value
-        new_age = age + tau0
-
-        if np.isscalar(new_age):
-            if new_age < _AGE_UNIVERSE_GYR * GYR:
-                redz_prime = cosmo.tage_to_z(new_age)
-            else:
-                redz_prime = -1
-
-        else:
-            redz_prime = -1.0 * np.ones_like(new_age)
-            idx = (new_age < _AGE_UNIVERSE_GYR * GYR)
-            redz_prime[idx] = cosmo.tage_to_z(new_age[idx])
-
-        return redz_prime
+        # Find the redshift of  t(z) + tau
+        redz_prime = utils.redz_after(tau0, redz=redz)
+        return redz_prime, tau0
 
 
 class GMT_Power_Law(_Galaxy_Merger_Time):
@@ -484,6 +474,16 @@ class Semi_Analytic_Model:
         self._density = None          #: Binary comoving number-density
         self._grid = None             #: Domain of population: total-mass, mass-ratio, and redshift
         self._shape = None            #: Shape of the parameter-space domain (mtot, mrat, redz)
+        self._fisco = None            #: Orbital rest-frame frequency of each bin's ISCO
+        self._gmt_time = None         #: GMT timescale of galaxy mergers [sec]
+        self._redz_prime = None       #: redshift following galaxy merger process
+
+        # These values change each time a certain function is called, but are cached after each call
+        self._dynamic_binary_number = None
+        self._gwb = None
+        self._coal = None
+        self._stall = None
+
         return
 
     @property
@@ -560,7 +560,10 @@ class Semi_Analytic_Model:
             mass_gmt = mstar_tot if GMT_USES_MTOT else mstar_pri
 
             # GMT returns `-1.0` for values beyond age of universe
-            zprime = self._gmt.zprime(mass_gmt, mstar_rat, redz)
+            zprime, gmt_time = self._gmt.zprime(mass_gmt, mstar_rat, redz)
+            self._gmt_time = gmt_time
+            self._redz_prime = zprime
+
             # find valid entries (M, Q, Z)
             idx_stalled = (zprime < 0.0)
             log.info(f"Stalled SAM bins based on GMT: {utils.frac_str(idx_stalled)}")
@@ -580,7 +583,8 @@ class Semi_Analytic_Model:
             # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]
             dens = self._gsmf(mass_gsmf, redz) * self._gpf(mass_gpf, mstar_rat, redz) * cosmo.dtdz(redz)
             # `gmt` returns [sec]
-            dens /= self._gmt(mass_gmt, mstar_rat, redz)
+            # dens /= self._gmt(mass_gmt, mstar_rat, redz)
+            dens /= gmt_time
             # now `dens` is  ``dn_gal / [dlog10(Mstar) dq_gal dz]``  with units of [Mpc^-3]
 
             if _DEBUG:
@@ -651,7 +655,11 @@ class Semi_Analytic_Model:
                 log.info(f"\tmass: {mass_bef:.2e} ==> {mass_aft:.2e} || change = {dm:.4e}")
 
             # set values after redshift zero to have zero density
-            dens[idx_stalled] = 0.0
+            if ZERO_GMT_STALLED_SYSTEMS:
+                dens[idx_stalled] = 0.0
+            else:
+                log.warning("NOT zeroing out systems with GMTs extending past redshift zero!")
+
             self._density = dens
 
         return self._density
@@ -696,7 +704,16 @@ class Semi_Analytic_Model:
             integ = integ.sum()
         return integ
 
-    def dynamic_binary_number(self, hard, fobs_orb=None, sepa=None, limit_merger_time=None):
+    @property
+    def fisco(self):
+        if self._fisco is None:
+            temp = utils.rad_isco(self.mtot)
+            temp = utils.kepler_freq_from_sepa(self.mtot, temp)
+            self._fisco = temp
+
+        return self._fisco
+
+    def dynamic_binary_number(self, hard, fobs_orb=None, sepa=None, zero_coalesced=True, zero_stalled=True):
         """Calculate the differential number of binaries (per bin-volume, per log-freq interval).
 
         #! BUG: `limit_merger_time` should compare merger time to the redshift of each bin !#
@@ -717,8 +734,12 @@ class Semi_Analytic_Model:
         sepa : ArrayLike
             Rest-frame binary separation in [cm].
             NOTE: either `fobs_orb` or `sepa` must be provided (and not both).
-        limit_merger_time : None or scalar,
-            Maximum allowed merger time in [sec].  If `None`, no maximum is imposed.
+        zero_coalesced : bool
+            Whether binaries should be checked for coalescence.
+            If `True`, they will not contribute to frequency bins above their ISCO frequency.
+        zero_stalled : bool
+            Whether binaries should be checked for stalling before z=0.
+            If `True`, they will not contribute to frequency bins that they reach after z=0.
 
         Returns
         -------
@@ -802,31 +823,6 @@ class Semi_Analytic_Model:
             # recall: dadt is negative (decreasing separation), units of [cm/sec]
             tau = - sa / dadt
 
-        # ---------------------
-        if (limit_merger_time is True):
-            log.debug("limiting tau to < galaxy merger time")
-            mstar = self.mass_stellar()[:, :, :, np.newaxis]
-            ms_rat = mstar[1] / mstar[0]
-            mstar = mstar.sum(axis=0)   # total mass [grams]
-            gmt = self._gmt(mstar, ms_rat, self.redz[np.newaxis, np.newaxis, :])  # [sec]
-            bads = (tau > gmt[..., np.newaxis])
-            tau[bads] = 0.0
-            log.debug(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
-
-        elif (limit_merger_time in [None, False]):
-            pass
-
-        elif utils.isnumeric(limit_merger_time):
-            log.debug(f"limiting tau to < {limit_merger_time/GYR:.2f} Gyr")
-            bads = (tau > limit_merger_time)
-            tau[bads] = 0.0
-            log.debug(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
-
-        else:
-            err = f"`limit_merger_time` ({type(limit_merger_time)}) must be boolean or scalar!"
-            log.exception(err)
-            raise ValueError(err)
-
         # convert `tau` to the correct shape, note that moveaxis MUST happen _before_ reshape!
         # (X, M*Q*Z) ==> (M*Q*Z, X)
         tau = np.moveaxis(tau, 0, -1)
@@ -843,9 +839,80 @@ class Semi_Analytic_Model:
             log.warning(f"Found {utils.frac_str(bads)} invalid hardening timescales.  Setting to zero densities.")
             dnum[bads] = 0.0
 
+        # ---- Check when binaries reach their ISCO (and zero out density at higher frequencies)
+        if zero_coalesced:
+            # (M,) rest-frame orbital-frequency of ISCO in [1/sec]
+            fisco = self.fisco
+            # duplicate for all Q and Z  i.e. (M,) ==> (M,Q,Z)
+            fisco = fisco[:, np.newaxis, np.newaxis] * np.ones(self.shape)
+            # (M,Q,Z) ==> (M*Q*Z)
+            fisco = fisco.flatten()
+            # `frst_orb` is shaped (X, M*Q*Z)
+            coal = (frst_orb > fisco[np.newaxis, :])
+            # reshape to match `dnum`  (X, M*Q*Z) ==> (M*Q*Z, X) ==> (M, Q, Z, X)
+            coal = coal.T.reshape(dnum.shape)
+            log.info(f"fraction of coalesced binaries: {utils.frac_str(coal)}")
+            dnum[coal] = 0.0
+            self._coal = coal
+        else:
+            log.warning("WARNING: _coalesced_ binaries are not being accounted for in `dynamic_binary_number`!")
+
+        # ---- Check that binaries reach each frequency bin before redshift zero
+        if zero_stalled:
+            # Calculate the time it takes binaries to evolve along a series of steps in separation
+            # number of steps in the integration, refer to this as X below
+            STEPS = 22
+            # () start from the hardening model's initial separation
+            rmax = hard._sepa_init
+            # (M,) end at the ISCO
+            rmin = utils.rad_isco(self.mtot)
+            # Choose steps for each binary, log-spaced between rmin and rmax
+            extr = np.log10([rmax * np.ones_like(rmin), rmin])
+            rads = np.linspace(0.0, 1.0, STEPS)[np.newaxis, :]
+            # (M, X)
+            rads = extr[0][:, np.newaxis] + (extr[1] - extr[0])[:, np.newaxis] * rads
+            rads = 10.0 ** rads
+            # (M, Q, Z, X)
+            mt, mr, rz, rads = np.broadcast_arrays(
+                self.mtot[:, np.newaxis, np.newaxis, np.newaxis],
+                self.mrat[np.newaxis, :, np.newaxis, np.newaxis],
+                self.redz[np.newaxis, np.newaxis, :, np.newaxis],
+                rads[:, np.newaxis, np.newaxis, :]
+            )
+            # (X, M*Q*Z)
+            mt, mr, rz, rads = [mm.reshape(-1, STEPS).T for mm in [mt, mr, rz, rads]]
+            # (X, M*Q*Z) --- `Fixed_Time.dadt` will only accept this shape
+            dadt = hard.dadt(mt, mr, rads)
+            # Integrate (inverse) hardening rates to calculate total lifetime to each separation
+            times_evo = -utils.trapz_loglog(-1.0 / dadt, rads, axis=0, cumsum=True)
+
+            # (X, M*Q*Z)   convert from separations to rest-frame orbital frequencies
+            frst_orb_evo = utils.kepler_freq_from_sepa(mt, rads)
+            # interpolate to target frequencies
+            # `frst_orb` is shaped (X, M*Q*Z)  `ndinterp` interpolates over 1th dimension
+            times = utils.ndinterp(frst_orb.T, frst_orb_evo[1:, :].T, times_evo.T, xlog=True, ylog=True).T
+
+            # Combine the binary-evolution time, with the galaxy-merger time
+            # (X, M*Q*Z)
+            time_tot = times + self._gmt_time.reshape(-1)[np.newaxis, :]
+            # Find the redshift when each binary reaches these frequencies, -1 for after z=0
+            redz_tot = utils.redz_after(time_tot, redz=rz[0, np.newaxis, :])
+            # Find systems not reaching these frequencies before redshift zero
+            stall = (redz_tot < 0.0)
+            # reshape to match `dnum`  (X, M*Q*Z) ==> (M*Q*Z, X) ==> (M, Q, Z, X)
+            stall = stall.T.reshape(dnum.shape)
+            log.info(f"fraction of stalled binaries: {utils.frac_str(stall)}")
+            dnum[stall] = 0.0
+            self._stall = stall
+
+        else:
+            log.warning("WARNING: _stalled_ binaries are not being accounted for in `dynamic_binary_number`!")
+
+        self._dynamic_binary_number = dnum
+
         return edges, dnum
 
-    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=False):
+    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=False, **kw_dynamic_binary_number):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
         Parameters
@@ -859,6 +926,8 @@ class Semi_Analytic_Model:
         realize : bool or int,
             Whether to construct a Poisson 'realization' (discretization) of the SAM distribution.
             Realizations approximate the finite-source effects of a realistic population.
+        **kw_dynamic_binary_number : keyword-value pairs,
+            Additional arguments passed along to `Semi_Analytic_Model.dynamic_binary_number()`.
 
         Returns
         -------
@@ -885,8 +954,7 @@ class Semi_Analytic_Model:
         # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
         #! NOTE: using frequency-bin _centers_ produces more accurate results than frequency-bin _edges_ !#
-        edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents)
-        # edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb_edges)
+        edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents, **kw_dynamic_binary_number)
         edges[-1] = fobs_orb_edges
         log.debug(f"dnum: {utils.stats(dnum)}")
 
@@ -895,27 +963,11 @@ class Semi_Analytic_Model:
             log.exception(err)
             raise ValueError(err)
 
-        if _DEBUG and np.any(np.isnan(dnum)):
-            err = "Found nan `dnum` values!"
-            log.exception(err)
-            raise ValueError(err)
-
-        if np.any(np.isnan(dnum)):
-            err = f"Found nan `dnum` values!"
-            log.exception(err)
-            raise ValueError(err)
-
-        if np.any(np.isnan(dnum)):
-            err = f"Found nan `dnum` values!"
-            log.exception(err)
-            raise ValueError(err)
-
         # "integrate" within each bin (i.e. multiply by bin volume)
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
         #       after poisson calculation, need to convert back to dN/dlogf
         #       to get proper characteristic strain measurement
         #! doing  ``dn/dlnf * Delta(ln[f])``  seems to be more accurate than trapz over log(freq) !#
-        # number = utils._integrate_grid_differential_number(edges, dnum, freq=True)
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
         number = number * np.diff(np.log(fobs_gw_edges))
         log.debug(f"number: {utils.stats(number)}")
@@ -927,28 +979,12 @@ class Semi_Analytic_Model:
             log.exception(err)
             raise ValueError(err)
 
-        if _DEBUG and np.any(np.isnan(number)):
-            print(f"{np.any(np.isnan(dnum))=}")
-            err = "Found nan `number` values!"
-            log.exception(err)
-            raise ValueError(err)
-
-        if np.any(np.isnan(number)):
-            print(f"{np.any(np.isnan(dnum))=}")
-            err = f"Found nan `number` values!"
-            log.exception(err)
-            raise ValueError(err)
-
-        if np.any(np.isnan(number)):
-            print(f"{np.any(np.isnan(dnum))=}")
-            err = f"Found nan `number` values!"
-            log.exception(err)
-            raise ValueError(err)
-
         # ---- Get the GWB spectrum from number of binaries over grid
         hc = gravwaves._gws_from_number_grid_integrated(edges, number, realize)
         if squeeze:
             hc = hc.squeeze()
+
+        self._gwb = hc
 
         return hc
 

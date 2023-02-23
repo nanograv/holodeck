@@ -27,7 +27,7 @@ import scipy.stats    # noqa
 import scipy.special  # noqa
 
 from holodeck import log, cosmo
-from holodeck.constants import NWTG, SCHW, SPLC, YR
+from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR
 
 # [Sesana2004]_ Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
@@ -35,6 +35,8 @@ _GW_DADT_SEP_CONST = - 64 * np.power(NWTG, 3) / 5 / np.power(SPLC, 5)
 _GW_DEDT_ECC_CONST = - 304 * np.power(NWTG, 3) / 15 / np.power(SPLC, 5)
 # [EN2007]_, Eq.2.2
 _GW_LUM_CONST = (32.0 / 5.0) * np.power(NWTG, 7.0/3.0) * np.power(SPLC, -5.0)
+
+_AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
 
 class _Modifier(abc.ABC):
@@ -658,6 +660,92 @@ def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
         vv = vals
     extr = np.array([np.min(vv), np.max(vv)])
     return extr
+
+
+def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
+    """Interpolate 2D data to an array of points.
+
+    `xvals` and `yvals` are (N, M) where the interpolation is done along the 1th (`M`)
+    axis (i.e. interpolation is done independently for each `N` row.  Should be generalizeable to
+    higher dim.
+
+    Parameters
+    ----------
+    xx : (T,) or (N, T) ndarray
+        Target x-values to interpolate to.
+    xvals : (N, M) ndarray
+        Evaluation points (x-values) of the functions to be interpolated.
+        Interpolation is performed over the 1th (last) axis.
+    yvals : (N, M) ndarray
+        Function values (y-values) of the function to be interpolated.
+        Interpolation is performed over the 1th (last) axis.
+
+    Returns
+    -------
+    ynew : (N, T) ndarray
+        Interpolated function values, for each of N functions and T evaluation points.
+
+    """
+    # assert np.ndim(xx) == 1
+    assert np.ndim(xvals) == 2
+    assert np.shape(xvals) == np.shape(yvals)
+
+    xx = np.asarray(xx)
+
+    if xlog:
+        xx = np.log10(xx)
+        xvals = np.log10(xvals)
+
+    if ylog:
+        yvals = np.log10(yvals)
+
+    # --- Convert `xx` to be broadcastable with (N, T)
+    # `xx` is shaped as (T,)  ==> (1, T)
+    if np.ndim(xx) == 1:
+        xx = xx[np.newaxis, :]
+    # `xx` is shaped as (N, T)
+    elif np.ndim(xx) == 2:
+        assert np.shape(xx)[0] == np.shape(xvals)[0]
+    else:
+        err = f"`xx` ({np.shape(xx)}) must be shaped as (T,) or (N, T)!"
+        log.exception(err)
+        raise ValueError(err)
+
+    # Convert to (N, T, M)
+    #     `xx` is (T,)  `xvals` is (N, M) for N-binaries and M-steps
+    select = (xx[:, :, np.newaxis] <= xvals[:, np.newaxis, :])
+
+    # ---- Find the indices in `xvals` after and before each value of `xx`
+    # Find the first indices in `xvals` AFTER `xx`
+    # (N, T)
+    aft = np.argmax(select, axis=-1)
+    # zero values in `aft` mean that either (a) no xvals after the targets were found
+    # of (b) that all xvals are after the targets.  In either case, we cannot interpolate!
+    valid = (aft > 0)
+    inval = ~valid
+    # find the last indices when `xvals` is SMALLER than each value of `xx`
+    bef = np.copy(aft)
+    bef[valid] -= 1
+
+    # (2, N, T)
+    cut = [aft, bef]
+    # (2, N, T)
+    xvals = [np.take_along_axis(xvals, cc, axis=-1) for cc in cut]
+    # Find how far to interpolate between values (in log-space)
+    #     (N, T)
+    frac = (xx - xvals[1]) / np.subtract(*xvals)
+
+    # (2, N, T)
+    data = [np.take_along_axis(yvals, cc, axis=-1) for cc in cut]
+    # Interpolate by `frac` for each binary
+    ynew = data[1] + (np.subtract(*data) * frac)
+    # Set invalid binaries to nan
+    ynew[inval, ...] = np.nan
+
+    if ylog:
+        ynew = 10.0 ** ynew
+
+    return ynew
 
 
 def nyquist_freqs(
@@ -1374,7 +1462,7 @@ def kepler_sepa_from_freq(mass, freq):
     return sepa
 
 
-def rad_isco(m1, m2, factor=3.0):
+def rad_isco(m1, m2=0.0, factor=3.0):
     """Inner-most Stable Circular Orbit, radius at which binaries 'merge'.
 
     ENH: allow single (total) mass argument.
@@ -1398,6 +1486,44 @@ def rad_isco(m1, m2, factor=3.0):
     """
     return factor * schwarzschild_radius(m1+m2)
 
+
+def redz_after(time, redz=None, age=None):
+    """Calculate the redshift after the given amount of time has passed.
+
+    Parameters
+    ----------
+    time : array_like in units of [sec]
+        Amount of time to pass.
+    redz : None or array_like,
+        Redshift of starting point after which `time` is added.
+    age : None or array_like, in units of [sec]
+        Age of the Universe at the starting point, after which `time` is added.
+
+    Returns
+    -------
+    new_redz : array_like
+        Redshift of the Universe after the given amount of time.
+
+    """
+    if (redz is None) == (age is None):
+        raise ValueError("One of `redz` and `age` must be provided (and not both)!")
+
+    if redz is not None:
+        age = cosmo.age(redz).to('s').value
+    new_age = age + time
+
+    if np.isscalar(new_age):
+        if new_age < _AGE_UNIVERSE_GYR * GYR:
+            new_redz = cosmo.tage_to_z(new_age)
+        else:
+            new_redz = -1.0
+
+    else:
+        new_redz = -1.0 * np.ones_like(new_age)
+        idx = (new_age < _AGE_UNIVERSE_GYR * GYR)
+        new_redz[idx] = cosmo.tage_to_z(new_age[idx])
+
+    return new_redz
 
 def schwarzschild_radius(mass):
     """Return the Schwarschild radius [cm] for the given mass [grams].
