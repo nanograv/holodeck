@@ -515,6 +515,22 @@ def gwb_ideal(fobs_gw, ndens, mtot, mrat, redz, dlog10, sum=True):
 
 
 def poisson_as_needed(values, thresh=1e10):
+    """Calculate Poisson distribution when values are below threshold, otherwise approximate with normal distribution.
+
+    Parameters
+    ----------
+    values : ndarray
+        Expectation values for poisson distribution.
+    thresh : float
+        Expectation value above which to use Normal distribution approximation.
+
+    Returns
+    -------
+    output : ndarray
+        (Approximately) Poisson distributed values.
+        Same shape as input `values`.
+
+    """
     output = np.zeros_like(values, dtype=int)
     idx = (values <= thresh)
     output[idx] = np.random.poisson(values[idx])
