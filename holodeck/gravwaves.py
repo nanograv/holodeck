@@ -6,17 +6,12 @@ and not the semi-analytic or observational population models.
 
 """
 
-from pathlib import Path
-
 import numba
 import numpy as np
-import scipy as sp
-import scipy.integrate  # noqa
 
 import kalepy as kale
 
 import holodeck as holo
-import holodeck.cyutils  # noqa
 from holodeck import utils, cosmo, log
 from holodeck.constants import SPLC, NWTG, MPC
 
@@ -668,6 +663,7 @@ def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=1
 
 
 def sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
+    import holodeck.cyutils  # noqa
 
     ndens = sam.static_binary_density
     mt_l10 = np.log10(sam.mtot)
@@ -679,6 +675,7 @@ def sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
 
 
 def sam_calc_gwb_single_eccen_discrete(gwfobs, sam, sepa_evo, eccen_evo, nharms=100, nreals=None):
+    import holodeck.cyutils  # noqa
 
     ndens = sam.static_binary_density
     mt_l10 = np.log10(sam.mtot)
