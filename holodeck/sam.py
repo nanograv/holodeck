@@ -55,7 +55,7 @@ from holodeck import cosmo, utils, log
 from holodeck.constants import GYR, SPLC, MSOL, MPC, YR, PC
 from holodeck import relations, gravwaves
 
-_DEBUG = False
+_DEBUG = True
 _DEBUG_LVL = log.DEBUG
 # _DEBUG_LVL = log.WARNING
 
@@ -931,7 +931,7 @@ class Semi_Analytic_Model:
 
         Returns
         -------
-        hc : (F,[R,]) ndarray of scalar
+        gwb : (F,[R,]) ndarray of scalar
             Dimensionless, characteristic strain at each frequency.
             If `realize` is an integer with value R, then R realizations of the GWB are returned,
             such that `hc` has shape (F,R,).
@@ -958,7 +958,8 @@ class Semi_Analytic_Model:
         edges[-1] = fobs_orb_edges
         log.debug(f"dnum: {utils.stats(dnum)}")
 
-        if _DEBUG and np.any(np.isnan(dnum)):
+        # if _DEBUG and np.any(np.isnan(dnum)):
+        if _DEBUG and np.any(~np.isfinite(dnum) | (dnum < 0.0)):
             err = "Found nan `dnum` values!"
             log.exception(err)
             raise ValueError(err)
@@ -973,20 +974,27 @@ class Semi_Analytic_Model:
         log.debug(f"number: {utils.stats(number)}")
         log.debug(f"number.sum(): {number.sum():.4e}")
 
-        if _DEBUG and np.any(np.isnan(number)):
-            print(f"{np.any(np.isnan(dnum))=}")
-            err = "Found nan `number` values!"
-            log.exception(err)
-            raise ValueError(err)
+        # if _DEBUG and np.any(~np.isfinite(number) | (number < 0.0)):
+        #     print(f"{np.any(np.isnan(dnum))=}")
+        #     err = "Found nan `number` values!"
+        #     log.exception(err)
+        #     raise ValueError(err)
+        if _DEBUG:
+            print("CHECK!")
+            _check_bads(edges, number, "number")
 
         # ---- Get the GWB spectrum from number of binaries over grid
-        hc = gravwaves._gws_from_number_grid_integrated(edges, number, realize)
+        gwb = gravwaves._gws_from_number_grid_integrated(edges, number, realize)
+
+        if _DEBUG:
+            _check_bads(edges, gwb, "gwb")
+
         if squeeze:
-            hc = hc.squeeze()
+            gwb = gwb.squeeze()
 
-        self._gwb = hc
+        self._gwb = gwb
 
-        return hc
+        return gwb
 
     def gwb_ideal(self, fobs_gw, sum=True, redz_prime=True):
         """Calculate the idealized, continuous GWB amplitude.
@@ -1394,3 +1402,21 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4):
 
     return output
 
+
+def _check_bads(edges, vals, name):
+    bads = ~np.isfinite(vals) | (vals < 0.0)
+    if not np.any(bads):
+        return
+
+    err = f"Found {utils.frac_str(bads)} bad {name} values!"
+
+    bads = np.where(bads)
+    assert len(bads) == len(edges), f"`bads` ({len(bads)=}) does not match `edges` ({len(edges)=}) !"
+    for ii, (edge, bad) in enumerate(zip(edges, bads)):
+        idx = np.unique(bad)
+        log.error(ii)
+        log.error(idx)
+        log.error(edge[idx])
+
+    log.exception(err)
+    raise ValueError(err)
