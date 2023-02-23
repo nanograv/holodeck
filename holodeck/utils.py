@@ -662,6 +662,92 @@ def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
     return extr
 
 
+def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
+    """Interpolate 2D data to an array of points.
+
+    `xvals` and `yvals` are (N, M) where the interpolation is done along the 1th (`M`)
+    axis (i.e. interpolation is done independently for each `N` row.  Should be generalizeable to
+    higher dim.
+
+    Parameters
+    ----------
+    xx : (T,) or (N, T) ndarray
+        Target x-values to interpolate to.
+    xvals : (N, M) ndarray
+        Evaluation points (x-values) of the functions to be interpolated.
+        Interpolation is performed over the 1th (last) axis.
+    yvals : (N, M) ndarray
+        Function values (y-values) of the function to be interpolated.
+        Interpolation is performed over the 1th (last) axis.
+
+    Returns
+    -------
+    ynew : (N, T) ndarray
+        Interpolated function values, for each of N functions and T evaluation points.
+
+    """
+    # assert np.ndim(xx) == 1
+    assert np.ndim(xvals) == 2
+    assert np.shape(xvals) == np.shape(yvals)
+
+    xx = np.asarray(xx)
+
+    if xlog:
+        xx = np.log10(xx)
+        xvals = np.log10(xvals)
+
+    if ylog:
+        yvals = np.log10(yvals)
+
+    # --- Convert `xx` to be broadcastable with (N, T)
+    # `xx` is shaped as (T,)  ==> (1, T)
+    if np.ndim(xx) == 1:
+        xx = xx[np.newaxis, :]
+    # `xx` is shaped as (N, T)
+    elif np.ndim(xx) == 2:
+        assert np.shape(xx)[0] == np.shape(xvals)[0]
+    else:
+        err = f"`xx` ({np.shape(xx)}) must be shaped as (T,) or (N, T)!"
+        log.exception(err)
+        raise ValueError(err)
+
+    # Convert to (N, T, M)
+    #     `xx` is (T,)  `xvals` is (N, M) for N-binaries and M-steps
+    select = (xx[:, :, np.newaxis] <= xvals[:, np.newaxis, :])
+
+    # ---- Find the indices in `xvals` after and before each value of `xx`
+    # Find the first indices in `xvals` AFTER `xx`
+    # (N, T)
+    aft = np.argmax(select, axis=-1)
+    # zero values in `aft` mean that either (a) no xvals after the targets were found
+    # of (b) that all xvals are after the targets.  In either case, we cannot interpolate!
+    valid = (aft > 0)
+    inval = ~valid
+    # find the last indices when `xvals` is SMALLER than each value of `xx`
+    bef = np.copy(aft)
+    bef[valid] -= 1
+
+    # (2, N, T)
+    cut = [aft, bef]
+    # (2, N, T)
+    xvals = [np.take_along_axis(xvals, cc, axis=-1) for cc in cut]
+    # Find how far to interpolate between values (in log-space)
+    #     (N, T)
+    frac = (xx - xvals[1]) / np.subtract(*xvals)
+
+    # (2, N, T)
+    data = [np.take_along_axis(yvals, cc, axis=-1) for cc in cut]
+    # Interpolate by `frac` for each binary
+    ynew = data[1] + (np.subtract(*data) * frac)
+    # Set invalid binaries to nan
+    ynew[inval, ...] = np.nan
+
+    if ylog:
+        ynew = 10.0 ** ynew
+
+    return ynew
+
+
 def nyquist_freqs(
     dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
 ) -> np.ndarray:
