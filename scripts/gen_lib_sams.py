@@ -23,7 +23,7 @@ To-Do
 
 """
 
-__version__ = '0.2.1'
+__version__ = '0.2.2'
 
 import argparse
 import os
@@ -349,7 +349,7 @@ class PS_Circ_01(holo.librarian._LHS_Parameter_Space):
         )
         hard = holo.hardening.Fixed_Time.from_sam(
             sam, hard_time, gamma_sc=hard_gamma_inner,
-            exact=True, progress=False
+            progress=False
         )
         return sam, hard
 
