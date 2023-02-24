@@ -610,7 +610,7 @@ class Fixed_Time(_Hardening):
     """
 
     # _INTERP_NUM_POINTS = 1e4             #: number of random data points used to construct interpolant
-    _INTERP_NUM_POINTS = 1e4
+    _INTERP_NUM_POINTS = 1e5
     _INTERP_THRESH_PAD_FACTOR = 5.0      #: allowance for when to use chunking and when to process full array
     _TIME_TOTAL_RMIN = 1.0e-5 * PC       #: minimum radius [cm] used to calculate inspiral time
     _NORM_CHUNK_SIZE = 1e3
@@ -937,10 +937,10 @@ class Fixed_Time(_Hardening):
 
             # ---- Initialization
             # Define the range of parameters to be explored
-            mt = [1e5, 1e11]   #: total mass [Msol]
+            mt = [1e4, 1e11]   #: total mass [Msol]
             mr = [1e-5, 1.0]   #: mass ratio
             # td = [0.0, 20.0]   #: lifetime [Gyr]    LINEAR
-            td = [1e-3, 20.0]   #: lifetime [Gyr]        LOG
+            td = [1.0e-3, 1.0e2]   #: lifetime [Gyr]        LOG
             rm = [1e3, 1e5]    #: radius maximum (initial separation) [pc]
 
             # Choose random test binary parameters
@@ -983,8 +983,7 @@ class Fixed_Time(_Hardening):
         interp = sp.interpolate.LinearNDInterpolator(vals, np.log10(norm))
         backup = sp.interpolate.NearestNDInterpolator(vals, np.log10(norm))
 
-        '''
-        check_norm, check_points = get_norm_for_random_points(100)
+        check_norm, check_points = get_norm_for_random_points(1000)
         check_vals = convert_points_to_interp_vals(check_points)
         interp_norm = 10.0 ** interp(check_vals)
         backup_norm = 10.0 ** backup(check_vals)
@@ -997,7 +996,6 @@ class Fixed_Time(_Hardening):
         print(f"{utils.stats(backup_norm)=}")
         print(f"{utils.stats(error_interp)=}")
         print(f"{utils.stats(error_backup)=}")
-        '''
 
         return interp, backup
 
@@ -1059,7 +1057,7 @@ class Fixed_Time(_Hardening):
         return norm
 
     @classmethod
-    def _get_norm(cls, target_time, *args, guess=1e7):
+    def _get_norm(cls, target_time, *args, guess=1e7, max_err=1e-6):
         """Calculate normalizations of the input arrays, to obtain the target binary lifetime.
 
         Uses deterministic least-squares optimization to find the best normalization values, using
@@ -1098,11 +1096,17 @@ class Fixed_Time(_Hardening):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             norm = sp.optimize.newton(lambda xx: integ(xx) - target_time, g1)
+            err = (integ(norm) - target_time) / target_time
+            log.debug(f"Fixed_Time._get_norm() : errors = {utils.stats(err)}")
+            if np.any(err > max_err):
+                fail = f"Errors in Fixed_Time norm exceed allowed: {utils.stats(err)} vs. {max_err})"
+                log.exception(fail)
+                raise ValueError(fail)
 
         return norm
 
     @classmethod
-    def _time_total(cls, norm, mt, mr, rchar, gamma_sc, gamma_df, rmax, num=100):
+    def _time_total(cls, norm, mt, mr, rchar, gamma_sc, gamma_df, rmax, num=200):
         """For the given parameters, integrate the binary evolution to find total lifetime.
 
         Parameters

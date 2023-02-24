@@ -861,7 +861,7 @@ class Semi_Analytic_Model:
         if zero_stalled:
             # Calculate the time it takes binaries to evolve along a series of steps in separation
             # number of steps in the integration, refer to this as X below
-            STEPS = 22
+            STEPS = 123
             # () start from the hardening model's initial separation
             rmax = hard._sepa_init
             # (M,) end at the ISCO
