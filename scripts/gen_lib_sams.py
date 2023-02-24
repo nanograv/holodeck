@@ -509,7 +509,7 @@ def main():
 
     end = datetime.now()
     log.info(f"\t{comm.rank} done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}")
-    # bnum = _barrier(bnum)
+    bnum = _barrier(bnum)
 
     return
 
