@@ -509,6 +509,7 @@ def main():
 
     end = datetime.now()
     log.info(f"\t{comm.rank} done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}")
+    # Make sure all processes are done before exiting, so that all files are ready for merging
     bnum = _barrier(bnum)
 
     return
