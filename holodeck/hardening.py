@@ -610,13 +610,12 @@ class Fixed_Time(_Hardening):
     """
 
     # _INTERP_NUM_POINTS = 1e4             #: number of random data points used to construct interpolant
-    _INTERP_NUM_POINTS = 1e5
+    _INTERP_NUM_POINTS = 1e4
     _INTERP_THRESH_PAD_FACTOR = 5.0      #: allowance for when to use chunking and when to process full array
-    _TIME_TOTAL_RMIN = 1.0e-5 * PC       #: minimum radius [cm] used to calculate inspiral time
     _NORM_CHUNK_SIZE = 1e3
 
     def __init__(self, time, mtot, mrat, redz, sepa,
-                 rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5, progress=True, exact=False):
+                 rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5, progress=True, interpolate_norm=None):
         """Initialize `Fixed_Time` instance for the given binary properties and function parameters.
 
         Parameters
@@ -682,16 +681,19 @@ class Fixed_Time(_Hardening):
             log.exception(err)
             raise ValueError(err)
 
-        # If there are lots of points, construct and use an interpolant
-        lots_of_points = self._INTERP_THRESH_PAD_FACTOR * self._INTERP_NUM_POINTS
-        log.debug(f"size={len(mtot)} vs. limit={lots_of_points}; `exact`={exact}")
-        if (len(mtot) > lots_of_points) and (not exact):
-            log.info("constructing hardening normalization interpolant")
+        # if `interpolate_norm` is True:  use an interpolant.
+        # if `interpolate_norm` is False: use exact calculation.
+        # if `interpolate_norm` is None:  use an interpolant if there are lots of points to calculate
+        interp_num_thresh = self._INTERP_THRESH_PAD_FACTOR * self._INTERP_NUM_POINTS
+        log.debug(f"size={len(mtot)} vs. limit={interp_num_thresh}; `interpolate_norm`={interpolate_norm}")
+        if (interpolate_norm is True) or ((interpolate_norm is None) and (len(mtot) > interp_num_thresh)):
+            log.debug("constructing hardening normalization interpolant")
             # both are callable as `interp(args)`, with `args` shaped (N, 4),
             # the 4 parameters are:      [log10(M/MSOL), log10(q), time/Gyr, log10(Rmax/PC)]
             # the interpolants return the log10 of the norm values
             interp, backup = self._calculate_norm_interpolant(rchar, gamma_sc, gamma_df)
 
+            log.debug("calculating normalization from interpolants")
             points = [np.log10(mtot/MSOL), np.log10(mrat), time/GYR, np.log10(sepa/PC)]
             points = np.array(points)
             norm = interp(points.T)
@@ -1106,7 +1108,7 @@ class Fixed_Time(_Hardening):
         return norm
 
     @classmethod
-    def _time_total(cls, norm, mt, mr, rchar, gamma_sc, gamma_df, rmax, num=200):
+    def _time_total(cls, norm, mt, mr, rchar, gamma_sc, gamma_df, rmax, num=123):
         """For the given parameters, integrate the binary evolution to find total lifetime.
 
         Parameters
@@ -1140,7 +1142,9 @@ class Fixed_Time(_Hardening):
 
         # Convert input values to broadcastable np.ndarray's
         norm = np.atleast_1d(norm)
-        args = [norm, mt, mr, rchar, gamma_sc, gamma_df, rmax, cls._TIME_TOTAL_RMIN]
+        rmin = utils.rad_isco(mt)
+
+        args = [norm, mt, mr, rchar, gamma_sc, gamma_df, rmax, rmin]
         args = np.broadcast_arrays(*args)
         norm, mt, mr, rchar, gamma_sc, gamma_df, rmax, rmin = args
 
