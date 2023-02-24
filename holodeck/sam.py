@@ -1369,8 +1369,6 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4):
 
     for ii in range(numz):
         dens_redz = dens[:, :, ii]
-        # m1m2_dens = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='cubic')
-        # points = m1m2_on_mtmr_grid
         if dlay is None:
             points = m1m2_on_mtmr_grid
         else:
@@ -1381,14 +1379,14 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4):
             dlay = interp.tri
 
         # Fill in problematic values with zeroth-order interpolant
-        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+        bads = np.isnan(m1m2_dens) | (m1m2_dens < 0.0)
         log.debug(f"After interpolation, {utils.frac_str(bads)} bad values exist")
         if np.any(bads):
             # temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='nearest')
             interp = sp.interpolate.NearestNDInterpolator(points, dens_redz.flatten())
             temp = interp(tuple(m1m2_grid))
             m1m2_dens[bads] = temp[bads]
-            bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+            bads = np.isnan(m1m2_dens) | (m1m2_dens < 0.0)
             log.debug(f"After 0th order interpolation, {utils.frac_str(bads)} bad values exist")
             if np.any(bads):
                 err = f"After 0th order interpolation, {utils.frac_str(bads)} remain!"
@@ -1396,8 +1394,6 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4):
                 raise ValueError(err)
 
         # Introduce scatter along both the 0th (primary) and 1th (secondary) axes
-        # m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=0)
-        # m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=1)
         m1m2_dens = utils._scatter_with_weights(m1m2_dens, weights, axis=0)
         m1m2_dens = utils._scatter_with_weights(m1m2_dens, weights, axis=1)
 
