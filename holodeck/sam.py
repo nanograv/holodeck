@@ -117,15 +117,15 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
 
     """
 
-    def __init__(self, phi0=-2.77, phiz=-0.27, mref0_log10=11.24, mref0=None, mrefz=0.0, alpha0=-1.24, alphaz=-0.03):
-        mref0, _ = utils._parse_val_log10_val_pars(
-            mref0, mref0_log10, val_units=MSOL, name='mref0', only_one=True
+    def __init__(self, phi0=-2.77, phiz=-0.27, mchar0_log10=11.24, mchar0=None, mcharz=0.0, alpha0=-1.24, alphaz=-0.03):
+        mchar0, _ = utils._parse_val_log10_val_pars(
+            mchar0, mchar0_log10, val_units=MSOL, name='mchar0', only_one=True
         )
 
         self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]  [log10(1/Mpc^3)]
         self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]  [log10(1/Mpc^3)]
-        self._mref0 = mref0       # +11.24  +/- [-0.17, +0.20]  [log10(Msol)]
-        self._mrefz = mrefz       #  0.0                        [log10(Msol)]    # noqa
+        self._mchar0 = mchar0       # +11.24  +/- [-0.17, +0.20]  [log10(Msol)]
+        self._mcharz = mcharz       #  0.0                        [log10(Msol)]    # noqa
         self._alpha0 = alpha0     # -1.24   +/- [-0.16, +0.16]
         self._alphaz = alphaz     # -0.03   +/- [-0.14, +0.16]
         return
@@ -150,9 +150,9 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
 
         """
         phi = self._phi_func(redz)
-        mref = self._mref_func(redz)
+        mchar = self._mchar_func(redz)
         alpha = self._alpha_func(redz)
-        xx = mstar / mref
+        xx = mstar / mchar
         # [Chen2019]_ Eq.8
         rv = np.log(10.0) * phi * np.power(xx, 1.0 + alpha) * np.exp(-xx)
         return rv
@@ -162,10 +162,10 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
         """
         return np.power(10.0, self._phi0 + self._phiz * redz)
 
-    def _mref_func(self, redz):
+    def _mchar_func(self, redz):
         """See: [Chen2019]_ Eq.10 - NOTE: added `redz` term
         """
-        return self._mref0 + self._mrefz * redz
+        return self._mchar0 + self._mcharz * redz
 
     def _alpha_func(self, redz):
         """See: [Chen2019]_ Eq.11
@@ -901,7 +901,13 @@ class Semi_Analytic_Model:
             stall = (redz_tot < 0.0)
             # reshape to match `dnum`  (X, M*Q*Z) ==> (M*Q*Z, X) ==> (M, Q, Z, X)
             stall = stall.T.reshape(dnum.shape)
-            log.info(f"fraction of stalled binaries: {utils.frac_str(stall)}")
+            log.info(f"fraction of stalled binary-frequencies: {utils.frac_str(stall)}")
+            stalled = np.any(stall, axis=-1)
+            log.info(f"fraction of binaries stalled at all frequencies: {utils.frac_str(stalled)}")
+            stalled_frac = np.count_nonzero(stalled) / stalled.size
+            if stalled_frac > 0.8:
+                log.warning(f"A large fraction of binaries are stalled at all frequencies!  {stalled_frac:.4e}")
+
             dnum[stall] = 0.0
             self._stall = stall
 
@@ -980,7 +986,6 @@ class Semi_Analytic_Model:
         #     log.exception(err)
         #     raise ValueError(err)
         if _DEBUG:
-            print("CHECK!")
             _check_bads(edges, number, "number")
 
         # ---- Get the GWB spectrum from number of binaries over grid

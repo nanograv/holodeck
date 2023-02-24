@@ -52,7 +52,7 @@ from holodeck import log as _log     #: import the default holodeck log just so 
 _log.setLevel(_log.WARNING)
 
 # Default argparse parameters
-DEF_SAM_SHAPE = 50
+DEF_SAM_SHAPE = (61, 81, 101)
 DEF_NUM_REALS = 100
 DEF_NUM_FBINS = 40
 DEF_PTA_DUR = 16.03     # [yrs]
@@ -219,8 +219,6 @@ class PSpace_Big_Circ_01(holo.librarian._LHS_Parameter_Space):
         'mmb_plaw',
     ]
 
-    SEPA_INIT = 1.0 * PC
-
     def __init__(self, log, nsamples, sam_shape, lhs_sampler, seed):
         super().__init__(
             log, nsamples, sam_shape, lhs_sampler, seed,
@@ -272,6 +270,90 @@ class PSpace_Big_Circ_01(holo.librarian._LHS_Parameter_Space):
         return sam, hard
 
 
+class PS_Circ_01(holo.librarian._LHS_Parameter_Space):
+
+    _PARAM_NAMES = [
+        'hard_time',
+        'hard_gamma_inner',
+
+        'gsmf_phi0',
+        # 'gsmf_phiz',
+        'gsmf_mchar0',
+        # 'gsmf_mcharz',
+        'gsmf_alpha0',
+        # 'gsmf_alphaz',
+
+        # 'gpf_malpha',
+        'gpf_zbeta',
+        'gpf_qgamma',
+
+        'gmt_norm',
+        # 'gmt_malpha',
+        'gmt_zbeta',
+        # 'gmt_qgamma',
+
+        'mmb_amp',
+        'mmb_plaw',
+        'mmb_scatter',
+    ]
+
+    def __init__(self, log, nsamples, sam_shape, lhs_sampler, seed):
+        super().__init__(
+            log, nsamples, sam_shape, lhs_sampler, seed,
+
+            hard_time=[-2.0, +1.12],   # [log10(Gyr)]
+            hard_gamma_inner=[-1.5, +0.0],
+            # hard_rchar=[+0.0, +4.0],   # [log10(pc)]
+            # hard_gamma_outer=[+2.0, +3.0],
+
+            gsmf_phi0=[-3.5, -1.5],
+            # gsmf_phiz =[-1.5, +0.5],
+            gsmf_mchar0=[10.0, 12.5],   # [log10(Msol)]
+            gsmf_alpha0=[-2.5, -0.5],
+
+            # gpf_malpha=[-1.0, +1.0],
+            gpf_zbeta=[-0.5, +2.5],
+            gpf_qgamma=[-1.5, +1.5],
+
+            gmt_norm=[0.1, +10.0],    # [Gyr]
+            # gmt_malpha=[-1.0, +1.0],
+            gmt_zbeta=[-3.0, +2.0],
+            # gmt_qgamma=[-1.0, +1.0],
+
+            mmb_amp=[+7.0, +10.0],   # [log10(Msol)]
+            mmb_plaw=[+0.25, +2.5],
+            mmb_scatter=[+0.0, +0.6],
+        )
+
+    def sam_for_lhsnumber(self, lhsnum):
+        param_grid = self.params_for_lhsnumber(lhsnum)
+
+        hard_time, hard_gamma_inner, \
+            gsmf_phi0, gsmf_mchar0, gsmf_alpha0, \
+            gpf_zbeta, gpf_qgamma, \
+            gmt_norm, gmt_zbeta, \
+            mmb_amp, mmb_plaw, mmb_scatter = param_grid
+
+        mmb_amp = (10.0 ** mmb_amp) * MSOL
+        hard_time = (10.0 ** hard_time) * GYR
+        gmt_norm = gmt_norm * GYR
+
+        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0, mchar0_log10=gsmf_mchar0, alpha0=gsmf_alpha0)
+        gpf = holo.sam.GPF_Power_Law(qgamma=gpf_qgamma, zbeta=gpf_zbeta)
+        gmt = holo.sam.GMT_Power_Law(time_norm=gmt_norm, zbeta=gmt_zbeta)
+        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw, scatter_dex=mmb_scatter)
+
+        sam = holo.sam.Semi_Analytic_Model(
+            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            shape=self.sam_shape
+        )
+        hard = holo.hardening.Fixed_Time.from_sam(
+            sam, hard_time, gamma_sc=hard_gamma_inner,
+            exact=True, progress=False
+        )
+        return sam, hard
+
+
 # ---- setup argparse
 
 def setup_argparse():
@@ -308,7 +390,7 @@ def setup_argparse():
     return args
 
 
-SPACE = PSpace_Big_Circ_01
+SPACE = PS_Circ_01
 comm = MPI.COMM_WORLD
 
 args = setup_argparse() if comm.rank == 0 else None
@@ -427,7 +509,7 @@ def main():
 
 def run_sam(pnum, path_output):
     fname = f"lib_sams__p{pnum:06d}.npz"
-    fname = os.path.join(path_output, fname)
+    fname = Path(path_output, fname)
     log.debug(f"{pnum=} :: {fname=}")
     if os.path.exists(fname):
         log.warning(f"File {fname} already exists.")
@@ -439,7 +521,7 @@ def run_sam(pnum, path_output):
         mem_rss = process.memory_info().rss / 1024**3
         mem_vms = process.memory_info().vms / 1024**3
         log.info(f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB")
-        
+
     pta_dur = args.pta_dur * YR
     nfreqs = args.nfreqs
     hifr = nfreqs/pta_dur
@@ -454,11 +536,9 @@ def run_sam(pnum, path_output):
 
     log.debug("Selecting `sam` and `hard` instances")
     sam, hard = space.sam_for_lhsnumber(pnum)
-    mem = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 3)
     log_mem()
     log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.nreals})")
     gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
-    mem = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 3)
     log_mem()
     log.debug(f"{holo.utils.stats(gwb)=}")
     legend = space.param_dict_for_lhsnumber(pnum)
@@ -467,8 +547,13 @@ def run_sam(pnum, path_output):
              pnum=pnum, pdim=space.paramdimen, nsamples=args.nsamples,
              lhs_grid=space.sampleindxs, lhs_grid_idx=space.lhsnumber_to_index(pnum),
              params=space.params, names=space.names, version=__version__, **legend)
+    log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-BEG)} (start: {BEG})")
 
-    log.info(f"Saved to {fname} after {(datetime.now()-BEG)} (start: {BEG})")
+    fname = fname.with_suffix('.png')
+    fig = holo.plot.plot_gwb(fobs_cents, gwb)
+    fig.savefig(fname, dpi=300)
+    log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-BEG)} (start: {BEG})")
+
     return
 
 
