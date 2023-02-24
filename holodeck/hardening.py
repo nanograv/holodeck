@@ -1129,7 +1129,7 @@ class Fixed_Time(_Hardening):
         # perform optimization
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            norm = sp.optimize.newton(lambda xx: integ(xx) - target_time, g1)
+            norm = sp.optimize.newton(lambda xx: integ(xx) - target_time, g1, maxiter=200, tol=1e-6)
             err = (integ(norm) - target_time) / target_time
             log.debug(f"Fixed_Time._get_norm() : errors = {utils.stats(err)}")
             if np.any(err > max_err):
