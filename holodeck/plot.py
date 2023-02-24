@@ -414,11 +414,55 @@ def draw_hist_steps(ax, xx, yy, yfilter=None, **kwargs):
     return ax.plot(*_get_hist_steps(xx, yy, yfilter=yfilter), **kwargs)
 
 
+def draw_gwb(ax, xx, gwb, nsamp=10, color=None, label=None, plot_kwargs={}):
+    if color is None:
+        color = ax._get_lines.get_next_color()
+
+    mm, *conf = np.percentile(gwb, [50, 25, 75], axis=1)
+    hh, = ax.plot(xx, mm, alpha=0.5, color=color, label=label, **plot_kwargs)
+    ax.fill_between(xx, *conf, color=color, alpha=0.15)
+
+    if (nsamp is not None) and (nsamp > 0):
+        nsamp_max = gwb.shape[1]
+        idx = np.random.choice(nsamp_max, np.min([nsamp, nsamp_max]), replace=False)
+        for ii in idx:
+            ax.plot(xx, gwb[:, ii], color=color, alpha=0.25, lw=1.0, ls='-')
+
+    return hh
+
+
+def plot_gwb(fobs, gwb):
+    xx = fobs * YR
+    fig, ax = figax(
+        xlabel=LABEL_GW_FREQUENCY_YR,
+        ylabel=LABEL_CHARACTERISTIC_STRAIN
+    )
+    draw_gwb(ax, xx, gwb)
+    _twin_hz(ax)
+    return fig
+
+
+def _twin_hz(ax, nano=True, fs=8, **kw):
+    tw = ax.twiny()
+    xlim = np.array(ax.get_xlim()) / YR
+    if nano:
+        label = "nHz"
+        xlim *= 1e9
+    else:
+        label = "Hz"
+
+    label = fr"GW Frequency $[\mathrm{{{label}}}]$"
+    tw.set(xlim=xlim, xscale='log')
+    tw.set_xlabel(label, fontsize=fs, **kw)
+    return
+
+
+
 # =================================================================================================
 # ====    Below Needs Review / Cleaning    ====
 # =================================================================================================
 
-
+'''
 def plot_bin_pop(pop):
     mt, mr = utils.mtmr_from_m1m2(pop.mass)
     redz = cosmo.a_to_z(pop.scafa)
@@ -518,21 +562,6 @@ def _draw_pop_masses(ax, pop, color='r', nplot=3e3):
         handles.append(hh)
 
     return handles, names
-
-
-def _twin_hz(ax, nano=True, fs=8, **kw):
-    tw = ax.twiny()
-    xlim = np.array(ax.get_xlim()) / YR
-    if nano:
-        label = "nHz"
-        xlim *= 1e9
-    else:
-        label = "Hz"
-
-    label = fr"GW Frequency $[\mathrm{{{label}}}]$"
-    tw.set(xlim=xlim, xscale='log')
-    tw.set_xlabel(label, fontsize=fs, **kw)
-    return
 
 
 def plot_gwb(gwb, color=None, uniform=False, nreals=5):
@@ -659,7 +688,7 @@ def draw_med_conf(ax, xx, vals, percs=[25, 75], axis=-1, yfilter=None, **kwargs)
 
     fill = ax.fill_between(_xx, lo, hi, alpha=0.2, color=hh.get_color())
     return (hh, fill)
-
+'''
 
 '''
 def plot_evo(evo, freqs):
@@ -703,7 +732,7 @@ def plot_evo(evo, freqs):
     return fig
 '''
 
-
+'''
 def plot_evo(evo, freqs=None, sepa=None, ax=None):
     if (freqs is None) and (sepa is None):
         err = "Either `freqs` or `sepa` must be provided!"
@@ -754,3 +783,4 @@ def plot_evo(evo, freqs=None, sepa=None, ax=None):
 
     # ax.legend(handles, labels)
     return fig
+'''
