@@ -610,12 +610,12 @@ class Fixed_Time(_Hardening):
     """
 
     # _INTERP_NUM_POINTS = 1e4             #: number of random data points used to construct interpolant
-    _INTERP_NUM_POINTS = 1e4
+    _INTERP_NUM_POINTS = 3e4
     _INTERP_THRESH_PAD_FACTOR = 5.0      #: allowance for when to use chunking and when to process full array
     _NORM_CHUNK_SIZE = 1e3
 
     def __init__(self, time, mtot, mrat, redz, sepa,
-                 rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5, progress=True, interpolate_norm=None):
+                 rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5, progress=True, interpolate_norm=False):
         """Initialize `Fixed_Time` instance for the given binary properties and function parameters.
 
         Parameters
@@ -688,6 +688,7 @@ class Fixed_Time(_Hardening):
         log.debug(f"size={len(mtot)} vs. limit={interp_num_thresh}; `interpolate_norm`={interpolate_norm}")
         if (interpolate_norm is True) or ((interpolate_norm is None) and (len(mtot) > interp_num_thresh)):
             log.debug("constructing hardening normalization interpolant")
+            log.warning("INTERPOLATED NORMALIZATION DOES NOT PERFORM AS WELL")
             # both are callable as `interp(args)`, with `args` shaped (N, 4),
             # the 4 parameters are:      [log10(M/MSOL), log10(q), time/Gyr, log10(Rmax/PC)]
             # the interpolants return the log10 of the norm values
@@ -936,13 +937,14 @@ class Fixed_Time(_Hardening):
 
         def get_norm_for_random_points(num_points):
             num = int(num_points)
+            max_fix_tries = 10
 
             # ---- Initialization
             # Define the range of parameters to be explored
-            mt = [1e4, 1e11]   #: total mass [Msol]
+            mt = [1e5, 1e11]   #: total mass [Msol]
             mr = [1e-5, 1.0]   #: mass ratio
             # td = [0.0, 20.0]   #: lifetime [Gyr]    LINEAR
-            td = [1.0e-3, 1.0e2]   #: lifetime [Gyr]        LOG
+            td = [1.0e-3, 3.0e1]   #: lifetime [Gyr]        LOG
             rm = [1e3, 1e5]    #: radius maximum (initial separation) [pc]
 
             # Choose random test binary parameters
@@ -954,8 +956,30 @@ class Fixed_Time(_Hardening):
 
             # ---- Get normalization for these parameters
             norm = cls._get_norm_chunk(td, mt, mr, rchar, gamma_sc, gamma_df, rm)
-
             points = [mt, mr, td, rm]
+            bads = ~(np.isfinite(norm) & (norm > 0.0))
+            fix_tries = 0
+            while np.any(bads) and (fix_tries < max_fix_tries):
+                err = f"bad random point norms {utils.frac_str(bads)}, norms: {utils.stats(norm)}"
+                if fix_tries >= max_fix_tries:
+                    log.exception(err)
+                    raise RuntimeError(err)
+
+                # bads = np.where(bads)[0]
+                # units = [MSOL, 1.0, GYR, PC]
+                # for pp, un in zip(points, units):
+                #     # print(f"{utils.stats(pp[bads]/un)}")
+                #     print(f"{pp[bads]/un}")
+
+                args = [aa[bads] for aa in [td, mt, mr, rm]]
+                num = args[0].size
+                args = [aa*np.random.normal(1.0, 0.05, num) for aa in args]
+                # args = [td, mt, mr, rchar, gamma_sc, gamma_df, rm]
+                args = args[:-1] + [rchar, gamma_sc, gamma_df] + [args[-1],]
+                norm[bads] = cls._get_norm_chunk(*args)
+                fix_tries += 1
+                log.debug(f"fixing bad norm values: {fix_tries} :: {norm[bads]=}")
+                bads = ~(np.isfinite(norm) & (norm > 0.0))
 
             return norm, points
 
@@ -969,22 +993,31 @@ class Fixed_Time(_Hardening):
             return vals
 
         num_points = int(cls._INTERP_NUM_POINTS)
+        log.debug("calculating exact normalization for {num_points:.2e} points")
         norm, points = get_norm_for_random_points(num_points)
-        vals = convert_points_to_interp_vals(points)
 
         # Make sure results are valid
         valid = np.isfinite(norm) & (norm > 0.0)
-        if not np.all(valid):
-            err = f"Invalid normalizations!  {utils.frac_str(valid, 4)}"
+        frac_val = np.count_nonzero(valid) / valid.size
+        if frac_val > 0.9:
+            norm = norm[valid]
+            points = [pp[valid] for pp in points]
+        else:
+            log.error(f"norms from random points: {utils.stats(norm)}")
+            err = f"Invalid normalizations!  {utils.frac_str(valid)}"
             log.exception(err)
             raise ValueError(err)
+
+        vals = convert_points_to_interp_vals(points)
 
         # ---- Construct interpolants
 
         # construct both a linear (1th order) and nearest (0th order) interpolant
-        interp = sp.interpolate.LinearNDInterpolator(vals, np.log10(norm))
-        backup = sp.interpolate.NearestNDInterpolator(vals, np.log10(norm))
+        log.debug("constructing interpolants")
+        interp = sp.interpolate.LinearNDInterpolator(vals, np.log10(norm), rescale=True)
+        backup = sp.interpolate.NearestNDInterpolator(vals, np.log10(norm), rescale=True)
 
+        log.debug("testing interpolants")
         check_norm, check_points = get_norm_for_random_points(1000)
         check_vals = convert_points_to_interp_vals(check_points)
         interp_norm = 10.0 ** interp(check_vals)
@@ -992,12 +1025,11 @@ class Fixed_Time(_Hardening):
         error_interp = (interp_norm - check_norm) / check_norm
         error_backup = (backup_norm - check_norm) / check_norm
 
-        print("\n")
-        print(f"{utils.stats(check_norm)=}")
-        print(f"{utils.stats(interp_norm)=}")
-        print(f"{utils.stats(backup_norm)=}")
-        print(f"{utils.stats(error_interp)=}")
-        print(f"{utils.stats(error_backup)=}")
+        log.debug(f"{utils.stats(check_norm)=}")
+        log.debug(f"{utils.stats(interp_norm)=}")
+        log.debug(f"{utils.stats(backup_norm)=}")
+        log.debug(f"{utils.stats(error_interp)=}")
+        log.debug(f"{utils.stats(error_backup)=}")
 
         return interp, backup
 
