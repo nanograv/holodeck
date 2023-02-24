@@ -484,7 +484,14 @@ def main():
 
     for ind in iterator:
         lhsparam = ind
-        log.info(f"{comm.rank=} {ind=} {space.param_dict_for_lhsnumber(lhsparam)}")
+        # log.info(f"{comm.rank=} {ind=} {space.param_dict_for_lhsnumber(lhsparam)}")
+        log.info(f"{comm.rank=} {ind=}")
+        pdict = space.param_dict_for_lhsnumber(lhsparam)
+        msg = "\n"
+        for kk, vv in pdict.items():
+            msg += f"{kk}={vv}\n"
+        log.info(msg)
+
         if args.test:
             continue
 

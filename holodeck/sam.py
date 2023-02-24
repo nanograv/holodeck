@@ -1215,7 +1215,7 @@ def evolve_eccen_uniform_single(sam, eccen_init, sepa_init, nsteps):
     return sepa, eccen
 
 
-def _add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, linear_interp_backup=False, logspace_interp=True):
+def _add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, linear_interp_backup=True, logspace_interp=True):
     """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
 
     The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
@@ -1292,6 +1292,7 @@ def _add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, linear_interp_ba
         if np.any(bads):
             err = f"After 0th order interpolation, {utils.frac_str(bads)} remain!"
             log.exception(err)
+            log.error(f"{utils.stats(dens.flatten())}")
             raise ValueError(err)
 
     # Introduce scatter along both the 0th (primary) and 1th (secondary) axes
