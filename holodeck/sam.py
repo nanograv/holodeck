@@ -964,11 +964,8 @@ class Semi_Analytic_Model:
         edges[-1] = fobs_orb_edges
         log.debug(f"dnum: {utils.stats(dnum)}")
 
-        # if _DEBUG and np.any(np.isnan(dnum)):
-        if _DEBUG and np.any(~np.isfinite(dnum) | (dnum < 0.0)):
-            err = "Found nan `dnum` values!"
-            log.exception(err)
-            raise ValueError(err)
+        if _DEBUG:
+            _check_bads(edges, dnum, "dnum")
 
         # "integrate" within each bin (i.e. multiply by bin volume)
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
@@ -980,11 +977,6 @@ class Semi_Analytic_Model:
         log.debug(f"number: {utils.stats(number)}")
         log.debug(f"number.sum(): {number.sum():.4e}")
 
-        # if _DEBUG and np.any(~np.isfinite(number) | (number < 0.0)):
-        #     print(f"{np.any(np.isnan(dnum))=}")
-        #     err = "Found nan `number` values!"
-        #     log.exception(err)
-        #     raise ValueError(err)
         if _DEBUG:
             _check_bads(edges, number, "number")
 
@@ -1410,7 +1402,7 @@ def _check_bads(edges, vals, name):
     if not np.any(bads):
         return
 
-    err = f"Found {utils.frac_str(bads)} bad {name} values!"
+    err = f"Found {utils.frac_str(bads)} bad '{name}' values!"
 
     bads = np.where(bads)
     assert len(bads) == len(edges), f"`bads` ({len(bads)=}) does not match `edges` ({len(edges)=}) !"

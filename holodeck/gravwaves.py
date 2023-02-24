@@ -439,10 +439,12 @@ def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
     elif utils.isinteger(realize):
         shape = number.shape + (realize,)
         _num = number[..., np.newaxis] * np.ones(shape)
-        hc = hc[..., np.newaxis] * poisson_as_needed(_num)
+        _pnum = poisson_as_needed(_num)
+        hc = hc[..., np.newaxis] * _pnum
         if holo.sam._DEBUG:
             log.info(f"number = {utils.stats(number)}")
             log.info(f"_num = {utils.stats(_num)}")
+            log.info(f"_pnum = {utils.stats(_pnum)}")
             log.info(f"hc = {utils.stats(hc)}")
             holo.sam._check_bads(edges + [np.arange(realize),], hc, "hc")
 
@@ -526,11 +528,14 @@ def poisson_as_needed(values, thresh=1e10):
         Same shape as input `values`.
 
     """
-    output = np.zeros_like(values, dtype=int)
+    # NOTE: do not use `int` type as it can cause overflow errors
+    # output = np.zeros_like(values, dtype=int)
+    output = np.zeros_like(values)
     idx = (values <= thresh)
     output[idx] = np.random.poisson(values[idx])
     tt = values[~idx]
-    output[~idx] = np.floor(np.random.normal(tt, np.sqrt(tt))).astype(int)
+    # output[~idx] = np.floor(np.random.normal(tt, np.sqrt(tt))).astype(int)
+    output[~idx] = np.floor(np.random.normal(tt, np.sqrt(tt)))
     return output
 
 
