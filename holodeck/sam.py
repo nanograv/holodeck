@@ -572,8 +572,8 @@ class Semi_Analytic_Model:
                     utils.print_stats(stack=False, print_func=log.error,
                                       mstar_tot=mstar_tot, mstar_rat=mstar_rat, redz=redz)
                     err = "No `zprime` values are greater than zero!"
-                    log.exception(err)
-                    raise RuntimeError(err)
+                    log.warning(err)
+                    # raise RuntimeError(err)
 
             # ---- Get Galaxy Merger Rate  [Chen2019] Eq.5
             log.debug(f"GSMF_USES_MTOT={GSMF_USES_MTOT}")
