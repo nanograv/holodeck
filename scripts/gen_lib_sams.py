@@ -37,6 +37,7 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
+import matplotlib.pyplot as plt
 from mpi4py import MPI
 
 import holodeck as holo
@@ -59,6 +60,8 @@ DEF_PTA_DUR = 16.03     # [yrs]
 
 DEF_ECCEN_NUM_STEPS = 123
 DEF_ECCEN_NHARMS = 100
+
+MAX_FAILURES = 5
 
 
 class Parameter_Space_Hard04(holo.librarian._Parameter_Space):
@@ -460,6 +463,7 @@ log.info(
 
 def main():
     bnum = 0
+    failures = 0
     npars = args.nsamples
 
     bnum = _barrier(bnum)
@@ -496,7 +500,15 @@ def main():
             continue
 
         try:
-            run_sam(lhsparam, PATH_OUTPUT)
+            rv = run_sam(lhsparam, PATH_OUTPUT)
+            if rv is False:
+                failures += 1
+
+            if failures > MAX_FAILURES:
+                err = f"Failed {failures} times on rank:{comm.rank}!"
+                log.exception(err)
+                raise RuntimeError(err)
+
         except Exception as err:
             logging.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{ind}")
             logging.warning(err)
@@ -542,27 +554,45 @@ def run_sam(pnum, path_output):
     log_mem()
     assert nfreqs == fobs_cents.size
 
-    log.debug("Selecting `sam` and `hard` instances")
-    sam, hard = space.sam_for_lhsnumber(pnum)
-    log_mem()
-    log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.nreals})")
-    gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
-    log_mem()
-    log.debug(f"{holo.utils.stats(gwb)=}")
-    legend = space.param_dict_for_lhsnumber(pnum)
-    log.debug(f"Saving {pnum} to file")
-    np.savez(fname, fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb,
-             pnum=pnum, pdim=space.paramdimen, nsamples=args.nsamples,
-             lhs_grid=space.sampleindxs, lhs_grid_idx=space.lhsnumber_to_index(pnum),
-             params=space.params, names=space.names, version=__version__, **legend)
+    try:
+        log.debug("Selecting `sam` and `hard` instances")
+        sam, hard = space.sam_for_lhsnumber(pnum)
+        log_mem()
+        log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.nreals})")
+        gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
+        log_mem()
+        log.debug(f"{holo.utils.stats(gwb)=}")
+        legend = space.param_dict_for_lhsnumber(pnum)
+        log.debug(f"Saving {pnum} to file")
+        data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb)
+        rv = True
+    except Exception as err:
+        log.exception("\n\n")
+        log.exception("="*100)
+        log.exception(f"`run_sam` FAILED on {pnum=}\n")
+        log.exception(err)
+        log.exception("="*100)
+        log.exception("\n\n")
+        rv = False
+        data = dict(fail=str(err))
+
+    meta_data = dict(
+        pnum=pnum, pdim=space.paramdimen, nsamples=args.nsamples,
+        lhs_grid=space.sampleindxs, lhs_grid_idx=space.lhsnumber_to_index(pnum),
+        params=space.params, names=space.names, version=__version__
+    )
+
+    np.savez(fname, **data, **meta_data, **legend)
     log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-BEG)} (start: {BEG})")
 
-    fname = fname.with_suffix('.png')
-    fig = holo.plot.plot_gwb(fobs_cents, gwb)
-    fig.savefig(fname, dpi=300)
-    log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-BEG)} (start: {BEG})")
+    if rv:
+        fname = fname.with_suffix('.png')
+        fig = holo.plot.plot_gwb(fobs_cents, gwb)
+        fig.savefig(fname, dpi=300)
+        log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-BEG)} (start: {BEG})")
+        plt.close('all')
 
-    return
+    return rv
 
 
 def _barrier(bnum):
