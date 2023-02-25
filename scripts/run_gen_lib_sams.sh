@@ -9,7 +9,7 @@ echo "==================    HOLODECK - run_gen_lib_sams.sh    ==================
 echo "================================================================================"
 echo ""
 
-OUTPUT="output/circ-01_2023-02-23_01_n2000_r100_f40"
+OUTPUT="output/circ-02_2023-02-24_01_n2000_r100_f40"
 OUTPUT=$OUTPUT"__TEST"
 SCRIPT="scripts/gen_lib_sams.py"
 LOG_NAME="job_log"
@@ -21,5 +21,5 @@ LOG_OUT="$LOG_NAME.out"
 LOG_ERR="$LOG_NAME.err"
 
 # mpirun -n 19  python $SCRIPT $OUTPUT -n 2000 -s 40 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR &
-mpirun -n 2  python $SCRIPT $OUTPUT -n 4 -s 10 -r 10 -f 4  1> $LOG_OUT 2> $LOG_ERR &
+mpirun -n 2  python $SCRIPT $OUTPUT -n 4 -s 20 -r 20 -f 20  1> $LOG_OUT 2> $LOG_ERR &
 
