@@ -431,13 +431,13 @@ def draw_gwb(ax, xx, gwb, nsamp=10, color=None, label=None, plot_kwargs={}):
     return hh
 
 
-def plot_gwb(fobs, gwb):
+def plot_gwb(fobs, gwb, **kwargs):
     xx = fobs * YR
     fig, ax = figax(
         xlabel=LABEL_GW_FREQUENCY_YR,
         ylabel=LABEL_CHARACTERISTIC_STRAIN
     )
-    draw_gwb(ax, xx, gwb)
+    draw_gwb(ax, xx, gwb, **kwargs)
     _twin_hz(ax)
     return fig
 

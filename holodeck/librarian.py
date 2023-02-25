@@ -5,12 +5,15 @@ import abc
 
 import h5py
 import numpy as np
+import scipy as sp
+import scipy.optimize  # noqa
 import tqdm
 
 from scipy.stats import qmc
 import pyDOE
 
 import holodeck as holo
+from holodeck.constants import YR
 
 
 class _Parameter_Space(abc.ABC):
@@ -159,6 +162,7 @@ class _Parameter_Space(abc.ABC):
     def sam_for_lhsnumber(self, lhsnum):
         return
 
+
 class _LHS_Parameter_Space(_Parameter_Space):
 
     _PARAM_NAMES = []
@@ -279,6 +283,11 @@ def sam_lib_combine(path_output, log, debug=False):
     fobs = data['fobs']
     fobs_edges = data['fobs_edges']
     nfreqs = fobs.size
+    if ('fail' in data) or ('gwb' not in data):
+        err = f"THIS IS A FAILED DATASET ({0}, {temp}).  LIBRARIAN HASNT BEEN UPDATED TO HANDLE THIS CASE!"
+        log.exception(err)
+        raise RuntimeError(err)
+
     temp_gwb = data['gwb'][:]
     nreals = temp_gwb.shape[1]
     param_vals = data['params']
@@ -309,8 +318,8 @@ def sam_lib_combine(path_output, log, debug=False):
     gwb = np.zeros(gwb_shape)
     sample_params = np.zeros((num_files, pdim))
     grid_idx = np.zeros((num_files, pdim), dtype=int)
-    if lhs_grid.shape == (): # not a gridded lhs parameter space
-        if lhs_grid[()] == -1: # using scipy LHS direct sampling
+    if lhs_grid.shape == ():   # not a gridded lhs parameter space
+        if lhs_grid[()] == -1:   # using scipy LHS direct sampling
             log.info(f"Parameter Space Type is direct LHS")
             pspacetype = 'ungriddedlhs'
         else:
@@ -324,6 +333,11 @@ def sam_lib_combine(path_output, log, debug=False):
     log.info(f"Collecting data from {len(files)} files")
     for ii, file in enumerate(tqdm.tqdm(files)):
         temp = np.load(file, allow_pickle=True)
+        if ('fail' in temp) or ('gwb' not in temp):
+            err = f"THIS IS A FAILED DATASET ({ii}, {file}).  LIBRARIAN HASNT BEEN UPDATED TO HANDLE THIS CASE!"
+            log.exception(err)
+            raise RuntimeError(err)
+
         assert ii == temp['pnum']
         assert np.allclose(fobs, temp['fobs'])
         assert np.allclose(fobs_edges, temp['fobs_edges'])
@@ -348,7 +362,7 @@ def sam_lib_combine(path_output, log, debug=False):
         h5.create_dataset('fobs', data=fobs)
         h5.create_dataset('fobs_edges', data=fobs_edges)
         h5.create_dataset('gwb', data=gwb)
-        pars_dataset = h5.create_dataset('sample_params', data=sample_params)
+        h5.create_dataset('sample_params', data=sample_params)
         h5.attrs['param_names'] = np.array(param_names).astype('S')
         h5.attrs['shape_names'] = np.array(shape_names).astype('S')
         h5.attrs['parameter_space_type'] = pspacetype
@@ -362,3 +376,63 @@ def sam_lib_combine(path_output, log, debug=False):
 
     log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
     return
+
+
+def fit_powerlaw(freqs, hc, nbins, init=[-15.0, -2.0/3.0]):
+    nbins = None if (nbins == 0) else nbins
+    cut = slice(None, nbins)
+    xx = freqs[cut] * YR
+    yy = hc[cut]
+
+    def powerlaw_fit(freqs, log10Ayr, gamma):
+        zz = log10Ayr + gamma * freqs
+        return zz
+
+    popt, pcov = sp.optimize.curve_fit(powerlaw_fit, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
+
+    amp = 10.0 ** popt[0]
+    gamma = popt[1]
+    return xx, amp, gamma
+
+
+def fit_spectra(freqs, gwb, nbins=[5, 10, 15]):
+    nf, nreals = np.shape(gwb)
+    assert len(freqs) == nf
+
+    num_snaps = len(nbins)
+    fit_lamp = np.zeros((nreals, num_snaps))
+    fit_plaw = np.zeros((nreals, num_snaps))
+    fit_med_lamp = np.zeros((num_snaps))
+    fit_med_plaw = np.zeros((num_snaps))
+    for ii, num in enumerate(nbins):
+        if (num is not None) and (num > nf):
+            continue
+
+        xx, amp, plaw = fit_powerlaw(freqs, np.median(gwb, axis=-1), num)
+        fit_med_lamp[ii] = np.log10(amp)
+        fit_med_plaw[ii] = plaw
+        for rr in range(nreals):
+            xx, amp, plaw = fit_powerlaw(freqs, gwb[:, rr], num)
+            fit_lamp[rr, ii] = np.log10(amp)
+            fit_plaw[rr, ii] = plaw
+
+    return nbins, fit_lamp, fit_plaw, fit_med_lamp, fit_med_plaw
+
+
+def get_gwb_fits_data(fobs_cents, gwb):
+    # these values must match label construction!
+    nbins = [5, 10, 15, 0]
+
+    nbins, lamp, plaw, med_lamp, med_plaw = holo.librarian.fit_spectra(fobs_cents, gwb, nbins=nbins)
+
+    label = (
+        f"log10(A10)={med_lamp[1]:.2f}, G10={med_plaw[1]:.4f}"
+        " | "
+        f"log10(A)={med_lamp[-1]:.2f}, G={med_plaw[-1]:.4f}"
+    )
+
+    fits_data = dict(
+        fit_nbins=nbins, fit_lamp=lamp, fit_plaw=plaw, fit_med_lamp=med_lamp, fit_med_plaw=med_plaw, fit_label=label
+    )
+    return fits_data
+

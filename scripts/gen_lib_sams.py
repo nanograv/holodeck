@@ -576,23 +576,63 @@ def run_sam(pnum, path_output):
         rv = False
         data = dict(fail=str(err))
 
+    if rv:
+        try:
+            fits_data = holo.librarian.get_gwb_fits_data(fobs_cents, gwb, nbins=[5, 10, 15, 0])
+        except Exception as err:
+            log.exception("Failed to load gwb fits data!")
+            log.exception(err)
+            fits_data = {}
+
+    else:
+        fits_data = {}
+
     meta_data = dict(
         pnum=pnum, pdim=space.paramdimen, nsamples=args.nsamples,
         lhs_grid=space.sampleindxs, lhs_grid_idx=space.lhsnumber_to_index(pnum),
         params=space.params, names=space.names, version=__version__
     )
 
-    np.savez(fname, **data, **meta_data, **legend)
+    np.savez(fname, **data, **meta_data, **fits_data, **legend)
     log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-BEG)} (start: {BEG})")
 
     if rv:
-        fname = fname.with_suffix('.png')
-        fig = holo.plot.plot_gwb(fobs_cents, gwb)
-        fig.savefig(fname, dpi=300)
-        log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-BEG)} (start: {BEG})")
-        plt.close('all')
+        try:
+            fname = fname.with_suffix('.png')
+            fig = make_gwb_plot(fobs_cents, gwb, fits_data)
+            fig.savefig(fname, dpi=300)
+            log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)}")
+            plt.close('all')
+        except Exception as err:
+            log.exception("Failed to make gwb plot!")
+            log.exception(err)
 
     return rv
+
+
+def make_gwb_plot(fobs, gwb, fits_data):
+    fig = holo.plot.plot_gwb(fobs, gwb)
+    ax = fig.axes[0]
+
+    if len(fits_data):
+        xx = fobs * YR
+        yy = 1e-15 * np.power(xx, -2.0/3.0)
+        ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
+
+        fits = holo.librarian.get_gwb_fits_data(fobs, gwb)
+
+        for ls, idx in zip([":", "--"], [1, -1]):
+            med_lamp = fits['fit_med_lamp'][idx]
+            med_plaw = fits['fit_med_plaw'][idx]
+            yy = (10.0 ** med_lamp) * (xx ** med_plaw)
+            label = fits['fit_nbins'][idx]
+            label = 'all' if label in [0, None] else label
+            ax.plot(xx, yy, color='k', ls=ls, alpha=0.5, lw=2.0, label=str(label) + " bins")
+
+        label = fits['fit_label'].replace(" | ", "\n")
+        fig.text(0.99, 0.99, label, fontsize=6, ha='right', va='top')
+
+    return fig
 
 
 def _barrier(bnum):
