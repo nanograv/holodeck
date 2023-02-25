@@ -431,32 +431,40 @@ def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
     hs = utils.gw_strain_source(mc, dc, fr)
     hc = (hs ** 2) * (fc / df)
 
+    # Create a single realization
     if realize is True:
-        # hc = hc * np.random.poisson(number)
         hc = hc * poisson_as_needed(number)
+        # Sum over M, Q, Z bins  ::  (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])
+        if sum:
+            hc = np.sum(hc, axis=(0, 1, 2))
+
+    # Do not create a discrete realization, use the expectation values directly
     elif realize in [None, False]:
         hc = hc * number
+        # Sum over M, Q, Z bins  ::  (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])
+        if sum:
+            hc = np.sum(hc, axis=(0, 1, 2))
+
+    # Create multiple discrete realizations
     elif utils.isinteger(realize):
-        shape = number.shape + (realize,)
-        _num = number[..., np.newaxis] * np.ones(shape)
-        _pnum = poisson_as_needed(_num)
-        hc = hc[..., np.newaxis] * _pnum
-        if holo.sam._DEBUG:
-            log.info(f"number = {utils.stats(number)}")
-            log.info(f"_num = {utils.stats(_num)}")
-            log.info(f"_pnum = {utils.stats(_pnum)}")
-            log.info(f"hc = {utils.stats(hc)}")
-            holo.sam._check_bads(edges + [np.arange(realize),], hc, "hc")
+        if sum:
+            import holodeck.cyutils   # noqa
+            # This function reate
+            hc = holo.cyutils.sam_poisson_gwb(number, hc, realize)
+
+        else:
+            log.warning(f"`sum`={sum} :: this requires a large amount of memory!")
+            shape = number.shape + (realize,)
+            hc = hc[..., np.newaxis] * poisson_as_needed(number[..., np.newaxis] * np.ones(shape))
+            if holo.sam._DEBUG:
+                log.info(f"number = {utils.stats(number)}")
+                log.info(f"hc = {utils.stats(hc)}")
+                holo.sam._check_bads(edges + [np.arange(realize),], hc, "hc")
 
     else:
         err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
         log.error(err)
         raise ValueError(err)
-
-    # Sum over M, Q, Z bins
-    # (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])
-    if sum:
-        hc = np.sum(hc, axis=(0, 1, 2))
 
     # convert from hc^2 to hc
     hc = np.sqrt(hc)
