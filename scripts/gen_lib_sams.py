@@ -578,7 +578,7 @@ def run_sam(pnum, path_output):
 
     if rv:
         try:
-            fits_data = holo.librarian.get_gwb_fits_data(fobs_cents, gwb, nbins=[5, 10, 15, 0])
+            fits_data = holo.librarian.get_gwb_fits_data(fobs_cents, gwb)
         except Exception as err:
             log.exception("Failed to load gwb fits data!")
             log.exception(err)
