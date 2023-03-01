@@ -272,6 +272,7 @@ class PS_Circ_01(_LHS_Parameter_Space):
 
     def sam_for_lhsnumber(self, lhsnum):
         param_grid = self.params_for_lhsnumber(lhsnum)
+        self.log.debug("params at {lhsnum}:: {param_grid}")
 
         hard_time, hard_gamma_inner, \
             gsmf_phi0, gsmf_mchar0, gsmf_alpha0, \
