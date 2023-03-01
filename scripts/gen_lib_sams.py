@@ -158,7 +158,6 @@ space = comm.bcast(space, root=0)
 log.info(
     f"samples={args.nsamples}, sam_shape={args.sam_shape}, nreals={args.nreals}\n"
     f"nfreqs={args.nfreqs}, pta_dur={args.pta_dur} [yr]\n"
-    # f"space.shape={space.shape}"
 )
 
 # ------------------------------------------------------------------------------
@@ -304,7 +303,7 @@ def run_sam(pnum, path_output):
     if rv:
         try:
             fname = fname.with_suffix('.png')
-            fig = make_gwb_plot(fobs_cents, gwb, fits_data)
+            fig = holo.librarian.make_gwb_plot(fobs_cents, gwb, fits_data)
             fig.savefig(fname, dpi=300)
             log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)}")
             plt.close('all')
@@ -313,31 +312,6 @@ def run_sam(pnum, path_output):
             log.exception(err)
 
     return rv
-
-
-def make_gwb_plot(fobs, gwb, fits_data):
-    fig = holo.plot.plot_gwb(fobs, gwb)
-    ax = fig.axes[0]
-
-    if len(fits_data):
-        xx = fobs * YR
-        yy = 1e-15 * np.power(xx, -2.0/3.0)
-        ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
-
-        fits = holo.librarian.get_gwb_fits_data(fobs, gwb)
-
-        for ls, idx in zip([":", "--"], [1, -1]):
-            med_lamp = fits['fit_med_lamp'][idx]
-            med_plaw = fits['fit_med_plaw'][idx]
-            yy = (10.0 ** med_lamp) * (xx ** med_plaw)
-            label = fits['fit_nbins'][idx]
-            label = 'all' if label in [0, None] else label
-            ax.plot(xx, yy, color='k', ls=ls, alpha=0.5, lw=2.0, label=str(label) + " bins")
-
-        label = fits['fit_label'].replace(" | ", "\n")
-        fig.text(0.99, 0.99, label, fontsize=6, ha='right', va='top')
-
-    return fig
 
 
 def _barrier(bnum):
