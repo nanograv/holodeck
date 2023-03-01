@@ -48,45 +48,12 @@ class _Parameter_Space(abc.ABC):
             names.append(par)
             params.append(vv)
 
-        '''
-        self.gsmf_phi0 = np.linspace(*gsmf_phi0)
-        self.times = np.logspace(*np.log10(times[:2]), times[2])
-        self.gpf_qgamma = np.linspace(*gpf_qgamma)
-        self.hard_gamma_inner = np.linspace(*hard_gamma_inner)
-        self.mmb_amp = np.linspace(*mmb_amp)
-        self.mmb_plaw = np.linspace(*mmb_plaw)
-        params = [
-            self.gsmf_phi0,
-            self.times,   # [Gyr]
-            self.gpf_qgamma,
-            self.hard_gamma_inner,
-            self.mmb_amp,
-            self.mmb_plaw
-        ]
-        self.names = [
-            'gsmf_phi0',
-            'times',
-            'gpf_qgamma',
-            'hard_gamma_inner',
-            'mmb_amp',
-            'mmb_plaw'
-        ]
-        '''
-
         self.paramdimen = len(params)
         self.params = params
         self.names = names
         maxints = [tmparr.size for tmparr in params]
 
-        # do scipy LHS
-        if False:
-            LHS = qmc.LatinHypercube(d=self.paramdimen, centered=False, strength=1)
-            # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
-            sampleindxs = LHS.random(n=nsamples)
-
-        # do pyDOE LHS
-        else:
-            sampleindxs = pyDOE.lhs(n=self.paramdimen, samples=nsamples, criterion='m')
+        sampleindxs = pyDOE.lhs(n=self.paramdimen, samples=nsamples, criterion='m')
 
         for i in range(self.paramdimen):
             sampleindxs[:, i] = np.floor(maxints[i] * sampleindxs[:, i])
@@ -106,9 +73,7 @@ class _Parameter_Space(abc.ABC):
             )
             log.warning(err)
 
-        # self.param_grid = np.moveaxis(self.param_grid, 0, -1)
-
-        pass
+        return
 
     def number_to_index(self, num):
         idx = np.unravel_index(num, self.shape)
@@ -129,27 +94,23 @@ class _Parameter_Space(abc.ABC):
 
     def param_dict_for_number(self, num):
         idx = self.number_to_index(num)
-        # pars = self.param_grid[idx]
         pars = self.params_at_index(idx)
         rv = {nn: pp for nn, pp in zip(self.names, pars)}
         return rv
 
     def param_dict_for_lhsnumber(self, lhsnum):
         idx = self.lhsnumber_to_index(lhsnum)
-        # pars = self.param_grid[idx]
         pars = self.params_at_index(idx)
         rv = {nn: pp for nn, pp in zip(self.names, pars)}
         return rv
 
     def params_for_number(self, num):
         idx = self.number_to_index(num)
-        # pars = self.param_grid[idx]
         pars = self.params_at_index(idx)
         return pars
 
     def params_for_lhsnumber(self, lhsnum):
         idx = self.lhsnumber_to_index(lhsnum)
-        # pars = self.param_grid[idx]
         pars = self.params_at_index(idx)
         return pars
 
@@ -203,7 +164,7 @@ class _LHS_Parameter_Space(_Parameter_Space):
         self.paramdimen = len(param_ranges)
         self.param_ranges = np.array(param_ranges)
         self.names = names
-        self.params = np.zeros((self.nsamples,self.paramdimen))
+        self.params = np.zeros((self.nsamples, self.paramdimen))
         # Below is done out of laziness and backwards compatibility but should be deprecated
         self.sampleindxs = -1
 
@@ -215,13 +176,13 @@ class _LHS_Parameter_Space(_Parameter_Space):
             st0 = np.random.get_state()
             log.info(f"Random state is:\n{st0}")
 
-
         # do scipy LHS
         if self.lhs_sampler == 'scipy':
             LHS = qmc.LatinHypercube(d=self.paramdimen, centered=False, strength=1, seed=self.seed)
             # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
             sample_rvs = LHS.random(n=nsamples)
-        elif self.lhs_sampler == 'pydoe': # do pyDOE LHS
+        # do pyDOE LHS
+        elif self.lhs_sampler == 'pydoe':
             sample_rvs = pyDOE.lhs(n=self.paramdimen, samples=nsamples, criterion='m')
         else:
             err = f"unknown LHS sampler: {self.lhs_sampler}"
@@ -243,15 +204,6 @@ class _LHS_Parameter_Space(_Parameter_Space):
     # Below are done out of laziness and backwards compatibility but should be deprecated
     def lhsnumber_to_index(self, pnum):
         return pnum
-
-    # @abc.abstractmethod
-    def sam_for_number(self, num):
-        raise
-        return
-
-    @abc.abstractmethod
-    def sam_for_lhsnumber(self, lhsnum):
-        return
 
 
 def sam_lib_combine(path_output, log, debug=False):
@@ -435,4 +387,30 @@ def get_gwb_fits_data(fobs_cents, gwb):
         fit_nbins=nbins, fit_lamp=lamp, fit_plaw=plaw, fit_med_lamp=med_lamp, fit_med_plaw=med_plaw, fit_label=label
     )
     return fits_data
+
+
+def make_gwb_plot(fobs, gwb, fits_data):
+    fig = holo.plot.plot_gwb(fobs, gwb)
+    ax = fig.axes[0]
+
+    if len(fits_data):
+        xx = fobs * YR
+        yy = 1e-15 * np.power(xx, -2.0/3.0)
+        ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
+
+        fits = holo.librarian.get_gwb_fits_data(fobs, gwb)
+
+        for ls, idx in zip([":", "--"], [1, -1]):
+            med_lamp = fits['fit_med_lamp'][idx]
+            med_plaw = fits['fit_med_plaw'][idx]
+            yy = (10.0 ** med_lamp) * (xx ** med_plaw)
+            label = fits['fit_nbins'][idx]
+            label = 'all' if label in [0, None] else label
+            ax.plot(xx, yy, color='k', ls=ls, alpha=0.5, lw=2.0, label=str(label) + " bins")
+
+        label = fits['fit_label'].replace(" | ", "\n")
+        fig.text(0.99, 0.99, label, fontsize=6, ha='right', va='top')
+
+    return fig
+
 
