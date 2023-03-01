@@ -61,6 +61,9 @@ DEF_ECCEN_NHARMS = 100
 
 MAX_FAILURES = 5
 
+# SPACE = holo.param_spaces.PS_Circ_01
+SPACE = holo.param_spaces.PS_Test_PD_01
+
 
 # ---- setup argparse
 
@@ -98,7 +101,6 @@ def setup_argparse():
     return args
 
 
-SPACE = holo.param_spaces.PS_Circ_01
 comm = MPI.COMM_WORLD
 
 args = setup_argparse() if comm.rank == 0 else None
@@ -140,19 +142,17 @@ log.info(f"Output path: {PATH_OUTPUT}")
 log.info(f"        log: {fname}")
 
 if comm.rank == 0:
-    src_file = Path(this_fname)
-    dst_file = PATH_OUTPUT.joinpath(src_file.name)
-    dst_file = dst_file.parent / ("runtime_" + dst_file.name)
-    shutil.copyfile(src_file, dst_file)
-    log.info(f"Copied {__file__} to {dst_file}")
+    copy_paths = [__file__, holo.librarian.__file__, holo.param_spaces.__file__]
+    for fname in copy_paths:
+        src_file = Path(fname)
+        dst_file = PATH_OUTPUT.joinpath("runtime_" + src_file.name)
+        # dst_file = dst_file.parent / ("runtime_" + dst_file.name)
+        shutil.copyfile(src_file, dst_file)
+        log.info(f"Copied {fname} to {dst_file}")
 
 # ---- setup Parameter_Space instance
 
 log.warning(f"SPACE = {SPACE}")
-# if issubclass(SPACE, holo.librarian._LHS_Parameter_Space):
-#     space = SPACE(log, args.nsamples, args.sam_shape, args.lhs, args.seed) if comm.rank == 0 else None
-# else:
-#     space = SPACE(log, args.nsamples, args.sam_shape) if comm.rank == 0 else None
 space = SPACE(log, args.nsamples, args.sam_shape, args.seed) if comm.rank == 0 else None
 space = comm.bcast(space, root=0)
 

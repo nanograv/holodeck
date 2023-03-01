@@ -3,7 +3,43 @@
 
 import holodeck as holo
 from holodeck.constants import MSOL, PC, GYR
-from holodeck.librarian import _Parameter_Space, _LHS_Parameter_Space
+from holodeck.librarian import (
+    _Parameter_Space, _LHS_Parameter_Space, _Param_Space,
+    PD_Normal, PD_Uniform, PD_Uniform_Log
+)
+
+
+class PS_Test_PD_01(_Param_Space):
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform_Log(0.01, 12.0),
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+        )
+        return
+
+    def model_for_number(self, num):
+        params = self.param_dict(num)
+
+        self.log.debug(f"params {num}:: {params}")
+
+        hard_time = params['hard_time'] * GYR
+
+        gsmf = holo.sam.GSMF_Schechter(phi0=params['gsmf_phi0'])
+        gpf = holo.sam.GPF_Power_Law()
+        gmt = holo.sam.GMT_Power_Law()
+        mmbulge = holo.relations.MMBulge_KH2013()
+
+        sam = holo.sam.Semi_Analytic_Model(
+            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            shape=self.sam_shape
+        )
+        hard = holo.hardening.Fixed_Time.from_sam(
+            sam, hard_time,
+            progress=False
+        )
+        return sam, hard
 
 
 class Parameter_Space_Hard04(_Parameter_Space):
