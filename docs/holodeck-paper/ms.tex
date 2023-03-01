@@ -29,11 +29,7 @@
 
 \title[holodeck: MBH binary populations]{Enter the \texttt{holodeck}: massive black hole binary population synthesis for gravitational wave calculations}
 \author[NANOGrav]{the NANOGrav collaboration}
-% \author[L.Z.~Kelley et al.]{
-%     Luke Zoltan Kelley$^{1}$\thanks{E-mail:lzkelley@northwestern.edu}\orcidA{} \\
-%     $^{1}$ \begin{minipage}[t]{\linewidth} Center for Interdisciplinary Exploration and Research in Astrophysics (CIERA), and\\Department of Physics \& Astronomy, Northwestern University, Evanston, IL 60208
-%     \end{minipage}
-% }
+
 
 
 \begin{document}
@@ -90,6 +86,7 @@
 % =================================================================================================
 % ====    Section 2 - Methods
 % =================================================================================================
+
 
 
 \section{Methods}
@@ -262,9 +259,31 @@
 
         The semi-analytic model formalism defines a continuous distribution of MBH binaries.  For many calculations, the discrete nature of MBHB sources is important, not only for examining individual continuous wave sources but also because of the important effects of discrete sources on the shape of the GWB due to the non-linear scaling of GW strain \citep{Sesana+2008}.  Additional, a component of the uncertainty in expected GW signals is due to `cosmic variance', which can be treated as Poisson noise when creating multiple samples (or `realizations') of our binary populations.  To handle discretization and resampling we use the \texttt{kalepy} package \citep{kalepy2021}, in particular, a method of outlier sampling to capture regions of parameter space where finite number effects are important.  The \holodeck{} semi-analytic models specify the number (or number-density) of binaries over a grid, i.e.~$N_{ijkl}$.  By definition, grid cells which have an expected total number of binaries $\gg 1$ will not produce appreciable finite-number effects, so instead they are given a weighting based on a Poisson distribution centered around their expectation value, i.e.~$\mathcal{P}(N_{ijkl})$.  Grid cells with expected numbers of order unity or less do produce important finite-number effects, and thus are directly resampled
 
+        \subsubsection{Parameters}
+
+            \begin{itemize}
+                \item \textbf{GSMF}
+                \begin{itemize}
+                    \item \citep{Tomczak+2014} - single schechter fits, little variation over redshift\\
+                    \item two
+                \end{itemize}
+
+
+                \item \textbf{GPF}
+                \begin{itemize}
+                    \item one \\
+                    \item two
+                \end{itemize}
+
+
+            \end{itemize}
+
+
+
 % =================================================================================================
 % ====    Section 3 - Results
 % =================================================================================================
+
 
 
 \section{Results}
@@ -285,6 +304,7 @@
 % =================================================================================================
 
 
+
 \section{Discussion \& Conclusions}
     \label{sec:disc}
 
@@ -296,6 +316,7 @@
 
 
 % ====    Acknowledgments
+
 
 
 \section*{Acknowledgments}
@@ -322,6 +343,7 @@
 % ====    Appendices
 
 \appendix
+
 
 
 \section{Additional Equations}
@@ -404,6 +426,7 @@
             H(z) & = H_0(z) \cdot \lrs[1/2]{\Omega_R \lr[4]{1+z} + \Omega_m \lr[3]{1+z} + \Omega_k \lr[2]{1+z} + \Omega_\Lambda}.
         \end{align}
         The $\Omega$ terms are the usual redshift-zero fractions of the critical density for radiation, non-relativistic matter, curvature, and dark energy.  We adopt the results of WMAP9 \citep{Hinshaw+2013} for our fiducial cosmology, assuming zero curvature: $H_0 = 69.33 \textrm{ km/s/Mpc}$, $\Omega_m = 0.2880$, $\Omega_\Lambda = 0.7120$.
+
 
 
 \section{Additional Material}
