@@ -22,7 +22,7 @@ class PS_Test_PD_01(_Param_Space):
     def model_for_number(self, num):
         params = self.param_dict(num)
 
-        self.log.debug(f"params {num}:: {params}")
+        self._log.debug(f"params {num}:: {params}")
 
         hard_time = params['hard_time'] * GYR
 
@@ -40,6 +40,17 @@ class PS_Test_PD_01(_Param_Space):
             progress=False
         )
         return sam, hard
+
+
+class PS_Test_PD_02(PS_Test_PD_01):
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform_Log(0.01, 12.0),
+            gsmf_phi0=PD_Normal(-2.5, -0.75),
+        )
+        return
 
 
 class Parameter_Space_Hard04(_Parameter_Space):
