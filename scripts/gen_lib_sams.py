@@ -149,10 +149,11 @@ if comm.rank == 0:
 # ---- setup Parameter_Space instance
 
 log.warning(f"SPACE = {SPACE}")
-if issubclass(SPACE, holo.librarian._LHS_Parameter_Space):
-    space = SPACE(log, args.nsamples, args.sam_shape, args.lhs, args.seed) if comm.rank == 0 else None
-else:
-    space = SPACE(log, args.nsamples, args.sam_shape) if comm.rank == 0 else None
+# if issubclass(SPACE, holo.librarian._LHS_Parameter_Space):
+#     space = SPACE(log, args.nsamples, args.sam_shape, args.lhs, args.seed) if comm.rank == 0 else None
+# else:
+#     space = SPACE(log, args.nsamples, args.sam_shape) if comm.rank == 0 else None
+space = SPACE(log, args.nsamples, args.sam_shape, args.seed) if comm.rank == 0 else None
 space = comm.bcast(space, root=0)
 
 log.info(
@@ -192,9 +193,8 @@ def main():
 
     for ind in iterator:
         lhsparam = ind
-        # log.info(f"{comm.rank=} {ind=} {space.param_dict_for_lhsnumber(lhsparam)}")
         log.info(f"{comm.rank=} {ind=}")
-        pdict = space.param_dict_for_lhsnumber(lhsparam)
+        pdict = space.param_dict(lhsparam)
         msg = "\n"
         for kk, vv in pdict.items():
             msg += f"{kk}={vv}\n"
@@ -260,13 +260,13 @@ def run_sam(pnum, path_output):
 
     try:
         log.debug("Selecting `sam` and `hard` instances")
-        sam, hard = space.sam_for_lhsnumber(pnum)
+        sam, hard = space(pnum)
         log_mem()
         log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.nreals})")
         gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
         log_mem()
         log.debug(f"{holo.utils.stats(gwb)=}")
-        legend = space.param_dict_for_lhsnumber(pnum)
+        legend = space.param_dict(pnum)
         log.debug(f"Saving {pnum} to file")
         data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb)
         rv = True
@@ -292,8 +292,7 @@ def run_sam(pnum, path_output):
         fits_data = {}
 
     meta_data = dict(
-        pnum=pnum, pdim=space.paramdimen, nsamples=args.nsamples,
-        lhs_grid=space.sampleindxs, lhs_grid_idx=space.lhsnumber_to_index(pnum),
+        pnum=pnum, pdim=space.ndims, nsamples=args.nsamples,
         params=space.params, names=space.names, version=__version__
     )
 

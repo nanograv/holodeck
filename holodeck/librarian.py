@@ -206,6 +206,120 @@ class _LHS_Parameter_Space(_Parameter_Space):
         return pnum
 
 
+class _Param_Space(abc.ABC):
+
+    def __init__(self, log, nsamples, sam_shape, seed, **kwargs):
+
+        log.debug(f"seed = {seed}")
+        np.random.seed(seed)
+        #! NOTE: this should be saved to output!!!
+        random_state = np.random.get_state()
+        log.debug(f"Random state is:\n{random_state}")
+
+        names = list(kwargs.keys())
+        ndims = len(names)
+        if ndims == 0:
+            err = f"No parameters passed to {self}!"
+            log.exception(err)
+            raise RuntimeError(err)
+
+        dists = []
+        for nam in names:
+            val = kwargs[nam]
+
+            if not isinstance(val, holo.librarian._Param_Dist):
+                err = f"{nam}: {val} is not a `_Param_Dist` object!"
+                log.exception(err)
+                raise ValueError(err)
+
+            try:
+                vv = val(0.0)
+                f"{vv:.4e}"
+            except Exception as err:
+                log.exception(f"Failed to call {val}(0.0)!")
+                log.exception(err)
+                raise err
+
+            dists.append(val)
+
+        # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
+        LHS = qmc.LatinHypercube(d=ndims, centered=False, strength=1, seed=seed)
+        # (S, D) - samples, dimensions
+        uniform_samples = LHS.random(n=nsamples)
+        samples = np.zeros_like(uniform_samples)
+
+        for ii, dist in enumerate(dists):
+            samples[:, ii] = dist(uniform_samples[:, ii])
+
+        self._log = log
+        self.names = names
+        self.nsamples = nsamples
+        self.ndims = ndims
+        self.sam_shape = sam_shape
+        self._seed = seed
+        self._random_state = random_state
+        self._uniform_samples = uniform_samples
+        self._samples = samples
+
+        return
+
+    def params(self, num):
+        return self._samples[num]
+
+    def param_dict(self, num):
+        rv = {nn: pp for nn, pp in zip(self.names, self.params(num))}
+        return rv
+
+    def __call__(self, num):
+        return self.model_for_number(num)
+
+    @property
+    def shape(self):
+        return self._samples.shape
+
+    @abc.abstractmethod
+    def model_for_number(self, num):
+        raise
+
+
+class _Param_Dist(abc.ABC):
+
+    @abc.abstractmethod
+    def __init__(self):
+        return
+
+    def __call__(self, xx):
+        return self._dist_func(xx)
+
+
+class PD_Uniform(_Param_Dist):
+
+    def __init__(self, lo, hi):
+        self._lo = lo
+        self._hi = hi
+        self._dist_func = lambda xx: self._lo + (self._hi - self._lo) * xx
+        return
+
+
+class PD_Uniform_Log(_Param_Dist):
+
+    def __init__(self, lo, hi):
+        self._lo = np.log10(lo)
+        self._hi = np.log10(hi)
+        self._dist_func = lambda xx: np.power(10.0, self._lo + (self._hi - self._lo) * xx)
+        return
+
+
+class PD_Normal(_Param_Dist):
+
+    def __init__(self, mean, stdev):
+        self._mean = mean
+        self._stdev = stdev
+        self._dist = sp.stats.norm(loc=mean, scale=stdev)
+        self._dist_func = lambda xx: self._dist.ppf(xx)
+        return
+
+
 def sam_lib_combine(path_output, log, debug=False):
     log.info(f"Path output = {path_output}")
 
