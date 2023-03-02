@@ -228,6 +228,8 @@ if __name__ == "__main__":
     np.seterr(divide='ignore', invalid='ignore', over='ignore')
     warnings.filterwarnings("ignore", category=UserWarning)
 
+    main()
+
     if (comm.rank == 0) and (not args.test):
         log.info("Concatenating outputs into single file")
         holo.librarian.sam_lib_combine(PATH_OUTPUT, log)
