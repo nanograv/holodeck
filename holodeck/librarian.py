@@ -26,6 +26,403 @@ from holodeck.constants import YR
 __version__ = "0.1.0"
 
 
+class _Param_Space(abc.ABC):
+
+    def __init__(self, log, nsamples, sam_shape, seed, **kwargs):
+
+        log.debug(f"seed = {seed}")
+        np.random.seed(seed)
+        #! NOTE: this should be saved to output!!!
+        random_state = np.random.get_state()
+        log.debug(f"Random state is:\n{random_state}")
+
+        names = list(kwargs.keys())
+        ndims = len(names)
+        if ndims == 0:
+            err = f"No parameters passed to {self}!"
+            log.exception(err)
+            raise RuntimeError(err)
+
+        dists = []
+        for nam in names:
+            val = kwargs[nam]
+
+            if not isinstance(val, holo.librarian._Param_Dist):
+                err = f"{nam}: {val} is not a `_Param_Dist` object!"
+                log.exception(err)
+                raise ValueError(err)
+
+            try:
+                vv = val(0.0)
+                f"{vv:.4e}"
+            except Exception as err:
+                log.exception(f"Failed to call {val}(0.0)!")
+                log.exception(err)
+                raise err
+
+            dists.append(val)
+
+        # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
+        LHS = qmc.LatinHypercube(d=ndims, centered=False, strength=1, seed=seed)
+        # (S, D) - samples, dimensions
+        samples = LHS.random(n=nsamples)
+        params = np.zeros_like(samples)
+
+        for ii, dist in enumerate(dists):
+            params[:, ii] = dist(samples[:, ii])
+
+        self._log = log
+        self.names = names
+        self.nsamples = nsamples
+        self.ndims = ndims
+        self.sam_shape = sam_shape
+        self._seed = seed
+        self._random_state = random_state
+        self._samples = samples
+        self._params = params
+
+        return
+
+    def params(self, num):
+        return self._params[num]
+
+    def param_dict(self, num):
+        rv = {nn: pp for nn, pp in zip(self.names, self.params(num))}
+        return rv
+
+    def __call__(self, num):
+        return self.model_for_number(num)
+
+    @property
+    def shape(self):
+        return self._samples.shape
+
+    @abc.abstractmethod
+    def model_for_number(self, num):
+        raise
+
+
+class _Param_Dist(abc.ABC):
+
+    @abc.abstractmethod
+    def __init__(self):
+        return
+
+    def __call__(self, xx):
+        return self._dist_func(xx)
+
+
+class PD_Uniform(_Param_Dist):
+
+    def __init__(self, lo, hi):
+        self._lo = lo
+        self._hi = hi
+        self._dist_func = lambda xx: self._lo + (self._hi - self._lo) * xx
+        return
+
+
+class PD_Uniform_Log(_Param_Dist):
+
+    def __init__(self, lo, hi):
+        self._lo = np.log10(lo)
+        self._hi = np.log10(hi)
+        self._dist_func = lambda xx: np.power(10.0, self._lo + (self._hi - self._lo) * xx)
+        return
+
+
+class PD_Normal(_Param_Dist):
+
+    def __init__(self, mean, stdev):
+        self._mean = mean
+        self._stdev = stdev
+        self._dist = sp.stats.norm(loc=mean, scale=stdev)
+        self._dist_func = lambda xx: self._dist.ppf(xx)
+        return
+
+
+def sam_lib_combine(path_output, log, debug=False):
+    path_output = Path(path_output)
+    log.info(f"Path output = {path_output}")
+
+    regex = "lib_sams__p*.npz"
+    files = sorted(path_output.glob(regex))
+    num_files = len(files)
+    log.info(f"\texists={path_output.exists()}, found {num_files} files")
+
+    # ---- Make sure that no file numbers are missing
+    all_exist = True
+    log.info("Checking files")
+    for ii in tqdm.tqdm(range(num_files)):
+        temp = path_output.joinpath(regex.replace('*', f"{ii:06d}"))
+        exists = temp.exists()
+        if not exists:
+            all_exist = False
+            break
+
+    if not all_exist:
+        err = f"Missing at least file number {ii} out of {num_files} files!"
+        log.exception(err)
+        raise ValueError(err)
+
+    # ---- Check one example data file
+    temp = files[0]
+    data = np.load(temp, allow_pickle=True)
+    log.info(f"Test file: {temp}\n\tkeys: {list(data.keys())}")
+    fobs = data['fobs']
+    fobs_edges = data['fobs_edges']
+    nfreqs = fobs.size
+    if ('fail' in data) or ('gwb' not in data):
+        err = f"THIS IS A FAILED DATASET ({0}, {temp}).  LIBRARIAN HASNT BEEN UPDATED TO HANDLE THIS CASE!"
+        log.exception(err)
+        raise RuntimeError(err)
+
+    temp_gwb = data['gwb'][:]
+    assert np.ndim(temp_gwb) == 2
+    _nfreqs, nreals = temp_gwb.shape
+    assert nfreqs == _nfreqs
+    all_sample_vals = data['samples']   # uniform [0.0, 1.0] samples in each dimension, converted to parameters
+    all_param_vals = data['params']     # physical parameters
+    param_names = data['names']
+    nsamples = data['nsamples']
+    pdim = data['pdim']
+    lib_vers = data['librarian_version']
+    log.info(f"Sample file uses librarian.py version {lib_vers}")
+    new_lib_vers = holo.librarian.__version__
+    if lib_vers != new_lib_vers:
+        log.warning(f"Loaded file {temp} uses librarian.py version {lib_vers}, current version is {new_lib_vers}!")
+
+    lib_vers = [lib_vers]
+    assert all_sample_vals.shape == (nsamples, pdim)
+    assert all_param_vals.shape == (nsamples, pdim)
+    if num_files != nsamples:
+        raise ValueError(f"nsamples={nsamples} but num_files={num_files} !!")
+
+    # ---- Store results from all files
+
+    gwb_shape = [num_files, nfreqs, nreals]
+    shape_names = list(param_names[:]) + ['freqs', 'reals']
+    gwb = np.zeros(gwb_shape)
+    sample_params = np.zeros((num_files, pdim))
+
+    log.info(f"Collecting data from {len(files)} files")
+    for ii, file in enumerate(tqdm.tqdm(files)):
+        temp = np.load(file, allow_pickle=True)
+        # When a processor fails for a given parameter, the output file is still created with the 'fail' key added
+        # TODO: handle this case when combining files (i.e. in this function)
+        if ('fail' in temp) or ('gwb' not in temp):
+            err = f"THIS IS A FAILED DATASET ({ii}, {file}).  LIBRARIAN HASNT BEEN UPDATED TO HANDLE THIS CASE!"
+            log.exception(err)
+            raise RuntimeError(err)
+
+        # Make sure basic parameters match from this file to the test file
+        assert ii == temp['pnum']
+        assert np.allclose(fobs, temp['fobs'])
+        assert np.allclose(fobs_edges, temp['fobs_edges'])
+        check = temp['librarian_version']
+        if check not in lib_vers:
+            log.warning("Mismatch in librarian.py version in saved files!  {ii} {file} with version {check}")
+            lib_vers.append(check)
+
+        # Make sure the individual parameters are consistent with the test file
+        for jj, nam in enumerate(param_names):
+            check = temp[nam]
+            expect = all_param_vals[ii, jj]
+            if not np.isclose(check, expect):
+                err = f"Expected {expect} from all parameters [{ii}, {jj}={nam}], but got {check}!"
+                log.exception(f"error in file {ii} {file}")
+                log.exception(err)
+                raise ValueError(err)
+
+            sample_params[ii, jj] = check
+        # Store the GWB from this file
+        gwb[ii, :, :] = temp['gwb'][...]
+        if debug:
+            break
+
+    # ---- Save to concatenated output file ----
+    out_filename = path_output.joinpath('sam_lib.hdf5')
+    log.info(f"Writing collected data to file {out_filename}")
+    with h5py.File(out_filename, 'w') as h5:
+        h5.create_dataset('fobs', data=fobs)
+        h5.create_dataset('fobs_edges', data=fobs_edges)
+        h5.create_dataset('gwb', data=gwb)
+        h5.create_dataset('sample_params', data=sample_params)
+        h5.attrs['param_names'] = np.array(param_names).astype('S')
+        h5.attrs['shape_names'] = np.array(shape_names).astype('S')
+        h5.attrs['librarian_version'] = ", ".join(lib_vers)
+
+    log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
+    return
+
+
+def fit_powerlaw(freqs, hc, nbins, init=[-15.0, -2.0/3.0]):
+    nbins = None if (nbins == 0) else nbins
+    cut = slice(None, nbins)
+    xx = freqs[cut] * YR
+    yy = hc[cut]
+
+    def powerlaw_fit(freqs, log10Ayr, gamma):
+        zz = log10Ayr + gamma * freqs
+        return zz
+
+    popt, pcov = sp.optimize.curve_fit(powerlaw_fit, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
+
+    amp = 10.0 ** popt[0]
+    gamma = popt[1]
+    return xx, amp, gamma
+
+
+def fit_spectra(freqs, gwb, nbins=[5, 10, 15]):
+    nf, nreals = np.shape(gwb)
+    assert len(freqs) == nf
+
+    num_snaps = len(nbins)
+    fit_lamp = np.zeros((nreals, num_snaps))
+    fit_plaw = np.zeros((nreals, num_snaps))
+    fit_med_lamp = np.zeros((num_snaps))
+    fit_med_plaw = np.zeros((num_snaps))
+    for ii, num in enumerate(nbins):
+        if (num is not None) and (num > nf):
+            continue
+
+        xx, amp, plaw = fit_powerlaw(freqs, np.median(gwb, axis=-1), num)
+        fit_med_lamp[ii] = np.log10(amp)
+        fit_med_plaw[ii] = plaw
+        for rr in range(nreals):
+            xx, amp, plaw = fit_powerlaw(freqs, gwb[:, rr], num)
+            fit_lamp[rr, ii] = np.log10(amp)
+            fit_plaw[rr, ii] = plaw
+
+    return nbins, fit_lamp, fit_plaw, fit_med_lamp, fit_med_plaw
+
+
+def get_gwb_fits_data(fobs_cents, gwb):
+    # these values must match label construction!
+    nbins = [5, 10, 15, 0]
+
+    nbins, lamp, plaw, med_lamp, med_plaw = holo.librarian.fit_spectra(fobs_cents, gwb, nbins=nbins)
+
+    label = (
+        f"log10(A10)={med_lamp[1]:.2f}, G10={med_plaw[1]:.4f}"
+        " | "
+        f"log10(A)={med_lamp[-1]:.2f}, G={med_plaw[-1]:.4f}"
+    )
+
+    fits_data = dict(
+        fit_nbins=nbins, fit_lamp=lamp, fit_plaw=plaw, fit_med_lamp=med_lamp, fit_med_plaw=med_plaw, fit_label=label
+    )
+    return fits_data
+
+
+def make_gwb_plot(fobs, gwb, fits_data):
+    fig = holo.plot.plot_gwb(fobs, gwb)
+    ax = fig.axes[0]
+
+    if len(fits_data):
+        xx = fobs * YR
+        yy = 1e-15 * np.power(xx, -2.0/3.0)
+        ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
+
+        fits = holo.librarian.get_gwb_fits_data(fobs, gwb)
+
+        for ls, idx in zip([":", "--"], [1, -1]):
+            med_lamp = fits['fit_med_lamp'][idx]
+            med_plaw = fits['fit_med_plaw'][idx]
+            yy = (10.0 ** med_lamp) * (xx ** med_plaw)
+            label = fits['fit_nbins'][idx]
+            label = 'all' if label in [0, None] else label
+            ax.plot(xx, yy, color='k', ls=ls, alpha=0.5, lw=2.0, label=str(label) + " bins")
+
+        label = fits['fit_label'].replace(" | ", "\n")
+        fig.text(0.99, 0.99, label, fontsize=6, ha='right', va='top')
+
+    return fig
+
+
+def run_sam_at_pspace_num(args, space, pnum, path_output):
+    log = args.log
+    fname = f"lib_sams__p{pnum:06d}.npz"
+    fname = Path(path_output, fname)
+    beg = datetime.now()
+    log.info(f"{pnum=} :: {fname=} beginning at {beg}")
+    if fname.exists():
+        log.warning(f"File {fname} already exists.")
+
+    def log_mem():
+        # results.ru_maxrss is KB on Linux, B on macos
+        mem_max = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 2)
+        process = psutil.Process(os.getpid())
+        mem_rss = process.memory_info().rss / 1024**3
+        mem_vms = process.memory_info().vms / 1024**3
+        log.info(f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB")
+
+    pta_dur = args.pta_dur * YR
+    nfreqs = args.nfreqs
+    hifr = nfreqs/pta_dur
+    pta_cad = 1.0 / (2 * hifr)
+    fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
+    fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
+    log.info(f"Created {fobs_cents.size} frequency bins")
+    log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
+    log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
+    log_mem()
+    assert nfreqs == fobs_cents.size
+
+    try:
+        log.debug("Selecting `sam` and `hard` instances")
+        sam, hard = space(pnum)
+        log_mem()
+        log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.nreals})")
+        gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
+        log_mem()
+        log.debug(f"{holo.utils.stats(gwb)=}")
+        legend = space.param_dict(pnum)
+        log.debug(f"Saving {pnum} to file")
+        data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb)
+        rv = True
+    except Exception as err:
+        log.exception("\n\n")
+        log.exception("="*100)
+        log.exception(f"`run_sam` FAILED on {pnum=}\n")
+        log.exception(err)
+        log.exception("="*100)
+        log.exception("\n\n")
+        rv = False
+        data = dict(fail=str(err))
+
+    if rv:
+        try:
+            fits_data = holo.librarian.get_gwb_fits_data(fobs_cents, gwb)
+        except Exception as err:
+            log.exception("Failed to load gwb fits data!")
+            log.exception(err)
+            fits_data = {}
+
+    else:
+        fits_data = {}
+
+    meta_data = dict(
+        pnum=pnum, pdim=space.ndims, nsamples=args.nsamples, librarian_version=__version__,
+        param_names=space.names, params=space._params, samples=space._samples,
+    )
+
+    np.savez(fname, **data, **meta_data, **fits_data, **legend)
+    log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-beg)}")
+
+    if rv:
+        try:
+            fname = fname.with_suffix('.png')
+            fig = holo.librarian.make_gwb_plot(fobs_cents, gwb, fits_data)
+            fig.savefig(fname, dpi=300)
+            log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)}")
+            plt.close('all')
+        except Exception as err:
+            log.exception("Failed to make gwb plot!")
+            log.exception(err)
+
+    return rv
+
+
 class _Parameter_Space(abc.ABC):
 
     _PARAM_NAMES = []
@@ -214,396 +611,6 @@ class _LHS_Parameter_Space(_Parameter_Space):
     # Below are done out of laziness and backwards compatibility but should be deprecated
     def lhsnumber_to_index(self, pnum):
         return pnum
-
-
-class _Param_Space(abc.ABC):
-
-    def __init__(self, log, nsamples, sam_shape, seed, **kwargs):
-
-        log.debug(f"seed = {seed}")
-        np.random.seed(seed)
-        #! NOTE: this should be saved to output!!!
-        random_state = np.random.get_state()
-        log.debug(f"Random state is:\n{random_state}")
-
-        names = list(kwargs.keys())
-        ndims = len(names)
-        if ndims == 0:
-            err = f"No parameters passed to {self}!"
-            log.exception(err)
-            raise RuntimeError(err)
-
-        dists = []
-        for nam in names:
-            val = kwargs[nam]
-
-            if not isinstance(val, holo.librarian._Param_Dist):
-                err = f"{nam}: {val} is not a `_Param_Dist` object!"
-                log.exception(err)
-                raise ValueError(err)
-
-            try:
-                vv = val(0.0)
-                f"{vv:.4e}"
-            except Exception as err:
-                log.exception(f"Failed to call {val}(0.0)!")
-                log.exception(err)
-                raise err
-
-            dists.append(val)
-
-        # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
-        LHS = qmc.LatinHypercube(d=ndims, centered=False, strength=1, seed=seed)
-        # (S, D) - samples, dimensions
-        samples = LHS.random(n=nsamples)
-        params = np.zeros_like(samples)
-
-        for ii, dist in enumerate(dists):
-            params[:, ii] = dist(samples[:, ii])
-
-        self._log = log
-        self.names = names
-        self.nsamples = nsamples
-        self.ndims = ndims
-        self.sam_shape = sam_shape
-        self._seed = seed
-        self._random_state = random_state
-        self._samples = samples
-        self._params = params
-
-        return
-
-    def params(self, num):
-        return self._params[num]
-
-    def param_dict(self, num):
-        rv = {nn: pp for nn, pp in zip(self.names, self.params(num))}
-        return rv
-
-    def __call__(self, num):
-        return self.model_for_number(num)
-
-    @property
-    def shape(self):
-        return self._samples.shape
-
-    @abc.abstractmethod
-    def model_for_number(self, num):
-        raise
-
-
-class _Param_Dist(abc.ABC):
-
-    @abc.abstractmethod
-    def __init__(self):
-        return
-
-    def __call__(self, xx):
-        return self._dist_func(xx)
-
-
-class PD_Uniform(_Param_Dist):
-
-    def __init__(self, lo, hi):
-        self._lo = lo
-        self._hi = hi
-        self._dist_func = lambda xx: self._lo + (self._hi - self._lo) * xx
-        return
-
-
-class PD_Uniform_Log(_Param_Dist):
-
-    def __init__(self, lo, hi):
-        self._lo = np.log10(lo)
-        self._hi = np.log10(hi)
-        self._dist_func = lambda xx: np.power(10.0, self._lo + (self._hi - self._lo) * xx)
-        return
-
-
-class PD_Normal(_Param_Dist):
-
-    def __init__(self, mean, stdev):
-        self._mean = mean
-        self._stdev = stdev
-        self._dist = sp.stats.norm(loc=mean, scale=stdev)
-        self._dist_func = lambda xx: self._dist.ppf(xx)
-        return
-
-
-def sam_lib_combine(path_output, log, debug=False):
-    path_output = Path(path_output)
-    log.info(f"Path output = {path_output}")
-
-    regex = "lib_sams__p*.npz"
-    files = sorted(path_output.glob(regex))
-    num_files = len(files)
-    log.info(f"\texists={path_output.exists()}, found {num_files} files")
-
-    # ---- Make sure that no file numbers are missing
-    all_exist = True
-    log.info("Checking files")
-    for ii in tqdm.tqdm(range(num_files)):
-        temp = path_output.joinpath(regex.replace('*', f"{ii:06d}"))
-        exists = temp.exists()
-        if not exists:
-            all_exist = False
-            break
-
-    if not all_exist:
-        err = f"Missing at least file number {ii} out of {num_files} files!"
-        log.exception(err)
-        raise ValueError(err)
-
-    # ---- Check one example data file
-    temp = files[0]
-    data = np.load(temp, allow_pickle=True)
-    log.info(f"Test file: {temp}\n\tkeys: {list(data.keys())}")
-    fobs = data['fobs']
-    fobs_edges = data['fobs_edges']
-    nfreqs = fobs.size
-    if ('fail' in data) or ('gwb' not in data):
-        err = f"THIS IS A FAILED DATASET ({0}, {temp}).  LIBRARIAN HASNT BEEN UPDATED TO HANDLE THIS CASE!"
-        log.exception(err)
-        raise RuntimeError(err)
-
-    temp_gwb = data['gwb'][:]
-    assert np.ndim(temp_gwb) == 2
-    _nfreqs, nreals = temp_gwb.shape
-    assert nfreqs == _nfreqs
-    all_sample_vals = data['samples']   # uniform [0.0, 1.0] samples in each dimension, converted to parameters
-    all_param_vals = data['params']     # physical parameters
-    param_names = data['names']
-    nsamples = data['nsamples']
-    pdim = data['pdim']
-    assert all_sample_vals.shape == (nsamples, pdim)
-    assert all_param_vals.shape == (nsamples, pdim)
-    if num_files != nsamples:
-        raise ValueError(f"nsamples={nsamples} but num_files={num_files} !!")
-
-    # ---- Store results from all files
-
-    gwb_shape = [num_files, nfreqs, nreals]
-    shape_names = list(param_names[:]) + ['freqs', 'reals']
-    gwb = np.zeros(gwb_shape)
-    sample_params = np.zeros((num_files, pdim))
-    grid_idx = np.zeros((num_files, pdim), dtype=int)
-
-    #! ====== CONTINUE HERE ========= !#
-
-    log.info(f"Collecting data from {len(files)} files")
-    for ii, file in enumerate(tqdm.tqdm(files)):
-        temp = np.load(file, allow_pickle=True)
-        if ('fail' in temp) or ('gwb' not in temp):
-            err = f"THIS IS A FAILED DATASET ({ii}, {file}).  LIBRARIAN HASNT BEEN UPDATED TO HANDLE THIS CASE!"
-            log.exception(err)
-            raise RuntimeError(err)
-
-        assert ii == temp['pnum']
-        assert np.allclose(fobs, temp['fobs'])
-        assert np.allclose(fobs_edges, temp['fobs_edges'])
-        pars = [temp[nn][()] for nn in param_names]
-        for jj, (pp, nn) in enumerate(zip(temp['params'], temp['names'])):
-            assert np.allclose(pp, param_vals[jj])
-            assert nn == param_names[jj]
-
-        assert np.all(lhs_grid == temp['lhs_grid'])
-
-        tt = temp['gwb'][:]
-        assert np.shape(tt) == (nfreqs, nreals)
-        gwb[ii] = tt
-        sample_params[ii, :] = pars
-        grid_idx[ii, :] = temp['lhs_grid_idx']
-        if debug:
-            break
-
-    out_filename = path_output.joinpath('sam_lib.hdf5')
-    log.info(f"Writing collected data to file {out_filename}")
-    with h5py.File(out_filename, 'w') as h5:
-        h5.create_dataset('fobs', data=fobs)
-        h5.create_dataset('fobs_edges', data=fobs_edges)
-        h5.create_dataset('gwb', data=gwb)
-        h5.create_dataset('sample_params', data=sample_params)
-        h5.attrs['param_names'] = np.array(param_names).astype('S')
-        h5.attrs['shape_names'] = np.array(shape_names).astype('S')
-        h5.attrs['parameter_space_type'] = pspacetype
-        if pspacetype == 'griddedlhs':
-            h5.create_dataset('lhs_grid', data=lhs_grid)
-            h5.create_dataset('lhs_grid_indices', data=grid_idx)
-            group = h5.create_group('parameters')
-            group.attrs['ordered_parameters'] = param_names
-            for pname, pvals in zip(param_names, param_vals):
-                group.create_dataset(pname, data=pvals)
-
-    log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
-    return
-
-
-def fit_powerlaw(freqs, hc, nbins, init=[-15.0, -2.0/3.0]):
-    nbins = None if (nbins == 0) else nbins
-    cut = slice(None, nbins)
-    xx = freqs[cut] * YR
-    yy = hc[cut]
-
-    def powerlaw_fit(freqs, log10Ayr, gamma):
-        zz = log10Ayr + gamma * freqs
-        return zz
-
-    popt, pcov = sp.optimize.curve_fit(powerlaw_fit, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
-
-    amp = 10.0 ** popt[0]
-    gamma = popt[1]
-    return xx, amp, gamma
-
-
-def fit_spectra(freqs, gwb, nbins=[5, 10, 15]):
-    nf, nreals = np.shape(gwb)
-    assert len(freqs) == nf
-
-    num_snaps = len(nbins)
-    fit_lamp = np.zeros((nreals, num_snaps))
-    fit_plaw = np.zeros((nreals, num_snaps))
-    fit_med_lamp = np.zeros((num_snaps))
-    fit_med_plaw = np.zeros((num_snaps))
-    for ii, num in enumerate(nbins):
-        if (num is not None) and (num > nf):
-            continue
-
-        xx, amp, plaw = fit_powerlaw(freqs, np.median(gwb, axis=-1), num)
-        fit_med_lamp[ii] = np.log10(amp)
-        fit_med_plaw[ii] = plaw
-        for rr in range(nreals):
-            xx, amp, plaw = fit_powerlaw(freqs, gwb[:, rr], num)
-            fit_lamp[rr, ii] = np.log10(amp)
-            fit_plaw[rr, ii] = plaw
-
-    return nbins, fit_lamp, fit_plaw, fit_med_lamp, fit_med_plaw
-
-
-def get_gwb_fits_data(fobs_cents, gwb):
-    # these values must match label construction!
-    nbins = [5, 10, 15, 0]
-
-    nbins, lamp, plaw, med_lamp, med_plaw = holo.librarian.fit_spectra(fobs_cents, gwb, nbins=nbins)
-
-    label = (
-        f"log10(A10)={med_lamp[1]:.2f}, G10={med_plaw[1]:.4f}"
-        " | "
-        f"log10(A)={med_lamp[-1]:.2f}, G={med_plaw[-1]:.4f}"
-    )
-
-    fits_data = dict(
-        fit_nbins=nbins, fit_lamp=lamp, fit_plaw=plaw, fit_med_lamp=med_lamp, fit_med_plaw=med_plaw, fit_label=label
-    )
-    return fits_data
-
-
-def make_gwb_plot(fobs, gwb, fits_data):
-    fig = holo.plot.plot_gwb(fobs, gwb)
-    ax = fig.axes[0]
-
-    if len(fits_data):
-        xx = fobs * YR
-        yy = 1e-15 * np.power(xx, -2.0/3.0)
-        ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
-
-        fits = holo.librarian.get_gwb_fits_data(fobs, gwb)
-
-        for ls, idx in zip([":", "--"], [1, -1]):
-            med_lamp = fits['fit_med_lamp'][idx]
-            med_plaw = fits['fit_med_plaw'][idx]
-            yy = (10.0 ** med_lamp) * (xx ** med_plaw)
-            label = fits['fit_nbins'][idx]
-            label = 'all' if label in [0, None] else label
-            ax.plot(xx, yy, color='k', ls=ls, alpha=0.5, lw=2.0, label=str(label) + " bins")
-
-        label = fits['fit_label'].replace(" | ", "\n")
-        fig.text(0.99, 0.99, label, fontsize=6, ha='right', va='top')
-
-    return fig
-
-
-def run_sam_at_pspace_num(args, space, pnum, path_output):
-    log = args.log
-    fname = f"lib_sams__p{pnum:06d}.npz"
-    fname = Path(path_output, fname)
-    beg = datetime.now()
-    log.info(f"{pnum=} :: {fname=} beginning at {beg}")
-    if fname.exists():
-        log.warning(f"File {fname} already exists.")
-
-    def log_mem():
-        # results.ru_maxrss is KB on Linux, B on macos
-        mem_max = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 2)
-        process = psutil.Process(os.getpid())
-        mem_rss = process.memory_info().rss / 1024**3
-        mem_vms = process.memory_info().vms / 1024**3
-        log.info(f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB")
-
-    pta_dur = args.pta_dur * YR
-    nfreqs = args.nfreqs
-    hifr = nfreqs/pta_dur
-    pta_cad = 1.0 / (2 * hifr)
-    fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
-    fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
-    log.info(f"Created {fobs_cents.size} frequency bins")
-    log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
-    log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
-    log_mem()
-    assert nfreqs == fobs_cents.size
-
-    try:
-        log.debug("Selecting `sam` and `hard` instances")
-        sam, hard = space(pnum)
-        log_mem()
-        log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.nreals})")
-        gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
-        log_mem()
-        log.debug(f"{holo.utils.stats(gwb)=}")
-        legend = space.param_dict(pnum)
-        log.debug(f"Saving {pnum} to file")
-        data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb)
-        rv = True
-    except Exception as err:
-        log.exception("\n\n")
-        log.exception("="*100)
-        log.exception(f"`run_sam` FAILED on {pnum=}\n")
-        log.exception(err)
-        log.exception("="*100)
-        log.exception("\n\n")
-        rv = False
-        data = dict(fail=str(err))
-
-    if rv:
-        try:
-            fits_data = holo.librarian.get_gwb_fits_data(fobs_cents, gwb)
-        except Exception as err:
-            log.exception("Failed to load gwb fits data!")
-            log.exception(err)
-            fits_data = {}
-
-    else:
-        fits_data = {}
-
-    meta_data = dict(
-        pnum=pnum, pdim=space.ndims, nsamples=args.nsamples, librarian_version=__version__,
-        param_names=space.names, params=space._params, samples=space._samples,
-    )
-
-    np.savez(fname, **data, **meta_data, **fits_data, **legend)
-    log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-beg)}")
-
-    if rv:
-        try:
-            fname = fname.with_suffix('.png')
-            fig = holo.librarian.make_gwb_plot(fobs_cents, gwb, fits_data)
-            fig.savefig(fname, dpi=300)
-            log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)}")
-            plt.close('all')
-        except Exception as err:
-            log.exception("Failed to make gwb plot!")
-            log.exception(err)
-
-    return rv
 
 
 def main():
