@@ -152,12 +152,16 @@ def sam_lib_combine(path_output, log, debug=False):
     # ---- Make sure that no file numbers are missing
     all_exist = True
     log.info("Checking files")
+    ii = 0
     for ii in tqdm.tqdm(range(num_files)):
         temp = path_output.joinpath(regex.replace('*', f"{ii:06d}"))
         exists = temp.exists()
         if not exists:
             all_exist = False
             break
+
+    if num_files < 2:
+        all_exist = False
 
     if not all_exist:
         err = f"Missing at least file number {ii} out of {num_files} files!"
@@ -182,10 +186,10 @@ def sam_lib_combine(path_output, log, debug=False):
     assert nfreqs == _nfreqs
     all_sample_vals = data['samples']   # uniform [0.0, 1.0] samples in each dimension, converted to parameters
     all_param_vals = data['params']     # physical parameters
-    param_names = data['names']
+    param_names = data['param_names']
     nsamples = data['nsamples']
     pdim = data['pdim']
-    lib_vers = data['librarian_version']
+    lib_vers = str(data['librarian_version'])
     log.info(f"Sample file uses librarian.py version {lib_vers}")
     new_lib_vers = holo.librarian.__version__
     if lib_vers != new_lib_vers:
@@ -218,7 +222,7 @@ def sam_lib_combine(path_output, log, debug=False):
         assert ii == temp['pnum']
         assert np.allclose(fobs, temp['fobs'])
         assert np.allclose(fobs_edges, temp['fobs_edges'])
-        check = temp['librarian_version']
+        check = str(temp['librarian_version'])
         if check not in lib_vers:
             log.warning("Mismatch in librarian.py version in saved files!  {ii} {file} with version {check}")
             lib_vers.append(check)
@@ -388,6 +392,7 @@ def run_sam_at_pspace_num(args, space, pnum, path_output):
         log.exception("="*100)
         log.exception("\n\n")
         rv = False
+        legend = {}
         data = dict(fail=str(err))
 
     if rv:
