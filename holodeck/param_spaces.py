@@ -9,13 +9,20 @@ from holodeck.librarian import (
 )
 
 
-class PS_Test_PD_01(_Param_Space):
+class PS_Test_Uniform(_Param_Space):
 
     def __init__(self, log, nsamples, sam_shape, seed):
         super().__init__(
             log, nsamples, sam_shape, seed,
-            hard_time=PD_Uniform_Log(0.01, 12.0),
+            hard_time=PD_Uniform(-2.0, 1.1),
             gsmf_phi0=PD_Uniform(-3.5, -1.5),
+
+            gsmf_mchar0=PD_Uniform(10.75, 11.75),   # [log10(Msol)]
+            gpf_qgamma=PD_Uniform(0.0, +2.0),
+            gmt_zbeta=PD_Uniform(-2.0, +2.0),
+
+            mmb_amp=PD_Uniform(+8.0, +9.0),   # [log10(Msol)]
+            mmb_scatter=PD_Uniform(+0.0, +0.6),
         )
         return
 
@@ -24,12 +31,12 @@ class PS_Test_PD_01(_Param_Space):
 
         self._log.debug(f"params {num}:: {params}")
 
-        hard_time = params['hard_time'] * GYR
+        hard_time = (10.0 ** params['hard_time']) * GYR
 
-        gsmf = holo.sam.GSMF_Schechter(phi0=params['gsmf_phi0'])
-        gpf = holo.sam.GPF_Power_Law()
-        gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013()
+        gsmf = holo.sam.GSMF_Schechter(phi0=params['gsmf_phi0'], mchar0_log10=params['gsmf_mchar0'])
+        gpf = holo.sam.GPF_Power_Law(qgamma=params['gpf_gamma'])
+        gmt = holo.sam.GMT_Power_Law(zbeta=params['gmt_zbeta'])
+        mmbulge = holo.relations.MMBulge_KH2013(mamp_log10=params['mmb_amp'], scatter_dex=params['mmb_scatter'])
 
         sam = holo.sam.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
@@ -42,15 +49,24 @@ class PS_Test_PD_01(_Param_Space):
         return sam, hard
 
 
-class PS_Test_PD_02(PS_Test_PD_01):
+class PS_Test_Normal(PS_Test_Uniform):
 
     def __init__(self, log, nsamples, sam_shape, seed):
-        super().__init__(
+        super(PS_Test_Uniform, self).__init__(
             log, nsamples, sam_shape, seed,
-            hard_time=PD_Uniform_Log(0.01, 12.0),
-            gsmf_phi0=PD_Normal(-2.5, -0.75),
+            hard_time=PD_Normal(-0.45, 0.775),
+            gsmf_phi0=PD_Normal(-2.5, 0.5),
+
+            gsmf_mchar0=PD_Normal(11.25, 0.25),   # [log10(Msol)]
+            gpf_qgamma=PD_Normal(1.0, 0.5),
+            gmt_zbeta=PD_Normal(0.0, 1.0),
+
+            mmb_amp=PD_Normal(8.5, 0.25),   # [log10(Msol)]
+            mmb_scatter=PD_Normal(0.3, 0.15),
         )
         return
+
+
 
 
 class Parameter_Space_Hard04(_Parameter_Space):

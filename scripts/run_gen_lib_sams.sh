@@ -9,17 +9,39 @@ echo "==================    HOLODECK - run_gen_lib_sams.sh    ==================
 echo "================================================================================"
 echo ""
 
-OUTPUT="output/circ-02_2023-02-24_01_n2000_r100_f40"
-OUTPUT=$OUTPUT"__TEST"
-SCRIPT="scripts/gen_lib_sams.py"
-LOG_NAME="job_log"
+# ====    setup simulation parameters    ====
+NAME="ps-test-pd-01_2023-03-01"
+PARS="n100_s61-81-101_r100_f40"
+
+# NAME="TEST__"$NAME
+
+SCRIPT="./scripts/gen_lib_sams.py"
+LOG_NAME="job_log_"$NAME
+
+OUTPUT="./output/"$NAME"_"$PARS
+
 mkdir -p $OUTPUT
 echo "Output directory: ${OUTPUT}"
 
-cp $0 "$OUTPUT/"
+cp $0 "$OUTPUT/runtime_job-script.slurm"
 LOG_OUT="$LOG_NAME.out"
 LOG_ERR="$LOG_NAME.err"
+echo "logs: ${LOG_OUT} ${LOG_ERR}"
 
-# mpirun -n 19  python $SCRIPT $OUTPUT -n 2000 -s 40 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR &
-mpirun -n 2  python $SCRIPT $OUTPUT -n 4 -s 20 -r 20 -f 20  1> $LOG_OUT 2> $LOG_ERR &
+# ====    run simulations    ====
 
+echo "PWD:"
+pwd
+ls $SCRIPT
+echo "Running `mpirun`"
+
+set -x
+
+# mpirun -np 80  python $SCRIPT $OUTPUT -n 4000 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR
+# mpirun -n 4  python $SCRIPT $OUTPUT -n 8 -s 10 -r 20 -f 40  1> $LOG_OUT 2> $LOG_ERR
+python $SCRIPT $OUTPUT -n 8 -s 10 -r 20 -f 40  1> $LOG_OUT 2> $LOG_ERR
+
+SHARE_OUTPUT=$OUTPUT"_SHARE"
+mkdir -p $SHARE_OUTPUT
+cp $OUTPUT/{*.py,holodeck*.log,*.hdf5} $SHARE_OUTPUT/
+cp {$LOG_ERR,$LOG_OUT} $SHARE_OUTPUT/
