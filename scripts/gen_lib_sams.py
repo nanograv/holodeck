@@ -201,12 +201,8 @@ def main():
             if rv is False:
                 failures += 1
 
-            if failures > MAX_FAILURES:
-                err = f"Failed {failures} times on rank:{comm.rank}!"
-                log.exception(err)
-                raise RuntimeError(err)
-
         except Exception as err:
+            failures += 1
             logging.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{par_num}")
             logging.warning(err)
             log.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{par_num}")
@@ -215,6 +211,11 @@ def main():
             traceback.print_exc()
             print("\n\n")
             raise
+
+        if failures > MAX_FAILURES:
+            err = f"Failed {failures} times on rank:{comm.rank}!"
+            log.exception(err)
+            raise RuntimeError(err)
 
     end = datetime.now()
     log.info(f"\t{comm.rank} done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}")
