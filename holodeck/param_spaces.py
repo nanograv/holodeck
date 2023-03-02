@@ -34,7 +34,7 @@ class PS_Test_Uniform(_Param_Space):
         hard_time = (10.0 ** params['hard_time']) * GYR
 
         gsmf = holo.sam.GSMF_Schechter(phi0=params['gsmf_phi0'], mchar0_log10=params['gsmf_mchar0'])
-        gpf = holo.sam.GPF_Power_Law(qgamma=params['gpf_gamma'])
+        gpf = holo.sam.GPF_Power_Law(qgamma=params['gpf_qgamma'])
         gmt = holo.sam.GMT_Power_Law(zbeta=params['gmt_zbeta'])
         mmbulge = holo.relations.MMBulge_KH2013(mamp_log10=params['mmb_amp'], scatter_dex=params['mmb_scatter'])
 
