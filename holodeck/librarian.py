@@ -201,12 +201,21 @@ def sam_lib_combine(path_output, log, debug=False):
     if num_files != nsamples:
         raise ValueError(f"nsamples={nsamples} but num_files={num_files} !!")
 
+    fit_nbins = data['fit_nbins']
+    fit_shape = data['fit_lamp'].shape
+    print(f"{fit_nbins=} {fit_shape=}")
+    fit_keys = ['fit_lamp', 'fit_plaw']  # , 'fit_med_lamp', 'fit_med_plaw']
+    for fk in fit_keys:
+        print(fk, data[fk].shape)
+
     # ---- Store results from all files
 
     gwb_shape = [num_files, nfreqs, nreals]
     shape_names = list(param_names[:]) + ['freqs', 'reals']
     gwb = np.zeros(gwb_shape)
     sample_params = np.zeros((num_files, pdim))
+    fit_shape = (num_files,) + fit_shape
+    fit_data = {kk: np.zeros(fit_shape) for kk in fit_keys}
 
     log.info(f"Collecting data from {len(files)} files")
     for ii, file in enumerate(tqdm.tqdm(files)):
@@ -238,6 +247,10 @@ def sam_lib_combine(path_output, log, debug=False):
                 raise ValueError(err)
 
             sample_params[ii, jj] = check
+
+        for fk in fit_keys:
+            fit_data[fk][ii, :, :] = temp[fk][...]
+
         # Store the GWB from this file
         gwb[ii, :, :] = temp['gwb'][...]
         if debug:
@@ -251,6 +264,9 @@ def sam_lib_combine(path_output, log, debug=False):
         h5.create_dataset('fobs_edges', data=fobs_edges)
         h5.create_dataset('gwb', data=gwb)
         h5.create_dataset('sample_params', data=sample_params)
+        for fk in fit_keys:
+            h5.create_dataset(fk, data=fit_data[fk])
+        h5.attrs['fit_nbins'] = fit_nbins
         h5.attrs['param_names'] = np.array(param_names).astype('S')
         h5.attrs['shape_names'] = np.array(shape_names).astype('S')
         h5.attrs['librarian_version'] = ", ".join(lib_vers)
