@@ -2,18 +2,28 @@
 """
 
 import abc
+from pathlib import Path
+from datetime import datetime
+import psutil
+import resource
+import os
 
 import h5py
 import numpy as np
 import scipy as sp
 import scipy.optimize  # noqa
+import matplotlib.pyplot as plt
 import tqdm
 
 from scipy.stats import qmc
 import pyDOE
 
 import holodeck as holo
+from holodeck import log
 from holodeck.constants import YR
+
+
+__version__ = "0.1.0"
 
 
 class _Parameter_Space(abc.ABC):
@@ -245,11 +255,11 @@ class _Param_Space(abc.ABC):
         # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
         LHS = qmc.LatinHypercube(d=ndims, centered=False, strength=1, seed=seed)
         # (S, D) - samples, dimensions
-        uniform_samples = LHS.random(n=nsamples)
-        samples = np.zeros_like(uniform_samples)
+        samples = LHS.random(n=nsamples)
+        params = np.zeros_like(samples)
 
         for ii, dist in enumerate(dists):
-            samples[:, ii] = dist(uniform_samples[:, ii])
+            params[:, ii] = dist(samples[:, ii])
 
         self._log = log
         self.names = names
@@ -258,13 +268,13 @@ class _Param_Space(abc.ABC):
         self.sam_shape = sam_shape
         self._seed = seed
         self._random_state = random_state
-        self._uniform_samples = uniform_samples
         self._samples = samples
+        self._params = params
 
         return
 
     def params(self, num):
-        return self._samples[num]
+        return self._params[num]
 
     def param_dict(self, num):
         rv = {nn: pp for nn, pp in zip(self.names, self.params(num))}
@@ -321,6 +331,7 @@ class PD_Normal(_Param_Dist):
 
 
 def sam_lib_combine(path_output, log, debug=False):
+    path_output = Path(path_output)
     log.info(f"Path output = {path_output}")
 
     regex = "lib_sams__p*.npz"
@@ -328,6 +339,7 @@ def sam_lib_combine(path_output, log, debug=False):
     num_files = len(files)
     log.info(f"\texists={path_output.exists()}, found {num_files} files")
 
+    # ---- Make sure that no file numbers are missing
     all_exist = True
     log.info("Checking files")
     for ii in tqdm.tqdm(range(num_files)):
@@ -355,27 +367,18 @@ def sam_lib_combine(path_output, log, debug=False):
         raise RuntimeError(err)
 
     temp_gwb = data['gwb'][:]
-    nreals = temp_gwb.shape[1]
-    param_vals = data['params']
-    param_names = data['names']
-    lhs_grid = data['lhs_grid']
-    try:
-        pdim = data['pdim']
-    except KeyError:
-        pdim = 6
-
-    try:
-        nsamples = data['nsamples']
-        if num_files != nsamples:
-            raise ValueError(f"nsamples={nsamples} but num_files={num_files} !!")
-    except KeyError:
-        pass
-
     assert np.ndim(temp_gwb) == 2
-    if temp_gwb.shape[0] != nfreqs:
-        raise ValueError(f"temp_gwb.shape={temp_gwb.shape} but nfreqs={nfreqs}!!")
-    if temp_gwb.shape[1] != nreals:
-        raise ValueError(f"temp_gwb.shape={temp_gwb.shape} but nreals={nreals}!!")
+    _nfreqs, nreals = temp_gwb.shape
+    assert nfreqs == _nfreqs
+    all_sample_vals = data['samples']   # uniform [0.0, 1.0] samples in each dimension, converted to parameters
+    all_param_vals = data['params']     # physical parameters
+    param_names = data['names']
+    nsamples = data['nsamples']
+    pdim = data['pdim']
+    assert all_sample_vals.shape == (nsamples, pdim)
+    assert all_param_vals.shape == (nsamples, pdim)
+    if num_files != nsamples:
+        raise ValueError(f"nsamples={nsamples} but num_files={num_files} !!")
 
     # ---- Store results from all files
 
@@ -384,17 +387,8 @@ def sam_lib_combine(path_output, log, debug=False):
     gwb = np.zeros(gwb_shape)
     sample_params = np.zeros((num_files, pdim))
     grid_idx = np.zeros((num_files, pdim), dtype=int)
-    if lhs_grid.shape == ():   # not a gridded lhs parameter space
-        if lhs_grid[()] == -1:   # using scipy LHS direct sampling
-            log.info(f"Parameter Space Type is direct LHS")
-            pspacetype = 'ungriddedlhs'
-        else:
-            err = f"Uknown parameter space type: {lhs_grid[()]}"
-            log.exception(err)
-            raise ValueError(err)
-    else:
-        log.info(f"Parameter Space Type is Gridded LHS")
-        pspacetype = 'griddedlhs'
+
+    #! ====== CONTINUE HERE ========= !#
 
     log.info(f"Collecting data from {len(files)} files")
     for ii, file in enumerate(tqdm.tqdm(files)):
@@ -528,3 +522,111 @@ def make_gwb_plot(fobs, gwb, fits_data):
     return fig
 
 
+def run_sam_at_pspace_num(args, space, pnum, path_output):
+    log = args.log
+    fname = f"lib_sams__p{pnum:06d}.npz"
+    fname = Path(path_output, fname)
+    beg = datetime.now()
+    log.info(f"{pnum=} :: {fname=} beginning at {beg}")
+    if fname.exists():
+        log.warning(f"File {fname} already exists.")
+
+    def log_mem():
+        # results.ru_maxrss is KB on Linux, B on macos
+        mem_max = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 2)
+        process = psutil.Process(os.getpid())
+        mem_rss = process.memory_info().rss / 1024**3
+        mem_vms = process.memory_info().vms / 1024**3
+        log.info(f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB")
+
+    pta_dur = args.pta_dur * YR
+    nfreqs = args.nfreqs
+    hifr = nfreqs/pta_dur
+    pta_cad = 1.0 / (2 * hifr)
+    fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
+    fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
+    log.info(f"Created {fobs_cents.size} frequency bins")
+    log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
+    log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
+    log_mem()
+    assert nfreqs == fobs_cents.size
+
+    try:
+        log.debug("Selecting `sam` and `hard` instances")
+        sam, hard = space(pnum)
+        log_mem()
+        log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.nreals})")
+        gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
+        log_mem()
+        log.debug(f"{holo.utils.stats(gwb)=}")
+        legend = space.param_dict(pnum)
+        log.debug(f"Saving {pnum} to file")
+        data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb)
+        rv = True
+    except Exception as err:
+        log.exception("\n\n")
+        log.exception("="*100)
+        log.exception(f"`run_sam` FAILED on {pnum=}\n")
+        log.exception(err)
+        log.exception("="*100)
+        log.exception("\n\n")
+        rv = False
+        data = dict(fail=str(err))
+
+    if rv:
+        try:
+            fits_data = holo.librarian.get_gwb_fits_data(fobs_cents, gwb)
+        except Exception as err:
+            log.exception("Failed to load gwb fits data!")
+            log.exception(err)
+            fits_data = {}
+
+    else:
+        fits_data = {}
+
+    meta_data = dict(
+        pnum=pnum, pdim=space.ndims, nsamples=args.nsamples, librarian_version=__version__,
+        param_names=space.names, params=space._params, samples=space._samples,
+    )
+
+    np.savez(fname, **data, **meta_data, **fits_data, **legend)
+    log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-beg)}")
+
+    if rv:
+        try:
+            fname = fname.with_suffix('.png')
+            fig = holo.librarian.make_gwb_plot(fobs_cents, gwb, fits_data)
+            fig.savefig(fname, dpi=300)
+            log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)}")
+            plt.close('all')
+        except Exception as err:
+            log.exception("Failed to make gwb plot!")
+            log.exception(err)
+
+    return rv
+
+
+def main():
+
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser()
+    subparsers = parser.add_subparsers(dest="subcommand")
+
+    combine = subparsers.add_parser('combine', help='combine output files')
+    combine.add_argument('path', default=None)
+    combine.add_argument('--debug', '-d', action='store_true', default=False)
+
+    args = parser.parse_args()
+    log.debug(f"{args=}")
+
+    if args.subcommand == 'combine':
+        sam_lib_combine(args.path, log, args.debug)
+    else:
+        raise
+
+    return
+
+
+if __name__ == "__main__":
+    main()

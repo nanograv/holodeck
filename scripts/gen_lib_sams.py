@@ -28,8 +28,6 @@ __version__ = '0.2.2'
 import argparse
 import os
 import logging
-import psutil
-import resource
 import shutil
 import sys
 import warnings
@@ -37,13 +35,13 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from mpi4py import MPI
 
 import holodeck as holo
 import holodeck.sam
 import holodeck.logger
-from holodeck.constants import YR
+# from holodeck.constants import YR
 from holodeck import log as _log     #: import the default holodeck log just so that we can silence it
 
 
@@ -82,14 +80,11 @@ def setup_argparse():
                         help='Number of frequency bins', default=DEF_NUM_FBINS)
     parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
                         help='Shape of SAM grid', default=DEF_SAM_SHAPE)
-    parser.add_argument('-l', '--lhs', action='store', choices=['scipy', 'pydoe'], default='scipy',
-                        help='Latin Hyper Cube sampling implementation to use (scipy or pydoe)')
+
     parser.add_argument('--seed', action='store', type=int, default=None,
                         help='Random seed to use')
     parser.add_argument('-t', '--test', action='store_true', default=False, dest='test',
                         help='Do not actually run, just output what parameters would have been done.')
-    parser.add_argument('-c', '--concatenate', action='store_true', default=False, dest='concatenateoutput',
-                        help='Concatenate output into single hdf5 file.')
     parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
                         help='verbose output [INFO]')
 
@@ -140,6 +135,7 @@ log = holo.logger.get_logger(name=log_name, level_stream=log_lvl, tofile=fname, 
 log.info(head)
 log.info(f"Output path: {PATH_OUTPUT}")
 log.info(f"        log: {fname}")
+args.log = log
 
 if comm.rank == 0:
     copy_paths = [__file__, holo.librarian.__file__, holo.param_spaces.__file__]
@@ -167,11 +163,10 @@ log.info(
 
 
 def main():
-    bnum = 0
     failures = 0
     npars = args.nsamples
 
-    bnum = _barrier(bnum)
+    comm.barrier()
 
     # Split and distribute index numbers to all processes
     if comm.rank == 0:
@@ -185,16 +180,14 @@ def main():
 
     indices = comm.scatter(indices, root=0)
 
-    bnum = _barrier(bnum)
     iterator = holo.utils.tqdm(indices) if comm.rank == 0 else np.atleast_1d(indices)
 
     if args.test:
         log.info("Running in testing mode. Outputting parameters:")
 
-    for ind in iterator:
-        lhsparam = ind
-        log.info(f"{comm.rank=} {ind=}")
-        pdict = space.param_dict(lhsparam)
+    for par_num in iterator:
+        log.info(f"{comm.rank=} {par_num=}")
+        pdict = space.param_dict(par_num)
         msg = "\n"
         for kk, vv in pdict.items():
             msg += f"{kk}={vv}\n"
@@ -204,7 +197,7 @@ def main():
             continue
 
         try:
-            rv = run_sam(lhsparam, PATH_OUTPUT)
+            rv = holo.librarian.run_sam_at_pspace_num(args, space, par_num, PATH_OUTPUT)
             if rv is False:
                 failures += 1
 
@@ -214,9 +207,9 @@ def main():
                 raise RuntimeError(err)
 
         except Exception as err:
-            logging.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{ind}")
+            logging.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{par_num}")
             logging.warning(err)
-            log.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{ind}")
+            log.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{par_num}")
             log.warning(err)
             import traceback
             traceback.print_exc()
@@ -226,106 +219,14 @@ def main():
     end = datetime.now()
     log.info(f"\t{comm.rank} done at {str(end)} after {str(end-BEG)} = {(end-BEG).total_seconds()}")
     # Make sure all processes are done before exiting, so that all files are ready for merging
-    bnum = _barrier(bnum)
+    comm.barrier()
 
     return
-
-
-def run_sam(pnum, path_output):
-    fname = f"lib_sams__p{pnum:06d}.npz"
-    fname = Path(path_output, fname)
-    log.debug(f"{pnum=} :: {fname=}")
-    if os.path.exists(fname):
-        log.warning(f"File {fname} already exists.")
-
-    def log_mem():
-        # results.ru_maxrss is KB on Linux, B on macos
-        mem_max = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 2)
-        process = psutil.Process(os.getpid())
-        mem_rss = process.memory_info().rss / 1024**3
-        mem_vms = process.memory_info().vms / 1024**3
-        log.info(f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB")
-
-    pta_dur = args.pta_dur * YR
-    nfreqs = args.nfreqs
-    hifr = nfreqs/pta_dur
-    pta_cad = 1.0 / (2 * hifr)
-    fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
-    fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
-    log.info(f"Created {fobs_cents.size} frequency bins")
-    log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
-    log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
-    log_mem()
-    assert nfreqs == fobs_cents.size
-
-    try:
-        log.debug("Selecting `sam` and `hard` instances")
-        sam, hard = space(pnum)
-        log_mem()
-        log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.nreals})")
-        gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
-        log_mem()
-        log.debug(f"{holo.utils.stats(gwb)=}")
-        legend = space.param_dict(pnum)
-        log.debug(f"Saving {pnum} to file")
-        data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb)
-        rv = True
-    except Exception as err:
-        log.exception("\n\n")
-        log.exception("="*100)
-        log.exception(f"`run_sam` FAILED on {pnum=}\n")
-        log.exception(err)
-        log.exception("="*100)
-        log.exception("\n\n")
-        rv = False
-        data = dict(fail=str(err))
-
-    if rv:
-        try:
-            fits_data = holo.librarian.get_gwb_fits_data(fobs_cents, gwb)
-        except Exception as err:
-            log.exception("Failed to load gwb fits data!")
-            log.exception(err)
-            fits_data = {}
-
-    else:
-        fits_data = {}
-
-    meta_data = dict(
-        pnum=pnum, pdim=space.ndims, nsamples=args.nsamples,
-        params=space.params, names=space.names, version=__version__
-    )
-
-    np.savez(fname, **data, **meta_data, **fits_data, **legend)
-    log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-BEG)} (start: {BEG})")
-
-    if rv:
-        try:
-            fname = fname.with_suffix('.png')
-            fig = holo.librarian.make_gwb_plot(fobs_cents, gwb, fits_data)
-            fig.savefig(fname, dpi=300)
-            log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)}")
-            plt.close('all')
-        except Exception as err:
-            log.exception("Failed to make gwb plot!")
-            log.exception(err)
-
-    return rv
-
-
-def _barrier(bnum):
-    log.debug(f"barrier {bnum}")
-    comm.barrier()
-    bnum += 1
-    return bnum
 
 
 if __name__ == "__main__":
     np.seterr(divide='ignore', invalid='ignore', over='ignore')
     warnings.filterwarnings("ignore", category=UserWarning)
-
-    if not args.concatenateoutput:
-        main()
 
     if (comm.rank == 0) and (not args.test):
         log.info("Concatenating outputs into single file")

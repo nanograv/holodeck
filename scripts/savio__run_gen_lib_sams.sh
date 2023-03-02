@@ -59,7 +59,7 @@ OUTPUT="./output/"$NAME"_"$PARS
 mkdir -p $OUTPUT
 echo "Output directory: ${OUTPUT}"
 
-cp $0 "$OUTPUT/"
+cp $0 "$OUTPUT/runtime_job-script.slurm"
 LOG_OUT="$LOG_NAME.out"
 LOG_ERR="$LOG_NAME.err"
 echo "logs: ${LOG_OUT} ${LOG_ERR}"
