@@ -140,6 +140,32 @@ class PD_Normal(_Param_Dist):
         return
 
 
+class PD_Lin_Log(holo.librarian._Param_Dist):
+
+    def __init__(self, lo, hi, crit, lofrac):
+        self._lo = lo
+        self._hi = hi
+        self._crit = crit
+        self._l10_crit = np.log10(crit)
+        self._l10_hi = np.log10(hi)
+        self._lofrac = lofrac
+        return
+
+    def _dist_func(self, xx):
+        lo = self._lo
+        hi = self._hi
+        crit = self._crit
+        lofrac = self._lofrac
+        xx = np.atleast_1d(xx)
+        yy = np.empty_like(xx)
+        loidx = (xx <= lofrac)
+        yy[loidx] = lo + xx[loidx] * (crit - lo) / lofrac
+        hiidx = ~loidx
+        temp = self._l10_crit + (self._l10_hi - self._l10_crit) * (xx[hiidx] - lofrac) / (1 - lofrac)
+        yy[hiidx] = np.power(10.0, temp)
+        return yy
+
+
 def sam_lib_combine(path_output, log, debug=False):
     path_output = Path(path_output)
     log.info(f"Path output = {path_output}")
