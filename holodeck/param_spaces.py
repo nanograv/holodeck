@@ -9,6 +9,66 @@ from holodeck.librarian import (
 )
 
 
+class PS_Circ_01(_Param_Space):
+
+    def __init__(self, log, nsamples, sam_shape, lhs_sampler, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+
+            hard_time=[-2.0, +1.12],   # [log10(Gyr)]
+            hard_gamma_inner=[-1.5, +0.0],
+            # hard_rchar=[+0.0, +4.0],   # [log10(pc)]
+            # hard_gamma_outer=[+2.0, +3.0],
+
+            gsmf_phi0=[-3.5, -1.5],
+            # gsmf_phiz =[-1.5, +0.5],
+            gsmf_mchar0=[10.0, 12.5],   # [log10(Msol)]
+            gsmf_alpha0=[-2.5, -0.5],
+
+            # gpf_malpha=[-1.0, +1.0],
+            gpf_zbeta=[-0.5, +2.5],
+            gpf_qgamma=[-1.5, +1.5],
+
+            gmt_norm=[0.1, +10.0],    # [Gyr]
+            # gmt_malpha=[-1.0, +1.0],
+            gmt_zbeta=[-3.0, +2.0],
+            # gmt_qgamma=[-1.0, +1.0],
+
+            mmb_amp=[+7.0, +10.0],   # [log10(Msol)]
+            mmb_plaw=[+0.25, +2.5],
+            mmb_scatter=[+0.0, +0.6],
+        )
+
+    def sam_for_lhsnumber(self, lhsnum):
+        param_grid = self.params_for_lhsnumber(lhsnum)
+        self.log.debug("params at {lhsnum}:: {param_grid}")
+
+        hard_time, hard_gamma_inner, \
+            gsmf_phi0, gsmf_mchar0, gsmf_alpha0, \
+            gpf_zbeta, gpf_qgamma, \
+            gmt_norm, gmt_zbeta, \
+            mmb_amp, mmb_plaw, mmb_scatter = param_grid
+
+        mmb_amp = (10.0 ** mmb_amp) * MSOL
+        hard_time = (10.0 ** hard_time) * GYR
+        gmt_norm = gmt_norm * GYR
+
+        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0, mchar0_log10=gsmf_mchar0, alpha0=gsmf_alpha0)
+        gpf = holo.sam.GPF_Power_Law(qgamma=gpf_qgamma, zbeta=gpf_zbeta)
+        gmt = holo.sam.GMT_Power_Law(time_norm=gmt_norm, zbeta=gmt_zbeta)
+        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw, scatter_dex=mmb_scatter)
+
+        sam = holo.sam.Semi_Analytic_Model(
+            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            shape=self.sam_shape
+        )
+        hard = holo.hardening.Fixed_Time.from_sam(
+            sam, hard_time, gamma_sc=hard_gamma_inner,
+            progress=False
+        )
+        return sam, hard
+
+
 class PS_Test_Uniform(_Param_Space):
 
     def __init__(self, log, nsamples, sam_shape, seed):
@@ -65,8 +125,6 @@ class PS_Test_Normal(PS_Test_Uniform):
             mmb_scatter=PD_Normal(0.3, 0.15),
         )
         return
-
-
 
 
 class Parameter_Space_Hard04(_Parameter_Space):
