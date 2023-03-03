@@ -60,7 +60,7 @@ DEF_ECCEN_NHARMS = 100
 MAX_FAILURES = 5
 
 # SPACE = holo.param_spaces.PS_Circ_01
-SPACE = holo.param_spaces.PS_Test_PD_01
+SPACE = holo.param_spaces.PS_Broad_Uniform_01
 
 
 # ---- setup argparse

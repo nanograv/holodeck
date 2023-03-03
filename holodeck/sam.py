@@ -658,7 +658,7 @@ class Semi_Analytic_Model:
             if ZERO_GMT_STALLED_SYSTEMS:
                 dens[idx_stalled] = 0.0
             else:
-                log.warning("NOT zeroing out systems with GMTs extending past redshift zero!")
+                log.info("NOT zeroing out systems with GMTs extending past redshift zero!")
 
             self._density = dens
 

@@ -442,6 +442,14 @@ def plot_gwb(fobs, gwb, **kwargs):
     return fig
 
 
+def _draw_plaw(ax, freqs, amp=1e-15, f0=1/YR, **kwargs):
+    kwargs.setdefault('alpha', 0.25)
+    kwargs.setdefault('color', 'k')
+    kwargs.setdefault('ls', '--')
+    plaw = amp * np.power(np.asarray(freqs)/f0, -2/3)
+    return ax.plot(freqs, plaw, **kwargs)
+
+
 def _twin_hz(ax, nano=True, fs=8, **kw):
     tw = ax.twiny()
     xlim = np.array(ax.get_xlim()) / YR
@@ -655,14 +663,6 @@ def _draw_gwb_conf(ax, gwb, **kwargs):
     kwargs['alpha'] = 1.0 - 0.5*(1.0 - kwargs['alpha'])
     ax.plot(freqs, conf[1], **kwargs)
     return
-
-
-def _draw_plaw(ax, freqs, amp=1e-15, f0=1/YR, **kwargs):
-    kwargs.setdefault('alpha', 0.25)
-    kwargs.setdefault('color', 'k')
-    kwargs.setdefault('ls', '--')
-    plaw = amp * np.power(np.asarray(freqs)/f0, -2/3)
-    return ax.plot(freqs, plaw, **kwargs)
 
 
 def draw_med_conf(ax, xx, vals, percs=[25, 75], axis=-1, yfilter=None, **kwargs):
