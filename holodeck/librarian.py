@@ -143,26 +143,91 @@ class PD_Normal(_Param_Dist):
 class PD_Lin_Log(holo.librarian._Param_Dist):
 
     def __init__(self, lo, hi, crit, lofrac):
+        """Distribute linearly below a cutoff, and then logarithmically above.
+
+        Parameters
+        ----------
+        lo : float,
+            lowest output value (in linear space)
+        hi : float,
+            highest output value (in linear space)
+        crit : float,
+            Location of transition from log to lin scaling.
+        lofrac : float,
+            Fraction of mass below the cutoff.
+
+        """
         self._lo = lo
         self._hi = hi
         self._crit = crit
-        self._l10_crit = np.log10(crit)
-        self._l10_hi = np.log10(hi)
         self._lofrac = lofrac
         return
 
     def _dist_func(self, xx):
         lo = self._lo
+        crit = self._crit
+        lofrac = self._lofrac
+        l10_crit = np.log10(crit)
+        l10_hi = np.log10(self._hi)
+        xx = np.atleast_1d(xx)
+        yy = np.empty_like(xx)
+
+        # select points below the cutoff
+        loidx = (xx <= lofrac)
+        # transform to linear-scaling between [lo, crit]
+        yy[loidx] = lo + xx[loidx] * (crit - lo) / lofrac
+
+        # select points above the cutoff
+        hiidx = ~loidx
+        # transform to log-scaling between [crit, hi]
+        temp = l10_crit + (l10_hi - l10_crit) * (xx[hiidx] - lofrac) / (1 - lofrac)
+        yy[hiidx] = np.power(10.0, temp)
+        return yy
+
+
+class PD_Log_Lin(holo.librarian._Param_Dist):
+
+    def __init__(self, lo, hi, crit, lofrac):
+        """Distribute logarithmically below a cutoff, and then linearly above.
+
+        Parameters
+        ----------
+        lo : float,
+            lowest output value (in linear space)
+        hi : float,
+            highest output value (in linear space)
+        crit : float,
+            Location of transition from log to lin scaling.
+        lofrac : float,
+            Fraction of mass below the cutoff.
+
+        """
+        self._lo = lo
+        self._hi = hi
+        self._crit = crit
+        self._lofrac = lofrac
+        return
+
+    def _dist_func(self, xx):
         hi = self._hi
         crit = self._crit
         lofrac = self._lofrac
+        l10_lo = np.log10(self._lo)
+        l10_crit = np.log10(crit)
+
         xx = np.atleast_1d(xx)
         yy = np.empty_like(xx)
+
+        # select points below the cutoff
         loidx = (xx <= lofrac)
-        yy[loidx] = lo + xx[loidx] * (crit - lo) / lofrac
+        # transform to log-scaling between [lo, crit]
+        temp = l10_lo + (l10_crit - l10_lo) * xx[loidx] / lofrac
+        yy[loidx] = np.power(10.0, temp)
+
+        # select points above the cutoff
         hiidx = ~loidx
-        temp = self._l10_crit + (self._l10_hi - self._l10_crit) * (xx[hiidx] - lofrac) / (1 - lofrac)
-        yy[hiidx] = np.power(10.0, temp)
+        # transform to lin-scaling between [crit, hi]
+        yy[hiidx] = crit + (hi - crit) * (xx[hiidx] - lofrac) / (1.0 - lofrac)
         return yy
 
 
