@@ -9,63 +9,73 @@ from holodeck.librarian import (
 )
 
 
-class PS_Circ_01(_Param_Space):
+class PS_Broad_Uniform_01(_Param_Space):
 
-    def __init__(self, log, nsamples, sam_shape, lhs_sampler, seed):
+    def __init__(self, log, nsamples, sam_shape, seed):
         super().__init__(
             log, nsamples, sam_shape, seed,
 
-            hard_time=[-2.0, +1.12],   # [log10(Gyr)]
-            hard_gamma_inner=[-1.5, +0.0],
+            hard_time=PD_Uniform(0.1, 12.0),   # [Gyr]
+            hard_gamma_inner=PD_Uniform(-1.5, +0.0),
             # hard_rchar=[+0.0, +4.0],   # [log10(pc)]
             # hard_gamma_outer=[+2.0, +3.0],
 
-            gsmf_phi0=[-3.5, -1.5],
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
             # gsmf_phiz =[-1.5, +0.5],
-            gsmf_mchar0=[10.0, 12.5],   # [log10(Msol)]
-            gsmf_alpha0=[-2.5, -0.5],
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.0),   # [log10(Msol)]
+            gsmf_alpha0=PD_Uniform(-2.0, -0.5),
 
             # gpf_malpha=[-1.0, +1.0],
-            gpf_zbeta=[-0.5, +2.5],
-            gpf_qgamma=[-1.5, +1.5],
+            gpf_zbeta=PD_Uniform(-0.5, +2.5),
+            gpf_qgamma=PD_Uniform(-1.5, +1.5),
 
-            gmt_norm=[0.1, +10.0],    # [Gyr]
+            gmt_norm=PD_Uniform(0.1, +10.0),    # [Gyr]
             # gmt_malpha=[-1.0, +1.0],
-            gmt_zbeta=[-3.0, +2.0],
+            gmt_zbeta=PD_Uniform(-2.0, +1.0),
             # gmt_qgamma=[-1.0, +1.0],
 
-            mmb_amp=[+7.0, +10.0],   # [log10(Msol)]
-            mmb_plaw=[+0.25, +2.5],
-            mmb_scatter=[+0.0, +0.6],
+            mmb_amp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
+            mmb_plaw=PD_Uniform(+0.5, +2.0),
+            mmb_scatter=PD_Uniform(+0.0, +0.6),
         )
 
-    def sam_for_lhsnumber(self, lhsnum):
-        param_grid = self.params_for_lhsnumber(lhsnum)
-        self.log.debug("params at {lhsnum}:: {param_grid}")
+    def model_for_number(self, num):
+        params = self.param_dict(num)
+        self._log.debug(f"params {num}:: {params}")
 
-        hard_time, hard_gamma_inner, \
-            gsmf_phi0, gsmf_mchar0, gsmf_alpha0, \
-            gpf_zbeta, gpf_qgamma, \
-            gmt_norm, gmt_zbeta, \
-            mmb_amp, mmb_plaw, mmb_scatter = param_grid
+        hard_time = params['hard_time'] * GYR
+        gmt_norm = params['gmt_norm'] * GYR
 
-        mmb_amp = (10.0 ** mmb_amp) * MSOL
-        hard_time = (10.0 ** hard_time) * GYR
-        gmt_norm = gmt_norm * GYR
-
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0, mchar0_log10=gsmf_mchar0, alpha0=gsmf_alpha0)
-        gpf = holo.sam.GPF_Power_Law(qgamma=gpf_qgamma, zbeta=gpf_zbeta)
-        gmt = holo.sam.GMT_Power_Law(time_norm=gmt_norm, zbeta=gmt_zbeta)
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw, scatter_dex=mmb_scatter)
+        gsmf = holo.sam.GSMF_Schechter(
+            phi0=params['gsmf_phi0'],
+            mchar0_log10=params['gsmf_mchar0_log10'],
+            alpha0=params['gsmf_alpha0'],
+        )
+        gpf = holo.sam.GPF_Power_Law(
+            qgamma=params['gpf_qgamma'],
+            zbeta=params['gpf_zbeta'],
+        )
+        gmt = holo.sam.GMT_Power_Law(
+            time_norm=gmt_norm,
+            zbeta=params['gmt_zbeta'],
+        )
+        mmbulge = holo.relations.MMBulge_KH2013(
+            mamp_log10=params['mmb_amp_log10'],
+            mplaw=params['mmb_plaw'],
+            scatter_dex=params['mmb_scatter'],
+        )
 
         sam = holo.sam.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
             shape=self.sam_shape
         )
         hard = holo.hardening.Fixed_Time.from_sam(
-            sam, hard_time, gamma_sc=hard_gamma_inner,
-            progress=False
+            sam,
+            hard_time,
+            gamma_sc=params['hard_gamma_inner'],
+            progress=False,
         )
+
         return sam, hard
 
 
@@ -125,6 +135,11 @@ class PS_Test_Normal(PS_Test_Uniform):
             mmb_scatter=PD_Normal(0.3, 0.15),
         )
         return
+
+
+# ==============================================================================
+# ====    OLD    ====
+# ==============================================================================
 
 
 class Parameter_Space_Hard04(_Parameter_Space):

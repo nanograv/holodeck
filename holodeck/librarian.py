@@ -47,7 +47,7 @@ class _Param_Space(abc.ABC):
         for nam in names:
             val = kwargs[nam]
 
-            if not isinstance(val, holo.librarian._Param_Dist):
+            if not isinstance(val, _Param_Dist):
                 err = f"{nam}: {val} is not a `_Param_Dist` object!"
                 log.exception(err)
                 raise ValueError(err)
@@ -140,7 +140,7 @@ class PD_Normal(_Param_Dist):
         return
 
 
-class PD_Lin_Log(holo.librarian._Param_Dist):
+class PD_Lin_Log(_Param_Dist):
 
     def __init__(self, lo, hi, crit, lofrac):
         """Distribute linearly below a cutoff, and then logarithmically above.
@@ -185,7 +185,7 @@ class PD_Lin_Log(holo.librarian._Param_Dist):
         return yy
 
 
-class PD_Log_Lin(holo.librarian._Param_Dist):
+class PD_Log_Lin(_Param_Dist):
 
     def __init__(self, lo, hi, crit, lofrac):
         """Distribute logarithmically below a cutoff, and then linearly above.
@@ -282,7 +282,7 @@ def sam_lib_combine(path_output, log, debug=False):
     pdim = data['pdim']
     lib_vers = str(data['librarian_version'])
     log.info(f"Sample file uses librarian.py version {lib_vers}")
-    new_lib_vers = holo.librarian.__version__
+    new_lib_vers = __version__
     if lib_vers != new_lib_vers:
         log.warning(f"Loaded file {temp} uses librarian.py version {lib_vers}, current version is {new_lib_vers}!")
 
@@ -294,19 +294,26 @@ def sam_lib_combine(path_output, log, debug=False):
 
     fit_nbins = data['fit_nbins']
     fit_shape = data['fit_lamp'].shape
-    print(f"{fit_nbins=} {fit_shape=}")
-    fit_keys = ['fit_lamp', 'fit_plaw']  # , 'fit_med_lamp', 'fit_med_plaw']
+    fit_med_shape = data['fit_med_lamp'].shape
+    print(f"{fit_nbins=} {fit_shape=} {fit_med_shape=}")
+    fit_keys = ['fit_lamp', 'fit_plaw']
+    fit_med_keys = ['fit_med_lamp', 'fit_med_plaw']
     for fk in fit_keys:
+        print(fk, data[fk].shape)
+    for fk in fit_med_keys:
         print(fk, data[fk].shape)
 
     # ---- Store results from all files
 
     gwb_shape = [num_files, nfreqs, nreals]
-    shape_names = list(param_names[:]) + ['freqs', 'reals']
+    shape_names = ['params', 'freqs', 'reals']
     gwb = np.zeros(gwb_shape)
     sample_params = np.zeros((num_files, pdim))
     fit_shape = (num_files,) + fit_shape
+    fit_med_shape = (num_files,) + fit_med_shape
     fit_data = {kk: np.zeros(fit_shape) for kk in fit_keys}
+    fit_data.update({kk: np.zeros(fit_med_shape) for kk in fit_med_keys})
+    print(f"{list(fit_data.keys())=}")
 
     log.info(f"Collecting data from {len(files)} files")
     for ii, file in enumerate(tqdm.tqdm(files)):
@@ -339,8 +346,8 @@ def sam_lib_combine(path_output, log, debug=False):
 
             sample_params[ii, jj] = check
 
-        for fk in fit_keys:
-            fit_data[fk][ii, :, :] = temp[fk][...]
+        for fk in fit_keys + fit_med_keys:
+            fit_data[fk][ii, ...] = temp[fk][...]
 
         # Store the GWB from this file
         gwb[ii, :, :] = temp['gwb'][...]
@@ -355,7 +362,7 @@ def sam_lib_combine(path_output, log, debug=False):
         h5.create_dataset('fobs_edges', data=fobs_edges)
         h5.create_dataset('gwb', data=gwb)
         h5.create_dataset('sample_params', data=sample_params)
-        for fk in fit_keys:
+        for fk in fit_keys + fit_med_keys:
             h5.create_dataset(fk, data=fit_data[fk])
         h5.attrs['fit_nbins'] = fit_nbins
         h5.attrs['param_names'] = np.array(param_names).astype('S')
@@ -366,21 +373,39 @@ def sam_lib_combine(path_output, log, debug=False):
     return
 
 
-def fit_powerlaw(freqs, hc, nbins, init=[-15.0, -2.0/3.0]):
-    nbins = None if (nbins == 0) else nbins
-    cut = slice(None, nbins)
-    xx = freqs[cut] * YR
-    yy = hc[cut]
+def fit_powerlaw(xx, yy, init=[-15.0, -2.0/3.0], min_val_frac=0.75):
+    """
 
-    def powerlaw_fit(freqs, log10Ayr, gamma):
+    Returns
+    -------
+    log10_amp
+    plaw
+
+    """
+
+    def powerlaw_func(freqs, log10Ayr, gamma):
         zz = log10Ayr + gamma * freqs
         return zz
 
-    popt, pcov = sp.optimize.curve_fit(powerlaw_fit, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
+    if (min_val_frac is not None) and (min_val_frac < 1.0):
+        idx = np.isfinite(yy) & (yy > 0.0)
+        frac_val = np.count_nonzero(idx) / idx.size
+        if frac_val > min_val_frac:
+            xx = xx[idx]
+            yy = yy[idx]
+        else:
+            xx = []
+            yy = []
 
-    amp = 10.0 ** popt[0]
+    if len(xx) >= 2:
+        popt, pcov = sp.optimize.curve_fit(powerlaw_func, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
+    else:
+        popt = [np.nan, np.nan]
+        # pcov = np.nan
+
+    log10_amp = popt[0]
     gamma = popt[1]
-    return xx, amp, gamma
+    return log10_amp, gamma
 
 
 def fit_spectra(freqs, gwb, nbins=[5, 10, 15]):
@@ -395,13 +420,23 @@ def fit_spectra(freqs, gwb, nbins=[5, 10, 15]):
     for ii, num in enumerate(nbins):
         if (num is not None) and (num > nf):
             continue
+        num = None if (num == 0) else num
+        cut = slice(None, num)
+        try:
+            xx = freqs[cut]*YR
+        except:
+            print(f"{freqs=}, {nbins=}")
+            raise
 
-        xx, amp, plaw = fit_powerlaw(freqs, np.median(gwb, axis=-1), num)
-        fit_med_lamp[ii] = np.log10(amp)
+        yy = np.median(gwb, axis=-1)
+        log10_amp, plaw = fit_powerlaw(xx, yy[cut])
+
+        fit_med_lamp[ii] = log10_amp
         fit_med_plaw[ii] = plaw
         for rr in range(nreals):
-            xx, amp, plaw = fit_powerlaw(freqs, gwb[:, rr], num)
-            fit_lamp[rr, ii] = np.log10(amp)
+            yy = gwb[:, rr]
+            log10_amp, plaw = fit_powerlaw(xx, yy[cut])
+            fit_lamp[rr, ii] = log10_amp
             fit_plaw[rr, ii] = plaw
 
     return nbins, fit_lamp, fit_plaw, fit_med_lamp, fit_med_plaw
@@ -411,7 +446,7 @@ def get_gwb_fits_data(fobs_cents, gwb):
     # these values must match label construction!
     nbins = [5, 10, 15, 0]
 
-    nbins, lamp, plaw, med_lamp, med_plaw = holo.librarian.fit_spectra(fobs_cents, gwb, nbins=nbins)
+    nbins, lamp, plaw, med_lamp, med_plaw = fit_spectra(fobs_cents, gwb, nbins=nbins)
 
     label = (
         f"log10(A10)={med_lamp[1]:.2f}, G10={med_plaw[1]:.4f}"
@@ -434,7 +469,7 @@ def make_gwb_plot(fobs, gwb, fits_data):
         yy = 1e-15 * np.power(xx, -2.0/3.0)
         ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
 
-        fits = holo.librarian.get_gwb_fits_data(fobs, gwb)
+        fits = get_gwb_fits_data(fobs, gwb)
 
         for ls, idx in zip([":", "--"], [1, -1]):
             med_lamp = fits['fit_med_lamp'][idx]
@@ -504,7 +539,7 @@ def run_sam_at_pspace_num(args, space, pnum, path_output):
 
     if rv:
         try:
-            fits_data = holo.librarian.get_gwb_fits_data(fobs_cents, gwb)
+            fits_data = get_gwb_fits_data(fobs_cents, gwb)
         except Exception as err:
             log.exception("Failed to load gwb fits data!")
             log.exception(err)
@@ -524,7 +559,7 @@ def run_sam_at_pspace_num(args, space, pnum, path_output):
     if rv:
         try:
             fname = fname.with_suffix('.png')
-            fig = holo.librarian.make_gwb_plot(fobs_cents, gwb, fits_data)
+            fig = make_gwb_plot(fobs_cents, gwb, fits_data)
             fig.savefig(fname, dpi=300)
             log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)}")
             plt.close('all')
