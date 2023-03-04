@@ -104,17 +104,23 @@ class _Param_Space(abc.ABC):
 
 class _Param_Dist(abc.ABC):
 
-    @abc.abstractmethod
-    def __init__(self):
+    def __init__(self, clip=None):
+        if clip is not None:
+            assert len(clip) == 2
+        self._clip = clip
         return
 
     def __call__(self, xx):
-        return self._dist_func(xx)
+        rv = self._dist_func(xx)
+        if self._clip is not None:
+            rv = np.clip(rv, *self._clip)
+        return rv
 
 
 class PD_Uniform(_Param_Dist):
 
-    def __init__(self, lo, hi):
+    def __init__(self, lo, hi, **kwargs):
+        super().__init__(**kwargs)
         self._lo = lo
         self._hi = hi
         self._dist_func = lambda xx: self._lo + (self._hi - self._lo) * xx
@@ -123,7 +129,8 @@ class PD_Uniform(_Param_Dist):
 
 class PD_Uniform_Log(_Param_Dist):
 
-    def __init__(self, lo, hi):
+    def __init__(self, lo, hi, **kwargs):
+        super().__init__(**kwargs)
         self._lo = np.log10(lo)
         self._hi = np.log10(hi)
         self._dist_func = lambda xx: np.power(10.0, self._lo + (self._hi - self._lo) * xx)
@@ -132,7 +139,8 @@ class PD_Uniform_Log(_Param_Dist):
 
 class PD_Normal(_Param_Dist):
 
-    def __init__(self, mean, stdev):
+    def __init__(self, mean, stdev, **kwargs):
+        super().__init__(**kwargs)
         self._mean = mean
         self._stdev = stdev
         self._dist = sp.stats.norm(loc=mean, scale=stdev)
@@ -142,7 +150,7 @@ class PD_Normal(_Param_Dist):
 
 class PD_Lin_Log(_Param_Dist):
 
-    def __init__(self, lo, hi, crit, lofrac):
+    def __init__(self, lo, hi, crit, lofrac, **kwargs):
         """Distribute linearly below a cutoff, and then logarithmically above.
 
         Parameters
@@ -157,6 +165,7 @@ class PD_Lin_Log(_Param_Dist):
             Fraction of mass below the cutoff.
 
         """
+        super().__init__(**kwargs)
         self._lo = lo
         self._hi = hi
         self._crit = crit
@@ -187,7 +196,7 @@ class PD_Lin_Log(_Param_Dist):
 
 class PD_Log_Lin(_Param_Dist):
 
-    def __init__(self, lo, hi, crit, lofrac):
+    def __init__(self, lo, hi, crit, lofrac, **kwargs):
         """Distribute logarithmically below a cutoff, and then linearly above.
 
         Parameters
@@ -202,6 +211,7 @@ class PD_Log_Lin(_Param_Dist):
             Fraction of mass below the cutoff.
 
         """
+        super().__init__(**kwargs)
         self._lo = lo
         self._hi = hi
         self._crit = crit
