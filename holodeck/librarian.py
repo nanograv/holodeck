@@ -131,6 +131,7 @@ class PD_Uniform_Log(_Param_Dist):
 
     def __init__(self, lo, hi, **kwargs):
         super().__init__(**kwargs)
+        assert lo > 0.0 and hi > 0.0
         self._lo = np.log10(lo)
         self._hi = np.log10(hi)
         self._dist_func = lambda xx: np.power(10.0, self._lo + (self._hi - self._lo) * xx)
@@ -141,6 +142,7 @@ class PD_Normal(_Param_Dist):
 
     def __init__(self, mean, stdev, **kwargs):
         super().__init__(**kwargs)
+        assert stdev > 0.0
         self._mean = mean
         self._stdev = stdev
         self._dist = sp.stats.norm(loc=mean, scale=stdev)
