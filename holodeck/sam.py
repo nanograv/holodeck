@@ -213,7 +213,7 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
     """
 
     def __init__(self, frac_norm_allq=0.025, frac_norm=None, mref=None, mref_log10=11.0,
-                 malpha=0.0, zbeta=0.8, qgamma=0.0, obs_conv_qlo=0.25):
+                 malpha=0.0, zbeta=0.8, qgamma=0.0, obs_conv_qlo=0.25, max_frac=1.0):
 
         mref, _ = utils._parse_val_log10_val_pars(
             mref, mref_log10, val_units=MSOL, name='mref', only_one=True
@@ -234,6 +234,12 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
         self._malpha = malpha         #      0.0   b/t [-0.2 , +0.2 ]  [-0.5 , +0.5 ]  # noqa
         self._zbeta = zbeta           #      0.8   b/t [+0.6 , +0.1 ]  [+0.0 , +2.0 ]  # noqa
         self._qgamma = qgamma         #      0.0   b/t [-0.2 , +0.2 ]  [-0.2 , +0.2 ]  # noqa
+
+        if (max_frac < 0.0) or (1.0 < max_frac):
+            err = f"Given `max_frac`={max_frac:.4f} must be between [0.0, 1.0]!"
+            log.exception(err)
+            raise ValueError(err)
+        self._max_frac = max_frac
 
         self._mref = mref   # NOTE: this is `a * M_0 = 1e11 Msol` in papers
         return
@@ -264,6 +270,7 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
         bb = self._zbeta
         gg = self._qgamma
         rv = f0p * np.power(mass/am0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
+        rv = np.clip(rv, None, self._max_frac)
         return rv
 
 
