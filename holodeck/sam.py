@@ -67,7 +67,7 @@ GSMF_USES_MTOT = False       #: the mass used in the GSMF is interpretted as M=m
 GPF_USES_MTOT = False        #: the mass used in the GPF  is interpretted as M=m1+m2, otherwise use primary m1
 GMT_USES_MTOT = False        #: the mass used in the GMT  is interpretted as M=m1+m2, otherwise use primary m1
 
-ZERO_GMT_STALLED_SYSTEMS = False
+# ZERO_GMT_STALLED_SYSTEMS = False
 
 
 # ==============================
@@ -383,10 +383,15 @@ class Semi_Analytic_Model:
 
     """
 
+    ZERO_GMT_STALLED_SYSTEMS = False
+    ZERO_DYNAMIC_STALLED_SYSTEMS = True
+    ZERO_DYNAMIC_COALESCED_SYSTEMS = True
+
     def __init__(
         self, mtot=(1.0e4*MSOL, 1.0e11*MSOL, 61), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
         shape=None,
-        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013
+        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013,
+        **kwargs
     ):
         """
 
@@ -402,6 +407,13 @@ class Semi_Analytic_Model:
         mmbulge : _type_, optional
 
         """
+
+        for key, val in kwargs.items():
+            if not hasattr(self, key):
+                err = f"{self} does not have attr {key}, cannot set with kwargs!"
+                log.exception(err)
+                raise KeyError(err)
+            setattr(self, key, val)
 
         # Sanitize input classes/instances
         gsmf = utils._get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
@@ -650,8 +662,6 @@ class Semi_Analytic_Model:
                 log.info(f"\tdens bef: ({utils.stats(dens)})")
                 dur = datetime.now()
                 mass_bef = self._integrated_binary_density(dens, sum=True)
-                # for ii, rz in enumerate(self.redz):
-                #     dens[:, :, ii] = add_scatter_to_masses(self.mtot, self.mrat, dens[:, :, ii], scatter)
                 dens = add_scatter_to_masses(self.mtot, self.mrat, dens, scatter)
 
                 mass_aft = self._integrated_binary_density(dens, sum=True)
@@ -662,54 +672,15 @@ class Semi_Analytic_Model:
                 log.info(f"\tmass: {mass_bef:.2e} ==> {mass_aft:.2e} || change = {dm:.4e}")
 
             # set values after redshift zero to have zero density
-            if ZERO_GMT_STALLED_SYSTEMS:
+            if self.ZERO_GMT_STALLED_SYSTEMS:
+                log.info(f"zeroing out {utils.frac_str(idx_stalled)} systems stalled from GMT")
                 dens[idx_stalled] = 0.0
             else:
-                log.info("NOT zeroing out systems with GMTs extending past redshift zero!")
+                log.warning("NOT zeroing out systems with GMTs extending past redshift zero!")
 
             self._density = dens
 
         return self._density
-
-    def _ndens_gal(self, mass_gal, mrat_gal, redz):
-        if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
-            log.warning("{self.__class__}._ndens_gal assumes that primary mass is used for GSMF, GPF and GMT!")
-
-        # NOTE: dlog10(M_1) / dlog10(M) = (M/M_1) * (dM_1/dM) = 1
-        nd = self._gsmf(mass_gal, redz) * self._gpf(mass_gal, mrat_gal, redz)
-        nd = nd * cosmo.dtdz(redz) / self._gmt(mass_gal, mrat_gal, redz)
-        return nd
-
-    def _ndens_mbh(self, mass_gal, mrat_gal, redz):
-        if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
-            log.warning("{self.__class__}._ndens_mbh assumes that primary mass is used for GSMF, GPF and GMT!")
-
-        # this is  d^3 n / [dlog10(M_gal-pri) dq_gal dz]
-        nd_gal = self._ndens_gal(mass_gal, mrat_gal, redz)
-
-        mplaw = self._mmbulge._mplaw
-        dqbh_dqgal = mplaw * np.power(mrat_gal, mplaw - 1.0)
-
-        dmstar_dmbh__pri = self._mmbulge.dmstar_dmbh(mass_gal)   # [unitless]
-        mbh_pri = self._mmbulge.mbh_from_mstar(mass_gal, scatter=False)
-        mbh_sec = self._mmbulge.mbh_from_mstar(mass_gal * mrat_gal, scatter=False)
-        mbh = mbh_pri + mbh_sec
-        mrat_mbh = mbh_sec / mbh_pri
-
-        dlm_dlm = (mbh / mass_gal) * dmstar_dmbh__pri / (1.0 + mrat_mbh)
-        dens = nd_gal * dlm_dlm / dqbh_dqgal
-        return dens
-
-    def _integrated_binary_density(self, ndens=None, sum=True):
-        # d^3 n / [dlog10M dq dz]
-        if ndens is None:
-            ndens = self.static_binary_density
-        integ = utils.trapz(ndens, np.log10(self.mtot), axis=0, cumsum=False)
-        integ = utils.trapz(integ, self.mrat, axis=1, cumsum=False)
-        integ = utils.trapz(integ, self.redz, axis=2, cumsum=False)
-        if sum:
-            integ = integ.sum()
-        return integ
 
     @property
     def fisco(self):
@@ -720,10 +691,8 @@ class Semi_Analytic_Model:
 
         return self._fisco
 
-    def dynamic_binary_number(self, hard, fobs_orb=None, sepa=None, zero_coalesced=True, zero_stalled=True):
+    def dynamic_binary_number(self, hard, fobs_orb=None, sepa=None, zero_coalesced=None, zero_stalled=None):
         """Calculate the differential number of binaries (per bin-volume, per log-freq interval).
-
-        #! BUG: `limit_merger_time` should compare merger time to the redshift of each bin !#
 
         d^4 N / [dlog10(M) dq dz dln(X)    <===    d^3 n / dlog10(M) dq dz
 
@@ -788,6 +757,14 @@ class Semi_Analytic_Model:
         else:
             xsize = len(sepa)
             edges = self.edges + [sepa, ]
+
+        if zero_coalesced is None:
+            zero_coalesced = self.ZERO_DYNAMIC_COALESCED_SYSTEMS
+
+        if zero_stalled is None:
+            zero_stalled = self.ZERO_DYNAMIC_STALLED_SYSTEMS
+
+        log.info(f"{zero_coalesced=}, {zero_stalled=}")
 
         # shape: (M, Q, Z)
         dens = self.static_binary_density   # d3n/[dz dlog10(M) dq]  units: [Mpc^-3]
@@ -1035,6 +1012,46 @@ class Semi_Analytic_Model:
         mr = self.mrat[np.newaxis, :, np.newaxis]
         gwb = gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
         return gwb
+
+    def _ndens_gal(self, mass_gal, mrat_gal, redz):
+        if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
+            log.warning("{self.__class__}._ndens_gal assumes that primary mass is used for GSMF, GPF and GMT!")
+
+        # NOTE: dlog10(M_1) / dlog10(M) = (M/M_1) * (dM_1/dM) = 1
+        nd = self._gsmf(mass_gal, redz) * self._gpf(mass_gal, mrat_gal, redz)
+        nd = nd * cosmo.dtdz(redz) / self._gmt(mass_gal, mrat_gal, redz)
+        return nd
+
+    def _ndens_mbh(self, mass_gal, mrat_gal, redz):
+        if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
+            log.warning("{self.__class__}._ndens_mbh assumes that primary mass is used for GSMF, GPF and GMT!")
+
+        # this is  d^3 n / [dlog10(M_gal-pri) dq_gal dz]
+        nd_gal = self._ndens_gal(mass_gal, mrat_gal, redz)
+
+        mplaw = self._mmbulge._mplaw
+        dqbh_dqgal = mplaw * np.power(mrat_gal, mplaw - 1.0)
+
+        dmstar_dmbh__pri = self._mmbulge.dmstar_dmbh(mass_gal)   # [unitless]
+        mbh_pri = self._mmbulge.mbh_from_mstar(mass_gal, scatter=False)
+        mbh_sec = self._mmbulge.mbh_from_mstar(mass_gal * mrat_gal, scatter=False)
+        mbh = mbh_pri + mbh_sec
+        mrat_mbh = mbh_sec / mbh_pri
+
+        dlm_dlm = (mbh / mass_gal) * dmstar_dmbh__pri / (1.0 + mrat_mbh)
+        dens = nd_gal * dlm_dlm / dqbh_dqgal
+        return dens
+
+    def _integrated_binary_density(self, ndens=None, sum=True):
+        # d^3 n / [dlog10M dq dz]
+        if ndens is None:
+            ndens = self.static_binary_density
+        integ = utils.trapz(ndens, np.log10(self.mtot), axis=0, cumsum=False)
+        integ = utils.trapz(integ, self.mrat, axis=1, cumsum=False)
+        integ = utils.trapz(integ, self.redz, axis=2, cumsum=False)
+        if sum:
+            integ = integ.sum()
+        return integ
 
 
 # ===========================================
