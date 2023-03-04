@@ -106,8 +106,8 @@ class PS_Astro_01(PS_Broad_Uniform_01):
             # gmt_qgamma=[-1.0, +1.0],
 
             mmb_amp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
-            mmb_plaw=PD_Uniform(+0.5, +2.0),
-            mmb_scatter=PD_Uniform(+0.0, +0.6),
+            mmb_plaw=PD_Normal(+1.2, +0.2),
+            mmb_scatter=PD_Normal(+0.32, +0.15),
         )
 
     def model_for_number(self, num):
