@@ -442,6 +442,62 @@ def plot_gwb(fobs, gwb, **kwargs):
     return fig
 
 
+def scientific_notation(val, man=1, exp=0, dollar=True):
+    """Convert a scalar into a string with scientific notation (latex formatted).
+
+    Arguments
+    ---------
+    val : scalar
+        Numerical value to convert.
+    man : int or `None`
+        Precision of the mantissa (decimal points); or `None` for omit mantissa.
+    exp : int or `None`
+        Precision of the exponent (decimal points); or `None` for omit exponent.
+    dollar : bool
+        Include dollar-signs ('$') around returned expression.
+
+    Returns
+    -------
+    rv_str : str
+        Scientific notation string using latex formatting.
+
+    """
+    if val == 0.0:
+        rv_str = "$"*dollar + "0.0" + "$"*dollar
+        return rv_str
+
+    # get log10 exponent
+    val_exp = np.floor(np.log10(np.fabs(val)))
+    # get mantissa (positive/negative is still included here)
+    val_man = val / np.power(10.0, val_exp)
+
+    val_man = np.around(val_man, man)
+    if val_man >= 10.0:
+        val_man /= 10.0
+        val_exp += 1
+
+    # Construct Mantissa String
+    # --------------------------------
+    str_man = "{0:.{1:d}f}".format(val_man, man)
+
+    # If the mantissa is '1' (or '1.0' or '1.00' etc), dont write it
+    if str_man == "{0:.{1:d}f}".format(1.0, man):
+        str_man = ""
+
+    # Construct Exponent String
+    # --------------------------------
+    str_exp = "10^{{ {:d} }}".format(int(val_exp))
+
+    # Put them together
+    # --------------------------------
+    rv_str = "$"*dollar + str_man
+    if len(str_man) and len(str_exp):
+        rv_str += " \\times"
+    rv_str += str_exp + "$"*dollar
+
+    return rv_str
+
+
 def _draw_plaw(ax, freqs, amp=1e-15, f0=1/YR, **kwargs):
     kwargs.setdefault('alpha', 0.25)
     kwargs.setdefault('color', 'k')

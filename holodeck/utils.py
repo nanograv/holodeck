@@ -483,7 +483,17 @@ def eccen_func(cent: float, width: float, size: int) -> np.ndarray:
     return eccen
 
 
-def frac_str(vals: npt.ArrayLike, prec: int = 2) -> str:
+def _func_gaussian(xx, aa, mm, ss):
+    yy = aa * np.exp(-(xx - mm)**2 / (2.0 * ss**2))
+    return yy
+
+
+def fit_gaussian(xx, yy, guess=[1.0, 0.0, 1.0]):
+    popt, pcov = sp.optimize.curve_fit(_func_gaussian, xx, yy, p0=guess, maxfev=10000)
+    return popt, pcov
+
+
+def frac_str(vals, prec=2):
     """Return a string with the fraction and decimal of non-zero elements of the given array.
 
     e.g. [0, 1, 2, 0, 0] ==> "2/5 = 4.0e-1"
