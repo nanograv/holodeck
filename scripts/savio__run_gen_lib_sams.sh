@@ -2,7 +2,7 @@
 #    run with `sbatch <SCRIPT>`
 
 #SBATCH --account=fc_lzkhpc               # Allocation/Account 'fc_lzkhpc'
-#SBATCH --job-name="broad-uniform-02"       # Name of job    `-J`
+#SBATCH --job-name="astro-tight-02-gw"       # Name of job    `-J`
 #SBATCH --mail-user=lzkelley@berkeley.edu   # Designate email address for job communications
 #SBATCH --output=slurm-%x.%j.out            # Path for output must already exist   `-o`
 #SBATCH --error=slurm-%x.%j.err             # Path for errors must already exist   `-e`
@@ -17,8 +17,8 @@
 # ---------------
 
 # ---- PRODUCTION ----
-#SBATCH --partition=savio2            # `savio2` 24 cores/node, allocation *by node*, 64GB/node
-###SBATCH --partition=savio2_bigmem     # `savio2_bigmem` 24 cores/node, allocation *by node*, 128 GB/node
+###SBATCH --partition=savio2            # `savio2` 24 cores/node, allocation *by node*, 64GB/node
+#SBATCH --partition=savio2_bigmem     # `savio2_bigmem` 24 cores/node, allocation *by node*, 128 GB/node
 ###SBATCH --partition=savio_bigmem      # `savio_bigmem` 20 cores/node, allocation *by node*, 512 GB/node
 
 #SBATCH --qos=savio_normal            # 24 nodes max per job, 72:00:00 wallclock limit
@@ -47,16 +47,16 @@ python --version
 
 # ====    setup parameters    ====
 
-NAME="broad-uniform-01_2023-03-03"
+NAME="astro-tight-02-gw_2023-03-03"
 PARS="n10000_s61-81-101_r100_f40"
-#PARS=""
+SPACE="PS_Astro_Tight_02_GW"
 
 #NAME="TEST_"$NAME
 
 SCRIPT="./scripts/gen_lib_sams.py"
 LOG_NAME=$NAME"_job-log"
 
-OUTPUT="./output/"$NAME"_"$PARS
+OUTPUT="/global/scratch/users/lzkelley/holodeck_output/"$NAME"_"$PARS
 
 mkdir -p $OUTPUT
 echo "Output directory: ${OUTPUT}"
@@ -76,8 +76,8 @@ echo "Running `mpirun`"
 
 set -x
 
-mpirun -np 96  python $SCRIPT $OUTPUT -n 10000 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR
-# mpirun -np 4  python $SCRIPT $OUTPUT -n 8 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR
+mpirun -np 96  python $SCRIPT $SPACE $OUTPUT -n 10000 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR
+# mpirun -np 4  python $SCRIPT $SPACE $OUTPUT -n 8 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR
 
 
 # ====    copy final products to share folder for uploading    ====

@@ -19,7 +19,7 @@ from scipy.stats import qmc
 import pyDOE
 
 import holodeck as holo
-from holodeck import log
+from holodeck import log, utils
 from holodeck.constants import YR
 
 
@@ -307,13 +307,10 @@ def sam_lib_combine(path_output, log, debug=False):
     fit_nbins = data['fit_nbins']
     fit_shape = data['fit_lamp'].shape
     fit_med_shape = data['fit_med_lamp'].shape
-    print(f"{fit_nbins=} {fit_shape=} {fit_med_shape=}")
     fit_keys = ['fit_lamp', 'fit_plaw']
     fit_med_keys = ['fit_med_lamp', 'fit_med_plaw']
-    for fk in fit_keys:
-        print(fk, data[fk].shape)
-    for fk in fit_med_keys:
-        print(fk, data[fk].shape)
+    for fk in fit_keys + fit_med_keys:
+        log.info(f"\t{fk:>40s}: {data[fk].shape}")
 
     # ---- Store results from all files
 
@@ -325,18 +322,30 @@ def sam_lib_combine(path_output, log, debug=False):
     fit_med_shape = (num_files,) + fit_med_shape
     fit_data = {kk: np.zeros(fit_shape) for kk in fit_keys}
     fit_data.update({kk: np.zeros(fit_med_shape) for kk in fit_med_keys})
-    print(f"{list(fit_data.keys())=}")
 
     log.info(f"Collecting data from {len(files)} files")
+    good_samp = np.ones(nsamples, dtype=bool)
+    all_nonzero = np.zeros(nsamples, dtype=bool)
+    any_nonzero = np.zeros_like(all_nonzero)
+    tot_nonzero = np.zeros((nsamples, nreals), dtype=bool)
     for ii, file in enumerate(tqdm.tqdm(files)):
         temp = np.load(file, allow_pickle=True)
         # When a processor fails for a given parameter, the output file is still created with the 'fail' key added
-        # TODO: handle this case when combining files (i.e. in this function)
         if ('fail' in temp) or ('gwb' not in temp):
-            err = f"THIS IS A FAILED DATASET ({ii}, {file}).  LIBRARIAN HASNT BEEN UPDATED TO HANDLE THIS CASE!"
-            log.exception(err)
-            raise RuntimeError(err)
+            msg = f"file {ii=:06d} is a failure file, setting values to NaN ({file})"
+            log.warning(msg)
+            gwb[ii, :, :] = np.nan
+            for fk in fit_keys + fit_med_keys:
+                fit_data[fk][ii, ...] = np.nan
 
+            good_samp[ii] = False
+            continue
+
+        this_gwb = temp['gwb']
+        all_nonzero[ii] = np.all(this_gwb > 0.0)
+        any_nonzero[ii] = np.any(this_gwb > 0.0)
+        tot_nonzero[ii, :] = np.all(this_gwb > 0.0, axis=0)
+        
         # Make sure basic parameters match from this file to the test file
         assert ii == temp['pnum']
         assert np.allclose(fobs, temp['fobs'])
@@ -366,6 +375,12 @@ def sam_lib_combine(path_output, log, debug=False):
         if debug:
             break
 
+    log.info(f"{utils.frac_str(~good_samp)} files are failures")
+    log.info(f"GWB")
+    log.info(f"\tall nonzero: {utils.frac_str(all_nonzero)} ")
+    log.info(f"\tany nonzero: {utils.frac_str(any_nonzero)} ")
+    log.info(f"\ttot nonzero: {utils.frac_str(tot_nonzero)} (realizations)")    
+        
     # ---- Save to concatenated output file ----
     out_filename = path_output.joinpath('sam_lib.hdf5')
     log.info(f"Writing collected data to file {out_filename}")
