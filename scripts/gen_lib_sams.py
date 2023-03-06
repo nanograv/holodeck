@@ -59,14 +59,14 @@ DEF_ECCEN_NHARMS = 100
 
 MAX_FAILURES = 5
 
-# SPACE = holo.param_spaces.PS_Circ_01
-SPACE = holo.param_spaces.PS_Broad_Uniform_01
-
 
 # ---- setup argparse
 
 def setup_argparse():
     parser = argparse.ArgumentParser()
+    parser.add_argument('param_space', type=str,
+                        help="Parameter space class name, found in 'holodeck.param_spaces'.")
+
     parser.add_argument('output', metavar='output', type=str,
                         help='output path [created if doesnt exist]')
 
@@ -88,8 +88,8 @@ def setup_argparse():
     parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
                         help='verbose output [INFO]')
 
-    args = parser.parse_args()
-
+    args = parser.parse_args()  
+    
     if args.test:
         args.verbose = True
 
@@ -135,6 +135,7 @@ log = holo.logger.get_logger(name=log_name, level_stream=log_lvl, tofile=fname, 
 log.info(head)
 log.info(f"Output path: {PATH_OUTPUT}")
 log.info(f"        log: {fname}")
+log.info(args)
 args.log = log
 
 if comm.rank == 0:
@@ -148,12 +149,18 @@ if comm.rank == 0:
 
 # ---- setup Parameter_Space instance
 
-log.warning(f"SPACE = {SPACE}")
-space = SPACE(log, args.nsamples, args.sam_shape, args.seed) if comm.rank == 0 else None
+try:
+    space = getattr(holo.param_spaces, args.param_space)
+except Exception as err:
+    log.exception(f"Failed to load '{args.param_space}' from holo.param_spaces!")
+    log.exception(err)
+    raise err
+
+space = space(log, args.nsamples, args.sam_shape, args.seed) if comm.rank == 0 else None
 space = comm.bcast(space, root=0)
 
 log.info(
-    f"samples={args.nsamples}, sam_shape={args.sam_shape}, nreals={args.nreals}\n"
+    f"param_space={args.param_space}, samples={args.nsamples}, sam_shape={args.sam_shape}, nreals={args.nreals}\n"
     f"nfreqs={args.nfreqs}, pta_dur={args.pta_dur} [yr]\n"
 )
 
