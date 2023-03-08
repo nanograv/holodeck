@@ -644,7 +644,7 @@ class Fixed_Time(_Hardening):
             (small separations: r < rchar), at times referred to internally as `g1`.
         gamma_df : scalar
             Power-law of hardening timescale in the dynamical-friction regime
-            (large separations: r > rchar), at times referred to internally as `g1`.
+            (large separations: r > rchar), at times referred to internally as `g2`.
 
         """
         self._progress = progress
