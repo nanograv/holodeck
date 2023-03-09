@@ -10,3 +10,6 @@ pydoe
 psutil
 tqdm
 cython
+schwimmbad
+emcee
+george
