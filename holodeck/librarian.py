@@ -345,7 +345,7 @@ def sam_lib_combine(path_output, log, debug=False):
         all_nonzero[ii] = np.all(this_gwb > 0.0)
         any_nonzero[ii] = np.any(this_gwb > 0.0)
         tot_nonzero[ii, :] = np.all(this_gwb > 0.0, axis=0)
-        
+
         # Make sure basic parameters match from this file to the test file
         assert ii == temp['pnum']
         assert np.allclose(fobs, temp['fobs'])
@@ -379,8 +379,8 @@ def sam_lib_combine(path_output, log, debug=False):
     log.info(f"GWB")
     log.info(f"\tall nonzero: {utils.frac_str(all_nonzero)} ")
     log.info(f"\tany nonzero: {utils.frac_str(any_nonzero)} ")
-    log.info(f"\ttot nonzero: {utils.frac_str(tot_nonzero)} (realizations)")    
-        
+    log.info(f"\ttot nonzero: {utils.frac_str(tot_nonzero)} (realizations)")
+
     # ---- Save to concatenated output file ----
     out_filename = path_output.joinpath('sam_lib.hdf5')
     log.info(f"Writing collected data to file {out_filename}")
