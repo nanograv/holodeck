@@ -16,9 +16,9 @@ The `holodeck` framework is currently under substantial, active development.  It
 
 The recommended installation for active development is to:
 
+0) OPTIONAL: create and activate a new anaconda environment to isolate your build: `conda create --name holo310 python=3.10; conda activate holo310`
 1) Clone the holodeck repository: `git clone https://github.com/nanograv/holodeck.git`
-2) Install the required external packages specified in the requirements file: `pip install -r requirements.txt`
-2b) [Optional:] you may want to also install the development requirements with: `pip install -r requirements-dev.txt`
+2) Install the required external packages specified in the requirements file: `pip install -r requirements.txt`.  OPTIONAL: install development requirements: `pip install -r requirements-dev.txt`
 3) Build the required c libraries from holodeck cython code: `cd holodeck; python setup.py build_ext -i`
 4) Perform an development/editable local installation: `python setup.py develop`
 
