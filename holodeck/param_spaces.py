@@ -18,7 +18,7 @@ class PS_Broad_Uniform_01(_Param_Space):
             hard_time=PD_Uniform(0.1, 12.0),   # [Gyr]
             hard_gamma_inner=PD_Uniform(-1.5, +0.0),
 
-            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),           # [log10(#/Mpc^3)]
             gsmf_mchar0_log10=PD_Uniform(10.5, 12.0),   # [log10(Msol)]
             gsmf_alpha0=PD_Uniform(-2.0, -0.5),
 
