@@ -20,4 +20,4 @@ conda activate holodeck
 
 CONFIG="./gp_config.ini"
 
-mpiexec python train_gp.py "${CONFIG}"
+mpiexec python gp_trainer.py "${CONFIG}"
