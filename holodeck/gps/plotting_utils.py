@@ -9,7 +9,7 @@ import numpy as np
 import scipy.signal as ssig
 from holodeck.constants import GYR, MSOL, PC, YR
 
-import gp_utils as gu
+from holodeck.gps import gp_utils as gu
 
 
 def sam_hard(env_pars, shape=40):
