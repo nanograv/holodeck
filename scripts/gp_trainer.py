@@ -9,7 +9,13 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-import gp_utils as gu
+from holodeck.gps import gp_utils as gu
+
+# import warnings
+# import numpy as np
+# warnings.filterwarnings("error", category=UserWarning)
+# # np.seterr(divide='ignore', invalid='ignore', over='ignore')
+# np.seterr(all='raise')
 
 # Emcee doesn't like multithreading
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -49,9 +55,10 @@ def main(config):
     FIXME: Add docs.
 
     """
-            # Split up config into sections
+    # Split up config into sections
     train_opts = config['Training Options']
     kern_opts = config['Kernel Options']
+    print(train_opts)
 
     # Make sure the library exists
     spectra_file = Path(train_opts.get('spectra_file'))
