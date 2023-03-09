@@ -112,7 +112,7 @@ docs/holodeck-paper/src/out
 output/*
 *.png
 *.pdf
-analysis
+# analysis
 docs/source/apidoc_modules
 hostfile
 readthedocs.html
