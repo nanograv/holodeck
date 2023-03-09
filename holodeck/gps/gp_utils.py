@@ -10,7 +10,16 @@ import h5py
 import numpy as np
 import schwimmbad
 import scipy.signal as ssig
+
+from holodeck import utils
 from holodeck.constants import YR
+
+
+VERBOSE = True
+
+FLOOR_STRAIN_SQUARED = 1e-40
+FILTER_DEF_WINDOW_LENGTH = 7
+FILTER_DEF_POLY_ORDER = 3
 
 
 class GaussProc(object):
@@ -159,6 +168,9 @@ def train_gp(spectra_file,
     """
     spectra = h5py.File(spectra_file, "r")
 
+    if VERBOSE:
+        print(f"Loaded spectra from {spectra_file}")
+
     # Get smoothed GWB
     gp_freqs, yerr, yobs, yobs_mean = get_smoothed_gwb(spectra, nfreqs,
                                                        test_frac,
@@ -212,30 +224,56 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     FIXME: Add docs.
 
     """
+
+    # Filter out NaN values which signify a failed sample point
+    # shape: (samples, freqs, realizations)
+    gwb_spectra = spectra['gwb']
+    bads = np.any(np.isnan(gwb_spectra), axis=(1, 2))
+    print(f"Found {utils.frac_str(bads)} samples with NaN entries.  Removing them from library.")
+    gwb_spectra = gwb_spectra[~bads]
+
     # Cut out portion for test set later
-    test_ind = int(spectra['gwb'].shape[0] * test_frac)
-    gwb_spectra = spectra["gwb"][test_ind:, :nfreqs, :]**2
+    test_ind = int(gwb_spectra.shape[0] * test_frac)
+    if VERBOSE:
+        print(f"setting aside {test_frac} of samples ({test_ind}) for testing, and choosing {nfreqs} frequencies")
+
+    gwb_spectra = gwb_spectra[test_ind:, :nfreqs, :]**2
 
     # Find all the zeros and set them to be h_c = 1e-20
-    low_ind = np.where(gwb_spectra < 1e-40)
-    gwb_spectra[low_ind] = 1e-40
+    low_ind = (gwb_spectra < FLOOR_STRAIN_SQUARED)
+    gwb_spectra[low_ind] = FLOOR_STRAIN_SQUARED
 
     # Find mean or median over realizations
     if center_measure.lower() == "median":
-        center = np.log10(np.nanmedian(gwb_spectra, axis=-1))
+        center = np.log10(np.median(gwb_spectra, axis=-1))
     elif center_measure.lower() == "mean":
-        center = np.log10(np.nanmean(gwb_spectra, axis=-1))
+        center = np.log10(np.mean(gwb_spectra, axis=-1))
     else:
         raise ValueError(
             f"`center_measure` must be 'mean' or 'median', not '{center_measure}'"
         )
 
     # Smooth Mean Spectra
-    smooth_center = ssig.savgol_filter(center, 7, 3)
+    filter_window = FILTER_DEF_WINDOW_LENGTH
+    filter_poly_order = FILTER_DEF_POLY_ORDER
+    if nfreqs < filter_window:
+        print(f"WARNING: {nfreqs=} < {filter_window=}, resetting default value")
+        if nfreqs < 4:
+            filter_window = None
+            filter_poly_order = None
+        else:
+            filter_window = nfreqs // 2
+            filter_poly_order = filter_window // 2
+        print(f"         {filter_window=} {filter_poly_order=}")
+
+    if filter_window is not None:
+        smooth_center = ssig.savgol_filter(center, filter_window, filter_poly_order)
+    else:
+        smooth_center = center
+
     # Find std
-    err = np.nanstd(np.log10(gwb_spectra), axis=-1)
-    if np.any(np.isnan(err)):
-        print("Got a NAN issue")
+    err = np.std(np.log10(gwb_spectra), axis=-1)
+
     # The "y" data are the medians or means and errors for the spectra at each point in parameter space
     yobs = smooth_center.copy()  # mean.copy()
     yerr = err.copy()
