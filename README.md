@@ -17,8 +17,10 @@ The `holodeck` framework is currently under substantial, active development.  It
 The recommended installation for active development is to:
 
 1) Clone the holodeck repository: `git clone https://github.com/nanograv/holodeck.git`
-2) Build the required c libraries from holodeck cython code: `cd holodeck; python setup.py build_ext -i`
-3) Perform an development/editable local installation: `python setup.py develop`
+2) Install the required external packages specified in the requirements file: `pip install -r requirements.txt`
+2b) [Optional:] you may want to also install the development requirements with: `pip install -r requirements-dev.txt`
+3) Build the required c libraries from holodeck cython code: `cd holodeck; python setup.py build_ext -i`
+4) Perform an development/editable local installation: `python setup.py develop`
 
 The 'editable' installation allows the code base to be modified, and have those changes take effect when using the `holodeck` module without having to rebuild/reinstall it.
 
