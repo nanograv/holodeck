@@ -2016,6 +2016,21 @@ def time_to_merge_at_sep(m1, m2, sepa):
     return delta_sep/(GW_CONST*m1*m2*(m1+m2))
 
 
+def gamma_psd_to_strain(gamma_psd):
+    gamma_strain = (gamma_psd + 3.0) / 2.0
+    return gamma_strain
+
+
+def gamma_strain_to_psd(gamma_strain):
+    gamma_psd = 2*gamma_strain - 3.0
+    return gamma_psd
+
+
+def gamma_strain_to_omega(gamma_strain):
+    gamma_omega = (gamma_strain - 2.0) / 2.0
+    return gamma_omega
+
+
 @numba.njit
 def _gw_ecc_func(eccen):
     """GW Hardening rate eccentricitiy dependence F(e).
