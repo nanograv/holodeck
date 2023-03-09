@@ -71,6 +71,7 @@ class GaussProc(object):
         kernel_lcase = list(map(str.lower, kernel_list))
         try:
             self.kernel = kernel_list[kernel_lcase.index(kernel.lower())]
+            self.kernel_class = getattr(kernels, self.kernel)
         except ValueError:
             print(f"Unexpected kernel '{kernel}'.")
             print("Acceptable values are:\n", *kernel_list, sep="\n")
@@ -105,11 +106,11 @@ class GaussProc(object):
         a, tau = np.exp(p[0]), np.exp(p[1:])
 
         try:
-            gp = george.GP(a * getattr(kernels, self.kernel)(
-                **self.kernel_opts, metric=tau, ndim=len(tau)))
+            gp = george.GP(a * self.kernel_class(**self.kernel_opts, metric=tau, ndim=len(tau)))
             gp.compute(self.x, self.yerr)
 
-            lnlike = gp.lnlikelihood(self.y, quiet=True)
+            # lnlike = gp.lnlikelihood(self.y, quiet=True)
+            lnlike = gp.log_likelihood(self.y, quiet=True)
         except np.linalg.LinAlgError:
             lnlike = -np.inf
 
@@ -240,6 +241,9 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     # Select valid spectra, and sample parameters
     gwb_spectra = gwb_spectra[~bads]
     xobs = xobs[~bads]
+    # Make sure old/deprecated parameters are not in library
+    if 'mmb_amp' in spectra.attrs['param_names']:
+        raise RuntimeError("Parameter `mmb_amp` should not be here!  Needs to be log-spaced (`mmb_amp_log10`)!")
 
     # Cut out portion for test set later
     test_ind = int(gwb_spectra.shape[0] * test_frac)
@@ -398,7 +402,7 @@ def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts):
 
 
 def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
-                      nsamples, burn_frac, mpi):
+                      nsamples, burn_frac, mpi, sample_kwargs={}):
     """Fit the parameters of the GP kernels.
 
     Parameters
@@ -443,12 +447,13 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
 
         # Initialize the walkers.
         p0 = [
-            np.log(np.full(ndim, 1.0)) + 1e-4 * np.random.randn(ndim)
+            # np.log(np.full(ndim, 1.0)) + 1e-4 * np.random.randn(ndim)
+            1.0e-4 * np.random.randn(ndim)
             for _ in range(nwalkers)
         ]
 
         print(freq_ind, "Running burn-in")
-        p0, lnp, _ = sampler[freq_ind].run_mcmc(p0, int(burn_frac * nsamples))
+        p0, lnp, _ = sampler[freq_ind].run_mcmc(p0, int(burn_frac * nsamples), **sample_kwargs)
         sampler[freq_ind].reset()
 
         print(freq_ind, "Running second burn-in")
