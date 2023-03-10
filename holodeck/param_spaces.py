@@ -18,7 +18,7 @@ class PS_Broad_Uniform_01(_Param_Space):
             hard_time=PD_Uniform(0.1, 12.0),   # [Gyr]
             hard_gamma_inner=PD_Uniform(-1.5, +0.0),
 
-            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),           # [log10(#/Mpc^3)]
             gsmf_mchar0_log10=PD_Uniform(10.5, 12.0),   # [log10(Msol)]
             gsmf_alpha0=PD_Uniform(-2.0, -0.5),
 
@@ -322,6 +322,34 @@ class PS_Astro_Tight_02_GW(PS_Broad_Uniform_01_GW):
             mmb_plaw=PD_Normal(+1.2, 0.1),
             mmb_scatter=PD_Normal(+0.32, 0.1),
         )
+
+
+class PS_Astro_Tight_03(PS_Broad_Uniform_01):
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super(PS_Broad_Uniform_01, self).__init__(
+            log, nsamples, sam_shape, seed,
+
+            hard_time=PD_Uniform(1.0, 10.0),   # [Gyr]
+            hard_gamma_inner=PD_Uniform(-1.5, -0.5),
+
+            # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
+            gsmf_phi0=PD_Normal(-2.56, 0.1),
+            gsmf_mchar0_log10=PD_Normal(10.9, 0.1),   # [log10(Msol)]
+            gsmf_alpha0=PD_Normal(-1.2, 0.05),
+
+            gpf_zbeta=PD_Normal(+0.8, 0.4),
+            gpf_qgamma=PD_Normal(+0.5, 0.3),
+
+            gmt_norm=PD_Uniform(0.2, 5.0),    # [Gyr]
+            gmt_zbeta=PD_Uniform(-2.0, +0.0),
+
+            mmb_amp_log10=PD_Normal(+8.6, 0.1),   # [log10(Msol)]
+            mmb_plaw=PD_Normal(+1.2, 0.1),
+            mmb_scatter=PD_Normal(+0.32, 0.1),
+        )
+
+
 
 
 # ==============================================================================

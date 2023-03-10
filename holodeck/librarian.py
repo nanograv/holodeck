@@ -400,41 +400,6 @@ def sam_lib_combine(path_output, log, debug=False):
     return
 
 
-def fit_powerlaw(xx, yy, init=[-15.0, -2.0/3.0], min_val_frac=0.75):
-    """
-
-    Returns
-    -------
-    log10_amp
-    plaw
-
-    """
-
-    def powerlaw_func(freqs, log10Ayr, gamma):
-        zz = log10Ayr + gamma * freqs
-        return zz
-
-    if (min_val_frac is not None) and (min_val_frac < 1.0):
-        idx = np.isfinite(yy) & (yy > 0.0)
-        frac_val = np.count_nonzero(idx) / idx.size
-        if frac_val > min_val_frac:
-            xx = xx[idx]
-            yy = yy[idx]
-        else:
-            xx = []
-            yy = []
-
-    if len(xx) >= 2:
-        popt, pcov = sp.optimize.curve_fit(powerlaw_func, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
-    else:
-        popt = [np.nan, np.nan]
-        # pcov = np.nan
-
-    log10_amp = popt[0]
-    gamma = popt[1]
-    return log10_amp, gamma
-
-
 def fit_spectra(freqs, gwb, nbins=[5, 10, 15]):
     nf, nreals = np.shape(gwb)
     assert len(freqs) == nf
@@ -456,17 +421,36 @@ def fit_spectra(freqs, gwb, nbins=[5, 10, 15]):
             raise
 
         yy = np.median(gwb, axis=-1)
-        log10_amp, plaw = fit_powerlaw(xx, yy[cut])
+        log10_amp, plaw = _fit_powerlaw(xx, yy[cut], min_val_frac=0.75)
 
         fit_med_lamp[ii] = log10_amp
         fit_med_plaw[ii] = plaw
         for rr in range(nreals):
             yy = gwb[:, rr]
-            log10_amp, plaw = fit_powerlaw(xx, yy[cut])
+            log10_amp, plaw = _fit_powerlaw(xx, yy[cut], min_val_frac=0.75)
             fit_lamp[rr, ii] = log10_amp
             fit_plaw[rr, ii] = plaw
 
     return nbins, fit_lamp, fit_plaw, fit_med_lamp, fit_med_plaw
+
+
+def _fit_powerlaw(xx, yy, min_val_frac=0.75):
+    if (min_val_frac is not None):
+        idx = np.isfinite(yy) & (yy > 0.0)
+        frac_val = np.count_nonzero(idx) / idx.size
+        if frac_val > min_val_frac:
+            xx = xx[idx]
+            yy = yy[idx]
+        else:
+            xx = []
+            yy = []
+
+    if len(xx) >= 2:
+        log10_amp, plaw = utils.fit_powerlaw(xx, yy)
+    else:
+        log10_amp, plaw = np.nan, np.nan
+
+    return log10_amp, plaw
 
 
 def get_gwb_fits_data(fobs_cents, gwb):
