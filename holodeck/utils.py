@@ -493,6 +493,42 @@ def fit_gaussian(xx, yy, guess=[1.0, 0.0, 1.0]):
     return popt, pcov
 
 
+def _func_line(xx, amp, slope):
+    yy = amp + slope * xx
+    return yy
+
+
+def fit_powerlaw(xx, yy, init=[-15.0, -2.0/3.0]):
+    """
+
+    Returns
+    -------
+    log10_amp
+    plaw
+
+    """
+
+    popt, pcov = sp.optimize.curve_fit(_func_line, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
+    log10_amp = popt[0]
+    gamma = popt[1]
+    return log10_amp, gamma
+
+
+def fit_powerlaw_fixed_index(xx, yy, index=-2.0/3.0, init=[-15.0]):
+    """
+
+    Returns
+    -------
+    log10_amp
+    plaw
+
+    """
+    _func_fixed = lambda xx, amp: _func_line(xx, amp, index)
+    popt, pcov = sp.optimize.curve_fit(_func_fixed, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
+    log10_amp = popt[0]
+    return log10_amp
+
+
 def frac_str(vals, prec=2):
     """Return a string with the fraction and decimal of non-zero elements of the given array.
 
@@ -1534,6 +1570,7 @@ def redz_after(time, redz=None, age=None):
         new_redz[idx] = cosmo.tage_to_z(new_age[idx])
 
     return new_redz
+
 
 def schwarzschild_radius(mass):
     """Return the Schwarschild radius [cm] for the given mass [grams].
