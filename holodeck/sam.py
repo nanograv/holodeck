@@ -900,7 +900,7 @@ class Semi_Analytic_Model:
             # reshape to match `dnum`  (X, M*Q*Z) ==> (M*Q*Z, X) ==> (M, Q, Z, X)
             stall = stall.T.reshape(dnum.shape)
             log.info(f"fraction of stalled binary-xvals: {utils.frac_str(stall)}")
-            stalled = np.any(stall, axis=-1)
+            stalled = np.all(stall, axis=-1)
             log.info(f"fraction of binaries stalled at all xvals: {utils.frac_str(stalled)}")
             stalled_frac = np.count_nonzero(stalled) / stalled.size
             if stalled_frac > 0.8:

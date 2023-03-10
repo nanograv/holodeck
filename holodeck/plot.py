@@ -471,7 +471,7 @@ def _twin_hz(ax, nano=True, fs=8, **kw):
     return
 
 
-def draw_med_conf(ax, xx, vals, fracs=[0.10, 0.50, 0.90], weights=None, plot={}, fill={}):
+def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={}):
     plot.setdefault('alpha', 0.5)
     fill.setdefault('alpha', 0.2)
     percs = np.atleast_1d(fracs)
@@ -481,21 +481,16 @@ def draw_med_conf(ax, xx, vals, fracs=[0.10, 0.50, 0.90], weights=None, plot={},
     inter_percs = [[0.5-pp/2, 0.5+pp/2] for pp in percs]
     # Add the median value (50%)
     inter_percs = [0.5, ] + np.concatenate(inter_percs).tolist()
-    # Get percentilese
-    # if weights is None:
-    #     med, *conf = np.percentile(vals, inter_percs, axis=-1)
-    # else:
-    #     med, *conf = kale.utils.quantiles()
-    med, *conf = kale.utils.quantiles(vals, percs=inter_percs, weights=weights)
+    # Get percentiles; they go along the last axis
+    rv = kale.utils.quantiles(vals, percs=inter_percs, weights=weights, axis=-1)
+    med, *conf = rv.T
 
     # plot median
     hh, = ax.plot(xx, med, **plot)
 
     # Reshape confidence intervals to nice plotting shape
-    # 2*P, X ==> (2, P, X)
-    conf = np.array(conf).reshape(2, len(percs), xx.size)
-    # (2, P, X) ==> (P, 2, X)
-    conf = np.moveaxis(conf, 0, 1)
+    # 2*P, X ==> (P, 2, X)
+    conf = np.array(conf).reshape(len(percs), 2, xx.size)
 
     # plot each confidence interval
     for lo, hi in conf:
