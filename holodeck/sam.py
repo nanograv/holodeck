@@ -691,7 +691,8 @@ class Semi_Analytic_Model:
 
         return self._fisco
 
-    def dynamic_binary_number(self, hard, fobs_orb=None, sepa=None, zero_coalesced=None, zero_stalled=None):
+    def dynamic_binary_number(self, hard, fobs_orb=None, sepa=None,
+                              zero_coalesced=None, zero_stalled=None, return_details=False):
         """Calculate the differential number of binaries (per bin-volume, per log-freq interval).
 
         d^4 N / [dlog10(M) dq dz dln(X)    <===    d^3 n / dlog10(M) dq dz
@@ -724,6 +725,7 @@ class Semi_Analytic_Model:
             {total-mass, mass-ratio, redshift, observer-frame orbital-frequency}
         dnum : (M, Q, Z, F) ndarray of scalar
             Differential number of binaries at the grid edges.  Units are dimensionless number of binaries.
+        [details]
 
         Notes
         -----
@@ -823,6 +825,15 @@ class Semi_Analytic_Model:
             log.warning(f"Found {utils.frac_str(bads)} invalid hardening timescales.  Setting to zero densities.")
             dnum[bads] = 0.0
 
+        if return_details:
+            # (X, M*Q*Z) ==> (M*Q*Z, X)
+            dadt = np.moveaxis(dadt, 0, -1)
+            # (M*Q*Z, X) ==> (M, Q, Z, X)
+            dadt = dadt.reshape(dens.shape + (xsize,))
+            details = dict(dens=dens, cosmo_fact=cosmo_fact, tau=tau, dadt=dadt)
+        else:
+            del dadt, tau, dens, cosmo_fact
+
         # ---- Check when binaries reach their ISCO (and zero out density at higher frequencies)
         if zero_coalesced:
             # (M,) rest-frame orbital-frequency of ISCO in [1/sec]
@@ -866,15 +877,18 @@ class Semi_Analytic_Model:
             # (X, M*Q*Z)
             mt, mr, rz, rads = [mm.reshape(-1, STEPS).T for mm in [mt, mr, rz, rads]]
             # (X, M*Q*Z) --- `Fixed_Time.dadt` will only accept this shape
-            dadt = hard.dadt(mt, mr, rads)
+            dadt_evo = hard.dadt(mt, mr, rads)
             # Integrate (inverse) hardening rates to calculate total lifetime to each separation
-            times_evo = -utils.trapz_loglog(-1.0 / dadt, rads, axis=0, cumsum=True)
+            times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=0, cumsum=True)
+            del dadt_evo
 
             # (X, M*Q*Z)   convert from separations to rest-frame orbital frequencies
             frst_orb_evo = utils.kepler_freq_from_sepa(mt, rads)
+            del rads, mt, mr
             # interpolate to target frequencies
             # `frst_orb` is shaped (X, M*Q*Z)  `ndinterp` interpolates over 1th dimension
             times = utils.ndinterp(frst_orb.T, frst_orb_evo[1:, :].T, times_evo.T, xlog=True, ylog=True).T
+            del frst_orb_evo, times_evo
 
             # Combine the binary-evolution time, with the galaxy-merger time
             # (X, M*Q*Z)
@@ -885,12 +899,12 @@ class Semi_Analytic_Model:
             stall = (redz_tot < 0.0)
             # reshape to match `dnum`  (X, M*Q*Z) ==> (M*Q*Z, X) ==> (M, Q, Z, X)
             stall = stall.T.reshape(dnum.shape)
-            log.info(f"fraction of stalled binary-frequencies: {utils.frac_str(stall)}")
+            log.info(f"fraction of stalled binary-xvals: {utils.frac_str(stall)}")
             stalled = np.any(stall, axis=-1)
-            log.info(f"fraction of binaries stalled at all frequencies: {utils.frac_str(stalled)}")
+            log.info(f"fraction of binaries stalled at all xvals: {utils.frac_str(stalled)}")
             stalled_frac = np.count_nonzero(stalled) / stalled.size
             if stalled_frac > 0.8:
-                log.warning(f"A large fraction of binaries are stalled at all frequencies!  {stalled_frac:.4e}")
+                log.warning(f"A large fraction of binaries are stalled at all xvals!  {stalled_frac:.4e}")
 
             dnum[stall] = 0.0
             self._stall = stall
@@ -899,6 +913,9 @@ class Semi_Analytic_Model:
             log.warning("WARNING: _stalled_ binaries are not being accounted for in `dynamic_binary_number`!")
 
         self._dynamic_binary_number = dnum
+
+        if return_details:
+            return edges, dnum, details
 
         return edges, dnum
 
