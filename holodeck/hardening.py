@@ -615,7 +615,7 @@ class Fixed_Time(_Hardening):
     _NORM_CHUNK_SIZE = 1e3
 
     def __init__(self, time, mtot, mrat, redz, sepa,
-                 rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5, progress=True, interpolate_norm=False):
+                 rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5, progress=False, interpolate_norm=False):
         """Initialize `Fixed_Time` instance for the given binary properties and function parameters.
 
         Parameters
