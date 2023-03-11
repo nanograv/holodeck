@@ -100,10 +100,11 @@ class _Param_Space(abc.ABC):
     def model_for_number(self, num):
         params = self.param_dict(num)
         self._log.debug(f"params {num} :: {params}")
-        return self.model_for_params(params)
+        return self.model_for_params(params, self.param_shape)
 
     @abc.abstractmethod
-    def model_for_params(self, params):
+    @classmethod
+    def model_for_params(cls, params):
         raise
 
 

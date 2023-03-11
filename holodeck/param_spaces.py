@@ -34,7 +34,8 @@ class PS_Broad_Uniform_01(_Param_Space):
             mmb_scatter=PD_Uniform(+0.0, +0.6),
         )
 
-    def model_for_params(self, params):
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None):
 
         # Other parameters are guesses
         hard_time = params['hard_time'] * GYR
@@ -82,9 +83,10 @@ class PS_Broad_Uniform_01(_Param_Space):
             scatter_dex=params['mmb_scatter'],
         )
 
+        kw = {} if sam_shape is None else dict(shape=sam_shape)
         sam = holo.sam.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
-            shape=self.sam_shape
+            **kw
         )
         hard = holo.hardening.Fixed_Time.from_sam(
             sam,
@@ -120,7 +122,8 @@ class PS_Broad_Uniform_01_GW(_Param_Space):
             mmb_scatter=PD_Uniform(+0.0, +0.6),
         )
 
-    def model_for_params(self, params):
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None):
 
         # Parameters are based on `sam-parameters.ipynb` fit to [Tomczak+2014]
         gsmf_phiz = -0.6
@@ -162,11 +165,12 @@ class PS_Broad_Uniform_01_GW(_Param_Space):
             scatter_dex=params['mmb_scatter'],
         )
 
+        kw = {} if sam_shape is None else dict(shape=sam_shape)
         sam = holo.sam.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
-            shape=self.sam_shape,
             ZERO_DYNAMIC_STALLED_SYSTEMS=False,
             ZERO_GMT_STALLED_SYSTEMS=True,
+            **kw
         )
 
         hard = holo.hardening.Hard_GW()
@@ -343,7 +347,8 @@ class PS_Test_Uniform(_Param_Space):
         )
         return
 
-    def model_for_params(self, params):
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None):
 
         hard_time = (10.0 ** params['hard_time']) * GYR
 
@@ -352,9 +357,10 @@ class PS_Test_Uniform(_Param_Space):
         gmt = holo.sam.GMT_Power_Law(zbeta=params['gmt_zbeta'])
         mmbulge = holo.relations.MMBulge_KH2013(mamp_log10=params['mmb_amp'], scatter_dex=params['mmb_scatter'])
 
+        kw = {} if sam_shape is None else dict(shape=sam_shape)
         sam = holo.sam.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
-            shape=self.sam_shape
+            **kw
         )
         hard = holo.hardening.Fixed_Time.from_sam(
             sam, hard_time,
