@@ -119,3 +119,6 @@ readthedocs.html
 data/
 notes.md
 minos_run_gen_lib_sams.sh
+cyutils.c
+cyutils.html
+cyutils_api.h

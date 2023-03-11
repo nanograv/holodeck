@@ -32,14 +32,18 @@ jobs:
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install -r requirements-dev.txt
-        python --version
         which python
+        python --version
+        python -m pip install --upgrade pip
+        python -m pip install -r requirements.txt
+        python -m pip install -r requirements-dev.txt
 
     - name: Install package
       run: |
-        python -m pip install . --no-deps
+        which python
+        python --version
+        python setup.py build_ext -i
+        python setup.py develop
         python --version
         python -c "import sys; print(f'Python {sys.version}')"
         python -c "import pip; print(f'pip {pip.__version__}')"
@@ -48,4 +52,9 @@ jobs:
 
     - name: Run pytest with tox
       # Run tox using the version of Python in `PATH`
-      run: tox -e py
+      run: |
+        which python
+        python --version
+        which tox
+        tox --version
+        tox -e py

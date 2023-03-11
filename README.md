@@ -12,12 +12,15 @@ This package, which is actively under development, is aimed at providing a compr
 
 ## Installation
 
-The `holodeck` framework is currently under substantial, active development.  It will not available on `pypi` (`pip`) or via `conda` install until it has stabilized.  Currently `holodeck` requires `python >= 3.8`, and tests are run on versions `3.8`, `3.9`, `3.10`.
+The `holodeck` framework is currently under substantial, active development.  It will not be available on `pypi` (`pip`) or via `conda` install until it has stabilized.  Currently `holodeck` requires `python >= 3.8`, and tests are run on versions `3.8`, `3.9`, `3.10`.
 
 The recommended installation for active development is to:
 
+0) OPTIONAL: create and activate a new anaconda environment to isolate your build: `conda create --name holo310 python=3.10; conda activate holo310`
 1) Clone the holodeck repository: `git clone https://github.com/nanograv/holodeck.git`
-2) Perform an 'editable' local installation: `cd holodeck; pip install -e . -r requirements-dev.txt`
+2) Install the required external packages specified in the requirements file: `pip install -r requirements.txt`.  OPTIONAL: install development requirements: `pip install -r requirements-dev.txt`
+3) Build the required c libraries from holodeck cython code: `cd holodeck; python setup.py build_ext -i`
+4) Perform an development/editable local installation: `python setup.py develop`
 
 The 'editable' installation allows the code base to be modified, and have those changes take effect when using the `holodeck` module without having to rebuild/reinstall it.
 

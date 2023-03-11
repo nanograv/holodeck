@@ -7,5 +7,9 @@ matplotlib
 numpy
 scipy
 pydoe
+psutil
 tqdm
 cython
+schwimmbad
+emcee
+george
