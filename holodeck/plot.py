@@ -471,6 +471,33 @@ def _twin_hz(ax, nano=True, fs=8, **kw):
     return
 
 
+def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={}):
+    plot.setdefault('alpha', 0.5)
+    fill.setdefault('alpha', 0.2)
+    percs = np.atleast_1d(fracs)
+    assert np.all((0.0 <= percs) & (percs <= 1.0))
+
+    # center the target percentages into pairs around 50%, e.g.  68 ==> [16,84]
+    inter_percs = [[0.5-pp/2, 0.5+pp/2] for pp in percs]
+    # Add the median value (50%)
+    inter_percs = [0.5, ] + np.concatenate(inter_percs).tolist()
+    # Get percentiles; they go along the last axis
+    rv = kale.utils.quantiles(vals, percs=inter_percs, weights=weights, axis=-1)
+    med, *conf = rv.T
+
+    # plot median
+    hh, = ax.plot(xx, med, **plot)
+
+    # Reshape confidence intervals to nice plotting shape
+    # 2*P, X ==> (P, 2, X)
+    conf = np.array(conf).reshape(len(percs), 2, xx.size)
+
+    # plot each confidence interval
+    for lo, hi in conf:
+        gg = ax.fill_between(xx, lo, hi, color=hh.get_color(), **fill)
+
+    return (hh, gg)
+
 
 # =================================================================================================
 # ====    Below Needs Review / Cleaning    ====
@@ -669,29 +696,4 @@ def _draw_gwb_conf(ax, gwb, **kwargs):
     kwargs['alpha'] = 1.0 - 0.5*(1.0 - kwargs['alpha'])
     ax.plot(freqs, conf[1], **kwargs)
     return
-
-
-def draw_med_conf(ax, xx, vals, percs=[25, 75], axis=-1, yfilter=None, **kwargs):
-    kwargs.setdefault('alpha', 0.5)
-    assert len(percs) == 2
-    med, *conf = np.percentile(vals, [50, percs[0], percs[1]], axis=-1)
-    if (xx.size,) == med.shape:
-        hist_flag = False
-    elif (xx.size-1,) == med.shape:
-        hist_flag = True
-    else:
-        raise ValueError(f"Bad shapes!  {np.shape(xx)=}, {np.shape(vals)=}")
-
-    if hist_flag:
-        hh, = draw_hist_steps(ax, xx, med, yfilter=yfilter, **kwargs)
-        _xx, lo = _get_hist_steps(xx, conf[0])
-        _xx, hi = _get_hist_steps(xx, conf[1])
-    else:
-        hh, = ax.plot(xx, med, **kwargs)
-        _xx = xx
-        lo = conf[0]
-        hi = conf[1]
-
-    fill = ax.fill_between(_xx, lo, hi, alpha=0.2, color=hh.get_color())
-    return (hh, fill)
 '''
