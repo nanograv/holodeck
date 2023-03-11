@@ -181,7 +181,6 @@ def train_gp(spectra_file,
 
     pars = list(spectra.attrs["param_names"].astype(str))
 
-
     if VERBOSE:
         print(f"Creating kernels", flush=True)
 
@@ -241,21 +240,23 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     xobs = spectra['sample_params']
     bads = np.any(np.isnan(gwb_spectra), axis=(1, 2))
     if VERBOSE:
-        print(f"Found {utils.frac_str(bads)} samples with NaN entries.  Removing them from library.", flush=True)
+        print(f"Found {utils.frac_str(bads)} samps w/ NaNs. Removing from lib", flush=True)
     # when sample points fail, all parameters are set to zero.  Make sure this is consistent
     if not np.all(xobs[bads] == 0.0):
-        raise RuntimeError(f"NaN elements of `gwb` did not correspond to zero elements of `sample_params`!")
+        err = f"NaN elements of `gwb` did not correspond to zero elements of `sample_params`!"
+        raise RuntimeError(err)
     # Select valid spectra, and sample parameters
     gwb_spectra = gwb_spectra[~bads]
     xobs = xobs[~bads]
     # Make sure old/deprecated parameters are not in library
     if 'mmb_amp' in spectra.attrs['param_names']:
-        raise RuntimeError("Parameter `mmb_amp` should not be here!  Needs to be log-spaced (`mmb_amp_log10`)!")
+        err = "Parameter `mmb_amp` should not be here!  Needs to be log-spaced (`mmb_amp_log10`)!"
+        raise RuntimeError(err)
 
     # Cut out portion for test set later
     test_ind = int(gwb_spectra.shape[0] * test_frac)
     if VERBOSE:
-        print(f"setting aside {test_frac} of samples ({test_ind}) for testing, and choosing {nfreqs} frequencies", flush=True)
+        print(f"{test_frac}/{test_ind} for testing, and choosing {nfreqs} freqs", flush=True)
 
     gwb_spectra = gwb_spectra[test_ind:, :nfreqs, :]**2
     xobs = xobs[test_ind:, :]
@@ -443,7 +444,7 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
         mpi=mpi, processes=min(nwalkers // 2, cpu_count()))
     if VERBOSE:
         print(f"{pool=}", flush=True)
-    
+
     # Schwimmbad docs are not clear if this needs to be here if we are passing the pool to
     # EnsembleSampler, but I've added it just in case.
     if mpi and not pool.is_master():
@@ -469,17 +470,23 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
         ]
 
         print(freq_ind, "Running burn-in", flush=True)
+        beg = time.time()
         p0, lnp, _ = sampler[freq_ind].run_mcmc(p0, int(burn_frac * nsamples), **sample_kwargs)
         sampler[freq_ind].reset()
+        print(f"\tdone after {(time.time() - beg) / 60.0:.2f} min\n")
 
         print(freq_ind, "Running second burn-in", flush=True)
+        beg = time.time()
         p = p0[np.argmax(lnp)]
         p0 = [p + 1e-8 * np.random.randn(ndim) for _ in range(nwalkers)]
         p0, _, _ = sampler[freq_ind].run_mcmc(p0, int(burn_frac * nsamples))
         sampler[freq_ind].reset()
+        print(f"\tdone after {(time.time() - beg) / 60.0:.2f} min\n")
 
         print(freq_ind, "Running production", flush=True)
+        beg = time.time()
         p0, _, _ = sampler[freq_ind].run_mcmc(p0, int(nsamples))
+        print(f"\tdone after {(time.time() - beg) / 60.0:.2f} min\n")
 
         print(
             f"Completed {freq_ind} out of {len(gp_freqs)-1} in {(time.time() - t_start) / 60.0:.2f} min\n",
@@ -491,7 +498,7 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
 
     if VERBOSE:
         print("pool closed; storing kernel information to GP class")
-    
+
     # Populate the GP class with the details of the kernel
     # MAP values for each frequency.
     for ii in range(len(gp_freqs)):
