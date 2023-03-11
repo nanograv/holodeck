@@ -172,7 +172,7 @@ def train_gp(spectra_file,
     spectra = h5py.File(spectra_file, "r")
 
     if VERBOSE:
-        print(f"Loaded spectra from {spectra_file}")
+        print(f"Loaded spectra from {spectra_file}", flush=True)
 
     # Get smoothed GWB
     gp_freqs, xobs, yerr, yobs, yobs_mean = get_smoothed_gwb(spectra, nfreqs,
@@ -181,13 +181,18 @@ def train_gp(spectra_file,
 
     pars = list(spectra.attrs["param_names"].astype(str))
 
-    # xobs = get_parameter_values(spectra, test_frac)
+
+    if VERBOSE:
+        print(f"Creating kernels", flush=True)
 
     gp_george, num_kpars = create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs,
                                              kernel, kernel_opts)
 
     # Sample the posterior distribution of the kernel parameters
     # to find MAP value for each frequency.
+
+    if VERBOSE:
+        print(f"Fitting GPs", flush=True)
 
     fit_kernel_params(gp_freqs, yobs_mean, gp_george, num_kpars, nwalkers,
                       nsamples, burn_frac, mpi)
@@ -236,7 +241,7 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     xobs = spectra['sample_params']
     bads = np.any(np.isnan(gwb_spectra), axis=(1, 2))
     if VERBOSE:
-        print(f"Found {utils.frac_str(bads)} samples with NaN entries.  Removing them from library.")
+        print(f"Found {utils.frac_str(bads)} samples with NaN entries.  Removing them from library.", flush=True)
     # when sample points fail, all parameters are set to zero.  Make sure this is consistent
     if not np.all(xobs[bads] == 0.0):
         raise RuntimeError(f"NaN elements of `gwb` did not correspond to zero elements of `sample_params`!")
@@ -250,7 +255,7 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     # Cut out portion for test set later
     test_ind = int(gwb_spectra.shape[0] * test_frac)
     if VERBOSE:
-        print(f"setting aside {test_frac} of samples ({test_ind}) for testing, and choosing {nfreqs} frequencies")
+        print(f"setting aside {test_frac} of samples ({test_ind}) for testing, and choosing {nfreqs} frequencies", flush=True)
 
     gwb_spectra = gwb_spectra[test_ind:, :nfreqs, :]**2
     xobs = xobs[test_ind:, :]
@@ -273,20 +278,20 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     filter_window = FILTER_DEF_WINDOW_LENGTH
     filter_poly_order = FILTER_DEF_POLY_ORDER
     if (filter_window is not None) and (nfreqs < filter_window):
-        print(f"WARNING: {nfreqs=} < {filter_window=}, resetting default value")
+        print(f"WARNING: {nfreqs=} < {filter_window=}, resetting default value", flush=True)
         if nfreqs < 4:
             filter_window = None
             filter_poly_order = None
         else:
             filter_window = nfreqs // 2
             filter_poly_order = filter_window // 2
-        print(f"         {filter_window=} {filter_poly_order=}")
+        print(f"         {filter_window=} {filter_poly_order=}", flush=True)
 
     if filter_window is not None:
         smooth_center = ssig.savgol_filter(center, filter_window, filter_poly_order)
     else:
         if VERBOSE:
-            print("Not using any smoothing on center spectrum.")
+            print("Not using any smoothing on center spectrum.", flush=True)
         smooth_center = center
 
     # Find std
@@ -432,10 +437,13 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
     """
     sampler = [0.0] * len(gp_freqs)
     ndim = nkpars
-    print(f"{mpi=}")
+    if VERBOSE:
+        print(f"{mpi=} {cpu_count()=}", flush=True)
     pool = schwimmbad.choose_pool(
-        mpi=mpi)  #, processes=min(nwalkers // 2, cpu_count()) )
-
+        mpi=mpi, processes=min(nwalkers // 2, cpu_count()))
+    if VERBOSE:
+        print(f"{pool=}", flush=True)
+    
     # Schwimmbad docs are not clear if this needs to be here if we are passing the pool to
     # EnsembleSampler, but I've added it just in case.
     if mpi and not pool.is_master():
@@ -460,25 +468,30 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
             for _ in range(nwalkers)
         ]
 
-        print(freq_ind, "Running burn-in")
+        print(freq_ind, "Running burn-in", flush=True)
         p0, lnp, _ = sampler[freq_ind].run_mcmc(p0, int(burn_frac * nsamples), **sample_kwargs)
         sampler[freq_ind].reset()
 
-        print(freq_ind, "Running second burn-in")
+        print(freq_ind, "Running second burn-in", flush=True)
         p = p0[np.argmax(lnp)]
         p0 = [p + 1e-8 * np.random.randn(ndim) for _ in range(nwalkers)]
         p0, _, _ = sampler[freq_ind].run_mcmc(p0, int(burn_frac * nsamples))
         sampler[freq_ind].reset()
 
-        print(freq_ind, "Running production")
+        print(freq_ind, "Running production", flush=True)
         p0, _, _ = sampler[freq_ind].run_mcmc(p0, int(nsamples))
 
         print(
-            f"Completed {freq_ind} out of {len(gp_freqs)-1} in {(time.time() - t_start) / 60.0:.2f} min\n"
+            f"Completed {freq_ind} out of {len(gp_freqs)-1} in {(time.time() - t_start) / 60.0:.2f} min\n",
+            flush=True
         )
 
     # Close the pool
     pool.close()
+
+    if VERBOSE:
+        print("pool closed; storing kernel information to GP class")
+    
     # Populate the GP class with the details of the kernel
     # MAP values for each frequency.
     for ii in range(len(gp_freqs)):
