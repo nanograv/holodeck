@@ -1,9 +1,9 @@
 #!/bin/bash -l
 #    run with `sbatch <SCRIPT>`
 
-#SBATCH --account=fc_lzkhpc               # Allocation/Account 'fc_lzkhpc'
-#SBATCH --job-name="astro-tight-02-gw"       # Name of job    `-J`
-#SBATCH --mail-user=lzkelley@berkeley.edu   # Designate email address for job communications
+#SBATCH --account=ACCOUNT_NAME              # Allocation/Account 'fc_lzkhpc'
+#SBATCH --job-name=JOB_NAME                 # Name of job    `-J`
+#SBATCH --mail-user=EMAIL@ADDRESS           # Designate email address for job communications
 #SBATCH --output=slurm-%x.%j.out            # Path for output must already exist   `-o`
 #SBATCH --error=slurm-%x.%j.err             # Path for errors must already exist   `-e`
 
@@ -19,26 +19,25 @@
 # ---- PRODUCTION ----
 ###SBATCH --partition=savio2            # `savio2` 24 cores/node, allocation *by node*, 64GB/node
 #SBATCH --partition=savio2_bigmem     # `savio2_bigmem` 24 cores/node, allocation *by node*, 128 GB/node
-###SBATCH --partition=savio_bigmem      # `savio_bigmem` 20 cores/node, allocation *by node*, 512 GB/node
-
 #SBATCH --qos=savio_normal            # 24 nodes max per job, 72:00:00 wallclock limit
 #SBATCH -t 48:00:00                   # Walltime/duration of the job  [HH:MM:SS]
-#SBATCH --nodes=4
-#SBATCH --ntasks=96                   # Number of MPI tasks
+#SBATCH --nodes=5
+#SBATCH --ntasks=120                   # Number of MPI tasks
 #SBATCH --ntasks-per-node=24          # expand memory
 #SBATCH --mail-type=ALL               # {ALL, BEGIN, END, NONE, FAIL, REQUEUE}
 # --------------------
 
-echo -e "\n====    savio__run_gen_lib_sams.sh    ===="
-echo $0
-
+echo -e "\n====    "$0"    ====\n"
 
 # ====    setup environment    ====
 
+# setup linux modules
 module purge
-module load gcc openmpi python
+module load gcc openmpi python    # NOTE: replace with specific modules as needed
 module list
-source activate py310
+
+# setup conda / python environment
+source activate holo310           # NOTE: replace with appropriate anaconda environment
 echo $PATH
 conda info -e
 which python
@@ -47,20 +46,25 @@ python --version
 
 # ====    setup parameters    ====
 
-NAME="astro-tight-02-gw_2023-03-03"
-PARS="n10000_s61-81-101_r100_f40"
-SPACE="PS_Astro_Tight_02_GW"
+SPACE="PS_Astro_Tight_03"           # NOTE: this must match exactly the class name in `holodeck/param_spaces.py`
 
-#NAME="TEST_"$NAME
+# Specify the run name, these are used in creating the log-name and the output folder
+NAME="astro-tight-03_2023-03-09"    # This is an arbitrary string specification for the job
+PARS="n10000_s61-81-101_r100_f40"   # This is an additional arbitrary string specification for the job
 
+# This is the script that will be run, make sure the path works
 SCRIPT="./scripts/gen_lib_sams.py"
+# This will be the name of the stdout and stderr logs
 LOG_NAME=$NAME"_job-log"
 
+# Output directory, make sure it has enough space
 OUTPUT="/global/scratch/users/lzkelley/holodeck_output/"$NAME"_"$PARS
 
+# Create the output directory if it doesn't already exist
 mkdir -p $OUTPUT
 echo "Output directory: ${OUTPUT}"
 
+# copy this job script to the output directory
 cp $0 "$OUTPUT/runtime_job-script.slurm"
 LOG_OUT="$LOG_NAME.out"
 LOG_ERR="$LOG_NAME.err"
@@ -76,7 +80,10 @@ echo "Running `mpirun`"
 
 set -x
 
-mpirun -np 96  python $SCRIPT $SPACE $OUTPUT -n 10000 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR
+# Real jobs
+mpirun -np 120  python $SCRIPT $SPACE $OUTPUT -n 10000 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR
+
+# Trivial test case to make sure the code runs
 # mpirun -np 4  python $SCRIPT $SPACE $OUTPUT -n 8 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR
 
 
