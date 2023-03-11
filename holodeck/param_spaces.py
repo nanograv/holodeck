@@ -5,7 +5,8 @@ import holodeck as holo
 from holodeck.constants import MSOL, PC, GYR
 from holodeck.librarian import (
     _Parameter_Space, _LHS_Parameter_Space, _Param_Space,
-    PD_Normal, PD_Uniform, PD_Uniform_Log
+    PD_Normal, PD_Uniform,
+    # PD_Uniform_Log,
 )
 
 
@@ -33,9 +34,7 @@ class PS_Broad_Uniform_01(_Param_Space):
             mmb_scatter=PD_Uniform(+0.0, +0.6),
         )
 
-    def model_for_number(self, num):
-        params = self.param_dict(num)
-        self._log.debug(f"params {num}:: {params}")
+    def model_for_params(self, params):
 
         # Other parameters are guesses
         hard_time = params['hard_time'] * GYR
@@ -121,9 +120,7 @@ class PS_Broad_Uniform_01_GW(_Param_Space):
             mmb_scatter=PD_Uniform(+0.0, +0.6),
         )
 
-    def model_for_number(self, num):
-        params = self.param_dict(num)
-        self._log.debug(f"params {num}:: {params}")
+    def model_for_params(self, params):
 
         # Parameters are based on `sam-parameters.ipynb` fit to [Tomczak+2014]
         gsmf_phiz = -0.6
@@ -298,6 +295,32 @@ class PS_Astro_Tight_02_GW(PS_Broad_Uniform_01_GW):
         )
 
 
+class PS_Astro_Tight_03(PS_Broad_Uniform_01):
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super(PS_Broad_Uniform_01, self).__init__(
+            log, nsamples, sam_shape, seed,
+
+            hard_time=PD_Uniform(1.0, 10.0),   # [Gyr]
+            hard_gamma_inner=PD_Uniform(-1.5, -0.5),
+
+            # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
+            gsmf_phi0=PD_Normal(-2.56, 0.1),
+            gsmf_mchar0_log10=PD_Normal(10.9, 0.1),   # [log10(Msol)]
+            gsmf_alpha0=PD_Normal(-1.2, 0.05),
+
+            gpf_zbeta=PD_Normal(+0.8, 0.4),
+            gpf_qgamma=PD_Normal(+0.5, 0.3),
+
+            gmt_norm=PD_Uniform(0.2, 5.0),    # [Gyr]
+            gmt_zbeta=PD_Uniform(-2.0, +0.0),
+
+            mmb_amp_log10=PD_Normal(+8.6, 0.1),   # [log10(Msol)]
+            mmb_plaw=PD_Normal(+1.2, 0.1),
+            mmb_scatter=PD_Normal(+0.32, 0.1),
+        )
+
+
 # ==============================================================================
 # ==============================================================================
 # ==============================================================================
@@ -320,10 +343,7 @@ class PS_Test_Uniform(_Param_Space):
         )
         return
 
-    def model_for_number(self, num):
-        params = self.param_dict(num)
-
-        self._log.debug(f"params {num}:: {params}")
+    def model_for_params(self, params):
 
         hard_time = (10.0 ** params['hard_time']) * GYR
 
