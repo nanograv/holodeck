@@ -411,55 +411,37 @@ def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
 
     """
 
-    foo = edges[-1]                   #: should be observer-frame orbital-frequencies
-    df = np.diff(foo)                 #: frequency bin widths
-    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
-
-    # ---- calculate GW strain ----
-    mt = kale.utils.midpoints(edges[0])
-    mr = kale.utils.midpoints(edges[1])
-    rz = kale.utils.midpoints(edges[2])
-    mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
-    mc = mc[:, :, np.newaxis, np.newaxis]
-    dc = cosmo.comoving_distance(rz).cgs.value
-    dc = dc[np.newaxis, np.newaxis, :, np.newaxis]
-
-    # convert from observer-frame to rest-frame; still using frequency-bin centers
-    fr = utils.frst_from_fobs(fc[np.newaxis, :], rz[:, np.newaxis])
-    fr = fr[np.newaxis, np.newaxis, :, :]
-
-    hs = utils.gw_strain_source(mc, dc, fr)
-    hc = (hs ** 2) * (fc / df)
+    hc2 = char_strain_sq_from_bin_edges(edges)
 
     # Create a single realization
     if realize is True:
-        hc = hc * poisson_as_needed(number)
+        hc2 = hc2 * poisson_as_needed(number)
         # Sum over M, Q, Z bins  ::  (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])
         if sum:
-            hc = np.sum(hc, axis=(0, 1, 2))
+            hc2 = np.sum(hc2, axis=(0, 1, 2))
 
     # Do not create a discrete realization, use the expectation values directly
     elif realize in [None, False]:
-        hc = hc * number
+        hc2 = hc2 * number
         # Sum over M, Q, Z bins  ::  (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])
         if sum:
-            hc = np.sum(hc, axis=(0, 1, 2))
+            hc2 = np.sum(hc2, axis=(0, 1, 2))
 
     # Create multiple discrete realizations
     elif utils.isinteger(realize):
         if sum:
             import holodeck.cyutils   # noqa
             # This function reate
-            hc = holo.cyutils.sam_poisson_gwb(number, hc, realize)
+            hc2 = holo.cyutils.sam_poisson_gwb(number, hc2, realize)
 
         else:
             log.warning(f"`sum`={sum} :: this requires a large amount of memory!")
             shape = number.shape + (realize,)
-            hc = hc[..., np.newaxis] * poisson_as_needed(number[..., np.newaxis] * np.ones(shape))
+            hc2 = hc2[..., np.newaxis] * poisson_as_needed(number[..., np.newaxis] * np.ones(shape))
             if holo.sam._DEBUG:
                 log.info(f"number = {utils.stats(number)}")
-                log.info(f"hc = {utils.stats(hc)}")
-                holo.sam._check_bads(edges + [np.arange(realize),], hc, "hc")
+                log.info(f"hc2 = {utils.stats(hc2)}")
+                holo.sam._check_bads(edges + [np.arange(realize),], hc2, "hc2")
 
     else:
         err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
@@ -467,7 +449,9 @@ def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
         raise ValueError(err)
 
     # convert from hc^2 to hc
-    hc = np.sqrt(hc)
+    hc2 = np.sqrt(hc2)
+    # this is for clarity, note that it does not duplicate the memory
+    hc = hc2
 
     return hc
 
@@ -545,6 +529,32 @@ def poisson_as_needed(values, thresh=1e10):
     # output[~idx] = np.floor(np.random.normal(tt, np.sqrt(tt))).astype(int)
     output[~idx] = np.floor(np.random.normal(tt, np.sqrt(tt)))
     return output
+
+
+def char_strain_sq_from_bin_edges(edges):
+    assert len(edges) == 4
+    assert np.all([np.ndim(ee) == 1 for ee in edges])
+
+    foo = edges[-1]                   #: should be observer-frame orbital-frequencies
+    df = np.diff(foo)                 #: frequency bin widths
+    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+
+    # ---- calculate GW strain ----
+    mt = kale.utils.midpoints(edges[0])
+    mr = kale.utils.midpoints(edges[1])
+    rz = kale.utils.midpoints(edges[2])
+    mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
+    mc = mc[:, :, np.newaxis, np.newaxis]
+    dc = cosmo.comoving_distance(rz).cgs.value
+    dc = dc[np.newaxis, np.newaxis, :, np.newaxis]
+
+    # convert from observer-frame to rest-frame; still using frequency-bin centers
+    fr = utils.frst_from_fobs(fc[np.newaxis, :], rz[:, np.newaxis])
+    fr = fr[np.newaxis, np.newaxis, :, :]
+
+    hs = utils.gw_strain_source(mc, dc, fr)
+    hc2 = (hs ** 2) * (fc / df)
+    return hc2
 
 
 # ==============================================================================
