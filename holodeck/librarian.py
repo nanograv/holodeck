@@ -97,8 +97,13 @@ class _Param_Space(abc.ABC):
     def shape(self):
         return self._samples.shape
 
-    @abc.abstractmethod
     def model_for_number(self, num):
+        params = self.param_dict(num)
+        self._log.debug(f"params {num} :: {params}")
+        return self.model_for_params(params)
+
+    @abc.abstractmethod
+    def model_for_params(self, params):
         raise
 
 
