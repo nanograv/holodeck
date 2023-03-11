@@ -102,8 +102,8 @@ class _Param_Space(abc.ABC):
         self._log.debug(f"params {num} :: {params}")
         return self.model_for_params(params, self.param_shape)
 
-    @abc.abstractmethod
     @classmethod
+    @abc.abstractmethod
     def model_for_params(cls, params):
         raise
 
