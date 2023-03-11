@@ -123,3 +123,4 @@ cyutils.c
 cyutils.html
 cyutils_api.h
 logs/
+slurm*

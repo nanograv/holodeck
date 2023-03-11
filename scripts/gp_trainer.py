@@ -6,6 +6,7 @@ import configparser
 import os
 import pickle
 import shutil
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -100,6 +101,9 @@ def main(config):
 
 
 if __name__ == "__main__":
+    print()
+    print(__file__)
+
     args = setup_argparse()
     config = configparser.ConfigParser()
     config.read(args.config_path)
