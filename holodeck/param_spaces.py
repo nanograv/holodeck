@@ -330,7 +330,7 @@ class PS_Astro_Tight_03(PS_Broad_Uniform_01):
         super(PS_Broad_Uniform_01, self).__init__(
             log, nsamples, sam_shape, seed,
 
-            hard_time=PD_Uniform(1.0, 10.0),   # [Gyr]
+            hard_time=PD_Uniform(1.0, 8.0),   # [Gyr]
             hard_gamma_inner=PD_Uniform(-1.5, -0.5),
 
             # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
