@@ -27,7 +27,7 @@ from libc.math cimport pow, sqrt, abs, M_PI
 from cpython.pycapsule cimport PyCapsule_IsValid, PyCapsule_GetPointer
 from numpy.random cimport bitgen_t
 from numpy.random import PCG64
-from numpy.random.c_distributions cimport random_poisson
+from numpy.random.c_distributions cimport random_poisson, random_normal
 
 
 # DTYPE = np.float64
@@ -838,3 +838,49 @@ cdef double[:, :, :] _sam_calc_gwb_single_eccen_discrete(
     free(jval)
     free(kval)
     return gwb
+
+
+def sam_poisson_gwb(dist, hc2, nreals, normal_threshold=1e10):
+    return _sam_poisson_gwb(np.array(dist.shape), dist, hc2, nreals, long(normal_threshold))
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef double[:, :] _sam_poisson_gwb(
+    long[:] shape, double[:, :, :, :] dist, double[:, :, :, :] hc2, int nreals, long thresh
+):
+    cdef int nm = shape[0]
+    cdef int nq = shape[1]
+    cdef int nz = shape[2]
+    cdef int nf = shape[3]
+    cdef int ii, jj, kk, ff, rr
+    cdef double num, bin_hc2, bin_num
+
+    # Setup random number generator from numpy library
+    cdef bitgen_t *rng
+    cdef const char *capsule_name = "BitGenerator"
+    capsule = PCG64().capsule
+    # Cast the pointer
+    rng = <bitgen_t *> PyCapsule_GetPointer(capsule, capsule_name)
+
+    cdef np.ndarray[np.double_t, ndim=2] gwb = np.zeros((nf, nreals))
+    for ii in range(nm):
+        for jj in range(nq):
+            for kk in range(nz):
+                for ff in range(nf):
+                    bin_num = dist[ii, jj, kk, ff]
+                    bin_hc2 = hc2[ii, jj, kk, ff]
+                    if bin_num > thresh:
+                        bin_std = sqrt(bin_num)
+                        for rr in range(nreals):
+                            num = <double>random_normal(rng, bin_num, bin_std)
+                            gwb[ff, rr] += num * bin_hc2
+                    else:
+                        for rr in range(nreals):
+                            num = <double>random_poisson(rng, bin_num)
+                            gwb[ff, rr] += num * bin_hc2
+
+    return gwb
+

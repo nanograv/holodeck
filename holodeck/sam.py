@@ -42,27 +42,32 @@ References
 """
 
 import abc
+from datetime import datetime
 
 import numpy as np
+import scipy as sp
+import scipy.interpolate  # noqa
 
 import kalepy as kale
 
 import holodeck as holo
 from holodeck import cosmo, utils, log
-from holodeck.constants import GYR, SPLC, MSOL, MPC
+from holodeck.constants import GYR, SPLC, MSOL, MPC, YR, PC
 from holodeck import relations, gravwaves
 
-_DEBUG = False
+_DEBUG = True
 _DEBUG_LVL = log.DEBUG
 # _DEBUG_LVL = log.WARNING
 
-_AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
+# _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
 REDZ_SAMPLE_VOLUME = True    #: get redshifts by sampling uniformly in 3D spatial volume, and converting
 
 GSMF_USES_MTOT = False       #: the mass used in the GSMF is interpretted as M=m1+m2, otherwise use primary m1
 GPF_USES_MTOT = False        #: the mass used in the GPF  is interpretted as M=m1+m2, otherwise use primary m1
 GMT_USES_MTOT = False        #: the mass used in the GMT  is interpretted as M=m1+m2, otherwise use primary m1
+
+# ZERO_GMT_STALLED_SYSTEMS = False
 
 
 # ==============================
@@ -112,15 +117,15 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
 
     """
 
-    def __init__(self, phi0=-2.77, phiz=-0.27, mref0_log10=11.24, mref0=None, mrefz=0.0, alpha0=-1.24, alphaz=-0.03):
-        mref0, _ = utils._parse_val_log10_val_pars(
-            mref0, mref0_log10, val_units=MSOL, name='mref0', only_one=True
+    def __init__(self, phi0=-2.77, phiz=-0.27, mchar0_log10=11.24, mchar0=None, mcharz=0.0, alpha0=-1.24, alphaz=-0.03):
+        mchar0, _ = utils._parse_val_log10_val_pars(
+            mchar0, mchar0_log10, val_units=MSOL, name='mchar0', only_one=True
         )
 
-        self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]  [1/Mpc^3]
-        self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]  [1/Mpc^3]
-        self._mref0 = mref0       # +11.24  +/- [-0.17, +0.20]  Msol
-        self._mrefz = mrefz       #  0.0                        Msol    # noqa
+        self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]  [log10(1/Mpc^3)]
+        self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]  [log10(1/Mpc^3)]
+        self._mchar0 = mchar0       # +11.24  +/- [-0.17, +0.20]  [log10(Msol)]
+        self._mcharz = mcharz       #  0.0                        [log10(Msol)]    # noqa
         self._alpha0 = alpha0     # -1.24   +/- [-0.16, +0.16]
         self._alphaz = alphaz     # -0.03   +/- [-0.14, +0.16]
         return
@@ -140,13 +145,14 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
         Returns
         -------
         rv : scalar or ndarray
-            Number-density of galaxies in units of [Mpc^-3]
+            Number-density of galaxies per log-interval of mass in units of [Mpc^-3]
+            i.e.  ``Phi = dn / d\\log_{10}(M)``
 
         """
         phi = self._phi_func(redz)
-        mref = self._mref_func(redz)
+        mchar = self._mchar_func(redz)
         alpha = self._alpha_func(redz)
-        xx = mstar / mref
+        xx = mstar / mchar
         # [Chen2019]_ Eq.8
         rv = np.log(10.0) * phi * np.power(xx, 1.0 + alpha) * np.exp(-xx)
         return rv
@@ -156,10 +162,10 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
         """
         return np.power(10.0, self._phi0 + self._phiz * redz)
 
-    def _mref_func(self, redz):
+    def _mchar_func(self, redz):
         """See: [Chen2019]_ Eq.10 - NOTE: added `redz` term
         """
-        return self._mref0 + self._mrefz * redz
+        return self._mchar0 + self._mcharz * redz
 
     def _alpha_func(self, redz):
         """See: [Chen2019]_ Eq.11
@@ -207,7 +213,7 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
     """
 
     def __init__(self, frac_norm_allq=0.025, frac_norm=None, mref=None, mref_log10=11.0,
-                 malpha=0.0, zbeta=0.8, qgamma=0.0, obs_conv_qlo=0.25):
+                 malpha=0.0, zbeta=0.8, qgamma=0.0, obs_conv_qlo=0.25, max_frac=1.0):
 
         mref, _ = utils._parse_val_log10_val_pars(
             mref, mref_log10, val_units=MSOL, name='mref', only_one=True
@@ -228,6 +234,12 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
         self._malpha = malpha         #      0.0   b/t [-0.2 , +0.2 ]  [-0.5 , +0.5 ]  # noqa
         self._zbeta = zbeta           #      0.8   b/t [+0.6 , +0.1 ]  [+0.0 , +2.0 ]  # noqa
         self._qgamma = qgamma         #      0.0   b/t [-0.2 , +0.2 ]  [-0.2 , +0.2 ]  # noqa
+
+        if (max_frac < 0.0) or (1.0 < max_frac):
+            err = f"Given `max_frac`={max_frac:.4f} must be between [0.0, 1.0]!"
+            log.exception(err)
+            raise ValueError(err)
+        self._max_frac = max_frac
 
         self._mref = mref   # NOTE: this is `a * M_0 = 1e11 Msol` in papers
         return
@@ -258,6 +270,7 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
         bb = self._zbeta
         gg = self._qgamma
         rv = f0p * np.power(mass/am0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
+        rv = np.clip(rv, None, self._max_frac)
         return rv
 
 
@@ -299,21 +312,9 @@ class _Galaxy_Merger_Time(abc.ABC):
         """Return the redshift after merger (i.e. input `redz` delayed by merger time).
         """
         tau0 = self(mass, mrat, redz, **kwargs)  # sec
-        age = cosmo.age(redz).to('s').value
-        new_age = age + tau0
-
-        if np.isscalar(new_age):
-            if new_age < _AGE_UNIVERSE_GYR * GYR:
-                redz_prime = cosmo.tage_to_z(new_age)
-            else:
-                redz_prime = -1
-
-        else:
-            redz_prime = -1.0 * np.ones_like(new_age)
-            idx = (new_age < _AGE_UNIVERSE_GYR * GYR)
-            redz_prime[idx] = cosmo.tage_to_z(new_age[idx])
-
-        return redz_prime
+        # Find the redshift of  t(z) + tau
+        redz_prime = utils.redz_after(tau0, redz=redz)
+        return redz_prime, tau0
 
 
 class GMT_Power_Law(_Galaxy_Merger_Time):
@@ -382,10 +383,15 @@ class Semi_Analytic_Model:
 
     """
 
+    ZERO_GMT_STALLED_SYSTEMS = False
+    ZERO_DYNAMIC_STALLED_SYSTEMS = True
+    ZERO_DYNAMIC_COALESCED_SYSTEMS = True
+
     def __init__(
         self, mtot=(1.0e4*MSOL, 1.0e11*MSOL, 61), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
         shape=None,
-        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013
+        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013,
+        **kwargs
     ):
         """
 
@@ -402,18 +408,18 @@ class Semi_Analytic_Model:
 
         """
 
+        for key, val in kwargs.items():
+            if not hasattr(self, key):
+                err = f"{self} does not have attr {key}, cannot set with kwargs!"
+                log.exception(err)
+                raise KeyError(err)
+            setattr(self, key, val)
+
         # Sanitize input classes/instances
         gsmf = utils._get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
         gpf = utils._get_subclass_instance(gpf, None, _Galaxy_Pair_Fraction)
         gmt = utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
         mmbulge = utils._get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
-
-        # nl = 3
-        # nh = 30 - nl
-        # mix = 0.1
-        # lo = zmath.spacing([extr[0], mix], 'log', nl)
-        # hi = zmath.spacing([mix, extr[1]], 'lin', nh+1)[1:]
-        # redz = np.concatenate([lo, hi])
 
         # Process grid specifications
         param_names = ['mtot', 'mrat', 'redz']
@@ -483,8 +489,20 @@ class Semi_Analytic_Model:
         self._gmt = gmt               #: Galaxy Merger Time (`_Galaxy_Merger_Time` instance)
         self._mmbulge = mmbulge       #: Mbh-Mbulge relation (`relations._MMBulge_Relation` instance)
 
+        # These values are calculated as needed by the class when the corresponding methods are called
         self._density = None          #: Binary comoving number-density
         self._grid = None             #: Domain of population: total-mass, mass-ratio, and redshift
+        self._shape = None            #: Shape of the parameter-space domain (mtot, mrat, redz)
+        self._fisco = None            #: Orbital rest-frame frequency of each bin's ISCO
+        self._gmt_time = None         #: GMT timescale of galaxy mergers [sec]
+        self._redz_prime = None       #: redshift following galaxy merger process
+
+        # These values change each time a certain function is called, but are cached after each call
+        self._dynamic_binary_number = None
+        self._gwb = None
+        self._coal = None
+        self._stall = None
+
         return
 
     @property
@@ -505,16 +523,17 @@ class Semi_Analytic_Model:
     def shape(self):
         """Shape of the parameter space domain (number of edges in each dimension), (3,) tuple
         """
-        shape = [len(ee) for ee in self.edges]
-        return tuple(shape)
+        if self._shape is None:
+            self._shape = tuple([len(ee) for ee in self.edges])
+        return self._shape
 
     def mass_stellar(self):
         """Calculate stellar masses for each MBH based on the M-MBulge relation.
 
         Returns
         -------
-        masses : (N, 2) ndarray of scalar,
-            Galaxy total stellar masses for all MBH. [:, 0] is primary, [:, 1] is secondary [grams].
+        masses : (2, N) ndarray of scalar,
+            Galaxy total stellar masses for all MBH. [0, :] is primary, [1, :] is secondary [grams].
 
         """
         # total-mass, mass-ratio ==> (M1, M2)
@@ -560,16 +579,20 @@ class Semi_Analytic_Model:
             mass_gmt = mstar_tot if GMT_USES_MTOT else mstar_pri
 
             # GMT returns `-1.0` for values beyond age of universe
-            zprime = self._gmt.zprime(mass_gmt, mstar_rat, redz)
+            zprime, gmt_time = self._gmt.zprime(mass_gmt, mstar_rat, redz)
+            self._gmt_time = gmt_time
+            self._redz_prime = zprime
+
             # find valid entries (M, Q, Z)
-            bads = (zprime < 0.0)
+            idx_stalled = (zprime < 0.0)
+            log.info(f"Stalled SAM bins based on GMT: {utils.frac_str(idx_stalled)}")
             if _DEBUG:
-                if np.all(bads):
+                if np.all(idx_stalled):
                     utils.print_stats(stack=False, print_func=log.error,
                                       mstar_tot=mstar_tot, mstar_rat=mstar_rat, redz=redz)
                     err = "No `zprime` values are greater than zero!"
-                    log.exception(err)
-                    raise RuntimeError(err)
+                    log.warning(err)
+                    # raise RuntimeError(err)
 
             # ---- Get Galaxy Merger Rate  [Chen2019] Eq.5
             log.debug(f"GSMF_USES_MTOT={GSMF_USES_MTOT}")
@@ -579,7 +602,8 @@ class Semi_Analytic_Model:
             # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]
             dens = self._gsmf(mass_gsmf, redz) * self._gpf(mass_gpf, mstar_rat, redz) * cosmo.dtdz(redz)
             # `gmt` returns [sec]
-            dens /= self._gmt(mass_gmt, mstar_rat, redz)
+            # dens /= self._gmt(mass_gmt, mstar_rat, redz)
+            dens /= gmt_time
             # now `dens` is  ``dn_gal / [dlog10(Mstar) dq_gal dz]``  with units of [Mpc^-3]
 
             if _DEBUG:
@@ -630,55 +654,45 @@ class Semi_Analytic_Model:
                     log.error(f"      bads = {utils.stats(dens[bads])}")
                     raise ValueError(err_msg)
 
+            # Add scatter from the M-Mbulge relation
+            scatter = self._mmbulge._scatter_dex
+            log.debug(f"mmbulge scatter = {scatter}")
+            if scatter > 0.0:
+                log.info(f"Adding MMbulge scatter ({scatter:.4e})")
+                log.info(f"\tdens bef: ({utils.stats(dens)})")
+                dur = datetime.now()
+                mass_bef = self._integrated_binary_density(dens, sum=True)
+                dens = add_scatter_to_masses(self.mtot, self.mrat, dens, scatter)
+
+                mass_aft = self._integrated_binary_density(dens, sum=True)
+                dur = datetime.now() - dur
+                dm = (mass_aft - mass_bef) / mass_bef
+                log.info(f"Scatter added after {dur.total_seconds()} sec")
+                log.info(f"\tdens aft: ({utils.stats(dens)})")
+                log.info(f"\tmass: {mass_bef:.2e} ==> {mass_aft:.2e} || change = {dm:.4e}")
+
             # set values after redshift zero to have zero density
-            dens[bads] = 0.0
+            if self.ZERO_GMT_STALLED_SYSTEMS:
+                log.info(f"zeroing out {utils.frac_str(idx_stalled)} systems stalled from GMT")
+                dens[idx_stalled] = 0.0
+            else:
+                log.warning("NOT zeroing out systems with GMTs extending past redshift zero!")
+
             self._density = dens
 
         return self._density
 
-    def _ndens_gal(self, mass_gal, mrat_gal, redz):
-        if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
-            log.warning("{self.__class__}._ndens_gal assumes that primary mass is used for GSMF, GPF and GMT!")
+    @property
+    def fisco(self):
+        if self._fisco is None:
+            temp = utils.rad_isco(self.mtot)
+            temp = utils.kepler_freq_from_sepa(self.mtot, temp)
+            self._fisco = temp
 
-        # NOTE: dlog10(M_1) / dlog10(M) = (M/M_1) * (dM_1/dM) = 1
-        nd = self._gsmf(mass_gal, redz) * self._gpf(mass_gal, mrat_gal, redz)
-        nd = nd * cosmo.dtdz(redz) / self._gmt(mass_gal, mrat_gal, redz)
-        return nd
+        return self._fisco
 
-    def _ndens_mbh(self, mass_gal, mrat_gal, redz):
-        if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
-            log.warning("{self.__class__}._ndens_mbh assumes that primary mass is used for GSMF, GPF and GMT!")
-
-        # this is  d^3 n / [dlog10(M_gal-pri) dq_gal dz]
-        nd_gal = self._ndens_gal(mass_gal, mrat_gal, redz)
-
-        mplaw = self._mmbulge._mplaw
-        dqbh_dqgal = mplaw * np.power(mrat_gal, mplaw - 1.0)
-
-        dmstar_dmbh__pri = self._mmbulge.dmstar_dmbh(mass_gal)   # [unitless]
-        mbh_pri = self._mmbulge.mbh_from_mstar(mass_gal, scatter=False)
-        mbh_sec = self._mmbulge.mbh_from_mstar(mass_gal * mrat_gal, scatter=False)
-        mbh = mbh_pri + mbh_sec
-        mrat_mbh = mbh_sec / mbh_pri
-
-        dlm_dlm = (mbh / mass_gal) * dmstar_dmbh__pri / (1.0 + mrat_mbh)
-        dens = nd_gal * dlm_dlm / dqbh_dqgal
-        return dens
-
-    def _integrated_binary_density(self, sum=True):
-        # d^3 n / [dlog10M dq dz]
-        ndens = self.static_binary_density
-        integ = utils.trapz(ndens, np.log10(self.mtot), axis=0, cumsum=False)
-        integ = utils.trapz(integ, self.mrat, axis=1, cumsum=False)
-        integ = utils.trapz(integ, self.redz, axis=2, cumsum=False)
-        if sum:
-            integ = integ.sum()
-        return integ
-
-    def dynamic_binary_number(self, hard, fobs_orb=None, sepa=None, limit_merger_time=None):
+    def dynamic_binary_number(self, hard, fobs_orb=None, sepa=None, zero_coalesced=None, zero_stalled=None):
         """Calculate the differential number of binaries (per bin-volume, per log-freq interval).
-
-        #! BUG: `limit_merger_time` should compare merger time to the redshift of each bin !#
 
         d^4 N / [dlog10(M) dq dz dln(X)    <===    d^3 n / dlog10(M) dq dz
 
@@ -696,8 +710,12 @@ class Semi_Analytic_Model:
         sepa : ArrayLike
             Rest-frame binary separation in [cm].
             NOTE: either `fobs_orb` or `sepa` must be provided (and not both).
-        limit_merger_time : None or scalar,
-            Maximum allowed merger time in [sec].  If `None`, no maximum is imposed.
+        zero_coalesced : bool
+            Whether binaries should be checked for coalescence.
+            If `True`, they will not contribute to frequency bins above their ISCO frequency.
+        zero_stalled : bool
+            Whether binaries should be checked for stalling before z=0.
+            If `True`, they will not contribute to frequency bins that they reach after z=0.
 
         Returns
         -------
@@ -740,6 +758,14 @@ class Semi_Analytic_Model:
             xsize = len(sepa)
             edges = self.edges + [sepa, ]
 
+        if zero_coalesced is None:
+            zero_coalesced = self.ZERO_DYNAMIC_COALESCED_SYSTEMS
+
+        if zero_stalled is None:
+            zero_stalled = self.ZERO_DYNAMIC_STALLED_SYSTEMS
+
+        log.info(f"{zero_coalesced=}, {zero_stalled=}")
+
         # shape: (M, Q, Z)
         dens = self.static_binary_density   # d3n/[dz dlog10(M) dq]  units: [Mpc^-3]
 
@@ -781,31 +807,6 @@ class Semi_Analytic_Model:
             # recall: dadt is negative (decreasing separation), units of [cm/sec]
             tau = - sa / dadt
 
-        # ---------------------
-        if (limit_merger_time is True):
-            log.debug("limiting tau to < galaxy merger time")
-            mstar = self.mass_stellar()[:, :, :, np.newaxis]
-            ms_rat = mstar[1] / mstar[0]
-            mstar = mstar.sum(axis=0)   # total mass [grams]
-            gmt = self._gmt(mstar, ms_rat, self.redz[np.newaxis, np.newaxis, :])  # [sec]
-            bads = (tau > gmt[..., np.newaxis])
-            tau[bads] = 0.0
-            log.debug(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
-
-        elif (limit_merger_time in [None, False]):
-            pass
-
-        elif utils.isnumeric(limit_merger_time):
-            log.debug(f"limiting tau to < {limit_merger_time/GYR:.2f} Gyr")
-            bads = (tau > limit_merger_time)
-            tau[bads] = 0.0
-            log.debug(f"tau/GYR={utils.stats(tau/GYR)}, bads={np.count_nonzero(bads)/bads.size:.2e}")
-
-        else:
-            err = f"`limit_merger_time` ({type(limit_merger_time)}) must be boolean or scalar!"
-            log.exception(err)
-            raise ValueError(err)
-
         # convert `tau` to the correct shape, note that moveaxis MUST happen _before_ reshape!
         # (X, M*Q*Z) ==> (M*Q*Z, X)
         tau = np.moveaxis(tau, 0, -1)
@@ -822,9 +823,86 @@ class Semi_Analytic_Model:
             log.warning(f"Found {utils.frac_str(bads)} invalid hardening timescales.  Setting to zero densities.")
             dnum[bads] = 0.0
 
+        # ---- Check when binaries reach their ISCO (and zero out density at higher frequencies)
+        if zero_coalesced:
+            # (M,) rest-frame orbital-frequency of ISCO in [1/sec]
+            fisco = self.fisco
+            # duplicate for all Q and Z  i.e. (M,) ==> (M,Q,Z)
+            fisco = fisco[:, np.newaxis, np.newaxis] * np.ones(self.shape)
+            # (M,Q,Z) ==> (M*Q*Z)
+            fisco = fisco.flatten()
+            # `frst_orb` is shaped (X, M*Q*Z)
+            coal = (frst_orb > fisco[np.newaxis, :])
+            # reshape to match `dnum`  (X, M*Q*Z) ==> (M*Q*Z, X) ==> (M, Q, Z, X)
+            coal = coal.T.reshape(dnum.shape)
+            log.info(f"fraction of coalesced binaries: {utils.frac_str(coal)}")
+            dnum[coal] = 0.0
+            self._coal = coal
+        else:
+            log.warning("WARNING: _coalesced_ binaries are not being accounted for in `dynamic_binary_number`!")
+
+        # ---- Check that binaries reach each frequency bin before redshift zero
+        if zero_stalled:
+            # Calculate the time it takes binaries to evolve along a series of steps in separation
+            # number of steps in the integration, refer to this as X below
+            STEPS = 123
+            # () start from the hardening model's initial separation
+            rmax = hard._sepa_init
+            # (M,) end at the ISCO
+            rmin = utils.rad_isco(self.mtot)
+            # Choose steps for each binary, log-spaced between rmin and rmax
+            extr = np.log10([rmax * np.ones_like(rmin), rmin])
+            rads = np.linspace(0.0, 1.0, STEPS)[np.newaxis, :]
+            # (M, X)
+            rads = extr[0][:, np.newaxis] + (extr[1] - extr[0])[:, np.newaxis] * rads
+            rads = 10.0 ** rads
+            # (M, Q, Z, X)
+            mt, mr, rz, rads = np.broadcast_arrays(
+                self.mtot[:, np.newaxis, np.newaxis, np.newaxis],
+                self.mrat[np.newaxis, :, np.newaxis, np.newaxis],
+                self.redz[np.newaxis, np.newaxis, :, np.newaxis],
+                rads[:, np.newaxis, np.newaxis, :]
+            )
+            # (X, M*Q*Z)
+            mt, mr, rz, rads = [mm.reshape(-1, STEPS).T for mm in [mt, mr, rz, rads]]
+            # (X, M*Q*Z) --- `Fixed_Time.dadt` will only accept this shape
+            dadt = hard.dadt(mt, mr, rads)
+            # Integrate (inverse) hardening rates to calculate total lifetime to each separation
+            times_evo = -utils.trapz_loglog(-1.0 / dadt, rads, axis=0, cumsum=True)
+
+            # (X, M*Q*Z)   convert from separations to rest-frame orbital frequencies
+            frst_orb_evo = utils.kepler_freq_from_sepa(mt, rads)
+            # interpolate to target frequencies
+            # `frst_orb` is shaped (X, M*Q*Z)  `ndinterp` interpolates over 1th dimension
+            times = utils.ndinterp(frst_orb.T, frst_orb_evo[1:, :].T, times_evo.T, xlog=True, ylog=True).T
+
+            # Combine the binary-evolution time, with the galaxy-merger time
+            # (X, M*Q*Z)
+            time_tot = times + self._gmt_time.reshape(-1)[np.newaxis, :]
+            # Find the redshift when each binary reaches these frequencies, -1 for after z=0
+            redz_tot = utils.redz_after(time_tot, redz=rz[0, np.newaxis, :])
+            # Find systems not reaching these frequencies before redshift zero
+            stall = (redz_tot < 0.0)
+            # reshape to match `dnum`  (X, M*Q*Z) ==> (M*Q*Z, X) ==> (M, Q, Z, X)
+            stall = stall.T.reshape(dnum.shape)
+            log.info(f"fraction of stalled binary-frequencies: {utils.frac_str(stall)}")
+            stalled = np.any(stall, axis=-1)
+            log.info(f"fraction of binaries stalled at all frequencies: {utils.frac_str(stalled)}")
+            stalled_frac = np.count_nonzero(stalled) / stalled.size
+            if stalled_frac > 0.8:
+                log.warning(f"A large fraction of binaries are stalled at all frequencies!  {stalled_frac:.4e}")
+
+            dnum[stall] = 0.0
+            self._stall = stall
+
+        else:
+            log.warning("WARNING: _stalled_ binaries are not being accounted for in `dynamic_binary_number`!")
+
+        self._dynamic_binary_number = dnum
+
         return edges, dnum
 
-    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=False):
+    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=False, **kw_dynamic_binary_number):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
         Parameters
@@ -838,10 +916,12 @@ class Semi_Analytic_Model:
         realize : bool or int,
             Whether to construct a Poisson 'realization' (discretization) of the SAM distribution.
             Realizations approximate the finite-source effects of a realistic population.
+        **kw_dynamic_binary_number : keyword-value pairs,
+            Additional arguments passed along to `Semi_Analytic_Model.dynamic_binary_number()`.
 
         Returns
         -------
-        hc : (F,[R,]) ndarray of scalar
+        gwb : (F,[R,]) ndarray of scalar
             Dimensionless, characteristic strain at each frequency.
             If `realize` is an integer with value R, then R realizations of the GWB are returned,
             such that `hc` has shape (F,R,).
@@ -864,75 +944,38 @@ class Semi_Analytic_Model:
         # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
         #! NOTE: using frequency-bin _centers_ produces more accurate results than frequency-bin _edges_ !#
-        edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents)
-        # edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb_edges)
+        edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents, **kw_dynamic_binary_number)
         edges[-1] = fobs_orb_edges
         log.debug(f"dnum: {utils.stats(dnum)}")
 
-        if _DEBUG and np.any(np.isnan(dnum)):
-            err = "Found nan `dnum` values!"
-            log.exception(err)
-            raise ValueError(err)
-
-        if _DEBUG and np.any(np.isnan(dnum)):
-            err = "Found nan `dnum` values!"
-            log.exception(err)
-            raise ValueError(err)
-
-        if np.any(np.isnan(dnum)):
-            err = f"Found nan `dnum` values!"
-            log.exception(err)
-            raise ValueError(err)
-
-        if np.any(np.isnan(dnum)):
-            err = f"Found nan `dnum` values!"
-            log.exception(err)
-            raise ValueError(err)
+        if _DEBUG:
+            _check_bads(edges, dnum, "dnum")
 
         # "integrate" within each bin (i.e. multiply by bin volume)
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
         #       after poisson calculation, need to convert back to dN/dlogf
         #       to get proper characteristic strain measurement
         #! doing  ``dn/dlnf * Delta(ln[f])``  seems to be more accurate than trapz over log(freq) !#
-        # number = utils._integrate_grid_differential_number(edges, dnum, freq=True)
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
         number = number * np.diff(np.log(fobs_gw_edges))
         log.debug(f"number: {utils.stats(number)}")
         log.debug(f"number.sum(): {number.sum():.4e}")
 
-        if _DEBUG and np.any(np.isnan(number)):
-            print(f"{np.any(np.isnan(dnum))=}")
-            err = "Found nan `number` values!"
-            log.exception(err)
-            raise ValueError(err)
-
-        if _DEBUG and np.any(np.isnan(number)):
-            print(f"{np.any(np.isnan(dnum))=}")
-            err = "Found nan `number` values!"
-            log.exception(err)
-            raise ValueError(err)
-
-        if np.any(np.isnan(number)):
-            print(f"{np.any(np.isnan(dnum))=}")
-            err = f"Found nan `number` values!"
-            log.exception(err)
-            raise ValueError(err)
-
-        if np.any(np.isnan(number)):
-            print(f"{np.any(np.isnan(dnum))=}")
-            err = f"Found nan `number` values!"
-            log.exception(err)
-            raise ValueError(err)
+        if _DEBUG:
+            _check_bads(edges, number, "number")
 
         # ---- Get the GWB spectrum from number of binaries over grid
-        # print('before calling hc here is edges:\n', edges)
-        # print('and here is number:\n', number.shape,'\n',number)
-        # print('and realize:\n', realize)
-        hc = gravwaves._gws_from_number_grid_integrated(edges, number, realize)
-        if squeeze:
-            hc = hc.squeeze()
+        gwb = gravwaves._gws_from_number_grid_integrated(edges, number, realize)
 
-        return hc
+        if _DEBUG:
+            _check_bads(edges, gwb, "gwb")
+
+        if squeeze:
+            gwb = gwb.squeeze()
+
+        self._gwb = gwb
+
+        return gwb
 
     def gwb_ideal(self, fobs_gw, sum=True, redz_prime=True):
         """Calculate the idealized, continuous GWB amplitude.
@@ -970,10 +1013,50 @@ class Semi_Analytic_Model:
         gwb = gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
         return gwb
 
+    def _ndens_gal(self, mass_gal, mrat_gal, redz):
+        if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
+            log.warning("{self.__class__}._ndens_gal assumes that primary mass is used for GSMF, GPF and GMT!")
 
-# =================================
-# ====    Evolution Methods    ====
-# =================================
+        # NOTE: dlog10(M_1) / dlog10(M) = (M/M_1) * (dM_1/dM) = 1
+        nd = self._gsmf(mass_gal, redz) * self._gpf(mass_gal, mrat_gal, redz)
+        nd = nd * cosmo.dtdz(redz) / self._gmt(mass_gal, mrat_gal, redz)
+        return nd
+
+    def _ndens_mbh(self, mass_gal, mrat_gal, redz):
+        if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
+            log.warning("{self.__class__}._ndens_mbh assumes that primary mass is used for GSMF, GPF and GMT!")
+
+        # this is  d^3 n / [dlog10(M_gal-pri) dq_gal dz]
+        nd_gal = self._ndens_gal(mass_gal, mrat_gal, redz)
+
+        mplaw = self._mmbulge._mplaw
+        dqbh_dqgal = mplaw * np.power(mrat_gal, mplaw - 1.0)
+
+        dmstar_dmbh__pri = self._mmbulge.dmstar_dmbh(mass_gal)   # [unitless]
+        mbh_pri = self._mmbulge.mbh_from_mstar(mass_gal, scatter=False)
+        mbh_sec = self._mmbulge.mbh_from_mstar(mass_gal * mrat_gal, scatter=False)
+        mbh = mbh_pri + mbh_sec
+        mrat_mbh = mbh_sec / mbh_pri
+
+        dlm_dlm = (mbh / mass_gal) * dmstar_dmbh__pri / (1.0 + mrat_mbh)
+        dens = nd_gal * dlm_dlm / dqbh_dqgal
+        return dens
+
+    def _integrated_binary_density(self, ndens=None, sum=True):
+        # d^3 n / [dlog10M dq dz]
+        if ndens is None:
+            ndens = self.static_binary_density
+        integ = utils.trapz(ndens, np.log10(self.mtot), axis=0, cumsum=False)
+        integ = utils.trapz(integ, self.mrat, axis=1, cumsum=False)
+        integ = utils.trapz(integ, self.redz, axis=2, cumsum=False)
+        if sum:
+            integ = integ.sum()
+        return integ
+
+
+# ===========================================
+# ====    Evolution & Utility Methods    ====
+# ===========================================
 
 
 def sample_sam_with_hardening(
@@ -1148,3 +1231,210 @@ def evolve_eccen_uniform_single(sam, eccen_init, sepa_init, nsteps):
     return sepa, eccen
 
 
+def _add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, linear_interp_backup=True, logspace_interp=True):
+    """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
+
+    The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
+    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.
+          A 2nd-order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
+          In-between, a 1st-order interpolant is used if `linear_interp_backup` is True.
+    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2) to
+          account for scatter.
+    * (3) The new density distribution is interpolated back to the original (mtot, mrat) grid.
+
+    Parameters
+    ----------
+    mtot : (M,) ndarray
+        Total masses in grams.
+    mrat : (Q,) ndarray
+        Mass ratios.
+    dens : (M, Q) ndarray
+        Density of binaries over the given mtot and mrat domain.
+    scatter : float
+        Amount of scatter in the M-MBulge relationship, in dex (i.e. over log10 of masses).
+    refine : int,
+        The increased density of grid-points used in the intermediate (m1, m2) domain, in step (1).
+    linear_interp_backup : bool,
+        Whether a linear interpolant is used to fill-in bad values after the 2nd order interpolant.
+        This generally doesn't seem to fix any values.
+    logspace_interp : bool,
+        Whether interpolation should be performed in the log-space of masses.
+        NOTE: strongly recommended.
+
+    Returns
+    -------
+    m1m2_dens : (M, Q) ndarray,
+        Binary density with scatter introduced.
+
+    """
+    assert np.shape(dens) == (mtot.size, mrat.size)
+
+    dist = sp.stats.norm(loc=0.0, scale=scatter)
+
+    # Get the primary and secondary masses corresponding to these total-mass and mass-ratios
+    m1, m2 = utils.m1m2_from_mtmr(mtot[:, np.newaxis], mrat[np.newaxis, :])
+    m1m2_on_mtmr_grid = (m1.flatten(), m2.flatten())
+
+    # Construct a symmetric rectilinear grid in (m1, m2) space
+    grid_size = m1.shape[0] * refine
+    # make sure the extrema will fully span the required domain
+    mextr = utils.minmax([0.9*mtot[0]*mrat[0]/(1.0 + mrat[0]), mtot[-1]*(1.0 + mrat[0])/mrat[0]])
+    mgrid = np.logspace(*np.log10(mextr), grid_size)
+
+    # Interpolate in log-space [recommended]
+    scatter_mgrid = mgrid.copy()
+    if logspace_interp:
+        mgrid = np.log10(mgrid)
+        m1m2_on_mtmr_grid = tuple([np.log10(mm) for mm in m1m2_on_mtmr_grid])
+
+    m1m2_grid = np.meshgrid(mgrid, mgrid, indexing='ij')
+    # Interpolate from irregular m1m2 space (based on mtmr space), into regular m1m2 grid
+    m1m2_dens = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='cubic')
+    # Fill in problematic values with first-order interpolant
+    if linear_interp_backup:
+        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+        temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='linear')
+        log.debug(f"After 2nd order interpolation, {utils.frac_str(bads)} bad values")
+        m1m2_dens[bads] = temp[bads]
+
+    # Fill in problematic values with zeroth-order interpolant
+    bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+    log.debug(f"After interpolation, {utils.frac_str(bads)} bad values exist")
+    if np.any(bads):
+        temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='nearest')
+        m1m2_dens[bads] = temp[bads]
+        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+        log.debug(f"After 0th order interpolation, {utils.frac_str(bads)} bad values exist")
+        if np.any(bads):
+            err = f"After 0th order interpolation, {utils.frac_str(bads)} remain!"
+            log.exception(err)
+            log.error(f"{utils.stats(dens.flatten())}")
+            raise ValueError(err)
+
+    # Introduce scatter along both the 0th (primary) and 1th (secondary) axes
+    m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=0)
+    m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=1)
+
+    # Interpolate result back to mtmr grid
+    interp = sp.interpolate.RegularGridInterpolator((mgrid, mgrid), m1m2_dens)
+    m1m2_dens = interp(m1m2_on_mtmr_grid, method='linear').reshape(m1.shape)
+    return m1m2_dens
+
+
+def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4):
+    """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
+
+    The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
+    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.
+          A 2nd-order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
+          In-between, a 1st-order interpolant is used if `linear_interp_backup` is True.
+    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2) to
+          account for scatter.
+    * (3) The new density distribution is interpolated back to the original (mtot, mrat) grid.
+
+    Parameters
+    ----------
+    mtot : (M,) ndarray
+        Total masses in grams.
+    mrat : (Q,) ndarray
+        Mass ratios.
+    dens : (M, Q) ndarray
+        Density of binaries over the given mtot and mrat domain.
+    scatter : float
+        Amount of scatter in the M-MBulge relationship, in dex (i.e. over log10 of masses).
+    refine : int,
+        The increased density of grid-points used in the intermediate (m1, m2) domain, in step (1).
+    linear_interp_backup : bool,
+        Whether a linear interpolant is used to fill-in bad values after the 2nd order interpolant.
+        This generally doesn't seem to fix any values.
+    logspace_interp : bool,
+        Whether interpolation should be performed in the log-space of masses.
+        NOTE: strongly recommended.
+
+    Returns
+    -------
+    m1m2_dens : (M, Q) ndarray,
+        Binary density with scatter introduced.
+
+    """
+    assert np.ndim(dens) == 3
+    assert np.shape(dens)[:2] == (mtot.size, mrat.size)
+    dist = sp.stats.norm(loc=0.0, scale=scatter)
+    output = np.zeros_like(dens)
+
+    # Get the primary and secondary masses corresponding to these total-mass and mass-ratios
+    m1, m2 = utils.m1m2_from_mtmr(mtot[:, np.newaxis], mrat[np.newaxis, :])
+    m1m2_on_mtmr_grid = (m1.flatten(), m2.flatten())
+
+    # Construct a symmetric rectilinear grid in (m1, m2) space
+    grid_size = m1.shape[0] * refine
+    # make sure the extrema will fully span the required domain
+    mextr = utils.minmax([0.9*mtot[0]*mrat[0]/(1.0 + mrat[0]), mtot[-1]*(1.0 + mrat[0])/mrat[0]])
+    _mgrid = np.logspace(*np.log10(mextr), grid_size)
+
+    # Interpolate in log-space [recommended]
+    mgrid_log10 = np.log10(_mgrid)
+    m1m2_on_mtmr_grid = tuple([np.log10(mm) for mm in m1m2_on_mtmr_grid])
+
+    m1m2_grid = np.meshgrid(mgrid_log10, mgrid_log10, indexing='ij')
+
+    # Interpolate from irregular m1m2 space (based on mtmr space), into regular m1m2 grid
+    numz = np.shape(dens)[2]
+    dlay = None
+    weights = utils._get_rolled_weights(mgrid_log10, dist)
+
+    for ii in range(numz):
+        dens_redz = dens[:, :, ii]
+        if dlay is None:
+            points = m1m2_on_mtmr_grid
+        else:
+            points = dlay
+        interp = sp.interpolate.CloughTocher2DInterpolator(points, dens_redz.flatten())
+        m1m2_dens = interp(tuple(m1m2_grid))
+        if dlay is None:
+            dlay = interp.tri
+
+        # Fill in problematic values with zeroth-order interpolant
+        bads = np.isnan(m1m2_dens) | (m1m2_dens < 0.0)
+        log.debug(f"After interpolation, {utils.frac_str(bads)} bad values exist")
+        if np.any(bads):
+            # temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='nearest')
+            interp = sp.interpolate.NearestNDInterpolator(points, dens_redz.flatten())
+            temp = interp(tuple(m1m2_grid))
+            m1m2_dens[bads] = temp[bads]
+            bads = np.isnan(m1m2_dens) | (m1m2_dens < 0.0)
+            log.debug(f"After 0th order interpolation, {utils.frac_str(bads)} bad values exist")
+            if np.any(bads):
+                err = f"After 0th order interpolation, {utils.frac_str(bads)} remain!"
+                log.exception(err)
+                raise ValueError(err)
+
+        # Introduce scatter along both the 0th (primary) and 1th (secondary) axes
+        m1m2_dens = utils._scatter_with_weights(m1m2_dens, weights, axis=0)
+        m1m2_dens = utils._scatter_with_weights(m1m2_dens, weights, axis=1)
+
+        # Interpolate result back to mtmr grid
+        interp = sp.interpolate.RegularGridInterpolator((mgrid_log10, mgrid_log10), m1m2_dens)
+        m1m2_dens = interp(m1m2_on_mtmr_grid, method='linear').reshape(m1.shape)
+        output[:, :, ii] = m1m2_dens[...]
+
+    return output
+
+
+def _check_bads(edges, vals, name):
+    bads = ~np.isfinite(vals) | (vals < 0.0)
+    if not np.any(bads):
+        return
+
+    err = f"Found {utils.frac_str(bads)} bad '{name}' values!"
+
+    bads = np.where(bads)
+    assert len(bads) == len(edges), f"`bads` ({len(bads)=}) does not match `edges` ({len(edges)=}) !"
+    for ii, (edge, bad) in enumerate(zip(edges, bads)):
+        idx = np.unique(bad)
+        log.error(ii)
+        log.error(idx)
+        log.error(edge[idx])
+
+    log.exception(err)
+    raise ValueError(err)

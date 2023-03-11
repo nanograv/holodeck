@@ -6,17 +6,12 @@ and not the semi-analytic or observational population models.
 
 """
 
-from pathlib import Path
-
 import numba
 import numpy as np
-import scipy as sp
-import scipy.integrate  # noqa
 
 import kalepy as kale
 
 import holodeck as holo
-# import holodeck.cyutils  # noqa
 from holodeck import utils, cosmo, log
 from holodeck.constants import SPLC, NWTG, MPC
 
@@ -184,7 +179,8 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     num_binaries = _lambda_fact * dlnf
 
     shape = (num_binaries.size, nreals)
-    num_pois = np.random.poisson(num_binaries[:, np.newaxis], shape)
+    # num_pois = np.random.poisson(num_binaries[:, np.newaxis], shape)
+    num_pois = poisson_as_needed(num_binaries[:, np.newaxis] * np.ones(shape))
 
     # --- Calculate GW Signals
     temp = hs2 * gne * (2.0 / harms)**2
@@ -386,103 +382,6 @@ def sampled_gws_from_sam(sam, fobs_gw, hard=holo.hardening.Hard_GW, **kwargs):
     return gff, gwf, gwb
 
 
-def _gws_from_number_grid_centroids(edges, dnum, number, realize):
-    """Calculate GWs based on a grid of number-of-binaries.
-
-    # ! BUG: THIS ASSUMES THAT FREQUENCIES ARE NYQUIST SAMPLED !
-    # ! otherwise the conversion from hs to hc doesnt work !
-
-    NOTE: `_gws_from_number_grid_integrated()` should be more accurate, but this method better
-    matches GWB from sampled (`kale.sample_`) populations!!
-
-    The input number of binaries is `N` s.t. $$N = (d^4 N / [dlog10(M) dq dz dlogf] ) * dlog10(M) dq dz dlogf$$
-    The number `N` is evaluated on a 4d grid, specified by `edges`, i.e. $$N = N(M, q, z, f_r)$$
-    NOTE: the provided `number` must also summed/integrated over dlogf.
-    To calculate characteristic strain, this function divides again by the dlogf term.
-
-    Parameters
-    ----------
-    edges : (4,) iterable of array_like,
-        The edges of each dimension of the parameter space.
-        The edges should be, in order: [mtot, mrat, redz, fobs],
-        In units of [grams], [], [], [1/sec].
-    dnum : (M, Q, Z, F) ndarray,
-        Differential comoving number-density of binaries in each bin.
-    number : (M, Q, Z, F) ndarray,
-        Volumetric comoving number-density of binaries in each bin.
-    realize : bool or int,
-        Whether or not to calculate one or multiple realizations of the population.
-        BUG: explain more.
-
-    Returns
-    -------
-    hc : (M',Q',Z',F) ndarray,
-        Total characteristic GW strain from each bin of parameter space.
-        NOTE: to get total strain from all bins, must sum in quarature!
-        e.g. ``gwb = np.sqrt(np.square(hc).sum())``
-
-    """
-
-    # # ---- find 'center-of-mass' of each bin (i.e. based on grid edges)
-    # # (3, M', Q', Z')
-    # # coms = self.grid
-    # # ===> (3, M', Q', Z', 1)
-    # coms = [cc[..., np.newaxis] for cc in grid]
-    # # ===> (4, M', Q', Z', F)
-    # coms = np.broadcast_arrays(*coms, fobs[np.newaxis, np.newaxis, np.newaxis, :])
-
-    # # ---- find weighted bin centers
-    # # get unweighted centers
-    # cent = kale.utils.midpoints(dnum, log=False, axis=(0, 1, 2, 3))
-    # # get weighted centers for each dimension
-    # for ii, cc in enumerate(coms):
-    #     coms[ii] = kale.utils.midpoints(dnum * cc, log=False, axis=(0, 1, 2, 3)) / cent
-    # print(f"{kale.utils.jshape(edges)=}, {dnum.shape=}")
-    coms = kale.utils.centroids(edges, dnum)
-
-    # ---- calculate GW strain at bin centroids
-    mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))
-    dc = cosmo.comoving_distance(coms[2]).cgs.value
-
-    # ! -- 2022-08-19: `edges` should already be using *orbital*-frequency
-    fr = utils.frst_from_fobs(coms[3], coms[2])
-    # ! old:
-    # convert from GW frequency to orbital frequency (divide by 2.0)
-    # hs = utils.gw_strain_source(mc, dc, fr/2.0)
-    # ! new:
-    hs = utils.gw_strain_source(mc, dc, fr)
-    # ! --
-
-    # NOTE: for `dlogf` it doesnt matter if these are orbital- or GW- frequencies
-    dlogf = np.diff(np.log(edges[-1]))
-    dlogf = dlogf[np.newaxis, np.newaxis, np.newaxis, :]
-
-    if realize is True:
-        number = np.random.poisson(number)
-    elif realize in [None, False]:
-        pass
-    elif utils.isinteger(realize):
-        shape = number.shape + (realize,)
-        number = np.random.poisson(number[..., np.newaxis], size=shape)
-        hs = hs[..., np.newaxis]
-        dlogf = dlogf[..., np.newaxis]
-    else:
-        err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
-        raise ValueError(err)
-
-    number = number / dlogf
-    hs = np.nan_to_num(hs)
-    hc = number * np.square(hs)
-
-    # # (M',Q',Z',F) ==> (F,)
-    # if integrate:
-    #     hc = np.sqrt(np.sum(hc, axis=(0, 1, 2)))
-
-    hc = np.sqrt(hc)
-
-    return hc
-
-
 def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
     """
 
@@ -532,33 +431,43 @@ def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
     hs = utils.gw_strain_source(mc, dc, fr)
     hc = (hs ** 2) * (fc / df)
 
+    # Create a single realization
     if realize is True:
-        hc = hc * np.random.poisson(number)
+        hc = hc * poisson_as_needed(number)
+        # Sum over M, Q, Z bins  ::  (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])
+        if sum:
+            hc = np.sum(hc, axis=(0, 1, 2))
+
+    # Do not create a discrete realization, use the expectation values directly
     elif realize in [None, False]:
         # print('err here')
         # print('hc:\n', hc, '\nhc shape:', hc.shape)
         # print('number:\n', number, '\nnumber shape', number.shape)
         hc = hc * number
+        # Sum over M, Q, Z bins  ::  (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])
+        if sum:
+            hc = np.sum(hc, axis=(0, 1, 2))
+
+    # Create multiple discrete realizations
     elif utils.isinteger(realize):
-        shape = number.shape + (realize,)
-        try:
-            hc = hc[..., np.newaxis] * np.random.poisson(number[..., np.newaxis], size=shape)
-        except ValueError as err:
-            log.error(str(err))
-            print(f"{utils.stats(number)=}")
-            print(f"{number.max()=:.8e}")
-            print(f"{number.dtype=}")
-            raise
+        if sum:
+            import holodeck.cyutils   # noqa
+            # This function reate
+            hc = holo.cyutils.sam_poisson_gwb(number, hc, realize)
+
+        else:
+            log.warning(f"`sum`={sum} :: this requires a large amount of memory!")
+            shape = number.shape + (realize,)
+            hc = hc[..., np.newaxis] * poisson_as_needed(number[..., np.newaxis] * np.ones(shape))
+            if holo.sam._DEBUG:
+                log.info(f"number = {utils.stats(number)}")
+                log.info(f"hc = {utils.stats(hc)}")
+                holo.sam._check_bads(edges + [np.arange(realize),], hc, "hc")
 
     else:
         err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
         log.error(err)
         raise ValueError(err)
-
-    # Sum over M, Q, Z bins
-    # (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])
-    if sum:
-        hc = np.sum(hc, axis=(0, 1, 2))
 
     # convert from hc^2 to hc
     hc = np.sqrt(hc)
@@ -611,6 +520,34 @@ def gwb_ideal(fobs_gw, ndens, mtot, mrat, redz, dlog10, sum=True):
     gwb = gwb * np.sum(integ) if sum else gwb * integ
     gwb = np.sqrt(gwb)
     return gwb
+
+
+def poisson_as_needed(values, thresh=1e10):
+    """Calculate Poisson distribution when values are below threshold, otherwise approximate with normal distribution.
+
+    Parameters
+    ----------
+    values : ndarray
+        Expectation values for poisson distribution.
+    thresh : float
+        Expectation value above which to use Normal distribution approximation.
+
+    Returns
+    -------
+    output : ndarray
+        (Approximately) Poisson distributed values.
+        Same shape as input `values`.
+
+    """
+    # NOTE: do not use `int` type as it can cause overflow errors
+    # output = np.zeros_like(values, dtype=int)
+    output = np.zeros_like(values)
+    idx = (values <= thresh)
+    output[idx] = np.random.poisson(values[idx])
+    tt = values[~idx]
+    # output[~idx] = np.floor(np.random.normal(tt, np.sqrt(tt))).astype(int)
+    output[~idx] = np.floor(np.random.normal(tt, np.sqrt(tt)))
+    return output
 
 
 # ==============================================================================
@@ -742,6 +679,7 @@ def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=1
 
 
 def sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
+    import holodeck.cyutils  # noqa
 
     ndens = sam.static_binary_density
     mt_l10 = np.log10(sam.mtot)
@@ -753,6 +691,7 @@ def sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
 
 
 def sam_calc_gwb_single_eccen_discrete(gwfobs, sam, sepa_evo, eccen_evo, nharms=100, nreals=None):
+    import holodeck.cyutils  # noqa
 
     ndens = sam.static_binary_density
     mt_l10 = np.log10(sam.mtot)
@@ -781,3 +720,100 @@ def sam_calc_gwb_single_eccen_discrete(gwfobs, sam, sepa_evo, eccen_evo, nharms=
 @utils.deprecated_fail(_gws_harmonics_at_evo_fobs)
 def _calc_mc_at_fobs(*args, **kwargs):
     return
+
+
+def _gws_from_number_grid_centroids(edges, dnum, number, realize):
+    """Calculate GWs based on a grid of number-of-binaries.
+
+    # ! BUG: THIS ASSUMES THAT FREQUENCIES ARE NYQUIST SAMPLED !
+    # ! otherwise the conversion from hs to hc doesnt work !
+
+    NOTE: `_gws_from_number_grid_integrated()` should be more accurate, but this method better
+    matches GWB from sampled (`kale.sample_`) populations!!
+
+    The input number of binaries is `N` s.t. $$N = (d^4 N / [dlog10(M) dq dz dlogf] ) * dlog10(M) dq dz dlogf$$
+    The number `N` is evaluated on a 4d grid, specified by `edges`, i.e. $$N = N(M, q, z, f_r)$$
+    NOTE: the provided `number` must also summed/integrated over dlogf.
+    To calculate characteristic strain, this function divides again by the dlogf term.
+
+    Parameters
+    ----------
+    edges : (4,) iterable of array_like,
+        The edges of each dimension of the parameter space.
+        The edges should be, in order: [mtot, mrat, redz, fobs],
+        In units of [grams], [], [], [1/sec].
+    dnum : (M, Q, Z, F) ndarray,
+        Differential comoving number-density of binaries in each bin.
+    number : (M, Q, Z, F) ndarray,
+        Volumetric comoving number-density of binaries in each bin.
+    realize : bool or int,
+        Whether or not to calculate one or multiple realizations of the population.
+        BUG: explain more.
+
+    Returns
+    -------
+    hc : (M',Q',Z',F) ndarray,
+        Total characteristic GW strain from each bin of parameter space.
+        NOTE: to get total strain from all bins, must sum in quarature!
+        e.g. ``gwb = np.sqrt(np.square(hc).sum())``
+
+    """
+
+    # # ---- find 'center-of-mass' of each bin (i.e. based on grid edges)
+    # # (3, M', Q', Z')
+    # # coms = self.grid
+    # # ===> (3, M', Q', Z', 1)
+    # coms = [cc[..., np.newaxis] for cc in grid]
+    # # ===> (4, M', Q', Z', F)
+    # coms = np.broadcast_arrays(*coms, fobs[np.newaxis, np.newaxis, np.newaxis, :])
+
+    # # ---- find weighted bin centers
+    # # get unweighted centers
+    # cent = kale.utils.midpoints(dnum, log=False, axis=(0, 1, 2, 3))
+    # # get weighted centers for each dimension
+    # for ii, cc in enumerate(coms):
+    #     coms[ii] = kale.utils.midpoints(dnum * cc, log=False, axis=(0, 1, 2, 3)) / cent
+    # print(f"{kale.utils.jshape(edges)=}, {dnum.shape=}")
+    coms = kale.utils.centroids(edges, dnum)
+
+    # ---- calculate GW strain at bin centroids
+    mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))
+    dc = cosmo.comoving_distance(coms[2]).cgs.value
+
+    # ! -- 2022-08-19: `edges` should already be using *orbital*-frequency
+    fr = utils.frst_from_fobs(coms[3], coms[2])
+    # ! old:
+    # convert from GW frequency to orbital frequency (divide by 2.0)
+    # hs = utils.gw_strain_source(mc, dc, fr/2.0)
+    # ! new:
+    hs = utils.gw_strain_source(mc, dc, fr)
+    # ! --
+
+    # NOTE: for `dlogf` it doesnt matter if these are orbital- or GW- frequencies
+    dlogf = np.diff(np.log(edges[-1]))
+    dlogf = dlogf[np.newaxis, np.newaxis, np.newaxis, :]
+
+    if realize is True:
+        number = np.random.poisson(number)
+    elif realize in [None, False]:
+        pass
+    elif utils.isinteger(realize):
+        shape = number.shape + (realize,)
+        number = np.random.poisson(number[..., np.newaxis], size=shape)
+        hs = hs[..., np.newaxis]
+        dlogf = dlogf[..., np.newaxis]
+    else:
+        err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
+        raise ValueError(err)
+
+    number = number / dlogf
+    hs = np.nan_to_num(hs)
+    hc = number * np.square(hs)
+
+    # # (M',Q',Z',F) ==> (F,)
+    # if integrate:
+    #     hc = np.sqrt(np.sum(hc, axis=(0, 1, 2)))
+
+    hc = np.sqrt(hc)
+
+    return hc

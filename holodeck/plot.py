@@ -13,6 +13,9 @@ import kalepy as kale
 from holodeck import cosmo, utils, observations, log
 from holodeck.constants import MSOL, PC, YR
 
+LABEL_GW_FREQUENCY_YR = "GW Frequency $[\mathrm{yr}^{-1}]$"
+LABEL_CHARACTERISTIC_STRAIN = "GW Characteristic Strain"
+
 
 class MidpointNormalize(mpl.colors.Normalize):
     """
@@ -56,7 +59,7 @@ class MidpointLogNormalize(mpl.colors.LogNorm):
         return vals
 
 
-def figax(figsize=[10, 4], ncols=1, nrows=1, sharex=False, sharey=False, squeeze=True,
+def figax(figsize=[7, 5], ncols=1, nrows=1, sharex=False, sharey=False, squeeze=True,
           scale=None, xscale='log', xlabel='', xlim=None, yscale='log', ylabel='', ylim=None,
           left=None, bottom=None, right=None, top=None, hspace=None, wspace=None,
           widths=None, heights=None, grid=True, **kwargs):
@@ -257,56 +260,6 @@ def smap(args=[0.0, 1.0], cmap=None, log=False, norm=None, midpoint=None,
     return smap
 
 
-def set_axis_color(ax, axis='y', fs=None, color='k', side='right'):
-    # Set tick colors and font-sizes
-    kw = dict(labelsize=fs) if (fs is not None) else {}
-    ax.tick_params(axis=axis, which='both', colors=color, **kw)
-
-    if axis == 'x':
-        ax.xaxis.label.set_color(color)
-        offt = ax.get_xaxis().get_offset_text()
-    else:
-        ax.yaxis.label.set_color(color)
-        offt = ax.get_yaxis().get_offset_text()
-
-    # Set Spine colors
-    if side is not None:
-        ax.spines[side].set_color(color)
-    offt.set_color(color)
-    return ax
-
-
-def set_axis_pos(ax, axis, pos, side):
-    axis = axis.lower()
-
-    if axis == 'x':
-        offt = ax.get_xaxis().get_offset_text()
-
-        offt.set_y(pos)
-        ax.xaxis.set_label_position(side)
-        ax.xaxis.set_ticks_position(side)
-
-    elif axis == 'y':
-        offt = ax.get_yaxis().get_offset_text()
-
-        offt.set_x(pos)
-        ax.yaxis.set_label_position(side)
-        ax.yaxis.set_ticks_position(side)
-
-    else:
-        err = f"`axis` argument should be ['x', 'y'], got '{axis}'!"
-        log.exception(err)
-        raise ValueError(err)
-
-    # Set Spine colors
-    ax.set_frame_on(True)
-    ax.spines[side].set_position(('axes', pos))
-    ax.spines[side].set_visible(True)
-    ax.patch.set_visible(False)
-
-    return ax
-
-
 def _get_norm(data, midpoint=None, log=False):
     """
     """
@@ -411,11 +364,119 @@ def draw_hist_steps(ax, xx, yy, yfilter=None, **kwargs):
     return ax.plot(*_get_hist_steps(xx, yy, yfilter=yfilter), **kwargs)
 
 
+def draw_gwb(ax, xx, gwb, nsamp=10, color=None, label=None, plot_kwargs={}):
+    if color is None:
+        color = ax._get_lines.get_next_color()
+
+    mm, *conf = np.percentile(gwb, [50, 25, 75], axis=1)
+    hh, = ax.plot(xx, mm, alpha=0.5, color=color, label=label, **plot_kwargs)
+    ax.fill_between(xx, *conf, color=color, alpha=0.15)
+
+    if (nsamp is not None) and (nsamp > 0):
+        nsamp_max = gwb.shape[1]
+        idx = np.random.choice(nsamp_max, np.min([nsamp, nsamp_max]), replace=False)
+        for ii in idx:
+            ax.plot(xx, gwb[:, ii], color=color, alpha=0.25, lw=1.0, ls='-')
+
+    return hh
+
+
+def plot_gwb(fobs, gwb, **kwargs):
+    xx = fobs * YR
+    fig, ax = figax(
+        xlabel=LABEL_GW_FREQUENCY_YR,
+        ylabel=LABEL_CHARACTERISTIC_STRAIN
+    )
+    draw_gwb(ax, xx, gwb, **kwargs)
+    _twin_hz(ax)
+    return fig
+
+
+def scientific_notation(val, man=1, exp=0, dollar=True):
+    """Convert a scalar into a string with scientific notation (latex formatted).
+
+    Arguments
+    ---------
+    val : scalar
+        Numerical value to convert.
+    man : int or `None`
+        Precision of the mantissa (decimal points); or `None` for omit mantissa.
+    exp : int or `None`
+        Precision of the exponent (decimal points); or `None` for omit exponent.
+    dollar : bool
+        Include dollar-signs ('$') around returned expression.
+
+    Returns
+    -------
+    rv_str : str
+        Scientific notation string using latex formatting.
+
+    """
+    if val == 0.0:
+        rv_str = "$"*dollar + "0.0" + "$"*dollar
+        return rv_str
+
+    # get log10 exponent
+    val_exp = np.floor(np.log10(np.fabs(val)))
+    # get mantissa (positive/negative is still included here)
+    val_man = val / np.power(10.0, val_exp)
+
+    val_man = np.around(val_man, man)
+    if val_man >= 10.0:
+        val_man /= 10.0
+        val_exp += 1
+
+    # Construct Mantissa String
+    # --------------------------------
+    str_man = "{0:.{1:d}f}".format(val_man, man)
+
+    # If the mantissa is '1' (or '1.0' or '1.00' etc), dont write it
+    if str_man == "{0:.{1:d}f}".format(1.0, man):
+        str_man = ""
+
+    # Construct Exponent String
+    # --------------------------------
+    str_exp = "10^{{ {:d} }}".format(int(val_exp))
+
+    # Put them together
+    # --------------------------------
+    rv_str = "$"*dollar + str_man
+    if len(str_man) and len(str_exp):
+        rv_str += " \\times"
+    rv_str += str_exp + "$"*dollar
+
+    return rv_str
+
+
+def _draw_plaw(ax, freqs, amp=1e-15, f0=1/YR, **kwargs):
+    kwargs.setdefault('alpha', 0.25)
+    kwargs.setdefault('color', 'k')
+    kwargs.setdefault('ls', '--')
+    plaw = amp * np.power(np.asarray(freqs)/f0, -2/3)
+    return ax.plot(freqs, plaw, **kwargs)
+
+
+def _twin_hz(ax, nano=True, fs=8, **kw):
+    tw = ax.twiny()
+    xlim = np.array(ax.get_xlim()) / YR
+    if nano:
+        label = "nHz"
+        xlim *= 1e9
+    else:
+        label = "Hz"
+
+    label = fr"GW Frequency $[\mathrm{{{label}}}]$"
+    tw.set(xlim=xlim, xscale='log')
+    tw.set_xlabel(label, fontsize=fs, **kw)
+    return
+
+
+
 # =================================================================================================
 # ====    Below Needs Review / Cleaning    ====
 # =================================================================================================
 
-
+'''
 def plot_bin_pop(pop):
     mt, mr = utils.mtmr_from_m1m2(pop.mass)
     redz = cosmo.a_to_z(pop.scafa)
@@ -517,21 +578,6 @@ def _draw_pop_masses(ax, pop, color='r', nplot=3e3):
     return handles, names
 
 
-def _twin_hz(ax, nano=True, fs=12, **kw):
-    tw = ax.twiny()
-    xlim = np.array(ax.get_xlim()) / YR
-    if nano:
-        label = "nHz"
-        xlim *= 1e9
-    else:
-        label = "Hz"
-
-    label = fr"frequency $[\mathrm{{{label}}}]$"
-    tw.set(xlim=xlim, xscale='log')
-    tw.set_xlabel(label, fontsize=fs, **kw)
-    return
-
-
 def plot_gwb(gwb, color=None, uniform=False, nreals=5):
     """Plot a GW background from the given `Grav_Waves` instance.
 
@@ -625,14 +671,6 @@ def _draw_gwb_conf(ax, gwb, **kwargs):
     return
 
 
-def _draw_plaw(ax, freqs, amp=1e-15, f0=1/YR, **kwargs):
-    kwargs.setdefault('alpha', 0.25)
-    kwargs.setdefault('color', 'k')
-    kwargs.setdefault('ls', '--')
-    plaw = amp * np.power(np.asarray(freqs)/f0, -2/3)
-    return ax.plot(freqs, plaw, **kwargs)
-
-
 def draw_med_conf(ax, xx, vals, percs=[25, 75], axis=-1, yfilter=None, **kwargs):
     kwargs.setdefault('alpha', 0.5)
     assert len(percs) == 2
@@ -656,98 +694,4 @@ def draw_med_conf(ax, xx, vals, percs=[25, 75], axis=-1, yfilter=None, **kwargs)
 
     fill = ax.fill_between(_xx, lo, hi, alpha=0.2, color=hh.get_color())
     return (hh, fill)
-
-
 '''
-def plot_evo(evo, freqs):
-    fig, ax = plt.subplots(figsize=[10, 5])
-    ax.set(xlabel='Obs Orb Freq [1/yr]', xscale='log', yscale='log')
-    tw = ax.twiny()
-    tw.set(xlim=1e9*np.array([freqs[0], freqs[-1]]), xscale='log', xlabel='Freq [nHz]')
-
-    data = evo.at('fobs', freqs)
-
-    def _draw_vals_conf(ax, xx, name, color=None, units=1.0):
-        if color is None:
-            color = ax._get_lines.get_next_color()
-        nn = name.split(' ')[0]
-        vals = data[nn]
-        if vals is None:
-            return None, None
-        ax.set_ylabel(name, color=color)
-        ax.tick_params(axis='y', which='both', colors=color)
-        vals = np.percentile(vals, [25, 50, 75], axis=0) / units
-        h1 = ax.fill_between(xx, vals[0], vals[-1], alpha=0.25, color=color)
-        h2, = ax.plot(xx, vals[1], alpha=0.75, lw=2.0, color=color)
-        return (h1, h2), nn
-
-    handles = []
-    labels = []
-
-    name = 'sepa [pc]'
-    hh, nn = _draw_vals_conf(ax, freqs*YR, name, 'blue', units=PC)
-    handles.append(hh)
-    labels.append(nn)
-
-    name = 'eccen'
-    tw = ax.twinx()
-    hh, nn = _draw_vals_conf(tw, freqs*YR, name, 'green')
-    if hh is not None:
-        handles.append(hh)
-        labels.append(nn)
-
-    ax.legend(handles, labels)
-    return fig
-'''
-
-
-def plot_evo(evo, freqs=None, sepa=None, ax=None):
-    if (freqs is None) and (sepa is None):
-        err = "Either `freqs` or `sepa` must be provided!"
-        log.exception(err)
-        raise ValueError(err)
-
-    if freqs is not None:
-        data = evo.at('fobs', freqs)
-        xx = freqs * YR
-        xlabel = 'GW Frequency [1/yr]'
-    else:
-        data = evo.at('sepa', sepa)
-        xx = sepa / PC
-        xlabel = 'Binary Separation [pc]'
-
-    if ax is None:
-        fig, ax = figax(xlabel=xlabel)
-    else:
-        fig = ax.get_figure()
-
-    def _draw_vals_conf(ax, xx, vals, color=None, label=None):
-        if color is None:
-            color = ax._get_lines.get_next_color()
-        if label is not None:
-            ax.set_ylabel(label, color=color)
-            ax.tick_params(axis='y', which='both', colors=color)
-        # vals = np.percentile(vals, [25, 50, 75], axis=0) / units
-        vals = utils.quantiles(vals, [0.25, 0.50, 0.75], axis=0).T
-        h1 = ax.fill_between(xx, vals[0], vals[-1], alpha=0.25, color=color)
-        h2, = ax.plot(xx, vals[1], alpha=0.75, lw=2.0, color=color)
-        return (h1, h2)
-
-    # handles = []
-    # labels = []
-
-    name = 'Hardening Time [yr]'
-    vals = np.fabs(data['sepa'] / data['dadt']) / YR
-    _draw_vals_conf(ax, xx, vals, label=name)
-    # handles.append(hh)
-    # labels.append(name)
-
-    # name = 'eccen'
-    # tw = ax.twinx()
-    # hh, nn = _draw_vals_conf(tw, freqs*YR, name, 'green')
-    # if hh is not None:
-    #     handles.append(hh)
-    #     labels.append(nn)
-
-    # ax.legend(handles, labels)
-    return fig

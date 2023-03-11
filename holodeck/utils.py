@@ -27,7 +27,7 @@ import scipy.stats    # noqa
 import scipy.special  # noqa
 
 from holodeck import log, cosmo
-from holodeck.constants import NWTG, SCHW, SPLC, YR
+from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR
 
 # [Sesana2004]_ Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
@@ -35,6 +35,8 @@ _GW_DADT_SEP_CONST = - 64 * np.power(NWTG, 3) / 5 / np.power(SPLC, 5)
 _GW_DEDT_ECC_CONST = - 304 * np.power(NWTG, 3) / 15 / np.power(SPLC, 5)
 # [EN2007]_, Eq.2.2
 _GW_LUM_CONST = (32.0 / 5.0) * np.power(NWTG, 7.0/3.0) * np.power(SPLC, -5.0)
+
+_AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
 
 class _Modifier(abc.ABC):
@@ -306,6 +308,146 @@ def _get_subclass_instance(value, default, superclass):
 # =================================================================================================
 
 
+def roll_rows(arr, roll_num):
+    """Roll each row (axis=0) of the given array by an amount specified.
+
+    Parameters
+    ----------
+    arr : (R, D) ndarray
+        Input data to be rolled.
+    roll_num : (R,) ndarray of int
+        Amount to roll each row.  Must match the number of rows (axis=0) in `arr`.
+
+    Returns
+    -------
+    result : (R, D) ndarray
+        Rolled version of the input data.
+
+    Example
+    -------
+    >>> a = np.arange(12).reshape(3, 4); b = [1, -1, 2]; utils.roll_rows(a, b)
+    array([[ 3,  0,  1,  2],
+           [ 5,  6,  7,  4],
+           [10, 11,  8,  9]])
+
+    """
+    roll = np.asarray(roll_num)
+    assert np.ndim(arr) == 2 and np.ndim(roll) == 1
+    nrows, ncols = arr.shape
+    assert roll.size == nrows
+    arr_roll = arr[:, [*range(ncols), *range(ncols-1)]].copy()
+    strd_0, strd_1 = arr_roll.strides
+    result = np.lib.stride_tricks.as_strided(arr_roll, (nrows, ncols, ncols), (strd_0, strd_1, strd_1))
+    result = result[np.arange(nrows), (ncols - roll)%ncols]
+    return result
+
+
+def get_scatter_weights(uniform_cents, dist):
+    """Get the weights (fractional mass) that should be transferred to each bin to introduce the given scatter.
+
+    Parameters
+    ----------
+    uniform_cents : (N,) ndarray
+        Uniformly spaced bin-centers specifying distances in the parameter of interest (e.g. mass).
+    dist : `scipy.stats._distn_infrastructure.rv_continuous_frozen` instance
+        Object providing a CDF function `cdf(x)` determining the weights for each bin.
+        e.g. ``dist = sp.stats.norm(loc=0.0, scale=0.1)``
+
+    Returns
+    -------
+    dm : (2*N - 1,) ndarray
+        Array of weights for bins with the given distances.
+        [-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
+
+    """
+    num = uniform_cents.size
+    # Get log-spacing between edges, this must be constant to work in this way!
+    dx = np.diff(uniform_cents)
+    # assert np.allclose(dx, dx[0]), "This method only works if `uniform_cents` are uniformly spaced!"
+    if not np.allclose(dx, dx[0]):
+        log.error(f"{dx[0]=} {dx=}")
+        log.error(f"{uniform_cents=}")
+        err = f"`get_scatter_weights` only works if `uniform_cents` are uniformly spaced!"
+        log.exception(err)
+        raise ValueError(err)
+
+    dx = dx[0]
+    # The bin edges are at distance [dx/2, 1.5*dx, 2.5*dx, ...]
+    dx = dx/2.0 + np.arange(num) * dx
+    # Convert to both sides:  [..., -1.5*dx, -0.5dx, +0.5dx, +1.5dx, ...]
+    dx = np.concatenate([-dx[::-1], dx])
+    # Get the mass across each interval by differencing the CDF at each edge location
+    dm = np.diff(dist.cdf(dx))
+    return dm
+
+
+def _scatter_with_weights(dens, weights, axis=0):
+    # Perform the convolution
+    dens = np.moveaxis(dens, axis, 0)
+    dens_new = np.einsum("j...,jk...", dens, weights)
+    dens_new = np.moveaxis(dens_new, 0, axis)
+    dens = np.moveaxis(dens, 0, axis)
+    return dens_new
+
+
+def _get_rolled_weights(log_cents, dist):
+    num = log_cents.size
+    # Get the fractional weights that this bin should be redistributed to
+    # (2*N - 1,)  giving the bins all the way to the left and the right
+    # e.g. [-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
+    weights = get_scatter_weights(log_cents, dist)
+
+    # Duplicate the weights into each row of an (N, N) matrix
+    # e.g. [[-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
+    #       [-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
+    #       [-N+1, -N+2, ..., -2, -1, 0, +1, +2, ..., +N-2, +N-1]
+    #        ...
+    weights = weights[np.newaxis, :] * np.ones((num, weights.size))
+    # Need to "roll" each row of the matrix such that the central bin is at number index=row
+    #    rolls backward by default,
+    roll = 1 - num + np.arange(num)
+    # Roll each row
+    # e.g. [[ 0, +1, +2, ..., +N-2, +N-1, -N+1, -N+2, ..., -2, -1]
+    #       [-1,  0, +1, +2, ..., +N-2, +N-1, -N+1, -N+2, ..., -2]
+    #       [-2, -1,  0, +1, +2, ..., +N-2, +N-1, -N+1, -N+2, ..., -3]
+    #        ...
+    weights = roll_rows(weights, roll)
+    # Cutoff each row after N elements
+    weights = weights[:, :num]
+    return weights
+
+
+def scatter_redistribute(cents, dist, dens, axis=0):
+    """Redistribute `dens` across the target axis to account for scatter/variance.
+
+    Parameters
+    ----------
+    cents : (N,) ndarray
+        Locations of bin centers in the parameter of interest.
+    dist : `scipy.stats._distn_infrastructure.rv_continuous_frozen` instance
+        Object providing a CDF function `cdf(x)` determining the weights for each bin.
+        e.g. ``dist = sp.stats.norm(loc=0.0, scale=0.1)``
+    dens : ndarray
+        Input values to be redistributed.  Must match the size of `cents` along axis `axis`.
+
+    Returns
+    -------
+    dens_new : ndarray
+        Array with resitributed values.  Same shape as input `dens`.
+
+    """
+    log_cents = np.log10(cents)
+    num = log_cents.size
+    if np.shape(dens)[axis] != num:
+        err = f"The size of `dens` ({np.shape(dens)}) along `axis` ({axis}) must match `cents` ({num})!!"
+        log.exception(err)
+        raise ValueError(err)
+
+    weights = _get_rolled_weights(log_cents, dist)
+    dens_new = _scatter_with_weights(dens, weights, axis=0)
+    return dens_new
+
+
 def eccen_func(cent: float, width: float, size: int) -> np.ndarray:
     """Draw random values between [0.0, 1.0] with a given center and width.
 
@@ -341,7 +483,17 @@ def eccen_func(cent: float, width: float, size: int) -> np.ndarray:
     return eccen
 
 
-def frac_str(vals: npt.ArrayLike, prec: int = 2) -> str:
+def _func_gaussian(xx, aa, mm, ss):
+    yy = aa * np.exp(-(xx - mm)**2 / (2.0 * ss**2))
+    return yy
+
+
+def fit_gaussian(xx, yy, guess=[1.0, 0.0, 1.0]):
+    popt, pcov = sp.optimize.curve_fit(_func_gaussian, xx, yy, p0=guess, maxfev=10000)
+    return popt, pcov
+
+
+def frac_str(vals, prec=2):
     """Return a string with the fraction and decimal of non-zero elements of the given array.
 
     e.g. [0, 1, 2, 0, 0] ==> "2/5 = 4.0e-1"
@@ -484,6 +636,17 @@ def log_normal_base_10(
     return dist
 
 
+def midpoints(vals, axis=-1, log=False):
+    mm = np.moveaxis(vals, axis, 0)
+    if log:
+        mm = np.log10(mm)
+    mm = 0.5 * (mm[1:] + mm[:-1])
+    if log:
+        mm = 10.0 ** mm
+    mm = np.moveaxis(mm, 0, axis)
+    return mm
+
+
 def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
     """Find the minimum and maximum values in the given array.
 
@@ -509,25 +672,90 @@ def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
     return extr
 
 
-def print_stats(stack=True, print_func=print, **kwargs):
-    """Print out basic properties and statistics on the input key-value array_like values.
+def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
+    """Interpolate 2D data to an array of points.
+
+    `xvals` and `yvals` are (N, M) where the interpolation is done along the 1th (`M`)
+    axis (i.e. interpolation is done independently for each `N` row.  Should be generalizeable to
+    higher dim.
 
     Parameters
     ----------
-    stack : bool,
-        Whether or not to print a backtrace to stdout.
-    print_func : callable,
-        Function to use for returning/printing output.
-    kwargs : dict,
-        Key-value pairs where values are array_like for the shape/stats to be printed.
+    xx : (T,) or (N, T) ndarray
+        Target x-values to interpolate to.
+    xvals : (N, M) ndarray
+        Evaluation points (x-values) of the functions to be interpolated.
+        Interpolation is performed over the 1th (last) axis.
+    yvals : (N, M) ndarray
+        Function values (y-values) of the function to be interpolated.
+        Interpolation is performed over the 1th (last) axis.
+
+    Returns
+    -------
+    ynew : (N, T) ndarray
+        Interpolated function values, for each of N functions and T evaluation points.
 
     """
-    if stack:
-        import traceback
-        traceback.print_stack()
-    for kk, vv in kwargs.items():
-        print_func(f"{kk} = shape: {np.shape(vv)}, stats: {stats(vv)}")
-    return
+    # assert np.ndim(xx) == 1
+    assert np.ndim(xvals) == 2
+    assert np.shape(xvals) == np.shape(yvals)
+
+    xx = np.asarray(xx)
+
+    if xlog:
+        xx = np.log10(xx)
+        xvals = np.log10(xvals)
+
+    if ylog:
+        yvals = np.log10(yvals)
+
+    # --- Convert `xx` to be broadcastable with (N, T)
+    # `xx` is shaped as (T,)  ==> (1, T)
+    if np.ndim(xx) == 1:
+        xx = xx[np.newaxis, :]
+    # `xx` is shaped as (N, T)
+    elif np.ndim(xx) == 2:
+        assert np.shape(xx)[0] == np.shape(xvals)[0]
+    else:
+        err = f"`xx` ({np.shape(xx)}) must be shaped as (T,) or (N, T)!"
+        log.exception(err)
+        raise ValueError(err)
+
+    # Convert to (N, T, M)
+    #     `xx` is (T,)  `xvals` is (N, M) for N-binaries and M-steps
+    select = (xx[:, :, np.newaxis] <= xvals[:, np.newaxis, :])
+
+    # ---- Find the indices in `xvals` after and before each value of `xx`
+    # Find the first indices in `xvals` AFTER `xx`
+    # (N, T)
+    aft = np.argmax(select, axis=-1)
+    # zero values in `aft` mean that either (a) no xvals after the targets were found
+    # of (b) that all xvals are after the targets.  In either case, we cannot interpolate!
+    valid = (aft > 0)
+    inval = ~valid
+    # find the last indices when `xvals` is SMALLER than each value of `xx`
+    bef = np.copy(aft)
+    bef[valid] -= 1
+
+    # (2, N, T)
+    cut = [aft, bef]
+    # (2, N, T)
+    xvals = [np.take_along_axis(xvals, cc, axis=-1) for cc in cut]
+    # Find how far to interpolate between values (in log-space)
+    #     (N, T)
+    frac = (xx - xvals[1]) / np.subtract(*xvals)
+
+    # (2, N, T)
+    data = [np.take_along_axis(yvals, cc, axis=-1) for cc in cut]
+    # Interpolate by `frac` for each binary
+    ynew = data[1] + (np.subtract(*data) * frac)
+    # Set invalid binaries to nan
+    ynew[inval, ...] = np.nan
+
+    if ylog:
+        ynew = 10.0 ** ynew
+
+    return ynew
 
 
 def nyquist_freqs(
@@ -596,7 +824,7 @@ def nyquist_freqs_edges(
     df = fmin    # bin width
     freqs = np.arange(fmin, fmax + df/10.0, df)   # centers
     freqs_edges = freqs - df/2.0    # shift to edges
-    freqs_edges = np.concatenate([freqs_edges, [fmax + df]]) #BUG? should this be df/2?
+    freqs_edges = np.concatenate([freqs_edges, [fmax + df/2.0]])
 
     if trim is not None:
         if np.shape(trim) != (2,):
@@ -607,6 +835,27 @@ def nyquist_freqs_edges(
             freqs_edges = freqs_edges[freqs_edges < trim[1]]
 
     return freqs_edges
+
+
+def print_stats(stack=True, print_func=print, **kwargs):
+    """Print out basic properties and statistics on the input key-value array_like values.
+
+    Parameters
+    ----------
+    stack : bool,
+        Whether or not to print a backtrace to stdout.
+    print_func : callable,
+        Function to use for returning/printing output.
+    kwargs : dict,
+        Key-value pairs where values are array_like for the shape/stats to be printed.
+
+    """
+    if stack:
+        import traceback
+        traceback.print_stack()
+    for kk, vv in kwargs.items():
+        print_func(f"{kk} = shape: {np.shape(vv)}, stats: {stats(vv)}")
+    return
 
 
 def quantile_filtered(values, percs, axis, func=np.isfinite):
@@ -1223,7 +1472,7 @@ def kepler_sepa_from_freq(mass, freq):
     return sepa
 
 
-def rad_isco(m1, m2, factor=3.0):
+def rad_isco(m1, m2=0.0, factor=3.0):
     """Inner-most Stable Circular Orbit, radius at which binaries 'merge'.
 
     ENH: allow single (total) mass argument.
@@ -1247,6 +1496,44 @@ def rad_isco(m1, m2, factor=3.0):
     """
     return factor * schwarzschild_radius(m1+m2)
 
+
+def redz_after(time, redz=None, age=None):
+    """Calculate the redshift after the given amount of time has passed.
+
+    Parameters
+    ----------
+    time : array_like in units of [sec]
+        Amount of time to pass.
+    redz : None or array_like,
+        Redshift of starting point after which `time` is added.
+    age : None or array_like, in units of [sec]
+        Age of the Universe at the starting point, after which `time` is added.
+
+    Returns
+    -------
+    new_redz : array_like
+        Redshift of the Universe after the given amount of time.
+
+    """
+    if (redz is None) == (age is None):
+        raise ValueError("One of `redz` and `age` must be provided (and not both)!")
+
+    if redz is not None:
+        age = cosmo.age(redz).to('s').value
+    new_age = age + time
+
+    if np.isscalar(new_age):
+        if new_age < _AGE_UNIVERSE_GYR * GYR:
+            new_redz = cosmo.tage_to_z(new_age)
+        else:
+            new_redz = -1.0
+
+    else:
+        new_redz = -1.0 * np.ones_like(new_age)
+        idx = (new_age < _AGE_UNIVERSE_GYR * GYR)
+        new_redz[idx] = cosmo.tage_to_z(new_age[idx])
+
+    return new_redz
 
 def schwarzschild_radius(mass):
     """Return the Schwarschild radius [cm] for the given mass [grams].
@@ -1727,6 +2014,21 @@ def time_to_merge_at_sep(m1, m2, sepa):
     a1 = rad_isco(m1, m2)
     delta_sep = np.power(sepa, 4.0) - np.power(a1, 4.0)
     return delta_sep/(GW_CONST*m1*m2*(m1+m2))
+
+
+def gamma_psd_to_strain(gamma_psd):
+    gamma_strain = (gamma_psd + 3.0) / 2.0
+    return gamma_strain
+
+
+def gamma_strain_to_psd(gamma_strain):
+    gamma_psd = 2*gamma_strain - 3.0
+    return gamma_psd
+
+
+def gamma_strain_to_omega(gamma_strain):
+    gamma_omega = (gamma_strain - 2.0) / 2.0
+    return gamma_omega
 
 
 @numba.njit
