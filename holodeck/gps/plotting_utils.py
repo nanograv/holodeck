@@ -11,6 +11,8 @@ from holodeck.constants import GYR, MSOL, PC, YR
 
 from holodeck.gps import gp_utils as gu
 
+FLOOR_STRAIN_SQUARED = 1e-40
+
 
 def sam_hard(env_pars, shape=40):
     """SAM used in the `hard04b` library.
@@ -366,7 +368,8 @@ def plot_over_realizations(ind,
                            gp_george,
                            gp_list,
                            center_measure="median",
-                           plot_dir=Path.cwd()):
+                           plot_dir=Path.cwd(),
+                           test_frac=0.0):
     """Plot the GP prediction over the GWB from `spectra`.
 
     Parameters
@@ -400,40 +403,60 @@ def plot_over_realizations(ind,
         sys.exit(
             f"{plot_dir.absolute()} does not exist. Please create it first.")
 
-    xobs = gu.get_parameter_values(spectra)
-    env_param = xobs[ind, :].copy()
+    # Test frac is purposefully left out here so you can make plots using the
+    # test set
+    freqs, xobs, yerr, yobs, yobs_mean = gu.get_smoothed_gwb(
+        spectra, len(gp_george), center_measure=center_measure)
+
+    # Alert if in test set
+    if ind < int(yobs.shape[0] * test_frac):
+        print(f"Index {ind} is in the test set")
+
+    smooth_center = yobs + yobs_mean
+
+    # Take the test set offset into account for xobs
+    env_param = xobs[ind - int(yobs.shape[0] * test_frac), :].copy()
 
     hc, rho, rho_pred = gu.hc_from_gp(gp_george, gp_list, env_param)
-
-    freqs, yerr, yobs, yobs_mean = gu.get_smoothed_gwb(
-        spectra, len(gp_george), center_measure=center_measure)
-    smooth_center = yobs + yobs_mean
 
     # Convert to Hz
     freqs /= YR
 
-    # the raw spectra #
-    for ii in range(spectra['gwb'].shape[-1]):
+
+    gwb_spectra = spectra['gwb']
+
+    # Need to drop NaNs
+    bads = np.any(np.isnan(gwb_spectra), axis=(1, 2))
+    gwb_spectra = gwb_spectra[~bads]
+
+    # Find all the zeros and set them to be h_c = 1e-20
+    low_ind = (gwb_spectra < np.sqrt(FLOOR_STRAIN_SQUARED))
+    gwb_spectra[low_ind] = np.sqrt(FLOOR_STRAIN_SQUARED)
+
+    # the raw spectra
+    # Let the last one be the one we apply a label to
+    for ii in range(gwb_spectra.shape[-1] - 1):
         plt.loglog(freqs,
-                   spectra['gwb'][ind, :len(gp_george), ii],
+                   gwb_spectra[ind, :len(gp_george), ii],
                    color='C0',
                    alpha=0.2,
                    zorder=0)
+    # Plot the last and add a label
     plt.loglog(freqs,
-               spectra['gwb'][ind, :len(gp_george), ii],
+               gwb_spectra[ind, :len(gp_george), ii+1],
                color='C0',
                alpha=0.2,
                zorder=0,
                label='Original Spectra')
 
-    # the smoothed mean #
+    # the smoothed mean
     plt.loglog(freqs,
                np.sqrt(10**smooth_center[ind][:len(gp_george)]),
                color='C1',
                label=f"Smoothed {center_measure}",
                lw=2)
 
-    # the GP realization #
+    # the GP realization
     plt.semilogx(freqs, hc, color='C3', lw=2.5, label='GP')
     plt.fill_between(freqs,
                      np.sqrt(10**(rho + rho_pred[:, 1])),
@@ -451,7 +474,7 @@ def plot_over_realizations(ind,
 
     # Print the parameter values for this gwb
     pars = list(spectra.attrs["param_names"].astype(str))
-    for i, par in enumerate(xobs[ind, :]):
-        print(f"{pars[i]} = {xobs[ind,i]:.2E}")
+    for i, par in enumerate(env_param):
+        print(f"{pars[i]} = {env_param[i]:.2E}")
 
-    return xobs[ind]
+    return env_param
