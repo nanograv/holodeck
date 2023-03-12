@@ -15,6 +15,9 @@ import holodeck as holo
 from holodeck import utils, cosmo, log
 from holodeck.constants import SPLC, NWTG, MPC
 
+import pyximport
+pyximport.install(language_level=3, setup_args={"include_dirs": np.get_include()})
+import holodeck.cyutils #noqa
 
 _CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen']
 
