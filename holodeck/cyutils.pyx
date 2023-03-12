@@ -884,3 +884,82 @@ cdef double[:, :] _sam_poisson_gwb(
 
     return gwb
 
+def ss_poisson_hc(number, h2fdf, nreals, normal_threshold=1e10):
+    shape = np.array(number.shape)
+    hc_ss = np.zeros((shape[3], nreals)) # shape (F,R)
+    hc_bg = np.zeros((shape[3], nreals)) # shape (F,R)
+    ssidx = np.zeros((3, shape[3], nreals), dtype=int) # shape (F,R)
+    _ss_poisson_hc(shape, number, h2fdf, nreals, long(normal_threshold),
+                    &hc_ss, &hc_bg, &ssidx)
+    return hc_ss, hc_bg, ssidx
+  
+
+# why is the shape a long? that doesn't seem like it'd need to be
+@cython.boundscheck(True)
+@cython.wraparound(True)
+@cython.nonecheck(True)
+@cython.cdivision(True)
+cdef double[:,:] _ss_poisson_hc(long[:] shape, double[:,:,:,:] number, double[:,:,:,:] h2fdf,
+    int nreals, long thresh, *np.ndarray[np.double_t, ndim=2] hc_ss, 
+    *np.ndarray[np.double_t, ndim=2], *np.ndarray[np.int, ndim=3]):
+
+    cdef int M = shape[0]
+    cdef int Q = shape[1]
+    cdef int Z = shape[2]
+    cdef int F = shape[3]
+    cdef int R = nreals
+
+    # Setup random number generator from numpy library
+    cdef bitgen_t *rng
+    cdef const char *capsule_name = "BitGenerator"
+    capsule = PCG64().capsule
+    # Cast the pointer
+    rng = <bitgen_t *> PyCapsule_GetPointer(capsule, capsule_name)
+
+    cdef int mm, qq, zz, ff, rr, m_max, q_max, z_max
+    cdef double max, num
+
+    # passed as pointers:
+    #   np.ndarray[np.double_t, ndim=2] hc_ss = np.zeros((F, R))
+    #   np.ndarray[np.double_t, ndim=2] hc_bg = np.zeros((F, R))
+    #   np.ndarray[np.double_t, ndim=3] ssidx = np.zeros((3, F, R))
+
+    # h2fdf = hs^2 * f/df
+    # hc_ss = sqrt(max hsfdf)
+    # hc_bg = sqrt(sum hsfdf*number in bin - max)
+    for rr in range(R):
+        for ff in range(F):
+            # find the max
+            max = 0 # max h2fdf
+            sum = 0 # sum of all h2fdf*number
+            for mm in range(M):
+                for qq in range(Q):
+                    for zz in range(Z):
+                        num = number[mm,qq,zz,ff] # this bin's number
+                        cur = h2fdf[mm,qq,zz,ff] # this bin's h2fdf
+                        if (num>thresh):
+                            std = sqrt(num)
+                            num = <double>random_normal(rng, num, std)  
+                        else:
+                            num = <double>random_poisson(rng, num)
+                        # check if max
+                        if (num>0 and cur>max):
+                            max = cur # update max if cur is larger
+                            m_max = mm
+                            q_max = qq
+                            z_max = zz
+                        sum += cur*num
+            if (max==0): 
+                print('No sources found at %dth frequency' % ff)
+            sum -= max # subtract single source from the gwb
+            hc_bg[ff,rr] = sqrt(sum)
+            hc_ss[ff,ff] = sqrt(max)
+            ssidx[:,ff,rr] = m_max, q_max, z_max
+    
+
+
+# idea: could sort hsamp and then random sample until a bin has val >=1, 
+# which would become hsamp. Then add the rest up for the background.
+                    
+                        
+
