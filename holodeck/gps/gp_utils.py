@@ -85,20 +85,20 @@ class GaussProc(object):
         # ymax = np.max(y+yerr)
         # ymin = np.min(y-yerr)
         # print(f"{amp=}, {ymax=}, {ymin=}, diff={ymax-ymin}")
-        spans = [[amp*1e-3, amp*1e1], ]
+        spans = [[amp*1e-3, amp*1e2], ]
         for kk, vv in par_dict.items():
             vv = list(vv.values())
             # print(f"\t{kk}: {vv}")
             dd = np.diff(vv)[0]
             # print(f"\t\t{dd}", end="\t")
-            dd = [dd/10.0, dd*10.0]
+            dd = [dd*1e-3, dd*1e3]
             # print(f"{dd}")
             spans.append(dd)
 
         # print(np.shape(spans), len(self.par_dict))
         # The number of GP parameters is one more than the number of spectra parameters.
-        self.pmax = np.full(len(self.par_dict) + 1, 20.0)  # sampling ranges
-        self.pmin = np.full(len(self.par_dict) + 1, -20.0)  # sampling ranges
+        # self.pmax = np.full(len(self.par_dict) + 1, 20.0)  # sampling ranges
+        # self.pmin = np.full(len(self.par_dict) + 1, -20.0)  # sampling ranges
         # self.pmin, self.pmax = np.array(spans).T
         self.pmin, self.pmax = np.log(spans).T
         print(f"{self.pmax=}")
