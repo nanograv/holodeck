@@ -100,7 +100,7 @@ class _Param_Space(abc.ABC):
     def model_for_number(self, num):
         params = self.param_dict(num)
         self._log.debug(f"params {num} :: {params}")
-        return self.model_for_params(params, self.param_shape)
+        return self.model_for_params(params, self.sam_shape)
 
     @classmethod
     @abc.abstractmethod
