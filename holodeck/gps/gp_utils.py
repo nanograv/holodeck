@@ -480,11 +480,13 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
     # Populate the GP class with the details of the kernel
     # MAP values for each frequency.
     for ii in range(len(gp_freqs)):
+        gp_george[ii].emcee_chain = sampler[ii].chain
+        gp_george[ii].emcee_lnprob = sampler[ii].lnprobability
         gp_george[ii].emcee_flatchain = sampler[ii].flatchain
         gp_george[ii].emcee_flatlnprob = sampler[ii].flatlnprobability
 
-        gp_george[ii].emcee_kernel_map = sampler[ii].flatchain[np.argmax(
-            sampler[ii].flatlnprobability)]
+        kmap = sampler[ii].flatchain[np.argmax(sampler[ii].flatlnprobability)]
+        gp_george[ii].emcee_kernel_map = kmap
 
         # add-in mean yobs (freq) values
         gp_george[ii].mean_spectra = yobs_mean[ii]
