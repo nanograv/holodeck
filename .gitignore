@@ -124,3 +124,5 @@ cyutils.html
 cyutils_api.h
 logs/
 slurm*
+*.out
+*.err
