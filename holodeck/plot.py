@@ -5,6 +5,7 @@ Provides convenience methods for generating standard plots and components using 
 """
 
 import numpy as np
+import scipy as sp
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
@@ -364,13 +365,11 @@ def draw_hist_steps(ax, xx, yy, yfilter=None, **kwargs):
     return ax.plot(*_get_hist_steps(xx, yy, yfilter=yfilter), **kwargs)
 
 
-def draw_gwb(ax, xx, gwb, nsamp=10, color=None, label=None, plot_kwargs={}):
+def draw_gwb(ax, xx, gwb, nsamp=10, color=None, label=None, **kwargs):
     if color is None:
         color = ax._get_lines.get_next_color()
 
-    mm, *conf = np.percentile(gwb, [50, 25, 75], axis=1)
-    hh, = ax.plot(xx, mm, alpha=0.5, color=color, label=label, **plot_kwargs)
-    ax.fill_between(xx, *conf, color=color, alpha=0.15)
+    hh = draw_med_conf(ax, xx, gwb, **kwargs)
 
     if (nsamp is not None) and (nsamp > 0):
         nsamp_max = gwb.shape[1]
@@ -483,6 +482,7 @@ def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill=
     inter_percs = [0.5, ] + np.concatenate(inter_percs).tolist()
     # Get percentiles; they go along the last axis
     rv = kale.utils.quantiles(vals, percs=inter_percs, weights=weights, axis=-1)
+
     med, *conf = rv.T
 
     # plot median
@@ -495,6 +495,56 @@ def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill=
     # plot each confidence interval
     for lo, hi in conf:
         gg = ax.fill_between(xx, lo, hi, color=hh.get_color(), **fill)
+
+    return (hh, gg)
+
+
+def smooth_spectra(xx, gwb, smooth=(20, 4), interp=100):
+    assert np.shape(xx) == (np.shape(gwb)[0],)
+
+    if len(smooth) != 2:
+        err = f"{smooth=} must be a (2,) of float specifying the filter-window size and polynomial-order!!"
+        raise ValueError(err)
+
+    xnew = kale.utils.spacing(xx, 'log', num=int(interp))
+    rv = [utils.interp(xnew, xx, vv) for vv in gwb.T]
+    rv = sp.signal.savgol_filter(rv, *smooth, axis=-1)
+
+    med, *conf = rv
+
+    # Reshape confidence intervals to nice plotting shape
+    # 2*P, X ==> (P, 2, X)
+    npercs = np.shape(conf)[0] // 2
+    conf = np.array(conf).reshape(npercs, 2, xnew.size)
+    return xnew, med, conf
+
+
+def get_med_conf(vals, fracs, weights=None, axis=-1):
+    percs = np.atleast_1d(fracs)
+    assert np.all((0.0 <= percs) & (percs <= 1.0))
+
+    # center the target percentages into pairs around 50%, e.g.  68 ==> [16,84]
+    inter_percs = [[0.5-pp/2, 0.5+pp/2] for pp in percs]
+    # Add the median value (50%)
+    inter_percs = [0.5, ] + np.concatenate(inter_percs).tolist()
+    # Get percentiles; they go along the last axis
+    rv = kale.utils.quantiles(vals, percs=inter_percs, weights=weights, axis=axis)
+    return rv
+
+
+def draw_smooth_med_conf(ax, xx, vals, smooth=(10, 4), interp=100, fracs=[0.50, 0.90], weights=None, plot={}, fill={}):
+    plot.setdefault('alpha', 0.5)
+    fill.setdefault('alpha', 0.2)
+
+    rv = get_med_conf(vals, fracs, weights, axis=-1)
+    xnew, med, conf = smooth_spectra(xx, rv, smooth=smooth, interp=interp)
+
+    # plot median
+    hh, = ax.plot(xnew, med, **plot)
+
+    # plot each confidence interval
+    for lo, hi in conf:
+        gg = ax.fill_between(xnew, lo, hi, color=hh.get_color(), **fill)
 
     return (hh, gg)
 
