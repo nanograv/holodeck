@@ -3,12 +3,15 @@ import sys
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 
-import holodeck as holo
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.signal as ssig
-from holodeck.constants import GYR, MSOL, PC, YR
 
+import kalepy as kale
+
+import holodeck as holo
+from holodeck import utils, plot
+from holodeck.constants import GYR, MSOL, PC, YR
 from holodeck.gps import gp_utils as gu
 
 FLOOR_STRAIN_SQUARED = 1e-40
@@ -355,7 +358,7 @@ def plot_parameter_variances(
     plt.ylabel(r"$h_{c} (f)$")
     plt.yscale("log")
     plt.xscale("log")
-    #plt.ylim(1e-16, 1e-13)
+    # plt.ylim(1e-16, 1e-13)
     plt.xlim(gp_freqs.min(), gp_freqs.max())
     plt.legend(loc=1)
     fname = plot_dir / "params_varied.png"
@@ -422,7 +425,6 @@ def plot_over_realizations(ind,
     # Convert to Hz
     freqs /= YR
 
-
     gwb_spectra = spectra['gwb']
 
     # Need to drop NaNs
@@ -478,3 +480,104 @@ def plot_over_realizations(ind,
         print(f"{pars[i]} = {env_param[i]:.2E}")
 
     return env_param
+
+
+def draw_spectra_strains_vs_gp_strains_at_freq_2d_grid(
+    axes, gwb, sample_params, gp_george, gp_trained, use_samples=True, grid_size=20, nsamples=200
+):
+    if np.shape(sample_params)[-1] != 2:
+        err = f"This is a 2D plot over 2 parameters only!  {np.shape(sample_params)=} should be (S, 2)"
+        raise ValueError(err)
+
+    if np.ndim(sample_params) != 2 or np.ndim(gwb) != 2:
+        err = f"{sample_params.shape=} should be (S, 2) and {gwb.shape=} should be (S, R) || S=samples R=realizations!"
+        raise ValueError(err)
+
+    if np.shape(sample_params)[0] != np.shape(gwb)[0]:
+        err = f"{sample_params.shape=} has a different number of samples than {gwb.shape=}!!"
+        raise ValueError(err)
+
+    # get extrema of gwb, stretch those extrema by a fraction of the total span
+    extr = kale.utils.minmax(gwb, log_stretch=0.2)
+    # get a scalarmappable object which contains a colormap and a normalization
+    smap = plot.smap(extr, log=True, cmap='viridis')
+    # get GWB median value
+    gwb_med = np.median(gwb, axis=-1)
+
+    # Find the edges of the given 2D parameter space
+    edges = [kale.utils.spacing(ee, scale='lin', num=grid_size, stretch=0.1) for ee in sample_params.T]
+    # Construct a grid from the given 2D parameter space
+    grid = np.asarray(np.meshgrid(*edges, indexing='ij'))
+    # (2, grid_size, grid_size)  ==>  (2, grid_size*grid_size)
+    grid = grid.reshape(2, -1)
+
+    # Calculate predictions based on median and stdev of a number of samples
+    if use_samples:
+        # sample from the distribution
+        hc_pred = gp_trained.sample_conditional(gp_george.y, grid.T, size=nsamples)
+        # convert from GP-space to strain space
+        hc_pred = gp_george.mean_spectra + hc_pred
+        hc_pred = np.sqrt(10.0 ** hc_pred)
+        stdev_pred = np.std(hc_pred, axis=0)
+        hc_pred = np.median(hc_pred, axis=0)
+    else:
+        # get direct, median prediction from GP and predicted stdev
+        hc_pred, cov_pred = gp_trained.predict(gp_george.y, grid.T)
+        hc_pred = gp_george.mean_spectra + hc_pred
+        hc_pred = np.sqrt(10.0 ** hc_pred)
+        # FIXME: this needs a conversion to strain space!
+        stdev_pred = np.sqrt(np.diag(cov_pred))
+
+    # If only one axis is given, plot only strain
+    if np.size(axes) == 1:
+        ax = axes
+        plot_stdev = False
+    # If two axes are given, plot both strain and strain-stdev
+    elif np.size(axes) == 2:
+        ax = axes[0]
+        plot_stdev = True
+    else:
+        raise ValueError(f"unexpected size of {axes=}!!  {np.size(axes)=}")
+
+    # reshape predicted strain to grid
+    shape = (2, ) + tuple([len(ee) for ee in edges])
+    # (2, grid_size*grid_size)  ==>  (2, grid_size, grid_size)
+    grid = grid.reshape(shape)
+    hc_pred = hc_pred.reshape(shape[1:])
+    # plot 2D histogram of predicted strains on the grid
+    ax.pcolormesh(*grid, hc_pred, cmap=smap.cmap, norm=smap.norm, alpha=0.5)
+
+    # scatter plot the library input spectra
+    colors = smap.to_rgba(gwb_med)
+    ax.scatter(*sample_params.T, c=colors, alpha=0.5)
+
+    # add colorbar below
+    plt.colorbar(smap, ax=ax, orientation='horizontal')
+
+    # print(f"{utils.stats(gwb_med)=}")
+    # print(f"{utils.stats(hc_pred)=}")
+
+    # plot stdevs on second axes
+    if plot_stdev:
+        ax = axes[1]
+        # get the library spectra stdev
+        gwb_stdev = np.std(gwb, axis=-1)
+        # get the extra values, with some added padding/stretch
+        extr = kale.utils.minmax(gwb_stdev, log_stretch=0.2)
+        # construct a new scalarmappable with colormap and normalization
+        smap = plot.smap(extr, log=True, cmap='viridis')
+        # plot scatter points for library stdev
+        colors = smap.to_rgba(gwb_stdev)
+        ax.scatter(*sample_params.T, c=colors, alpha=0.5)
+
+        # reshape predicted stdevs to grid
+        stdev_pred = stdev_pred.reshape(shape[1:])
+        # plot predicted stdevs as 2D hist on grid
+        ax.pcolormesh(*grid, stdev_pred, cmap=smap.cmap, norm=smap.norm, alpha=0.5)
+        # add colorbar below
+        plt.colorbar(smap, ax=ax, orientation='horizontal')
+
+        # print(f"{utils.stats(gwb_stdev)=}")
+        # print(f"{utils.stats(stdev_pred)=}")
+
+    return
