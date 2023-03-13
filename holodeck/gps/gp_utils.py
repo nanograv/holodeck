@@ -52,13 +52,17 @@ class GaussProc(object):
 
     """
 
-    def __init__(self,
-                 x,
-                 y,
-                 yerr=None,
-                 par_dict=None,
-                 kernel="ExpSquaredKernel",
-                 kernel_opts={}):
+    def __init__(
+        self,
+        x,
+        y,
+        yerr=None,
+        par_dict=None,
+        kernel="ExpSquaredKernel",
+        solver=george.BasicSolver,
+        # solver=george.HODLRSolver,
+        kernel_opts={}
+    ):
 
         self.x = x
         self.y = y
@@ -79,30 +83,35 @@ class GaussProc(object):
             raise
 
         self.kernel_opts = kernel_opts
+        self.solver = solver
 
-        if False:
-            # print(f"{self.par_dict=}")
-            amp = np.var([y + yerr, y - yerr])
-            # ymax = np.max(y+yerr)
-            # ymin = np.min(y-yerr)
-            # print(f"{amp=}, {ymax=}, {ymin=}, diff={ymax-ymin}")
-            spans = [[amp*1e-3, amp*1e2], ]
-            for kk, vv in par_dict.items():
-                vv = list(vv.values())
-                # print(f"\t{kk}: {vv}")
-                dd = np.diff(vv)[0]
-                # print(f"\t\t{dd}", end="\t")
-                dd = [dd*1e-3, dd*1e3]
-                # print(f"{dd}")
-                spans.append(dd)
 
-            # print(np.shape(spans), len(self.par_dict))
-            # self.pmin, self.pmax = np.array(spans).T
-            self.pmin, self.pmax = np.log(spans).T
-        else:
-            # The number of GP parameters is one more than the number of spectra parameters.
-            self.pmax = np.full(len(self.par_dict) + 1, 20.0)  # sampling ranges
-            self.pmin = np.full(len(self.par_dict) + 1, -20.0)  # sampling ranges
+
+        amp = np.var([y + yerr, y - yerr])
+        ymax = np.max(y+yerr)
+        ymin = np.min(y-yerr)
+        # print(f"{amp=}, {ymax=}, {ymin=}, diff={ymax-ymin}")
+        spans = [[amp*1e-1, amp*1e1], ]
+        for kk, vv in par_dict.items():
+            vv = list(vv.values())
+            # print(f"\t{kk}: {vv}")
+            dd = np.diff(vv)[0]
+            # print(f"\t\t{dd}", end="\t")
+            dd = [dd*1e-1, dd*1e1]
+            # print(f"\t\t{dd}", end="\t")
+            dd = np.square(dd)
+            # print(f"{dd}")
+            spans.append(dd)
+
+        # print(spans)
+        # print(np.log(spans))
+        self.pmin, self.pmax = np.log(spans).T
+
+
+
+        # The number of GP parameters is one more than the number of spectra parameters.
+        self.pmax = np.full(len(self.par_dict) + 1, 20.0)  # sampling ranges
+        self.pmin = np.full(len(self.par_dict) + 1, -20.0)  # sampling ranges
 
         print(f"{self.pmax=}")
         print(f"{self.pmin=}")
@@ -131,7 +140,8 @@ class GaussProc(object):
 
         try:
             kernel = self.kernel_class(**self.kernel_opts, metric=tau, ndim=len(tau))
-            gp = george.GP(a * kernel)  # , solver=george.HODLRSolver)
+            # gp = george.GP(a * kernel, solver=george.HODLRSolver)
+            gp = george.GP(a * kernel, solver=self.solver)
             gp.compute(self.x, self.yerr)
 
             # lnlike = gp.lnlikelihood(self.y, quiet=True)
@@ -207,8 +217,10 @@ def train_gp(spectra_file,
     if VERBOSE:
         print(f"Creating kernels", flush=True)
 
-    gp_george, num_kpars = create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs,
-                                             kernel, kernel_opts)
+    gp_george, num_kpars = create_gp_kernels(
+        gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts,
+        store_kwargs=dict(test_frac=test_frac, yobs_mean=yobs_mean)
+    )
 
     # Sample the posterior distribution of the kernel parameters
     # to find MAP value for each frequency.
@@ -216,7 +228,7 @@ def train_gp(spectra_file,
     if VERBOSE:
         print(f"Fitting GPs", flush=True)
 
-    fit_kernel_params(gp_freqs, yobs_mean, gp_george, num_kpars, nwalkers,
+    fit_kernel_params(gp_freqs, gp_george, num_kpars, nwalkers,
                       nsamples, burn_frac, mpi)
 
     return gp_george
@@ -335,7 +347,7 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     return gp_freqs, xobs, yerr, yobs, yobs_mean
 
 
-def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts):
+def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, solver, kernel_opts, store_kwargs={}):
     """Instantiate GP kernel for each frequency.
 
     Parameters
@@ -367,7 +379,7 @@ def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts):
     """
     # Instantiate a list of GP kernels and models [one for each frequency]
     gp_george = []
-    k = []
+
     # Create the parameter dictionary for the gp objects
     par_dict = dict()
     for ind, par in enumerate(pars):
@@ -377,19 +389,23 @@ def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts):
         }
 
     for freq_ind in range(len(gp_freqs)):
-        gp = GaussProc(xobs, yobs[:, freq_ind], yerr[:, freq_ind], par_dict,
-                       kernel, kernel_opts)
+        gp = GaussProc(xobs, yobs[:, freq_ind], yerr=yerr[:, freq_ind], par_dict=par_dict,
+                       kernel=kernel, solver=solver, kernel_opts=kernel_opts)
+        for kk, vv in store_kwargs.items():
+            setattr(gp, kk, vv)
+
         gp_george.append(gp)
 
-        k.append(1.0 * getattr(kernels, gp_george[freq_ind].kernel)(
-            np.full(len(pars), 2.0), ndim=len(pars)))
-
-        num_kpars = len(k[freq_ind])
+    # create a dummy kernel, just to get the number of parameters
+    kernel = getattr(kernels, gp_george[-1].kernel)
+    # NOTE: this needs to be multiplied by a prefactor to get the correct number of parameters!
+    kernel = 1.0 * kernel(np.full(len(pars), 2.0), ndim=len(pars))
+    num_kpars = len(kernel)
 
     return gp_george, num_kpars
 
 
-def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
+def fit_kernel_params(gp_freqs, gp_george, nkpars, nwalkers,
                       nsamples, burn_frac, mpi, sample_kwargs={}):
     """Fit the parameters of the GP kernels.
 
@@ -417,11 +433,10 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
 
     """
     ndim = nkpars
+    nproc = min(nwalkers // 2, cpu_count())
+    pool = schwimmbad.choose_pool(mpi=mpi, processes=nproc)
     if VERBOSE:
-        print(f"{mpi=} {cpu_count()=}", flush=True)
-    pool = schwimmbad.choose_pool(
-        mpi=mpi, processes=min(nwalkers // 2, cpu_count()))
-    if VERBOSE:
+        print(f"{mpi=} {cpu_count()=} {nproc=}", flush=True)
         print(f"{pool=}", flush=True)
 
     # Schwimmbad docs are not clear if this needs to be here if we are passing the pool to
@@ -430,66 +445,87 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
         pool.wait()
         sys.exit(0)
 
-    sampler = [0.0] * len(gp_freqs)
     for freq_ind in range(len(gp_freqs)):
         # Paralellize emcee with nwalkers //2 or the maximum number of processors available, whichever is smaller
         # with Pool(min(nwalkers // 2, cpu_count())) as pool:
         t_start = time.time()
         gpg = gp_george[freq_ind]
+        num_samples_burn = int(burn_frac * nsamples)
+        gpg._burn_frac = burn_frac
+        gpg._num_samples_burn = num_samples_burn
+        gpg._num_samples_total = nsamples
 
         # Set up the sampler.
-        sampler[freq_ind] = emcee.EnsembleSampler(nwalkers, ndim, gpg.lnprob, pool=pool)
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, gpg.lnprob, pool=pool)
 
-        # Initialize the walkers.
-        if True:
-            p0 = 1.0e-4 * np.random.randn(nwalkers, ndim)
-        else:
-            p0 = np.random.uniform(gpg.pmin, gpg.pmax, size=(nwalkers, ndim))
+        # Initialize the walkers
+        p0 = np.random.uniform(gpg.pmin, gpg.pmax, size=(nwalkers, ndim))
 
+        # ---- Run First burn-in
         print(freq_ind, "Running burn-in", flush=True)
         beg = time.time()
-        p0, lnp, _ = sampler[freq_ind].run_mcmc(p0, int(burn_frac * nsamples), **sample_kwargs)
-        sampler[freq_ind].reset()
+        p0, lnp, _ = sampler.run_mcmc(p0, num_samples_burn, **sample_kwargs)
+        burn_chain_0 = np.copy(sampler.chain)
+        burn_lnprob_0 = np.copy(sampler.lnprobability)
         print(f"\tdone after {(time.time() - beg) / 60.0:.2f} min\n")
 
+        # ---- Run Second burn-in
         print(freq_ind, "Running second burn-in", flush=True)
         beg = time.time()
-        # p = p0[np.argmax(lnp)]
-        # p0 = [p + 1e-8 * np.random.randn(ndim) for _ in range(nwalkers)]
-        p0 = p0[np.argmax(lnp)] + 1.0e-8 * np.random.randn(nwalkers, ndim)
-        p0, _, _ = sampler[freq_ind].run_mcmc(p0, int(burn_frac * nsamples))
-        sampler[freq_ind].reset()
+
+        # `lnp` is (walkers,)
+        map_idx = np.argmax(lnp)
+
+        # Get a measure of the variance from the second-half of the previous burn-in
+        num_select = num_samples_burn // 2
+        chain = sampler.chain[:, num_select:, :]
+        # get the variance along each chain/dimension
+        var = np.var(chain, axis=1)
+        # for each dimension, get the median of the variances across the chains,
+        var = np.median(var, axis=0)
+
+        # perturb = 1.0e-8
+        # perturb = 1e-2 * var[np.newaxis, :]
+        perturb = var[np.newaxis, :]
+        p0 = p0[map_idx] + perturb * np.random.randn(nwalkers, ndim)
+        sampler.reset()
+        p0, _, _ = sampler.run_mcmc(p0, num_samples_burn)
+        burn_chain_1 = np.copy(sampler.chain)
+        burn_lnprob_1 = np.copy(sampler.lnprobability)
         print(f"\tdone after {(time.time() - beg) / 60.0:.2f} min\n")
 
+        # ---- Run production sampling
         print(freq_ind, "Running production", flush=True)
+        sampler.reset()
         beg = time.time()
-        p0, _, _ = sampler[freq_ind].run_mcmc(p0, int(nsamples))
+        p0, _, _ = sampler.run_mcmc(p0, int(nsamples))
         print(f"\tdone after {(time.time() - beg) / 60.0:.2f} min\n", flush=True)
 
-        print(
-            f"Completed {freq_ind} out of {len(gp_freqs)-1} in {(time.time() - t_start) / 60.0:.2f} min\n",
-            flush=True
-        )
+        # Populate the GP class with the details of the kernel
+        gpg.emcee_burn_chain_0 = burn_chain_0
+        gpg.emcee_burn_chain_1 = burn_chain_1
+        gpg.emcee_burn_lnprob_0 = burn_lnprob_0
+        gpg.emcee_burn_lnprob_1 = burn_lnprob_1
+        gpg.emcee_chain = sampler.chain
+        gpg.emcee_lnprob = sampler.lnprobability
+        gpg.emcee_flatchain = sampler.flatchain
+        gpg.emcee_flatlnprob = sampler.flatlnprobability
+
+        # MAP values for each frequency.
+        kmap = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
+        gpg.emcee_kernel_map = kmap
+
+        dur = (time.time() - t_start) / 60.0
+        msg = f"Completed {freq_ind} out of {len(gp_freqs)-1} in {dur:.2f} min\n"
+        print(msg, flush=True)
 
     # Close the pool
     pool.close()
 
     if VERBOSE:
-        print("pool closed; storing kernel information to GP class")
+        print("done; pool closed.")
 
-    # Populate the GP class with the details of the kernel
-    # MAP values for each frequency.
-    for ii in range(len(gp_freqs)):
-        gp_george[ii].emcee_chain = sampler[ii].chain
-        gp_george[ii].emcee_lnprob = sampler[ii].lnprobability
-        gp_george[ii].emcee_flatchain = sampler[ii].flatchain
-        gp_george[ii].emcee_flatlnprob = sampler[ii].flatlnprobability
-
-        kmap = sampler[ii].flatchain[np.argmax(sampler[ii].flatlnprobability)]
-        gp_george[ii].emcee_kernel_map = kmap
-
-        # add-in mean yobs (freq) values
-        gp_george[ii].mean_spectra = yobs_mean[ii]
+    return
 
 
 def set_up_predictions(gp_george):
@@ -525,15 +561,16 @@ def set_up_predictions(gp_george):
         kernel_map_attr = "emcee_kernel_map"
 
     for ii in range(num_freqs):
-        gp_kparams = np.exp(getattr(gp_george[ii], kernel_map_attr))
+        gpg = gp_george[ii]
+        gp_kparams = np.exp(getattr(gpg, kernel_map_attr))
 
         # Try to use the kernel attribute. If it doesn't exist, default to ExpSquaredKernel
-        kernel = getattr(gp_george[ii], "kernel", "ExpSquaredKernel")
+        kernel = getattr(gpg, "kernel", "ExpSquaredKernel")
         kernel = getattr(kernels, kernel)
         kernel = kernel(gp_kparams[1:], ndim=len(gp_kparams[1:]))
-        gp_list.append(george.GP(gp_kparams[0] * kernel, solver=george.HODLRSolver))
+        gp_list.append(george.GP(gp_kparams[0] * kernel, solver=gpg.solver))
 
-        gp_list[ii].compute(gp_george[ii].x, gp_george[ii].yerr)
+        gp_list[ii].compute(gpg.x, gpg.yerr)
 
     return gp_list
 
