@@ -890,8 +890,9 @@ def ss_poisson_hc(number, h2fdf, nreals, normal_threshold=1e10):
     hc_bg = np.zeros((shape[3], nreals)) # shape (F,R)
     ssidx = np.zeros((3, shape[3], nreals), dtype=int) # shape (F,R)
     _ss_poisson_hc(shape, number, h2fdf, nreals, long(normal_threshold),
-                    &hc_ss, &hc_bg, &ssidx)
+        &hc_ss, &hc_bg, &ssidx)
     return hc_ss, hc_bg, ssidx
+    
   
 
 # why is the shape a long? that doesn't seem like it'd need to be
@@ -899,9 +900,12 @@ def ss_poisson_hc(number, h2fdf, nreals, normal_threshold=1e10):
 @cython.wraparound(True)
 @cython.nonecheck(True)
 @cython.cdivision(True)
-cdef double[:,:] _ss_poisson_hc(long[:] shape, double[:,:,:,:] number, double[:,:,:,:] h2fdf,
-    int nreals, long thresh, *np.ndarray[np.double_t, ndim=2] hc_ss, 
-    *np.ndarray[np.double_t, ndim=2], *np.ndarray[np.int, ndim=3]):
+# _ss_poisson_hc(long[:] shape, double[:,:,:,:] number, double[:,:,:,:] h2fdf,
+#     int nreals, long thresh, *np.ndarray[np.double_t, ndim=2] hc_ss, 
+#     *np.ndarray[np.double_t, ndim=2], *np.ndarray[np.int, ndim=3]): # using pointers
+cdef void _ss_poisson_hc(long[:] shape, double[:,:,:,:] number, double[:,:,:,:] h2fdf,
+    int nreals, long thresh, np.ndarray[np.double_t, ndim=2] *hc_ss, 
+    np.ndarray[np.double_t, ndim=2] *hc_bg, np.ndarray[np.int, ndim=3] *ssidx):
 
     cdef int M = shape[0]
     cdef int Q = shape[1]
@@ -923,6 +927,9 @@ cdef double[:,:] _ss_poisson_hc(long[:] shape, double[:,:,:,:] number, double[:,
     #   np.ndarray[np.double_t, ndim=2] hc_ss = np.zeros((F, R))
     #   np.ndarray[np.double_t, ndim=2] hc_bg = np.zeros((F, R))
     #   np.ndarray[np.double_t, ndim=3] ssidx = np.zeros((3, F, R))
+    # defining first time here:
+
+
 
     # h2fdf = hs^2 * f/df
     # hc_ss = sqrt(max hsfdf)
@@ -952,9 +959,11 @@ cdef double[:,:] _ss_poisson_hc(long[:] shape, double[:,:,:,:] number, double[:,
             if (max==0): 
                 print('No sources found at %dth frequency' % ff)
             sum -= max # subtract single source from the gwb
-            hc_bg[ff,rr] = sqrt(sum)
-            hc_ss[ff,ff] = sqrt(max)
-            ssidx[:,ff,rr] = m_max, q_max, z_max
+            hc_bg[ff][rr] = sqrt(sum)
+            hc_ss[ff][ff] = sqrt(max)
+            ssidx[:, ff, rr] = m_max, q_max, z_max
+
+    return 
     
 
 
