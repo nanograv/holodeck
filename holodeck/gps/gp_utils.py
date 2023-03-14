@@ -1,4 +1,5 @@
 """Utilities for Gaussian Processes."""
+import sys
 import time
 import warnings
 from multiprocessing import Pool, cpu_count
@@ -106,7 +107,8 @@ class GaussProc(object):
         a, tau = np.exp(p[0]), np.exp(p[1:])
 
         try:
-            gp = george.GP(a * self.kernel_class(**self.kernel_opts, metric=tau, ndim=len(tau)))
+            gp = george.GP(a * self.kernel_class(**self.kernel_opts, metric=tau,
+                                                 ndim=len(tau)), solver=george.HODLRSolver)
             gp.compute(self.x, self.yerr)
 
             # lnlike = gp.lnlikelihood(self.y, quiet=True)
@@ -434,6 +436,12 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
     pool = schwimmbad.choose_pool(
         mpi=mpi)  #, processes=min(nwalkers // 2, cpu_count()) )
 
+    # Schwimmbad docs are not clear if this needs to be here if we are passing the pool to
+    # EnsembleSampler, but I've added it just in case.
+    if mpi and not pool.is_master():
+        pool.wait()
+        sys.exit(0)
+
     for freq_ind in range(len(gp_freqs)):
         # Paralellize emcee with nwalkers //2 or the maximum number of processors available, whichever is smaller
         # with Pool(min(nwalkers // 2, cpu_count())) as pool:
@@ -525,7 +533,7 @@ def set_up_predictions(spectra, gp_george):
         gp_list.append(
             george.GP(gp_kparams[0] * getattr(
                 kernels, getattr(gp_george[ii], "kernel", "ExpSquaredKernel"))(
-                    gp_kparams[1:], ndim=len(gp_kparams[1:]))))
+                    gp_kparams[1:], ndim=len(gp_kparams[1:])), solver=george.HODLRSolver))
 
         gp_list[ii].compute(gp_george[ii].x, gp_george[ii].yerr)
 
