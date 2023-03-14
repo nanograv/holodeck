@@ -1054,25 +1054,107 @@ cdef _test_long_array(long[:] arr):
     for i in range(len(arr)):
         arr[i]=int(2)
 
-def ss_bg_hc(number, nreals):
-    shape = number.shape
+def ss_bg_hc(number, h2fdf, nreals, normal_threshold=1e10):
+    """
+    Calculates the characteristic strain from loud single sources and a background of all other sources.
+
+    Parameters
+    __________
+    number : [M, Q, Z, F] ndarray
+        number in each bin
+    h2fdf : [M, Q, Z, F] ndarray
+        strain squared x frequency / frequency bin width for each bin
+    nreals
+        number of realizations
+    """
+    cdef long[:] shape = np.array(number.shape)
     F = shape[3]
     R = nreals
     cdef np.ndarray[np.double_t, ndim=2] hc_ss = np.zeros((F,R))
     cdef np.ndarray[np.double_t, ndim=2] hc_bg = np.zeros((F,R))
     cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
-    _ss_bg_hc(shape, nreals, hc_ss, hc_bg, ssidx)
-    print(hc_ss, hc_bg, ssidx)
+    _ss_bg_hc(shape, h2fdf, number, nreals, normal_threshold, 
+                hc_ss, hc_bg, ssidx)
+    # print(hc_ss, hc_bg, ssidx)
     return hc_ss, hc_bg, ssidx
     
+@cython.boundscheck(True)
+@cython.wraparound(True)
+@cython.nonecheck(True)
+@cython.cdivision(True)
+cdef void _ss_bg_hc(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number,
+            long nreals, long thresh,
+            double[:,:] hc_ss, double[:,:] hc_bg, long[:,:,:] ssidx):
+    """
+    Calculates the characteristic strain from loud single sources and a background of all other sources.
 
-cdef void _ss_bg_hc(long[:] shape, long nreals, double[:,:] hc_ss, double[:,:] hc_bg, 
-            long[:,:,:] ssidx):
+    Parameters
+    __________
+    shape
+    number
+    h2fdf
+        strain amplitude squared * f/Delta f for a single source in each bin.
+    nreals : int
+        number of realizations.
+    hc_ss
+        memory address of single source strain array.
+    hc_bg
+        memory address of background strain array.
+    ssidx
+        memory address of array for indices of max strain bins.
+
+    Returns
+    _________
+    void
+    updated via memory address: hc_ss, hc_bg, ssidx
+    """
+    
+    cdef int M = shape[0]
+    cdef int Q = shape[1]
+    cdef int Z = shape[2]
     cdef int F = shape[3]
     cdef int R = nreals
-    for ii in range(F):
-        for jj in range(R):
-            hc_ss[ii,jj] = 1.5
-            hc_bg[ii,jj] = 2.0
-            ssidx[0,ii,jj] = 3
+
+    cdef int mm, qq, zz, ff, rr, m_max, q_max, z_max
+    cdef double max, num, sum
+
+
+    # Setup random number generator from numpy library
+    cdef bitgen_t *rng
+    cdef const char *capsule_name = "BitGenerator"
+    capsule = PCG64().capsule
+    # Cast the pointer
+    rng = <bitgen_t *> PyCapsule_GetPointer(capsule, capsule_name)
+
+    for rr in range(R):
+        for ff in range(F):
+            max=0
+            sum=0
+            for mm in range(M):
+                for qq in range(Q):
+                    for zz in range(Z):
+                        num = number[mm,qq,zz,ff]
+                        cur = h2fdf[mm,qq,zz,ff]
+                        if (num>thresh):
+                            std = sqrt(num)
+                            num = <double>random_normal(rng, num, std)  
+                        else:
+                            num = <double>random_poisson(rng, num)
+                        if(cur > max and num > 0):
+                            max = h2fdf[mm,qq,zz,ff]
+                            m_max = mm
+                            q_max = qq
+                            z_max = zz
+                        sum += num * cur
+            hc_ss[ff,rr] = max
+            hc_bg[ff,rr] = sum - max
+            # ssidx[:,ff,rr] = m_max, q_max, z_max
+            ssidx[0,ff,rr] = m_max
+            ssidx[1,ff,rr] = q_max
+            ssidx[2,ff,rr] = z_max
+            if (max==0): 
+                print('No sources found at %dth frequency' % ff) # could warn
+    # still need to sqrt and sum! (or do this back in python)
+    
     return
+
