@@ -218,7 +218,8 @@ def train_gp(spectra_file,
         print(f"Creating kernels", flush=True)
 
     gp_george, num_kpars = create_gp_kernels(
-        gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts,
+        gp_freqs, pars, xobs, yerr, yobs, yobs_mean, test_frac,
+        kernel, kernel_opts,
         store_kwargs=dict(test_frac=test_frac, yobs_mean=yobs_mean)
     )
 
@@ -228,7 +229,7 @@ def train_gp(spectra_file,
     if VERBOSE:
         print(f"Fitting GPs", flush=True)
 
-    fit_kernel_params(gp_freqs, gp_george, num_kpars, nwalkers,
+    fit_kernel_params(gp_freqs, yobs_mean, gp_george, num_kpars, nwalkers,
                       nsamples, burn_frac, mpi)
 
     return gp_george
@@ -347,7 +348,7 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     return gp_freqs, xobs, yerr, yobs, yobs_mean
 
 
-def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, solver, kernel_opts, store_kwargs={}):
+def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, yobs_mean, test_frac, kernel, solver, kernel_opts):
     """Instantiate GP kernel for each frequency.
 
     Parameters
@@ -391,9 +392,8 @@ def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, solver, kernel_o
     for freq_ind in range(len(gp_freqs)):
         gp = GaussProc(xobs, yobs[:, freq_ind], yerr=yerr[:, freq_ind], par_dict=par_dict,
                        kernel=kernel, solver=solver, kernel_opts=kernel_opts)
-        for kk, vv in store_kwargs.items():
-            setattr(gp, kk, vv)
-
+        gp.mean_spectra = yobs_mean
+        gp.test_frac = test_frac
         gp_george.append(gp)
 
     # create a dummy kernel, just to get the number of parameters
@@ -405,7 +405,7 @@ def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, solver, kernel_o
     return gp_george, num_kpars
 
 
-def fit_kernel_params(gp_freqs, gp_george, nkpars, nwalkers,
+def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
                       nsamples, burn_frac, mpi, sample_kwargs={}):
     """Fit the parameters of the GP kernels.
 
@@ -510,6 +510,7 @@ def fit_kernel_params(gp_freqs, gp_george, nkpars, nwalkers,
         gpg.emcee_lnprob = sampler.lnprobability
         gpg.emcee_flatchain = sampler.flatchain
         gpg.emcee_flatlnprob = sampler.flatlnprobability
+        gpg.mean_spectra = yobs_mean[freq_ind]
 
         # MAP values for each frequency.
         kmap = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
