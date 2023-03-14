@@ -1,12 +1,8 @@
 name: Build and publish Python distributions to PyPI
-on:
-  push:
-    # !! TEMPORARILY DISABLE THIS WORKFLOW / ACTION !!
-    branches-ignore:
-      - '**'
-    # branches:
-    #   - "main"
-    # !! ------------------------------------------ !!
+# on:
+#   push:
+#     branches:
+#       - "main"
 
 jobs:
   build-publish:
