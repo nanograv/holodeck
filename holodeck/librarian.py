@@ -146,13 +146,21 @@ class PD_Uniform_Log(_Param_Dist):
 
 class PD_Normal(_Param_Dist):
 
-    def __init__(self, mean, stdev, **kwargs):
+    def __init__(self, mean, stdev, clip=None, **kwargs):
         super().__init__(**kwargs)
         assert stdev > 0.0
         self._mean = mean
         self._stdev = stdev
+        self._clip = clip
         self._dist = sp.stats.norm(loc=mean, scale=stdev)
-        self._dist_func = lambda xx: self._dist.ppf(xx)
+        if clip is not None:
+            if len(clip) != 2:
+                err = f"{clip=} | `clip` must be (2,) values of lo and hi bounds at which to clip!"
+                log.exception(err)
+                raise ValueError(err)
+            self._dist_func = lambda xx: np.clip(self._dist.ppf(xx), *clip)
+        else:
+            self._dist_func = lambda xx: self._dist.ppf(xx)
         return
 
 
