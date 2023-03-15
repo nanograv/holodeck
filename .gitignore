@@ -122,3 +122,5 @@ minos_run_gen_lib_sams.sh
 cyutils.c
 cyutils.html
 cyutils_api.h
+*.out
+*.err
