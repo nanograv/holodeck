@@ -2,15 +2,21 @@ name: build-status
 
 on:
   push:
-    branches:
-      - "main"
-      # - "dev"
-      # - "docs"
+    # !! TEMPORARILY DISABLE THIS WORKFLOW / ACTION !!
+    branches-ignore:
+      - '**'
+    # branches:
+    #   - "main"
+    #   # - "dev"
+    #   # - "docs"
   pull_request:
-    branches:
-      - "main"
-      # - "dev"
-      # - "docs"
+    # !! TEMPORARILY DISABLE THIS WORKFLOW / ACTION !!
+    branches-ignore:
+      - '**'
+    # branches:
+    #   - "main"
+    #   # - "dev"
+    #   # - "docs"
 
 jobs:
   test:
