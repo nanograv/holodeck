@@ -8,14 +8,14 @@ from importlib import reload
 import logging
 import warnings
 import numpy as np
-import astropy as ap
+# import astropy as ap
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
 
-import kalepy as kale
-import kalepy.plot
+import kalepy as kale # noqa
+# import kalepy.plot
 
 import holodeck as holo
 from holodeck import cosmo, utils, plot
@@ -24,13 +24,6 @@ from holodeck.constants import MSOL, PC, YR, MPC, GYR
 # Silence annoying numpy errors
 np.seterr(divide='ignore', invalid='ignore', over='ignore')
 warnings.filterwarnings("ignore", category=UserWarning)
-
-# Plotting settings
-mpl.rc('font', **{'family': 'serif', 'sans-serif': ['Times'], 'size': 15})
-mpl.rc('lines', solid_capstyle='round')
-mpl.rc('mathtext', fontset='cm')
-mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
-plt.rcParams.update({'grid.alpha': 0.5})
 
 log = holo.log
 log.setLevel(logging.INFO)
@@ -150,14 +143,14 @@ def ss_by_cdefs(edges, number, realize, round = True):
     htemp = np.copy(hsamp) #htemp is s same as hsamp except 0 where bgnum=0
     htemp[(bgnum==0)] = 0
     shape = htemp.shape
-    print('shape', shape)
+    # print('shape', shape)
     newshape = (shape[0]*shape[1]*shape[2], shape[3])
     htemp = htemp.reshape(newshape) # change hsamp to shape (M*Q*Z, F)
     argmax = np.argmax(htemp, axis=0) # max at each frequency
-    print('argmax', argmax)
+    # print('argmax', argmax)
     ssidx = np.array(np.unravel_index(argmax, shape[:-1])) # unravel indices
-    print('ssidx', ssidx)
-    
+    # print('ssidx', ssidx)
+
     # --- Background Characteristic Strain --- in shape (F,) 
     hc_bg = np.sqrt(np.sum(bgnum*h2fdf, axis=(0,1,2)))
     return hc_bg, hc_ss, ssidx, hsamp
@@ -485,7 +478,7 @@ def parameters_from_indices(edges, ssidx):
     m_arr = mt[ssidx[0,...]]
     q_arr = mr[ssidx[1,...]]
     z_arr = rz[ssidx[2,...]]
-    f_arr = fc
+    f_arr = np.reshape(np.repeat(fc, len(ssidx[0,0])), m_arr.shape)
 
     return m_arr, q_arr, z_arr, f_arr
 
@@ -952,8 +945,7 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
         assert (np.all(bgnum >= 0)), 'negative numbers found with round=True'
     else:
         bgnum = np.copy(number)
-        if(ss==True):
-            warnings.warn('Number grid used for single source calculation.')
+        warnings.warn('Number grid used for single source calculation.')
 
     if(realize == True):
         bgnum = np.random.poisson(number)
@@ -1429,67 +1421,61 @@ def example5(print_test = True, exname = 'Example 5'):
 ###################################################
 ################## PLOTTING #######################
 ###################################################
-def add_sampleGWB_to_plot(fig, ax, PLOT_GWB, LABEL, COLOR='b'):
-    nsamp = PLOT_GWB.shape[1]
-    ax.plot(xx, np.median(PLOT_GWB, axis=1), color=COLOR, label=LABEL)
-    # plot contours at 50% and 98% confidence intervals
-    for pp in [50, 98]:
-        percs = pp / 2
-        percs = [50 - percs, 50 + percs]
-        ax.fill_between(xx, *np.percentile(PLOT_GWB, percs, axis=-1), alpha=0.25, color=COLOR)
-    # Plot `nsamp` random spectra 
-    
-    idx = np.random.choice(PLOT_GWB.shape[1], nsamp, replace=False)
-    ax.plot(xx, PLOT_GWB[:, idx], lw=1.0, alpha=0.5, color=COLOR, linestyle = 'dotted')
-
-
-def add_sample_all_to_plot(ax, BG, SS, reals, LABEL, COLOR, rand=False):
+def plot_medians(ax, xx, BG=None, SS=None, LABEL='', 
+                 BG_COLOR='k', BG_ERRORS = False, 
+                 SS_COLOR='k', SS_ERRORS = True):
     """
     Parameters:
+    ax
+    xx
     BG
     SS
     reals
     label
     COLOR
     """
-    if(rand):
-        idx = np.random.choice(BG.shape[1], nsamp, replace=False)
-        ax.plot(xx, BG[:,idx], lw=2.0, alpha=0.4, color=COLOR, linestyle='dotted',
-                    label=('bg (%s)' % LABEL))
-        ax.scatter(xx, SS[:,idx], color=colors[rr], marker='o', s=80,
-                edgecolor='k', alpha=0.4, label=('ss (%s)' % LABEL))
-    else:
-        for rr in range(reals):
-            if rr==reals-1:
-                ax.plot(xx, BG[:,rr], lw=2.0, alpha=0.4, color=COLOR, linestyle='dotted',
-                        label=('bg (%s)' % LABEL))
-                ax.scatter(xx, SS[:,rr], color=COLOR, marker='o', s=80,
-                    edgecolor='k', alpha=0.4, label=('ss (%s)' % LABEL))
-
     # plot median bg of samples
-    ax.plot(xx, np.median(BG, axis=1), color=COLOR, linewidth=3, 
-            linestyle='solid', alpha=0.9,
-            label=('bg median (%s)' % LABEL))
+    if(BG is not None and BG_ERRORS == False):
+        ax.plot(xx, np.median(BG, axis=1), 
+                color=BG_COLOR, label=('bg median' + LABEL),
+                linewidth=3, linestyle='solid', alpha=0.8)
+    elif(BG is not None and BG_ERRORS == True):
+        ax.errorbar(xx, np.median(BG, axis=1), yerr=np.std(BG, axis=1),
+                    color=BG_COLOR, label=('bg median'+LABEL),
+                    fmt='-', linewidth=2, alpha=0.8, capsize=3)
 
     # plot median ss of samples
-    ax.errorbar(xx, np.median(SS, axis=1), color=COLOR,
-        yerr=np.std(SS, axis=1), fmt='*', alpha=1,
-        capsize=3, label=('ss median (%s)' % LABEL))
+    if(SS is not None and SS_ERRORS == False):
+        ax.scatter(xx, np.median(SS, axis=1), 
+                   color=SS_COLOR, label=('ss median'+LABEL),
+                   marker ='*', s = 50, alpha=0.8)
+    elif(SS is not None and SS_ERRORS == True):
+        ax.errorbar(xx, np.median(SS, axis=1), yerr=np.std(SS, axis=1), 
+                    color=SS_COLOR, label=('ss median'+LABEL),
+                    fmt='*', alpha=0.8, markersize=7, capsize=3)
 
 
-def add_sample_BG_to_plot(ax, BG, LABEL, reals, COLOR='b', rand=False):
+def plot_BG(ax, xx, BG, LABEL, reals=0, median=False, COLOR='b', rand=False):
     """
+    Plot the background median, middle 50% and 98% confidence intervals,
+    and optionally several realizations. All plotted in same color.
+
     Parameters
-    __________
-    ax
-    BG
-    LABEL
-    reals
-    COLOR
-    rand
+    ------------
+    ax : pyplot ax object
+    xx : (F,) 1darray of scalars
+    BG : (F,R) Ndarray of scalars
+    LABEL : String
+    reals : int
+        How many bg realizations to plot
+    median : bool
+        Whether or not to plot the bg median (same color)
+    COLOR : String
+    rand : bool
+        Whether to randomize which realizations are plotted (True)
+        or plots the 0th to reals-th realizations.
     """
-    nsamp = BG.shape[1]
-    ax.plot(xx, np.median(BG, axis=1), color=COLOR, label=LABEL)
+    if(median==True): ax.plot(xx, np.median(BG, axis=1), color=COLOR, label=LABEL)
     # plot contours at 50% and 98% confidence intervals
     for pp in [50, 98]:
         percs = pp / 2
@@ -1497,37 +1483,202 @@ def add_sample_BG_to_plot(ax, BG, LABEL, reals, COLOR='b', rand=False):
         ax.fill_between(xx, *np.percentile(BG, percs, axis=-1), alpha=0.25, color=COLOR)
     # Plot `nsamp` random spectra 
     
-    if(rand):
-        idx = np.random.choice(BG.shape[1], reals, replace=False)
-        ax.plot(xx, BG[:, idx], lw=1.0, alpha=0.5, color=COLOR, linestyle = 'dotted')
-    else: 
-        for rr in range(reals):
-            ax.plot(xx, BG[:, rr], lw=1.0, alpha=0.5, color=COLOR, linestyle = 'dotted')
+    if (reals is not None):
+        if(rand):
+            idx = np.random.choice(BG.shape[1], reals, replace=False)
+            ax.plot(xx, BG[:, idx], lw=1.0, alpha=0.5, color=COLOR, linestyle = 'dotted')
+        else: 
+            for rr in range(reals):
+                ax.plot(xx, BG[:, rr], lw=1.0, alpha=0.5, color=COLOR, linestyle = 'dotted')
 
 
 
-def add_sample_SS_to_plot(ax, BG, SS, reals, incl_BG=True):
+def plot_samples(ax, xx, BG=None, SS=None, reals=1, LABEL=''):
     """
+    Plot the background and/or single sources for the first 'reals' 
+    number of realizations, with each color corresponding to a difference 
+    realization.
+
     Parameters
     ----------
-    ax
-    BG
-    SS
-    reals
-    incl_BG
+    ax : pyplot ax object
+    xx : (F,) array of scalars
+    BG : (F,R) ndarray or None
+    SS : (F,R) ndarray or None
+    reals : int
     """
     colors = cm.rainbow(np.linspace(0,1,reals))
     for rr in range(reals):
         if rr==reals-1:
-            if(incl_BG):
+            if(BG is not None):
                 ax.plot(xx, BG[:,rr], lw=2.0, alpha=0.5, color=colors[rr], linestyle='solid',
-                    label='background')
-            ax.scatter(xx, SS[:,rr], color=colors[rr], marker='o', s=80,
-                edgecolor='k', alpha=0.5, label='single source')
+                    label='background'+LABEL)
+            if(SS is not None):
+                ax.scatter(xx, SS[:,rr], color=colors[rr], marker='o', s=80,
+                    edgecolor='k', alpha=0.5, label='single source'+LABEL)
         else:
-            if(incl_BG):
+            if(BG is not None):
                 ax.plot(xx, BG[:,rr], lw=2.0, alpha=0.5, color=colors[rr], linestyle='solid')
-            ax.scatter(xx, SS[:,rr], color=colors[rr], marker='o', s=80,
-                edgecolor='k', alpha=0.5)
+            if(SS is not None):
+                ax.scatter(xx, SS[:,rr], color=colors[rr], marker='o', s=80,
+                    edgecolor='k', alpha=0.5)
+
+def plot_std(ax, xx, BG, SS, COLOR='b', LABEL=''):
+    """ 
+    Plot the standard deviations of the bg and ss characteristic strains.
+
+    Parameters
+    --------
+    ax : pyplot ax object
+    xx : (F,) array of scalars
+    BG : (F, R) Ndarray of scalars
+    SS : (F, R) Ndarray of scalars
+    COLOR : string
+    LABEL : string
+
+    Returns
+    -------
+    std_bg : (F,) array of scalars
+    std_ss : (F,) array of scalars
+    """
+    std_bg = np.std(BG, axis=1)
+    # med_bg = np.median(BG, axis=1)
+    std_ss = np.std(SS, axis=1)
+    # med_ss = np.median(SS, axis=1)
+
+    ax.plot(xx, std_bg, lw=4.0, alpha=0.6, color=COLOR, 
+            label = 'bg stdev'+LABEL, marker='o', ms=10, linestyle = 'solid')
+    ax.plot(xx, std_ss, lw=2.0, alpha=0.6, color=COLOR, markeredgecolor='k',
+            label = 'ss stdev'+LABEL, marker='o', ms=10, linestyle='dotted')
+    return std_bg, std_ss
+    
+def plot_IQR(ax, xx, BG=None, SS=None, COLOR='r', LABEL=''):
+    """ 
+    Plot the IQR of the bg and ss characteristic strains.
+
+    Parameters
+    ----------
+    ax : pyplot ax object
+    xx : (F,) array of scalars
+    BG : (F, R) Ndarray of scalars
+    SS : (F, R) Ndarray of scalars
+    COLOR : string
+    LABEL : string
+
+    Returns
+    -------
+    """
+
+    if (BG is not None):
+        Q75_bg, Q25_bg= np.percentile(BG, [75 ,25], axis=1)
+        IQR_bg = Q75_bg-Q25_bg
+        ax.plot(xx, IQR_bg, lw=4.0, alpha=0.6, color=COLOR, 
+            label = 'bg stdev'+LABEL, marker='P', ms=10, linestyle = 'solid')
+    if(SS is not None):
+        Q75_ss, Q25_ss = np.percentile(SS, [75 ,25], axis=1)
+        IQR_ss = Q75_ss-Q25_ss
+        ax.plot(xx, IQR_ss, lw=2.0, alpha=0.6, color=COLOR, markeredgecolor='k',
+                label = 'ss stdev'+LABEL, marker='P', ms=10, linestyle='dotted')          
+    
+
+
+def plot_percentiles(ax, xx, BG=None, SS=None, LABEL='',
+                     BG_COLOR='b', SS_COLOR='r',
+                     BG_MARKER=None, SS_MARKER=None,
+                     BG_LINESTYLE='solid', SS_LINESTYLE='solid'):
+    """ 
+    Plots 25th and 75th percentiles, and IQR region between 
+    (50% confidence interval).
+
+    Parameters
+    ---------
+    ax : pyplot ax object
+    xx : (F,) 1darray of scalars
+    BG : (F, R) Ndarray of scalars or None
+    SS : (F, R) Ndarray of scalars or None
+    BG_COLOR : string
+    SS_COLOR : string
+    BG_MARKER : string
+    SS_MARKER : string
+    BG_LINESTYLE : string
+    SS_LINESTYLE : string
+    """
+
+    if (BG is not None):
+        Q75_bg, Q25_bg= np.percentile(BG, [75 ,25], axis=1)
+        ax.plot(xx, Q25_bg, label = 'bg'+LABEL,
+                lw=2.0, alpha=.8, color=BG_COLOR, 
+                marker = BG_MARKER, ms=5, linestyle = BG_LINESTYLE)
+        ax.plot(xx, Q75_bg, 
+                lw=2.0, alpha=.8, color=BG_COLOR, 
+                marker = BG_MARKER, ms=5, linestyle = BG_LINESTYLE)
+        ax.fill_between(xx, Q25_bg, Q75_bg, alpha=0.2, color=BG_COLOR)
+      
+    if(SS is not None):
+        Q75_ss, Q25_ss = np.percentile(SS, [75 ,25], axis=1)
+        ax.plot(xx, Q25_ss, label = 'ss'+LABEL, 
+                lw=2.0, alpha=.8, color=SS_COLOR, 
+                marker = SS_MARKER, ms=5, linestyle = SS_LINESTYLE)
+        ax.plot(xx, Q75_ss, 
+                lw=2.0, alpha=.8, color=SS_COLOR, 
+                marker = SS_MARKER, ms=5, linestyle = SS_LINESTYLE)
+        ax.fill_between(xx, Q25_ss, Q75_ss, alpha=0.2, color=SS_COLOR)
+      
+
+def plot_params(axs, xx, params, grid, reals, 
+                titles = np.array([['Total Mass $M/M_\odot$', 'Mass Ratio $q$'], 
+                                   ['Redshift $z$', 'Characteristic Strain $h_c$']]),
+                xlabel = 'Frequency $f_\mathrm{obs}$ (1/yr)',
+                legend = True):             
+    """
+    Plot mass, ratio, redshift, and strain in 4 separate subplots.
+
+    Parameters:
+    -----------
+    axs : (2,2) array of pyplot ax object
+    xx : (F,) 1d array of scalars
+    params : (4,) 1Darray of (F,R,) NDarrays
+    titles : (4,) array of strings
+    xlabel : string
+    legend : bool
+        Whether or not to include a legend in each subplot
+
+    """
+    colors = cm.rainbow(np.linspace(0,1,reals))
+    for ii in range(len(axs)):
+        for jj in range(len(axs)):
+            axs[ii,jj].set_ylabel(titles[ii,jj])
+
+            if(ii==0 or jj==0): # mass, ratio, or redshift
+                # bin edges
+                for kk in range(len(grid[ii,jj])):
+                    if(kk==0): label='edges'
+                    else: label=None 
+                    axs[ii,jj].axhline(grid[ii,jj][kk], color='black', alpha=0.6, lw=0.15, label=label)
+                
+                # single source realizations
+                for rr in range(reals):
+                    axs[ii,jj].scatter(xx, params[ii,jj,:,rr], color=colors[rr],
+                                    marker='o', s=80, alpha=0.5)
+            
+            else: #strain
+                for rr in range(reals):
+                    axs[ii,jj].scatter(xx, params[ii,jj,:,rr], color=colors[rr], 
+                                    marker='o', s=80, alpha=0.5)
+            # axs[ii,jj].errorbar(xx, np.mean(params[ii,jj], axis=1), 
+            #                 yerr = np.std(params[ii,jj], axis=1), label='mean',
+            #                 fmt = 'o', color='darkmagenta', capsize=3, alpha=.8)
+            axs[ii,jj].scatter(xx, np.median(params[ii,jj], axis=1), label='median',
+                            edgecolor='k', linewidth=2, facecolors='none', alpha=1, s=80)
+            axs[ii,jj].set_yscale('log')
+            axs[ii,jj].set_xscale('log')
+
             
 
+            # axs[ii,jj].fill_between(grid[ii,jj][0], grid[ii,jj][-1])
+
+            if(ii==1): axs[ii,jj].set_xlabel(xlabel)
+            if(jj==1):
+                axs[ii,jj].yaxis.set_label_position("right")
+                axs[ii,jj].yaxis.tick_right()
+            if(legend): axs[ii,jj].legend(loc='lower left')
