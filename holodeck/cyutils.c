@@ -2564,6 +2564,7 @@ static __Pyx_memviewslice __pyx_f_8holodeck_7cyutils__sam_calc_gwb_single_eccen(
 static __Pyx_memviewslice __pyx_f_8holodeck_7cyutils__sam_calc_gwb_single_eccen_discrete(__Pyx_memviewslice, __Pyx_memviewslice, __Pyx_memviewslice, __Pyx_memviewslice, __Pyx_memviewslice, __Pyx_memviewslice, __Pyx_memviewslice, __Pyx_memviewslice, int, int); /*proto*/
 static __Pyx_memviewslice __pyx_f_8holodeck_7cyutils__sam_poisson_gwb(__Pyx_memviewslice, __Pyx_memviewslice, __Pyx_memviewslice, int, long); /*proto*/
 static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice, __Pyx_memviewslice, __Pyx_memviewslice, long, long, __Pyx_memviewslice, __Pyx_memviewslice, __Pyx_memviewslice); /*proto*/
+static void __pyx_f_8holodeck_7cyutils__ss_bg_hc_and_par(__Pyx_memviewslice, __Pyx_memviewslice, __Pyx_memviewslice, long, long, __Pyx_memviewslice, __Pyx_memviewslice, __Pyx_memviewslice, __Pyx_memviewslice, __Pyx_memviewslice, __Pyx_memviewslice, __Pyx_memviewslice, __Pyx_memviewslice); /*proto*/
 static struct __pyx_array_obj *__pyx_array_new(PyObject *, Py_ssize_t, char *, char *, char *); /*proto*/
 static void *__pyx_align_pointer(void *, size_t); /*proto*/
 static PyObject *__pyx_memoryview_new(PyObject *, int, int, __Pyx_TypeInfo *); /*proto*/
@@ -2621,7 +2622,10 @@ static const char __pyx_k_O[] = "O";
 static const char __pyx_k_R[] = "R";
 static const char __pyx_k_c[] = "c";
 static const char __pyx_k_id[] = "id";
+static const char __pyx_k_mr[] = "mr";
+static const char __pyx_k_mt[] = "mt";
 static const char __pyx_k_np[] = "np";
+static const char __pyx_k_rz[] = "rz";
 static const char __pyx_k_hc2[] = "hc2";
 static const char __pyx_k_new[] = "__new__";
 static const char __pyx_k_obj[] = "obj";
@@ -2643,6 +2647,7 @@ static const char __pyx_k_test[] = "__test__";
 static const char __pyx_k_ASCII[] = "ASCII";
 static const char __pyx_k_PCG64[] = "PCG64";
 static const char __pyx_k_array[] = "array";
+static const char __pyx_k_bgpar[] = "bgpar";
 static const char __pyx_k_class[] = "__class__";
 static const char __pyx_k_dtype[] = "dtype";
 static const char __pyx_k_error[] = "error";
@@ -2656,6 +2661,7 @@ static const char __pyx_k_print[] = "print";
 static const char __pyx_k_range[] = "range";
 static const char __pyx_k_shape[] = "shape";
 static const char __pyx_k_ssidx[] = "ssidx";
+static const char __pyx_k_sspar[] = "sspar";
 static const char __pyx_k_start[] = "start";
 static const char __pyx_k_zeros[] = "zeros";
 static const char __pyx_k_encode[] = "encode";
@@ -2707,6 +2713,7 @@ static const char __pyx_k_sam_poisson_gwb[] = "sam_poisson_gwb";
 static const char __pyx_k_setstate_cython[] = "__setstate_cython__";
 static const char __pyx_k_holodeck_cyutils[] = "holodeck.cyutils";
 static const char __pyx_k_normal_threshold[] = "normal_threshold";
+static const char __pyx_k_ss_bg_hc_and_par[] = "ss_bg_hc_and_par";
 static const char __pyx_k_pyx_unpickle_Enum[] = "__pyx_unpickle_Enum";
 static const char __pyx_k_cline_in_traceback[] = "cline_in_traceback";
 static const char __pyx_k_strided_and_direct[] = "<strided and direct>";
@@ -2771,6 +2778,7 @@ static PyObject *__pyx_n_s_View_MemoryView;
 static PyObject *__pyx_n_s_allocate_buffer;
 static PyObject *__pyx_n_s_array;
 static PyObject *__pyx_n_s_base;
+static PyObject *__pyx_n_s_bgpar;
 static PyObject *__pyx_n_s_c;
 static PyObject *__pyx_n_u_c;
 static PyObject *__pyx_n_s_capsule;
@@ -2807,7 +2815,9 @@ static PyObject *__pyx_kp_s_itemsize_0_for_cython_array;
 static PyObject *__pyx_n_s_main;
 static PyObject *__pyx_n_s_memview;
 static PyObject *__pyx_n_s_mode;
+static PyObject *__pyx_n_s_mr;
 static PyObject *__pyx_n_s_mrat;
+static PyObject *__pyx_n_s_mt;
 static PyObject *__pyx_n_s_mtot_log10;
 static PyObject *__pyx_n_s_name;
 static PyObject *__pyx_n_s_name_2;
@@ -2841,6 +2851,7 @@ static PyObject *__pyx_n_s_reduce;
 static PyObject *__pyx_n_s_reduce_cython;
 static PyObject *__pyx_n_s_reduce_ex;
 static PyObject *__pyx_n_s_redz;
+static PyObject *__pyx_n_s_rz;
 static PyObject *__pyx_n_s_sam_calc_gwb_single_eccen;
 static PyObject *__pyx_n_s_sam_calc_gwb_single_eccen_discre;
 static PyObject *__pyx_n_s_sam_poisson_gwb;
@@ -2850,7 +2861,9 @@ static PyObject *__pyx_n_s_setstate_cython;
 static PyObject *__pyx_n_s_shape;
 static PyObject *__pyx_n_s_size;
 static PyObject *__pyx_n_s_ss_bg_hc;
+static PyObject *__pyx_n_s_ss_bg_hc_and_par;
 static PyObject *__pyx_n_s_ssidx;
+static PyObject *__pyx_n_s_sspar;
 static PyObject *__pyx_n_s_start;
 static PyObject *__pyx_n_s_step;
 static PyObject *__pyx_n_s_stop;
@@ -2869,6 +2882,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_sam_calc_gwb_single_eccen(CYTHON_UN
 static PyObject *__pyx_pf_8holodeck_7cyutils_2sam_calc_gwb_single_eccen_discrete(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_ndens, PyObject *__pyx_v_mtot_log10, PyObject *__pyx_v_mrat, PyObject *__pyx_v_redz, PyObject *__pyx_v_dcom, PyObject *__pyx_v_gwfobs, PyObject *__pyx_v_sepa_evo, PyObject *__pyx_v_eccen_evo, PyObject *__pyx_v_nharms, PyObject *__pyx_v_nreals); /* proto */
 static PyObject *__pyx_pf_8holodeck_7cyutils_4sam_poisson_gwb(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_dist, PyObject *__pyx_v_hc2, PyObject *__pyx_v_nreals, PyObject *__pyx_v_normal_threshold); /* proto */
 static PyObject *__pyx_pf_8holodeck_7cyutils_6ss_bg_hc(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_number, PyObject *__pyx_v_h2fdf, PyObject *__pyx_v_nreals, PyObject *__pyx_v_normal_threshold); /* proto */
+static PyObject *__pyx_pf_8holodeck_7cyutils_8ss_bg_hc_and_par(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_number, PyObject *__pyx_v_h2fdf, PyObject *__pyx_v_nreals, PyObject *__pyx_v_mt, PyObject *__pyx_v_mr, PyObject *__pyx_v_rz, PyObject *__pyx_v_normal_threshold); /* proto */
 static int __pyx_array___pyx_pf_15View_dot_MemoryView_5array___cinit__(struct __pyx_array_obj *__pyx_v_self, PyObject *__pyx_v_shape, Py_ssize_t __pyx_v_itemsize, PyObject *__pyx_v_format, PyObject *__pyx_v_mode, int __pyx_v_allocate_buffer); /* proto */
 static int __pyx_array___pyx_pf_15View_dot_MemoryView_5array_2__getbuffer__(struct __pyx_array_obj *__pyx_v_self, Py_buffer *__pyx_v_info, int __pyx_v_flags); /* proto */
 static void __pyx_array___pyx_pf_15View_dot_MemoryView_5array_4__dealloc__(struct __pyx_array_obj *__pyx_v_self); /* proto */
@@ -2950,16 +2964,18 @@ static PyObject *__pyx_tuple__24;
 static PyObject *__pyx_tuple__26;
 static PyObject *__pyx_tuple__28;
 static PyObject *__pyx_tuple__30;
-static PyObject *__pyx_tuple__31;
 static PyObject *__pyx_tuple__32;
 static PyObject *__pyx_tuple__33;
 static PyObject *__pyx_tuple__34;
 static PyObject *__pyx_tuple__35;
+static PyObject *__pyx_tuple__36;
+static PyObject *__pyx_tuple__37;
 static PyObject *__pyx_codeobj__23;
 static PyObject *__pyx_codeobj__25;
 static PyObject *__pyx_codeobj__27;
 static PyObject *__pyx_codeobj__29;
-static PyObject *__pyx_codeobj__36;
+static PyObject *__pyx_codeobj__31;
+static PyObject *__pyx_codeobj__38;
 /* Late includes */
 
 /* "holodeck/cyutils.pyx":53
@@ -7475,7 +7491,7 @@ static __Pyx_memviewslice __pyx_f_8holodeck_7cyutils__sam_poisson_gwb(__Pyx_memv
 
 /* Python wrapper */
 static PyObject *__pyx_pw_8holodeck_7cyutils_7ss_bg_hc(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_8holodeck_7cyutils_6ss_bg_hc[] = "\n    Calculates the characteristic strain from loud single sources and a background of all other sources.\n\n    Parameters\n    __________\n    number : [M, Q, Z, F] ndarray\n        number in each bin\n    h2fdf : [M, Q, Z, F] ndarray\n        strain squared x frequency / frequency bin width for each bin\n    nreals\n        number of realizations\n    ";
+static char __pyx_doc_8holodeck_7cyutils_6ss_bg_hc[] = "\n    Calculates the characteristic strain from loud single sources and a background of all other sources.\n\n    Parameters\n    --------------\n    number : [M, Q, Z, F] ndarray\n        number in each bin\n    h2fdf : [M, Q, Z, F] ndarray\n        strain squared x frequency / frequency bin width for each bin\n    nreals\n        number of realizations\n\n    Returns\n    --------------\n    hc2ss : (F, R) Ndarray of scalars\n    hc2bg : (F, R) Ndarray of scalars\n    ssidx : (3, F, R) Ndarray of ints\n\n    ";
 static PyMethodDef __pyx_mdef_8holodeck_7cyutils_7ss_bg_hc = {"ss_bg_hc", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_8holodeck_7cyutils_7ss_bg_hc, METH_VARARGS|METH_KEYWORDS, __pyx_doc_8holodeck_7cyutils_6ss_bg_hc};
 static PyObject *__pyx_pw_8holodeck_7cyutils_7ss_bg_hc(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_number = 0;
@@ -7614,19 +7630,19 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_6ss_bg_hc(CYTHON_UNUSED PyObject *_
   __pyx_pybuffernd_ssidx.data = NULL;
   __pyx_pybuffernd_ssidx.rcbuffer = &__pyx_pybuffer_ssidx;
 
-  /* "holodeck/cyutils.pyx":902
- *         number of realizations
+  /* "holodeck/cyutils.pyx":909
+ * 
  *     """
  *     cdef long[:] shape = np.array(number.shape)             # <<<<<<<<<<<<<<
  *     F = shape[3]
  *     R = nreals
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 902, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 909, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_array); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 902, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_array); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 909, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_v_number, __pyx_n_s_shape); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 902, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_v_number, __pyx_n_s_shape); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 909, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __pyx_t_4 = NULL;
   if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_3))) {
@@ -7641,16 +7657,16 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_6ss_bg_hc(CYTHON_UNUSED PyObject *_
   __pyx_t_1 = (__pyx_t_4) ? __Pyx_PyObject_Call2Args(__pyx_t_3, __pyx_t_4, __pyx_t_2) : __Pyx_PyObject_CallOneArg(__pyx_t_3, __pyx_t_2);
   __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 902, __pyx_L1_error)
+  if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 909, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_t_5 = __Pyx_PyObject_to_MemoryviewSlice_ds_long(__pyx_t_1, PyBUF_WRITABLE); if (unlikely(!__pyx_t_5.memview)) __PYX_ERR(0, 902, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyObject_to_MemoryviewSlice_ds_long(__pyx_t_1, PyBUF_WRITABLE); if (unlikely(!__pyx_t_5.memview)) __PYX_ERR(0, 909, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __pyx_v_shape = __pyx_t_5;
   __pyx_t_5.memview = NULL;
   __pyx_t_5.data = NULL;
 
-  /* "holodeck/cyutils.pyx":903
+  /* "holodeck/cyutils.pyx":910
  *     """
  *     cdef long[:] shape = np.array(number.shape)
  *     F = shape[3]             # <<<<<<<<<<<<<<
@@ -7665,14 +7681,14 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_6ss_bg_hc(CYTHON_UNUSED PyObject *_
   } else if (unlikely(__pyx_t_6 >= __pyx_v_shape.shape[0])) __pyx_t_7 = 0;
   if (unlikely(__pyx_t_7 != -1)) {
     __Pyx_RaiseBufferIndexError(__pyx_t_7);
-    __PYX_ERR(0, 903, __pyx_L1_error)
+    __PYX_ERR(0, 910, __pyx_L1_error)
   }
-  __pyx_t_1 = __Pyx_PyInt_From_long((*((long *) ( /* dim=0 */ (__pyx_v_shape.data + __pyx_t_6 * __pyx_v_shape.strides[0]) )))); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 903, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyInt_From_long((*((long *) ( /* dim=0 */ (__pyx_v_shape.data + __pyx_t_6 * __pyx_v_shape.strides[0]) )))); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 910, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_v_F = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "holodeck/cyutils.pyx":904
+  /* "holodeck/cyutils.pyx":911
  *     cdef long[:] shape = np.array(number.shape)
  *     F = shape[3]
  *     R = nreals             # <<<<<<<<<<<<<<
@@ -7682,19 +7698,19 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_6ss_bg_hc(CYTHON_UNUSED PyObject *_
   __Pyx_INCREF(__pyx_v_nreals);
   __pyx_v_R = __pyx_v_nreals;
 
-  /* "holodeck/cyutils.pyx":905
+  /* "holodeck/cyutils.pyx":912
  *     F = shape[3]
  *     R = nreals
  *     cdef np.ndarray[np.double_t, ndim=2] hc2ss = np.zeros((F,R))             # <<<<<<<<<<<<<<
  *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
  *     cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_n_s_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 905, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_n_s_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 912, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 905, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 912, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_t_3 = PyTuple_New(2); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 905, __pyx_L1_error)
+  __pyx_t_3 = PyTuple_New(2); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 912, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_INCREF(__pyx_v_F);
   __Pyx_GIVEREF(__pyx_v_F);
@@ -7715,16 +7731,16 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_6ss_bg_hc(CYTHON_UNUSED PyObject *_
   __pyx_t_1 = (__pyx_t_4) ? __Pyx_PyObject_Call2Args(__pyx_t_2, __pyx_t_4, __pyx_t_3) : __Pyx_PyObject_CallOneArg(__pyx_t_2, __pyx_t_3);
   __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 905, __pyx_L1_error)
+  if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 912, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  if (!(likely(((__pyx_t_1) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_1, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 905, __pyx_L1_error)
+  if (!(likely(((__pyx_t_1) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_1, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 912, __pyx_L1_error)
   __pyx_t_8 = ((PyArrayObject *)__pyx_t_1);
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
     if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_hc2ss.rcbuffer->pybuffer, (PyObject*)__pyx_t_8, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) {
       __pyx_v_hc2ss = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 905, __pyx_L1_error)
+      __PYX_ERR(0, 912, __pyx_L1_error)
     } else {__pyx_pybuffernd_hc2ss.diminfo[0].strides = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_hc2ss.diminfo[0].shape = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_hc2ss.diminfo[1].strides = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_hc2ss.diminfo[1].shape = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.shape[1];
     }
   }
@@ -7732,19 +7748,19 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_6ss_bg_hc(CYTHON_UNUSED PyObject *_
   __pyx_v_hc2ss = ((PyArrayObject *)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "holodeck/cyutils.pyx":906
+  /* "holodeck/cyutils.pyx":913
  *     R = nreals
  *     cdef np.ndarray[np.double_t, ndim=2] hc2ss = np.zeros((F,R))
  *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))             # <<<<<<<<<<<<<<
  *     cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
  *     _ss_bg_hc(shape, h2fdf, number, nreals, normal_threshold,
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 906, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 913, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_zeros); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 906, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_zeros); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 913, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  __pyx_t_2 = PyTuple_New(2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 906, __pyx_L1_error)
+  __pyx_t_2 = PyTuple_New(2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 913, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_INCREF(__pyx_v_F);
   __Pyx_GIVEREF(__pyx_v_F);
@@ -7765,16 +7781,16 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_6ss_bg_hc(CYTHON_UNUSED PyObject *_
   __pyx_t_1 = (__pyx_t_4) ? __Pyx_PyObject_Call2Args(__pyx_t_3, __pyx_t_4, __pyx_t_2) : __Pyx_PyObject_CallOneArg(__pyx_t_3, __pyx_t_2);
   __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 906, __pyx_L1_error)
+  if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 913, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  if (!(likely(((__pyx_t_1) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_1, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 906, __pyx_L1_error)
+  if (!(likely(((__pyx_t_1) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_1, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 913, __pyx_L1_error)
   __pyx_t_9 = ((PyArrayObject *)__pyx_t_1);
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
     if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_hc2bg.rcbuffer->pybuffer, (PyObject*)__pyx_t_9, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) {
       __pyx_v_hc2bg = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_hc2bg.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 906, __pyx_L1_error)
+      __PYX_ERR(0, 913, __pyx_L1_error)
     } else {__pyx_pybuffernd_hc2bg.diminfo[0].strides = __pyx_pybuffernd_hc2bg.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_hc2bg.diminfo[0].shape = __pyx_pybuffernd_hc2bg.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_hc2bg.diminfo[1].strides = __pyx_pybuffernd_hc2bg.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_hc2bg.diminfo[1].shape = __pyx_pybuffernd_hc2bg.rcbuffer->pybuffer.shape[1];
     }
   }
@@ -7782,19 +7798,19 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_6ss_bg_hc(CYTHON_UNUSED PyObject *_
   __pyx_v_hc2bg = ((PyArrayObject *)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "holodeck/cyutils.pyx":907
+  /* "holodeck/cyutils.pyx":914
  *     cdef np.ndarray[np.double_t, ndim=2] hc2ss = np.zeros((F,R))
  *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
  *     cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)             # <<<<<<<<<<<<<<
  *     _ss_bg_hc(shape, h2fdf, number, nreals, normal_threshold,
  *                 hc2ss, hc2bg, ssidx)
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 907, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 914, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 907, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 914, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_1 = PyTuple_New(3); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 907, __pyx_L1_error)
+  __pyx_t_1 = PyTuple_New(3); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 914, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_INCREF(__pyx_int_3);
   __Pyx_GIVEREF(__pyx_int_3);
@@ -7805,26 +7821,26 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_6ss_bg_hc(CYTHON_UNUSED PyObject *_
   __Pyx_INCREF(__pyx_v_R);
   __Pyx_GIVEREF(__pyx_v_R);
   PyTuple_SET_ITEM(__pyx_t_1, 2, __pyx_v_R);
-  __pyx_t_2 = PyTuple_New(1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 907, __pyx_L1_error)
+  __pyx_t_2 = PyTuple_New(1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 914, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_GIVEREF(__pyx_t_1);
   PyTuple_SET_ITEM(__pyx_t_2, 0, __pyx_t_1);
   __pyx_t_1 = 0;
-  __pyx_t_1 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 907, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 914, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, ((PyObject *)(&PyInt_Type))) < 0) __PYX_ERR(0, 907, __pyx_L1_error)
-  __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_3, __pyx_t_2, __pyx_t_1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 907, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, ((PyObject *)(&PyInt_Type))) < 0) __PYX_ERR(0, 914, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_3, __pyx_t_2, __pyx_t_1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 914, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  if (!(likely(((__pyx_t_4) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_4, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 907, __pyx_L1_error)
+  if (!(likely(((__pyx_t_4) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_4, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 914, __pyx_L1_error)
   __pyx_t_10 = ((PyArrayObject *)__pyx_t_4);
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
     if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_ssidx.rcbuffer->pybuffer, (PyObject*)__pyx_t_10, &__Pyx_TypeInfo_nn___pyx_t_5numpy_long_t, PyBUF_FORMAT| PyBUF_STRIDES, 3, 0, __pyx_stack) == -1)) {
       __pyx_v_ssidx = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 907, __pyx_L1_error)
+      __PYX_ERR(0, 914, __pyx_L1_error)
     } else {__pyx_pybuffernd_ssidx.diminfo[0].strides = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_ssidx.diminfo[0].shape = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_ssidx.diminfo[1].strides = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_ssidx.diminfo[1].shape = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.shape[1]; __pyx_pybuffernd_ssidx.diminfo[2].strides = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.strides[2]; __pyx_pybuffernd_ssidx.diminfo[2].shape = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.shape[2];
     }
   }
@@ -7832,30 +7848,30 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_6ss_bg_hc(CYTHON_UNUSED PyObject *_
   __pyx_v_ssidx = ((PyArrayObject *)__pyx_t_4);
   __pyx_t_4 = 0;
 
-  /* "holodeck/cyutils.pyx":908
+  /* "holodeck/cyutils.pyx":915
  *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
  *     cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
  *     _ss_bg_hc(shape, h2fdf, number, nreals, normal_threshold,             # <<<<<<<<<<<<<<
  *                 hc2ss, hc2bg, ssidx)
  *     # print(hc2ss, hc2bg, ssidx)
  */
-  __pyx_t_11 = __Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_double(__pyx_v_h2fdf, PyBUF_WRITABLE); if (unlikely(!__pyx_t_11.memview)) __PYX_ERR(0, 908, __pyx_L1_error)
-  __pyx_t_12 = __Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_double(__pyx_v_number, PyBUF_WRITABLE); if (unlikely(!__pyx_t_12.memview)) __PYX_ERR(0, 908, __pyx_L1_error)
-  __pyx_t_13 = __Pyx_PyInt_As_long(__pyx_v_nreals); if (unlikely((__pyx_t_13 == (long)-1) && PyErr_Occurred())) __PYX_ERR(0, 908, __pyx_L1_error)
-  __pyx_t_14 = __Pyx_PyInt_As_long(__pyx_v_normal_threshold); if (unlikely((__pyx_t_14 == (long)-1) && PyErr_Occurred())) __PYX_ERR(0, 908, __pyx_L1_error)
+  __pyx_t_11 = __Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_double(__pyx_v_h2fdf, PyBUF_WRITABLE); if (unlikely(!__pyx_t_11.memview)) __PYX_ERR(0, 915, __pyx_L1_error)
+  __pyx_t_12 = __Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_double(__pyx_v_number, PyBUF_WRITABLE); if (unlikely(!__pyx_t_12.memview)) __PYX_ERR(0, 915, __pyx_L1_error)
+  __pyx_t_13 = __Pyx_PyInt_As_long(__pyx_v_nreals); if (unlikely((__pyx_t_13 == (long)-1) && PyErr_Occurred())) __PYX_ERR(0, 915, __pyx_L1_error)
+  __pyx_t_14 = __Pyx_PyInt_As_long(__pyx_v_normal_threshold); if (unlikely((__pyx_t_14 == (long)-1) && PyErr_Occurred())) __PYX_ERR(0, 915, __pyx_L1_error)
 
-  /* "holodeck/cyutils.pyx":909
+  /* "holodeck/cyutils.pyx":916
  *     cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
  *     _ss_bg_hc(shape, h2fdf, number, nreals, normal_threshold,
  *                 hc2ss, hc2bg, ssidx)             # <<<<<<<<<<<<<<
  *     # print(hc2ss, hc2bg, ssidx)
  *     return hc2ss, hc2bg, ssidx
  */
-  __pyx_t_15 = __Pyx_PyObject_to_MemoryviewSlice_dsds_double(((PyObject *)__pyx_v_hc2ss), PyBUF_WRITABLE); if (unlikely(!__pyx_t_15.memview)) __PYX_ERR(0, 909, __pyx_L1_error)
-  __pyx_t_16 = __Pyx_PyObject_to_MemoryviewSlice_dsds_double(((PyObject *)__pyx_v_hc2bg), PyBUF_WRITABLE); if (unlikely(!__pyx_t_16.memview)) __PYX_ERR(0, 909, __pyx_L1_error)
-  __pyx_t_17 = __Pyx_PyObject_to_MemoryviewSlice_dsdsds_long(((PyObject *)__pyx_v_ssidx), PyBUF_WRITABLE); if (unlikely(!__pyx_t_17.memview)) __PYX_ERR(0, 909, __pyx_L1_error)
+  __pyx_t_15 = __Pyx_PyObject_to_MemoryviewSlice_dsds_double(((PyObject *)__pyx_v_hc2ss), PyBUF_WRITABLE); if (unlikely(!__pyx_t_15.memview)) __PYX_ERR(0, 916, __pyx_L1_error)
+  __pyx_t_16 = __Pyx_PyObject_to_MemoryviewSlice_dsds_double(((PyObject *)__pyx_v_hc2bg), PyBUF_WRITABLE); if (unlikely(!__pyx_t_16.memview)) __PYX_ERR(0, 916, __pyx_L1_error)
+  __pyx_t_17 = __Pyx_PyObject_to_MemoryviewSlice_dsdsds_long(((PyObject *)__pyx_v_ssidx), PyBUF_WRITABLE); if (unlikely(!__pyx_t_17.memview)) __PYX_ERR(0, 916, __pyx_L1_error)
 
-  /* "holodeck/cyutils.pyx":908
+  /* "holodeck/cyutils.pyx":915
  *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
  *     cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
  *     _ss_bg_hc(shape, h2fdf, number, nreals, normal_threshold,             # <<<<<<<<<<<<<<
@@ -7879,7 +7895,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_6ss_bg_hc(CYTHON_UNUSED PyObject *_
   __pyx_t_17.memview = NULL;
   __pyx_t_17.data = NULL;
 
-  /* "holodeck/cyutils.pyx":911
+  /* "holodeck/cyutils.pyx":918
  *                 hc2ss, hc2bg, ssidx)
  *     # print(hc2ss, hc2bg, ssidx)
  *     return hc2ss, hc2bg, ssidx             # <<<<<<<<<<<<<<
@@ -7887,7 +7903,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_6ss_bg_hc(CYTHON_UNUSED PyObject *_
  * @cython.boundscheck(False)
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_4 = PyTuple_New(3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 911, __pyx_L1_error)
+  __pyx_t_4 = PyTuple_New(3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 918, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_INCREF(((PyObject *)__pyx_v_hc2ss));
   __Pyx_GIVEREF(((PyObject *)__pyx_v_hc2ss));
@@ -7949,7 +7965,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_6ss_bg_hc(CYTHON_UNUSED PyObject *_
   return __pyx_r;
 }
 
-/* "holodeck/cyutils.pyx":917
+/* "holodeck/cyutils.pyx":924
  * @cython.nonecheck(False)
  * @cython.cdivision(True)
  * cdef void _ss_bg_hc(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number,             # <<<<<<<<<<<<<<
@@ -8011,7 +8027,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("_ss_bg_hc", 0);
 
-  /* "holodeck/cyutils.pyx":944
+  /* "holodeck/cyutils.pyx":954
  *     """
  * 
  *     cdef int M = shape[0]             # <<<<<<<<<<<<<<
@@ -8021,7 +8037,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
   __pyx_t_1 = 0;
   __pyx_v_M = (*((long *) ( /* dim=0 */ (__pyx_v_shape.data + __pyx_t_1 * __pyx_v_shape.strides[0]) )));
 
-  /* "holodeck/cyutils.pyx":945
+  /* "holodeck/cyutils.pyx":955
  * 
  *     cdef int M = shape[0]
  *     cdef int Q = shape[1]             # <<<<<<<<<<<<<<
@@ -8031,7 +8047,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
   __pyx_t_1 = 1;
   __pyx_v_Q = (*((long *) ( /* dim=0 */ (__pyx_v_shape.data + __pyx_t_1 * __pyx_v_shape.strides[0]) )));
 
-  /* "holodeck/cyutils.pyx":946
+  /* "holodeck/cyutils.pyx":956
  *     cdef int M = shape[0]
  *     cdef int Q = shape[1]
  *     cdef int Z = shape[2]             # <<<<<<<<<<<<<<
@@ -8041,7 +8057,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
   __pyx_t_1 = 2;
   __pyx_v_Z = (*((long *) ( /* dim=0 */ (__pyx_v_shape.data + __pyx_t_1 * __pyx_v_shape.strides[0]) )));
 
-  /* "holodeck/cyutils.pyx":947
+  /* "holodeck/cyutils.pyx":957
  *     cdef int Q = shape[1]
  *     cdef int Z = shape[2]
  *     cdef int F = shape[3]             # <<<<<<<<<<<<<<
@@ -8051,7 +8067,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
   __pyx_t_1 = 3;
   __pyx_v_F = (*((long *) ( /* dim=0 */ (__pyx_v_shape.data + __pyx_t_1 * __pyx_v_shape.strides[0]) )));
 
-  /* "holodeck/cyutils.pyx":948
+  /* "holodeck/cyutils.pyx":958
  *     cdef int Z = shape[2]
  *     cdef int F = shape[3]
  *     cdef int R = nreals             # <<<<<<<<<<<<<<
@@ -8060,7 +8076,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
  */
   __pyx_v_R = __pyx_v_nreals;
 
-  /* "holodeck/cyutils.pyx":956
+  /* "holodeck/cyutils.pyx":966
  *     # Setup random number generator from numpy library
  *     cdef bitgen_t *rng
  *     cdef const char *capsule_name = "BitGenerator"             # <<<<<<<<<<<<<<
@@ -8069,14 +8085,14 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
  */
   __pyx_v_capsule_name = ((char const *)"BitGenerator");
 
-  /* "holodeck/cyutils.pyx":957
+  /* "holodeck/cyutils.pyx":967
  *     cdef bitgen_t *rng
  *     cdef const char *capsule_name = "BitGenerator"
  *     capsule = PCG64().capsule             # <<<<<<<<<<<<<<
  *     # Cast the pointer
  *     rng = <bitgen_t *> PyCapsule_GetPointer(capsule, capsule_name)
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_n_s_PCG64); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 957, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_n_s_PCG64); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 967, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __pyx_t_4 = NULL;
   if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_3))) {
@@ -8090,26 +8106,26 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
   }
   __pyx_t_2 = (__pyx_t_4) ? __Pyx_PyObject_CallOneArg(__pyx_t_3, __pyx_t_4) : __Pyx_PyObject_CallNoArg(__pyx_t_3);
   __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
-  if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 957, __pyx_L1_error)
+  if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 967, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_capsule); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 957, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_capsule); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 967, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __pyx_v_capsule = __pyx_t_3;
   __pyx_t_3 = 0;
 
-  /* "holodeck/cyutils.pyx":959
+  /* "holodeck/cyutils.pyx":969
  *     capsule = PCG64().capsule
  *     # Cast the pointer
  *     rng = <bitgen_t *> PyCapsule_GetPointer(capsule, capsule_name)             # <<<<<<<<<<<<<<
  * 
  *     for rr in range(R):
  */
-  __pyx_t_5 = PyCapsule_GetPointer(__pyx_v_capsule, __pyx_v_capsule_name); if (unlikely(__pyx_t_5 == ((void *)NULL) && PyErr_Occurred())) __PYX_ERR(0, 959, __pyx_L1_error)
+  __pyx_t_5 = PyCapsule_GetPointer(__pyx_v_capsule, __pyx_v_capsule_name); if (unlikely(__pyx_t_5 == ((void *)NULL) && PyErr_Occurred())) __PYX_ERR(0, 969, __pyx_L1_error)
   __pyx_v_rng = ((bitgen_t *)__pyx_t_5);
 
-  /* "holodeck/cyutils.pyx":961
+  /* "holodeck/cyutils.pyx":971
  *     rng = <bitgen_t *> PyCapsule_GetPointer(capsule, capsule_name)
  * 
  *     for rr in range(R):             # <<<<<<<<<<<<<<
@@ -8121,7 +8137,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
   for (__pyx_t_8 = 0; __pyx_t_8 < __pyx_t_7; __pyx_t_8+=1) {
     __pyx_v_rr = __pyx_t_8;
 
-    /* "holodeck/cyutils.pyx":962
+    /* "holodeck/cyutils.pyx":972
  * 
  *     for rr in range(R):
  *         for ff in range(F):             # <<<<<<<<<<<<<<
@@ -8133,7 +8149,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
     for (__pyx_t_11 = 0; __pyx_t_11 < __pyx_t_10; __pyx_t_11+=1) {
       __pyx_v_ff = __pyx_t_11;
 
-      /* "holodeck/cyutils.pyx":963
+      /* "holodeck/cyutils.pyx":973
  *     for rr in range(R):
  *         for ff in range(F):
  *             max=0             # <<<<<<<<<<<<<<
@@ -8142,7 +8158,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
  */
       __pyx_v_max = 0.0;
 
-      /* "holodeck/cyutils.pyx":964
+      /* "holodeck/cyutils.pyx":974
  *         for ff in range(F):
  *             max=0
  *             sum=0             # <<<<<<<<<<<<<<
@@ -8151,7 +8167,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
  */
       __pyx_v_sum = 0.0;
 
-      /* "holodeck/cyutils.pyx":965
+      /* "holodeck/cyutils.pyx":975
  *             max=0
  *             sum=0
  *             for mm in range(M):             # <<<<<<<<<<<<<<
@@ -8163,7 +8179,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
       for (__pyx_t_14 = 0; __pyx_t_14 < __pyx_t_13; __pyx_t_14+=1) {
         __pyx_v_mm = __pyx_t_14;
 
-        /* "holodeck/cyutils.pyx":966
+        /* "holodeck/cyutils.pyx":976
  *             sum=0
  *             for mm in range(M):
  *                 for qq in range(Q):             # <<<<<<<<<<<<<<
@@ -8175,7 +8191,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
         for (__pyx_t_17 = 0; __pyx_t_17 < __pyx_t_16; __pyx_t_17+=1) {
           __pyx_v_qq = __pyx_t_17;
 
-          /* "holodeck/cyutils.pyx":967
+          /* "holodeck/cyutils.pyx":977
  *             for mm in range(M):
  *                 for qq in range(Q):
  *                     for zz in range(Z):             # <<<<<<<<<<<<<<
@@ -8187,7 +8203,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
           for (__pyx_t_20 = 0; __pyx_t_20 < __pyx_t_19; __pyx_t_20+=1) {
             __pyx_v_zz = __pyx_t_20;
 
-            /* "holodeck/cyutils.pyx":968
+            /* "holodeck/cyutils.pyx":978
  *                 for qq in range(Q):
  *                     for zz in range(Z):
  *                         num = number[mm,qq,zz,ff]             # <<<<<<<<<<<<<<
@@ -8200,7 +8216,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
             __pyx_t_23 = __pyx_v_ff;
             __pyx_v_num = (*((double *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_number.data + __pyx_t_1 * __pyx_v_number.strides[0]) ) + __pyx_t_21 * __pyx_v_number.strides[1]) ) + __pyx_t_22 * __pyx_v_number.strides[2]) ) + __pyx_t_23 * __pyx_v_number.strides[3]) )));
 
-            /* "holodeck/cyutils.pyx":969
+            /* "holodeck/cyutils.pyx":979
  *                     for zz in range(Z):
  *                         num = number[mm,qq,zz,ff]
  *                         cur = h2fdf[mm,qq,zz,ff]             # <<<<<<<<<<<<<<
@@ -8211,12 +8227,12 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
             __pyx_t_22 = __pyx_v_qq;
             __pyx_t_21 = __pyx_v_zz;
             __pyx_t_1 = __pyx_v_ff;
-            __pyx_t_3 = PyFloat_FromDouble((*((double *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_h2fdf.data + __pyx_t_23 * __pyx_v_h2fdf.strides[0]) ) + __pyx_t_22 * __pyx_v_h2fdf.strides[1]) ) + __pyx_t_21 * __pyx_v_h2fdf.strides[2]) ) + __pyx_t_1 * __pyx_v_h2fdf.strides[3]) )))); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 969, __pyx_L1_error)
+            __pyx_t_3 = PyFloat_FromDouble((*((double *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_h2fdf.data + __pyx_t_23 * __pyx_v_h2fdf.strides[0]) ) + __pyx_t_22 * __pyx_v_h2fdf.strides[1]) ) + __pyx_t_21 * __pyx_v_h2fdf.strides[2]) ) + __pyx_t_1 * __pyx_v_h2fdf.strides[3]) )))); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 979, __pyx_L1_error)
             __Pyx_GOTREF(__pyx_t_3);
             __Pyx_XDECREF_SET(__pyx_v_cur, __pyx_t_3);
             __pyx_t_3 = 0;
 
-            /* "holodeck/cyutils.pyx":970
+            /* "holodeck/cyutils.pyx":980
  *                         num = number[mm,qq,zz,ff]
  *                         cur = h2fdf[mm,qq,zz,ff]
  *                         if (num>thresh):             # <<<<<<<<<<<<<<
@@ -8226,7 +8242,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
             __pyx_t_24 = ((__pyx_v_num > __pyx_v_thresh) != 0);
             if (__pyx_t_24) {
 
-              /* "holodeck/cyutils.pyx":971
+              /* "holodeck/cyutils.pyx":981
  *                         cur = h2fdf[mm,qq,zz,ff]
  *                         if (num>thresh):
  *                             std = sqrt(num)             # <<<<<<<<<<<<<<
@@ -8235,7 +8251,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
  */
               __pyx_v_std = sqrt(__pyx_v_num);
 
-              /* "holodeck/cyutils.pyx":972
+              /* "holodeck/cyutils.pyx":982
  *                         if (num>thresh):
  *                             std = sqrt(num)
  *                             num = <double>random_normal(rng, num, std)             # <<<<<<<<<<<<<<
@@ -8244,7 +8260,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
  */
               __pyx_v_num = ((double)random_normal(__pyx_v_rng, __pyx_v_num, __pyx_v_std));
 
-              /* "holodeck/cyutils.pyx":970
+              /* "holodeck/cyutils.pyx":980
  *                         num = number[mm,qq,zz,ff]
  *                         cur = h2fdf[mm,qq,zz,ff]
  *                         if (num>thresh):             # <<<<<<<<<<<<<<
@@ -8254,7 +8270,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
               goto __pyx_L13;
             }
 
-            /* "holodeck/cyutils.pyx":974
+            /* "holodeck/cyutils.pyx":984
  *                             num = <double>random_normal(rng, num, std)
  *                         else:
  *                             num = <double>random_poisson(rng, num)             # <<<<<<<<<<<<<<
@@ -8266,18 +8282,18 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
             }
             __pyx_L13:;
 
-            /* "holodeck/cyutils.pyx":975
+            /* "holodeck/cyutils.pyx":985
  *                         else:
  *                             num = <double>random_poisson(rng, num)
  *                         if(cur > max and num > 0):             # <<<<<<<<<<<<<<
  *                             max = h2fdf[mm,qq,zz,ff]
  *                             m_max = mm
  */
-            __pyx_t_3 = PyFloat_FromDouble(__pyx_v_max); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 975, __pyx_L1_error)
+            __pyx_t_3 = PyFloat_FromDouble(__pyx_v_max); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 985, __pyx_L1_error)
             __Pyx_GOTREF(__pyx_t_3);
-            __pyx_t_2 = PyObject_RichCompare(__pyx_v_cur, __pyx_t_3, Py_GT); __Pyx_XGOTREF(__pyx_t_2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 975, __pyx_L1_error)
+            __pyx_t_2 = PyObject_RichCompare(__pyx_v_cur, __pyx_t_3, Py_GT); __Pyx_XGOTREF(__pyx_t_2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 985, __pyx_L1_error)
             __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-            __pyx_t_25 = __Pyx_PyObject_IsTrue(__pyx_t_2); if (unlikely(__pyx_t_25 < 0)) __PYX_ERR(0, 975, __pyx_L1_error)
+            __pyx_t_25 = __Pyx_PyObject_IsTrue(__pyx_t_2); if (unlikely(__pyx_t_25 < 0)) __PYX_ERR(0, 985, __pyx_L1_error)
             __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
             if (__pyx_t_25) {
             } else {
@@ -8289,7 +8305,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
             __pyx_L15_bool_binop_done:;
             if (__pyx_t_24) {
 
-              /* "holodeck/cyutils.pyx":976
+              /* "holodeck/cyutils.pyx":986
  *                             num = <double>random_poisson(rng, num)
  *                         if(cur > max and num > 0):
  *                             max = h2fdf[mm,qq,zz,ff]             # <<<<<<<<<<<<<<
@@ -8302,7 +8318,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
               __pyx_t_23 = __pyx_v_ff;
               __pyx_v_max = (*((double *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_h2fdf.data + __pyx_t_1 * __pyx_v_h2fdf.strides[0]) ) + __pyx_t_21 * __pyx_v_h2fdf.strides[1]) ) + __pyx_t_22 * __pyx_v_h2fdf.strides[2]) ) + __pyx_t_23 * __pyx_v_h2fdf.strides[3]) )));
 
-              /* "holodeck/cyutils.pyx":977
+              /* "holodeck/cyutils.pyx":987
  *                         if(cur > max and num > 0):
  *                             max = h2fdf[mm,qq,zz,ff]
  *                             m_max = mm             # <<<<<<<<<<<<<<
@@ -8311,7 +8327,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
  */
               __pyx_v_m_max = __pyx_v_mm;
 
-              /* "holodeck/cyutils.pyx":978
+              /* "holodeck/cyutils.pyx":988
  *                             max = h2fdf[mm,qq,zz,ff]
  *                             m_max = mm
  *                             q_max = qq             # <<<<<<<<<<<<<<
@@ -8320,7 +8336,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
  */
               __pyx_v_q_max = __pyx_v_qq;
 
-              /* "holodeck/cyutils.pyx":979
+              /* "holodeck/cyutils.pyx":989
  *                             m_max = mm
  *                             q_max = qq
  *                             z_max = zz             # <<<<<<<<<<<<<<
@@ -8329,7 +8345,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
  */
               __pyx_v_z_max = __pyx_v_zz;
 
-              /* "holodeck/cyutils.pyx":975
+              /* "holodeck/cyutils.pyx":985
  *                         else:
  *                             num = <double>random_poisson(rng, num)
  *                         if(cur > max and num > 0):             # <<<<<<<<<<<<<<
@@ -8338,32 +8354,32 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
  */
             }
 
-            /* "holodeck/cyutils.pyx":980
+            /* "holodeck/cyutils.pyx":990
  *                             q_max = qq
  *                             z_max = zz
  *                         sum += num * cur             # <<<<<<<<<<<<<<
  *             hc2ss[ff,rr] = max
  *             hc2bg[ff,rr] = sum - max
  */
-            __pyx_t_2 = PyFloat_FromDouble(__pyx_v_sum); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 980, __pyx_L1_error)
+            __pyx_t_2 = PyFloat_FromDouble(__pyx_v_sum); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 990, __pyx_L1_error)
             __Pyx_GOTREF(__pyx_t_2);
-            __pyx_t_3 = PyFloat_FromDouble(__pyx_v_num); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 980, __pyx_L1_error)
+            __pyx_t_3 = PyFloat_FromDouble(__pyx_v_num); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 990, __pyx_L1_error)
             __Pyx_GOTREF(__pyx_t_3);
-            __pyx_t_4 = PyNumber_Multiply(__pyx_t_3, __pyx_v_cur); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 980, __pyx_L1_error)
+            __pyx_t_4 = PyNumber_Multiply(__pyx_t_3, __pyx_v_cur); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 990, __pyx_L1_error)
             __Pyx_GOTREF(__pyx_t_4);
             __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-            __pyx_t_3 = PyNumber_InPlaceAdd(__pyx_t_2, __pyx_t_4); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 980, __pyx_L1_error)
+            __pyx_t_3 = PyNumber_InPlaceAdd(__pyx_t_2, __pyx_t_4); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 990, __pyx_L1_error)
             __Pyx_GOTREF(__pyx_t_3);
             __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
             __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-            __pyx_t_26 = __pyx_PyFloat_AsDouble(__pyx_t_3); if (unlikely((__pyx_t_26 == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 980, __pyx_L1_error)
+            __pyx_t_26 = __pyx_PyFloat_AsDouble(__pyx_t_3); if (unlikely((__pyx_t_26 == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 990, __pyx_L1_error)
             __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
             __pyx_v_sum = __pyx_t_26;
           }
         }
       }
 
-      /* "holodeck/cyutils.pyx":981
+      /* "holodeck/cyutils.pyx":991
  *                             z_max = zz
  *                         sum += num * cur
  *             hc2ss[ff,rr] = max             # <<<<<<<<<<<<<<
@@ -8374,7 +8390,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
       __pyx_t_22 = __pyx_v_rr;
       *((double *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_hc2ss.data + __pyx_t_23 * __pyx_v_hc2ss.strides[0]) ) + __pyx_t_22 * __pyx_v_hc2ss.strides[1]) )) = __pyx_v_max;
 
-      /* "holodeck/cyutils.pyx":982
+      /* "holodeck/cyutils.pyx":992
  *                         sum += num * cur
  *             hc2ss[ff,rr] = max
  *             hc2bg[ff,rr] = sum - max             # <<<<<<<<<<<<<<
@@ -8385,7 +8401,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
       __pyx_t_23 = __pyx_v_rr;
       *((double *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_hc2bg.data + __pyx_t_22 * __pyx_v_hc2bg.strides[0]) ) + __pyx_t_23 * __pyx_v_hc2bg.strides[1]) )) = (__pyx_v_sum - __pyx_v_max);
 
-      /* "holodeck/cyutils.pyx":984
+      /* "holodeck/cyutils.pyx":994
  *             hc2bg[ff,rr] = sum - max
  *             # ssidx[:,ff,rr] = m_max, q_max, z_max
  *             ssidx[0,ff,rr] = m_max             # <<<<<<<<<<<<<<
@@ -8397,7 +8413,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
       __pyx_t_21 = __pyx_v_rr;
       *((long *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_ssidx.data + __pyx_t_23 * __pyx_v_ssidx.strides[0]) ) + __pyx_t_22 * __pyx_v_ssidx.strides[1]) ) + __pyx_t_21 * __pyx_v_ssidx.strides[2]) )) = __pyx_v_m_max;
 
-      /* "holodeck/cyutils.pyx":985
+      /* "holodeck/cyutils.pyx":995
  *             # ssidx[:,ff,rr] = m_max, q_max, z_max
  *             ssidx[0,ff,rr] = m_max
  *             ssidx[1,ff,rr] = q_max             # <<<<<<<<<<<<<<
@@ -8409,7 +8425,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
       __pyx_t_23 = __pyx_v_rr;
       *((long *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_ssidx.data + __pyx_t_21 * __pyx_v_ssidx.strides[0]) ) + __pyx_t_22 * __pyx_v_ssidx.strides[1]) ) + __pyx_t_23 * __pyx_v_ssidx.strides[2]) )) = __pyx_v_q_max;
 
-      /* "holodeck/cyutils.pyx":986
+      /* "holodeck/cyutils.pyx":996
  *             ssidx[0,ff,rr] = m_max
  *             ssidx[1,ff,rr] = q_max
  *             ssidx[2,ff,rr] = z_max             # <<<<<<<<<<<<<<
@@ -8421,7 +8437,7 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
       __pyx_t_21 = __pyx_v_rr;
       *((long *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_ssidx.data + __pyx_t_23 * __pyx_v_ssidx.strides[0]) ) + __pyx_t_22 * __pyx_v_ssidx.strides[1]) ) + __pyx_t_21 * __pyx_v_ssidx.strides[2]) )) = __pyx_v_z_max;
 
-      /* "holodeck/cyutils.pyx":987
+      /* "holodeck/cyutils.pyx":997
  *             ssidx[1,ff,rr] = q_max
  *             ssidx[2,ff,rr] = z_max
  *             if (max==0):             # <<<<<<<<<<<<<<
@@ -8431,24 +8447,24 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
       __pyx_t_24 = ((__pyx_v_max == 0.0) != 0);
       if (__pyx_t_24) {
 
-        /* "holodeck/cyutils.pyx":988
+        /* "holodeck/cyutils.pyx":998
  *             ssidx[2,ff,rr] = z_max
  *             if (max==0):
  *                 print('No sources found at %dth frequency' % ff) # could warn             # <<<<<<<<<<<<<<
  *     # still need to sqrt and sum! (or do this back in python)
  * 
  */
-        __pyx_t_3 = __Pyx_PyInt_From_int(__pyx_v_ff); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 988, __pyx_L1_error)
+        __pyx_t_3 = __Pyx_PyInt_From_int(__pyx_v_ff); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 998, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_3);
-        __pyx_t_4 = PyUnicode_Format(__pyx_kp_u_No_sources_found_at_dth_frequenc, __pyx_t_3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 988, __pyx_L1_error)
+        __pyx_t_4 = PyUnicode_Format(__pyx_kp_u_No_sources_found_at_dth_frequenc, __pyx_t_3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 998, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_4);
         __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-        __pyx_t_3 = __Pyx_PyObject_CallOneArg(__pyx_builtin_print, __pyx_t_4); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 988, __pyx_L1_error)
+        __pyx_t_3 = __Pyx_PyObject_CallOneArg(__pyx_builtin_print, __pyx_t_4); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 998, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_3);
         __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
         __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-        /* "holodeck/cyutils.pyx":987
+        /* "holodeck/cyutils.pyx":997
  *             ssidx[1,ff,rr] = q_max
  *             ssidx[2,ff,rr] = z_max
  *             if (max==0):             # <<<<<<<<<<<<<<
@@ -8459,15 +8475,16 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
     }
   }
 
-  /* "holodeck/cyutils.pyx":991
+  /* "holodeck/cyutils.pyx":1001
  *     # still need to sqrt and sum! (or do this back in python)
  * 
  *     return             # <<<<<<<<<<<<<<
  * 
+ * # I also need to pass the edges to calculate the avged ones
  */
   goto __pyx_L0;
 
-  /* "holodeck/cyutils.pyx":917
+  /* "holodeck/cyutils.pyx":924
  * @cython.nonecheck(False)
  * @cython.cdivision(True)
  * cdef void _ss_bg_hc(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number,             # <<<<<<<<<<<<<<
@@ -8481,6 +8498,2009 @@ static void __pyx_f_8holodeck_7cyutils__ss_bg_hc(__Pyx_memviewslice __pyx_v_shap
   __Pyx_XDECREF(__pyx_t_3);
   __Pyx_XDECREF(__pyx_t_4);
   __Pyx_WriteUnraisable("holodeck.cyutils._ss_bg_hc", __pyx_clineno, __pyx_lineno, __pyx_filename, 1, 0);
+  __pyx_L0:;
+  __Pyx_XDECREF(__pyx_v_capsule);
+  __Pyx_XDECREF(__pyx_v_cur);
+  __Pyx_RefNannyFinishContext();
+}
+
+/* "holodeck/cyutils.pyx":1004
+ * 
+ * # I also need to pass the edges to calculate the avged ones
+ * def ss_bg_hc_and_par(number, h2fdf, nreals, mt, mr, rz, normal_threshold=1e10):             # <<<<<<<<<<<<<<
+ *     """
+ *     Calculates the characteristic strain from loud single sources and a background of all other sources.
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_8holodeck_7cyutils_9ss_bg_hc_and_par(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_8holodeck_7cyutils_8ss_bg_hc_and_par[] = "\n    Calculates the characteristic strain from loud single sources and a background of all other sources.\n\n    Parameters\n    ------------------------\n    number : [M, Q, Z, F] NDarray\n        number in each bin\n    h2fdf : [M, Q, Z, F] NDarray\n        Strain amplitude squared x frequency / frequency bin width for each bin.\n    nreals\n        Number of realizations.\n    mt : (M,) 1Darray of scalars\n        Total masses, M, of each bin center.\n    mr : (Q,) 1Darray of scalars\n        Mass ratios, q, of each bin center.\n    rz : (Z,) 1Darray of scalars\n        Redshifts, z, of each bin center.\n\n    Returns\n    --------------------------\n    hc2ss : (F, R) Ndarray of scalars\n        Char strain squared of the loudest single sources.\n    hc2bg : (F, R) Ndarray of scalars\n        Char strain squared of the background.\n    ssidx : (3, F, R) NDarray of ints\n        Indices of the loudest single sources.\n    bgpar : (3, F, R) NDarray of scalars\n        Average effective M, q, z parameters of the background.\n    sspar : (3, F, R) NDarray of scalars\n        M, q, z parameters of the loudest single sources.\n    ";
+static PyMethodDef __pyx_mdef_8holodeck_7cyutils_9ss_bg_hc_and_par = {"ss_bg_hc_and_par", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_8holodeck_7cyutils_9ss_bg_hc_and_par, METH_VARARGS|METH_KEYWORDS, __pyx_doc_8holodeck_7cyutils_8ss_bg_hc_and_par};
+static PyObject *__pyx_pw_8holodeck_7cyutils_9ss_bg_hc_and_par(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  PyObject *__pyx_v_number = 0;
+  PyObject *__pyx_v_h2fdf = 0;
+  PyObject *__pyx_v_nreals = 0;
+  PyObject *__pyx_v_mt = 0;
+  PyObject *__pyx_v_mr = 0;
+  PyObject *__pyx_v_rz = 0;
+  PyObject *__pyx_v_normal_threshold = 0;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("ss_bg_hc_and_par (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_number,&__pyx_n_s_h2fdf,&__pyx_n_s_nreals,&__pyx_n_s_mt,&__pyx_n_s_mr,&__pyx_n_s_rz,&__pyx_n_s_normal_threshold,0};
+    PyObject* values[7] = {0,0,0,0,0,0,0};
+    values[6] = ((PyObject *)__pyx_float_1e10);
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  7: values[6] = PyTuple_GET_ITEM(__pyx_args, 6);
+        CYTHON_FALLTHROUGH;
+        case  6: values[5] = PyTuple_GET_ITEM(__pyx_args, 5);
+        CYTHON_FALLTHROUGH;
+        case  5: values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+        CYTHON_FALLTHROUGH;
+        case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+        CYTHON_FALLTHROUGH;
+        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        CYTHON_FALLTHROUGH;
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_number)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_h2fdf)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("ss_bg_hc_and_par", 0, 6, 7, 1); __PYX_ERR(0, 1004, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  2:
+        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_nreals)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("ss_bg_hc_and_par", 0, 6, 7, 2); __PYX_ERR(0, 1004, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  3:
+        if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_mt)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("ss_bg_hc_and_par", 0, 6, 7, 3); __PYX_ERR(0, 1004, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  4:
+        if (likely((values[4] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_mr)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("ss_bg_hc_and_par", 0, 6, 7, 4); __PYX_ERR(0, 1004, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  5:
+        if (likely((values[5] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_rz)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("ss_bg_hc_and_par", 0, 6, 7, 5); __PYX_ERR(0, 1004, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  6:
+        if (kw_args > 0) {
+          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_normal_threshold);
+          if (value) { values[6] = value; kw_args--; }
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "ss_bg_hc_and_par") < 0)) __PYX_ERR(0, 1004, __pyx_L3_error)
+      }
+    } else {
+      switch (PyTuple_GET_SIZE(__pyx_args)) {
+        case  7: values[6] = PyTuple_GET_ITEM(__pyx_args, 6);
+        CYTHON_FALLTHROUGH;
+        case  6: values[5] = PyTuple_GET_ITEM(__pyx_args, 5);
+        values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+        values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+        values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+    }
+    __pyx_v_number = values[0];
+    __pyx_v_h2fdf = values[1];
+    __pyx_v_nreals = values[2];
+    __pyx_v_mt = values[3];
+    __pyx_v_mr = values[4];
+    __pyx_v_rz = values[5];
+    __pyx_v_normal_threshold = values[6];
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("ss_bg_hc_and_par", 0, 6, 7, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 1004, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("holodeck.cyutils.ss_bg_hc_and_par", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_8holodeck_7cyutils_8ss_bg_hc_and_par(__pyx_self, __pyx_v_number, __pyx_v_h2fdf, __pyx_v_nreals, __pyx_v_mt, __pyx_v_mr, __pyx_v_rz, __pyx_v_normal_threshold);
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_8holodeck_7cyutils_8ss_bg_hc_and_par(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_number, PyObject *__pyx_v_h2fdf, PyObject *__pyx_v_nreals, PyObject *__pyx_v_mt, PyObject *__pyx_v_mr, PyObject *__pyx_v_rz, PyObject *__pyx_v_normal_threshold) {
+  __Pyx_memviewslice __pyx_v_shape = { 0, 0, { 0 }, { 0 }, { 0 } };
+  PyObject *__pyx_v_F = NULL;
+  PyObject *__pyx_v_R = NULL;
+  PyArrayObject *__pyx_v_hc2ss = 0;
+  PyArrayObject *__pyx_v_hc2bg = 0;
+  PyArrayObject *__pyx_v_ssidx = 0;
+  PyArrayObject *__pyx_v_bgpar = 0;
+  PyArrayObject *__pyx_v_sspar = 0;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_bgpar;
+  __Pyx_Buffer __pyx_pybuffer_bgpar;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_hc2bg;
+  __Pyx_Buffer __pyx_pybuffer_hc2bg;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_hc2ss;
+  __Pyx_Buffer __pyx_pybuffer_hc2ss;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_ssidx;
+  __Pyx_Buffer __pyx_pybuffer_ssidx;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_sspar;
+  __Pyx_Buffer __pyx_pybuffer_sspar;
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  PyObject *__pyx_t_2 = NULL;
+  PyObject *__pyx_t_3 = NULL;
+  PyObject *__pyx_t_4 = NULL;
+  __Pyx_memviewslice __pyx_t_5 = { 0, 0, { 0 }, { 0 }, { 0 } };
+  Py_ssize_t __pyx_t_6;
+  int __pyx_t_7;
+  PyArrayObject *__pyx_t_8 = NULL;
+  PyArrayObject *__pyx_t_9 = NULL;
+  PyArrayObject *__pyx_t_10 = NULL;
+  PyArrayObject *__pyx_t_11 = NULL;
+  PyArrayObject *__pyx_t_12 = NULL;
+  __Pyx_memviewslice __pyx_t_13 = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_t_14 = { 0, 0, { 0 }, { 0 }, { 0 } };
+  long __pyx_t_15;
+  long __pyx_t_16;
+  __Pyx_memviewslice __pyx_t_17 = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_t_18 = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_t_19 = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_t_20 = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_t_21 = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_t_22 = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_t_23 = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_t_24 = { 0, 0, { 0 }, { 0 }, { 0 } };
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("ss_bg_hc_and_par", 0);
+  __pyx_pybuffer_hc2ss.pybuffer.buf = NULL;
+  __pyx_pybuffer_hc2ss.refcount = 0;
+  __pyx_pybuffernd_hc2ss.data = NULL;
+  __pyx_pybuffernd_hc2ss.rcbuffer = &__pyx_pybuffer_hc2ss;
+  __pyx_pybuffer_hc2bg.pybuffer.buf = NULL;
+  __pyx_pybuffer_hc2bg.refcount = 0;
+  __pyx_pybuffernd_hc2bg.data = NULL;
+  __pyx_pybuffernd_hc2bg.rcbuffer = &__pyx_pybuffer_hc2bg;
+  __pyx_pybuffer_ssidx.pybuffer.buf = NULL;
+  __pyx_pybuffer_ssidx.refcount = 0;
+  __pyx_pybuffernd_ssidx.data = NULL;
+  __pyx_pybuffernd_ssidx.rcbuffer = &__pyx_pybuffer_ssidx;
+  __pyx_pybuffer_bgpar.pybuffer.buf = NULL;
+  __pyx_pybuffer_bgpar.refcount = 0;
+  __pyx_pybuffernd_bgpar.data = NULL;
+  __pyx_pybuffernd_bgpar.rcbuffer = &__pyx_pybuffer_bgpar;
+  __pyx_pybuffer_sspar.pybuffer.buf = NULL;
+  __pyx_pybuffer_sspar.refcount = 0;
+  __pyx_pybuffernd_sspar.data = NULL;
+  __pyx_pybuffernd_sspar.rcbuffer = &__pyx_pybuffer_sspar;
+
+  /* "holodeck/cyutils.pyx":1037
+ *     """
+ * 
+ *     cdef long[:] shape = np.array(number.shape)             # <<<<<<<<<<<<<<
+ *     F = shape[3]
+ *     R = nreals
+ */
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1037, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_array); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1037, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_v_number, __pyx_n_s_shape); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1037, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __pyx_t_4 = NULL;
+  if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_3))) {
+    __pyx_t_4 = PyMethod_GET_SELF(__pyx_t_3);
+    if (likely(__pyx_t_4)) {
+      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_3);
+      __Pyx_INCREF(__pyx_t_4);
+      __Pyx_INCREF(function);
+      __Pyx_DECREF_SET(__pyx_t_3, function);
+    }
+  }
+  __pyx_t_1 = (__pyx_t_4) ? __Pyx_PyObject_Call2Args(__pyx_t_3, __pyx_t_4, __pyx_t_2) : __Pyx_PyObject_CallOneArg(__pyx_t_3, __pyx_t_2);
+  __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1037, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __pyx_t_5 = __Pyx_PyObject_to_MemoryviewSlice_ds_long(__pyx_t_1, PyBUF_WRITABLE); if (unlikely(!__pyx_t_5.memview)) __PYX_ERR(0, 1037, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_v_shape = __pyx_t_5;
+  __pyx_t_5.memview = NULL;
+  __pyx_t_5.data = NULL;
+
+  /* "holodeck/cyutils.pyx":1038
+ * 
+ *     cdef long[:] shape = np.array(number.shape)
+ *     F = shape[3]             # <<<<<<<<<<<<<<
+ *     R = nreals
+ *     cdef np.ndarray[np.double_t, ndim=2] hc2ss = np.zeros((F,R))
+ */
+  __pyx_t_6 = 3;
+  __pyx_t_7 = -1;
+  if (__pyx_t_6 < 0) {
+    __pyx_t_6 += __pyx_v_shape.shape[0];
+    if (unlikely(__pyx_t_6 < 0)) __pyx_t_7 = 0;
+  } else if (unlikely(__pyx_t_6 >= __pyx_v_shape.shape[0])) __pyx_t_7 = 0;
+  if (unlikely(__pyx_t_7 != -1)) {
+    __Pyx_RaiseBufferIndexError(__pyx_t_7);
+    __PYX_ERR(0, 1038, __pyx_L1_error)
+  }
+  __pyx_t_1 = __Pyx_PyInt_From_long((*((long *) ( /* dim=0 */ (__pyx_v_shape.data + __pyx_t_6 * __pyx_v_shape.strides[0]) )))); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1038, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_v_F = __pyx_t_1;
+  __pyx_t_1 = 0;
+
+  /* "holodeck/cyutils.pyx":1039
+ *     cdef long[:] shape = np.array(number.shape)
+ *     F = shape[3]
+ *     R = nreals             # <<<<<<<<<<<<<<
+ *     cdef np.ndarray[np.double_t, ndim=2] hc2ss = np.zeros((F,R))
+ *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
+ */
+  __Pyx_INCREF(__pyx_v_nreals);
+  __pyx_v_R = __pyx_v_nreals;
+
+  /* "holodeck/cyutils.pyx":1040
+ *     F = shape[3]
+ *     R = nreals
+ *     cdef np.ndarray[np.double_t, ndim=2] hc2ss = np.zeros((F,R))             # <<<<<<<<<<<<<<
+ *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
+ *     cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
+ */
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_n_s_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1040, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1040, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __pyx_t_3 = PyTuple_New(2); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1040, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_INCREF(__pyx_v_F);
+  __Pyx_GIVEREF(__pyx_v_F);
+  PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_v_F);
+  __Pyx_INCREF(__pyx_v_R);
+  __Pyx_GIVEREF(__pyx_v_R);
+  PyTuple_SET_ITEM(__pyx_t_3, 1, __pyx_v_R);
+  __pyx_t_4 = NULL;
+  if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_2))) {
+    __pyx_t_4 = PyMethod_GET_SELF(__pyx_t_2);
+    if (likely(__pyx_t_4)) {
+      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_2);
+      __Pyx_INCREF(__pyx_t_4);
+      __Pyx_INCREF(function);
+      __Pyx_DECREF_SET(__pyx_t_2, function);
+    }
+  }
+  __pyx_t_1 = (__pyx_t_4) ? __Pyx_PyObject_Call2Args(__pyx_t_2, __pyx_t_4, __pyx_t_3) : __Pyx_PyObject_CallOneArg(__pyx_t_2, __pyx_t_3);
+  __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1040, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  if (!(likely(((__pyx_t_1) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_1, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 1040, __pyx_L1_error)
+  __pyx_t_8 = ((PyArrayObject *)__pyx_t_1);
+  {
+    __Pyx_BufFmt_StackElem __pyx_stack[1];
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_hc2ss.rcbuffer->pybuffer, (PyObject*)__pyx_t_8, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) {
+      __pyx_v_hc2ss = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.buf = NULL;
+      __PYX_ERR(0, 1040, __pyx_L1_error)
+    } else {__pyx_pybuffernd_hc2ss.diminfo[0].strides = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_hc2ss.diminfo[0].shape = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_hc2ss.diminfo[1].strides = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_hc2ss.diminfo[1].shape = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.shape[1];
+    }
+  }
+  __pyx_t_8 = 0;
+  __pyx_v_hc2ss = ((PyArrayObject *)__pyx_t_1);
+  __pyx_t_1 = 0;
+
+  /* "holodeck/cyutils.pyx":1041
+ *     R = nreals
+ *     cdef np.ndarray[np.double_t, ndim=2] hc2ss = np.zeros((F,R))
+ *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))             # <<<<<<<<<<<<<<
+ *     cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
+ *     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
+ */
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1041, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_zeros); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1041, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __pyx_t_2 = PyTuple_New(2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1041, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_INCREF(__pyx_v_F);
+  __Pyx_GIVEREF(__pyx_v_F);
+  PyTuple_SET_ITEM(__pyx_t_2, 0, __pyx_v_F);
+  __Pyx_INCREF(__pyx_v_R);
+  __Pyx_GIVEREF(__pyx_v_R);
+  PyTuple_SET_ITEM(__pyx_t_2, 1, __pyx_v_R);
+  __pyx_t_4 = NULL;
+  if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_3))) {
+    __pyx_t_4 = PyMethod_GET_SELF(__pyx_t_3);
+    if (likely(__pyx_t_4)) {
+      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_3);
+      __Pyx_INCREF(__pyx_t_4);
+      __Pyx_INCREF(function);
+      __Pyx_DECREF_SET(__pyx_t_3, function);
+    }
+  }
+  __pyx_t_1 = (__pyx_t_4) ? __Pyx_PyObject_Call2Args(__pyx_t_3, __pyx_t_4, __pyx_t_2) : __Pyx_PyObject_CallOneArg(__pyx_t_3, __pyx_t_2);
+  __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1041, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  if (!(likely(((__pyx_t_1) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_1, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 1041, __pyx_L1_error)
+  __pyx_t_9 = ((PyArrayObject *)__pyx_t_1);
+  {
+    __Pyx_BufFmt_StackElem __pyx_stack[1];
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_hc2bg.rcbuffer->pybuffer, (PyObject*)__pyx_t_9, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) {
+      __pyx_v_hc2bg = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_hc2bg.rcbuffer->pybuffer.buf = NULL;
+      __PYX_ERR(0, 1041, __pyx_L1_error)
+    } else {__pyx_pybuffernd_hc2bg.diminfo[0].strides = __pyx_pybuffernd_hc2bg.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_hc2bg.diminfo[0].shape = __pyx_pybuffernd_hc2bg.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_hc2bg.diminfo[1].strides = __pyx_pybuffernd_hc2bg.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_hc2bg.diminfo[1].shape = __pyx_pybuffernd_hc2bg.rcbuffer->pybuffer.shape[1];
+    }
+  }
+  __pyx_t_9 = 0;
+  __pyx_v_hc2bg = ((PyArrayObject *)__pyx_t_1);
+  __pyx_t_1 = 0;
+
+  /* "holodeck/cyutils.pyx":1042
+ *     cdef np.ndarray[np.double_t, ndim=2] hc2ss = np.zeros((F,R))
+ *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
+ *     cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)             # <<<<<<<<<<<<<<
+ *     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
+ *     cdef np.ndarray[np.double_t, ndim=3] sspar = np.zeros((3,F,R))
+ */
+  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1042, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_3 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1042, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_t_1 = PyTuple_New(3); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1042, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_INCREF(__pyx_int_3);
+  __Pyx_GIVEREF(__pyx_int_3);
+  PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_int_3);
+  __Pyx_INCREF(__pyx_v_F);
+  __Pyx_GIVEREF(__pyx_v_F);
+  PyTuple_SET_ITEM(__pyx_t_1, 1, __pyx_v_F);
+  __Pyx_INCREF(__pyx_v_R);
+  __Pyx_GIVEREF(__pyx_v_R);
+  PyTuple_SET_ITEM(__pyx_t_1, 2, __pyx_v_R);
+  __pyx_t_2 = PyTuple_New(1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1042, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_GIVEREF(__pyx_t_1);
+  PyTuple_SET_ITEM(__pyx_t_2, 0, __pyx_t_1);
+  __pyx_t_1 = 0;
+  __pyx_t_1 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1042, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, ((PyObject *)(&PyInt_Type))) < 0) __PYX_ERR(0, 1042, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_3, __pyx_t_2, __pyx_t_1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1042, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  if (!(likely(((__pyx_t_4) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_4, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 1042, __pyx_L1_error)
+  __pyx_t_10 = ((PyArrayObject *)__pyx_t_4);
+  {
+    __Pyx_BufFmt_StackElem __pyx_stack[1];
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_ssidx.rcbuffer->pybuffer, (PyObject*)__pyx_t_10, &__Pyx_TypeInfo_nn___pyx_t_5numpy_long_t, PyBUF_FORMAT| PyBUF_STRIDES, 3, 0, __pyx_stack) == -1)) {
+      __pyx_v_ssidx = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.buf = NULL;
+      __PYX_ERR(0, 1042, __pyx_L1_error)
+    } else {__pyx_pybuffernd_ssidx.diminfo[0].strides = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_ssidx.diminfo[0].shape = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_ssidx.diminfo[1].strides = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_ssidx.diminfo[1].shape = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.shape[1]; __pyx_pybuffernd_ssidx.diminfo[2].strides = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.strides[2]; __pyx_pybuffernd_ssidx.diminfo[2].shape = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.shape[2];
+    }
+  }
+  __pyx_t_10 = 0;
+  __pyx_v_ssidx = ((PyArrayObject *)__pyx_t_4);
+  __pyx_t_4 = 0;
+
+  /* "holodeck/cyutils.pyx":1043
+ *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
+ *     cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
+ *     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))             # <<<<<<<<<<<<<<
+ *     cdef np.ndarray[np.double_t, ndim=3] sspar = np.zeros((3,F,R))
+ *     _ss_bg_hc_and_par(shape, h2fdf, number, nreals, normal_threshold,
+ */
+  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1043, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1043, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_t_1 = PyTuple_New(3); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1043, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_INCREF(__pyx_int_3);
+  __Pyx_GIVEREF(__pyx_int_3);
+  PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_int_3);
+  __Pyx_INCREF(__pyx_v_F);
+  __Pyx_GIVEREF(__pyx_v_F);
+  PyTuple_SET_ITEM(__pyx_t_1, 1, __pyx_v_F);
+  __Pyx_INCREF(__pyx_v_R);
+  __Pyx_GIVEREF(__pyx_v_R);
+  PyTuple_SET_ITEM(__pyx_t_1, 2, __pyx_v_R);
+  __pyx_t_3 = NULL;
+  if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_2))) {
+    __pyx_t_3 = PyMethod_GET_SELF(__pyx_t_2);
+    if (likely(__pyx_t_3)) {
+      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_2);
+      __Pyx_INCREF(__pyx_t_3);
+      __Pyx_INCREF(function);
+      __Pyx_DECREF_SET(__pyx_t_2, function);
+    }
+  }
+  __pyx_t_4 = (__pyx_t_3) ? __Pyx_PyObject_Call2Args(__pyx_t_2, __pyx_t_3, __pyx_t_1) : __Pyx_PyObject_CallOneArg(__pyx_t_2, __pyx_t_1);
+  __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1043, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  if (!(likely(((__pyx_t_4) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_4, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 1043, __pyx_L1_error)
+  __pyx_t_11 = ((PyArrayObject *)__pyx_t_4);
+  {
+    __Pyx_BufFmt_StackElem __pyx_stack[1];
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_bgpar.rcbuffer->pybuffer, (PyObject*)__pyx_t_11, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_STRIDES, 3, 0, __pyx_stack) == -1)) {
+      __pyx_v_bgpar = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_bgpar.rcbuffer->pybuffer.buf = NULL;
+      __PYX_ERR(0, 1043, __pyx_L1_error)
+    } else {__pyx_pybuffernd_bgpar.diminfo[0].strides = __pyx_pybuffernd_bgpar.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_bgpar.diminfo[0].shape = __pyx_pybuffernd_bgpar.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_bgpar.diminfo[1].strides = __pyx_pybuffernd_bgpar.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_bgpar.diminfo[1].shape = __pyx_pybuffernd_bgpar.rcbuffer->pybuffer.shape[1]; __pyx_pybuffernd_bgpar.diminfo[2].strides = __pyx_pybuffernd_bgpar.rcbuffer->pybuffer.strides[2]; __pyx_pybuffernd_bgpar.diminfo[2].shape = __pyx_pybuffernd_bgpar.rcbuffer->pybuffer.shape[2];
+    }
+  }
+  __pyx_t_11 = 0;
+  __pyx_v_bgpar = ((PyArrayObject *)__pyx_t_4);
+  __pyx_t_4 = 0;
+
+  /* "holodeck/cyutils.pyx":1044
+ *     cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
+ *     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
+ *     cdef np.ndarray[np.double_t, ndim=3] sspar = np.zeros((3,F,R))             # <<<<<<<<<<<<<<
+ *     _ss_bg_hc_and_par(shape, h2fdf, number, nreals, normal_threshold,
+ *                  mt, mr, rz,
+ */
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1044, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_zeros); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1044, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __pyx_t_2 = PyTuple_New(3); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1044, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_INCREF(__pyx_int_3);
+  __Pyx_GIVEREF(__pyx_int_3);
+  PyTuple_SET_ITEM(__pyx_t_2, 0, __pyx_int_3);
+  __Pyx_INCREF(__pyx_v_F);
+  __Pyx_GIVEREF(__pyx_v_F);
+  PyTuple_SET_ITEM(__pyx_t_2, 1, __pyx_v_F);
+  __Pyx_INCREF(__pyx_v_R);
+  __Pyx_GIVEREF(__pyx_v_R);
+  PyTuple_SET_ITEM(__pyx_t_2, 2, __pyx_v_R);
+  __pyx_t_3 = NULL;
+  if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_1))) {
+    __pyx_t_3 = PyMethod_GET_SELF(__pyx_t_1);
+    if (likely(__pyx_t_3)) {
+      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_1);
+      __Pyx_INCREF(__pyx_t_3);
+      __Pyx_INCREF(function);
+      __Pyx_DECREF_SET(__pyx_t_1, function);
+    }
+  }
+  __pyx_t_4 = (__pyx_t_3) ? __Pyx_PyObject_Call2Args(__pyx_t_1, __pyx_t_3, __pyx_t_2) : __Pyx_PyObject_CallOneArg(__pyx_t_1, __pyx_t_2);
+  __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1044, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  if (!(likely(((__pyx_t_4) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_4, __pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 1044, __pyx_L1_error)
+  __pyx_t_12 = ((PyArrayObject *)__pyx_t_4);
+  {
+    __Pyx_BufFmt_StackElem __pyx_stack[1];
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_sspar.rcbuffer->pybuffer, (PyObject*)__pyx_t_12, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_STRIDES, 3, 0, __pyx_stack) == -1)) {
+      __pyx_v_sspar = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_sspar.rcbuffer->pybuffer.buf = NULL;
+      __PYX_ERR(0, 1044, __pyx_L1_error)
+    } else {__pyx_pybuffernd_sspar.diminfo[0].strides = __pyx_pybuffernd_sspar.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_sspar.diminfo[0].shape = __pyx_pybuffernd_sspar.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_sspar.diminfo[1].strides = __pyx_pybuffernd_sspar.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_sspar.diminfo[1].shape = __pyx_pybuffernd_sspar.rcbuffer->pybuffer.shape[1]; __pyx_pybuffernd_sspar.diminfo[2].strides = __pyx_pybuffernd_sspar.rcbuffer->pybuffer.strides[2]; __pyx_pybuffernd_sspar.diminfo[2].shape = __pyx_pybuffernd_sspar.rcbuffer->pybuffer.shape[2];
+    }
+  }
+  __pyx_t_12 = 0;
+  __pyx_v_sspar = ((PyArrayObject *)__pyx_t_4);
+  __pyx_t_4 = 0;
+
+  /* "holodeck/cyutils.pyx":1045
+ *     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
+ *     cdef np.ndarray[np.double_t, ndim=3] sspar = np.zeros((3,F,R))
+ *     _ss_bg_hc_and_par(shape, h2fdf, number, nreals, normal_threshold,             # <<<<<<<<<<<<<<
+ *                  mt, mr, rz,
+ *                 hc2ss, hc2bg, ssidx, bgpar, sspar)
+ */
+  __pyx_t_13 = __Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_double(__pyx_v_h2fdf, PyBUF_WRITABLE); if (unlikely(!__pyx_t_13.memview)) __PYX_ERR(0, 1045, __pyx_L1_error)
+  __pyx_t_14 = __Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_double(__pyx_v_number, PyBUF_WRITABLE); if (unlikely(!__pyx_t_14.memview)) __PYX_ERR(0, 1045, __pyx_L1_error)
+  __pyx_t_15 = __Pyx_PyInt_As_long(__pyx_v_nreals); if (unlikely((__pyx_t_15 == (long)-1) && PyErr_Occurred())) __PYX_ERR(0, 1045, __pyx_L1_error)
+  __pyx_t_16 = __Pyx_PyInt_As_long(__pyx_v_normal_threshold); if (unlikely((__pyx_t_16 == (long)-1) && PyErr_Occurred())) __PYX_ERR(0, 1045, __pyx_L1_error)
+
+  /* "holodeck/cyutils.pyx":1046
+ *     cdef np.ndarray[np.double_t, ndim=3] sspar = np.zeros((3,F,R))
+ *     _ss_bg_hc_and_par(shape, h2fdf, number, nreals, normal_threshold,
+ *                  mt, mr, rz,             # <<<<<<<<<<<<<<
+ *                 hc2ss, hc2bg, ssidx, bgpar, sspar)
+ *     # print(hc2ss, hc2bg, ssidx)
+ */
+  __pyx_t_17 = __Pyx_PyObject_to_MemoryviewSlice_ds_double(__pyx_v_mt, PyBUF_WRITABLE); if (unlikely(!__pyx_t_17.memview)) __PYX_ERR(0, 1046, __pyx_L1_error)
+  __pyx_t_18 = __Pyx_PyObject_to_MemoryviewSlice_ds_double(__pyx_v_mr, PyBUF_WRITABLE); if (unlikely(!__pyx_t_18.memview)) __PYX_ERR(0, 1046, __pyx_L1_error)
+  __pyx_t_19 = __Pyx_PyObject_to_MemoryviewSlice_ds_double(__pyx_v_rz, PyBUF_WRITABLE); if (unlikely(!__pyx_t_19.memview)) __PYX_ERR(0, 1046, __pyx_L1_error)
+
+  /* "holodeck/cyutils.pyx":1047
+ *     _ss_bg_hc_and_par(shape, h2fdf, number, nreals, normal_threshold,
+ *                  mt, mr, rz,
+ *                 hc2ss, hc2bg, ssidx, bgpar, sspar)             # <<<<<<<<<<<<<<
+ *     # print(hc2ss, hc2bg, ssidx)
+ *     return hc2ss, hc2bg, ssidx, bgpar, sspar
+ */
+  __pyx_t_20 = __Pyx_PyObject_to_MemoryviewSlice_dsds_double(((PyObject *)__pyx_v_hc2ss), PyBUF_WRITABLE); if (unlikely(!__pyx_t_20.memview)) __PYX_ERR(0, 1047, __pyx_L1_error)
+  __pyx_t_21 = __Pyx_PyObject_to_MemoryviewSlice_dsds_double(((PyObject *)__pyx_v_hc2bg), PyBUF_WRITABLE); if (unlikely(!__pyx_t_21.memview)) __PYX_ERR(0, 1047, __pyx_L1_error)
+  __pyx_t_22 = __Pyx_PyObject_to_MemoryviewSlice_dsdsds_long(((PyObject *)__pyx_v_ssidx), PyBUF_WRITABLE); if (unlikely(!__pyx_t_22.memview)) __PYX_ERR(0, 1047, __pyx_L1_error)
+  __pyx_t_23 = __Pyx_PyObject_to_MemoryviewSlice_dsdsds_double(((PyObject *)__pyx_v_bgpar), PyBUF_WRITABLE); if (unlikely(!__pyx_t_23.memview)) __PYX_ERR(0, 1047, __pyx_L1_error)
+  __pyx_t_24 = __Pyx_PyObject_to_MemoryviewSlice_dsdsds_double(((PyObject *)__pyx_v_sspar), PyBUF_WRITABLE); if (unlikely(!__pyx_t_24.memview)) __PYX_ERR(0, 1047, __pyx_L1_error)
+
+  /* "holodeck/cyutils.pyx":1045
+ *     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
+ *     cdef np.ndarray[np.double_t, ndim=3] sspar = np.zeros((3,F,R))
+ *     _ss_bg_hc_and_par(shape, h2fdf, number, nreals, normal_threshold,             # <<<<<<<<<<<<<<
+ *                  mt, mr, rz,
+ *                 hc2ss, hc2bg, ssidx, bgpar, sspar)
+ */
+  __pyx_f_8holodeck_7cyutils__ss_bg_hc_and_par(__pyx_v_shape, __pyx_t_13, __pyx_t_14, __pyx_t_15, __pyx_t_16, __pyx_t_17, __pyx_t_18, __pyx_t_19, __pyx_t_20, __pyx_t_21, __pyx_t_22, __pyx_t_23, __pyx_t_24);
+  __PYX_XDEC_MEMVIEW(&__pyx_t_13, 1);
+  __pyx_t_13.memview = NULL;
+  __pyx_t_13.data = NULL;
+  __PYX_XDEC_MEMVIEW(&__pyx_t_14, 1);
+  __pyx_t_14.memview = NULL;
+  __pyx_t_14.data = NULL;
+  __PYX_XDEC_MEMVIEW(&__pyx_t_17, 1);
+  __pyx_t_17.memview = NULL;
+  __pyx_t_17.data = NULL;
+  __PYX_XDEC_MEMVIEW(&__pyx_t_18, 1);
+  __pyx_t_18.memview = NULL;
+  __pyx_t_18.data = NULL;
+  __PYX_XDEC_MEMVIEW(&__pyx_t_19, 1);
+  __pyx_t_19.memview = NULL;
+  __pyx_t_19.data = NULL;
+  __PYX_XDEC_MEMVIEW(&__pyx_t_20, 1);
+  __pyx_t_20.memview = NULL;
+  __pyx_t_20.data = NULL;
+  __PYX_XDEC_MEMVIEW(&__pyx_t_21, 1);
+  __pyx_t_21.memview = NULL;
+  __pyx_t_21.data = NULL;
+  __PYX_XDEC_MEMVIEW(&__pyx_t_22, 1);
+  __pyx_t_22.memview = NULL;
+  __pyx_t_22.data = NULL;
+  __PYX_XDEC_MEMVIEW(&__pyx_t_23, 1);
+  __pyx_t_23.memview = NULL;
+  __pyx_t_23.data = NULL;
+  __PYX_XDEC_MEMVIEW(&__pyx_t_24, 1);
+  __pyx_t_24.memview = NULL;
+  __pyx_t_24.data = NULL;
+
+  /* "holodeck/cyutils.pyx":1049
+ *                 hc2ss, hc2bg, ssidx, bgpar, sspar)
+ *     # print(hc2ss, hc2bg, ssidx)
+ *     return hc2ss, hc2bg, ssidx, bgpar, sspar             # <<<<<<<<<<<<<<
+ * 
+ * @cython.boundscheck(True)
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_4 = PyTuple_New(5); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1049, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __Pyx_INCREF(((PyObject *)__pyx_v_hc2ss));
+  __Pyx_GIVEREF(((PyObject *)__pyx_v_hc2ss));
+  PyTuple_SET_ITEM(__pyx_t_4, 0, ((PyObject *)__pyx_v_hc2ss));
+  __Pyx_INCREF(((PyObject *)__pyx_v_hc2bg));
+  __Pyx_GIVEREF(((PyObject *)__pyx_v_hc2bg));
+  PyTuple_SET_ITEM(__pyx_t_4, 1, ((PyObject *)__pyx_v_hc2bg));
+  __Pyx_INCREF(((PyObject *)__pyx_v_ssidx));
+  __Pyx_GIVEREF(((PyObject *)__pyx_v_ssidx));
+  PyTuple_SET_ITEM(__pyx_t_4, 2, ((PyObject *)__pyx_v_ssidx));
+  __Pyx_INCREF(((PyObject *)__pyx_v_bgpar));
+  __Pyx_GIVEREF(((PyObject *)__pyx_v_bgpar));
+  PyTuple_SET_ITEM(__pyx_t_4, 3, ((PyObject *)__pyx_v_bgpar));
+  __Pyx_INCREF(((PyObject *)__pyx_v_sspar));
+  __Pyx_GIVEREF(((PyObject *)__pyx_v_sspar));
+  PyTuple_SET_ITEM(__pyx_t_4, 4, ((PyObject *)__pyx_v_sspar));
+  __pyx_r = __pyx_t_4;
+  __pyx_t_4 = 0;
+  goto __pyx_L0;
+
+  /* "holodeck/cyutils.pyx":1004
+ * 
+ * # I also need to pass the edges to calculate the avged ones
+ * def ss_bg_hc_and_par(number, h2fdf, nreals, mt, mr, rz, normal_threshold=1e10):             # <<<<<<<<<<<<<<
+ *     """
+ *     Calculates the characteristic strain from loud single sources and a background of all other sources.
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_XDECREF(__pyx_t_2);
+  __Pyx_XDECREF(__pyx_t_3);
+  __Pyx_XDECREF(__pyx_t_4);
+  __PYX_XDEC_MEMVIEW(&__pyx_t_5, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_t_13, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_t_14, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_t_17, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_t_18, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_t_19, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_t_20, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_t_21, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_t_22, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_t_23, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_t_24, 1);
+  { PyObject *__pyx_type, *__pyx_value, *__pyx_tb;
+    __Pyx_PyThreadState_declare
+    __Pyx_PyThreadState_assign
+    __Pyx_ErrFetch(&__pyx_type, &__pyx_value, &__pyx_tb);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_bgpar.rcbuffer->pybuffer);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_hc2bg.rcbuffer->pybuffer);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_hc2ss.rcbuffer->pybuffer);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_ssidx.rcbuffer->pybuffer);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_sspar.rcbuffer->pybuffer);
+  __Pyx_ErrRestore(__pyx_type, __pyx_value, __pyx_tb);}
+  __Pyx_AddTraceback("holodeck.cyutils.ss_bg_hc_and_par", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  goto __pyx_L2;
+  __pyx_L0:;
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_bgpar.rcbuffer->pybuffer);
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_hc2bg.rcbuffer->pybuffer);
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_hc2ss.rcbuffer->pybuffer);
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_ssidx.rcbuffer->pybuffer);
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_sspar.rcbuffer->pybuffer);
+  __pyx_L2:;
+  __PYX_XDEC_MEMVIEW(&__pyx_v_shape, 1);
+  __Pyx_XDECREF(__pyx_v_F);
+  __Pyx_XDECREF(__pyx_v_R);
+  __Pyx_XDECREF((PyObject *)__pyx_v_hc2ss);
+  __Pyx_XDECREF((PyObject *)__pyx_v_hc2bg);
+  __Pyx_XDECREF((PyObject *)__pyx_v_ssidx);
+  __Pyx_XDECREF((PyObject *)__pyx_v_bgpar);
+  __Pyx_XDECREF((PyObject *)__pyx_v_sspar);
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "holodeck/cyutils.pyx":1055
+ * @cython.nonecheck(True)
+ * @cython.cdivision(True)
+ * cdef void _ss_bg_hc_and_par(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number,             # <<<<<<<<<<<<<<
+ *             long nreals, long thresh,
+ *             double[:] mt, double[:] mr, double[:] rz,
+ */
+
+static void __pyx_f_8holodeck_7cyutils__ss_bg_hc_and_par(__Pyx_memviewslice __pyx_v_shape, __Pyx_memviewslice __pyx_v_h2fdf, __Pyx_memviewslice __pyx_v_number, long __pyx_v_nreals, long __pyx_v_thresh, __Pyx_memviewslice __pyx_v_mt, __Pyx_memviewslice __pyx_v_mr, __Pyx_memviewslice __pyx_v_rz, __Pyx_memviewslice __pyx_v_hc2ss, __Pyx_memviewslice __pyx_v_hc2bg, __Pyx_memviewslice __pyx_v_ssidx, __Pyx_memviewslice __pyx_v_bgpar, __Pyx_memviewslice __pyx_v_sspar) {
+  int __pyx_v_M;
+  int __pyx_v_Q;
+  int __pyx_v_Z;
+  int __pyx_v_F;
+  int __pyx_v_R;
+  int __pyx_v_mm;
+  int __pyx_v_qq;
+  int __pyx_v_zz;
+  int __pyx_v_ff;
+  int __pyx_v_rr;
+  int __pyx_v_m_max;
+  int __pyx_v_q_max;
+  int __pyx_v_z_max;
+  double __pyx_v_max;
+  double __pyx_v_num;
+  double __pyx_v_sum;
+  double __pyx_v_m_avg;
+  double __pyx_v_q_avg;
+  double __pyx_v_z_avg;
+  bitgen_t *__pyx_v_rng;
+  char const *__pyx_v_capsule_name;
+  PyObject *__pyx_v_capsule = NULL;
+  PyObject *__pyx_v_cur = NULL;
+  double __pyx_v_std;
+  __Pyx_RefNannyDeclarations
+  Py_ssize_t __pyx_t_1;
+  int __pyx_t_2;
+  PyObject *__pyx_t_3 = NULL;
+  PyObject *__pyx_t_4 = NULL;
+  PyObject *__pyx_t_5 = NULL;
+  void *__pyx_t_6;
+  int __pyx_t_7;
+  int __pyx_t_8;
+  int __pyx_t_9;
+  int __pyx_t_10;
+  int __pyx_t_11;
+  int __pyx_t_12;
+  int __pyx_t_13;
+  int __pyx_t_14;
+  int __pyx_t_15;
+  int __pyx_t_16;
+  int __pyx_t_17;
+  int __pyx_t_18;
+  int __pyx_t_19;
+  int __pyx_t_20;
+  Py_ssize_t __pyx_t_21;
+  Py_ssize_t __pyx_t_22;
+  Py_ssize_t __pyx_t_23;
+  int __pyx_t_24;
+  int __pyx_t_25;
+  int __pyx_t_26;
+  double __pyx_t_27;
+  PyObject *__pyx_t_28 = NULL;
+  Py_ssize_t __pyx_t_29;
+  Py_ssize_t __pyx_t_30;
+  Py_ssize_t __pyx_t_31;
+  Py_ssize_t __pyx_t_32;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("_ss_bg_hc_and_par", 0);
+
+  /* "holodeck/cyutils.pyx":1094
+ *     """
+ * 
+ *     cdef int M = shape[0]             # <<<<<<<<<<<<<<
+ *     cdef int Q = shape[1]
+ *     cdef int Z = shape[2]
+ */
+  if (unlikely(((PyObject *) __pyx_v_shape.memview) == Py_None)) {
+    PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+    __PYX_ERR(0, 1094, __pyx_L1_error)
+  }
+  __pyx_t_1 = 0;
+  __pyx_t_2 = -1;
+  if (__pyx_t_1 < 0) {
+    __pyx_t_1 += __pyx_v_shape.shape[0];
+    if (unlikely(__pyx_t_1 < 0)) __pyx_t_2 = 0;
+  } else if (unlikely(__pyx_t_1 >= __pyx_v_shape.shape[0])) __pyx_t_2 = 0;
+  if (unlikely(__pyx_t_2 != -1)) {
+    __Pyx_RaiseBufferIndexError(__pyx_t_2);
+    __PYX_ERR(0, 1094, __pyx_L1_error)
+  }
+  __pyx_v_M = (*((long *) ( /* dim=0 */ (__pyx_v_shape.data + __pyx_t_1 * __pyx_v_shape.strides[0]) )));
+
+  /* "holodeck/cyutils.pyx":1095
+ * 
+ *     cdef int M = shape[0]
+ *     cdef int Q = shape[1]             # <<<<<<<<<<<<<<
+ *     cdef int Z = shape[2]
+ *     cdef int F = shape[3]
+ */
+  if (unlikely(((PyObject *) __pyx_v_shape.memview) == Py_None)) {
+    PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+    __PYX_ERR(0, 1095, __pyx_L1_error)
+  }
+  __pyx_t_1 = 1;
+  __pyx_t_2 = -1;
+  if (__pyx_t_1 < 0) {
+    __pyx_t_1 += __pyx_v_shape.shape[0];
+    if (unlikely(__pyx_t_1 < 0)) __pyx_t_2 = 0;
+  } else if (unlikely(__pyx_t_1 >= __pyx_v_shape.shape[0])) __pyx_t_2 = 0;
+  if (unlikely(__pyx_t_2 != -1)) {
+    __Pyx_RaiseBufferIndexError(__pyx_t_2);
+    __PYX_ERR(0, 1095, __pyx_L1_error)
+  }
+  __pyx_v_Q = (*((long *) ( /* dim=0 */ (__pyx_v_shape.data + __pyx_t_1 * __pyx_v_shape.strides[0]) )));
+
+  /* "holodeck/cyutils.pyx":1096
+ *     cdef int M = shape[0]
+ *     cdef int Q = shape[1]
+ *     cdef int Z = shape[2]             # <<<<<<<<<<<<<<
+ *     cdef int F = shape[3]
+ *     cdef int R = nreals
+ */
+  if (unlikely(((PyObject *) __pyx_v_shape.memview) == Py_None)) {
+    PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+    __PYX_ERR(0, 1096, __pyx_L1_error)
+  }
+  __pyx_t_1 = 2;
+  __pyx_t_2 = -1;
+  if (__pyx_t_1 < 0) {
+    __pyx_t_1 += __pyx_v_shape.shape[0];
+    if (unlikely(__pyx_t_1 < 0)) __pyx_t_2 = 0;
+  } else if (unlikely(__pyx_t_1 >= __pyx_v_shape.shape[0])) __pyx_t_2 = 0;
+  if (unlikely(__pyx_t_2 != -1)) {
+    __Pyx_RaiseBufferIndexError(__pyx_t_2);
+    __PYX_ERR(0, 1096, __pyx_L1_error)
+  }
+  __pyx_v_Z = (*((long *) ( /* dim=0 */ (__pyx_v_shape.data + __pyx_t_1 * __pyx_v_shape.strides[0]) )));
+
+  /* "holodeck/cyutils.pyx":1097
+ *     cdef int Q = shape[1]
+ *     cdef int Z = shape[2]
+ *     cdef int F = shape[3]             # <<<<<<<<<<<<<<
+ *     cdef int R = nreals
+ * 
+ */
+  if (unlikely(((PyObject *) __pyx_v_shape.memview) == Py_None)) {
+    PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+    __PYX_ERR(0, 1097, __pyx_L1_error)
+  }
+  __pyx_t_1 = 3;
+  __pyx_t_2 = -1;
+  if (__pyx_t_1 < 0) {
+    __pyx_t_1 += __pyx_v_shape.shape[0];
+    if (unlikely(__pyx_t_1 < 0)) __pyx_t_2 = 0;
+  } else if (unlikely(__pyx_t_1 >= __pyx_v_shape.shape[0])) __pyx_t_2 = 0;
+  if (unlikely(__pyx_t_2 != -1)) {
+    __Pyx_RaiseBufferIndexError(__pyx_t_2);
+    __PYX_ERR(0, 1097, __pyx_L1_error)
+  }
+  __pyx_v_F = (*((long *) ( /* dim=0 */ (__pyx_v_shape.data + __pyx_t_1 * __pyx_v_shape.strides[0]) )));
+
+  /* "holodeck/cyutils.pyx":1098
+ *     cdef int Z = shape[2]
+ *     cdef int F = shape[3]
+ *     cdef int R = nreals             # <<<<<<<<<<<<<<
+ * 
+ *     cdef int mm, qq, zz, ff, rr, m_max, q_max, z_max
+ */
+  __pyx_v_R = __pyx_v_nreals;
+
+  /* "holodeck/cyutils.pyx":1106
+ *     # Setup random number generator from numpy library
+ *     cdef bitgen_t *rng
+ *     cdef const char *capsule_name = "BitGenerator"             # <<<<<<<<<<<<<<
+ *     capsule = PCG64().capsule
+ *     # Cast the pointer
+ */
+  __pyx_v_capsule_name = ((char const *)"BitGenerator");
+
+  /* "holodeck/cyutils.pyx":1107
+ *     cdef bitgen_t *rng
+ *     cdef const char *capsule_name = "BitGenerator"
+ *     capsule = PCG64().capsule             # <<<<<<<<<<<<<<
+ *     # Cast the pointer
+ *     rng = <bitgen_t *> PyCapsule_GetPointer(capsule, capsule_name)
+ */
+  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_PCG64); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1107, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __pyx_t_5 = NULL;
+  if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_4))) {
+    __pyx_t_5 = PyMethod_GET_SELF(__pyx_t_4);
+    if (likely(__pyx_t_5)) {
+      PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_4);
+      __Pyx_INCREF(__pyx_t_5);
+      __Pyx_INCREF(function);
+      __Pyx_DECREF_SET(__pyx_t_4, function);
+    }
+  }
+  __pyx_t_3 = (__pyx_t_5) ? __Pyx_PyObject_CallOneArg(__pyx_t_4, __pyx_t_5) : __Pyx_PyObject_CallNoArg(__pyx_t_4);
+  __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
+  if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1107, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_capsule); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1107, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __pyx_v_capsule = __pyx_t_4;
+  __pyx_t_4 = 0;
+
+  /* "holodeck/cyutils.pyx":1109
+ *     capsule = PCG64().capsule
+ *     # Cast the pointer
+ *     rng = <bitgen_t *> PyCapsule_GetPointer(capsule, capsule_name)             # <<<<<<<<<<<<<<
+ *     for rr in range(R):
+ *         for ff in range(F):
+ */
+  __pyx_t_6 = PyCapsule_GetPointer(__pyx_v_capsule, __pyx_v_capsule_name); if (unlikely(__pyx_t_6 == ((void *)NULL) && PyErr_Occurred())) __PYX_ERR(0, 1109, __pyx_L1_error)
+  __pyx_v_rng = ((bitgen_t *)__pyx_t_6);
+
+  /* "holodeck/cyutils.pyx":1110
+ *     # Cast the pointer
+ *     rng = <bitgen_t *> PyCapsule_GetPointer(capsule, capsule_name)
+ *     for rr in range(R):             # <<<<<<<<<<<<<<
+ *         for ff in range(F):
+ *             max=0
+ */
+  __pyx_t_2 = __pyx_v_R;
+  __pyx_t_7 = __pyx_t_2;
+  for (__pyx_t_8 = 0; __pyx_t_8 < __pyx_t_7; __pyx_t_8+=1) {
+    __pyx_v_rr = __pyx_t_8;
+
+    /* "holodeck/cyutils.pyx":1111
+ *     rng = <bitgen_t *> PyCapsule_GetPointer(capsule, capsule_name)
+ *     for rr in range(R):
+ *         for ff in range(F):             # <<<<<<<<<<<<<<
+ *             max=0
+ *             sum=0
+ */
+    __pyx_t_9 = __pyx_v_F;
+    __pyx_t_10 = __pyx_t_9;
+    for (__pyx_t_11 = 0; __pyx_t_11 < __pyx_t_10; __pyx_t_11+=1) {
+      __pyx_v_ff = __pyx_t_11;
+
+      /* "holodeck/cyutils.pyx":1112
+ *     for rr in range(R):
+ *         for ff in range(F):
+ *             max=0             # <<<<<<<<<<<<<<
+ *             sum=0
+ *             m_avg=0
+ */
+      __pyx_v_max = 0.0;
+
+      /* "holodeck/cyutils.pyx":1113
+ *         for ff in range(F):
+ *             max=0
+ *             sum=0             # <<<<<<<<<<<<<<
+ *             m_avg=0
+ *             q_avg=0
+ */
+      __pyx_v_sum = 0.0;
+
+      /* "holodeck/cyutils.pyx":1114
+ *             max=0
+ *             sum=0
+ *             m_avg=0             # <<<<<<<<<<<<<<
+ *             q_avg=0
+ *             z_avg=0
+ */
+      __pyx_v_m_avg = 0.0;
+
+      /* "holodeck/cyutils.pyx":1115
+ *             sum=0
+ *             m_avg=0
+ *             q_avg=0             # <<<<<<<<<<<<<<
+ *             z_avg=0
+ *             for mm in range(M):
+ */
+      __pyx_v_q_avg = 0.0;
+
+      /* "holodeck/cyutils.pyx":1116
+ *             m_avg=0
+ *             q_avg=0
+ *             z_avg=0             # <<<<<<<<<<<<<<
+ *             for mm in range(M):
+ *                 for qq in range(Q):
+ */
+      __pyx_v_z_avg = 0.0;
+
+      /* "holodeck/cyutils.pyx":1117
+ *             q_avg=0
+ *             z_avg=0
+ *             for mm in range(M):             # <<<<<<<<<<<<<<
+ *                 for qq in range(Q):
+ *                     for zz in range(Z):
+ */
+      __pyx_t_12 = __pyx_v_M;
+      __pyx_t_13 = __pyx_t_12;
+      for (__pyx_t_14 = 0; __pyx_t_14 < __pyx_t_13; __pyx_t_14+=1) {
+        __pyx_v_mm = __pyx_t_14;
+
+        /* "holodeck/cyutils.pyx":1118
+ *             z_avg=0
+ *             for mm in range(M):
+ *                 for qq in range(Q):             # <<<<<<<<<<<<<<
+ *                     for zz in range(Z):
+ *                         num = number[mm,qq,zz,ff]
+ */
+        __pyx_t_15 = __pyx_v_Q;
+        __pyx_t_16 = __pyx_t_15;
+        for (__pyx_t_17 = 0; __pyx_t_17 < __pyx_t_16; __pyx_t_17+=1) {
+          __pyx_v_qq = __pyx_t_17;
+
+          /* "holodeck/cyutils.pyx":1119
+ *             for mm in range(M):
+ *                 for qq in range(Q):
+ *                     for zz in range(Z):             # <<<<<<<<<<<<<<
+ *                         num = number[mm,qq,zz,ff]
+ *                         cur = h2fdf[mm,qq,zz,ff]
+ */
+          __pyx_t_18 = __pyx_v_Z;
+          __pyx_t_19 = __pyx_t_18;
+          for (__pyx_t_20 = 0; __pyx_t_20 < __pyx_t_19; __pyx_t_20+=1) {
+            __pyx_v_zz = __pyx_t_20;
+
+            /* "holodeck/cyutils.pyx":1120
+ *                 for qq in range(Q):
+ *                     for zz in range(Z):
+ *                         num = number[mm,qq,zz,ff]             # <<<<<<<<<<<<<<
+ *                         cur = h2fdf[mm,qq,zz,ff]
+ *                         if (num>thresh):
+ */
+            if (unlikely(((PyObject *) __pyx_v_number.memview) == Py_None)) {
+              PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+              __PYX_ERR(0, 1120, __pyx_L1_error)
+            }
+            __pyx_t_1 = __pyx_v_mm;
+            __pyx_t_21 = __pyx_v_qq;
+            __pyx_t_22 = __pyx_v_zz;
+            __pyx_t_23 = __pyx_v_ff;
+            __pyx_t_24 = -1;
+            if (__pyx_t_1 < 0) {
+              __pyx_t_1 += __pyx_v_number.shape[0];
+              if (unlikely(__pyx_t_1 < 0)) __pyx_t_24 = 0;
+            } else if (unlikely(__pyx_t_1 >= __pyx_v_number.shape[0])) __pyx_t_24 = 0;
+            if (__pyx_t_21 < 0) {
+              __pyx_t_21 += __pyx_v_number.shape[1];
+              if (unlikely(__pyx_t_21 < 0)) __pyx_t_24 = 1;
+            } else if (unlikely(__pyx_t_21 >= __pyx_v_number.shape[1])) __pyx_t_24 = 1;
+            if (__pyx_t_22 < 0) {
+              __pyx_t_22 += __pyx_v_number.shape[2];
+              if (unlikely(__pyx_t_22 < 0)) __pyx_t_24 = 2;
+            } else if (unlikely(__pyx_t_22 >= __pyx_v_number.shape[2])) __pyx_t_24 = 2;
+            if (__pyx_t_23 < 0) {
+              __pyx_t_23 += __pyx_v_number.shape[3];
+              if (unlikely(__pyx_t_23 < 0)) __pyx_t_24 = 3;
+            } else if (unlikely(__pyx_t_23 >= __pyx_v_number.shape[3])) __pyx_t_24 = 3;
+            if (unlikely(__pyx_t_24 != -1)) {
+              __Pyx_RaiseBufferIndexError(__pyx_t_24);
+              __PYX_ERR(0, 1120, __pyx_L1_error)
+            }
+            __pyx_v_num = (*((double *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_number.data + __pyx_t_1 * __pyx_v_number.strides[0]) ) + __pyx_t_21 * __pyx_v_number.strides[1]) ) + __pyx_t_22 * __pyx_v_number.strides[2]) ) + __pyx_t_23 * __pyx_v_number.strides[3]) )));
+
+            /* "holodeck/cyutils.pyx":1121
+ *                     for zz in range(Z):
+ *                         num = number[mm,qq,zz,ff]
+ *                         cur = h2fdf[mm,qq,zz,ff]             # <<<<<<<<<<<<<<
+ *                         if (num>thresh):
+ *                             std = sqrt(num)
+ */
+            if (unlikely(((PyObject *) __pyx_v_h2fdf.memview) == Py_None)) {
+              PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+              __PYX_ERR(0, 1121, __pyx_L1_error)
+            }
+            __pyx_t_23 = __pyx_v_mm;
+            __pyx_t_22 = __pyx_v_qq;
+            __pyx_t_21 = __pyx_v_zz;
+            __pyx_t_1 = __pyx_v_ff;
+            __pyx_t_24 = -1;
+            if (__pyx_t_23 < 0) {
+              __pyx_t_23 += __pyx_v_h2fdf.shape[0];
+              if (unlikely(__pyx_t_23 < 0)) __pyx_t_24 = 0;
+            } else if (unlikely(__pyx_t_23 >= __pyx_v_h2fdf.shape[0])) __pyx_t_24 = 0;
+            if (__pyx_t_22 < 0) {
+              __pyx_t_22 += __pyx_v_h2fdf.shape[1];
+              if (unlikely(__pyx_t_22 < 0)) __pyx_t_24 = 1;
+            } else if (unlikely(__pyx_t_22 >= __pyx_v_h2fdf.shape[1])) __pyx_t_24 = 1;
+            if (__pyx_t_21 < 0) {
+              __pyx_t_21 += __pyx_v_h2fdf.shape[2];
+              if (unlikely(__pyx_t_21 < 0)) __pyx_t_24 = 2;
+            } else if (unlikely(__pyx_t_21 >= __pyx_v_h2fdf.shape[2])) __pyx_t_24 = 2;
+            if (__pyx_t_1 < 0) {
+              __pyx_t_1 += __pyx_v_h2fdf.shape[3];
+              if (unlikely(__pyx_t_1 < 0)) __pyx_t_24 = 3;
+            } else if (unlikely(__pyx_t_1 >= __pyx_v_h2fdf.shape[3])) __pyx_t_24 = 3;
+            if (unlikely(__pyx_t_24 != -1)) {
+              __Pyx_RaiseBufferIndexError(__pyx_t_24);
+              __PYX_ERR(0, 1121, __pyx_L1_error)
+            }
+            __pyx_t_4 = PyFloat_FromDouble((*((double *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_h2fdf.data + __pyx_t_23 * __pyx_v_h2fdf.strides[0]) ) + __pyx_t_22 * __pyx_v_h2fdf.strides[1]) ) + __pyx_t_21 * __pyx_v_h2fdf.strides[2]) ) + __pyx_t_1 * __pyx_v_h2fdf.strides[3]) )))); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1121, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_4);
+            __Pyx_XDECREF_SET(__pyx_v_cur, __pyx_t_4);
+            __pyx_t_4 = 0;
+
+            /* "holodeck/cyutils.pyx":1122
+ *                         num = number[mm,qq,zz,ff]
+ *                         cur = h2fdf[mm,qq,zz,ff]
+ *                         if (num>thresh):             # <<<<<<<<<<<<<<
+ *                             std = sqrt(num)
+ *                             num = <double>random_normal(rng, num, std)
+ */
+            __pyx_t_25 = ((__pyx_v_num > __pyx_v_thresh) != 0);
+            if (__pyx_t_25) {
+
+              /* "holodeck/cyutils.pyx":1123
+ *                         cur = h2fdf[mm,qq,zz,ff]
+ *                         if (num>thresh):
+ *                             std = sqrt(num)             # <<<<<<<<<<<<<<
+ *                             num = <double>random_normal(rng, num, std)
+ *                         else:
+ */
+              __pyx_v_std = sqrt(__pyx_v_num);
+
+              /* "holodeck/cyutils.pyx":1124
+ *                         if (num>thresh):
+ *                             std = sqrt(num)
+ *                             num = <double>random_normal(rng, num, std)             # <<<<<<<<<<<<<<
+ *                         else:
+ *                             num = <double>random_poisson(rng, num)
+ */
+              __pyx_v_num = ((double)random_normal(__pyx_v_rng, __pyx_v_num, __pyx_v_std));
+
+              /* "holodeck/cyutils.pyx":1122
+ *                         num = number[mm,qq,zz,ff]
+ *                         cur = h2fdf[mm,qq,zz,ff]
+ *                         if (num>thresh):             # <<<<<<<<<<<<<<
+ *                             std = sqrt(num)
+ *                             num = <double>random_normal(rng, num, std)
+ */
+              goto __pyx_L13;
+            }
+
+            /* "holodeck/cyutils.pyx":1126
+ *                             num = <double>random_normal(rng, num, std)
+ *                         else:
+ *                             num = <double>random_poisson(rng, num)             # <<<<<<<<<<<<<<
+ *                         if(cur > max and num > 0):
+ *                             max = cur
+ */
+            /*else*/ {
+              __pyx_v_num = ((double)random_poisson(__pyx_v_rng, __pyx_v_num));
+            }
+            __pyx_L13:;
+
+            /* "holodeck/cyutils.pyx":1127
+ *                         else:
+ *                             num = <double>random_poisson(rng, num)
+ *                         if(cur > max and num > 0):             # <<<<<<<<<<<<<<
+ *                             max = cur
+ *                             m_max = mm
+ */
+            __pyx_t_4 = PyFloat_FromDouble(__pyx_v_max); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1127, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_4);
+            __pyx_t_3 = PyObject_RichCompare(__pyx_v_cur, __pyx_t_4, Py_GT); __Pyx_XGOTREF(__pyx_t_3); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1127, __pyx_L1_error)
+            __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+            __pyx_t_26 = __Pyx_PyObject_IsTrue(__pyx_t_3); if (unlikely(__pyx_t_26 < 0)) __PYX_ERR(0, 1127, __pyx_L1_error)
+            __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+            if (__pyx_t_26) {
+            } else {
+              __pyx_t_25 = __pyx_t_26;
+              goto __pyx_L15_bool_binop_done;
+            }
+            __pyx_t_26 = ((__pyx_v_num > 0.0) != 0);
+            __pyx_t_25 = __pyx_t_26;
+            __pyx_L15_bool_binop_done:;
+            if (__pyx_t_25) {
+
+              /* "holodeck/cyutils.pyx":1128
+ *                             num = <double>random_poisson(rng, num)
+ *                         if(cur > max and num > 0):
+ *                             max = cur             # <<<<<<<<<<<<<<
+ *                             m_max = mm
+ *                             q_max = qq
+ */
+              __pyx_t_27 = __pyx_PyFloat_AsDouble(__pyx_v_cur); if (unlikely((__pyx_t_27 == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 1128, __pyx_L1_error)
+              __pyx_v_max = __pyx_t_27;
+
+              /* "holodeck/cyutils.pyx":1129
+ *                         if(cur > max and num > 0):
+ *                             max = cur
+ *                             m_max = mm             # <<<<<<<<<<<<<<
+ *                             q_max = qq
+ *                             z_max = zz
+ */
+              __pyx_v_m_max = __pyx_v_mm;
+
+              /* "holodeck/cyutils.pyx":1130
+ *                             max = cur
+ *                             m_max = mm
+ *                             q_max = qq             # <<<<<<<<<<<<<<
+ *                             z_max = zz
+ *                         sum += num * cur
+ */
+              __pyx_v_q_max = __pyx_v_qq;
+
+              /* "holodeck/cyutils.pyx":1131
+ *                             m_max = mm
+ *                             q_max = qq
+ *                             z_max = zz             # <<<<<<<<<<<<<<
+ *                         sum += num * cur
+ *                         m_avg += num * cur * mt[mm]
+ */
+              __pyx_v_z_max = __pyx_v_zz;
+
+              /* "holodeck/cyutils.pyx":1127
+ *                         else:
+ *                             num = <double>random_poisson(rng, num)
+ *                         if(cur > max and num > 0):             # <<<<<<<<<<<<<<
+ *                             max = cur
+ *                             m_max = mm
+ */
+            }
+
+            /* "holodeck/cyutils.pyx":1132
+ *                             q_max = qq
+ *                             z_max = zz
+ *                         sum += num * cur             # <<<<<<<<<<<<<<
+ *                         m_avg += num * cur * mt[mm]
+ *                         q_avg += num * cur * mr[qq]
+ */
+            __pyx_t_3 = PyFloat_FromDouble(__pyx_v_sum); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1132, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_3);
+            __pyx_t_4 = PyFloat_FromDouble(__pyx_v_num); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1132, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_4);
+            __pyx_t_5 = PyNumber_Multiply(__pyx_t_4, __pyx_v_cur); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 1132, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_5);
+            __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+            __pyx_t_4 = PyNumber_InPlaceAdd(__pyx_t_3, __pyx_t_5); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1132, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_4);
+            __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+            __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+            __pyx_t_27 = __pyx_PyFloat_AsDouble(__pyx_t_4); if (unlikely((__pyx_t_27 == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 1132, __pyx_L1_error)
+            __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+            __pyx_v_sum = __pyx_t_27;
+
+            /* "holodeck/cyutils.pyx":1133
+ *                             z_max = zz
+ *                         sum += num * cur
+ *                         m_avg += num * cur * mt[mm]             # <<<<<<<<<<<<<<
+ *                         q_avg += num * cur * mr[qq]
+ *                         z_avg += num * cur * rz[zz]
+ */
+            __pyx_t_4 = PyFloat_FromDouble(__pyx_v_m_avg); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1133, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_4);
+            __pyx_t_5 = PyFloat_FromDouble(__pyx_v_num); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 1133, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_5);
+            __pyx_t_3 = PyNumber_Multiply(__pyx_t_5, __pyx_v_cur); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1133, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_3);
+            __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+            if (unlikely(((PyObject *) __pyx_v_mt.memview) == Py_None)) {
+              PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+              __PYX_ERR(0, 1133, __pyx_L1_error)
+            }
+            __pyx_t_1 = __pyx_v_mm;
+            __pyx_t_24 = -1;
+            if (__pyx_t_1 < 0) {
+              __pyx_t_1 += __pyx_v_mt.shape[0];
+              if (unlikely(__pyx_t_1 < 0)) __pyx_t_24 = 0;
+            } else if (unlikely(__pyx_t_1 >= __pyx_v_mt.shape[0])) __pyx_t_24 = 0;
+            if (unlikely(__pyx_t_24 != -1)) {
+              __Pyx_RaiseBufferIndexError(__pyx_t_24);
+              __PYX_ERR(0, 1133, __pyx_L1_error)
+            }
+            __pyx_t_5 = PyFloat_FromDouble((*((double *) ( /* dim=0 */ (__pyx_v_mt.data + __pyx_t_1 * __pyx_v_mt.strides[0]) )))); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 1133, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_5);
+            __pyx_t_28 = PyNumber_Multiply(__pyx_t_3, __pyx_t_5); if (unlikely(!__pyx_t_28)) __PYX_ERR(0, 1133, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_28);
+            __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+            __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+            __pyx_t_5 = PyNumber_InPlaceAdd(__pyx_t_4, __pyx_t_28); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 1133, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_5);
+            __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+            __Pyx_DECREF(__pyx_t_28); __pyx_t_28 = 0;
+            __pyx_t_27 = __pyx_PyFloat_AsDouble(__pyx_t_5); if (unlikely((__pyx_t_27 == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 1133, __pyx_L1_error)
+            __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+            __pyx_v_m_avg = __pyx_t_27;
+
+            /* "holodeck/cyutils.pyx":1134
+ *                         sum += num * cur
+ *                         m_avg += num * cur * mt[mm]
+ *                         q_avg += num * cur * mr[qq]             # <<<<<<<<<<<<<<
+ *                         z_avg += num * cur * rz[zz]
+ *             # characteristic frequencies squared
+ */
+            __pyx_t_5 = PyFloat_FromDouble(__pyx_v_q_avg); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 1134, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_5);
+            __pyx_t_28 = PyFloat_FromDouble(__pyx_v_num); if (unlikely(!__pyx_t_28)) __PYX_ERR(0, 1134, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_28);
+            __pyx_t_4 = PyNumber_Multiply(__pyx_t_28, __pyx_v_cur); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1134, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_4);
+            __Pyx_DECREF(__pyx_t_28); __pyx_t_28 = 0;
+            if (unlikely(((PyObject *) __pyx_v_mr.memview) == Py_None)) {
+              PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+              __PYX_ERR(0, 1134, __pyx_L1_error)
+            }
+            __pyx_t_1 = __pyx_v_qq;
+            __pyx_t_24 = -1;
+            if (__pyx_t_1 < 0) {
+              __pyx_t_1 += __pyx_v_mr.shape[0];
+              if (unlikely(__pyx_t_1 < 0)) __pyx_t_24 = 0;
+            } else if (unlikely(__pyx_t_1 >= __pyx_v_mr.shape[0])) __pyx_t_24 = 0;
+            if (unlikely(__pyx_t_24 != -1)) {
+              __Pyx_RaiseBufferIndexError(__pyx_t_24);
+              __PYX_ERR(0, 1134, __pyx_L1_error)
+            }
+            __pyx_t_28 = PyFloat_FromDouble((*((double *) ( /* dim=0 */ (__pyx_v_mr.data + __pyx_t_1 * __pyx_v_mr.strides[0]) )))); if (unlikely(!__pyx_t_28)) __PYX_ERR(0, 1134, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_28);
+            __pyx_t_3 = PyNumber_Multiply(__pyx_t_4, __pyx_t_28); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1134, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_3);
+            __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+            __Pyx_DECREF(__pyx_t_28); __pyx_t_28 = 0;
+            __pyx_t_28 = PyNumber_InPlaceAdd(__pyx_t_5, __pyx_t_3); if (unlikely(!__pyx_t_28)) __PYX_ERR(0, 1134, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_28);
+            __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+            __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+            __pyx_t_27 = __pyx_PyFloat_AsDouble(__pyx_t_28); if (unlikely((__pyx_t_27 == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 1134, __pyx_L1_error)
+            __Pyx_DECREF(__pyx_t_28); __pyx_t_28 = 0;
+            __pyx_v_q_avg = __pyx_t_27;
+
+            /* "holodeck/cyutils.pyx":1135
+ *                         m_avg += num * cur * mt[mm]
+ *                         q_avg += num * cur * mr[qq]
+ *                         z_avg += num * cur * rz[zz]             # <<<<<<<<<<<<<<
+ *             # characteristic frequencies squared
+ *             hc2ss[ff,rr] = max
+ */
+            __pyx_t_28 = PyFloat_FromDouble(__pyx_v_z_avg); if (unlikely(!__pyx_t_28)) __PYX_ERR(0, 1135, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_28);
+            __pyx_t_3 = PyFloat_FromDouble(__pyx_v_num); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1135, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_3);
+            __pyx_t_5 = PyNumber_Multiply(__pyx_t_3, __pyx_v_cur); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 1135, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_5);
+            __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+            if (unlikely(((PyObject *) __pyx_v_rz.memview) == Py_None)) {
+              PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+              __PYX_ERR(0, 1135, __pyx_L1_error)
+            }
+            __pyx_t_1 = __pyx_v_zz;
+            __pyx_t_24 = -1;
+            if (__pyx_t_1 < 0) {
+              __pyx_t_1 += __pyx_v_rz.shape[0];
+              if (unlikely(__pyx_t_1 < 0)) __pyx_t_24 = 0;
+            } else if (unlikely(__pyx_t_1 >= __pyx_v_rz.shape[0])) __pyx_t_24 = 0;
+            if (unlikely(__pyx_t_24 != -1)) {
+              __Pyx_RaiseBufferIndexError(__pyx_t_24);
+              __PYX_ERR(0, 1135, __pyx_L1_error)
+            }
+            __pyx_t_3 = PyFloat_FromDouble((*((double *) ( /* dim=0 */ (__pyx_v_rz.data + __pyx_t_1 * __pyx_v_rz.strides[0]) )))); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1135, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_3);
+            __pyx_t_4 = PyNumber_Multiply(__pyx_t_5, __pyx_t_3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1135, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_4);
+            __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+            __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+            __pyx_t_3 = PyNumber_InPlaceAdd(__pyx_t_28, __pyx_t_4); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1135, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_3);
+            __Pyx_DECREF(__pyx_t_28); __pyx_t_28 = 0;
+            __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+            __pyx_t_27 = __pyx_PyFloat_AsDouble(__pyx_t_3); if (unlikely((__pyx_t_27 == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 1135, __pyx_L1_error)
+            __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+            __pyx_v_z_avg = __pyx_t_27;
+          }
+        }
+      }
+
+      /* "holodeck/cyutils.pyx":1137
+ *                         z_avg += num * cur * rz[zz]
+ *             # characteristic frequencies squared
+ *             hc2ss[ff,rr] = max             # <<<<<<<<<<<<<<
+ *             hc2bg[ff,rr] = sum - max
+ * 
+ */
+      if (unlikely(((PyObject *) __pyx_v_hc2ss.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1137, __pyx_L1_error)
+      }
+      __pyx_t_1 = __pyx_v_ff;
+      __pyx_t_21 = __pyx_v_rr;
+      __pyx_t_12 = -1;
+      if (__pyx_t_1 < 0) {
+        __pyx_t_1 += __pyx_v_hc2ss.shape[0];
+        if (unlikely(__pyx_t_1 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_1 >= __pyx_v_hc2ss.shape[0])) __pyx_t_12 = 0;
+      if (__pyx_t_21 < 0) {
+        __pyx_t_21 += __pyx_v_hc2ss.shape[1];
+        if (unlikely(__pyx_t_21 < 0)) __pyx_t_12 = 1;
+      } else if (unlikely(__pyx_t_21 >= __pyx_v_hc2ss.shape[1])) __pyx_t_12 = 1;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1137, __pyx_L1_error)
+      }
+      *((double *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_hc2ss.data + __pyx_t_1 * __pyx_v_hc2ss.strides[0]) ) + __pyx_t_21 * __pyx_v_hc2ss.strides[1]) )) = __pyx_v_max;
+
+      /* "holodeck/cyutils.pyx":1138
+ *             # characteristic frequencies squared
+ *             hc2ss[ff,rr] = max
+ *             hc2bg[ff,rr] = sum - max             # <<<<<<<<<<<<<<
+ * 
+ *             # single source indices
+ */
+      if (unlikely(((PyObject *) __pyx_v_hc2bg.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1138, __pyx_L1_error)
+      }
+      __pyx_t_21 = __pyx_v_ff;
+      __pyx_t_1 = __pyx_v_rr;
+      __pyx_t_12 = -1;
+      if (__pyx_t_21 < 0) {
+        __pyx_t_21 += __pyx_v_hc2bg.shape[0];
+        if (unlikely(__pyx_t_21 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_21 >= __pyx_v_hc2bg.shape[0])) __pyx_t_12 = 0;
+      if (__pyx_t_1 < 0) {
+        __pyx_t_1 += __pyx_v_hc2bg.shape[1];
+        if (unlikely(__pyx_t_1 < 0)) __pyx_t_12 = 1;
+      } else if (unlikely(__pyx_t_1 >= __pyx_v_hc2bg.shape[1])) __pyx_t_12 = 1;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1138, __pyx_L1_error)
+      }
+      *((double *) ( /* dim=1 */ (( /* dim=0 */ (__pyx_v_hc2bg.data + __pyx_t_21 * __pyx_v_hc2bg.strides[0]) ) + __pyx_t_1 * __pyx_v_hc2bg.strides[1]) )) = (__pyx_v_sum - __pyx_v_max);
+
+      /* "holodeck/cyutils.pyx":1141
+ * 
+ *             # single source indices
+ *             ssidx[0,ff,rr] = m_max             # <<<<<<<<<<<<<<
+ *             ssidx[1,ff,rr] = q_max
+ *             ssidx[2,ff,rr] = z_max
+ */
+      if (unlikely(((PyObject *) __pyx_v_ssidx.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1141, __pyx_L1_error)
+      }
+      __pyx_t_1 = 0;
+      __pyx_t_21 = __pyx_v_ff;
+      __pyx_t_22 = __pyx_v_rr;
+      __pyx_t_12 = -1;
+      if (__pyx_t_1 < 0) {
+        __pyx_t_1 += __pyx_v_ssidx.shape[0];
+        if (unlikely(__pyx_t_1 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_1 >= __pyx_v_ssidx.shape[0])) __pyx_t_12 = 0;
+      if (__pyx_t_21 < 0) {
+        __pyx_t_21 += __pyx_v_ssidx.shape[1];
+        if (unlikely(__pyx_t_21 < 0)) __pyx_t_12 = 1;
+      } else if (unlikely(__pyx_t_21 >= __pyx_v_ssidx.shape[1])) __pyx_t_12 = 1;
+      if (__pyx_t_22 < 0) {
+        __pyx_t_22 += __pyx_v_ssidx.shape[2];
+        if (unlikely(__pyx_t_22 < 0)) __pyx_t_12 = 2;
+      } else if (unlikely(__pyx_t_22 >= __pyx_v_ssidx.shape[2])) __pyx_t_12 = 2;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1141, __pyx_L1_error)
+      }
+      *((long *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_ssidx.data + __pyx_t_1 * __pyx_v_ssidx.strides[0]) ) + __pyx_t_21 * __pyx_v_ssidx.strides[1]) ) + __pyx_t_22 * __pyx_v_ssidx.strides[2]) )) = __pyx_v_m_max;
+
+      /* "holodeck/cyutils.pyx":1142
+ *             # single source indices
+ *             ssidx[0,ff,rr] = m_max
+ *             ssidx[1,ff,rr] = q_max             # <<<<<<<<<<<<<<
+ *             ssidx[2,ff,rr] = z_max
+ * 
+ */
+      if (unlikely(((PyObject *) __pyx_v_ssidx.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1142, __pyx_L1_error)
+      }
+      __pyx_t_22 = 1;
+      __pyx_t_21 = __pyx_v_ff;
+      __pyx_t_1 = __pyx_v_rr;
+      __pyx_t_12 = -1;
+      if (__pyx_t_22 < 0) {
+        __pyx_t_22 += __pyx_v_ssidx.shape[0];
+        if (unlikely(__pyx_t_22 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_22 >= __pyx_v_ssidx.shape[0])) __pyx_t_12 = 0;
+      if (__pyx_t_21 < 0) {
+        __pyx_t_21 += __pyx_v_ssidx.shape[1];
+        if (unlikely(__pyx_t_21 < 0)) __pyx_t_12 = 1;
+      } else if (unlikely(__pyx_t_21 >= __pyx_v_ssidx.shape[1])) __pyx_t_12 = 1;
+      if (__pyx_t_1 < 0) {
+        __pyx_t_1 += __pyx_v_ssidx.shape[2];
+        if (unlikely(__pyx_t_1 < 0)) __pyx_t_12 = 2;
+      } else if (unlikely(__pyx_t_1 >= __pyx_v_ssidx.shape[2])) __pyx_t_12 = 2;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1142, __pyx_L1_error)
+      }
+      *((long *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_ssidx.data + __pyx_t_22 * __pyx_v_ssidx.strides[0]) ) + __pyx_t_21 * __pyx_v_ssidx.strides[1]) ) + __pyx_t_1 * __pyx_v_ssidx.strides[2]) )) = __pyx_v_q_max;
+
+      /* "holodeck/cyutils.pyx":1143
+ *             ssidx[0,ff,rr] = m_max
+ *             ssidx[1,ff,rr] = q_max
+ *             ssidx[2,ff,rr] = z_max             # <<<<<<<<<<<<<<
+ * 
+ *             # background average parameters
+ */
+      if (unlikely(((PyObject *) __pyx_v_ssidx.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1143, __pyx_L1_error)
+      }
+      __pyx_t_1 = 2;
+      __pyx_t_21 = __pyx_v_ff;
+      __pyx_t_22 = __pyx_v_rr;
+      __pyx_t_12 = -1;
+      if (__pyx_t_1 < 0) {
+        __pyx_t_1 += __pyx_v_ssidx.shape[0];
+        if (unlikely(__pyx_t_1 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_1 >= __pyx_v_ssidx.shape[0])) __pyx_t_12 = 0;
+      if (__pyx_t_21 < 0) {
+        __pyx_t_21 += __pyx_v_ssidx.shape[1];
+        if (unlikely(__pyx_t_21 < 0)) __pyx_t_12 = 1;
+      } else if (unlikely(__pyx_t_21 >= __pyx_v_ssidx.shape[1])) __pyx_t_12 = 1;
+      if (__pyx_t_22 < 0) {
+        __pyx_t_22 += __pyx_v_ssidx.shape[2];
+        if (unlikely(__pyx_t_22 < 0)) __pyx_t_12 = 2;
+      } else if (unlikely(__pyx_t_22 >= __pyx_v_ssidx.shape[2])) __pyx_t_12 = 2;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1143, __pyx_L1_error)
+      }
+      *((long *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_ssidx.data + __pyx_t_1 * __pyx_v_ssidx.strides[0]) ) + __pyx_t_21 * __pyx_v_ssidx.strides[1]) ) + __pyx_t_22 * __pyx_v_ssidx.strides[2]) )) = __pyx_v_z_max;
+
+      /* "holodeck/cyutils.pyx":1146
+ * 
+ *             # background average parameters
+ *             bgpar[0,ff,rr] = ((m_avg - h2fdf[m_max, q_max, z_max, ff] * mt[m_max])             # <<<<<<<<<<<<<<
+ *                                 /(sum-max))
+ *             bgpar[1,ff,rr] = ((q_avg - h2fdf[m_max, q_max, z_max, ff] * mr[q_max])
+ */
+      if (unlikely(((PyObject *) __pyx_v_h2fdf.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1146, __pyx_L1_error)
+      }
+      __pyx_t_22 = __pyx_v_m_max;
+      __pyx_t_21 = __pyx_v_q_max;
+      __pyx_t_1 = __pyx_v_z_max;
+      __pyx_t_23 = __pyx_v_ff;
+      __pyx_t_12 = -1;
+      if (__pyx_t_22 < 0) {
+        __pyx_t_22 += __pyx_v_h2fdf.shape[0];
+        if (unlikely(__pyx_t_22 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_22 >= __pyx_v_h2fdf.shape[0])) __pyx_t_12 = 0;
+      if (__pyx_t_21 < 0) {
+        __pyx_t_21 += __pyx_v_h2fdf.shape[1];
+        if (unlikely(__pyx_t_21 < 0)) __pyx_t_12 = 1;
+      } else if (unlikely(__pyx_t_21 >= __pyx_v_h2fdf.shape[1])) __pyx_t_12 = 1;
+      if (__pyx_t_1 < 0) {
+        __pyx_t_1 += __pyx_v_h2fdf.shape[2];
+        if (unlikely(__pyx_t_1 < 0)) __pyx_t_12 = 2;
+      } else if (unlikely(__pyx_t_1 >= __pyx_v_h2fdf.shape[2])) __pyx_t_12 = 2;
+      if (__pyx_t_23 < 0) {
+        __pyx_t_23 += __pyx_v_h2fdf.shape[3];
+        if (unlikely(__pyx_t_23 < 0)) __pyx_t_12 = 3;
+      } else if (unlikely(__pyx_t_23 >= __pyx_v_h2fdf.shape[3])) __pyx_t_12 = 3;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1146, __pyx_L1_error)
+      }
+      if (unlikely(((PyObject *) __pyx_v_mt.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1146, __pyx_L1_error)
+      }
+      __pyx_t_29 = __pyx_v_m_max;
+      __pyx_t_12 = -1;
+      if (__pyx_t_29 < 0) {
+        __pyx_t_29 += __pyx_v_mt.shape[0];
+        if (unlikely(__pyx_t_29 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_29 >= __pyx_v_mt.shape[0])) __pyx_t_12 = 0;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1146, __pyx_L1_error)
+      }
+
+      /* "holodeck/cyutils.pyx":1147
+ *             # background average parameters
+ *             bgpar[0,ff,rr] = ((m_avg - h2fdf[m_max, q_max, z_max, ff] * mt[m_max])
+ *                                 /(sum-max))             # <<<<<<<<<<<<<<
+ *             bgpar[1,ff,rr] = ((q_avg - h2fdf[m_max, q_max, z_max, ff] * mr[q_max])
+ *                                 /(sum-max))
+ */
+      if (unlikely(((PyObject *) __pyx_v_bgpar.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1146, __pyx_L1_error)
+      }
+
+      /* "holodeck/cyutils.pyx":1146
+ * 
+ *             # background average parameters
+ *             bgpar[0,ff,rr] = ((m_avg - h2fdf[m_max, q_max, z_max, ff] * mt[m_max])             # <<<<<<<<<<<<<<
+ *                                 /(sum-max))
+ *             bgpar[1,ff,rr] = ((q_avg - h2fdf[m_max, q_max, z_max, ff] * mr[q_max])
+ */
+      __pyx_t_30 = 0;
+      __pyx_t_31 = __pyx_v_ff;
+      __pyx_t_32 = __pyx_v_rr;
+      __pyx_t_12 = -1;
+      if (__pyx_t_30 < 0) {
+        __pyx_t_30 += __pyx_v_bgpar.shape[0];
+        if (unlikely(__pyx_t_30 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_30 >= __pyx_v_bgpar.shape[0])) __pyx_t_12 = 0;
+      if (__pyx_t_31 < 0) {
+        __pyx_t_31 += __pyx_v_bgpar.shape[1];
+        if (unlikely(__pyx_t_31 < 0)) __pyx_t_12 = 1;
+      } else if (unlikely(__pyx_t_31 >= __pyx_v_bgpar.shape[1])) __pyx_t_12 = 1;
+      if (__pyx_t_32 < 0) {
+        __pyx_t_32 += __pyx_v_bgpar.shape[2];
+        if (unlikely(__pyx_t_32 < 0)) __pyx_t_12 = 2;
+      } else if (unlikely(__pyx_t_32 >= __pyx_v_bgpar.shape[2])) __pyx_t_12 = 2;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1146, __pyx_L1_error)
+      }
+      *((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_bgpar.data + __pyx_t_30 * __pyx_v_bgpar.strides[0]) ) + __pyx_t_31 * __pyx_v_bgpar.strides[1]) ) + __pyx_t_32 * __pyx_v_bgpar.strides[2]) )) = ((__pyx_v_m_avg - ((*((double *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_h2fdf.data + __pyx_t_22 * __pyx_v_h2fdf.strides[0]) ) + __pyx_t_21 * __pyx_v_h2fdf.strides[1]) ) + __pyx_t_1 * __pyx_v_h2fdf.strides[2]) ) + __pyx_t_23 * __pyx_v_h2fdf.strides[3]) ))) * (*((double *) ( /* dim=0 */ (__pyx_v_mt.data + __pyx_t_29 * __pyx_v_mt.strides[0]) ))))) / (__pyx_v_sum - __pyx_v_max));
+
+      /* "holodeck/cyutils.pyx":1148
+ *             bgpar[0,ff,rr] = ((m_avg - h2fdf[m_max, q_max, z_max, ff] * mt[m_max])
+ *                                 /(sum-max))
+ *             bgpar[1,ff,rr] = ((q_avg - h2fdf[m_max, q_max, z_max, ff] * mr[q_max])             # <<<<<<<<<<<<<<
+ *                                 /(sum-max))
+ *             bgpar[2,ff,rr] = ((z_avg - h2fdf[m_max, q_max, z_max, ff] * rz[z_max])
+ */
+      if (unlikely(((PyObject *) __pyx_v_h2fdf.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1148, __pyx_L1_error)
+      }
+      __pyx_t_29 = __pyx_v_m_max;
+      __pyx_t_23 = __pyx_v_q_max;
+      __pyx_t_1 = __pyx_v_z_max;
+      __pyx_t_21 = __pyx_v_ff;
+      __pyx_t_12 = -1;
+      if (__pyx_t_29 < 0) {
+        __pyx_t_29 += __pyx_v_h2fdf.shape[0];
+        if (unlikely(__pyx_t_29 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_29 >= __pyx_v_h2fdf.shape[0])) __pyx_t_12 = 0;
+      if (__pyx_t_23 < 0) {
+        __pyx_t_23 += __pyx_v_h2fdf.shape[1];
+        if (unlikely(__pyx_t_23 < 0)) __pyx_t_12 = 1;
+      } else if (unlikely(__pyx_t_23 >= __pyx_v_h2fdf.shape[1])) __pyx_t_12 = 1;
+      if (__pyx_t_1 < 0) {
+        __pyx_t_1 += __pyx_v_h2fdf.shape[2];
+        if (unlikely(__pyx_t_1 < 0)) __pyx_t_12 = 2;
+      } else if (unlikely(__pyx_t_1 >= __pyx_v_h2fdf.shape[2])) __pyx_t_12 = 2;
+      if (__pyx_t_21 < 0) {
+        __pyx_t_21 += __pyx_v_h2fdf.shape[3];
+        if (unlikely(__pyx_t_21 < 0)) __pyx_t_12 = 3;
+      } else if (unlikely(__pyx_t_21 >= __pyx_v_h2fdf.shape[3])) __pyx_t_12 = 3;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1148, __pyx_L1_error)
+      }
+      if (unlikely(((PyObject *) __pyx_v_mr.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1148, __pyx_L1_error)
+      }
+      __pyx_t_22 = __pyx_v_q_max;
+      __pyx_t_12 = -1;
+      if (__pyx_t_22 < 0) {
+        __pyx_t_22 += __pyx_v_mr.shape[0];
+        if (unlikely(__pyx_t_22 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_22 >= __pyx_v_mr.shape[0])) __pyx_t_12 = 0;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1148, __pyx_L1_error)
+      }
+
+      /* "holodeck/cyutils.pyx":1149
+ *                                 /(sum-max))
+ *             bgpar[1,ff,rr] = ((q_avg - h2fdf[m_max, q_max, z_max, ff] * mr[q_max])
+ *                                 /(sum-max))             # <<<<<<<<<<<<<<
+ *             bgpar[2,ff,rr] = ((z_avg - h2fdf[m_max, q_max, z_max, ff] * rz[z_max])
+ *                                 /(sum-max))
+ */
+      if (unlikely(((PyObject *) __pyx_v_bgpar.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1148, __pyx_L1_error)
+      }
+
+      /* "holodeck/cyutils.pyx":1148
+ *             bgpar[0,ff,rr] = ((m_avg - h2fdf[m_max, q_max, z_max, ff] * mt[m_max])
+ *                                 /(sum-max))
+ *             bgpar[1,ff,rr] = ((q_avg - h2fdf[m_max, q_max, z_max, ff] * mr[q_max])             # <<<<<<<<<<<<<<
+ *                                 /(sum-max))
+ *             bgpar[2,ff,rr] = ((z_avg - h2fdf[m_max, q_max, z_max, ff] * rz[z_max])
+ */
+      __pyx_t_32 = 1;
+      __pyx_t_31 = __pyx_v_ff;
+      __pyx_t_30 = __pyx_v_rr;
+      __pyx_t_12 = -1;
+      if (__pyx_t_32 < 0) {
+        __pyx_t_32 += __pyx_v_bgpar.shape[0];
+        if (unlikely(__pyx_t_32 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_32 >= __pyx_v_bgpar.shape[0])) __pyx_t_12 = 0;
+      if (__pyx_t_31 < 0) {
+        __pyx_t_31 += __pyx_v_bgpar.shape[1];
+        if (unlikely(__pyx_t_31 < 0)) __pyx_t_12 = 1;
+      } else if (unlikely(__pyx_t_31 >= __pyx_v_bgpar.shape[1])) __pyx_t_12 = 1;
+      if (__pyx_t_30 < 0) {
+        __pyx_t_30 += __pyx_v_bgpar.shape[2];
+        if (unlikely(__pyx_t_30 < 0)) __pyx_t_12 = 2;
+      } else if (unlikely(__pyx_t_30 >= __pyx_v_bgpar.shape[2])) __pyx_t_12 = 2;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1148, __pyx_L1_error)
+      }
+      *((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_bgpar.data + __pyx_t_32 * __pyx_v_bgpar.strides[0]) ) + __pyx_t_31 * __pyx_v_bgpar.strides[1]) ) + __pyx_t_30 * __pyx_v_bgpar.strides[2]) )) = ((__pyx_v_q_avg - ((*((double *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_h2fdf.data + __pyx_t_29 * __pyx_v_h2fdf.strides[0]) ) + __pyx_t_23 * __pyx_v_h2fdf.strides[1]) ) + __pyx_t_1 * __pyx_v_h2fdf.strides[2]) ) + __pyx_t_21 * __pyx_v_h2fdf.strides[3]) ))) * (*((double *) ( /* dim=0 */ (__pyx_v_mr.data + __pyx_t_22 * __pyx_v_mr.strides[0]) ))))) / (__pyx_v_sum - __pyx_v_max));
+
+      /* "holodeck/cyutils.pyx":1150
+ *             bgpar[1,ff,rr] = ((q_avg - h2fdf[m_max, q_max, z_max, ff] * mr[q_max])
+ *                                 /(sum-max))
+ *             bgpar[2,ff,rr] = ((z_avg - h2fdf[m_max, q_max, z_max, ff] * rz[z_max])             # <<<<<<<<<<<<<<
+ *                                 /(sum-max))
+ *             # single source parameters
+ */
+      if (unlikely(((PyObject *) __pyx_v_h2fdf.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1150, __pyx_L1_error)
+      }
+      __pyx_t_22 = __pyx_v_m_max;
+      __pyx_t_21 = __pyx_v_q_max;
+      __pyx_t_1 = __pyx_v_z_max;
+      __pyx_t_23 = __pyx_v_ff;
+      __pyx_t_12 = -1;
+      if (__pyx_t_22 < 0) {
+        __pyx_t_22 += __pyx_v_h2fdf.shape[0];
+        if (unlikely(__pyx_t_22 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_22 >= __pyx_v_h2fdf.shape[0])) __pyx_t_12 = 0;
+      if (__pyx_t_21 < 0) {
+        __pyx_t_21 += __pyx_v_h2fdf.shape[1];
+        if (unlikely(__pyx_t_21 < 0)) __pyx_t_12 = 1;
+      } else if (unlikely(__pyx_t_21 >= __pyx_v_h2fdf.shape[1])) __pyx_t_12 = 1;
+      if (__pyx_t_1 < 0) {
+        __pyx_t_1 += __pyx_v_h2fdf.shape[2];
+        if (unlikely(__pyx_t_1 < 0)) __pyx_t_12 = 2;
+      } else if (unlikely(__pyx_t_1 >= __pyx_v_h2fdf.shape[2])) __pyx_t_12 = 2;
+      if (__pyx_t_23 < 0) {
+        __pyx_t_23 += __pyx_v_h2fdf.shape[3];
+        if (unlikely(__pyx_t_23 < 0)) __pyx_t_12 = 3;
+      } else if (unlikely(__pyx_t_23 >= __pyx_v_h2fdf.shape[3])) __pyx_t_12 = 3;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1150, __pyx_L1_error)
+      }
+      if (unlikely(((PyObject *) __pyx_v_rz.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1150, __pyx_L1_error)
+      }
+      __pyx_t_29 = __pyx_v_z_max;
+      __pyx_t_12 = -1;
+      if (__pyx_t_29 < 0) {
+        __pyx_t_29 += __pyx_v_rz.shape[0];
+        if (unlikely(__pyx_t_29 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_29 >= __pyx_v_rz.shape[0])) __pyx_t_12 = 0;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1150, __pyx_L1_error)
+      }
+
+      /* "holodeck/cyutils.pyx":1151
+ *                                 /(sum-max))
+ *             bgpar[2,ff,rr] = ((z_avg - h2fdf[m_max, q_max, z_max, ff] * rz[z_max])
+ *                                 /(sum-max))             # <<<<<<<<<<<<<<
+ *             # single source parameters
+ *             sspar[0,ff,rr] = mt[m_max]
+ */
+      if (unlikely(((PyObject *) __pyx_v_bgpar.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1150, __pyx_L1_error)
+      }
+
+      /* "holodeck/cyutils.pyx":1150
+ *             bgpar[1,ff,rr] = ((q_avg - h2fdf[m_max, q_max, z_max, ff] * mr[q_max])
+ *                                 /(sum-max))
+ *             bgpar[2,ff,rr] = ((z_avg - h2fdf[m_max, q_max, z_max, ff] * rz[z_max])             # <<<<<<<<<<<<<<
+ *                                 /(sum-max))
+ *             # single source parameters
+ */
+      __pyx_t_30 = 2;
+      __pyx_t_31 = __pyx_v_ff;
+      __pyx_t_32 = __pyx_v_rr;
+      __pyx_t_12 = -1;
+      if (__pyx_t_30 < 0) {
+        __pyx_t_30 += __pyx_v_bgpar.shape[0];
+        if (unlikely(__pyx_t_30 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_30 >= __pyx_v_bgpar.shape[0])) __pyx_t_12 = 0;
+      if (__pyx_t_31 < 0) {
+        __pyx_t_31 += __pyx_v_bgpar.shape[1];
+        if (unlikely(__pyx_t_31 < 0)) __pyx_t_12 = 1;
+      } else if (unlikely(__pyx_t_31 >= __pyx_v_bgpar.shape[1])) __pyx_t_12 = 1;
+      if (__pyx_t_32 < 0) {
+        __pyx_t_32 += __pyx_v_bgpar.shape[2];
+        if (unlikely(__pyx_t_32 < 0)) __pyx_t_12 = 2;
+      } else if (unlikely(__pyx_t_32 >= __pyx_v_bgpar.shape[2])) __pyx_t_12 = 2;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1150, __pyx_L1_error)
+      }
+      *((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_bgpar.data + __pyx_t_30 * __pyx_v_bgpar.strides[0]) ) + __pyx_t_31 * __pyx_v_bgpar.strides[1]) ) + __pyx_t_32 * __pyx_v_bgpar.strides[2]) )) = ((__pyx_v_z_avg - ((*((double *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_h2fdf.data + __pyx_t_22 * __pyx_v_h2fdf.strides[0]) ) + __pyx_t_21 * __pyx_v_h2fdf.strides[1]) ) + __pyx_t_1 * __pyx_v_h2fdf.strides[2]) ) + __pyx_t_23 * __pyx_v_h2fdf.strides[3]) ))) * (*((double *) ( /* dim=0 */ (__pyx_v_rz.data + __pyx_t_29 * __pyx_v_rz.strides[0]) ))))) / (__pyx_v_sum - __pyx_v_max));
+
+      /* "holodeck/cyutils.pyx":1153
+ *                                 /(sum-max))
+ *             # single source parameters
+ *             sspar[0,ff,rr] = mt[m_max]             # <<<<<<<<<<<<<<
+ *             sspar[1,ff,rr] = mr[q_max]
+ *             sspar[2,ff,rr] = rz[z_max]
+ */
+      if (unlikely(((PyObject *) __pyx_v_mt.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1153, __pyx_L1_error)
+      }
+      __pyx_t_29 = __pyx_v_m_max;
+      __pyx_t_12 = -1;
+      if (__pyx_t_29 < 0) {
+        __pyx_t_29 += __pyx_v_mt.shape[0];
+        if (unlikely(__pyx_t_29 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_29 >= __pyx_v_mt.shape[0])) __pyx_t_12 = 0;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1153, __pyx_L1_error)
+      }
+      if (unlikely(((PyObject *) __pyx_v_sspar.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1153, __pyx_L1_error)
+      }
+      __pyx_t_23 = 0;
+      __pyx_t_1 = __pyx_v_ff;
+      __pyx_t_21 = __pyx_v_rr;
+      __pyx_t_12 = -1;
+      if (__pyx_t_23 < 0) {
+        __pyx_t_23 += __pyx_v_sspar.shape[0];
+        if (unlikely(__pyx_t_23 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_23 >= __pyx_v_sspar.shape[0])) __pyx_t_12 = 0;
+      if (__pyx_t_1 < 0) {
+        __pyx_t_1 += __pyx_v_sspar.shape[1];
+        if (unlikely(__pyx_t_1 < 0)) __pyx_t_12 = 1;
+      } else if (unlikely(__pyx_t_1 >= __pyx_v_sspar.shape[1])) __pyx_t_12 = 1;
+      if (__pyx_t_21 < 0) {
+        __pyx_t_21 += __pyx_v_sspar.shape[2];
+        if (unlikely(__pyx_t_21 < 0)) __pyx_t_12 = 2;
+      } else if (unlikely(__pyx_t_21 >= __pyx_v_sspar.shape[2])) __pyx_t_12 = 2;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1153, __pyx_L1_error)
+      }
+      *((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_sspar.data + __pyx_t_23 * __pyx_v_sspar.strides[0]) ) + __pyx_t_1 * __pyx_v_sspar.strides[1]) ) + __pyx_t_21 * __pyx_v_sspar.strides[2]) )) = (*((double *) ( /* dim=0 */ (__pyx_v_mt.data + __pyx_t_29 * __pyx_v_mt.strides[0]) )));
+
+      /* "holodeck/cyutils.pyx":1154
+ *             # single source parameters
+ *             sspar[0,ff,rr] = mt[m_max]
+ *             sspar[1,ff,rr] = mr[q_max]             # <<<<<<<<<<<<<<
+ *             sspar[2,ff,rr] = rz[z_max]
+ *             if (max==0): # sanity check
+ */
+      if (unlikely(((PyObject *) __pyx_v_mr.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1154, __pyx_L1_error)
+      }
+      __pyx_t_29 = __pyx_v_q_max;
+      __pyx_t_12 = -1;
+      if (__pyx_t_29 < 0) {
+        __pyx_t_29 += __pyx_v_mr.shape[0];
+        if (unlikely(__pyx_t_29 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_29 >= __pyx_v_mr.shape[0])) __pyx_t_12 = 0;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1154, __pyx_L1_error)
+      }
+      if (unlikely(((PyObject *) __pyx_v_sspar.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1154, __pyx_L1_error)
+      }
+      __pyx_t_21 = 1;
+      __pyx_t_1 = __pyx_v_ff;
+      __pyx_t_23 = __pyx_v_rr;
+      __pyx_t_12 = -1;
+      if (__pyx_t_21 < 0) {
+        __pyx_t_21 += __pyx_v_sspar.shape[0];
+        if (unlikely(__pyx_t_21 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_21 >= __pyx_v_sspar.shape[0])) __pyx_t_12 = 0;
+      if (__pyx_t_1 < 0) {
+        __pyx_t_1 += __pyx_v_sspar.shape[1];
+        if (unlikely(__pyx_t_1 < 0)) __pyx_t_12 = 1;
+      } else if (unlikely(__pyx_t_1 >= __pyx_v_sspar.shape[1])) __pyx_t_12 = 1;
+      if (__pyx_t_23 < 0) {
+        __pyx_t_23 += __pyx_v_sspar.shape[2];
+        if (unlikely(__pyx_t_23 < 0)) __pyx_t_12 = 2;
+      } else if (unlikely(__pyx_t_23 >= __pyx_v_sspar.shape[2])) __pyx_t_12 = 2;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1154, __pyx_L1_error)
+      }
+      *((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_sspar.data + __pyx_t_21 * __pyx_v_sspar.strides[0]) ) + __pyx_t_1 * __pyx_v_sspar.strides[1]) ) + __pyx_t_23 * __pyx_v_sspar.strides[2]) )) = (*((double *) ( /* dim=0 */ (__pyx_v_mr.data + __pyx_t_29 * __pyx_v_mr.strides[0]) )));
+
+      /* "holodeck/cyutils.pyx":1155
+ *             sspar[0,ff,rr] = mt[m_max]
+ *             sspar[1,ff,rr] = mr[q_max]
+ *             sspar[2,ff,rr] = rz[z_max]             # <<<<<<<<<<<<<<
+ *             if (max==0): # sanity check
+ *                 print('No sources found at %dth frequency' % ff) # could warn
+ */
+      if (unlikely(((PyObject *) __pyx_v_rz.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1155, __pyx_L1_error)
+      }
+      __pyx_t_29 = __pyx_v_z_max;
+      __pyx_t_12 = -1;
+      if (__pyx_t_29 < 0) {
+        __pyx_t_29 += __pyx_v_rz.shape[0];
+        if (unlikely(__pyx_t_29 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_29 >= __pyx_v_rz.shape[0])) __pyx_t_12 = 0;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1155, __pyx_L1_error)
+      }
+      if (unlikely(((PyObject *) __pyx_v_sspar.memview) == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
+        __PYX_ERR(0, 1155, __pyx_L1_error)
+      }
+      __pyx_t_23 = 2;
+      __pyx_t_1 = __pyx_v_ff;
+      __pyx_t_21 = __pyx_v_rr;
+      __pyx_t_12 = -1;
+      if (__pyx_t_23 < 0) {
+        __pyx_t_23 += __pyx_v_sspar.shape[0];
+        if (unlikely(__pyx_t_23 < 0)) __pyx_t_12 = 0;
+      } else if (unlikely(__pyx_t_23 >= __pyx_v_sspar.shape[0])) __pyx_t_12 = 0;
+      if (__pyx_t_1 < 0) {
+        __pyx_t_1 += __pyx_v_sspar.shape[1];
+        if (unlikely(__pyx_t_1 < 0)) __pyx_t_12 = 1;
+      } else if (unlikely(__pyx_t_1 >= __pyx_v_sspar.shape[1])) __pyx_t_12 = 1;
+      if (__pyx_t_21 < 0) {
+        __pyx_t_21 += __pyx_v_sspar.shape[2];
+        if (unlikely(__pyx_t_21 < 0)) __pyx_t_12 = 2;
+      } else if (unlikely(__pyx_t_21 >= __pyx_v_sspar.shape[2])) __pyx_t_12 = 2;
+      if (unlikely(__pyx_t_12 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_12);
+        __PYX_ERR(0, 1155, __pyx_L1_error)
+      }
+      *((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_sspar.data + __pyx_t_23 * __pyx_v_sspar.strides[0]) ) + __pyx_t_1 * __pyx_v_sspar.strides[1]) ) + __pyx_t_21 * __pyx_v_sspar.strides[2]) )) = (*((double *) ( /* dim=0 */ (__pyx_v_rz.data + __pyx_t_29 * __pyx_v_rz.strides[0]) )));
+
+      /* "holodeck/cyutils.pyx":1156
+ *             sspar[1,ff,rr] = mr[q_max]
+ *             sspar[2,ff,rr] = rz[z_max]
+ *             if (max==0): # sanity check             # <<<<<<<<<<<<<<
+ *                 print('No sources found at %dth frequency' % ff) # could warn
+ *     # still need to sqrt and sum! (back in python)
+ */
+      __pyx_t_25 = ((__pyx_v_max == 0.0) != 0);
+      if (__pyx_t_25) {
+
+        /* "holodeck/cyutils.pyx":1157
+ *             sspar[2,ff,rr] = rz[z_max]
+ *             if (max==0): # sanity check
+ *                 print('No sources found at %dth frequency' % ff) # could warn             # <<<<<<<<<<<<<<
+ *     # still need to sqrt and sum! (back in python)
+ * 
+ */
+        __pyx_t_3 = __Pyx_PyInt_From_int(__pyx_v_ff); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1157, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_3);
+        __pyx_t_4 = PyUnicode_Format(__pyx_kp_u_No_sources_found_at_dth_frequenc, __pyx_t_3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1157, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_4);
+        __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+        __pyx_t_3 = __Pyx_PyObject_CallOneArg(__pyx_builtin_print, __pyx_t_4); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1157, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_3);
+        __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+        __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+
+        /* "holodeck/cyutils.pyx":1156
+ *             sspar[1,ff,rr] = mr[q_max]
+ *             sspar[2,ff,rr] = rz[z_max]
+ *             if (max==0): # sanity check             # <<<<<<<<<<<<<<
+ *                 print('No sources found at %dth frequency' % ff) # could warn
+ *     # still need to sqrt and sum! (back in python)
+ */
+      }
+    }
+  }
+
+  /* "holodeck/cyutils.pyx":1160
+ *     # still need to sqrt and sum! (back in python)
+ * 
+ *     return             # <<<<<<<<<<<<<<
+ * 
+ */
+  goto __pyx_L0;
+
+  /* "holodeck/cyutils.pyx":1055
+ * @cython.nonecheck(True)
+ * @cython.cdivision(True)
+ * cdef void _ss_bg_hc_and_par(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number,             # <<<<<<<<<<<<<<
+ *             long nreals, long thresh,
+ *             double[:] mt, double[:] mr, double[:] rz,
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_3);
+  __Pyx_XDECREF(__pyx_t_4);
+  __Pyx_XDECREF(__pyx_t_5);
+  __Pyx_XDECREF(__pyx_t_28);
+  __Pyx_WriteUnraisable("holodeck.cyutils._ss_bg_hc_and_par", __pyx_clineno, __pyx_lineno, __pyx_filename, 1, 0);
   __pyx_L0:;
   __Pyx_XDECREF(__pyx_v_capsule);
   __Pyx_XDECREF(__pyx_v_cur);
@@ -23349,6 +25369,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_allocate_buffer, __pyx_k_allocate_buffer, sizeof(__pyx_k_allocate_buffer), 0, 0, 1, 1},
   {&__pyx_n_s_array, __pyx_k_array, sizeof(__pyx_k_array), 0, 0, 1, 1},
   {&__pyx_n_s_base, __pyx_k_base, sizeof(__pyx_k_base), 0, 0, 1, 1},
+  {&__pyx_n_s_bgpar, __pyx_k_bgpar, sizeof(__pyx_k_bgpar), 0, 0, 1, 1},
   {&__pyx_n_s_c, __pyx_k_c, sizeof(__pyx_k_c), 0, 0, 1, 1},
   {&__pyx_n_u_c, __pyx_k_c, sizeof(__pyx_k_c), 0, 1, 0, 1},
   {&__pyx_n_s_capsule, __pyx_k_capsule, sizeof(__pyx_k_capsule), 0, 0, 1, 1},
@@ -23385,7 +25406,9 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_main, __pyx_k_main, sizeof(__pyx_k_main), 0, 0, 1, 1},
   {&__pyx_n_s_memview, __pyx_k_memview, sizeof(__pyx_k_memview), 0, 0, 1, 1},
   {&__pyx_n_s_mode, __pyx_k_mode, sizeof(__pyx_k_mode), 0, 0, 1, 1},
+  {&__pyx_n_s_mr, __pyx_k_mr, sizeof(__pyx_k_mr), 0, 0, 1, 1},
   {&__pyx_n_s_mrat, __pyx_k_mrat, sizeof(__pyx_k_mrat), 0, 0, 1, 1},
+  {&__pyx_n_s_mt, __pyx_k_mt, sizeof(__pyx_k_mt), 0, 0, 1, 1},
   {&__pyx_n_s_mtot_log10, __pyx_k_mtot_log10, sizeof(__pyx_k_mtot_log10), 0, 0, 1, 1},
   {&__pyx_n_s_name, __pyx_k_name, sizeof(__pyx_k_name), 0, 0, 1, 1},
   {&__pyx_n_s_name_2, __pyx_k_name_2, sizeof(__pyx_k_name_2), 0, 0, 1, 1},
@@ -23419,6 +25442,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_reduce_cython, __pyx_k_reduce_cython, sizeof(__pyx_k_reduce_cython), 0, 0, 1, 1},
   {&__pyx_n_s_reduce_ex, __pyx_k_reduce_ex, sizeof(__pyx_k_reduce_ex), 0, 0, 1, 1},
   {&__pyx_n_s_redz, __pyx_k_redz, sizeof(__pyx_k_redz), 0, 0, 1, 1},
+  {&__pyx_n_s_rz, __pyx_k_rz, sizeof(__pyx_k_rz), 0, 0, 1, 1},
   {&__pyx_n_s_sam_calc_gwb_single_eccen, __pyx_k_sam_calc_gwb_single_eccen, sizeof(__pyx_k_sam_calc_gwb_single_eccen), 0, 0, 1, 1},
   {&__pyx_n_s_sam_calc_gwb_single_eccen_discre, __pyx_k_sam_calc_gwb_single_eccen_discre, sizeof(__pyx_k_sam_calc_gwb_single_eccen_discre), 0, 0, 1, 1},
   {&__pyx_n_s_sam_poisson_gwb, __pyx_k_sam_poisson_gwb, sizeof(__pyx_k_sam_poisson_gwb), 0, 0, 1, 1},
@@ -23428,7 +25452,9 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_shape, __pyx_k_shape, sizeof(__pyx_k_shape), 0, 0, 1, 1},
   {&__pyx_n_s_size, __pyx_k_size, sizeof(__pyx_k_size), 0, 0, 1, 1},
   {&__pyx_n_s_ss_bg_hc, __pyx_k_ss_bg_hc, sizeof(__pyx_k_ss_bg_hc), 0, 0, 1, 1},
+  {&__pyx_n_s_ss_bg_hc_and_par, __pyx_k_ss_bg_hc_and_par, sizeof(__pyx_k_ss_bg_hc_and_par), 0, 0, 1, 1},
   {&__pyx_n_s_ssidx, __pyx_k_ssidx, sizeof(__pyx_k_ssidx), 0, 0, 1, 1},
+  {&__pyx_n_s_sspar, __pyx_k_sspar, sizeof(__pyx_k_sspar), 0, 0, 1, 1},
   {&__pyx_n_s_start, __pyx_k_start, sizeof(__pyx_k_start), 0, 0, 1, 1},
   {&__pyx_n_s_step, __pyx_k_step, sizeof(__pyx_k_step), 0, 0, 1, 1},
   {&__pyx_n_s_stop, __pyx_k_stop, sizeof(__pyx_k_stop), 0, 0, 1, 1},
@@ -23447,7 +25473,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
 };
 static CYTHON_SMALL_CODE int __Pyx_InitCachedBuiltins(void) {
   __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(0, 310, __pyx_L1_error)
-  __pyx_builtin_print = __Pyx_GetBuiltinName(__pyx_n_s_print); if (!__pyx_builtin_print) __PYX_ERR(0, 988, __pyx_L1_error)
+  __pyx_builtin_print = __Pyx_GetBuiltinName(__pyx_n_s_print); if (!__pyx_builtin_print) __PYX_ERR(0, 998, __pyx_L1_error)
   __pyx_builtin_ImportError = __Pyx_GetBuiltinName(__pyx_n_s_ImportError); if (!__pyx_builtin_ImportError) __PYX_ERR(1, 944, __pyx_L1_error)
   __pyx_builtin_ValueError = __Pyx_GetBuiltinName(__pyx_n_s_ValueError); if (!__pyx_builtin_ValueError) __PYX_ERR(2, 134, __pyx_L1_error)
   __pyx_builtin_MemoryError = __Pyx_GetBuiltinName(__pyx_n_s_MemoryError); if (!__pyx_builtin_MemoryError) __PYX_ERR(2, 149, __pyx_L1_error)
@@ -23730,6 +25756,18 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__28);
   __pyx_codeobj__29 = (PyObject*)__Pyx_PyCode_New(4, 0, 10, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__28, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_holodeck_cyutils_pyx, __pyx_n_s_ss_bg_hc, 889, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__29)) __PYX_ERR(0, 889, __pyx_L1_error)
 
+  /* "holodeck/cyutils.pyx":1004
+ * 
+ * # I also need to pass the edges to calculate the avged ones
+ * def ss_bg_hc_and_par(number, h2fdf, nreals, mt, mr, rz, normal_threshold=1e10):             # <<<<<<<<<<<<<<
+ *     """
+ *     Calculates the characteristic strain from loud single sources and a background of all other sources.
+ */
+  __pyx_tuple__30 = PyTuple_Pack(15, __pyx_n_s_number, __pyx_n_s_h2fdf, __pyx_n_s_nreals, __pyx_n_s_mt, __pyx_n_s_mr, __pyx_n_s_rz, __pyx_n_s_normal_threshold, __pyx_n_s_shape, __pyx_n_s_F, __pyx_n_s_R, __pyx_n_s_hc2ss, __pyx_n_s_hc2bg, __pyx_n_s_ssidx, __pyx_n_s_bgpar, __pyx_n_s_sspar); if (unlikely(!__pyx_tuple__30)) __PYX_ERR(0, 1004, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__30);
+  __Pyx_GIVEREF(__pyx_tuple__30);
+  __pyx_codeobj__31 = (PyObject*)__Pyx_PyCode_New(7, 0, 15, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__30, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_holodeck_cyutils_pyx, __pyx_n_s_ss_bg_hc_and_par, 1004, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__31)) __PYX_ERR(0, 1004, __pyx_L1_error)
+
   /* "View.MemoryView":287
  *         return self.name
  * 
@@ -23737,9 +25775,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * cdef strided = Enum("<strided and direct>") # default
  * cdef indirect = Enum("<strided and indirect>")
  */
-  __pyx_tuple__30 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct_or_indirect); if (unlikely(!__pyx_tuple__30)) __PYX_ERR(2, 287, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__30);
-  __Pyx_GIVEREF(__pyx_tuple__30);
+  __pyx_tuple__32 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct_or_indirect); if (unlikely(!__pyx_tuple__32)) __PYX_ERR(2, 287, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__32);
+  __Pyx_GIVEREF(__pyx_tuple__32);
 
   /* "View.MemoryView":288
  * 
@@ -23748,9 +25786,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * cdef indirect = Enum("<strided and indirect>")
  * 
  */
-  __pyx_tuple__31 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct); if (unlikely(!__pyx_tuple__31)) __PYX_ERR(2, 288, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__31);
-  __Pyx_GIVEREF(__pyx_tuple__31);
+  __pyx_tuple__33 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct); if (unlikely(!__pyx_tuple__33)) __PYX_ERR(2, 288, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__33);
+  __Pyx_GIVEREF(__pyx_tuple__33);
 
   /* "View.MemoryView":289
  * cdef generic = Enum("<strided and direct or indirect>")
@@ -23759,9 +25797,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * 
  * 
  */
-  __pyx_tuple__32 = PyTuple_Pack(1, __pyx_kp_s_strided_and_indirect); if (unlikely(!__pyx_tuple__32)) __PYX_ERR(2, 289, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__32);
-  __Pyx_GIVEREF(__pyx_tuple__32);
+  __pyx_tuple__34 = PyTuple_Pack(1, __pyx_kp_s_strided_and_indirect); if (unlikely(!__pyx_tuple__34)) __PYX_ERR(2, 289, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__34);
+  __Pyx_GIVEREF(__pyx_tuple__34);
 
   /* "View.MemoryView":292
  * 
@@ -23770,9 +25808,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * cdef indirect_contiguous = Enum("<contiguous and indirect>")
  * 
  */
-  __pyx_tuple__33 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_direct); if (unlikely(!__pyx_tuple__33)) __PYX_ERR(2, 292, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__33);
-  __Pyx_GIVEREF(__pyx_tuple__33);
+  __pyx_tuple__35 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_direct); if (unlikely(!__pyx_tuple__35)) __PYX_ERR(2, 292, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__35);
+  __Pyx_GIVEREF(__pyx_tuple__35);
 
   /* "View.MemoryView":293
  * 
@@ -23781,19 +25819,19 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * 
  * 
  */
-  __pyx_tuple__34 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_indirect); if (unlikely(!__pyx_tuple__34)) __PYX_ERR(2, 293, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__34);
-  __Pyx_GIVEREF(__pyx_tuple__34);
+  __pyx_tuple__36 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_indirect); if (unlikely(!__pyx_tuple__36)) __PYX_ERR(2, 293, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__36);
+  __Pyx_GIVEREF(__pyx_tuple__36);
 
   /* "(tree fragment)":1
  * def __pyx_unpickle_Enum(__pyx_type, long __pyx_checksum, __pyx_state):             # <<<<<<<<<<<<<<
  *     cdef object __pyx_PickleError
  *     cdef object __pyx_result
  */
-  __pyx_tuple__35 = PyTuple_Pack(5, __pyx_n_s_pyx_type, __pyx_n_s_pyx_checksum, __pyx_n_s_pyx_state, __pyx_n_s_pyx_PickleError, __pyx_n_s_pyx_result); if (unlikely(!__pyx_tuple__35)) __PYX_ERR(2, 1, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__35);
-  __Pyx_GIVEREF(__pyx_tuple__35);
-  __pyx_codeobj__36 = (PyObject*)__Pyx_PyCode_New(3, 0, 5, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__35, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_stringsource, __pyx_n_s_pyx_unpickle_Enum, 1, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__36)) __PYX_ERR(2, 1, __pyx_L1_error)
+  __pyx_tuple__37 = PyTuple_Pack(5, __pyx_n_s_pyx_type, __pyx_n_s_pyx_checksum, __pyx_n_s_pyx_state, __pyx_n_s_pyx_PickleError, __pyx_n_s_pyx_result); if (unlikely(!__pyx_tuple__37)) __PYX_ERR(2, 1, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__37);
+  __Pyx_GIVEREF(__pyx_tuple__37);
+  __pyx_codeobj__38 = (PyObject*)__Pyx_PyCode_New(3, 0, 5, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__37, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_stringsource, __pyx_n_s_pyx_unpickle_Enum, 1, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__38)) __PYX_ERR(2, 1, __pyx_L1_error)
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -24395,6 +26433,18 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_ss_bg_hc, __pyx_t_3) < 0) __PYX_ERR(0, 889, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
+  /* "holodeck/cyutils.pyx":1004
+ * 
+ * # I also need to pass the edges to calculate the avged ones
+ * def ss_bg_hc_and_par(number, h2fdf, nreals, mt, mr, rz, normal_threshold=1e10):             # <<<<<<<<<<<<<<
+ *     """
+ *     Calculates the characteristic strain from loud single sources and a background of all other sources.
+ */
+  __pyx_t_3 = PyCFunction_NewEx(&__pyx_mdef_8holodeck_7cyutils_9ss_bg_hc_and_par, NULL, __pyx_n_s_holodeck_cyutils); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1004, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_ss_bg_hc_and_par, __pyx_t_3) < 0) __PYX_ERR(0, 1004, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+
   /* "holodeck/cyutils.pyx":1
  * """Module for methods implemented in cython.             # <<<<<<<<<<<<<<
  * 
@@ -24425,7 +26475,7 @@ if (!__Pyx_RefNanny) {
  * cdef strided = Enum("<strided and direct>") # default
  * cdef indirect = Enum("<strided and indirect>")
  */
-  __pyx_t_3 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__30, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(2, 287, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__32, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(2, 287, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_XGOTREF(generic);
   __Pyx_DECREF_SET(generic, __pyx_t_3);
@@ -24439,7 +26489,7 @@ if (!__Pyx_RefNanny) {
  * cdef indirect = Enum("<strided and indirect>")
  * 
  */
-  __pyx_t_3 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__31, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(2, 288, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__33, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(2, 288, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_XGOTREF(strided);
   __Pyx_DECREF_SET(strided, __pyx_t_3);
@@ -24453,7 +26503,7 @@ if (!__Pyx_RefNanny) {
  * 
  * 
  */
-  __pyx_t_3 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__32, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(2, 289, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__34, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(2, 289, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_XGOTREF(indirect);
   __Pyx_DECREF_SET(indirect, __pyx_t_3);
@@ -24467,7 +26517,7 @@ if (!__Pyx_RefNanny) {
  * cdef indirect_contiguous = Enum("<contiguous and indirect>")
  * 
  */
-  __pyx_t_3 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__33, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(2, 292, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__35, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(2, 292, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_XGOTREF(contiguous);
   __Pyx_DECREF_SET(contiguous, __pyx_t_3);
@@ -24481,7 +26531,7 @@ if (!__Pyx_RefNanny) {
  * 
  * 
  */
-  __pyx_t_3 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__34, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(2, 293, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__36, NULL); if (unlikely(!__pyx_t_3)) __PYX_ERR(2, 293, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_XGOTREF(indirect_contiguous);
   __Pyx_DECREF_SET(indirect_contiguous, __pyx_t_3);
