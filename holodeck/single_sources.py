@@ -33,7 +33,7 @@ log.setLevel(logging.INFO)
 ############## STRAIN CALCULATIONS ################
 ###################################################
 
-def ss_by_cdefs(edges, number, realize, round = True):
+def ss_by_cdefs(edges, number, realize, round = True, params = False):
        
     """ More efficient way to calculate strain from numbered 
     grid integrated
@@ -114,10 +114,17 @@ def ss_by_cdefs(edges, number, realize, round = True):
 
     # For multiple realizations, using cython
     if(utils.isinteger(realize)):
-        hc2ss, hc2bg, ssidx = holo.cyutils.ss_bg_hc(number, h2fdf, realize)
-        hc_ss = np.sqrt(hc2ss)
-        hc_bg = np.sqrt(hc2bg)
-        return hc_bg, hc_ss, ssidx, hsamp
+        if(params == True):
+            hc2ss, hc2bg, ssidx, bgpar, sspar = \
+                holo.cyutils.ss_bg_hc_pars(number, h2fdf, realize, mt, mr, rz)
+            return hc_bg, hc_ss, ssidx, hsamp, bgpar, sspar
+            
+        else:
+            # use cython to get h_c^2 for ss and bg
+            hc2ss, hc2bg, ssidx = holo.cyutils.ss_bg_hc(number, h2fdf, realize)
+            hc_ss = np.sqrt(hc2ss)
+            hc_bg = np.sqrt(hc2bg)
+            return hc_bg, hc_ss, ssidx, hsamp
     
     # OTHERWISE
     elif(realize==False):
