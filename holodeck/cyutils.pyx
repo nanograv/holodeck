@@ -891,13 +891,20 @@ def ss_bg_hc(number, h2fdf, nreals, normal_threshold=1e10):
     Calculates the characteristic strain from loud single sources and a background of all other sources.
 
     Parameters
-    __________
+    --------------
     number : [M, Q, Z, F] ndarray
         number in each bin
     h2fdf : [M, Q, Z, F] ndarray
         strain squared x frequency / frequency bin width for each bin
     nreals
         number of realizations
+
+    Returns
+    --------------
+    hc2ss : (F, R) Ndarray of scalars
+    hc2bg : (F, R) Ndarray of scalars
+    ssidx : (3, F, R) Ndarray of ints
+
     """
     cdef long[:] shape = np.array(number.shape)
     F = shape[3]
@@ -922,19 +929,22 @@ cdef void _ss_bg_hc(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number
 
     Parameters
     __________
-    shape
-    number
-    h2fdf
+    shape : long[:] array
+        shape of number, [M, Q, Z, F]
+    number : double[:,:,:,:] array
+        number per bin
+    h2fdf : double[:,:,:,:] array
         strain amplitude squared * f/Delta f for a single source in each bin.
     nreals : int
         number of realizations.
-    hc2ss
+    hc2ss : double[:,:] array
         (memory address of) single source characteristic strain squared array.
-    hc2bg
+    hc2bg : double[:,:] array
         (memory address of) background characteristic strain squared array.
-    ssidx
-        memory address of array for indices of max strain bins.
-
+    ssidx : [:,:,:] long array
+        (memory address of) array for indices of max strain bins.
+    bgpar : 
+        (memory address of) array of effective average parameters
     Returns
     _________
     void
@@ -989,4 +999,163 @@ cdef void _ss_bg_hc(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number
     # still need to sqrt and sum! (or do this back in python)
     
     return
+
+# I also need to pass the edges to calculate the avged ones
+def ss_bg_hc_and_par(number, h2fdf, nreals, mt, mr, rz, normal_threshold=1e10):
+    """
+    Calculates the characteristic strain from loud single sources and a background of all other sources.
+
+    Parameters
+    ------------------------
+    number : [M, Q, Z, F] NDarray
+        number in each bin
+    h2fdf : [M, Q, Z, F] NDarray
+        Strain amplitude squared x frequency / frequency bin width for each bin.
+    nreals
+        Number of realizations.
+    mt : (M,) 1Darray of scalars
+        Total masses, M, of each bin center.
+    mr : (Q,) 1Darray of scalars
+        Mass ratios, q, of each bin center.
+    rz : (Z,) 1Darray of scalars
+        Redshifts, z, of each bin center.
+
+    Returns
+    --------------------------
+    hc2ss : (F, R) Ndarray of scalars
+        Char strain squared of the loudest single sources.
+    hc2bg : (F, R) Ndarray of scalars
+        Char strain squared of the background.
+    ssidx : (3, F, R) NDarray of ints
+        Indices of the loudest single sources.
+    bgpar : (3, F, R) NDarray of scalars
+        Average effective M, q, z parameters of the background.
+    sspar : (3, F, R) NDarray of scalars
+        M, q, z parameters of the loudest single sources.
+    """
+
+    cdef long[:] shape = np.array(number.shape)
+    F = shape[3]
+    R = nreals
+    cdef np.ndarray[np.double_t, ndim=2] hc2ss = np.zeros((F,R))
+    cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
+    cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
+    cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
+    cdef np.ndarray[np.double_t, ndim=3] sspar = np.zeros((3,F,R))
+    _ss_bg_hc_and_par(shape, h2fdf, number, nreals, normal_threshold, 
+                 mt, mr, rz,
+                hc2ss, hc2bg, ssidx, bgpar, sspar)
+    # print(hc2ss, hc2bg, ssidx)
+    return hc2ss, hc2bg, ssidx, bgpar, sspar
+    
+@cython.boundscheck(True)
+@cython.wraparound(True)
+@cython.nonecheck(True)
+@cython.cdivision(True)
+cdef void _ss_bg_hc_and_par(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number,
+            long nreals, long thresh,
+            double[:] mt, double[:] mr, double[:] rz,
+            double[:,:] hc2ss, double[:,:] hc2bg, long[:,:,:] ssidx, 
+            double[:,:,:] bgpar, double[:,:,:] sspar):
+    """
+    Calculates the characteristic strain from loud single sources and a background of all other sources.
+
+    Parameters
+    __________
+    shape : long[:] array
+        shape of number, [M, Q, Z, F]
+    number : double[:,:,:,:] array
+        number per bin
+    h2fdf : double[:,:,:,:] array
+        strain amplitude squared * f/Delta f for a single source in each bin.
+    nreals : int
+        number of realizations.
+    mt : (M,) 1Darray of scalars
+        total masses of each bin center
+    mr : (Q,) 1Darray of scalars
+        mass ratios of each bin center
+    rz : (Z,) 1Darray of scalars
+        redshifts of each bin center
+
+    hc2ss : double[:,:] array
+        (memory address of) single source characteristic strain squared array.
+    hc2bg : double[:,:] array
+        (memory address of) background characteristic strain squared array.
+    ssidx : [:,:,:] long array
+        (memory address of) array for indices of max strain bins.
+    bgpar : 
+        (memory address of) array of effective average parameters
+    Returns
+    _________
+    void
+    updated via memory address: hc2ss, hc2bg, ssidx, bg_par
+    """
+    
+    cdef int M = shape[0]
+    cdef int Q = shape[1]
+    cdef int Z = shape[2]
+    cdef int F = shape[3]
+    cdef int R = nreals
+
+    cdef int mm, qq, zz, ff, rr, m_max, q_max, z_max
+    cdef double max, num, sum, m_avg, q_avg, z_avg
+
+
+    # Setup random number generator from numpy library
+    cdef bitgen_t *rng
+    cdef const char *capsule_name = "BitGenerator"
+    capsule = PCG64().capsule
+    # Cast the pointer
+    rng = <bitgen_t *> PyCapsule_GetPointer(capsule, capsule_name)
+    for rr in range(R):
+        for ff in range(F):
+            max=0
+            sum=0
+            m_avg=0
+            q_avg=0
+            z_avg=0
+            for mm in range(M):
+                for qq in range(Q):
+                    for zz in range(Z):
+                        num = number[mm,qq,zz,ff]
+                        cur = h2fdf[mm,qq,zz,ff]
+                        if (num>thresh):
+                            std = sqrt(num)
+                            num = <double>random_normal(rng, num, std)  
+                        else:
+                            num = <double>random_poisson(rng, num)
+                        if(cur > max and num > 0):
+                            max = cur
+                            m_max = mm
+                            q_max = qq
+                            z_max = zz
+                        sum += num * cur
+                        m_avg += num * cur * mt[mm]
+                        q_avg += num * cur * mr[qq]
+                        z_avg += num * cur * rz[zz]
+            # characteristic frequencies squared
+            hc2ss[ff,rr] = max
+            hc2bg[ff,rr] = sum - max
+
+            # single source indices
+            ssidx[0,ff,rr] = m_max
+            ssidx[1,ff,rr] = q_max
+            ssidx[2,ff,rr] = z_max
+
+            # background average parameters
+            bgpar[0,ff,rr] = ((m_avg - h2fdf[m_max, q_max, z_max, ff] * mt[m_max])
+                                /(sum-max))
+            bgpar[1,ff,rr] = ((q_avg - h2fdf[m_max, q_max, z_max, ff] * mr[q_max])
+                                /(sum-max))
+            bgpar[2,ff,rr] = ((z_avg - h2fdf[m_max, q_max, z_max, ff] * rz[z_max])
+                                /(sum-max))
+            # single source parameters
+            sspar[0,ff,rr] = mt[m_max]
+            sspar[1,ff,rr] = mr[q_max]
+            sspar[2,ff,rr] = rz[z_max]
+            if (max==0): # sanity check
+                print('No sources found at %dth frequency' % ff) # could warn
+    # still need to sqrt and sum! (back in python)
+    
+    return 
 
