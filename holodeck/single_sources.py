@@ -60,19 +60,26 @@ def ss_by_cdefs(edges, number, realize, round = True, params = False):
 
     Returns
     -------
-    hc_bg : (F, R) ndarray of scalars
+    hc_bg : (F, R) NDarray of scalars
         Characteristic strain of the GWB.
-        just (F,) if realize = True or False
-    hc_ss : (F, R) ndarray of scalars
+        just (F,) if realize = True or False.
+    hc_ss : (F, R) NDarray of scalars
         The characteristic strain of the loudest single source at each frequency.
-        just (F,) if realize = True or False
-    ssidx : (3, F, R) ndarray
+        just (F,) if realize = True or False.
+    ssidx : (3, F, R) NDarray
         The indices of loudest single sources at each frequency of each realization
         in the format: [[M indices], [q indices], [z indices], [f indices], [r indices]] 
-        just (3,F,) if realize = True or False
-    hsamp : (M, Q, Z, F) ndarray
+        just (3,F,) if realize = True or False.
+    hsamp : (M, Q, Z, F) NDarray
         Strain amplitude of a single source in every bin (regardless of if that bin
         actually has any sources.)
+    bgpar : (3, F, R) NDarray of scalars
+        Average effective binary astrophysical parameters for background
+        sources at each frequency and realization, returned only if 
+        params = True.
+    sspar : (3, F, R) NDarray of scalars
+        Astrophysical parametes of single sources at each frequency
+        for each realizations, returned only if params = True.
     
 
     In the unlikely scenario that there are two equal hsmaxes 
@@ -1751,3 +1758,48 @@ def plot_params(axs, xx, grid, REALS=1, LABEL='',
                 axs[ii,jj].yaxis.set_label_position("right")
                 axs[ii,jj].yaxis.tick_right()
             if(SHOW_LEGEND): axs[ii,jj].legend(loc='lower left')
+
+
+
+###################################################
+############ DETECTION STATISTICS #################
+###################################################
+
+
+def threshold_hc():
+    """
+    Rosado+ 2015, SNR calculation
+    S := cross correlation between pulsars 
+    S = \int_{-T/2}^{T/2} dt \int dt' s_i(t) s_j(t') Q(t,t')
+    where T is the observation time, s_i(t) and s_j(t) are the data 
+    from two different pulsars, Q(t,t') is a filter function.
+
+    S_T := pre-defined detection threshold
+    """
+
+    return 0
+
+
+def ss_occurence_rate(hc_ss, S_T):
+    """
+    Parameters:
+    ------------
+    hc_ss : (F, R) NDarray of scalars
+        characteristic strain of single sources 
+    S_T : float
+        threshold strain? 
+
+    """
+    return 0
+
+def bg_occurence_rate():
+    """ 
+    According to Rosado+ 2015
+    Universe may contain GWB if S >= S_T
+    """
+
+def false_alarm_probability():
+    """
+    TODO
+    """
+    return 0
