@@ -366,6 +366,134 @@ class GMT_Power_Law(_Galaxy_Merger_Time):
         return mtime
 
 
+# ----    Galaxy Merger Rate    ----
+
+class _Galaxy_Merger_Rate(abc.ABC):
+    """Galaxy Merger Rate base class, used to model merger rates of galaxy pairs.
+    """
+
+    @abc.abstractmethod
+    def __init__(self, *args, **kwargs):
+        return
+
+    @abc.abstractmethod
+    def __call__(self, mass, mrat, redz):
+        """Return the galaxy merger rate for the given parameters.
+
+        Parameters
+        ----------
+        mass : (N,) array_like[scalar]
+            Mass of the system, units of [grams].
+            NOTE: the definition of mass is ambiguous, i.e. whether it is the primary mass, or the
+            combined system mass.
+        mrat : scalar or ndarray,
+            Mass-ratio of the system (m2/m1 <= 1.0), dimensionless.
+        redz : scalar or ndarray,
+            Redshift.
+
+        Returns
+        -------
+        rv : scalar or ndarray,
+            Galaxy merger rate, in units of [1/sec].
+
+        """
+        return
+
+    '''
+    def zprime(self, mass, mrat, redz, **kwargs):
+        """Return the redshift after merger (i.e. input `redz` delayed by merger time).
+        """
+        # tau0 = self(mass, mrat, redz, **kwargs)  # sec
+        # # Find the redshift of  t(z) + tau
+        # redz_prime = utils.redz_after(tau0, redz=redz)
+        # return redz_prime, tau0
+        return np.copy(redz), np.zeros_like(redz)
+    '''
+
+
+class GMR_Illustris(_Galaxy_Merger_Rate):
+    """Galaxy Merger Rate - based on fits to Illustris cosmological simulations.
+
+    See [Rodriguez-Gomez+2015], Table 1.
+    "merger rate as a function of descendant stellar mass M_star, progenitor stellar mass ratio mu_star"
+
+    """
+
+    def __init__(self,
+                 norm0_log10=-2.2287,     # -2.2287 ± 0.0045    [log10(A*Gyr)]  A0 in [RG15]
+                 normz=+2.4644,           # +2.4644 ± 0.0128    eta in [RG15]
+                 malpha0=+0.2241,         # +0.2241 ± 0.0038    alpha0 in [RG15]
+                 malphaz=-1.1759,         # -1.1759 ± 0.0316    alpha1 in [RG15]
+                 mdelta0=+0.7668,         # +0.7668 ± 0.0202    delta0 in [RG15]
+                 mdeltaz=-0.4695,         # -0.4695 ± 0.0440    delta1 in [RG15]
+                 qgamma0=-1.2595,         # -1.2595 ± 0.0026    beta0 in [RG15]
+                 qgammaz=+0.0611,         # +0.0611 ± 0.0021    beta1 in [RG15]
+                 qgammam=-0.0477,         # -0.0477 ± 0.0013    gamma in [RG15]
+                 ):
+        self._norm0 = (10.0 ** norm0_log10) / GYR              # [1/sec]
+        self._normz = normz
+
+        self._malpha0 = malpha0
+        self._malphaz = malphaz
+        self._mdelta0 = mdelta0
+        self._mdeltaz = mdeltaz
+        self._qgamma0 = qgamma0
+        self._qgammaz = qgammaz
+        self._qgammam = qgammam
+
+        self._mref_delta = 2.0e11 * MSOL   # fixed value
+        self._mref = 1.0e10 * MSOL   # fixed value
+        return
+
+    def _get_norm(self, redz):
+        norm = self._norm0 * np.power(1.0 + redz, self._normz)
+        return norm
+
+    def _get_malpha(self, redz):
+        malpha = self._malpha0 * np.power(1.0 + redz, self._malphaz)
+        return malpha
+
+    def _get_mdelta(self, redz):
+        mdelta = self._mdelta0 * np.power(1.0 + redz, self._mdeltaz)
+        return mdelta
+
+    def _get_qgamma(self, mtot, redz):
+        qgamma = self._qgamma0 * np.power(1.0 + redz, self._qgammaz)
+        qgamma = qgamma + self._qgammam * np.log10(mtot/self._mref)
+        return qgamma
+
+    def __call__(self, mtot, mrat, redz):
+        """Return the galaxy merger rate for the given parameters.
+
+        Parameters
+        ----------
+        mtot : (N,) array_like[scalar]
+            Total mass of the system, units of [grams].
+        mrat : (N,) array_like[scalar]
+            Mass ratio of each binary.
+        redz : (N,) array_like[scalar]
+            Redshifts of each binary.
+
+        Returns
+        -------
+        rate : array_like
+            Merger rate in [1/sec].
+
+        """
+        norm = self._get_norm(redz)
+        malpha = self._get_malpha(redz)
+        mdelta = self._get_mdelta(redz)
+        qgamma = self._get_qgamma(mtot, redz)
+
+        xx = (mtot/self._mref)
+        mt = np.power(xx, malpha)
+        mp1t = np.power(1.0 + (mt/self._mref_delta), mdelta)
+        qt = np.power(mrat, qgamma)
+
+        rate = norm * mt * mp1t * qt
+        return rate
+
+
 # ===================================
 # ====    Semi-Analytic Model    ====
 # ===================================
@@ -863,10 +991,8 @@ class Semi_Analytic_Model:
             except AttributeError as err:
                 log.exception(err)
                 msg = (
-                    "Failed load initial separation from hardening model!  This is likely because you are using a "
-                    "non-self-consistent hardening model.  This means you cannot determine which systems stall "
-                    "before reaching redshift zero.  FIX: To skip this check, pass `zero_stalled=False` in your "
-                    "call to `Semi_Analytic_Model.dynamic_binary_number` or `Semi_Analytic_Model.gwb`."
+                    "Failed to load initial separation from hardening model!  Are you using a "
+                    "self-consistent hardening model?  If not, set `zero_stalled=False`!"
                 )
                 print(msg)
                 log.exception(msg)
@@ -932,7 +1058,7 @@ class Semi_Analytic_Model:
 
         return edges, dnum
 
-    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=False, zero_coalesced=None, zero_stalled=None):
+    def gwb(self, fobs_gw_edges, hard=None, realize=False, zero_coalesced=None, zero_stalled=None):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
         Parameters
@@ -964,6 +1090,13 @@ class Semi_Analytic_Model:
             err = "GWB can only be calculated across bins of frequency, `fobs_gw_edges` must provide bin edges!"
             log.exception(err)
             raise ValueError(err)
+
+        if hard is None:
+            hard = holo.hardening.Hard_GW
+            log.info(f"Using `{hard}` for default hardening rate.")
+            if zero_stalled is None:
+                log.info(f"This hardening model is not self-consistent, and requires `zero_stalled=False`.")
+                zero_stalled = False
 
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
         # ---- Get the differential-number of binaries for each bin
@@ -1035,8 +1168,7 @@ class Semi_Analytic_Model:
             mstar_pri, mstar_rat, mstar_tot, rz = np.broadcast_arrays(*args)
 
             gmt_mass = mstar_tot if GMT_USES_MTOT else mstar_pri
-            rz = self._gmt.zprime(gmt_mass, mstar_rat, rz)
-            print(f"{self} :: {utils.stats(rz)=}")
+            rz, _ = self._gmt.zprime(gmt_mass, mstar_rat, rz)
 
         # d^3 n / [dlog10(M) dq dz] in units of [Mpc^-3], convert to [cm^-3]
         ndens = self.static_binary_density / (MPC**3)
