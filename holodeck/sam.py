@@ -858,7 +858,20 @@ class Semi_Analytic_Model:
             # number of steps in the integration, refer to this as X below
             STEPS = 123
             # () start from the hardening model's initial separation
-            rmax = hard._sepa_init
+            try:
+                rmax = hard._sepa_init
+            except AttributeError as err:
+                log.exception(err)
+                msg = (
+                    "Failed load initial separation from hardening model!  This is likely because you are using a "
+                    "non-self-consistent hardening model.  This means you cannot determine which systems stall "
+                    "before reaching redshift zero.  FIX: To skip this check, pass `zero_stalled=False` in your "
+                    "call to `Semi_Analytic_Model.dynamic_binary_number` or `Semi_Analytic_Model.gwb`."
+                )
+                print(msg)
+                log.exception(msg)
+                raise RuntimeError(msg)
+
             # (M,) end at the ISCO
             rmin = utils.rad_isco(self.mtot)
             # Choose steps for each binary, log-spaced between rmin and rmax
@@ -919,7 +932,7 @@ class Semi_Analytic_Model:
 
         return edges, dnum
 
-    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=False, **kw_dynamic_binary_number):
+    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=False, zero_coalesced=None, zero_stalled=None):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
         Parameters
@@ -961,7 +974,10 @@ class Semi_Analytic_Model:
         # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
         #! NOTE: using frequency-bin _centers_ produces more accurate results than frequency-bin _edges_ !#
-        edges, dnum = self.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents, **kw_dynamic_binary_number)
+        edges, dnum = self.dynamic_binary_number(
+            hard, fobs_orb=fobs_orb_cents,
+            zero_coalesced=zero_coalesced, zero_stalled=zero_stalled
+        )
         edges[-1] = fobs_orb_edges
         log.debug(f"dnum: {utils.stats(dnum)}")
 
