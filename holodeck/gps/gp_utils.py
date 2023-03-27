@@ -108,7 +108,7 @@ class GaussProc(object):
 
         try:
             gp = george.GP(a * self.kernel_class(**self.kernel_opts, metric=tau,
-                                                 ndim=len(tau)), solver=george.HODLRSolver)
+                                                 ndim=len(tau)))
             gp.compute(self.x, self.yerr)
 
             # lnlike = gp.lnlikelihood(self.y, quiet=True)
@@ -533,7 +533,7 @@ def set_up_predictions(spectra, gp_george):
         gp_list.append(
             george.GP(gp_kparams[0] * getattr(
                 kernels, getattr(gp_george[ii], "kernel", "ExpSquaredKernel"))(
-                    gp_kparams[1:], ndim=len(gp_kparams[1:])), solver=george.HODLRSolver))
+                    gp_kparams[1:], ndim=len(gp_kparams[1:]))))
 
         gp_list[ii].compute(gp_george[ii].x, gp_george[ii].yerr)
 
