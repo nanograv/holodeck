@@ -55,7 +55,7 @@ from holodeck import cosmo, utils, log
 from holodeck.constants import GYR, SPLC, MSOL, MPC, YR, PC
 from holodeck import relations, gravwaves
 
-_DEBUG = True
+_DEBUG = False
 _DEBUG_LVL = log.DEBUG
 # _DEBUG_LVL = log.WARNING
 
@@ -411,8 +411,8 @@ class _Galaxy_Merger_Rate(abc.ABC):
     '''
 
 
-class GMR_Illustris(_Galaxy_Merger_Rate):
-    """Galaxy Merger Rate - based on fits to Illustris cosmological simulations.
+class GMR_Power_Law(_Galaxy_Merger_Rate):
+    """Galaxy Merger Rate - based on multiple power-laws.
 
     See [Rodriguez-Gomez+2015], Table 1.
     "merger rate as a function of descendant stellar mass M_star, progenitor stellar mass ratio mu_star"
@@ -420,16 +420,37 @@ class GMR_Illustris(_Galaxy_Merger_Rate):
     """
 
     def __init__(self,
-                 norm0_log10=-2.2287,     # -2.2287 ± 0.0045    [log10(A*Gyr)]  A0 in [RG15]
-                 normz=+2.4644,           # +2.4644 ± 0.0128    eta in [RG15]
-                 malpha0=+0.2241,         # +0.2241 ± 0.0038    alpha0 in [RG15]
-                 malphaz=-1.1759,         # -1.1759 ± 0.0316    alpha1 in [RG15]
-                 mdelta0=+0.7668,         # +0.7668 ± 0.0202    delta0 in [RG15]
-                 mdeltaz=-0.4695,         # -0.4695 ± 0.0440    delta1 in [RG15]
-                 qgamma0=-1.2595,         # -1.2595 ± 0.0026    beta0 in [RG15]
-                 qgammaz=+0.0611,         # +0.0611 ± 0.0021    beta1 in [RG15]
-                 qgammam=-0.0477,         # -0.0477 ± 0.0013    gamma in [RG15]
+                 norm0_log10=None,
+                 normz=None,
+                 malpha0=None,
+                 malphaz=None,
+                 mdelta0=None,
+                 mdeltaz=None,
+                 qgamma0=None,
+                 qgammaz=None,
                  ):
+
+        if norm0_log10 is None:
+            norm0_log10 = -2.2287,     # -2.2287 ± 0.0045    [log10(A*Gyr)]  A0 in [RG15]
+        if normz is None:
+            # normz = +2.4644,           # +2.4644 ± 0.0128    eta in [RG15]
+            normz = 0.0
+        if malpha0 is None:
+            malpha0 = +0.2241,         # +0.2241 ± 0.0038    alpha0 in [RG15]
+        if malphaz is None:
+            # malphaz = -1.1759,         # -1.1759 ± 0.0316    alpha1 in [RG15]
+            malphaz = 0.0
+        if mdelta0 is None:
+            mdelta0 = +0.7668,         # +0.7668 ± 0.0202    delta0 in [RG15]
+        if mdeltaz is None:
+            # mdeltaz = -0.4695,         # -0.4695 ± 0.0440    delta1 in [RG15]
+            mdeltaz = 0.0
+        if qgamma0 is None:
+            qgamma0 = -1.2595,         # -1.2595 ± 0.0026    beta0 in [RG15]
+        if qgammaz is None:
+            # qgammaz = +0.0611,         # +0.0611 ± 0.0021    beta1 in [RG15]
+            qgammaz = 0.0
+
         self._norm0 = (10.0 ** norm0_log10) / GYR              # [1/sec]
         self._normz = normz
 
@@ -439,7 +460,6 @@ class GMR_Illustris(_Galaxy_Merger_Rate):
         self._mdeltaz = mdeltaz
         self._qgamma0 = qgamma0
         self._qgammaz = qgammaz
-        self._qgammam = qgammam
 
         self._mref_delta = 2.0e11 * MSOL   # fixed value
         self._mref = 1.0e10 * MSOL   # fixed value
@@ -457,9 +477,11 @@ class GMR_Illustris(_Galaxy_Merger_Rate):
         mdelta = self._mdelta0 * np.power(1.0 + redz, self._mdeltaz)
         return mdelta
 
-    def _get_qgamma(self, mtot, redz):
+    def _get_qgamma(self, redz, mtot):
+        """
+        NOTE: `mtot` is needed as an argument as it is used by subclass `GMR_Illustris(GMR_Power_Law)`
+        """
         qgamma = self._qgamma0 * np.power(1.0 + redz, self._qgammaz)
-        qgamma = qgamma + self._qgammam * np.log10(mtot/self._mref)
         return qgamma
 
     def __call__(self, mtot, mrat, redz):
@@ -483,7 +505,8 @@ class GMR_Illustris(_Galaxy_Merger_Rate):
         norm = self._get_norm(redz)
         malpha = self._get_malpha(redz)
         mdelta = self._get_mdelta(redz)
-        qgamma = self._get_qgamma(mtot, redz)
+        # NOTE: `mtot` is not used here, in `GMR_Power_Law`, but is used in subclass `GMR_Illustris`
+        qgamma = self._get_qgamma(redz, mtot)
 
         xx = (mtot/self._mref)
         mt = np.power(xx, malpha)
@@ -492,6 +515,65 @@ class GMR_Illustris(_Galaxy_Merger_Rate):
 
         rate = norm * mt * mp1t * qt
         return rate
+
+
+class GMR_Illustris(GMR_Power_Law):
+    """Galaxy Merger Rate - based on fits to Illustris cosmological simulations.
+
+    See [Rodriguez-Gomez+2015], Table 1.
+    "merger rate as a function of descendant stellar mass M_star, progenitor stellar mass ratio mu_star"
+
+    """
+
+    def __init__(self,
+                 norm0_log10=None,
+                 normz=None,
+                 malpha0=None,
+                 malphaz=None,
+                 mdelta0=None,
+                 mdeltaz=None,
+                 qgamma0=None,
+                 qgammaz=None,
+                 qgammam=None,
+                 ):
+
+        if norm0_log10 is None:
+            norm0_log10 = -2.2287,     # -2.2287 ± 0.0045    [log10(A*Gyr)]  A0 in [RG15]
+        if normz is None:
+            normz = +2.4644,           # +2.4644 ± 0.0128    eta in [RG15]
+        if malpha0 is None:
+            malpha0 = +0.2241,         # +0.2241 ± 0.0038    alpha0 in [RG15]
+        if malphaz is None:
+            malphaz = -1.1759,         # -1.1759 ± 0.0316    alpha1 in [RG15]
+        if mdelta0 is None:
+            mdelta0 = +0.7668,         # +0.7668 ± 0.0202    delta0 in [RG15]
+        if mdeltaz is None:
+            mdeltaz = -0.4695,         # -0.4695 ± 0.0440    delta1 in [RG15]
+        if qgamma0 is None:
+            qgamma0 = -1.2595,         # -1.2595 ± 0.0026    beta0 in [RG15]
+        if qgammaz is None:
+            qgammaz = +0.0611,         # +0.0611 ± 0.0021    beta1 in [RG15]
+        if qgammam is None:
+            qgammam = -0.0477,         # -0.0477 ± 0.0013    gamma in [RG15]
+
+        super().__init__(
+            norm0_log10=norm0_log10,
+            normz=normz,
+            malpha0=malpha0,
+            malphaz=malphaz,
+            mdelta0=mdelta0,
+            mdeltaz=mdeltaz,
+            qgamma0=qgamma0,
+            qgammaz=qgammaz,
+        )
+
+        self._qgammam = qgammam
+        return
+
+    def _get_qgamma(self, redz, mtot):
+        qgamma = self._qgamma0 * np.power(1.0 + redz, self._qgammaz)
+        qgamma = qgamma + self._qgammam * np.log10(mtot/self._mref)
+        return qgamma
 
 
 # ===================================
@@ -516,23 +598,22 @@ class Semi_Analytic_Model:
     ZERO_DYNAMIC_COALESCED_SYSTEMS = True
 
     def __init__(
-        self, mtot=(1.0e4*MSOL, 1.0e11*MSOL, 61), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
-        shape=None,
-        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013,
+        self, mtot=(1.0e4*MSOL, 1.0e11*MSOL, 61), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101), shape=None,
+        gsmf=GSMF_Schechter, mmbulge=relations.MMBulge_MM2013, gpf=None, gmt=None, gmr=None,
         **kwargs
     ):
         """
 
         Parameters
         ----------
-        mtot : list, optional
-        mrat : list, optional
-        redz : list, optional
-        shape : _type_, optional
-        gsmf : _type_, optional
-        gpf : _type_, optional
-        gmt : _type_, optional
-        mmbulge : _type_, optional
+        mtot :
+        mrat :
+        redz :
+        shape :
+        gsmf :
+        gpf :
+        gmt :
+        mmbulge :
 
         """
 
@@ -544,75 +625,33 @@ class Semi_Analytic_Model:
             setattr(self, key, val)
 
         # Sanitize input classes/instances
-        gsmf = utils._get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
-        gpf = utils._get_subclass_instance(gpf, None, _Galaxy_Pair_Fraction)
-        gmt = utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
+        gsmf = utils._get_subclass_instance(gsmf, GSMF_Schechter, _Galaxy_Stellar_Mass_Function)
+        if gmr is None:
+            # if GMR is None, then we need both GMT and GPF
+            gmt = utils._get_subclass_instance(gmt, GMT_Power_Law, _Galaxy_Merger_Time)
+            gpf = utils._get_subclass_instance(gpf, GPF_Power_Law, _Galaxy_Pair_Fraction)
+        else:
+            gmr = utils._get_subclass_instance(gmr, GMR_Illustris, _Galaxy_Merger_Rate)
+            # if GMR is given, GMT can still be used - for calculating GMT stalling
+            gmt = utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time, allow_none=True)
+            # if GMR is given, GPF is not used: make sure it is not given
+            if (gpf is not None):
+                err = f"When `GMR` ({gmr}) is provided, do not provide a GPF!"
+                log.exception(err)
+                raise ValueError(err)
+
         mmbulge = utils._get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
+        log.debug(f"{gsmf=}, {gmr=}, {gpf=}, {gmt=}, {mmbulge=}")
 
-        # Process grid specifications
-        param_names = ['mtot', 'mrat', 'redz']
-        params = [mtot, mrat, redz]
-        for ii, (par, name) in enumerate(zip(params, param_names)):
-            log.debug(f"{name}: {par}")
-            if isinstance(par, tuple) and (len(par) == 3):
-                continue
-            elif isinstance(par, np.ndarray):
-                continue
-            else:
-                err = (
-                    f"{name} (type={type(par)}, len={len(par)}) must be a (3,) tuple specifying a log-spacing, "
-                    "or ndarray of grid edges!"
-                )
-                log.exception(err)
-                raise ValueError(err)
+        # Convert from grid arguments into actual grid spacings for each parameter
+        mtot, mrat, redz = _load_sam_grid_params(mtot, mrat, redz, shape)
 
-        # Determine shape of grid (i.e. number of bins in each parameter)
-        if shape is not None:
-            if np.isscalar(shape):
-                shape = [shape for ii in range(3)]
-
-            shape = np.asarray(shape)
-            if not np.issubdtype(shape.dtype, int) or (shape.size != 3) or np.any(shape <= 1):
-                raise ValueError(f"`shape` ({shape}) must be an integer, or (3,) iterable of integers, larger than 1!")
-
-            # mtot
-            for ii, par in enumerate(params):
-                if shape[ii] is not None:
-                    log.debug(f"{param_names[ii]}: resetting grid shape to {shape[ii]}")
-                    if not isinstance(par, tuple) or len(par) != 3:
-                        err = (
-                            f"Cannot set shape ({shape[ii]}) for {param_names[ii]} which is not a (3,) tuple "
-                            "specifying a log-spacing!"
-                        )
-                        log.exception(err)
-                        raise ValueError(err)
-
-                    par = [pp for pp in par]
-                    par[2] = shape[ii]
-                    par = tuple(par)
-                    params[ii] = par
-
-        # Set grid-spacing for each parameter
-        for ii, (par, name) in enumerate(zip(params, param_names)):
-            log.debug(f"{name}: {par}")
-            if isinstance(par, tuple) and (len(par) == 3):
-                par = np.logspace(*np.log10(par[:2]), par[2])
-            elif isinstance(par, np.ndarray):
-                par = np.copy(par)
-            else:
-                err = f"{name} must be a (3,) tuple specifying a log-spacing; or ndarray of grid edges!  ({par})"
-                log.exception(err)
-                raise ValueError(err)
-
-            log.debug(f"{name}: [{par[0]}, {par[-1]}] {par.size}")
-            params[ii] = par
-
-        mtot, mrat, redz = params
         self.mtot = mtot
         self.mrat = mrat
         self.redz = redz
 
         self._gsmf = gsmf             #: Galaxy Stellar-Mass Function (`_Galaxy_Stellar_Mass_Function` instance)
+        self._gmr = gmr               #: Galaxy Merger Rate (`_Galaxy_Merger_Rate` instance)
         self._gpf = gpf               #: Galaxy Pair Fraction (`_Galaxy_Pair_Fraction` instance)
         self._gmt = gmt               #: Galaxy Merger Time (`_Galaxy_Merger_Time` instance)
         self._mmbulge = mmbulge       #: Mbh-Mbulge relation (`relations._MMBulge_Relation` instance)
@@ -702,37 +741,48 @@ class Semi_Analytic_Model:
             # Convert to shape (M, Q, Z)
             mstar_pri, mstar_rat, mstar_tot, redz = np.broadcast_arrays(*args)
 
+            log.debug(f"GSMF_USES_MTOT={GSMF_USES_MTOT}")
             mass_gsmf = mstar_tot if GSMF_USES_MTOT else mstar_pri
-            mass_gpf = mstar_tot if GPF_USES_MTOT else mstar_pri
-            mass_gmt = mstar_tot if GMT_USES_MTOT else mstar_pri
 
-            # GMT returns `-1.0` for values beyond age of universe
-            zprime, gmt_time = self._gmt.zprime(mass_gmt, mstar_rat, redz)
-            self._gmt_time = gmt_time
-            self._redz_prime = zprime
+            # ---- Find redshift of binaries following galaxy-merger
 
-            # find valid entries (M, Q, Z)
-            idx_stalled = (zprime < 0.0)
-            log.info(f"Stalled SAM bins based on GMT: {utils.frac_str(idx_stalled)}")
-            if _DEBUG:
-                if np.all(idx_stalled):
+            if self._gmt is not None:
+                log.debug(f"GMT_USES_MTOT ={GMT_USES_MTOT}")
+                mass_gmt = mstar_tot if GMT_USES_MTOT else mstar_pri
+
+                # GMT returns `-1.0` for values beyond age of universe
+                zprime, gmt_time = self._gmt.zprime(mass_gmt, mstar_rat, redz)
+                self._gmt_time = gmt_time
+                self._redz_prime = zprime
+
+                # find valid entries (M, Q, Z)
+                idx_stalled = (zprime < 0.0)
+                log.debug(f"Stalled SAM bins based on GMT: {utils.frac_str(idx_stalled)}")
+                if _DEBUG and np.all(idx_stalled):
                     utils.print_stats(stack=False, print_func=log.error,
                                       mstar_tot=mstar_tot, mstar_rat=mstar_rat, redz=redz)
                     err = "No `zprime` values are greater than zero!"
                     log.warning(err)
-                    # raise RuntimeError(err)
+            else:
+                log.info("No GMT was provided, cannot calculate Galaxy-Merger based stalling.")
+                idx_stalled = None
 
             # ---- Get Galaxy Merger Rate  [Chen2019] Eq.5
-            log.debug(f"GSMF_USES_MTOT={GSMF_USES_MTOT}")
-            log.debug(f"GPF_USES_MTOT ={GPF_USES_MTOT}")
-            log.debug(f"GMT_USES_MTOT ={GMT_USES_MTOT}")
 
-            # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]
-            dens = self._gsmf(mass_gsmf, redz) * self._gpf(mass_gpf, mstar_rat, redz) * cosmo.dtdz(redz)
-            # `gmt` returns [sec]
-            # dens /= self._gmt(mass_gmt, mstar_rat, redz)
-            dens /= gmt_time
-            # now `dens` is  ``dn_gal / [dlog10(Mstar) dq_gal dz]``  with units of [Mpc^-3]
+            if self._gmr is None:
+                log.debug("Calculating galaxy merger rate using pair-fraction (GPF) and merger-time (GMT)")
+                log.debug(f"GPF_USES_MTOT ={GPF_USES_MTOT}")
+                mass_gpf = mstar_tot if GPF_USES_MTOT else mstar_pri
+                # `gmt` returns [sec]  `gpf` is dimensionless,  so this is [1/sec]
+                gal_merger_rate = self._gpf(mass_gpf, mstar_rat, redz) / gmt_time
+            else:
+                log.debug("Calculating galaxy merger rate directly from GMR")
+                gal_merger_rate = self._gmr(mstar_tot, mstar_rat, redz)
+
+            # ---- Calculate binary density   ``dn_gal / [dlog10(Mstar) dq_gal dz]``
+
+            # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]   `gal_merger_rate` is [1/sec]  ===>  [Mpc^-3]
+            dens = self._gsmf(mass_gsmf, redz) * gal_merger_rate * cosmo.dtdz(redz)
 
             if _DEBUG:
                 dens_check = self._ndens_gal(mass_gsmf, mstar_rat, redz)
@@ -782,12 +832,13 @@ class Semi_Analytic_Model:
                     log.error(f"      bads = {utils.stats(dens[bads])}")
                     raise ValueError(err_msg)
 
-            # Add scatter from the M-Mbulge relation
+            # ---- Add scatter from the M-Mbulge relation
+
             scatter = self._mmbulge._scatter_dex
             log.debug(f"mmbulge scatter = {scatter}")
             if scatter > 0.0:
-                log.info(f"Adding MMbulge scatter ({scatter:.4e})")
-                log.info(f"\tdens bef: ({utils.stats(dens)})")
+                log.debug(f"Adding MMbulge scatter ({scatter:.4e})")
+                log.debug(f"\tdens bef: ({utils.stats(dens)})")
                 dur = datetime.now()
                 mass_bef = self._integrated_binary_density(dens, sum=True)
                 dens = add_scatter_to_masses(self.mtot, self.mrat, dens, scatter)
@@ -795,16 +846,16 @@ class Semi_Analytic_Model:
                 mass_aft = self._integrated_binary_density(dens, sum=True)
                 dur = datetime.now() - dur
                 dm = (mass_aft - mass_bef) / mass_bef
-                log.info(f"Scatter added after {dur.total_seconds()} sec")
-                log.info(f"\tdens aft: ({utils.stats(dens)})")
-                log.info(f"\tmass: {mass_bef:.2e} ==> {mass_aft:.2e} || change = {dm:.4e}")
+                log.debug(f"Scatter added after {dur.total_seconds()} sec")
+                log.debug(f"\tdens aft: ({utils.stats(dens)})")
+                log.debug(f"\tmass: {mass_bef:.2e} ==> {mass_aft:.2e} || change = {dm:.4e}")
 
             # set values after redshift zero to have zero density
-            if self.ZERO_GMT_STALLED_SYSTEMS:
-                log.info(f"zeroing out {utils.frac_str(idx_stalled)} systems stalled from GMT")
+            if self.ZERO_GMT_STALLED_SYSTEMS and (idx_stalled is not None):
+                log.debug(f"zeroing out {utils.frac_str(idx_stalled)} systems stalled from GMT")
                 dens[idx_stalled] = 0.0
             else:
-                log.warning("NOT zeroing out systems with GMTs extending past redshift zero!")
+                log.info("NOT zeroing out systems with GMTs extending past redshift zero!")
 
             self._density = dens
 
@@ -875,6 +926,8 @@ class Semi_Analytic_Model:
 
         """
 
+        # ---- Sanitize Inputs
+
         if (fobs_orb is None) == (sepa is None):
             err = "one (and only one) of `fobs_orb` or `sepa` must be provided!"
             log.exception(err)
@@ -893,6 +946,8 @@ class Semi_Analytic_Model:
 
         if zero_stalled is None:
             zero_stalled = self.ZERO_DYNAMIC_STALLED_SYSTEMS
+
+        # ---- Load density and primitive quantities
 
         log.info(f"{zero_coalesced=}, {zero_stalled=}")
 
@@ -1603,3 +1658,66 @@ def _check_bads(edges, vals, name):
 
     log.exception(err)
     raise ValueError(err)
+
+
+def _load_sam_grid_params(mtot, mrat, redz, shape):
+    # Process grid specifications
+    param_names = ['mtot', 'mrat', 'redz']
+    params = [mtot, mrat, redz]
+    for ii, (par, name) in enumerate(zip(params, param_names)):
+        log.debug(f"{name}: {par}")
+        if isinstance(par, tuple) and (len(par) == 3):
+            continue
+        elif isinstance(par, np.ndarray):
+            continue
+        else:
+            err = (
+                f"{name} (type={type(par)}, len={len(par)}) must be a (3,) tuple specifying a log-spacing, "
+                "or ndarray of grid edges!"
+            )
+            log.exception(err)
+            raise ValueError(err)
+
+    # Determine shape of grid (i.e. number of bins in each parameter)
+    if shape is not None:
+        if np.isscalar(shape):
+            shape = [shape for ii in range(3)]
+
+        shape = np.asarray(shape)
+        if not np.issubdtype(shape.dtype, int) or (shape.size != 3) or np.any(shape <= 1):
+            raise ValueError(f"`shape` ({shape}) must be an integer, or (3,) iterable of integers, larger than 1!")
+
+        # mtot
+        for ii, par in enumerate(params):
+            if shape[ii] is not None:
+                log.debug(f"{param_names[ii]}: resetting grid shape to {shape[ii]}")
+                if not isinstance(par, tuple) or len(par) != 3:
+                    err = (
+                        f"Cannot set shape ({shape[ii]}) for {param_names[ii]} which is not a (3,) tuple "
+                        "specifying a log-spacing!"
+                    )
+                    log.exception(err)
+                    raise ValueError(err)
+
+                par = [pp for pp in par]
+                par[2] = shape[ii]
+                par = tuple(par)
+                params[ii] = par
+
+    # Set grid-spacing for each parameter
+    for ii, (par, name) in enumerate(zip(params, param_names)):
+        log.debug(f"{name}: {par}")
+        if isinstance(par, tuple) and (len(par) == 3):
+            par = np.logspace(*np.log10(par[:2]), par[2])
+        elif isinstance(par, np.ndarray):
+            par = np.copy(par)
+        else:
+            err = f"{name} must be a (3,) tuple specifying a log-spacing; or ndarray of grid edges!  ({par})"
+            log.exception(err)
+            raise ValueError(err)
+
+        log.debug(f"{name}: [{par[0]}, {par[-1]}] {par.size}")
+        params[ii] = par
+
+    mtot, mrat, redz = params
+    return mtot, mrat, redz
