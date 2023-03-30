@@ -257,7 +257,7 @@ def get_file_size(fnames, precision=1):
     return byte_str
 
 
-def _get_subclass_instance(value, default, superclass):
+def _get_subclass_instance(value, default, superclass, allow_none=False):
     """Convert the given `value` into a subclass instance.
 
     `None` ==> instance from `default` class
@@ -289,6 +289,10 @@ def _get_subclass_instance(value, default, superclass):
     # Set `value` to a default, if needed and it is given
     if (value is None) and (default is not None):
         value = default
+
+    # if `value` is not set, and there is no default, and `None` is allowed... just return None
+    if (value is None) and allow_none:
+        return value
 
     # If `value` is a class (constructor), then construct an instance from it
     if inspect.isclass(value):
@@ -758,9 +762,7 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
     return ynew
 
 
-def nyquist_freqs(
-    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
-) -> np.ndarray:
+def nyquist_freqs(dur=15.0*YR, cad=0.1*YR, trim=None):
     """Calculate Nyquist frequencies for the given timing parameters.
 
     Parameters
@@ -796,9 +798,7 @@ def nyquist_freqs(
     return freqs
 
 
-def nyquist_freqs_edges(
-    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
-) -> np.ndarray:
+def nyquist_freqs_edges(dur=15.0*YR, cad=0.1*YR, trim=None):
     """Calculate Nyquist frequencies for the given timing parameters.
 
     Parameters
