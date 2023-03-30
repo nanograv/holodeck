@@ -431,22 +431,22 @@ class GMR_Power_Law(_Galaxy_Merger_Rate):
                  ):
 
         if norm0_log10 is None:
-            norm0_log10 = -2.2287,     # -2.2287 ± 0.0045    [log10(A*Gyr)]  A0 in [RG15]
+            norm0_log10 = -2.2287        # -2.2287 ± 0.0045    [log10(A*Gyr)]  A0 in [RG15]
         if normz is None:
             # normz = +2.4644,           # +2.4644 ± 0.0128    eta in [RG15]
             normz = 0.0
         if malpha0 is None:
-            malpha0 = +0.2241,         # +0.2241 ± 0.0038    alpha0 in [RG15]
+            malpha0 = +0.2241            # +0.2241 ± 0.0038    alpha0 in [RG15]
         if malphaz is None:
             # malphaz = -1.1759,         # -1.1759 ± 0.0316    alpha1 in [RG15]
             malphaz = 0.0
         if mdelta0 is None:
-            mdelta0 = +0.7668,         # +0.7668 ± 0.0202    delta0 in [RG15]
+            mdelta0 = +0.7668            # +0.7668 ± 0.0202    delta0 in [RG15]
         if mdeltaz is None:
             # mdeltaz = -0.4695,         # -0.4695 ± 0.0440    delta1 in [RG15]
             mdeltaz = 0.0
         if qgamma0 is None:
-            qgamma0 = -1.2595,         # -1.2595 ± 0.0026    beta0 in [RG15]
+            qgamma0 = -1.2595            # -1.2595 ± 0.0026    beta0 in [RG15]
         if qgammaz is None:
             # qgammaz = +0.0611,         # +0.0611 ± 0.0021    beta1 in [RG15]
             qgammaz = 0.0
@@ -538,23 +538,23 @@ class GMR_Illustris(GMR_Power_Law):
                  ):
 
         if norm0_log10 is None:
-            norm0_log10 = -2.2287,     # -2.2287 ± 0.0045    [log10(A*Gyr)]  A0 in [RG15]
+            norm0_log10 = -2.2287      # -2.2287 ± 0.0045    [log10(A*Gyr)]  A0 in [RG15]
         if normz is None:
-            normz = +2.4644,           # +2.4644 ± 0.0128    eta in [RG15]
+            normz = +2.4644            # +2.4644 ± 0.0128    eta in [RG15]
         if malpha0 is None:
-            malpha0 = +0.2241,         # +0.2241 ± 0.0038    alpha0 in [RG15]
+            malpha0 = +0.2241          # +0.2241 ± 0.0038    alpha0 in [RG15]
         if malphaz is None:
-            malphaz = -1.1759,         # -1.1759 ± 0.0316    alpha1 in [RG15]
+            malphaz = -1.1759          # -1.1759 ± 0.0316    alpha1 in [RG15]
         if mdelta0 is None:
-            mdelta0 = +0.7668,         # +0.7668 ± 0.0202    delta0 in [RG15]
+            mdelta0 = +0.7668          # +0.7668 ± 0.0202    delta0 in [RG15]
         if mdeltaz is None:
-            mdeltaz = -0.4695,         # -0.4695 ± 0.0440    delta1 in [RG15]
+            mdeltaz = -0.4695          # -0.4695 ± 0.0440    delta1 in [RG15]
         if qgamma0 is None:
-            qgamma0 = -1.2595,         # -1.2595 ± 0.0026    beta0 in [RG15]
+            qgamma0 = -1.2595          # -1.2595 ± 0.0026    beta0 in [RG15]
         if qgammaz is None:
-            qgammaz = +0.0611,         # +0.0611 ± 0.0021    beta1 in [RG15]
+            qgammaz = +0.0611          # +0.0611 ± 0.0021    beta1 in [RG15]
         if qgammam is None:
-            qgammam = -0.0477,         # -0.0477 ± 0.0013    gamma in [RG15]
+            qgammam = -0.0477          # -0.0477 ± 0.0013    gamma in [RG15]
 
         super().__init__(
             norm0_log10=norm0_log10,
