@@ -2068,6 +2068,28 @@ def gamma_strain_to_omega(gamma_strain):
     return gamma_omega
 
 
+def char_strain_to_psd(freqs, hc):
+    psd = hc**2 / (12*np.pi**2 * freqs**3)
+    return psd
+
+
+def psd_to_char_strain(freqs, psd):
+    hc = np.sqrt(psd * (12*np.pi**2 * freqs**3))
+    return hc
+
+
+def char_strain_to_rho(freqs, hc, tspan):
+    psd = char_strain_to_psd(freqs, hc)
+    rho = np.sqrt(psd/tspan)
+    return rho
+
+
+def rho_to_char_strain(freqs, rho, tspan):
+    psd = tspan * rho**2
+    hc = psd_to_char_strain(freqs, psd)
+    return hc
+
+
 @numba.njit
 def _gw_ecc_func(eccen):
     """GW Hardening rate eccentricitiy dependence F(e).
