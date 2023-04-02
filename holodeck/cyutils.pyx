@@ -1487,8 +1487,16 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
         for ff in range(F):
             ll = 0 # track which index in the loudest list you're currently storing
                      # start at 0 for the loudest of all.
-            bg_sum = 0 # sum of bg h2fdf, for parameter averaging and gwb
-            ls_sum = 0 # sum of ls h2fdf, for parameter averaging
+            # reset strain sums
+            sum_bg = 0 # sum of bg h2fdf, for parameter averaging and gwb
+            sum_ls = 0 # sum of ls h2fdf, for parameter averaging
+            # reset parameter averaging sums
+            m_ls = 0
+            q_ls = 0
+            z_ls = 0
+            m_bg = 0
+            q_bg = 0
+            z_bg = 0
             for bb in range(M*Q*Z): #iterate through bins, loudest to quietest
                 mm = msort[bb]
                 qq = qsort[bb]
