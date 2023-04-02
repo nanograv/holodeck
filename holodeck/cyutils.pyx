@@ -1216,7 +1216,7 @@ cdef (int *) _sort_h2fdf(double[:] flat_h2fdf, long size):
     return indices
 
 
-def loudest_hc_from_sorted(number, h2fdf, nreals, nloudest, mt, mr, rz, msort, qsort, zsort, normal_threshold=1e10):
+def loudest_hc_from_sorted(number, h2fdf, nreals, nloudest, msort, qsort, zsort, normal_threshold=1e10):
     """
     Calculates the characteristic strain from loud single sources and a background of all other sources.
 
@@ -1230,12 +1230,6 @@ def loudest_hc_from_sorted(number, h2fdf, nreals, nloudest, mt, mr, rz, msort, q
         Number of realizations.
     nloudest
         Number of loudest sources to separate in each frequency bin.
-    mt : (M,) 1Darray of scalars
-        Total masses, M, of each bin center.
-    mr : (Q,) 1Darray of scalars
-        Mass ratios, q, of each bin center.
-    rz : (Z,) 1Darray of scalars
-        Redshifts, z, of each bin center.
     msort : (M*Q*Z,) 1Darray
         M indices of each bin, sorted from largest to smallest h2fdf.
     qsort : (M*Q*Z,) 1Darray
@@ -1260,7 +1254,7 @@ def loudest_hc_from_sorted(number, h2fdf, nreals, nloudest, mt, mr, rz, msort, q
     cdef np.ndarray[np.double_t, ndim=3] hc2ls = np.zeros((F,R,L))
     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
     _loudest_hc_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold, 
-                            mt, mr, rz, msort, qsort, zsort,
+                            msort, qsort, zsort,
                             hc2ls, hc2bg)
     return hc2ls, hc2bg
     
@@ -1270,7 +1264,6 @@ def loudest_hc_from_sorted(number, h2fdf, nreals, nloudest, mt, mr, rz, msort, q
 @cython.cdivision(True)
 cdef void _loudest_hc_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number,
             long nreals, long nloudest, long thresh,
-            double[:] mt, double[:] mr, double[:] rz,
             long[:] msort, long[:] qsort, long[:] zsort,
             double[:,:,:] hc2ls, double[:,:] hc2bg):
     """
@@ -1288,12 +1281,6 @@ cdef void _loudest_hc_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, double[:
         Number of realizations.
     nloudest : int
         Number of loudest sources at each source.
-    mt : (M,) 1Darray of scalars
-        Total masses of each bin center.
-    mr : (Q,) 1Darray of scalars
-        Mass ratios of each bin center.
-    rz : (Z,) 1Darray of scalars
-        Redshifts of each bin center.
     msort : (M*Q*Z,) 1Darray
         M indices of each bin, sorted from largest to smallest h2fdf.
     qsort : (M*Q*Z,) 1Darray
