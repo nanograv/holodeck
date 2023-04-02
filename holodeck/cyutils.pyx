@@ -1215,150 +1215,6 @@ cdef (int *) _sort_h2fdf(double[:] flat_h2fdf, long size):
     
     return indices
 
-# def loudest_hc(number, h2fdf, nreals, nloudest, mt, mr, rz, normal_threshold=1e10):
-#     """
-#     Calculates the characteristic strain from loud single sources and a background of all other sources.
-
-#     Parameters
-#     ------------------------
-#     number : [M, Q, Z, F] NDarray
-#         number in each bin
-#     h2fdf : [M, Q, Z, F] NDarray
-#         Strain amplitude squared x frequency / frequency bin width for each bin.
-#     nreals
-#         Number of realizations.
-#     nloudest
-#         Number of loudest sources to separate in each frequency bin.
-#     mt : (M,) 1Darray of scalars
-#         Total masses, M, of each bin center.
-#     mr : (Q,) 1Darray of scalars
-#         Mass ratios, q, of each bin center.
-#     rz : (Z,) 1Darray of scalars
-#         Redshifts, z, of each bin center.
-
-#     Returns
-#     --------------------------
-#     hc2ss : (F, R, L) Ndarray of scalars
-#         Char strain squared of the loudest single sources.
-#     hc2bg : (F, R) Ndarray of scalars
-#         Char strain squared of the background.
-#     """
-
-#     cdef long[:] shape = np.array(number.shape)
-#     F = shape[3]
-#     R = nreals
-#     L = nloudest
-#     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
-#     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
-#     _loudest_hc(shape, h2fdf, number, nreals, nloudest, normal_threshold, 
-#                  mt, mr, rz,
-#                 hc2ss, hc2bg)
-#     return hc2ss, hc2bg
-    
-# @cython.boundscheck(True)
-# @cython.wraparound(True)
-# @cython.nonecheck(True)
-# @cython.cdivision(True)
-# cdef void _loudest_hc(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number,
-#             long nreals, long nloudest, long thresh,
-#             double[:] mt, double[:] mr, double[:] rz,
-#             double[:,:,:] hc2ss, double[:,:] hc2bg):
-#     """
-#     Calculates the characteristic strain from loud single sources and a background of all other sources.
-
-#     Parameters
-#     ----------
-#     shape : long[:] array
-#         Shape of number, [M, Q, Z, F].
-#     number : double[:,:,:,:] array
-#         Number per bin.
-#     h2fdf : double[:,:,:,:] array
-#         Strain amplitude squared * f/Delta f for a single source in each bin.
-#     nreals : int
-#         Number of realizations.
-#     nloudest : int
-#         Number of loudest sources at each source.
-#     mt : (M,) 1Darray of scalars
-#         Total masses of each bin center.
-#     mr : (Q,) 1Darray of scalars
-#         Mass ratios of each bin center.
-#     rz : (Z,) 1Darray of scalars
-#         Redshifts of each bin center.
-#     hc2ss : double[:,:,:] array
-#         (Memory address of) single source characteristic strain squared array.
-#     hc2bg : double[:,:] array
-#         (Memory address of) background characteristic strain squared array.
-    
-#     Returns
-#     -------
-#     void
-#     updated via memory address: hc2ss, hc2bg, ssidx, bg_par
-#     """
-    
-#     cdef int M = shape[0]
-#     cdef int Q = shape[1]
-#     cdef int Z = shape[2]
-#     cdef int F = shape[3]
-#     cdef int L = nloudest
-#     cdef int R = nreals
-
-#     cdef int mm, qq, zz, ff, rr, ll, loud
-#     cdef double num, sum, sub, m_avg, q_avg, z_avg
-#     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
-#     # cdef (double *) = <double *>malloc(L * sizeof(double))
-#     # cdef double maxes[L]
-#     # cdef (int *)indices = <int *>malloc(L * sizeof(int))
-
-#     # Setup random number generator from numpy library
-#     cdef bitgen_t *rng
-#     cdef const char *capsule_name = "BitGenerator"
-#     capsule = PCG64().capsule
-#     # Cast the pointer
-#     rng = <bitgen_t *> PyCapsule_GetPointer(capsule, capsule_name)
-#     for rr in range(R):
-#         for ff in range(F):
-#             loud = 0 # track which index in the loudest list you're currently storing. '0' for the loudest of all.
-#             sum=0
-#             m_avg=0
-#             q_avg=0
-#             z_avg=0
-#             for mm in range(M):
-#                 for qq in range(Q):
-#                     for zz in range(Z):
-#                         num = number[mm,qq,zz,ff]
-#                         if (num>thresh): # Gaussian sample
-#                             std = sqrt(num)
-#                             num = <double>random_normal(rng, num, std)  
-#                         else:            # Poisson sample
-#                             num = <double>random_poisson(rng, num)
-#                         if(num < 1):
-#                             continue
-#                         cur = h2fdf[mm,qq,zz,ff]
-#                         while(loud<nloudest) and (num>0):
-#                             loudest
-#                         for ll in range(L):
-#                             if(cur > maxes[indices[0]] and num > (ll-1)):
-
-                                
-#                         sum += num * cur
-#                         m_avg += num * cur * mt[mm]
-#                         q_avg += num * cur * mr[qq]
-#                         z_avg += num * cur * rz[zz]
-          
-#             sub=0
-#             for ll in range(L):
-#                 # characteristic frequencies squared
-#                 hc2ss[ff,rr,ll] = maxes[ll]
-#                 sub = sub+maxes[ll]
-#             hc2bg[ff,rr] = sum - sub
-
-         
-#             if (max==0): # sanity check
-#                 print('No sources found at %dth frequency' % ff) # could warn
-#     # still need to sqrt and sum! (back in python)
-    
-#     return 
-
 
 def loudest_hc_from_sorted(number, h2fdf, nreals, nloudest, mt, mr, rz, msort, qsort, zsort, normal_threshold=1e10):
     """
@@ -1535,6 +1391,12 @@ def loudest_hc_and_par_from_sorted(number, h2fdf, nreals, nloudest, mt, mr, rz, 
         Char strain squared of the loudest single sources.
     hc2bg : (F, R) Ndarray of scalars
         Char strain squared of the background.
+    lspar : (3, F, R) NDarray of scalars
+        Average effective M, q, z parameters of the loudest L sources.
+    bgpar : (3, F, R) NDarray of scalars
+        Average effective M, q, z parameters of the background.
+    lsidx : (3, F, R, L) NDarray of ints
+        Indices of the loudest single sources.
     """
 
     cdef long[:] shape = np.array(number.shape)
@@ -1543,10 +1405,13 @@ def loudest_hc_and_par_from_sorted(number, h2fdf, nreals, nloudest, mt, mr, rz, 
     L = nloudest
     cdef np.ndarray[np.double_t, ndim=3] hc2ls = np.zeros((F,R,L))
     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
-    _loudest_hc_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold, 
+    cdef np.ndarray[np.double_t, ndim=3] lspar = np.zeros((3,F,R))
+    cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
+    cdef np.ndarray[np.long_t, ndim=4] lsidx = np.zeros((3,F,R,L), dtype=int)
+    _loudest_hc_and_par_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold, 
                             mt, mr, rz, msort, qsort, zsort,
-                            hc2ls, hc2bg)
-    return hc2ls, hc2bg
+                            hc2ls, hc2bg, lspar, bgpar, lsidx)
+    return hc2ls, hc2bg, lspar, bgpar, lsidx
     
 @cython.boundscheck(True)
 @cython.wraparound(True)
@@ -1556,7 +1421,7 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
             long nreals, long nloudest, long thresh,
             double[:] mt, double[:] mr, double[:] rz,
             long[:] msort, long[:] qsort, long[:] zsort,
-            double[:,:,:] hc2ls, double[:,:] hc2bg):
+            double[:,:,:] hc2ls, double[:,:] hc2bg, double[:,:,:] lspar, double[:,:,:] bgpar, long[:,:,:,:] lsidx):
     """
     Calculates the characteristic strain from loud single sources and a background of all other sources.
 
@@ -1588,6 +1453,12 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
         (Memory address of) single source characteristic strain squared array.
     hc2bg : double[:,:] array
         (Memory address of) background characteristic strain squared array.
+    lspar : (3, F, R) NDarray of scalars
+        Average effective M, q, z parameters of the loudest L sources.
+    bgpar : (3, F, R) NDarray of scalars
+        Average effective M, q, z parameters of the background.
+    lsidx : (3, F, R, L) NDarray of ints
+        Indices of the loudest sources.
     
     Returns
     -------
@@ -1602,8 +1473,8 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
     cdef int L = nloudest
     cdef int R = nreals
 
-    cdef int mm, qq, zz, ff, rr, ll, loud
-    cdef double num, sum
+    cdef int mm, qq, zz, ff, rr, ll
+    cdef double num, cur, sum_bg, sum_ls, m_bg, q_bg, z_bg, m_ls, q_ls, z_ls
     cdef np.ndarray[np.double_t, ndim=3] maxes = np.zeros((F,R,L))
     
     # Setup random number generator from numpy library
@@ -1616,7 +1487,8 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
         for ff in range(F):
             ll = 0 # track which index in the loudest list you're currently storing
                      # start at 0 for the loudest of all.
-            sum = 0
+            bg_sum = 0 # sum of bg h2fdf, for parameter averaging and gwb
+            ls_sum = 0 # sum of ls h2fdf, for parameter averaging
             for bb in range(M*Q*Z): #iterate through bins, loudest to quietest
                 mm = msort[bb]
                 qq = qsort[bb]
@@ -1629,14 +1501,43 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
                     num = <double>random_poisson(rng, num)
                 if(num < 1):
                     continue
-                cur = h2fdf[mm,qq,zz,ff]
+                cur = h2fdf[mm,qq,zz,ff] # h^2 * f/df of current bin
                 if (num<1):
                     continue # to next loudest bin
                 while (ll < L) and (num > 0):
+                    # store ll loudest source strain
                     hc2ls[ff,rr,ll] = cur
+
+                    # store indices of ll loudest source
+                    lsidx[0,ff,rr,ll] = mm
+                    lsidx[1,ff,rr,ll] = qq
+                    lsidx[2,ff,rr,ll] = zz
+
+                    
+                    sum_ls += cur # tot ls h2fdf
+                    # add to average parameters of loudest sources
+                    m_ls += cur * mt[mm] # tot weighted ls mass
+                    q_ls += cur * mr[qq] # tot weighted ls ratio
+                    z_ls += cur * rz[zz] # tot weighted ls redshift
+
+                    # update number and ll index
                     num -= 1
                     ll += 1
-                sum += num * cur
+                
+                sum_bg += num * cur # tot bg h2fdf
+                # add to average parameters of background sources
+                m_bg += num * cur * mt[mm] # tot weight bg mass
+                q_bg += num * cur * mr[qq] # tot weighted bg ratio
+                z_bg += num * cur * rz[zz] # tot weighted bg redshift
+            
+            hc2bg[ff,rr] = sum_bg # background strain
+            # background average parameters
+            bgpar[0,ff,rr] = m_bg/sum_bg # bg avg mass
+            bgpar[1,ff,rr] = q_bg/sum_bg # bg avg ratio
+            bgpar[2,ff,rr] = z_bg/sum_bg # bg avg redshift
+            # loudest source average parameters
+            lspar[0,ff,rr] = m_ls/sum_ls # ls avg mass
+            lspar[1,ff,rr] = q_ls/sum_ls # ls avg ratio
+            lspar[2,ff,rr] = z_ls/sum_ls # ls avg redshift
 
-            hc2bg[ff,rr] = sum
 
