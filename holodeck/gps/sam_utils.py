@@ -91,10 +91,7 @@ class SamModel(abc.ABC):
         ]
 
         if set(pars) != set(self.param_names):
-            raise KeyError
-            sys.exit(
-                f"These parameters are not valid.\n Expected {self.param_names} and got {list(env_pars.keys())}."
-            )
+            raise KeyError(f"These parameters are not valid.\n Expected {self.param_names} and got {list(env_pars.keys())}.")
 
 
 class Hard04(SamModel):
