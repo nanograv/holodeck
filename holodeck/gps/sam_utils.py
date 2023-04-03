@@ -139,6 +139,44 @@ class Hard04(SamModel):
         return sam, hard
 
 
+class Broad_Uniform_02B(SamModel):
+
+    _PARAM_NAMES = [
+        'hard_time',
+        'gsmf_phi0',
+        'gsmf_mchar0_log10',
+        'mmb_amp_log10',
+        'mmb_scatter',
+    ]
+
+    def __init__(self, param_names=_PARAM_NAMES):
+        super().__init__(param_names=param_names)
+
+    def sam_for_params(self, env_pars, sam_shape):
+        self.validate_params(env_pars)
+        time, gsmf_phi0, gsmf_mchar0_log10, mmb_amp, mmb_scatter = env_pars.values(
+        )
+        time = (10.0**time) * GYR
+        mmb_amp = (10**mmb_amp) * MSOL
+
+        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0, mchar0_log10=gsmf_mchar0_log10)
+        gpf = holo.sam.GPF_Power_Law()
+        gmt = holo.sam.GMT_Power_Law()
+        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp, scatter_dex=mmb_scatter)
+
+        sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf,
+                                           gpf=gpf,
+                                           gmt=gmt,
+                                           mmbulge=mmbulge,
+                                           shape=sam_shape)
+        hard = holo.hardening.Fixed_Time.from_sam(sam,
+                                                  time,
+                                                  exact=True,
+                                                  progress=False)
+        return sam, hard
+
+
+
 class Eccen01(SamModel):
 
     _PARAM_NAMES = [

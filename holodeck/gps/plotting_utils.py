@@ -1,6 +1,6 @@
 """Plotting utilities for Gaussian Processes."""
 import sys
-from multiprocessing import Pool, cpu_count
+from multiprocessing import cpu_count, Pool
 from pathlib import Path
 
 import holodeck as holo
@@ -10,6 +10,8 @@ import scipy.signal as ssig
 from holodeck.constants import GYR, MSOL, PC, YR
 
 from holodeck.gps import gp_utils as gu
+
+from labellines import labelLine, labelLines
 
 FLOOR_STRAIN_SQUARED = 1e-40
 
@@ -116,7 +118,7 @@ def get_smooth_center(env_pars,
         raise ValueError(
             f"`center_measure` must be 'mean' or 'median', not '{center_measure}'"
         )
-
+    #print(f"{center=}\n{center.shape=}")
     return ssig.savgol_filter(center, 7, 3)
 
 
@@ -274,6 +276,183 @@ def plot_individual_parameter(gp_george,
         plt.yscale("log")
         plt.xlim(gp_freqs.min(), gp_freqs.max())
         plt.legend(loc=3)
+        fname = plot_dir / f"param_varied_{par_interest}.png"
+        plt.savefig(fname)
+        print(f"Plot saved at {fname.absolute()}")
+
+    if return_results:
+        return hc, rho, rho_pred, smooth_center
+
+def pub_plot_individual_parameter(gp_george,
+                              gp_list,
+                              pars_const,
+                              par_interest,
+                              spectra,
+                              num_points=5,
+                              center_measure="median",
+                              plot=True,
+                              plot_dir=Path.cwd(),
+                              find_sam_mean=True,
+                              model=sam_hard,
+                              sam_shape=40,
+                              nreal=50,
+                              color_map=plt.cm.Dark2,
+                              multiprocessing=False,
+                              return_results=False):
+    """Plot GWBs while varying a single parameter.
+
+    Parameters
+    ----------
+    gp_george : list[GaussProc]
+        The GP model that has been read in from a .PKL file
+    gp_list : list[george.gp.GP]
+        The configured GPs ready for predictions
+    pars_const : dict
+        Dictionary of constant parameter values
+    par_interest : str
+        The parameter to vary
+    spectra : h5py._hl.files.File
+        The variable containing the library in HDF5 format
+    num_points : int
+        Number of evenly-spaced samples in the linspace(min(`par_interest`),
+        max(`par_interest`))
+    center_measure: str, optional
+        The measure of center to use when returning a zero-center data. Can be
+        either "mean" or "median"
+    plot : bool, optional
+        Make or supress plots
+    plot_dir : str or Path, optional
+        The directory to save plots in
+    find_sam_mean : bool, optional
+        Whether to calculate the GWB and find the smoothed mean
+    model : function, optional
+        The function which describes the SAM to use
+    sam_shape : int, optional
+        The shape of the SAM grid
+    nreal : int, optional
+        Number of GWB realizations
+    color_map : matplotlib.pyplot.cm, optional
+        The color map to use for the plots
+    return_results: bool
+        Whether to return the numerical results used for the plots
+
+    Returns
+    -------
+    hc : numpy.array
+        The array of characteristic strains
+    rho : numpy.array
+        Array of rho values
+    rho_pred : numpy.array
+        Array of rho_pred values
+    smooth_mean : numpy.array
+        Array of smoothed GWBs
+
+    Examples
+    --------
+    FIXME: Add docs.
+
+    """
+    # Ensure Path object
+    if type(plot_dir) == str:
+        plot_dir = Path(plot_dir)
+
+    if not plot_dir.is_dir():
+        sys.exit(
+            f"{plot_dir.absolute()} does not exist. Please create it first.")
+
+    colors = color_map(np.linspace(0, 1, num=num_points))
+
+    # Get frequencies used for GP training
+    gp_freqs = spectra["fobs"][:len(gp_george)].copy()
+
+    # Get linspace dict for parameters
+    pars_linspace = gu.pars_linspace_dict(gp_george, num_points=num_points)
+
+    hc = np.zeros((len(gp_freqs), num_points))
+    rho = np.zeros((len(gp_freqs), num_points))
+    rho_pred = np.zeros((len(gp_freqs), 2, num_points))
+    smooth_center = np.zeros((len(gp_freqs), num_points))
+
+    env_pars_list = []
+    for i, par_varied in enumerate(pars_linspace[par_interest]):
+
+        # create a dict where the parameter of interest takes a value from the `pars_linspace`,
+        # and every other parameter takes its value from `par_const`.
+        # This way, we iterate over the parameter of interest.
+        env_pars = {
+            par: (par_varied if par == par_interest else pars_const[par])
+            for par in pars_const.keys()
+        }
+
+        env_pars_list.append(env_pars)
+
+        # Get hc from GP
+        hc[:, i], rho[:,
+                      i], rho_pred[:, :,
+                                   i] = gu.hc_from_gp(gp_george, gp_list,
+                                                      list(env_pars.values()))
+
+    # Get smoothed mean of GWB if using SAM
+    if find_sam_mean:
+        fobs_edges = spectra["fobs_edges"][:len(gp_freqs) + 1]
+        if multiprocessing:
+            args = [(env_pars_list[i], model, fobs_edges, nreal, sam_shape,
+                     center_measure)
+                    for i, _ in enumerate(pars_linspace[par_interest])]
+
+            with Pool(cpu_count() - 1) as pool:
+                smooth_center = np.array(pool.starmap(get_smooth_center, args)).T
+        else:
+            smooth_center = []
+            for i, _ in enumerate(pars_linspace[par_interest]):
+                print(f"{i=} {env_pars_list[i]=} {model=} {fobs_edges=} {nreal=} {sam_shape=} {center_measure=}")
+                smooth_center.append(get_smooth_center(env_pars_list[i], model, fobs_edges, nreal, sam_shape, center_measure))
+            smooth_center = np.array(smooth_center)
+
+
+    # Make plot
+    if plot:
+        if find_sam_mean:
+            # the smoothed mean
+            for j in range(num_points):
+                plt.loglog(
+                    gp_freqs * YR,
+                    10**smooth_center[:, j],
+                    color=colors[j],
+                    lw=1,
+                    linestyle="dashed",
+                )
+
+        for j in range(num_points):
+            plt.semilogx(
+                gp_freqs * YR,
+                hc[:, j],
+                lw=1,
+                label=f"${pars_linspace[par_interest][j]:.2f}$",
+                c=colors[j],
+                alpha=1,
+            )
+
+            plt.fill_between(
+                gp_freqs * YR,
+                np.sqrt(10**(rho[:, j] + rho_pred[:, 1, j])),
+                np.sqrt(10**(rho[:, j] - rho_pred[:, 1, j])),
+                color=colors[j],
+                alpha=0.25,
+            )
+        
+        if par_interest == 'hard_time':
+            xvals = np.array([7.0e-2, 7.0e-2, 1.25e-1, 2.5e-1, 2.5e-1])
+            labelLines(plt.gca().get_lines(), xvals=xvals, zorder=2.5)
+        else:
+            labelLines(plt.gca().get_lines(), zorder=2.5)
+        plt.xlabel("Observed GW Frequency [1/yr]")
+        plt.ylabel(r"$h_{c} (f)$")
+        plt.yscale("log")
+        plt.xlim(3.0e-2, 3.0e0)
+        plt.ylim(5.0e-17, 5e-14)
+        plt.title(f"{par_interest}")
+        #plt.legend(loc=3)
         fname = plot_dir / f"param_varied_{par_interest}.png"
         plt.savefig(fname)
         print(f"Plot saved at {fname.absolute()}")
