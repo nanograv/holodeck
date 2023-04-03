@@ -7,11 +7,15 @@ import holodeck as holo
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.signal as ssig
+from holodeck import utils
 from holodeck.constants import GYR, MSOL, PC, YR
-
 from holodeck.gps import gp_utils as gu
 
+VERBOSE = True
+
 FLOOR_STRAIN_SQUARED = 1e-40
+FILTER_DEF_WINDOW_LENGTH = 7
+FILTER_DEF_POLY_ORDER = 3
 
 
 def sam_hard(env_pars, shape=40):
@@ -103,10 +107,19 @@ def get_smooth_center(env_pars,
     sam, hard = model(env_pars, sam_shape)
     gwb = sam.gwb(fobs_edges, realize=nreal, hard=hard)
 
-    # Take care of zeros
-    low_ind = np.where(gwb < 1e-40)
-    gwb[low_ind] = 1e-40
+    print("Done with SAM")
+    bads = np.any(np.isnan(gwb), axis=(0, 1))
+    if VERBOSE:
+        print(f"Found {utils.frac_str(bads)} samples with NaN entries.  Removing them from library.")
+    # Select valid spectra
+    gwb = gwb[~bads]
 
+    # Find all the zeros and set them to be h_c = 1e-20
+    low_ind = (gwb < FLOOR_STRAIN_SQUARED)
+    gwb[low_ind] = FLOOR_STRAIN_SQUARED
+
+
+    print("Choosing center_measure")
     # Find mean or median over realizations
     if center_measure.lower() == "median":
         center = np.log10(np.median(gwb, axis=-1))
@@ -117,7 +130,30 @@ def get_smooth_center(env_pars,
             f"`center_measure` must be 'mean' or 'median', not '{center_measure}'"
         )
 
-    return ssig.savgol_filter(center, 7, 3)
+    # Smooth Mean Spectra
+    filter_window = FILTER_DEF_WINDOW_LENGTH
+    filter_poly_order = FILTER_DEF_POLY_ORDER
+    nfreqs = len(fobs_edges)-1
+    if (filter_window is not None) and (nfreqs < filter_window):
+        print(
+            f"WARNING: {nfreqs=} < {filter_window=}, resetting default value"
+        )
+        if nfreqs < 4:
+            filter_window = None
+            filter_poly_order = None
+        else:
+            filter_window = nfreqs // 2 + 1 if (nfreqs//2)%2==0 else nfreqs // 2
+            filter_poly_order = filter_window // 2
+        print(f"         {filter_window=} {filter_poly_order=}")
+
+    if filter_window is not None:
+        smooth_center = ssig.savgol_filter(center, filter_window, filter_poly_order)
+    else:
+        if VERBOSE:
+            print("Not using any smoothing on center spectrum.")
+        smooth_center = center
+
+    return smooth_center
 
 
 def plot_individual_parameter(gp_george,
