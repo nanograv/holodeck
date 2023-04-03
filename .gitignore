@@ -112,7 +112,7 @@ docs/holodeck-paper/src/out
 output/*
 *.png
 *.pdf
-analysis
+# analysis
 docs/source/apidoc_modules
 hostfile
 readthedocs.html
@@ -122,5 +122,7 @@ minos_run_gen_lib_sams.sh
 cyutils.c
 cyutils.html
 cyutils_api.h
+logs/
+slurm*
 *.out
 *.err

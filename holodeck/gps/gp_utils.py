@@ -19,6 +19,7 @@ from holodeck.constants import YR
 VERBOSE = True
 
 FLOOR_STRAIN_SQUARED = 1e-40
+FLOOR_ERR = 1.0
 FILTER_DEF_WINDOW_LENGTH = 7
 FILTER_DEF_POLY_ORDER = 3
 
@@ -289,8 +290,16 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
             print("Not using any smoothing on center spectrum.")
         smooth_center = center
 
+    # Get realizations that are all low. We will later use this
+    # boolean array to set a noise floor
+    # I've done it this way in case only certain frequencies have
+    # all ~0 realizations.
+    low_real = np.all(low_ind, axis=-1)
+
     # Find std
-    err = np.std(np.log10(gwb_spectra), axis=-1)
+    # Where low_real is True, return 1.0
+    # else return the std along the realization dimension
+    err = np.where(low_real, FLOOR_ERR, np.std(np.log10(gwb_spectra), axis=-1))
 
     # The "y" data are the medians or means and errors for the spectra at each point in parameter space
     yobs = smooth_center.copy()  # mean.copy()
