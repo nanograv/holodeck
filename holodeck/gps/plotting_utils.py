@@ -236,7 +236,7 @@ def plot_individual_parameter(gp_george,
                 for i, _ in enumerate(pars_linspace[par_interest])]
 
         with Pool(cpu_count() - 1) as pool:
-            smooth_center = np.array(pool.starmap(get_smooth_center, args)).T
+            smooth_center = np.array(pool.starmap(get_smooth_center, args)).T.squeeze()
 
     # Make plot
     if plot:
