@@ -334,7 +334,8 @@ def pub_plot_individual_parameter(gp_george,
                               nreal=50,
                               color_map=plt.cm.Dark2,
                               multiprocessing=False,
-                              return_results=False):
+                              return_results=False,
+                              ax=None):
     """Plot GWBs while varying a single parameter.
 
     Parameters
@@ -371,6 +372,8 @@ def pub_plot_individual_parameter(gp_george,
         The color map to use for the plots
     return_results: bool
         Whether to return the numerical results used for the plots
+    ax : matplotlib.Axes , optional
+        Axes object to use for plotting
 
     Returns
     -------
@@ -396,7 +399,20 @@ def pub_plot_individual_parameter(gp_george,
         sys.exit(
             f"{plot_dir.absolute()} does not exist. Please create it first.")
 
-    colors = color_map(np.linspace(0, 1, num=num_points))
+    # Conversion dictionary between holodeck parameter names and Astro Interp symbols
+    par_to_symbol = {'gsmf_phi0' : r"$\Phi_0$", 'gsmf_mchar0_log10' : r"$\log{M_0}$", 'mmb_amp_log10' : r"$\alpha_{\mathrm{MM}}$", 'mmb_scatter' : r"$\epsilon_{\mathrm{MM}}$", 'hard_time' : r"$\tau$"}
+    # _G_alaxies are _G_reen, _B_lack holes are _B_lood orange, _T_ime is _T_otally purple
+    galaxy_params = ['gsmf_phi0', 'gsmf_mchar0_log10']
+    blackhole_params = ['mmb_amp_log10', 'mmb_scatter']
+    time_params = ['hard_time']
+    if par_interest in galaxy_params:
+        colors = plt.cm.Greens(np.linspace(0.5, 1, num=num_points))
+    elif par_interest in blackhole_params:
+        colors = plt.cm.Oranges(np.linspace(0.5, 1, num=num_points))
+    elif par_interest in time_params:
+        colors = plt.cm.Purples(np.linspace(0.5, 1, num=num_points))
+    else:
+        colors = color_map(np.linspace(0, 1, num=num_points))
 
     # Get frequencies used for GP training
     gp_freqs = spectra["fobs"][:len(gp_george)].copy()
@@ -449,6 +465,12 @@ def pub_plot_individual_parameter(gp_george,
 
     # Make plot
     if plot:
+        plt.rcParams.update({'font.size': 11})
+        plt.rcParams.update({'font.family': 'Times New Roman'})
+        plt.rcParams.update({'mathtext.fontset': 'stix'})
+        plt.rcParams.update({'font.weight': 'light'})
+        if ax == None:
+            ax = plt.gca()
         if find_sam_mean:
             # the smoothed mean
             for j in range(num_points):
@@ -483,16 +505,17 @@ def pub_plot_individual_parameter(gp_george,
             labelLines(plt.gca().get_lines(), xvals=xvals, zorder=2.5)
         else:
             labelLines(plt.gca().get_lines(), zorder=2.5)
-        plt.xlabel("Observed GW Frequency [1/yr]")
-        plt.ylabel(r"$h_{c} (f)$")
+        #plt.xlabel("Observed GW Frequency [1/yr]")
+        #plt.ylabel(r"$h_{c} (f)$")
         plt.yscale("log")
         plt.xlim(3.0e-2, 3.0e0)
         plt.ylim(5.0e-17, 5e-14)
-        plt.title(f"{par_interest}")
+        plt.text(0.97, 0.9, par_to_symbol[par_interest], transform=ax.transAxes, horizontalalignment='right')
+        #plt.title(f"{par_interest}")
         #plt.legend(loc=3)
-        fname = plot_dir / f"param_varied_{par_interest}.png"
-        plt.savefig(fname)
-        print(f"Plot saved at {fname.absolute()}")
+        #fname = plot_dir / f"pub_param_varied_{par_interest}.png"
+        #plt.savefig(fname)
+        #print(f"Plot saved at {fname.absolute()}")
 
     if return_results:
         return hc, rho, rho_pred, smooth_center
