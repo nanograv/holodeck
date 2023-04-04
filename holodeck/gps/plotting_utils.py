@@ -428,6 +428,7 @@ def pub_plot_individual_parameter(gp_george,
                                    i] = gu.hc_from_gp(gp_george, gp_list,
                                                       list(env_pars.values()))
 
+
     # Get smoothed mean of GWB if using SAM
     if find_sam_mean:
         fobs_edges = spectra["fobs_edges"][:len(gp_freqs) + 1]
@@ -437,7 +438,7 @@ def pub_plot_individual_parameter(gp_george,
                     for i, _ in enumerate(pars_linspace[par_interest])]
 
             with Pool(cpu_count() - 1) as pool:
-                smooth_center = np.array(pool.starmap(get_smooth_center, args)).T
+                smooth_center = np.array(pool.starmap(get_smooth_center, args)).T.squeeze()
         else:
             smooth_center = []
             for i, _ in enumerate(pars_linspace[par_interest]):
