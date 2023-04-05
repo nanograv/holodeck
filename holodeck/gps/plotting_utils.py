@@ -75,7 +75,8 @@ def get_smooth_center(env_pars,
                       fobs_edges,
                       nreal=50,
                       sam_shape=40,
-                      center_measure="median"):
+                      center_measure="median",
+                      returninterval=False):
     """Calculate `nreal` GWB realizations and get the smoothed center (mean or median).
 
     Parameters
@@ -93,12 +94,18 @@ def get_smooth_center(env_pars,
     center_measure: str, optional
         The measure of center to use when returning a zero-center data. Can be
         either "mean" or "median"
+    returninterval: bool, optional
+        Whether or not to return the 68% confidence interval
 
 
     Returns
     -------
     numpy.array
         The smoothed mean of the GWB realizations
+    
+    or if returninterval is set to True returns
+    gwb_smooth, gwb_up, gwb_lo: nump.array
+        The smoothed mean and 68% upper and lower intervals
 
     Examples
     --------
@@ -120,7 +127,9 @@ def get_smooth_center(env_pars,
     low_ind = (gwb < FLOOR_STRAIN_SQUARED)
     gwb[low_ind] = FLOOR_STRAIN_SQUARED
 
-
+    if returninterval:
+        gwbup = np.percentile(gwb, 84, axis=-1)
+        gwblo = np.percentile(gwb, 16, axis=-1)
     print("Choosing center_measure")
     # Find mean or median over realizations
     if center_measure.lower() == "median":
@@ -150,12 +159,21 @@ def get_smooth_center(env_pars,
 
     if filter_window is not None:
         smooth_center = ssig.savgol_filter(center, filter_window, filter_poly_order)
+        if returninterval:
+            smooth_gwbup = ssig.savgol_filter(gwbup, filter_window, filter_poly_order)
+            smooth_gwblo = ssig.savgol_filter(gwblo, filter_window, filter_poly_order)
     else:
         if VERBOSE:
             print("Not using any smoothing on center spectrum.")
         smooth_center = center
+        if returninterval:
+            smooth_gwbup = gwbup
+            smooth_gwblo = gwblo
 
-    return smooth_center
+    if returninterval:
+        return smooth_center, gwbup, gwblo
+    else:
+        return smooth_center
 
 
 def plot_individual_parameter(gp_george,
@@ -447,22 +465,20 @@ def pub_plot_individual_parameter(gp_george,
 
     # Get smoothed mean of GWB if using SAM
     if find_sam_mean:
-        fobs_edges = spectra["fobs_edges"][:len(gp_freqs) + 1]
+        fobs_edges = spectra["fobs_edges"][:] # [:len(gp_freqs) + 1]
         if multiprocessing:
             args = [(env_pars_list[i], model, fobs_edges, nreal, sam_shape,
-                     center_measure)
+                     center_measure, True)
                     for i, _ in enumerate(pars_linspace[par_interest])]
-
             with Pool(cpu_count() - 1) as pool:
                 smooth_center = np.array(pool.starmap(get_smooth_center, args)).T.squeeze()
         else:
             smooth_center = []
             for i, _ in enumerate(pars_linspace[par_interest]):
-                print(f"{i=} {env_pars_list[i]=} {model=} {fobs_edges=} {nreal=} {sam_shape=} {center_measure=}")
                 smooth_center.append(get_smooth_center(env_pars_list[i], model, fobs_edges, nreal, sam_shape, center_measure))
             smooth_center = np.array(smooth_center)
 
-
+    print(f"{smooth_center.shape=}")
     # Make plot
     if plot:
         plt.rcParams.update({'font.size': 11})
@@ -475,40 +491,50 @@ def pub_plot_individual_parameter(gp_george,
             # the smoothed mean
             for j in range(num_points):
                 plt.loglog(
-                    gp_freqs * YR,
-                    10**smooth_center[:, j],
+                    spectra['fobs'][:] * YR,
+                    10**smooth_center[:, 0, j],
                     color=colors[j],
                     lw=1,
+                    label=f"${pars_linspace[par_interest][j]:.2f}$",
+                )
+                if j % 2 == 0:
+                    plt.fill_between(
+                        spectra['fobs'][:] * YR,
+                        smooth_center[:, 2, j],
+                        smooth_center[:, 1, j],
+                        color=colors[j],
+                        alpha=0.25,
+                    )  
+        plotgps = False
+        if plotgps:
+            for j in range(num_points):
+                plt.semilogx(
+                    gp_freqs * YR,
+                    hc[:, j],
+                    lw=1,
+                    c=colors[j],
+                    alpha=1,
                     linestyle="dashed",
                 )
 
-        for j in range(num_points):
-            plt.semilogx(
-                gp_freqs * YR,
-                hc[:, j],
-                lw=1,
-                label=f"${pars_linspace[par_interest][j]:.2f}$",
-                c=colors[j],
-                alpha=1,
-            )
-
-            plt.fill_between(
-                gp_freqs * YR,
-                np.sqrt(10**(rho[:, j] + rho_pred[:, 1, j])),
-                np.sqrt(10**(rho[:, j] - rho_pred[:, 1, j])),
-                color=colors[j],
-                alpha=0.25,
-            )
+#             plt.fill_between(
+#                 gp_freqs * YR,
+#                 np.sqrt(10**(rho[:, j] + rho_pred[:, 1, j])),
+#                 np.sqrt(10**(rho[:, j] - rho_pred[:, 1, j])),
+#                 color=colors[j],
+#                 alpha=0.25,
+#             )
         
         if par_interest == 'hard_time':
-            xvals = np.array([7.0e-2, 7.0e-2, 1.25e-1, 2.5e-1, 2.5e-1])
+            xvals = np.array([7.0e-2, 7.0e-2, 4.0e-1, 8.0e-1, 8.0e-1])
             labelLines(plt.gca().get_lines(), xvals=xvals, zorder=2.5)
         else:
             labelLines(plt.gca().get_lines(), zorder=2.5)
         #plt.xlabel("Observed GW Frequency [1/yr]")
         #plt.ylabel(r"$h_{c} (f)$")
         plt.yscale("log")
-        plt.xlim(3.0e-2, 3.0e0)
+        #plt.xlim(6.0e-2, 3.0e0)
+        plt.xlim(spectra['fobs'][:].min() * YR, spectra['fobs'][:].max() * YR)
         plt.ylim(5.0e-17, 5e-14)
         plt.text(0.97, 0.9, par_to_symbol[par_interest], transform=ax.transAxes, horizontalalignment='right')
         #plt.title(f"{par_interest}")
