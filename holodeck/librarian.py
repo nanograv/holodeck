@@ -595,6 +595,7 @@ def run_sam_at_pspace_num(args, space, pnum, path_output):
     return rv
 
 
+'''
 class _Parameter_Space(abc.ABC):
 
     _PARAM_NAMES = []
@@ -783,6 +784,7 @@ class _LHS_Parameter_Space(_Parameter_Space):
     # Below are done out of laziness and backwards compatibility but should be deprecated
     def lhsnumber_to_index(self, pnum):
         return pnum
+'''
 
 
 def main():

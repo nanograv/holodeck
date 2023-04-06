@@ -4,8 +4,9 @@
 import holodeck as holo
 from holodeck.constants import MSOL, PC, GYR
 from holodeck.librarian import (
-    _Parameter_Space, _LHS_Parameter_Space, _Param_Space,
+    _Param_Space,
     PD_Normal, PD_Uniform,
+    # _Parameter_Space, _LHS_Parameter_Space,
     # PD_Uniform_Log,
 )
 
@@ -1060,7 +1061,7 @@ def fiducial_model_for_params(sam_shape=None, **kwargs):
 # ====    OLD    ====
 # ==============================================================================
 
-
+'''
 class Parameter_Space_Hard04(_Parameter_Space):
 
     _PARAM_NAMES = [
@@ -1353,4 +1354,4 @@ class PS_Circ_01(_LHS_Parameter_Space):
             progress=False
         )
         return sam, hard
-
+'''
