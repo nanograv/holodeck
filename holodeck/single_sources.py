@@ -34,7 +34,7 @@ log.setLevel(logging.INFO)
 ###################################################
 
 # version for running libraries
-def ss_gws(edges, number, realize, loudest=1, round = True, params = False):
+def ss_gws(edges, number, realize, loudest = 1, params = False):
        
     """ Calculate strain from the loudest single sources and background.
 
@@ -52,10 +52,6 @@ def ss_gws(edges, number, realize, loudest=1, round = True, params = False):
         Specification of how many discrete realizations to construct.
     loudest : int
         Number of loudest single sources to separate from background.
-    round : bool
-        Specification of whether to discretize the sample if realize is False, 
-        by rounding number of binaries in each bin to integers. 
-        Does nothing if realize is True.
     
 
     Returns

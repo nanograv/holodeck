@@ -19,6 +19,7 @@ from scipy.stats import qmc
 import pyDOE
 
 import holodeck as holo
+import holodeck.single_sources as ss
 from holodeck import log, utils
 from holodeck.constants import YR
 
@@ -577,7 +578,7 @@ def run_sam_at_pspace_num(args, space, pnum, path_output):
 
     meta_data = dict(
         pnum=pnum, pdim=space.ndims, nsamples=args.nsamples, librarian_version=__version__,
-        param_names=space.names, params=space._params, samples=space._samples,
+        param_names=space.names, params=space._params, samples=space._samples, # prob don't need these for all of them
     )
 
     np.savez(fname, **data, **meta_data, **fits_data, **legend)
@@ -596,6 +597,104 @@ def run_sam_at_pspace_num(args, space, pnum, path_output):
 
     return rv
 
+def run_ss_at_pspace_num(args, space, pnum, path_output):
+    log = args.log
+    fname = f"lib_sams__p{pnum:06d}.npz"
+    fname = Path(path_output, fname)
+    beg = datetime.now()
+    log.info(f"{pnum=} :: {fname=} beginning at {beg}")
+    if fname.exists():
+        log.warning(f"File {fname} already exists.")
+
+    def log_mem():
+        # results.ru_maxrss is KB on Linux, B on macos
+        mem_max = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 2)
+        process = psutil.Process(os.getpid())
+        mem_rss = process.memory_info().rss / 1024**3
+        mem_vms = process.memory_info().vms / 1024**3
+        log.info(f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB")
+
+    pta_dur = args.pta_dur * YR
+    nfreqs = args.nfreqs
+    hifr = nfreqs/pta_dur
+    pta_cad = 1.0 / (2 * hifr)
+    fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
+    fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
+    log.info(f"Created {fobs_cents.size} frequency bins")
+    log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
+    log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
+    log_mem()
+    assert nfreqs == fobs_cents.size
+
+    try:
+        log.debug("Selecting `sam` and `hard` instances")
+        sam, hard = space(pnum)
+        log_mem()
+
+        ### HERE IS WHERE THINGS CHANGE FOR SS ###
+        log.debug(f"Calculating SS and BG GWs for shape ({fobs_cents.size}, {args.nreals})")
+        fobs_orb_edges = fobs_edges / 2.0 
+        fobs_orb_cents = fobs_cents/ 2.0
+        # edges
+        edges, dnum = sam.dynamic_binary_number(holo.hardening.Hard_GW, fobs_orb=fobs_orb_cents, zero_stalled=False) # should the zero stalled option be part of the parameter space?
+        edges[-1] = fobs_orb_edges
+        # integrate for number
+        number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
+        number = number * np.diff(np.log(fobs_edges))
+        # gws
+        hc_ss, hc_bg, sspar, bgpar = ss.ss_gws(edges, number, realize=args.nreals, 
+                                               loudest = 5, params = True) # replace 5 with args.nloudest
+        log_mem()
+        log.debug(f"{holo.utils.stats(hc_ss)=}")
+        legend = space.param_dict(pnum)
+        log.debug(f"Saving {pnum} to file")
+        data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
+                    hc_ss = hc_ss, hc_bg = hc_bg, sspar = sspar, bgpar = bgpar)
+        ### EDITED UP TO HERE ###
+
+        rv = True
+    except Exception as err:
+        log.exception("\n\n")
+        log.exception("="*100)
+        log.exception(f"`run_sam` FAILED on {pnum=}\n")
+        log.exception(err)
+        log.exception("="*100)
+        log.exception("\n\n")
+        rv = False
+        legend = {}
+        data = dict(fail=str(err))
+
+    if rv:
+        try:
+            fits_data = get_gwb_fits_data(fobs_cents, hc_bg)
+        except Exception as err:
+            log.exception("Failed to load gwb fits data!")
+            log.exception(err)
+            fits_data = {}
+
+    else:
+        fits_data = {}
+
+    meta_data = dict(
+        pnum=pnum, pdim=space.ndims, nsamples=args.nsamples, librarian_version=__version__,
+        param_names=space.names, params=space._params, samples=space._samples, # prob don't need these for all of them
+    )
+
+    np.savez(fname, **data, **meta_data, **fits_data, **legend)
+    log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-beg)}")
+
+    if rv:
+        try:
+            fname = fname.with_suffix('.png')
+            fig = make_gwb_plot(fobs_cents, hc_bg, fits_data)
+            fig.savefig(fname, dpi=300)
+            log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)}")
+            plt.close('all')
+        except Exception as err:
+            log.exception("Failed to make gwb plot!")
+            log.exception(err)
+
+    return rv
 
 class _Parameter_Space(abc.ABC):
 
