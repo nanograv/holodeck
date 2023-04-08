@@ -32,6 +32,119 @@ log.setLevel(logging.INFO)
 ###################################################
 ############## STRAIN CALCULATIONS ################
 ###################################################
+
+# version for running libraries
+def ss_gws(edges, number, realize, loudest=1, round = True, params = False):
+       
+    """ Calculate strain from the loudest single sources and background.
+
+
+    Parameters
+    ----------
+    edges : (4,) list of 1darrays
+        A list containing the edges along each dimension.  The four dimensions correspond to
+        total mass, mass ratio, redshift, and observer-frame orbital frequency.
+        The length of each of the four arrays is M+1, Q+1, Z+1, F+1.
+    number : (M, Q, Z, F) ndarray of scalars
+        The number of binaries in each bin of parameter space.  This is calculated by integrating
+        `dnum` over each bin.
+    realize : int,
+        Specification of how many discrete realizations to construct.
+    loudest : int
+        Number of loudest single sources to separate from background.
+    round : bool
+        Specification of whether to discretize the sample if realize is False, 
+        by rounding number of binaries in each bin to integers. 
+        Does nothing if realize is True.
+    
+
+    Returns
+    -------
+    hc_ss : (F, R, L) NDarray of scalars
+        The characteristic strain of the L loudest single sources at each frequency.
+    hc_bg : (F, R) NDarray of scalars
+        Characteristic strain of the GWB.
+    sspar : (3, F, R, L) NDarray of scalars
+        Astrophysical parametes of each loud single sources, 
+        for each frequency and realization. 
+        Returned only if params = True.
+    bgpar : (3, F, R) NDarray of scalars
+        Average effective binary astrophysical parameters for background
+        sources at each frequency and realization, 
+        Returned only if params = True.
+    """
+
+    # Frequency bin midpoints
+    foo = edges[-1]                   #: should be observer-frame orbital-frequencies
+    df = np.diff(foo)                 #: frequency bin widths
+    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+    F = len(fc)                       #: number of frequencies
+
+    # All other bin midpoints
+    mt = kale.utils.midpoints(edges[0]) #: total mass
+    mr = kale.utils.midpoints(edges[1]) #: mass ratio
+    rz = kale.utils.midpoints(edges[2]) #: redshift
+
+
+    # --- Chirp Masses --- in shape (M, Q) 
+    cmass = utils.chirp_mass_mtmr(mt[:,np.newaxis], mr[np.newaxis,:])
+
+    # --- Comoving Distances --- in shape (Z)
+    cdist = holo.cosmo.comoving_distance(rz).cgs.value
+
+    # --- Rest Frame Frequencies --- in shape (Z, F) 
+    rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
+
+    # --- Source Strain Amplitude --- in shape (M, Q, Z, F) 
+    hsamp = utils.gw_strain_source(cmass[:,:,np.newaxis,np.newaxis],
+                                   cdist[np.newaxis,np.newaxis,:,np.newaxis],
+                                   rfreq[np.newaxis,np.newaxis,:,:])
+    # hsfdf = hsamp^2 * f/df
+    h2fdf = hsamp**2 * (fc[np.newaxis, np.newaxis, np.newaxis,:]
+                    /df[np.newaxis, np.newaxis, np.newaxis,:]) 
+    
+    # indices of bins sorted by h2fdf
+    indices = np.argsort(-h2fdf[...,0].flatten()) # just sort for first frequency
+    unraveled = np.array(np.unravel_index(indices, (len(mt),len(mr),len(rz))))
+    msort = unraveled[0,:]
+    qsort = unraveled[1,:]
+    zsort = unraveled[2,:]
+
+    # For multiple realizations, using cython
+    if(utils.isinteger(realize)):
+        if(params == True):
+            # hc2ss = char strain squared of each loud single source
+            # hc2bg = char strain squared of the background
+            # lspar = avg parameters of loudest sources
+            # bgpar = avg parameters of background
+            # ssidx = indices of loud single sources
+            hc2ss, hc2bg, lspar, bgpar, ssidx = \
+                holo.cyutils.loudest_hc_and_par_from_sorted(number, h2fdf, realize, loudest,
+                                                            mt, mr, rz, msort, qsort, zsort)
+            hc_ss = np.sqrt(hc2ss) # calculate single source strain
+            hc_bg = np.sqrt(hc2bg) # calculate background strain
+
+            # calulate parameters of single sources
+            sspar = np.array([mt[ssidx[0,...]], mr[ssidx[1,...]], rz[ssidx[2,...]]])
+            
+            return hc_ss, hc_bg, sspar, bgpar
+            
+        else:
+            # use cython to get h_c^2 for ss and bg
+            hc2ss, hc2bg = holo.cyutils.loudest_hc_from_sorted(number, h2fdf, realize, loudest,
+                                                               msort, qsort, zsort)
+            hc_ss = np.sqrt(hc2ss)
+            hc_bg = np.sqrt(hc2bg)
+            return hc_ss, hc_bg
+    
+    # OTHERWISE
+    else:
+        raise Exception("`realize` ({}) must be an integer!")
+
+
+
+
+
 def loudest_by_cython(edges, number, realize, loudest, round = True, params = False):
        
     """ More efficient way to calculate strain from numbered 
