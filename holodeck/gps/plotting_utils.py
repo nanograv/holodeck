@@ -7,9 +7,15 @@ import holodeck as holo
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.signal as ssig
+from holodeck import utils
 from holodeck.constants import GYR, MSOL, PC, YR
+from holodeck.gps import gp_utils as gu
 
-import gp_utils as gu
+VERBOSE = True
+
+FLOOR_STRAIN_SQUARED = 1e-40
+FILTER_DEF_WINDOW_LENGTH = 7
+FILTER_DEF_POLY_ORDER = 3
 
 
 def sam_hard(env_pars, shape=40):
@@ -101,10 +107,19 @@ def get_smooth_center(env_pars,
     sam, hard = model(env_pars, sam_shape)
     gwb = sam.gwb(fobs_edges, realize=nreal, hard=hard)
 
-    # Take care of zeros
-    low_ind = np.where(gwb < 1e-40)
-    gwb[low_ind] = 1e-40
+    print("Done with SAM")
+    bads = np.any(np.isnan(gwb), axis=(0, 1))
+    if VERBOSE:
+        print(f"Found {utils.frac_str(bads)} samples with NaN entries.  Removing them from library.")
+    # Select valid spectra
+    gwb = gwb[~bads]
 
+    # Find all the zeros and set them to be h_c = 1e-20
+    low_ind = (gwb < FLOOR_STRAIN_SQUARED)
+    gwb[low_ind] = FLOOR_STRAIN_SQUARED
+
+
+    print("Choosing center_measure")
     # Find mean or median over realizations
     if center_measure.lower() == "median":
         center = np.log10(np.median(gwb, axis=-1))
@@ -115,7 +130,30 @@ def get_smooth_center(env_pars,
             f"`center_measure` must be 'mean' or 'median', not '{center_measure}'"
         )
 
-    return ssig.savgol_filter(center, 7, 3)
+    # Smooth Mean Spectra
+    filter_window = FILTER_DEF_WINDOW_LENGTH
+    filter_poly_order = FILTER_DEF_POLY_ORDER
+    nfreqs = len(fobs_edges)-1
+    if (filter_window is not None) and (nfreqs < filter_window):
+        print(
+            f"WARNING: {nfreqs=} < {filter_window=}, resetting default value"
+        )
+        if nfreqs < 4:
+            filter_window = None
+            filter_poly_order = None
+        else:
+            filter_window = nfreqs // 2 + 1 if (nfreqs//2)%2==0 else nfreqs // 2
+            filter_poly_order = filter_window // 2
+        print(f"         {filter_window=} {filter_poly_order=}")
+
+    if filter_window is not None:
+        smooth_center = ssig.savgol_filter(center, filter_window, filter_poly_order)
+    else:
+        if VERBOSE:
+            print("Not using any smoothing on center spectrum.")
+        smooth_center = center
+
+    return smooth_center
 
 
 def plot_individual_parameter(gp_george,
@@ -234,7 +272,7 @@ def plot_individual_parameter(gp_george,
                 for i, _ in enumerate(pars_linspace[par_interest])]
 
         with Pool(cpu_count() - 1) as pool:
-            smooth_center = np.array(pool.starmap(get_smooth_center, args)).T
+            smooth_center = np.array(pool.starmap(get_smooth_center, args)).T.squeeze()
 
     # Make plot
     if plot:
@@ -366,7 +404,8 @@ def plot_over_realizations(ind,
                            gp_george,
                            gp_list,
                            center_measure="median",
-                           plot_dir=Path.cwd()):
+                           plot_dir=Path.cwd(),
+                           test_frac=0.0):
     """Plot the GP prediction over the GWB from `spectra`.
 
     Parameters
@@ -400,40 +439,60 @@ def plot_over_realizations(ind,
         sys.exit(
             f"{plot_dir.absolute()} does not exist. Please create it first.")
 
-    xobs = gu.get_parameter_values(spectra)
-    env_param = xobs[ind, :].copy()
+    # Test frac is purposefully left out here so you can make plots using the
+    # test set
+    freqs, xobs, yerr, yobs, yobs_mean = gu.get_smoothed_gwb(
+        spectra, len(gp_george), center_measure=center_measure)
+
+    # Alert if in test set
+    if ind < int(yobs.shape[0] * test_frac):
+        print(f"Index {ind} is in the test set")
+
+    smooth_center = yobs + yobs_mean
+
+    # Take the test set offset into account for xobs
+    env_param = xobs[ind - int(yobs.shape[0] * test_frac), :].copy()
 
     hc, rho, rho_pred = gu.hc_from_gp(gp_george, gp_list, env_param)
-
-    freqs, yerr, yobs, yobs_mean = gu.get_smoothed_gwb(
-        spectra, len(gp_george), center_measure=center_measure)
-    smooth_center = yobs + yobs_mean
 
     # Convert to Hz
     freqs /= YR
 
-    # the raw spectra #
-    for ii in range(spectra['gwb'].shape[-1]):
+
+    gwb_spectra = spectra['gwb']
+
+    # Need to drop NaNs
+    bads = np.any(np.isnan(gwb_spectra), axis=(1, 2))
+    gwb_spectra = gwb_spectra[~bads]
+
+    # Find all the zeros and set them to be h_c = 1e-20
+    low_ind = (gwb_spectra < np.sqrt(FLOOR_STRAIN_SQUARED))
+    gwb_spectra[low_ind] = np.sqrt(FLOOR_STRAIN_SQUARED)
+
+    # the raw spectra
+    # Let the last one be the one we apply a label to
+    for ii in range(gwb_spectra.shape[-1] - 1):
         plt.loglog(freqs,
-                   spectra['gwb'][ind, :len(gp_george), ii],
+                   gwb_spectra[ind, :len(gp_george), ii],
                    color='C0',
                    alpha=0.2,
                    zorder=0)
+    # Plot the last and add a label
     plt.loglog(freqs,
-               spectra['gwb'][ind, :len(gp_george), ii],
+               gwb_spectra[ind, :len(gp_george), ii+1],
                color='C0',
                alpha=0.2,
                zorder=0,
                label='Original Spectra')
 
-    # the smoothed mean #
+    # the smoothed mean
     plt.loglog(freqs,
                np.sqrt(10**smooth_center[ind][:len(gp_george)]),
                color='C1',
                label=f"Smoothed {center_measure}",
                lw=2)
 
-    # the GP realization #
+    # the GP realization
     plt.semilogx(freqs, hc, color='C3', lw=2.5, label='GP')
     plt.fill_between(freqs,
                      np.sqrt(10**(rho + rho_pred[:, 1])),
@@ -451,7 +510,7 @@ def plot_over_realizations(ind,
 
     # Print the parameter values for this gwb
     pars = list(spectra.attrs["param_names"].astype(str))
-    for i, par in enumerate(xobs[ind, :]):
-        print(f"{pars[i]} = {xobs[ind,i]:.2E}")
+    for i, par in enumerate(env_param):
+        print(f"{pars[i]} = {env_param[i]:.2E}")
 
-    return xobs[ind]
+    return env_param

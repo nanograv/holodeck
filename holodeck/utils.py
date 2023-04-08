@@ -493,6 +493,42 @@ def fit_gaussian(xx, yy, guess=[1.0, 0.0, 1.0]):
     return popt, pcov
 
 
+def _func_line(xx, amp, slope):
+    yy = amp + slope * xx
+    return yy
+
+
+def fit_powerlaw(xx, yy, init=[-15.0, -2.0/3.0]):
+    """
+
+    Returns
+    -------
+    log10_amp
+    plaw
+
+    """
+
+    popt, pcov = sp.optimize.curve_fit(_func_line, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
+    log10_amp = popt[0]
+    gamma = popt[1]
+    return log10_amp, gamma
+
+
+def fit_powerlaw_fixed_index(xx, yy, index=-2.0/3.0, init=[-15.0]):
+    """
+
+    Returns
+    -------
+    log10_amp
+    plaw
+
+    """
+    _func_fixed = lambda xx, amp: _func_line(xx, amp, index)
+    popt, pcov = sp.optimize.curve_fit(_func_fixed, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
+    log10_amp = popt[0]
+    return log10_amp
+
+
 def frac_str(vals, prec=2):
     """Return a string with the fraction and decimal of non-zero elements of the given array.
 
@@ -1535,6 +1571,7 @@ def redz_after(time, redz=None, age=None):
 
     return new_redz
 
+
 def schwarzschild_radius(mass):
     """Return the Schwarschild radius [cm] for the given mass [grams].
 
@@ -2029,6 +2066,28 @@ def gamma_strain_to_psd(gamma_strain):
 def gamma_strain_to_omega(gamma_strain):
     gamma_omega = (gamma_strain - 2.0) / 2.0
     return gamma_omega
+
+
+def char_strain_to_psd(freqs, hc):
+    psd = hc**2 / (12*np.pi**2 * freqs**3)
+    return psd
+
+
+def psd_to_char_strain(freqs, psd):
+    hc = np.sqrt(psd * (12*np.pi**2 * freqs**3))
+    return hc
+
+
+def char_strain_to_rho(freqs, hc, tspan):
+    psd = char_strain_to_psd(freqs, hc)
+    rho = np.sqrt(psd/tspan)
+    return rho
+
+
+def rho_to_char_strain(freqs, rho, tspan):
+    psd = tspan * rho**2
+    hc = psd_to_char_strain(freqs, psd)
+    return hc
 
 
 @numba.njit
