@@ -3,17 +3,19 @@
 Usage
 -----
 
-mpirun -n <NPROCS> python ./scripts/gen_lib_sams.py <PATH> -n <SAMPS> -r <REALS> -f <FREQS>
+mpirun -n <NPROCS> python ./scripts/gen_lib_sams.py <PARAM_SPACE> <PATH> -n <SAMPS> -r <REALS> -f <FREQS> -s <SHAPE>
 
+    <PARAM_SPACE> : name of the parameter space class (in holodeck.param_spaces) to run; must match exactly.
     <NPROCS> : number of processors to run on
     <PATH> : output directory to save data to
     <SAMPS> : number of parameter-space samples for latin hyper-cube
     <REALS> : number of realizations at each parameter-space location
     <FREQS> : number of frequencies (multiples of PTA observing baseline)
+    <SHAPE> : SAM grid shape, as a single int value (applied to all dimensions)
 
 Example:
 
-    mpirun -n 8 python ./scripts/gen_lib_sams.py output/2022-12-05_01 -n 32 -r 10 -f 20
+    mpirun -n 8 python ./scripts/gen_lib_sams.py PS_Broad_Uniform_02B output/2022-12-05_01 -n 32 -r 10 -f 20 -s 80
 
 
 To-Do
@@ -88,8 +90,8 @@ def setup_argparse():
     parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
                         help='verbose output [INFO]')
 
-    args = parser.parse_args()  
-    
+    args = parser.parse_args()
+
     if args.test:
         args.verbose = True
 

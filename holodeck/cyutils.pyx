@@ -1,13 +1,14 @@
 """Module for methods implemented in cython.
 
-This module can be used by including the following code:
-    ```
-    import pyximport
-    pyximport.install(language_level=3, setup_args={"include_dirs": np.get_include()})
-    import holodeck.cyutils
-    ```
+To use and load this module, you will need to build the cython extension using:
 
-python setup.py build_ext -i
+$ python setup.py build_ext -i
+
+from the holodeck root directory (containing the `setup.py` file).
+
+And you still need to install holodeck in develop mode, using:
+
+$ python setup.py develop
 
 """
 

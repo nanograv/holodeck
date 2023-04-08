@@ -1,4 +1,5 @@
 """Utilities for Gaussian Processes."""
+import sys
 import time
 import warnings
 from multiprocessing import Pool, cpu_count
@@ -10,7 +11,17 @@ import h5py
 import numpy as np
 import schwimmbad
 import scipy.signal as ssig
+
+from holodeck import utils
 from holodeck.constants import YR
+
+
+VERBOSE = True
+
+FLOOR_STRAIN_SQUARED = 1e-40
+FLOOR_ERR = 1.0
+FILTER_DEF_WINDOW_LENGTH = 7
+FILTER_DEF_POLY_ORDER = 3
 
 
 class GaussProc(object):
@@ -62,6 +73,7 @@ class GaussProc(object):
         kernel_lcase = list(map(str.lower, kernel_list))
         try:
             self.kernel = kernel_list[kernel_lcase.index(kernel.lower())]
+            self.kernel_class = getattr(kernels, self.kernel)
         except ValueError:
             print(f"Unexpected kernel '{kernel}'.")
             print("Acceptable values are:\n", *kernel_list, sep="\n")
@@ -96,11 +108,12 @@ class GaussProc(object):
         a, tau = np.exp(p[0]), np.exp(p[1:])
 
         try:
-            gp = george.GP(a * getattr(kernels, self.kernel)(
-                **self.kernel_opts, metric=tau, ndim=len(tau)))
+            gp = george.GP(a * self.kernel_class(**self.kernel_opts, metric=tau,
+                                                 ndim=len(tau)))
             gp.compute(self.x, self.yerr)
 
-            lnlike = gp.lnlikelihood(self.y, quiet=True)
+            # lnlike = gp.lnlikelihood(self.y, quiet=True)
+            lnlike = gp.log_likelihood(self.y, quiet=True)
         except np.linalg.LinAlgError:
             lnlike = -np.inf
 
@@ -159,14 +172,17 @@ def train_gp(spectra_file,
     """
     spectra = h5py.File(spectra_file, "r")
 
+    if VERBOSE:
+        print(f"Loaded spectra from {spectra_file}")
+
     # Get smoothed GWB
-    gp_freqs, yerr, yobs, yobs_mean = get_smoothed_gwb(spectra, nfreqs,
-                                                       test_frac,
-                                                       center_measure)
+    gp_freqs, xobs, yerr, yobs, yobs_mean = get_smoothed_gwb(spectra, nfreqs,
+                                                             test_frac,
+                                                             center_measure)
 
     pars = list(spectra.attrs["param_names"].astype(str))
 
-    xobs = get_parameter_values(spectra, test_frac)
+    # xobs = get_parameter_values(spectra, test_frac)
 
     gp_george, num_kpars = create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs,
                                              kernel, kernel_opts)
@@ -200,6 +216,8 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     -------
     gp_freqs : numpy.array
         The frequencies corresponding to the GWB data
+    xobs : numpy.array
+        A numpy array containing the parameters used to generate each GWB in `spectra`
     yerr : numpy.array
         The error on the GWB training data
     yobs : numpy.array
@@ -212,30 +230,77 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     FIXME: Add docs.
 
     """
+
+    # Filter out NaN values which signify a failed sample point
+    # shape: (samples, freqs, realizations)
+    gwb_spectra = spectra['gwb']
+    xobs = spectra['sample_params']
+    bads = np.any(np.isnan(gwb_spectra), axis=(1, 2))
+    if VERBOSE:
+        print(f"Found {utils.frac_str(bads)} samples with NaN entries.  Removing them from library.")
+    # when sample points fail, all parameters are set to zero.  Make sure this is consistent
+    if not np.all(xobs[bads] == 0.0):
+        raise RuntimeError(f"NaN elements of `gwb` did not correspond to zero elements of `sample_params`!")
+    # Select valid spectra, and sample parameters
+    gwb_spectra = gwb_spectra[~bads]
+    xobs = xobs[~bads]
+    # Make sure old/deprecated parameters are not in library
+    if 'mmb_amp' in spectra.attrs['param_names']:
+        raise RuntimeError("Parameter `mmb_amp` should not be here!  Needs to be log-spaced (`mmb_amp_log10`)!")
+
     # Cut out portion for test set later
-    test_ind = int(spectra['gwb'].shape[0] * test_frac)
-    gwb_spectra = spectra["gwb"][test_ind:, :nfreqs, :]**2
+    test_ind = int(gwb_spectra.shape[0] * test_frac)
+    if VERBOSE:
+        print(f"setting aside {test_frac} of samples ({test_ind}) for testing, and choosing {nfreqs} frequencies")
+
+    gwb_spectra = gwb_spectra[test_ind:, :nfreqs, :]**2
+    xobs = xobs[test_ind:, :]
 
     # Find all the zeros and set them to be h_c = 1e-20
-    low_ind = np.where(gwb_spectra < 1e-40)
-    gwb_spectra[low_ind] = 1e-40
+    low_ind = (gwb_spectra < FLOOR_STRAIN_SQUARED)
+    gwb_spectra[low_ind] = FLOOR_STRAIN_SQUARED
 
     # Find mean or median over realizations
     if center_measure.lower() == "median":
-        center = np.log10(np.nanmedian(gwb_spectra, axis=-1))
+        center = np.log10(np.median(gwb_spectra, axis=-1))
     elif center_measure.lower() == "mean":
-        center = np.log10(np.nanmean(gwb_spectra, axis=-1))
+        center = np.log10(np.mean(gwb_spectra, axis=-1))
     else:
         raise ValueError(
             f"`center_measure` must be 'mean' or 'median', not '{center_measure}'"
         )
 
     # Smooth Mean Spectra
-    smooth_center = ssig.savgol_filter(center, 7, 3)
+    filter_window = FILTER_DEF_WINDOW_LENGTH
+    filter_poly_order = FILTER_DEF_POLY_ORDER
+    if (filter_window is not None) and (nfreqs < filter_window):
+        print(f"WARNING: {nfreqs=} < {filter_window=}, resetting default value")
+        if nfreqs < 4:
+            filter_window = None
+            filter_poly_order = None
+        else:
+            filter_window = nfreqs // 2
+            filter_poly_order = filter_window // 2
+        print(f"         {filter_window=} {filter_poly_order=}")
+
+    if filter_window is not None:
+        smooth_center = ssig.savgol_filter(center, filter_window, filter_poly_order)
+    else:
+        if VERBOSE:
+            print("Not using any smoothing on center spectrum.")
+        smooth_center = center
+
+    # Get realizations that are all low. We will later use this
+    # boolean array to set a noise floor
+    # I've done it this way in case only certain frequencies have
+    # all ~0 realizations.
+    low_real = np.all(low_ind, axis=-1)
+
     # Find std
-    err = np.nanstd(np.log10(gwb_spectra), axis=-1)
-    if np.any(np.isnan(err)):
-        print("Got a NAN issue")
+    # Where low_real is True, return 1.0
+    # else return the std along the realization dimension
+    err = np.where(low_real, FLOOR_ERR, np.std(np.log10(gwb_spectra), axis=-1))
+
     # The "y" data are the medians or means and errors for the spectra at each point in parameter space
     yobs = smooth_center.copy()  # mean.copy()
     yerr = err.copy()
@@ -247,9 +312,10 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     yobs_mean = np.mean(yobs, axis=0)
     yobs -= yobs_mean[None, :]
 
-    return gp_freqs, yerr, yobs, yobs_mean
+    return gp_freqs, xobs, yerr, yobs, yobs_mean
 
 
+'''
 def get_parameter_values(spectra, test_frac=0.0):
     """Get array of GWB parameters.
 
@@ -289,6 +355,7 @@ def get_parameter_values(spectra, test_frac=0.0):
                                                        pars.index("mmb_amp")])
 
     return xobs
+'''
 
 
 def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts):
@@ -346,7 +413,7 @@ def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts):
 
 
 def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
-                      nsamples, burn_frac, mpi):
+                      nsamples, burn_frac, mpi, sample_kwargs={}):
     """Fit the parameters of the GP kernels.
 
     Parameters
@@ -378,6 +445,12 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
     pool = schwimmbad.choose_pool(
         mpi=mpi)  #, processes=min(nwalkers // 2, cpu_count()) )
 
+    # Schwimmbad docs are not clear if this needs to be here if we are passing the pool to
+    # EnsembleSampler, but I've added it just in case.
+    if mpi and not pool.is_master():
+        pool.wait()
+        sys.exit(0)
+
     for freq_ind in range(len(gp_freqs)):
         # Paralellize emcee with nwalkers //2 or the maximum number of processors available, whichever is smaller
         # with Pool(min(nwalkers // 2, cpu_count())) as pool:
@@ -391,12 +464,13 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
 
         # Initialize the walkers.
         p0 = [
-            np.log(np.full(ndim, 1.0)) + 1e-4 * np.random.randn(ndim)
+            # np.log(np.full(ndim, 1.0)) + 1e-4 * np.random.randn(ndim)
+            1.0e-4 * np.random.randn(ndim)
             for _ in range(nwalkers)
         ]
 
         print(freq_ind, "Running burn-in")
-        p0, lnp, _ = sampler[freq_ind].run_mcmc(p0, int(burn_frac * nsamples))
+        p0, lnp, _ = sampler[freq_ind].run_mcmc(p0, int(burn_frac * nsamples), **sample_kwargs)
         sampler[freq_ind].reset()
 
         print(freq_ind, "Running second burn-in")
