@@ -2668,9 +2668,7 @@ static const char __pyx_k_error[] = "error";
 static const char __pyx_k_flags[] = "flags";
 static const char __pyx_k_h2fdf[] = "h2fdf";
 static const char __pyx_k_hc2bg[] = "hc2bg";
-static const char __pyx_k_hc2ls[] = "hc2ls";
 static const char __pyx_k_hc2ss[] = "hc2ss";
-static const char __pyx_k_lsidx[] = "lsidx";
 static const char __pyx_k_lspar[] = "lspar";
 static const char __pyx_k_msort[] = "msort";
 static const char __pyx_k_ndens[] = "ndens";
@@ -2839,7 +2837,6 @@ static PyObject *__pyx_n_s_gwfobs;
 static PyObject *__pyx_n_s_h2fdf;
 static PyObject *__pyx_n_s_hc2;
 static PyObject *__pyx_n_s_hc2bg;
-static PyObject *__pyx_n_s_hc2ls;
 static PyObject *__pyx_n_s_hc2ss;
 static PyObject *__pyx_n_s_holodeck_cyutils;
 static PyObject *__pyx_kp_s_holodeck_cyutils_pyx;
@@ -2851,7 +2848,6 @@ static PyObject *__pyx_n_s_itemsize;
 static PyObject *__pyx_kp_s_itemsize_0_for_cython_array;
 static PyObject *__pyx_n_s_loudest_hc_and_par_from_sorted;
 static PyObject *__pyx_n_s_loudest_hc_from_sorted;
-static PyObject *__pyx_n_s_lsidx;
 static PyObject *__pyx_n_s_lspar;
 static PyObject *__pyx_n_s_main;
 static PyObject *__pyx_n_s_memview;
@@ -11192,7 +11188,7 @@ static int *__pyx_f_8holodeck_7cyutils__sort_h2fdf(__Pyx_memviewslice __pyx_v_fl
 
 /* Python wrapper */
 static PyObject *__pyx_pw_8holodeck_7cyutils_15loudest_hc_from_sorted(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_8holodeck_7cyutils_14loudest_hc_from_sorted[] = "\n    Calculates the characteristic strain from loud single sources and a background of all other sources.\n\n    Parameters\n    ------------------------\n    number : [M, Q, Z, F] NDarray\n        number in each bin\n    h2fdf : [M, Q, Z, F] NDarray\n        Strain amplitude squared x frequency / frequency bin width for each bin.\n    nreals\n        Number of realizations.\n    nloudest\n        Number of loudest sources to separate in each frequency bin.\n    msort : (M*Q*Z,) 1Darray\n        M indices of each bin, sorted from largest to smallest h2fdf.\n    qsort : (M*Q*Z,) 1Darray\n        q indices of each bin, sorted from largest to smallest h2fdf.\n    zsort : (M*Q*Z,) 1Darray\n        z indices of each bin, sorted from largest to smallest h2fdf.\n    normal_threshold : float\n        Threshold for approximating poisson sampling as normal.\n\n    Returns\n    --------------------------\n    hc2ls : (F, R, L) Ndarray of scalars\n        Char strain squared of the loudest single sources.\n    hc2bg : (F, R) Ndarray of scalars\n        Char strain squared of the background.\n    ";
+static char __pyx_doc_8holodeck_7cyutils_14loudest_hc_from_sorted[] = "\n    Calculates the characteristic strain from loud single sources and a background of all other sources.\n\n    Parameters\n    ------------------------\n    number : [M, Q, Z, F] NDarray\n        number in each bin\n    h2fdf : [M, Q, Z, F] NDarray\n        Strain amplitude squared x frequency / frequency bin width for each bin.\n    nreals\n        Number of realizations.\n    nloudest\n        Number of loudest sources to separate in each frequency bin.\n    msort : (M*Q*Z,) 1Darray\n        M indices of each bin, sorted from largest to smallest h2fdf.\n    qsort : (M*Q*Z,) 1Darray\n        q indices of each bin, sorted from largest to smallest h2fdf.\n    zsort : (M*Q*Z,) 1Darray\n        z indices of each bin, sorted from largest to smallest h2fdf.\n    normal_threshold : float\n        Threshold for approximating poisson sampling as normal.\n\n    Returns\n    --------------------------\n    hc2ss : (F, R, L) Ndarray of scalars\n        Char strain squared of the loudest single sources.\n    hc2bg : (F, R) Ndarray of scalars\n        Char strain squared of the background.\n    ";
 static PyMethodDef __pyx_mdef_8holodeck_7cyutils_15loudest_hc_from_sorted = {"loudest_hc_from_sorted", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_8holodeck_7cyutils_15loudest_hc_from_sorted, METH_VARARGS|METH_KEYWORDS, __pyx_doc_8holodeck_7cyutils_14loudest_hc_from_sorted};
 static PyObject *__pyx_pw_8holodeck_7cyutils_15loudest_hc_from_sorted(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_number = 0;
@@ -11331,12 +11327,12 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
   PyObject *__pyx_v_F = NULL;
   PyObject *__pyx_v_R = NULL;
   PyObject *__pyx_v_L = NULL;
-  PyArrayObject *__pyx_v_hc2ls = 0;
+  PyArrayObject *__pyx_v_hc2ss = 0;
   PyArrayObject *__pyx_v_hc2bg = 0;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_hc2bg;
   __Pyx_Buffer __pyx_pybuffer_hc2bg;
-  __Pyx_LocalBuf_ND __pyx_pybuffernd_hc2ls;
-  __Pyx_Buffer __pyx_pybuffer_hc2ls;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_hc2ss;
+  __Pyx_Buffer __pyx_pybuffer_hc2ss;
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
@@ -11361,10 +11357,10 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("loudest_hc_from_sorted", 0);
-  __pyx_pybuffer_hc2ls.pybuffer.buf = NULL;
-  __pyx_pybuffer_hc2ls.refcount = 0;
-  __pyx_pybuffernd_hc2ls.data = NULL;
-  __pyx_pybuffernd_hc2ls.rcbuffer = &__pyx_pybuffer_hc2ls;
+  __pyx_pybuffer_hc2ss.pybuffer.buf = NULL;
+  __pyx_pybuffer_hc2ss.refcount = 0;
+  __pyx_pybuffernd_hc2ss.data = NULL;
+  __pyx_pybuffernd_hc2ss.rcbuffer = &__pyx_pybuffer_hc2ss;
   __pyx_pybuffer_hc2bg.pybuffer.buf = NULL;
   __pyx_pybuffer_hc2bg.refcount = 0;
   __pyx_pybuffernd_hc2bg.data = NULL;
@@ -11433,7 +11429,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
  *     F = shape[3]
  *     R = nreals             # <<<<<<<<<<<<<<
  *     L = nloudest
- *     cdef np.ndarray[np.double_t, ndim=3] hc2ls = np.zeros((F,R,L))
+ *     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
  */
   __Pyx_INCREF(__pyx_v_nreals);
   __pyx_v_R = __pyx_v_nreals;
@@ -11442,7 +11438,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
  *     F = shape[3]
  *     R = nreals
  *     L = nloudest             # <<<<<<<<<<<<<<
- *     cdef np.ndarray[np.double_t, ndim=3] hc2ls = np.zeros((F,R,L))
+ *     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
  *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
  */
   __Pyx_INCREF(__pyx_v_nloudest);
@@ -11451,7 +11447,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
   /* "holodeck/cyutils.pyx":1254
  *     R = nreals
  *     L = nloudest
- *     cdef np.ndarray[np.double_t, ndim=3] hc2ls = np.zeros((F,R,L))             # <<<<<<<<<<<<<<
+ *     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))             # <<<<<<<<<<<<<<
  *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
  *     _loudest_hc_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold,
  */
@@ -11491,19 +11487,19 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
   __pyx_t_8 = ((PyArrayObject *)__pyx_t_1);
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_hc2ls.rcbuffer->pybuffer, (PyObject*)__pyx_t_8, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_STRIDES, 3, 0, __pyx_stack) == -1)) {
-      __pyx_v_hc2ls = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_hc2ls.rcbuffer->pybuffer.buf = NULL;
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_hc2ss.rcbuffer->pybuffer, (PyObject*)__pyx_t_8, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_STRIDES, 3, 0, __pyx_stack) == -1)) {
+      __pyx_v_hc2ss = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.buf = NULL;
       __PYX_ERR(0, 1254, __pyx_L1_error)
-    } else {__pyx_pybuffernd_hc2ls.diminfo[0].strides = __pyx_pybuffernd_hc2ls.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_hc2ls.diminfo[0].shape = __pyx_pybuffernd_hc2ls.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_hc2ls.diminfo[1].strides = __pyx_pybuffernd_hc2ls.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_hc2ls.diminfo[1].shape = __pyx_pybuffernd_hc2ls.rcbuffer->pybuffer.shape[1]; __pyx_pybuffernd_hc2ls.diminfo[2].strides = __pyx_pybuffernd_hc2ls.rcbuffer->pybuffer.strides[2]; __pyx_pybuffernd_hc2ls.diminfo[2].shape = __pyx_pybuffernd_hc2ls.rcbuffer->pybuffer.shape[2];
+    } else {__pyx_pybuffernd_hc2ss.diminfo[0].strides = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_hc2ss.diminfo[0].shape = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_hc2ss.diminfo[1].strides = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_hc2ss.diminfo[1].shape = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.shape[1]; __pyx_pybuffernd_hc2ss.diminfo[2].strides = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.strides[2]; __pyx_pybuffernd_hc2ss.diminfo[2].shape = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.shape[2];
     }
   }
   __pyx_t_8 = 0;
-  __pyx_v_hc2ls = ((PyArrayObject *)__pyx_t_1);
+  __pyx_v_hc2ss = ((PyArrayObject *)__pyx_t_1);
   __pyx_t_1 = 0;
 
   /* "holodeck/cyutils.pyx":1255
  *     L = nloudest
- *     cdef np.ndarray[np.double_t, ndim=3] hc2ls = np.zeros((F,R,L))
+ *     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
  *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))             # <<<<<<<<<<<<<<
  *     _loudest_hc_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold,
  *                             msort, qsort, zsort,
@@ -11552,11 +11548,11 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
   __pyx_t_1 = 0;
 
   /* "holodeck/cyutils.pyx":1256
- *     cdef np.ndarray[np.double_t, ndim=3] hc2ls = np.zeros((F,R,L))
+ *     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
  *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
  *     _loudest_hc_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold,             # <<<<<<<<<<<<<<
  *                             msort, qsort, zsort,
- *                             hc2ls, hc2bg)
+ *                             hc2ss, hc2bg)
  */
   __pyx_t_10 = __Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_double(__pyx_v_h2fdf, PyBUF_WRITABLE); if (unlikely(!__pyx_t_10.memview)) __PYX_ERR(0, 1256, __pyx_L1_error)
   __pyx_t_11 = __Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_double(__pyx_v_number, PyBUF_WRITABLE); if (unlikely(!__pyx_t_11.memview)) __PYX_ERR(0, 1256, __pyx_L1_error)
@@ -11568,8 +11564,8 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
  *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
  *     _loudest_hc_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold,
  *                             msort, qsort, zsort,             # <<<<<<<<<<<<<<
- *                             hc2ls, hc2bg)
- *     return hc2ls, hc2bg
+ *                             hc2ss, hc2bg)
+ *     return hc2ss, hc2bg
  */
   __pyx_t_5 = __Pyx_PyObject_to_MemoryviewSlice_ds_long(__pyx_v_msort, PyBUF_WRITABLE); if (unlikely(!__pyx_t_5.memview)) __PYX_ERR(0, 1257, __pyx_L1_error)
   __pyx_t_15 = __Pyx_PyObject_to_MemoryviewSlice_ds_long(__pyx_v_qsort, PyBUF_WRITABLE); if (unlikely(!__pyx_t_15.memview)) __PYX_ERR(0, 1257, __pyx_L1_error)
@@ -11578,19 +11574,19 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
   /* "holodeck/cyutils.pyx":1258
  *     _loudest_hc_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold,
  *                             msort, qsort, zsort,
- *                             hc2ls, hc2bg)             # <<<<<<<<<<<<<<
- *     return hc2ls, hc2bg
+ *                             hc2ss, hc2bg)             # <<<<<<<<<<<<<<
+ *     return hc2ss, hc2bg
  * 
  */
-  __pyx_t_17 = __Pyx_PyObject_to_MemoryviewSlice_dsdsds_double(((PyObject *)__pyx_v_hc2ls), PyBUF_WRITABLE); if (unlikely(!__pyx_t_17.memview)) __PYX_ERR(0, 1258, __pyx_L1_error)
+  __pyx_t_17 = __Pyx_PyObject_to_MemoryviewSlice_dsdsds_double(((PyObject *)__pyx_v_hc2ss), PyBUF_WRITABLE); if (unlikely(!__pyx_t_17.memview)) __PYX_ERR(0, 1258, __pyx_L1_error)
   __pyx_t_18 = __Pyx_PyObject_to_MemoryviewSlice_dsds_double(((PyObject *)__pyx_v_hc2bg), PyBUF_WRITABLE); if (unlikely(!__pyx_t_18.memview)) __PYX_ERR(0, 1258, __pyx_L1_error)
 
   /* "holodeck/cyutils.pyx":1256
- *     cdef np.ndarray[np.double_t, ndim=3] hc2ls = np.zeros((F,R,L))
+ *     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
  *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
  *     _loudest_hc_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold,             # <<<<<<<<<<<<<<
  *                             msort, qsort, zsort,
- *                             hc2ls, hc2bg)
+ *                             hc2ss, hc2bg)
  */
   __pyx_f_8holodeck_7cyutils__loudest_hc_from_sorted(__pyx_v_shape, __pyx_t_10, __pyx_t_11, __pyx_t_12, __pyx_t_13, __pyx_t_14, __pyx_t_5, __pyx_t_15, __pyx_t_16, __pyx_t_17, __pyx_t_18);
   __PYX_XDEC_MEMVIEW(&__pyx_t_10, 1);
@@ -11617,17 +11613,17 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
 
   /* "holodeck/cyutils.pyx":1259
  *                             msort, qsort, zsort,
- *                             hc2ls, hc2bg)
- *     return hc2ls, hc2bg             # <<<<<<<<<<<<<<
+ *                             hc2ss, hc2bg)
+ *     return hc2ss, hc2bg             # <<<<<<<<<<<<<<
  * 
  * @cython.boundscheck(True)
  */
   __Pyx_XDECREF(__pyx_r);
   __pyx_t_1 = PyTuple_New(2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1259, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __Pyx_INCREF(((PyObject *)__pyx_v_hc2ls));
-  __Pyx_GIVEREF(((PyObject *)__pyx_v_hc2ls));
-  PyTuple_SET_ITEM(__pyx_t_1, 0, ((PyObject *)__pyx_v_hc2ls));
+  __Pyx_INCREF(((PyObject *)__pyx_v_hc2ss));
+  __Pyx_GIVEREF(((PyObject *)__pyx_v_hc2ss));
+  PyTuple_SET_ITEM(__pyx_t_1, 0, ((PyObject *)__pyx_v_hc2ss));
   __Pyx_INCREF(((PyObject *)__pyx_v_hc2bg));
   __Pyx_GIVEREF(((PyObject *)__pyx_v_hc2bg));
   PyTuple_SET_ITEM(__pyx_t_1, 1, ((PyObject *)__pyx_v_hc2bg));
@@ -11661,20 +11657,20 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
     __Pyx_PyThreadState_assign
     __Pyx_ErrFetch(&__pyx_type, &__pyx_value, &__pyx_tb);
     __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_hc2bg.rcbuffer->pybuffer);
-    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_hc2ls.rcbuffer->pybuffer);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_hc2ss.rcbuffer->pybuffer);
   __Pyx_ErrRestore(__pyx_type, __pyx_value, __pyx_tb);}
   __Pyx_AddTraceback("holodeck.cyutils.loudest_hc_from_sorted", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   goto __pyx_L2;
   __pyx_L0:;
   __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_hc2bg.rcbuffer->pybuffer);
-  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_hc2ls.rcbuffer->pybuffer);
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_hc2ss.rcbuffer->pybuffer);
   __pyx_L2:;
   __PYX_XDEC_MEMVIEW(&__pyx_v_shape, 1);
   __Pyx_XDECREF(__pyx_v_F);
   __Pyx_XDECREF(__pyx_v_R);
   __Pyx_XDECREF(__pyx_v_L);
-  __Pyx_XDECREF((PyObject *)__pyx_v_hc2ls);
+  __Pyx_XDECREF((PyObject *)__pyx_v_hc2ss);
   __Pyx_XDECREF((PyObject *)__pyx_v_hc2bg);
   __Pyx_XGIVEREF(__pyx_r);
   __Pyx_RefNannyFinishContext();
@@ -11689,7 +11685,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
  *             long[:] msort, long[:] qsort, long[:] zsort,
  */
 
-static void __pyx_f_8holodeck_7cyutils__loudest_hc_from_sorted(__Pyx_memviewslice __pyx_v_shape, __Pyx_memviewslice __pyx_v_h2fdf, __Pyx_memviewslice __pyx_v_number, long __pyx_v_nreals, long __pyx_v_nloudest, long __pyx_v_thresh, __Pyx_memviewslice __pyx_v_msort, __Pyx_memviewslice __pyx_v_qsort, __Pyx_memviewslice __pyx_v_zsort, __Pyx_memviewslice __pyx_v_hc2ls, __Pyx_memviewslice __pyx_v_hc2bg) {
+static void __pyx_f_8holodeck_7cyutils__loudest_hc_from_sorted(__Pyx_memviewslice __pyx_v_shape, __Pyx_memviewslice __pyx_v_h2fdf, __Pyx_memviewslice __pyx_v_number, long __pyx_v_nreals, long __pyx_v_nloudest, long __pyx_v_thresh, __Pyx_memviewslice __pyx_v_msort, __Pyx_memviewslice __pyx_v_qsort, __Pyx_memviewslice __pyx_v_zsort, __Pyx_memviewslice __pyx_v_hc2ss, __Pyx_memviewslice __pyx_v_hc2bg) {
   int __pyx_v_M;
   int __pyx_v_Q;
   int __pyx_v_Z;
@@ -12261,7 +12257,7 @@ static void __pyx_f_8holodeck_7cyutils__loudest_hc_from_sorted(__Pyx_memviewslic
  *                 if (num<1):
  *                     continue # to next loudest bin             # <<<<<<<<<<<<<<
  *                 while (ll < L) and (num > 0):
- *                     hc2ls[ff,rr,ll] = cur
+ *                     hc2ss[ff,rr,ll] = cur
  */
           goto __pyx_L7_continue;
 
@@ -12278,7 +12274,7 @@ static void __pyx_f_8holodeck_7cyutils__loudest_hc_from_sorted(__Pyx_memviewslic
  *                 if (num<1):
  *                     continue # to next loudest bin
  *                 while (ll < L) and (num > 0):             # <<<<<<<<<<<<<<
- *                     hc2ls[ff,rr,ll] = cur
+ *                     hc2ss[ff,rr,ll] = cur
  *                     num -= 1
  */
         while (1) {
@@ -12296,12 +12292,12 @@ static void __pyx_f_8holodeck_7cyutils__loudest_hc_from_sorted(__Pyx_memviewslic
           /* "holodeck/cyutils.pyx":1339
  *                     continue # to next loudest bin
  *                 while (ll < L) and (num > 0):
- *                     hc2ls[ff,rr,ll] = cur             # <<<<<<<<<<<<<<
+ *                     hc2ss[ff,rr,ll] = cur             # <<<<<<<<<<<<<<
  *                     num -= 1
  *                     ll += 1
  */
           __pyx_t_25 = __pyx_PyFloat_AsDouble(__pyx_v_cur); if (unlikely((__pyx_t_25 == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 1339, __pyx_L1_error)
-          if (unlikely(((PyObject *) __pyx_v_hc2ls.memview) == Py_None)) {
+          if (unlikely(((PyObject *) __pyx_v_hc2ss.memview) == Py_None)) {
             PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
             __PYX_ERR(0, 1339, __pyx_L1_error)
           }
@@ -12310,26 +12306,26 @@ static void __pyx_f_8holodeck_7cyutils__loudest_hc_from_sorted(__Pyx_memviewslic
           __pyx_t_21 = __pyx_v_ll;
           __pyx_t_19 = -1;
           if (__pyx_t_1 < 0) {
-            __pyx_t_1 += __pyx_v_hc2ls.shape[0];
+            __pyx_t_1 += __pyx_v_hc2ss.shape[0];
             if (unlikely(__pyx_t_1 < 0)) __pyx_t_19 = 0;
-          } else if (unlikely(__pyx_t_1 >= __pyx_v_hc2ls.shape[0])) __pyx_t_19 = 0;
+          } else if (unlikely(__pyx_t_1 >= __pyx_v_hc2ss.shape[0])) __pyx_t_19 = 0;
           if (__pyx_t_20 < 0) {
-            __pyx_t_20 += __pyx_v_hc2ls.shape[1];
+            __pyx_t_20 += __pyx_v_hc2ss.shape[1];
             if (unlikely(__pyx_t_20 < 0)) __pyx_t_19 = 1;
-          } else if (unlikely(__pyx_t_20 >= __pyx_v_hc2ls.shape[1])) __pyx_t_19 = 1;
+          } else if (unlikely(__pyx_t_20 >= __pyx_v_hc2ss.shape[1])) __pyx_t_19 = 1;
           if (__pyx_t_21 < 0) {
-            __pyx_t_21 += __pyx_v_hc2ls.shape[2];
+            __pyx_t_21 += __pyx_v_hc2ss.shape[2];
             if (unlikely(__pyx_t_21 < 0)) __pyx_t_19 = 2;
-          } else if (unlikely(__pyx_t_21 >= __pyx_v_hc2ls.shape[2])) __pyx_t_19 = 2;
+          } else if (unlikely(__pyx_t_21 >= __pyx_v_hc2ss.shape[2])) __pyx_t_19 = 2;
           if (unlikely(__pyx_t_19 != -1)) {
             __Pyx_RaiseBufferIndexError(__pyx_t_19);
             __PYX_ERR(0, 1339, __pyx_L1_error)
           }
-          *((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_hc2ls.data + __pyx_t_1 * __pyx_v_hc2ls.strides[0]) ) + __pyx_t_20 * __pyx_v_hc2ls.strides[1]) ) + __pyx_t_21 * __pyx_v_hc2ls.strides[2]) )) = __pyx_t_25;
+          *((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_hc2ss.data + __pyx_t_1 * __pyx_v_hc2ss.strides[0]) ) + __pyx_t_20 * __pyx_v_hc2ss.strides[1]) ) + __pyx_t_21 * __pyx_v_hc2ss.strides[2]) )) = __pyx_t_25;
 
           /* "holodeck/cyutils.pyx":1340
  *                 while (ll < L) and (num > 0):
- *                     hc2ls[ff,rr,ll] = cur
+ *                     hc2ss[ff,rr,ll] = cur
  *                     num -= 1             # <<<<<<<<<<<<<<
  *                     ll += 1
  *                 sum += num * cur
@@ -12337,7 +12333,7 @@ static void __pyx_f_8holodeck_7cyutils__loudest_hc_from_sorted(__Pyx_memviewslic
           __pyx_v_num = (__pyx_v_num - 1.0);
 
           /* "holodeck/cyutils.pyx":1341
- *                     hc2ls[ff,rr,ll] = cur
+ *                     hc2ss[ff,rr,ll] = cur
  *                     num -= 1
  *                     ll += 1             # <<<<<<<<<<<<<<
  *                 sum += num * cur
@@ -12444,7 +12440,7 @@ static void __pyx_f_8holodeck_7cyutils__loudest_hc_from_sorted(__Pyx_memviewslic
 
 /* Python wrapper */
 static PyObject *__pyx_pw_8holodeck_7cyutils_17loudest_hc_and_par_from_sorted(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted[] = "\n    Calculates the characteristic strain from loud single sources and a background of all other sources.\n\n    Parameters\n    ------------------------\n    number : [M, Q, Z, F] NDarray\n        number in each bin\n    h2fdf : [M, Q, Z, F] NDarray\n        Strain amplitude squared x frequency / frequency bin width for each bin.\n    nreals\n        Number of realizations.\n    nloudest\n        Number of loudest sources to separate in each frequency bin.\n    mt : (M,) 1Darray of scalars\n        Total masses, M, of each bin center.\n    mr : (Q,) 1Darray of scalars\n        Mass ratios, q, of each bin center.\n    rz : (Z,) 1Darray of scalars\n        Redshifts, z, of each bin center.\n    msort : (M*Q*Z,) 1Darray\n        M indices of each bin, sorted from largest to smallest h2fdf.\n    qsort : (M*Q*Z,) 1Darray\n        q indices of each bin, sorted from largest to smallest h2fdf.\n    zsort : (M*Q*Z,) 1Darray\n        z indices of each bin, sorted from largest to smallest h2fdf.\n    normal_threshold : float\n        Threshold for approximating poisson sampling as normal.\n\n    Returns\n    --------------------------\n    hc2ls : (F, R, L) Ndarray of scalars\n        Char strain squared of the loudest single sources.\n    hc2bg : (F, R) Ndarray of scalars\n        Char strain squared of the background.\n    lspar : (3, F, R) NDarray of scalars\n        Average effective M, q, z parameters of the loudest L sources.\n    bgpar : (3, F, R) NDarray of scalars\n        Average effective M, q, z parameters of the background.\n    lsidx : (3, F, R, L) NDarray of ints\n        Indices of the loudest single sources.\n    ";
+static char __pyx_doc_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted[] = "\n    Calculates the characteristic strain from loud single sources and a background of all other sources.\n\n    Parameters\n    ------------------------\n    number : [M, Q, Z, F] NDarray\n        number in each bin\n    h2fdf : [M, Q, Z, F] NDarray\n        Strain amplitude squared x frequency / frequency bin width for each bin.\n    nreals\n        Number of realizations.\n    nloudest\n        Number of loudest sources to separate in each frequency bin.\n    mt : (M,) 1Darray of scalars\n        Total masses, M, of each bin center.\n    mr : (Q,) 1Darray of scalars\n        Mass ratios, q, of each bin center.\n    rz : (Z,) 1Darray of scalars\n        Redshifts, z, of each bin center.\n    msort : (M*Q*Z,) 1Darray\n        M indices of each bin, sorted from largest to smallest h2fdf.\n    qsort : (M*Q*Z,) 1Darray\n        q indices of each bin, sorted from largest to smallest h2fdf.\n    zsort : (M*Q*Z,) 1Darray\n        z indices of each bin, sorted from largest to smallest h2fdf.\n    normal_threshold : float\n        Threshold for approximating poisson sampling as normal.\n\n    Returns\n    --------------------------\n    hc2ss : (F, R, L) Ndarray of scalars\n        Char strain squared of the loudest single sources.\n    hc2bg : (F, R) Ndarray of scalars\n        Char strain squared of the background.\n    lspar : (3, F, R) NDarray of scalars\n        Average effective M, q, z parameters of the loudest L sources.\n    bgpar : (3, F, R) NDarray of scalars\n        Average effective M, q, z parameters of the background.\n    ssidx : (3, F, R, L) NDarray of ints\n        Indices of the loudest single sources.\n    ";
 static PyMethodDef __pyx_mdef_8holodeck_7cyutils_17loudest_hc_and_par_from_sorted = {"loudest_hc_and_par_from_sorted", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_8holodeck_7cyutils_17loudest_hc_and_par_from_sorted, METH_VARARGS|METH_KEYWORDS, __pyx_doc_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted};
 static PyObject *__pyx_pw_8holodeck_7cyutils_17loudest_hc_and_par_from_sorted(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_number = 0;
@@ -12616,21 +12612,21 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   PyObject *__pyx_v_F = NULL;
   PyObject *__pyx_v_R = NULL;
   PyObject *__pyx_v_L = NULL;
-  PyArrayObject *__pyx_v_hc2ls = 0;
+  PyArrayObject *__pyx_v_hc2ss = 0;
   PyArrayObject *__pyx_v_hc2bg = 0;
   PyArrayObject *__pyx_v_lspar = 0;
   PyArrayObject *__pyx_v_bgpar = 0;
-  PyArrayObject *__pyx_v_lsidx = 0;
+  PyArrayObject *__pyx_v_ssidx = 0;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_bgpar;
   __Pyx_Buffer __pyx_pybuffer_bgpar;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_hc2bg;
   __Pyx_Buffer __pyx_pybuffer_hc2bg;
-  __Pyx_LocalBuf_ND __pyx_pybuffernd_hc2ls;
-  __Pyx_Buffer __pyx_pybuffer_hc2ls;
-  __Pyx_LocalBuf_ND __pyx_pybuffernd_lsidx;
-  __Pyx_Buffer __pyx_pybuffer_lsidx;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_hc2ss;
+  __Pyx_Buffer __pyx_pybuffer_hc2ss;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_lspar;
   __Pyx_Buffer __pyx_pybuffer_lspar;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_ssidx;
+  __Pyx_Buffer __pyx_pybuffer_ssidx;
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   PyObject *__pyx_t_1 = NULL;
@@ -12664,10 +12660,10 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("loudest_hc_and_par_from_sorted", 0);
-  __pyx_pybuffer_hc2ls.pybuffer.buf = NULL;
-  __pyx_pybuffer_hc2ls.refcount = 0;
-  __pyx_pybuffernd_hc2ls.data = NULL;
-  __pyx_pybuffernd_hc2ls.rcbuffer = &__pyx_pybuffer_hc2ls;
+  __pyx_pybuffer_hc2ss.pybuffer.buf = NULL;
+  __pyx_pybuffer_hc2ss.refcount = 0;
+  __pyx_pybuffernd_hc2ss.data = NULL;
+  __pyx_pybuffernd_hc2ss.rcbuffer = &__pyx_pybuffer_hc2ss;
   __pyx_pybuffer_hc2bg.pybuffer.buf = NULL;
   __pyx_pybuffer_hc2bg.refcount = 0;
   __pyx_pybuffernd_hc2bg.data = NULL;
@@ -12680,10 +12676,10 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   __pyx_pybuffer_bgpar.refcount = 0;
   __pyx_pybuffernd_bgpar.data = NULL;
   __pyx_pybuffernd_bgpar.rcbuffer = &__pyx_pybuffer_bgpar;
-  __pyx_pybuffer_lsidx.pybuffer.buf = NULL;
-  __pyx_pybuffer_lsidx.refcount = 0;
-  __pyx_pybuffernd_lsidx.data = NULL;
-  __pyx_pybuffernd_lsidx.rcbuffer = &__pyx_pybuffer_lsidx;
+  __pyx_pybuffer_ssidx.pybuffer.buf = NULL;
+  __pyx_pybuffer_ssidx.refcount = 0;
+  __pyx_pybuffernd_ssidx.data = NULL;
+  __pyx_pybuffernd_ssidx.rcbuffer = &__pyx_pybuffer_ssidx;
 
   /* "holodeck/cyutils.pyx":1389
  *     """
@@ -12748,7 +12744,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
  *     F = shape[3]
  *     R = nreals             # <<<<<<<<<<<<<<
  *     L = nloudest
- *     cdef np.ndarray[np.double_t, ndim=3] hc2ls = np.zeros((F,R,L))
+ *     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
  */
   __Pyx_INCREF(__pyx_v_nreals);
   __pyx_v_R = __pyx_v_nreals;
@@ -12757,7 +12753,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
  *     F = shape[3]
  *     R = nreals
  *     L = nloudest             # <<<<<<<<<<<<<<
- *     cdef np.ndarray[np.double_t, ndim=3] hc2ls = np.zeros((F,R,L))
+ *     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
  *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
  */
   __Pyx_INCREF(__pyx_v_nloudest);
@@ -12766,7 +12762,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   /* "holodeck/cyutils.pyx":1393
  *     R = nreals
  *     L = nloudest
- *     cdef np.ndarray[np.double_t, ndim=3] hc2ls = np.zeros((F,R,L))             # <<<<<<<<<<<<<<
+ *     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))             # <<<<<<<<<<<<<<
  *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
  *     cdef np.ndarray[np.double_t, ndim=3] lspar = np.zeros((3,F,R))
  */
@@ -12806,19 +12802,19 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   __pyx_t_8 = ((PyArrayObject *)__pyx_t_1);
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_hc2ls.rcbuffer->pybuffer, (PyObject*)__pyx_t_8, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_STRIDES, 3, 0, __pyx_stack) == -1)) {
-      __pyx_v_hc2ls = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_hc2ls.rcbuffer->pybuffer.buf = NULL;
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_hc2ss.rcbuffer->pybuffer, (PyObject*)__pyx_t_8, &__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_STRIDES, 3, 0, __pyx_stack) == -1)) {
+      __pyx_v_hc2ss = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.buf = NULL;
       __PYX_ERR(0, 1393, __pyx_L1_error)
-    } else {__pyx_pybuffernd_hc2ls.diminfo[0].strides = __pyx_pybuffernd_hc2ls.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_hc2ls.diminfo[0].shape = __pyx_pybuffernd_hc2ls.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_hc2ls.diminfo[1].strides = __pyx_pybuffernd_hc2ls.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_hc2ls.diminfo[1].shape = __pyx_pybuffernd_hc2ls.rcbuffer->pybuffer.shape[1]; __pyx_pybuffernd_hc2ls.diminfo[2].strides = __pyx_pybuffernd_hc2ls.rcbuffer->pybuffer.strides[2]; __pyx_pybuffernd_hc2ls.diminfo[2].shape = __pyx_pybuffernd_hc2ls.rcbuffer->pybuffer.shape[2];
+    } else {__pyx_pybuffernd_hc2ss.diminfo[0].strides = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_hc2ss.diminfo[0].shape = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_hc2ss.diminfo[1].strides = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_hc2ss.diminfo[1].shape = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.shape[1]; __pyx_pybuffernd_hc2ss.diminfo[2].strides = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.strides[2]; __pyx_pybuffernd_hc2ss.diminfo[2].shape = __pyx_pybuffernd_hc2ss.rcbuffer->pybuffer.shape[2];
     }
   }
   __pyx_t_8 = 0;
-  __pyx_v_hc2ls = ((PyArrayObject *)__pyx_t_1);
+  __pyx_v_hc2ss = ((PyArrayObject *)__pyx_t_1);
   __pyx_t_1 = 0;
 
   /* "holodeck/cyutils.pyx":1394
  *     L = nloudest
- *     cdef np.ndarray[np.double_t, ndim=3] hc2ls = np.zeros((F,R,L))
+ *     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
  *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))             # <<<<<<<<<<<<<<
  *     cdef np.ndarray[np.double_t, ndim=3] lspar = np.zeros((3,F,R))
  *     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
@@ -12867,11 +12863,11 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   __pyx_t_1 = 0;
 
   /* "holodeck/cyutils.pyx":1395
- *     cdef np.ndarray[np.double_t, ndim=3] hc2ls = np.zeros((F,R,L))
+ *     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
  *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
  *     cdef np.ndarray[np.double_t, ndim=3] lspar = np.zeros((3,F,R))             # <<<<<<<<<<<<<<
  *     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
- *     cdef np.ndarray[np.long_t, ndim=4] lsidx = np.zeros((3,F,R,L), dtype=int)
+ *     cdef np.ndarray[np.long_t, ndim=4] ssidx = np.zeros((3,F,R,L), dtype=int)
  */
   __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_n_s_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1395, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
@@ -12923,7 +12919,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
  *     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
  *     cdef np.ndarray[np.double_t, ndim=3] lspar = np.zeros((3,F,R))
  *     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))             # <<<<<<<<<<<<<<
- *     cdef np.ndarray[np.long_t, ndim=4] lsidx = np.zeros((3,F,R,L), dtype=int)
+ *     cdef np.ndarray[np.long_t, ndim=4] ssidx = np.zeros((3,F,R,L), dtype=int)
  *     _loudest_hc_and_par_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold,
  */
   __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1396, __pyx_L1_error)
@@ -12975,7 +12971,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   /* "holodeck/cyutils.pyx":1397
  *     cdef np.ndarray[np.double_t, ndim=3] lspar = np.zeros((3,F,R))
  *     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
- *     cdef np.ndarray[np.long_t, ndim=4] lsidx = np.zeros((3,F,R,L), dtype=int)             # <<<<<<<<<<<<<<
+ *     cdef np.ndarray[np.long_t, ndim=4] ssidx = np.zeros((3,F,R,L), dtype=int)             # <<<<<<<<<<<<<<
  *     _loudest_hc_and_par_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold,
  *                             mt, mr, rz, msort, qsort, zsort,
  */
@@ -13015,22 +13011,22 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   __pyx_t_12 = ((PyArrayObject *)__pyx_t_4);
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_lsidx.rcbuffer->pybuffer, (PyObject*)__pyx_t_12, &__Pyx_TypeInfo_nn___pyx_t_5numpy_long_t, PyBUF_FORMAT| PyBUF_STRIDES, 4, 0, __pyx_stack) == -1)) {
-      __pyx_v_lsidx = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_lsidx.rcbuffer->pybuffer.buf = NULL;
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_ssidx.rcbuffer->pybuffer, (PyObject*)__pyx_t_12, &__Pyx_TypeInfo_nn___pyx_t_5numpy_long_t, PyBUF_FORMAT| PyBUF_STRIDES, 4, 0, __pyx_stack) == -1)) {
+      __pyx_v_ssidx = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.buf = NULL;
       __PYX_ERR(0, 1397, __pyx_L1_error)
-    } else {__pyx_pybuffernd_lsidx.diminfo[0].strides = __pyx_pybuffernd_lsidx.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_lsidx.diminfo[0].shape = __pyx_pybuffernd_lsidx.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_lsidx.diminfo[1].strides = __pyx_pybuffernd_lsidx.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_lsidx.diminfo[1].shape = __pyx_pybuffernd_lsidx.rcbuffer->pybuffer.shape[1]; __pyx_pybuffernd_lsidx.diminfo[2].strides = __pyx_pybuffernd_lsidx.rcbuffer->pybuffer.strides[2]; __pyx_pybuffernd_lsidx.diminfo[2].shape = __pyx_pybuffernd_lsidx.rcbuffer->pybuffer.shape[2]; __pyx_pybuffernd_lsidx.diminfo[3].strides = __pyx_pybuffernd_lsidx.rcbuffer->pybuffer.strides[3]; __pyx_pybuffernd_lsidx.diminfo[3].shape = __pyx_pybuffernd_lsidx.rcbuffer->pybuffer.shape[3];
+    } else {__pyx_pybuffernd_ssidx.diminfo[0].strides = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_ssidx.diminfo[0].shape = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_ssidx.diminfo[1].strides = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_ssidx.diminfo[1].shape = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.shape[1]; __pyx_pybuffernd_ssidx.diminfo[2].strides = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.strides[2]; __pyx_pybuffernd_ssidx.diminfo[2].shape = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.shape[2]; __pyx_pybuffernd_ssidx.diminfo[3].strides = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.strides[3]; __pyx_pybuffernd_ssidx.diminfo[3].shape = __pyx_pybuffernd_ssidx.rcbuffer->pybuffer.shape[3];
     }
   }
   __pyx_t_12 = 0;
-  __pyx_v_lsidx = ((PyArrayObject *)__pyx_t_4);
+  __pyx_v_ssidx = ((PyArrayObject *)__pyx_t_4);
   __pyx_t_4 = 0;
 
   /* "holodeck/cyutils.pyx":1398
  *     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
- *     cdef np.ndarray[np.long_t, ndim=4] lsidx = np.zeros((3,F,R,L), dtype=int)
+ *     cdef np.ndarray[np.long_t, ndim=4] ssidx = np.zeros((3,F,R,L), dtype=int)
  *     _loudest_hc_and_par_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold,             # <<<<<<<<<<<<<<
  *                             mt, mr, rz, msort, qsort, zsort,
- *                             hc2ls, hc2bg, lspar, bgpar, lsidx)
+ *                             hc2ss, hc2bg, lspar, bgpar, ssidx)
  */
   __pyx_t_13 = __Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_double(__pyx_v_h2fdf, PyBUF_WRITABLE); if (unlikely(!__pyx_t_13.memview)) __PYX_ERR(0, 1398, __pyx_L1_error)
   __pyx_t_14 = __Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_double(__pyx_v_number, PyBUF_WRITABLE); if (unlikely(!__pyx_t_14.memview)) __PYX_ERR(0, 1398, __pyx_L1_error)
@@ -13039,11 +13035,11 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   __pyx_t_17 = __Pyx_PyInt_As_long(__pyx_v_normal_threshold); if (unlikely((__pyx_t_17 == (long)-1) && PyErr_Occurred())) __PYX_ERR(0, 1398, __pyx_L1_error)
 
   /* "holodeck/cyutils.pyx":1399
- *     cdef np.ndarray[np.long_t, ndim=4] lsidx = np.zeros((3,F,R,L), dtype=int)
+ *     cdef np.ndarray[np.long_t, ndim=4] ssidx = np.zeros((3,F,R,L), dtype=int)
  *     _loudest_hc_and_par_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold,
  *                             mt, mr, rz, msort, qsort, zsort,             # <<<<<<<<<<<<<<
- *                             hc2ls, hc2bg, lspar, bgpar, lsidx)
- *     return hc2ls, hc2bg, lspar, bgpar, lsidx
+ *                             hc2ss, hc2bg, lspar, bgpar, ssidx)
+ *     return hc2ss, hc2bg, lspar, bgpar, ssidx
  */
   __pyx_t_18 = __Pyx_PyObject_to_MemoryviewSlice_ds_double(__pyx_v_mt, PyBUF_WRITABLE); if (unlikely(!__pyx_t_18.memview)) __PYX_ERR(0, 1399, __pyx_L1_error)
   __pyx_t_19 = __Pyx_PyObject_to_MemoryviewSlice_ds_double(__pyx_v_mr, PyBUF_WRITABLE); if (unlikely(!__pyx_t_19.memview)) __PYX_ERR(0, 1399, __pyx_L1_error)
@@ -13055,22 +13051,22 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   /* "holodeck/cyutils.pyx":1400
  *     _loudest_hc_and_par_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold,
  *                             mt, mr, rz, msort, qsort, zsort,
- *                             hc2ls, hc2bg, lspar, bgpar, lsidx)             # <<<<<<<<<<<<<<
- *     return hc2ls, hc2bg, lspar, bgpar, lsidx
+ *                             hc2ss, hc2bg, lspar, bgpar, ssidx)             # <<<<<<<<<<<<<<
+ *     return hc2ss, hc2bg, lspar, bgpar, ssidx
  * 
  */
-  __pyx_t_23 = __Pyx_PyObject_to_MemoryviewSlice_dsdsds_double(((PyObject *)__pyx_v_hc2ls), PyBUF_WRITABLE); if (unlikely(!__pyx_t_23.memview)) __PYX_ERR(0, 1400, __pyx_L1_error)
+  __pyx_t_23 = __Pyx_PyObject_to_MemoryviewSlice_dsdsds_double(((PyObject *)__pyx_v_hc2ss), PyBUF_WRITABLE); if (unlikely(!__pyx_t_23.memview)) __PYX_ERR(0, 1400, __pyx_L1_error)
   __pyx_t_24 = __Pyx_PyObject_to_MemoryviewSlice_dsds_double(((PyObject *)__pyx_v_hc2bg), PyBUF_WRITABLE); if (unlikely(!__pyx_t_24.memview)) __PYX_ERR(0, 1400, __pyx_L1_error)
   __pyx_t_25 = __Pyx_PyObject_to_MemoryviewSlice_dsdsds_double(((PyObject *)__pyx_v_lspar), PyBUF_WRITABLE); if (unlikely(!__pyx_t_25.memview)) __PYX_ERR(0, 1400, __pyx_L1_error)
   __pyx_t_26 = __Pyx_PyObject_to_MemoryviewSlice_dsdsds_double(((PyObject *)__pyx_v_bgpar), PyBUF_WRITABLE); if (unlikely(!__pyx_t_26.memview)) __PYX_ERR(0, 1400, __pyx_L1_error)
-  __pyx_t_27 = __Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_long(((PyObject *)__pyx_v_lsidx), PyBUF_WRITABLE); if (unlikely(!__pyx_t_27.memview)) __PYX_ERR(0, 1400, __pyx_L1_error)
+  __pyx_t_27 = __Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_long(((PyObject *)__pyx_v_ssidx), PyBUF_WRITABLE); if (unlikely(!__pyx_t_27.memview)) __PYX_ERR(0, 1400, __pyx_L1_error)
 
   /* "holodeck/cyutils.pyx":1398
  *     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
- *     cdef np.ndarray[np.long_t, ndim=4] lsidx = np.zeros((3,F,R,L), dtype=int)
+ *     cdef np.ndarray[np.long_t, ndim=4] ssidx = np.zeros((3,F,R,L), dtype=int)
  *     _loudest_hc_and_par_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold,             # <<<<<<<<<<<<<<
  *                             mt, mr, rz, msort, qsort, zsort,
- *                             hc2ls, hc2bg, lspar, bgpar, lsidx)
+ *                             hc2ss, hc2bg, lspar, bgpar, ssidx)
  */
   __pyx_f_8holodeck_7cyutils__loudest_hc_and_par_from_sorted(__pyx_v_shape, __pyx_t_13, __pyx_t_14, __pyx_t_15, __pyx_t_16, __pyx_t_17, __pyx_t_18, __pyx_t_19, __pyx_t_20, __pyx_t_5, __pyx_t_21, __pyx_t_22, __pyx_t_23, __pyx_t_24, __pyx_t_25, __pyx_t_26, __pyx_t_27);
   __PYX_XDEC_MEMVIEW(&__pyx_t_13, 1);
@@ -13115,17 +13111,17 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
 
   /* "holodeck/cyutils.pyx":1401
  *                             mt, mr, rz, msort, qsort, zsort,
- *                             hc2ls, hc2bg, lspar, bgpar, lsidx)
- *     return hc2ls, hc2bg, lspar, bgpar, lsidx             # <<<<<<<<<<<<<<
+ *                             hc2ss, hc2bg, lspar, bgpar, ssidx)
+ *     return hc2ss, hc2bg, lspar, bgpar, ssidx             # <<<<<<<<<<<<<<
  * 
  * @cython.boundscheck(True)
  */
   __Pyx_XDECREF(__pyx_r);
   __pyx_t_4 = PyTuple_New(5); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1401, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  __Pyx_INCREF(((PyObject *)__pyx_v_hc2ls));
-  __Pyx_GIVEREF(((PyObject *)__pyx_v_hc2ls));
-  PyTuple_SET_ITEM(__pyx_t_4, 0, ((PyObject *)__pyx_v_hc2ls));
+  __Pyx_INCREF(((PyObject *)__pyx_v_hc2ss));
+  __Pyx_GIVEREF(((PyObject *)__pyx_v_hc2ss));
+  PyTuple_SET_ITEM(__pyx_t_4, 0, ((PyObject *)__pyx_v_hc2ss));
   __Pyx_INCREF(((PyObject *)__pyx_v_hc2bg));
   __Pyx_GIVEREF(((PyObject *)__pyx_v_hc2bg));
   PyTuple_SET_ITEM(__pyx_t_4, 1, ((PyObject *)__pyx_v_hc2bg));
@@ -13135,9 +13131,9 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   __Pyx_INCREF(((PyObject *)__pyx_v_bgpar));
   __Pyx_GIVEREF(((PyObject *)__pyx_v_bgpar));
   PyTuple_SET_ITEM(__pyx_t_4, 3, ((PyObject *)__pyx_v_bgpar));
-  __Pyx_INCREF(((PyObject *)__pyx_v_lsidx));
-  __Pyx_GIVEREF(((PyObject *)__pyx_v_lsidx));
-  PyTuple_SET_ITEM(__pyx_t_4, 4, ((PyObject *)__pyx_v_lsidx));
+  __Pyx_INCREF(((PyObject *)__pyx_v_ssidx));
+  __Pyx_GIVEREF(((PyObject *)__pyx_v_ssidx));
+  PyTuple_SET_ITEM(__pyx_t_4, 4, ((PyObject *)__pyx_v_ssidx));
   __pyx_r = __pyx_t_4;
   __pyx_t_4 = 0;
   goto __pyx_L0;
@@ -13175,9 +13171,9 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
     __Pyx_ErrFetch(&__pyx_type, &__pyx_value, &__pyx_tb);
     __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_bgpar.rcbuffer->pybuffer);
     __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_hc2bg.rcbuffer->pybuffer);
-    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_hc2ls.rcbuffer->pybuffer);
-    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_lsidx.rcbuffer->pybuffer);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_hc2ss.rcbuffer->pybuffer);
     __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_lspar.rcbuffer->pybuffer);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_ssidx.rcbuffer->pybuffer);
   __Pyx_ErrRestore(__pyx_type, __pyx_value, __pyx_tb);}
   __Pyx_AddTraceback("holodeck.cyutils.loudest_hc_and_par_from_sorted", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
@@ -13185,19 +13181,19 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   __pyx_L0:;
   __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_bgpar.rcbuffer->pybuffer);
   __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_hc2bg.rcbuffer->pybuffer);
-  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_hc2ls.rcbuffer->pybuffer);
-  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_lsidx.rcbuffer->pybuffer);
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_hc2ss.rcbuffer->pybuffer);
   __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_lspar.rcbuffer->pybuffer);
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_ssidx.rcbuffer->pybuffer);
   __pyx_L2:;
   __PYX_XDEC_MEMVIEW(&__pyx_v_shape, 1);
   __Pyx_XDECREF(__pyx_v_F);
   __Pyx_XDECREF(__pyx_v_R);
   __Pyx_XDECREF(__pyx_v_L);
-  __Pyx_XDECREF((PyObject *)__pyx_v_hc2ls);
+  __Pyx_XDECREF((PyObject *)__pyx_v_hc2ss);
   __Pyx_XDECREF((PyObject *)__pyx_v_hc2bg);
   __Pyx_XDECREF((PyObject *)__pyx_v_lspar);
   __Pyx_XDECREF((PyObject *)__pyx_v_bgpar);
-  __Pyx_XDECREF((PyObject *)__pyx_v_lsidx);
+  __Pyx_XDECREF((PyObject *)__pyx_v_ssidx);
   __Pyx_XGIVEREF(__pyx_r);
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
@@ -13211,7 +13207,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
  *             double[:] mt, double[:] mr, double[:] rz,
  */
 
-static void __pyx_f_8holodeck_7cyutils__loudest_hc_and_par_from_sorted(__Pyx_memviewslice __pyx_v_shape, __Pyx_memviewslice __pyx_v_h2fdf, __Pyx_memviewslice __pyx_v_number, long __pyx_v_nreals, long __pyx_v_nloudest, long __pyx_v_thresh, __Pyx_memviewslice __pyx_v_mt, __Pyx_memviewslice __pyx_v_mr, __Pyx_memviewslice __pyx_v_rz, __Pyx_memviewslice __pyx_v_msort, __Pyx_memviewslice __pyx_v_qsort, __Pyx_memviewslice __pyx_v_zsort, __Pyx_memviewslice __pyx_v_hc2ls, __Pyx_memviewslice __pyx_v_hc2bg, __Pyx_memviewslice __pyx_v_lspar, __Pyx_memviewslice __pyx_v_bgpar, __Pyx_memviewslice __pyx_v_lsidx) {
+static void __pyx_f_8holodeck_7cyutils__loudest_hc_and_par_from_sorted(__Pyx_memviewslice __pyx_v_shape, __Pyx_memviewslice __pyx_v_h2fdf, __Pyx_memviewslice __pyx_v_number, long __pyx_v_nreals, long __pyx_v_nloudest, long __pyx_v_thresh, __Pyx_memviewslice __pyx_v_mt, __Pyx_memviewslice __pyx_v_mr, __Pyx_memviewslice __pyx_v_rz, __Pyx_memviewslice __pyx_v_msort, __Pyx_memviewslice __pyx_v_qsort, __Pyx_memviewslice __pyx_v_zsort, __Pyx_memviewslice __pyx_v_hc2ss, __Pyx_memviewslice __pyx_v_hc2bg, __Pyx_memviewslice __pyx_v_lspar, __Pyx_memviewslice __pyx_v_bgpar, __Pyx_memviewslice __pyx_v_ssidx) {
   int __pyx_v_M;
   int __pyx_v_Q;
   int __pyx_v_Z;
@@ -13867,7 +13863,7 @@ static void __pyx_f_8holodeck_7cyutils__loudest_hc_and_par_from_sorted(__Pyx_mem
  *                     continue # to next loudest bin
  *                 while (ll < L) and (num > 0):             # <<<<<<<<<<<<<<
  *                     # store ll loudest source strain
- *                     hc2ls[ff,rr,ll] = cur
+ *                     hc2ss[ff,rr,ll] = cur
  */
         while (1) {
           __pyx_t_24 = ((__pyx_v_ll < __pyx_v_L) != 0);
@@ -13884,11 +13880,11 @@ static void __pyx_f_8holodeck_7cyutils__loudest_hc_and_par_from_sorted(__Pyx_mem
           /* "holodeck/cyutils.pyx":1504
  *                 while (ll < L) and (num > 0):
  *                     # store ll loudest source strain
- *                     hc2ls[ff,rr,ll] = cur             # <<<<<<<<<<<<<<
+ *                     hc2ss[ff,rr,ll] = cur             # <<<<<<<<<<<<<<
  * 
  *                     # store indices of ll loudest source
  */
-          if (unlikely(((PyObject *) __pyx_v_hc2ls.memview) == Py_None)) {
+          if (unlikely(((PyObject *) __pyx_v_hc2ss.memview) == Py_None)) {
             PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
             __PYX_ERR(0, 1504, __pyx_L1_error)
           }
@@ -13897,31 +13893,31 @@ static void __pyx_f_8holodeck_7cyutils__loudest_hc_and_par_from_sorted(__Pyx_mem
           __pyx_t_21 = __pyx_v_ll;
           __pyx_t_19 = -1;
           if (__pyx_t_1 < 0) {
-            __pyx_t_1 += __pyx_v_hc2ls.shape[0];
+            __pyx_t_1 += __pyx_v_hc2ss.shape[0];
             if (unlikely(__pyx_t_1 < 0)) __pyx_t_19 = 0;
-          } else if (unlikely(__pyx_t_1 >= __pyx_v_hc2ls.shape[0])) __pyx_t_19 = 0;
+          } else if (unlikely(__pyx_t_1 >= __pyx_v_hc2ss.shape[0])) __pyx_t_19 = 0;
           if (__pyx_t_20 < 0) {
-            __pyx_t_20 += __pyx_v_hc2ls.shape[1];
+            __pyx_t_20 += __pyx_v_hc2ss.shape[1];
             if (unlikely(__pyx_t_20 < 0)) __pyx_t_19 = 1;
-          } else if (unlikely(__pyx_t_20 >= __pyx_v_hc2ls.shape[1])) __pyx_t_19 = 1;
+          } else if (unlikely(__pyx_t_20 >= __pyx_v_hc2ss.shape[1])) __pyx_t_19 = 1;
           if (__pyx_t_21 < 0) {
-            __pyx_t_21 += __pyx_v_hc2ls.shape[2];
+            __pyx_t_21 += __pyx_v_hc2ss.shape[2];
             if (unlikely(__pyx_t_21 < 0)) __pyx_t_19 = 2;
-          } else if (unlikely(__pyx_t_21 >= __pyx_v_hc2ls.shape[2])) __pyx_t_19 = 2;
+          } else if (unlikely(__pyx_t_21 >= __pyx_v_hc2ss.shape[2])) __pyx_t_19 = 2;
           if (unlikely(__pyx_t_19 != -1)) {
             __Pyx_RaiseBufferIndexError(__pyx_t_19);
             __PYX_ERR(0, 1504, __pyx_L1_error)
           }
-          *((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_hc2ls.data + __pyx_t_1 * __pyx_v_hc2ls.strides[0]) ) + __pyx_t_20 * __pyx_v_hc2ls.strides[1]) ) + __pyx_t_21 * __pyx_v_hc2ls.strides[2]) )) = __pyx_v_cur;
+          *((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_hc2ss.data + __pyx_t_1 * __pyx_v_hc2ss.strides[0]) ) + __pyx_t_20 * __pyx_v_hc2ss.strides[1]) ) + __pyx_t_21 * __pyx_v_hc2ss.strides[2]) )) = __pyx_v_cur;
 
           /* "holodeck/cyutils.pyx":1507
  * 
  *                     # store indices of ll loudest source
- *                     lsidx[0,ff,rr,ll] = mm             # <<<<<<<<<<<<<<
- *                     lsidx[1,ff,rr,ll] = qq
- *                     lsidx[2,ff,rr,ll] = zz
+ *                     ssidx[0,ff,rr,ll] = mm             # <<<<<<<<<<<<<<
+ *                     ssidx[1,ff,rr,ll] = qq
+ *                     ssidx[2,ff,rr,ll] = zz
  */
-          if (unlikely(((PyObject *) __pyx_v_lsidx.memview) == Py_None)) {
+          if (unlikely(((PyObject *) __pyx_v_ssidx.memview) == Py_None)) {
             PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
             __PYX_ERR(0, 1507, __pyx_L1_error)
           }
@@ -13931,35 +13927,35 @@ static void __pyx_f_8holodeck_7cyutils__loudest_hc_and_par_from_sorted(__Pyx_mem
           __pyx_t_22 = __pyx_v_ll;
           __pyx_t_19 = -1;
           if (__pyx_t_21 < 0) {
-            __pyx_t_21 += __pyx_v_lsidx.shape[0];
+            __pyx_t_21 += __pyx_v_ssidx.shape[0];
             if (unlikely(__pyx_t_21 < 0)) __pyx_t_19 = 0;
-          } else if (unlikely(__pyx_t_21 >= __pyx_v_lsidx.shape[0])) __pyx_t_19 = 0;
+          } else if (unlikely(__pyx_t_21 >= __pyx_v_ssidx.shape[0])) __pyx_t_19 = 0;
           if (__pyx_t_20 < 0) {
-            __pyx_t_20 += __pyx_v_lsidx.shape[1];
+            __pyx_t_20 += __pyx_v_ssidx.shape[1];
             if (unlikely(__pyx_t_20 < 0)) __pyx_t_19 = 1;
-          } else if (unlikely(__pyx_t_20 >= __pyx_v_lsidx.shape[1])) __pyx_t_19 = 1;
+          } else if (unlikely(__pyx_t_20 >= __pyx_v_ssidx.shape[1])) __pyx_t_19 = 1;
           if (__pyx_t_1 < 0) {
-            __pyx_t_1 += __pyx_v_lsidx.shape[2];
+            __pyx_t_1 += __pyx_v_ssidx.shape[2];
             if (unlikely(__pyx_t_1 < 0)) __pyx_t_19 = 2;
-          } else if (unlikely(__pyx_t_1 >= __pyx_v_lsidx.shape[2])) __pyx_t_19 = 2;
+          } else if (unlikely(__pyx_t_1 >= __pyx_v_ssidx.shape[2])) __pyx_t_19 = 2;
           if (__pyx_t_22 < 0) {
-            __pyx_t_22 += __pyx_v_lsidx.shape[3];
+            __pyx_t_22 += __pyx_v_ssidx.shape[3];
             if (unlikely(__pyx_t_22 < 0)) __pyx_t_19 = 3;
-          } else if (unlikely(__pyx_t_22 >= __pyx_v_lsidx.shape[3])) __pyx_t_19 = 3;
+          } else if (unlikely(__pyx_t_22 >= __pyx_v_ssidx.shape[3])) __pyx_t_19 = 3;
           if (unlikely(__pyx_t_19 != -1)) {
             __Pyx_RaiseBufferIndexError(__pyx_t_19);
             __PYX_ERR(0, 1507, __pyx_L1_error)
           }
-          *((long *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_lsidx.data + __pyx_t_21 * __pyx_v_lsidx.strides[0]) ) + __pyx_t_20 * __pyx_v_lsidx.strides[1]) ) + __pyx_t_1 * __pyx_v_lsidx.strides[2]) ) + __pyx_t_22 * __pyx_v_lsidx.strides[3]) )) = __pyx_v_mm;
+          *((long *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_ssidx.data + __pyx_t_21 * __pyx_v_ssidx.strides[0]) ) + __pyx_t_20 * __pyx_v_ssidx.strides[1]) ) + __pyx_t_1 * __pyx_v_ssidx.strides[2]) ) + __pyx_t_22 * __pyx_v_ssidx.strides[3]) )) = __pyx_v_mm;
 
           /* "holodeck/cyutils.pyx":1508
  *                     # store indices of ll loudest source
- *                     lsidx[0,ff,rr,ll] = mm
- *                     lsidx[1,ff,rr,ll] = qq             # <<<<<<<<<<<<<<
- *                     lsidx[2,ff,rr,ll] = zz
+ *                     ssidx[0,ff,rr,ll] = mm
+ *                     ssidx[1,ff,rr,ll] = qq             # <<<<<<<<<<<<<<
+ *                     ssidx[2,ff,rr,ll] = zz
  * 
  */
-          if (unlikely(((PyObject *) __pyx_v_lsidx.memview) == Py_None)) {
+          if (unlikely(((PyObject *) __pyx_v_ssidx.memview) == Py_None)) {
             PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
             __PYX_ERR(0, 1508, __pyx_L1_error)
           }
@@ -13969,35 +13965,35 @@ static void __pyx_f_8holodeck_7cyutils__loudest_hc_and_par_from_sorted(__Pyx_mem
           __pyx_t_21 = __pyx_v_ll;
           __pyx_t_19 = -1;
           if (__pyx_t_22 < 0) {
-            __pyx_t_22 += __pyx_v_lsidx.shape[0];
+            __pyx_t_22 += __pyx_v_ssidx.shape[0];
             if (unlikely(__pyx_t_22 < 0)) __pyx_t_19 = 0;
-          } else if (unlikely(__pyx_t_22 >= __pyx_v_lsidx.shape[0])) __pyx_t_19 = 0;
+          } else if (unlikely(__pyx_t_22 >= __pyx_v_ssidx.shape[0])) __pyx_t_19 = 0;
           if (__pyx_t_1 < 0) {
-            __pyx_t_1 += __pyx_v_lsidx.shape[1];
+            __pyx_t_1 += __pyx_v_ssidx.shape[1];
             if (unlikely(__pyx_t_1 < 0)) __pyx_t_19 = 1;
-          } else if (unlikely(__pyx_t_1 >= __pyx_v_lsidx.shape[1])) __pyx_t_19 = 1;
+          } else if (unlikely(__pyx_t_1 >= __pyx_v_ssidx.shape[1])) __pyx_t_19 = 1;
           if (__pyx_t_20 < 0) {
-            __pyx_t_20 += __pyx_v_lsidx.shape[2];
+            __pyx_t_20 += __pyx_v_ssidx.shape[2];
             if (unlikely(__pyx_t_20 < 0)) __pyx_t_19 = 2;
-          } else if (unlikely(__pyx_t_20 >= __pyx_v_lsidx.shape[2])) __pyx_t_19 = 2;
+          } else if (unlikely(__pyx_t_20 >= __pyx_v_ssidx.shape[2])) __pyx_t_19 = 2;
           if (__pyx_t_21 < 0) {
-            __pyx_t_21 += __pyx_v_lsidx.shape[3];
+            __pyx_t_21 += __pyx_v_ssidx.shape[3];
             if (unlikely(__pyx_t_21 < 0)) __pyx_t_19 = 3;
-          } else if (unlikely(__pyx_t_21 >= __pyx_v_lsidx.shape[3])) __pyx_t_19 = 3;
+          } else if (unlikely(__pyx_t_21 >= __pyx_v_ssidx.shape[3])) __pyx_t_19 = 3;
           if (unlikely(__pyx_t_19 != -1)) {
             __Pyx_RaiseBufferIndexError(__pyx_t_19);
             __PYX_ERR(0, 1508, __pyx_L1_error)
           }
-          *((long *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_lsidx.data + __pyx_t_22 * __pyx_v_lsidx.strides[0]) ) + __pyx_t_1 * __pyx_v_lsidx.strides[1]) ) + __pyx_t_20 * __pyx_v_lsidx.strides[2]) ) + __pyx_t_21 * __pyx_v_lsidx.strides[3]) )) = __pyx_v_qq;
+          *((long *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_ssidx.data + __pyx_t_22 * __pyx_v_ssidx.strides[0]) ) + __pyx_t_1 * __pyx_v_ssidx.strides[1]) ) + __pyx_t_20 * __pyx_v_ssidx.strides[2]) ) + __pyx_t_21 * __pyx_v_ssidx.strides[3]) )) = __pyx_v_qq;
 
           /* "holodeck/cyutils.pyx":1509
- *                     lsidx[0,ff,rr,ll] = mm
- *                     lsidx[1,ff,rr,ll] = qq
- *                     lsidx[2,ff,rr,ll] = zz             # <<<<<<<<<<<<<<
+ *                     ssidx[0,ff,rr,ll] = mm
+ *                     ssidx[1,ff,rr,ll] = qq
+ *                     ssidx[2,ff,rr,ll] = zz             # <<<<<<<<<<<<<<
  * 
  * 
  */
-          if (unlikely(((PyObject *) __pyx_v_lsidx.memview) == Py_None)) {
+          if (unlikely(((PyObject *) __pyx_v_ssidx.memview) == Py_None)) {
             PyErr_SetString(PyExc_TypeError, "Cannot index None memoryview slice");
             __PYX_ERR(0, 1509, __pyx_L1_error)
           }
@@ -14007,26 +14003,26 @@ static void __pyx_f_8holodeck_7cyutils__loudest_hc_and_par_from_sorted(__Pyx_mem
           __pyx_t_22 = __pyx_v_ll;
           __pyx_t_19 = -1;
           if (__pyx_t_21 < 0) {
-            __pyx_t_21 += __pyx_v_lsidx.shape[0];
+            __pyx_t_21 += __pyx_v_ssidx.shape[0];
             if (unlikely(__pyx_t_21 < 0)) __pyx_t_19 = 0;
-          } else if (unlikely(__pyx_t_21 >= __pyx_v_lsidx.shape[0])) __pyx_t_19 = 0;
+          } else if (unlikely(__pyx_t_21 >= __pyx_v_ssidx.shape[0])) __pyx_t_19 = 0;
           if (__pyx_t_20 < 0) {
-            __pyx_t_20 += __pyx_v_lsidx.shape[1];
+            __pyx_t_20 += __pyx_v_ssidx.shape[1];
             if (unlikely(__pyx_t_20 < 0)) __pyx_t_19 = 1;
-          } else if (unlikely(__pyx_t_20 >= __pyx_v_lsidx.shape[1])) __pyx_t_19 = 1;
+          } else if (unlikely(__pyx_t_20 >= __pyx_v_ssidx.shape[1])) __pyx_t_19 = 1;
           if (__pyx_t_1 < 0) {
-            __pyx_t_1 += __pyx_v_lsidx.shape[2];
+            __pyx_t_1 += __pyx_v_ssidx.shape[2];
             if (unlikely(__pyx_t_1 < 0)) __pyx_t_19 = 2;
-          } else if (unlikely(__pyx_t_1 >= __pyx_v_lsidx.shape[2])) __pyx_t_19 = 2;
+          } else if (unlikely(__pyx_t_1 >= __pyx_v_ssidx.shape[2])) __pyx_t_19 = 2;
           if (__pyx_t_22 < 0) {
-            __pyx_t_22 += __pyx_v_lsidx.shape[3];
+            __pyx_t_22 += __pyx_v_ssidx.shape[3];
             if (unlikely(__pyx_t_22 < 0)) __pyx_t_19 = 3;
-          } else if (unlikely(__pyx_t_22 >= __pyx_v_lsidx.shape[3])) __pyx_t_19 = 3;
+          } else if (unlikely(__pyx_t_22 >= __pyx_v_ssidx.shape[3])) __pyx_t_19 = 3;
           if (unlikely(__pyx_t_19 != -1)) {
             __Pyx_RaiseBufferIndexError(__pyx_t_19);
             __PYX_ERR(0, 1509, __pyx_L1_error)
           }
-          *((long *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_lsidx.data + __pyx_t_21 * __pyx_v_lsidx.strides[0]) ) + __pyx_t_20 * __pyx_v_lsidx.strides[1]) ) + __pyx_t_1 * __pyx_v_lsidx.strides[2]) ) + __pyx_t_22 * __pyx_v_lsidx.strides[3]) )) = __pyx_v_zz;
+          *((long *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_ssidx.data + __pyx_t_21 * __pyx_v_ssidx.strides[0]) ) + __pyx_t_20 * __pyx_v_ssidx.strides[1]) ) + __pyx_t_1 * __pyx_v_ssidx.strides[2]) ) + __pyx_t_22 * __pyx_v_ssidx.strides[3]) )) = __pyx_v_zz;
 
           /* "holodeck/cyutils.pyx":1512
  * 
@@ -29578,7 +29574,6 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_h2fdf, __pyx_k_h2fdf, sizeof(__pyx_k_h2fdf), 0, 0, 1, 1},
   {&__pyx_n_s_hc2, __pyx_k_hc2, sizeof(__pyx_k_hc2), 0, 0, 1, 1},
   {&__pyx_n_s_hc2bg, __pyx_k_hc2bg, sizeof(__pyx_k_hc2bg), 0, 0, 1, 1},
-  {&__pyx_n_s_hc2ls, __pyx_k_hc2ls, sizeof(__pyx_k_hc2ls), 0, 0, 1, 1},
   {&__pyx_n_s_hc2ss, __pyx_k_hc2ss, sizeof(__pyx_k_hc2ss), 0, 0, 1, 1},
   {&__pyx_n_s_holodeck_cyutils, __pyx_k_holodeck_cyutils, sizeof(__pyx_k_holodeck_cyutils), 0, 0, 1, 1},
   {&__pyx_kp_s_holodeck_cyutils_pyx, __pyx_k_holodeck_cyutils_pyx, sizeof(__pyx_k_holodeck_cyutils_pyx), 0, 0, 1, 0},
@@ -29590,7 +29585,6 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_kp_s_itemsize_0_for_cython_array, __pyx_k_itemsize_0_for_cython_array, sizeof(__pyx_k_itemsize_0_for_cython_array), 0, 0, 1, 0},
   {&__pyx_n_s_loudest_hc_and_par_from_sorted, __pyx_k_loudest_hc_and_par_from_sorted, sizeof(__pyx_k_loudest_hc_and_par_from_sorted), 0, 0, 1, 1},
   {&__pyx_n_s_loudest_hc_from_sorted, __pyx_k_loudest_hc_from_sorted, sizeof(__pyx_k_loudest_hc_from_sorted), 0, 0, 1, 1},
-  {&__pyx_n_s_lsidx, __pyx_k_lsidx, sizeof(__pyx_k_lsidx), 0, 0, 1, 1},
   {&__pyx_n_s_lspar, __pyx_k_lspar, sizeof(__pyx_k_lspar), 0, 0, 1, 1},
   {&__pyx_n_s_main, __pyx_k_main, sizeof(__pyx_k_main), 0, 0, 1, 1},
   {&__pyx_n_s_memview, __pyx_k_memview, sizeof(__pyx_k_memview), 0, 0, 1, 1},
@@ -30014,7 +30008,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  *     """
  *     Calculates the characteristic strain from loud single sources and a background of all other sources.
  */
-  __pyx_tuple__37 = PyTuple_Pack(14, __pyx_n_s_number, __pyx_n_s_h2fdf, __pyx_n_s_nreals, __pyx_n_s_nloudest, __pyx_n_s_msort, __pyx_n_s_qsort, __pyx_n_s_zsort, __pyx_n_s_normal_threshold, __pyx_n_s_shape, __pyx_n_s_F, __pyx_n_s_R, __pyx_n_s_L, __pyx_n_s_hc2ls, __pyx_n_s_hc2bg); if (unlikely(!__pyx_tuple__37)) __PYX_ERR(0, 1219, __pyx_L1_error)
+  __pyx_tuple__37 = PyTuple_Pack(14, __pyx_n_s_number, __pyx_n_s_h2fdf, __pyx_n_s_nreals, __pyx_n_s_nloudest, __pyx_n_s_msort, __pyx_n_s_qsort, __pyx_n_s_zsort, __pyx_n_s_normal_threshold, __pyx_n_s_shape, __pyx_n_s_F, __pyx_n_s_R, __pyx_n_s_L, __pyx_n_s_hc2ss, __pyx_n_s_hc2bg); if (unlikely(!__pyx_tuple__37)) __PYX_ERR(0, 1219, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__37);
   __Pyx_GIVEREF(__pyx_tuple__37);
   __pyx_codeobj__38 = (PyObject*)__Pyx_PyCode_New(8, 0, 14, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__37, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_holodeck_cyutils_pyx, __pyx_n_s_loudest_hc_from_sorted, 1219, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__38)) __PYX_ERR(0, 1219, __pyx_L1_error)
@@ -30026,7 +30020,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  *     """
  *     Calculates the characteristic strain from loud single sources and a background of all other sources.
  */
-  __pyx_tuple__39 = PyTuple_Pack(20, __pyx_n_s_number, __pyx_n_s_h2fdf, __pyx_n_s_nreals, __pyx_n_s_nloudest, __pyx_n_s_mt, __pyx_n_s_mr, __pyx_n_s_rz, __pyx_n_s_msort, __pyx_n_s_qsort, __pyx_n_s_zsort, __pyx_n_s_normal_threshold, __pyx_n_s_shape, __pyx_n_s_F, __pyx_n_s_R, __pyx_n_s_L, __pyx_n_s_hc2ls, __pyx_n_s_hc2bg, __pyx_n_s_lspar, __pyx_n_s_bgpar, __pyx_n_s_lsidx); if (unlikely(!__pyx_tuple__39)) __PYX_ERR(0, 1346, __pyx_L1_error)
+  __pyx_tuple__39 = PyTuple_Pack(20, __pyx_n_s_number, __pyx_n_s_h2fdf, __pyx_n_s_nreals, __pyx_n_s_nloudest, __pyx_n_s_mt, __pyx_n_s_mr, __pyx_n_s_rz, __pyx_n_s_msort, __pyx_n_s_qsort, __pyx_n_s_zsort, __pyx_n_s_normal_threshold, __pyx_n_s_shape, __pyx_n_s_F, __pyx_n_s_R, __pyx_n_s_L, __pyx_n_s_hc2ss, __pyx_n_s_hc2bg, __pyx_n_s_lspar, __pyx_n_s_bgpar, __pyx_n_s_ssidx); if (unlikely(!__pyx_tuple__39)) __PYX_ERR(0, 1346, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__39);
   __Pyx_GIVEREF(__pyx_tuple__39);
   __pyx_codeobj__40 = (PyObject*)__Pyx_PyCode_New(11, 0, 20, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__39, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_holodeck_cyutils_pyx, __pyx_n_s_loudest_hc_and_par_from_sorted, 1346, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__40)) __PYX_ERR(0, 1346, __pyx_L1_error)

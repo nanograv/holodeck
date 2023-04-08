@@ -5679,7 +5679,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_12sort_h2fdf(CYTHON_UNUSED PyObject
 <pre class="cython line score-94" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1219</span>: <span class="k">def</span> <span class="nf">loudest_hc_from_sorted</span><span class="p">(</span><span class="n">number</span><span class="p">,</span> <span class="n">h2fdf</span><span class="p">,</span> <span class="n">nreals</span><span class="p">,</span> <span class="n">nloudest</span><span class="p">,</span> <span class="n">msort</span><span class="p">,</span> <span class="n">qsort</span><span class="p">,</span> <span class="n">zsort</span><span class="p">,</span> <span class="n">normal_threshold</span><span class="o">=</span><span class="mf">1e10</span><span class="p">):</span></pre>
 <pre class='cython code score-94 '>/* Python wrapper */
 static PyObject *__pyx_pw_8holodeck_7cyutils_15loudest_hc_from_sorted(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_8holodeck_7cyutils_14loudest_hc_from_sorted[] = "\n    Calculates the characteristic strain from loud single sources and a background of all other sources.\n\n    Parameters\n    ------------------------\n    number : [M, Q, Z, F] NDarray\n        number in each bin\n    h2fdf : [M, Q, Z, F] NDarray\n        Strain amplitude squared x frequency / frequency bin width for each bin.\n    nreals\n        Number of realizations.\n    nloudest\n        Number of loudest sources to separate in each frequency bin.\n    msort : (M*Q*Z,) 1Darray\n        M indices of each bin, sorted from largest to smallest h2fdf.\n    qsort : (M*Q*Z,) 1Darray\n        q indices of each bin, sorted from largest to smallest h2fdf.\n    zsort : (M*Q*Z,) 1Darray\n        z indices of each bin, sorted from largest to smallest h2fdf.\n    normal_threshold : float\n        Threshold for approximating poisson sampling as normal.\n\n    Returns\n    --------------------------\n    hc2ls : (F, R, L) Ndarray of scalars\n        Char strain squared of the loudest single sources.\n    hc2bg : (F, R) Ndarray of scalars\n        Char strain squared of the background.\n    ";
+static char __pyx_doc_8holodeck_7cyutils_14loudest_hc_from_sorted[] = "\n    Calculates the characteristic strain from loud single sources and a background of all other sources.\n\n    Parameters\n    ------------------------\n    number : [M, Q, Z, F] NDarray\n        number in each bin\n    h2fdf : [M, Q, Z, F] NDarray\n        Strain amplitude squared x frequency / frequency bin width for each bin.\n    nreals\n        Number of realizations.\n    nloudest\n        Number of loudest sources to separate in each frequency bin.\n    msort : (M*Q*Z,) 1Darray\n        M indices of each bin, sorted from largest to smallest h2fdf.\n    qsort : (M*Q*Z,) 1Darray\n        q indices of each bin, sorted from largest to smallest h2fdf.\n    zsort : (M*Q*Z,) 1Darray\n        z indices of each bin, sorted from largest to smallest h2fdf.\n    normal_threshold : float\n        Threshold for approximating poisson sampling as normal.\n\n    Returns\n    --------------------------\n    hc2ss : (F, R, L) Ndarray of scalars\n        Char strain squared of the loudest single sources.\n    hc2bg : (F, R) Ndarray of scalars\n        Char strain squared of the background.\n    ";
 static PyMethodDef __pyx_mdef_8holodeck_7cyutils_15loudest_hc_from_sorted = {"loudest_hc_from_sorted", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_8holodeck_7cyutils_15loudest_hc_from_sorted, METH_VARARGS|METH_KEYWORDS, __pyx_doc_8holodeck_7cyutils_14loudest_hc_from_sorted};
 static PyObject *__pyx_pw_8holodeck_7cyutils_15loudest_hc_from_sorted(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_number = 0;
@@ -5818,19 +5818,19 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
   PyObject *__pyx_v_F = NULL;
   PyObject *__pyx_v_R = NULL;
   PyObject *__pyx_v_L = NULL;
-  PyArrayObject *__pyx_v_hc2ls = 0;
+  PyArrayObject *__pyx_v_hc2ss = 0;
   PyArrayObject *__pyx_v_hc2bg = 0;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_hc2bg;
   __Pyx_Buffer __pyx_pybuffer_hc2bg;
-  __Pyx_LocalBuf_ND __pyx_pybuffernd_hc2ls;
-  __Pyx_Buffer __pyx_pybuffer_hc2ls;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_hc2ss;
+  __Pyx_Buffer __pyx_pybuffer_hc2ss;
   PyObject *__pyx_r = NULL;
   <span class='refnanny'>__Pyx_RefNannyDeclarations</span>
   <span class='refnanny'>__Pyx_RefNannySetupContext</span>("loudest_hc_from_sorted", 0);
-  __pyx_pybuffer_hc2ls.pybuffer.buf = NULL;
-  __pyx_pybuffer_hc2ls.refcount = 0;
-  __pyx_pybuffernd_hc2ls.data = NULL;
-  __pyx_pybuffernd_hc2ls.rcbuffer = &amp;__pyx_pybuffer_hc2ls;
+  __pyx_pybuffer_hc2ss.pybuffer.buf = NULL;
+  __pyx_pybuffer_hc2ss.refcount = 0;
+  __pyx_pybuffernd_hc2ss.data = NULL;
+  __pyx_pybuffernd_hc2ss.rcbuffer = &amp;__pyx_pybuffer_hc2ss;
   __pyx_pybuffer_hc2bg.pybuffer.buf = NULL;
   __pyx_pybuffer_hc2bg.refcount = 0;
   __pyx_pybuffernd_hc2bg.data = NULL;
@@ -5854,27 +5854,27 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
     __Pyx_PyThreadState_assign
     <span class='pyx_c_api'>__Pyx_ErrFetch</span>(&amp;__pyx_type, &amp;__pyx_value, &amp;__pyx_tb);
     <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_hc2bg.rcbuffer-&gt;pybuffer);
-    <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer);
+    <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer);
   <span class='pyx_c_api'>__Pyx_ErrRestore</span>(__pyx_type, __pyx_value, __pyx_tb);}
   <span class='pyx_c_api'>__Pyx_AddTraceback</span>("holodeck.cyutils.loudest_hc_from_sorted", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   goto __pyx_L2;
   __pyx_L0:;
   <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_hc2bg.rcbuffer-&gt;pybuffer);
-  <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer);
+  <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer);
   __pyx_L2:;
   __PYX_XDEC_MEMVIEW(&amp;__pyx_v_shape, 1);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_v_F);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_v_R);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_v_L);
-  <span class='pyx_macro_api'>__Pyx_XDECREF</span>((PyObject *)__pyx_v_hc2ls);
+  <span class='pyx_macro_api'>__Pyx_XDECREF</span>((PyObject *)__pyx_v_hc2ss);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>((PyObject *)__pyx_v_hc2bg);
   <span class='refnanny'>__Pyx_XGIVEREF</span>(__pyx_r);
   <span class='refnanny'>__Pyx_RefNannyFinishContext</span>();
   return __pyx_r;
 }
 /* … */
-  __pyx_tuple__37 = <span class='py_c_api'>PyTuple_Pack</span>(14, __pyx_n_s_number, __pyx_n_s_h2fdf, __pyx_n_s_nreals, __pyx_n_s_nloudest, __pyx_n_s_msort, __pyx_n_s_qsort, __pyx_n_s_zsort, __pyx_n_s_normal_threshold, __pyx_n_s_shape, __pyx_n_s_F, __pyx_n_s_R, __pyx_n_s_L, __pyx_n_s_hc2ls, __pyx_n_s_hc2bg);<span class='error_goto'> if (unlikely(!__pyx_tuple__37)) __PYX_ERR(0, 1219, __pyx_L1_error)</span>
+  __pyx_tuple__37 = <span class='py_c_api'>PyTuple_Pack</span>(14, __pyx_n_s_number, __pyx_n_s_h2fdf, __pyx_n_s_nreals, __pyx_n_s_nloudest, __pyx_n_s_msort, __pyx_n_s_qsort, __pyx_n_s_zsort, __pyx_n_s_normal_threshold, __pyx_n_s_shape, __pyx_n_s_F, __pyx_n_s_R, __pyx_n_s_L, __pyx_n_s_hc2ss, __pyx_n_s_hc2bg);<span class='error_goto'> if (unlikely(!__pyx_tuple__37)) __PYX_ERR(0, 1219, __pyx_L1_error)</span>
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_tuple__37);
   <span class='refnanny'>__Pyx_GIVEREF</span>(__pyx_tuple__37);
 /* … */
@@ -5907,7 +5907,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
 <pre class="cython line score-0">&#xA0;<span class="">1241</span>: </pre>
 <pre class="cython line score-0">&#xA0;<span class="">1242</span>: <span class="sd">    Returns</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1243</span>: <span class="sd">    --------------------------</span></pre>
-<pre class="cython line score-0">&#xA0;<span class="">1244</span>: <span class="sd">    hc2ls : (F, R, L) Ndarray of scalars</span></pre>
+<pre class="cython line score-0">&#xA0;<span class="">1244</span>: <span class="sd">    hc2ss : (F, R, L) Ndarray of scalars</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1245</span>: <span class="sd">        Char strain squared of the loudest single sources.</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1246</span>: <span class="sd">    hc2bg : (F, R) Ndarray of scalars</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1247</span>: <span class="sd">        Char strain squared of the background.</span></pre>
@@ -5963,7 +5963,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
 </pre><pre class="cython line score-1" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1253</span>:     <span class="n">L</span> <span class="o">=</span> <span class="n">nloudest</span></pre>
 <pre class='cython code score-1 '>  <span class='pyx_macro_api'>__Pyx_INCREF</span>(__pyx_v_nloudest);
   __pyx_v_L = __pyx_v_nloudest;
-</pre><pre class="cython line score-36" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1254</span>:     <span class="k">cdef</span> <span class="kt">np</span>.<span class="kt">ndarray</span>[<span class="kt">np</span>.<span class="nf">double_t</span><span class="p">,</span> <span class="nf">ndim</span><span class="o">=</span><span class="mf">3</span><span class="p">]</span> <span class="n">hc2ls</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">F</span><span class="p">,</span><span class="n">R</span><span class="p">,</span><span class="n">L</span><span class="p">))</span></pre>
+</pre><pre class="cython line score-36" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1254</span>:     <span class="k">cdef</span> <span class="kt">np</span>.<span class="kt">ndarray</span>[<span class="kt">np</span>.<span class="nf">double_t</span><span class="p">,</span> <span class="nf">ndim</span><span class="o">=</span><span class="mf">3</span><span class="p">]</span> <span class="n">hc2ss</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">F</span><span class="p">,</span><span class="n">R</span><span class="p">,</span><span class="n">L</span><span class="p">))</span></pre>
 <pre class='cython code score-36 '>  <span class='pyx_c_api'>__Pyx_GetModuleGlobalName</span>(__pyx_t_3, __pyx_n_s_np);<span class='error_goto'> if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1254, __pyx_L1_error)</span>
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_t_3);
   __pyx_t_2 = <span class='pyx_c_api'>__Pyx_PyObject_GetAttrStr</span>(__pyx_t_3, __pyx_n_s_zeros);<span class='error_goto'> if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1254, __pyx_L1_error)</span>
@@ -6000,14 +6000,14 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
   __pyx_t_8 = ((PyArrayObject *)__pyx_t_1);
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(<span class='pyx_c_api'>__Pyx_GetBufferAndValidate</span>(&amp;__pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer, (PyObject*)__pyx_t_8, &amp;__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_STRIDES, 3, 0, __pyx_stack) == -1)) {
-      __pyx_v_hc2ls = ((PyArrayObject *)Py_None); <span class='pyx_macro_api'>__Pyx_INCREF</span>(Py_None); __pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer.buf = NULL;
+    if (unlikely(<span class='pyx_c_api'>__Pyx_GetBufferAndValidate</span>(&amp;__pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer, (PyObject*)__pyx_t_8, &amp;__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_STRIDES, 3, 0, __pyx_stack) == -1)) {
+      __pyx_v_hc2ss = ((PyArrayObject *)Py_None); <span class='pyx_macro_api'>__Pyx_INCREF</span>(Py_None); __pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer.buf = NULL;
       <span class='error_goto'>__PYX_ERR(0, 1254, __pyx_L1_error)</span>
-    } else {__pyx_pybuffernd_hc2ls.diminfo[0].strides = __pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer.strides[0]; __pyx_pybuffernd_hc2ls.diminfo[0].shape = __pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer.shape[0]; __pyx_pybuffernd_hc2ls.diminfo[1].strides = __pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer.strides[1]; __pyx_pybuffernd_hc2ls.diminfo[1].shape = __pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer.shape[1]; __pyx_pybuffernd_hc2ls.diminfo[2].strides = __pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer.strides[2]; __pyx_pybuffernd_hc2ls.diminfo[2].shape = __pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer.shape[2];
+    } else {__pyx_pybuffernd_hc2ss.diminfo[0].strides = __pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer.strides[0]; __pyx_pybuffernd_hc2ss.diminfo[0].shape = __pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer.shape[0]; __pyx_pybuffernd_hc2ss.diminfo[1].strides = __pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer.strides[1]; __pyx_pybuffernd_hc2ss.diminfo[1].shape = __pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer.shape[1]; __pyx_pybuffernd_hc2ss.diminfo[2].strides = __pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer.strides[2]; __pyx_pybuffernd_hc2ss.diminfo[2].shape = __pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer.shape[2];
     }
   }
   __pyx_t_8 = 0;
-  __pyx_v_hc2ls = ((PyArrayObject *)__pyx_t_1);
+  __pyx_v_hc2ss = ((PyArrayObject *)__pyx_t_1);
   __pyx_t_1 = 0;
 </pre><pre class="cython line score-34" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1255</span>:     <span class="k">cdef</span> <span class="kt">np</span>.<span class="kt">ndarray</span>[<span class="kt">np</span>.<span class="nf">double_t</span><span class="p">,</span> <span class="nf">ndim</span><span class="o">=</span><span class="mf">2</span><span class="p">]</span> <span class="n">hc2bg</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">F</span><span class="p">,</span><span class="n">R</span><span class="p">))</span></pre>
 <pre class='cython code score-34 '>  <span class='pyx_c_api'>__Pyx_GetModuleGlobalName</span>(__pyx_t_2, __pyx_n_s_np);<span class='error_goto'> if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1255, __pyx_L1_error)</span>
@@ -6085,16 +6085,16 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
 <pre class='cython code score-6 '>  __pyx_t_5 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_ds_long</span>(__pyx_v_msort, PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_5.memview)) __PYX_ERR(0, 1257, __pyx_L1_error)</span>
   __pyx_t_15 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_ds_long</span>(__pyx_v_qsort, PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_15.memview)) __PYX_ERR(0, 1257, __pyx_L1_error)</span>
   __pyx_t_16 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_ds_long</span>(__pyx_v_zsort, PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_16.memview)) __PYX_ERR(0, 1257, __pyx_L1_error)</span>
-</pre><pre class="cython line score-4" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1258</span>:                             <span class="n">hc2ls</span><span class="p">,</span> <span class="n">hc2bg</span><span class="p">)</span></pre>
-<pre class='cython code score-4 '>  __pyx_t_17 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_dsdsds_double</span>(((PyObject *)__pyx_v_hc2ls), PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_17.memview)) __PYX_ERR(0, 1258, __pyx_L1_error)</span>
+</pre><pre class="cython line score-4" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1258</span>:                             <span class="n">hc2ss</span><span class="p">,</span> <span class="n">hc2bg</span><span class="p">)</span></pre>
+<pre class='cython code score-4 '>  __pyx_t_17 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_dsdsds_double</span>(((PyObject *)__pyx_v_hc2ss), PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_17.memview)) __PYX_ERR(0, 1258, __pyx_L1_error)</span>
   __pyx_t_18 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_dsds_double</span>(((PyObject *)__pyx_v_hc2bg), PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_18.memview)) __PYX_ERR(0, 1258, __pyx_L1_error)</span>
-</pre><pre class="cython line score-10" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1259</span>:     <span class="k">return</span> <span class="n">hc2ls</span><span class="p">,</span> <span class="n">hc2bg</span></pre>
+</pre><pre class="cython line score-10" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1259</span>:     <span class="k">return</span> <span class="n">hc2ss</span><span class="p">,</span> <span class="n">hc2bg</span></pre>
 <pre class='cython code score-10 '>  <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_r);
   __pyx_t_1 = <span class='py_c_api'>PyTuple_New</span>(2);<span class='error_goto'> if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1259, __pyx_L1_error)</span>
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_t_1);
-  <span class='pyx_macro_api'>__Pyx_INCREF</span>(((PyObject *)__pyx_v_hc2ls));
-  <span class='refnanny'>__Pyx_GIVEREF</span>(((PyObject *)__pyx_v_hc2ls));
-  <span class='py_macro_api'>PyTuple_SET_ITEM</span>(__pyx_t_1, 0, ((PyObject *)__pyx_v_hc2ls));
+  <span class='pyx_macro_api'>__Pyx_INCREF</span>(((PyObject *)__pyx_v_hc2ss));
+  <span class='refnanny'>__Pyx_GIVEREF</span>(((PyObject *)__pyx_v_hc2ss));
+  <span class='py_macro_api'>PyTuple_SET_ITEM</span>(__pyx_t_1, 0, ((PyObject *)__pyx_v_hc2ss));
   <span class='pyx_macro_api'>__Pyx_INCREF</span>(((PyObject *)__pyx_v_hc2bg));
   <span class='refnanny'>__Pyx_GIVEREF</span>(((PyObject *)__pyx_v_hc2bg));
   <span class='py_macro_api'>PyTuple_SET_ITEM</span>(__pyx_t_1, 1, ((PyObject *)__pyx_v_hc2bg));
@@ -6107,7 +6107,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
 <pre class="cython line score-0">&#xA0;<span class="">1263</span>: <span class="nd">@cython</span><span class="o">.</span><span class="n">nonecheck</span><span class="p">(</span><span class="bp">True</span><span class="p">)</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1264</span>: <span class="nd">@cython</span><span class="o">.</span><span class="n">cdivision</span><span class="p">(</span><span class="bp">True</span><span class="p">)</span></pre>
 <pre class="cython line score-19" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1265</span>: <span class="k">cdef</span> <span class="kt">void</span> <span class="nf">_loudest_hc_from_sorted</span><span class="p">(</span><span class="nb">long</span><span class="p">[:]</span> <span class="n">shape</span><span class="p">,</span> <span class="n">double</span><span class="p">[:,:,:,:]</span> <span class="n">h2fdf</span><span class="p">,</span> <span class="n">double</span><span class="p">[:,:,:,:]</span> <span class="n">number</span><span class="p">,</span></pre>
-<pre class='cython code score-19 '>static void __pyx_f_8holodeck_7cyutils__loudest_hc_from_sorted(__Pyx_memviewslice __pyx_v_shape, __Pyx_memviewslice __pyx_v_h2fdf, __Pyx_memviewslice __pyx_v_number, long __pyx_v_nreals, long __pyx_v_nloudest, long __pyx_v_thresh, __Pyx_memviewslice __pyx_v_msort, __Pyx_memviewslice __pyx_v_qsort, __Pyx_memviewslice __pyx_v_zsort, __Pyx_memviewslice __pyx_v_hc2ls, __Pyx_memviewslice __pyx_v_hc2bg) {
+<pre class='cython code score-19 '>static void __pyx_f_8holodeck_7cyutils__loudest_hc_from_sorted(__Pyx_memviewslice __pyx_v_shape, __Pyx_memviewslice __pyx_v_h2fdf, __Pyx_memviewslice __pyx_v_number, long __pyx_v_nreals, long __pyx_v_nloudest, long __pyx_v_thresh, __Pyx_memviewslice __pyx_v_msort, __Pyx_memviewslice __pyx_v_qsort, __Pyx_memviewslice __pyx_v_zsort, __Pyx_memviewslice __pyx_v_hc2ss, __Pyx_memviewslice __pyx_v_hc2bg) {
   int __pyx_v_M;
   int __pyx_v_Q;
   int __pyx_v_Z;
@@ -6165,7 +6165,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
 }
 </pre><pre class="cython line score-0">&#xA0;<span class="">1266</span>:             <span class="nb">long</span> <span class="n">nreals</span><span class="p">,</span> <span class="nb">long</span> <span class="n">nloudest</span><span class="p">,</span> <span class="nb">long</span> <span class="n">thresh</span><span class="p">,</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1267</span>:             <span class="nb">long</span><span class="p">[:]</span> <span class="n">msort</span><span class="p">,</span> <span class="nb">long</span><span class="p">[:]</span> <span class="n">qsort</span><span class="p">,</span> <span class="nb">long</span><span class="p">[:]</span> <span class="n">zsort</span><span class="p">,</span></pre>
-<pre class="cython line score-0">&#xA0;<span class="">1268</span>:             <span class="n">double</span><span class="p">[:,:,:]</span> <span class="n">hc2ls</span><span class="p">,</span> <span class="n">double</span><span class="p">[:,:]</span> <span class="n">hc2bg</span><span class="p">):</span></pre>
+<pre class="cython line score-0">&#xA0;<span class="">1268</span>:             <span class="n">double</span><span class="p">[:,:,:]</span> <span class="n">hc2ss</span><span class="p">,</span> <span class="n">double</span><span class="p">[:,:]</span> <span class="n">hc2bg</span><span class="p">):</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1269</span>: <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1270</span>: <span class="sd">    Calculates the characteristic strain from loud single sources and a background of all other sources.</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1271</span>: </pre>
@@ -6187,7 +6187,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
 <pre class="cython line score-0">&#xA0;<span class="">1287</span>: <span class="sd">        q indices of each bin, sorted from largest to smallest h2fdf.</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1288</span>: <span class="sd">    zsort : (M*Q*Z,) 1Darray</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1289</span>: <span class="sd">        z indices of each bin, sorted from largest to smallest h2fdf.</span></pre>
-<pre class="cython line score-0">&#xA0;<span class="">1290</span>: <span class="sd">    hc2ls : double[:,:,:] array</span></pre>
+<pre class="cython line score-0">&#xA0;<span class="">1290</span>: <span class="sd">    hc2ss : double[:,:,:] array</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1291</span>: <span class="sd">        (Memory address of) single source characteristic strain squared array.</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1292</span>: <span class="sd">    hc2bg : double[:,:] array</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1293</span>: <span class="sd">        (Memory address of) background characteristic strain squared array.</span></pre>
@@ -6528,9 +6528,9 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
           __pyx_t_23 = __pyx_t_24;
           __pyx_L14_bool_binop_done:;
           if (!__pyx_t_23) break;
-</pre><pre class="cython line score-17" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1339</span>:                     <span class="n">hc2ls</span><span class="p">[</span><span class="n">ff</span><span class="p">,</span><span class="n">rr</span><span class="p">,</span><span class="n">ll</span><span class="p">]</span> <span class="o">=</span> <span class="n">cur</span></pre>
+</pre><pre class="cython line score-17" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1339</span>:                     <span class="n">hc2ss</span><span class="p">[</span><span class="n">ff</span><span class="p">,</span><span class="n">rr</span><span class="p">,</span><span class="n">ll</span><span class="p">]</span> <span class="o">=</span> <span class="n">cur</span></pre>
 <pre class='cython code score-17 '>          __pyx_t_25 = __pyx_<span class='py_c_api'>PyFloat_AsDouble</span>(__pyx_v_cur); if (unlikely((__pyx_t_25 == (double)-1) &amp;&amp; <span class='py_c_api'>PyErr_Occurred</span>())) <span class='error_goto'>__PYX_ERR(0, 1339, __pyx_L1_error)</span>
-          if (unlikely(((PyObject *) __pyx_v_hc2ls.memview) == Py_None)) {
+          if (unlikely(((PyObject *) __pyx_v_hc2ss.memview) == Py_None)) {
             <span class='py_c_api'>PyErr_SetString</span>(PyExc_TypeError, "Cannot index None memoryview slice");
             <span class='error_goto'>__PYX_ERR(0, 1339, __pyx_L1_error)</span>
           }
@@ -6539,22 +6539,22 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
           __pyx_t_21 = __pyx_v_ll;
           __pyx_t_19 = -1;
           if (__pyx_t_1 &lt; 0) {
-            __pyx_t_1 += __pyx_v_hc2ls.shape[0];
+            __pyx_t_1 += __pyx_v_hc2ss.shape[0];
             if (unlikely(__pyx_t_1 &lt; 0)) __pyx_t_19 = 0;
-          } else if (unlikely(__pyx_t_1 &gt;= __pyx_v_hc2ls.shape[0])) __pyx_t_19 = 0;
+          } else if (unlikely(__pyx_t_1 &gt;= __pyx_v_hc2ss.shape[0])) __pyx_t_19 = 0;
           if (__pyx_t_20 &lt; 0) {
-            __pyx_t_20 += __pyx_v_hc2ls.shape[1];
+            __pyx_t_20 += __pyx_v_hc2ss.shape[1];
             if (unlikely(__pyx_t_20 &lt; 0)) __pyx_t_19 = 1;
-          } else if (unlikely(__pyx_t_20 &gt;= __pyx_v_hc2ls.shape[1])) __pyx_t_19 = 1;
+          } else if (unlikely(__pyx_t_20 &gt;= __pyx_v_hc2ss.shape[1])) __pyx_t_19 = 1;
           if (__pyx_t_21 &lt; 0) {
-            __pyx_t_21 += __pyx_v_hc2ls.shape[2];
+            __pyx_t_21 += __pyx_v_hc2ss.shape[2];
             if (unlikely(__pyx_t_21 &lt; 0)) __pyx_t_19 = 2;
-          } else if (unlikely(__pyx_t_21 &gt;= __pyx_v_hc2ls.shape[2])) __pyx_t_19 = 2;
+          } else if (unlikely(__pyx_t_21 &gt;= __pyx_v_hc2ss.shape[2])) __pyx_t_19 = 2;
           if (unlikely(__pyx_t_19 != -1)) {
             <span class='pyx_c_api'>__Pyx_RaiseBufferIndexError</span>(__pyx_t_19);
             <span class='error_goto'>__PYX_ERR(0, 1339, __pyx_L1_error)</span>
           }
-          *((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_hc2ls.data + __pyx_t_1 * __pyx_v_hc2ls.strides[0]) ) + __pyx_t_20 * __pyx_v_hc2ls.strides[1]) ) + __pyx_t_21 * __pyx_v_hc2ls.strides[2]) )) = __pyx_t_25;
+          *((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_hc2ss.data + __pyx_t_1 * __pyx_v_hc2ss.strides[0]) ) + __pyx_t_20 * __pyx_v_hc2ss.strides[1]) ) + __pyx_t_21 * __pyx_v_hc2ss.strides[2]) )) = __pyx_t_25;
 </pre><pre class="cython line score-0" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1340</span>:                     <span class="n">num</span> <span class="o">-=</span> <span class="mf">1</span></pre>
 <pre class='cython code score-0 '>          __pyx_v_num = (__pyx_v_num - 1.0);
 </pre><pre class="cython line score-0" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1341</span>:                     <span class="n">ll</span> <span class="o">+=</span> <span class="mf">1</span></pre>
@@ -6605,7 +6605,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_14loudest_hc_from_sorted(CYTHON_UNU
 <pre class="cython line score-127" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1346</span>: <span class="k">def</span> <span class="nf">loudest_hc_and_par_from_sorted</span><span class="p">(</span><span class="n">number</span><span class="p">,</span> <span class="n">h2fdf</span><span class="p">,</span> <span class="n">nreals</span><span class="p">,</span> <span class="n">nloudest</span><span class="p">,</span> <span class="n">mt</span><span class="p">,</span> <span class="n">mr</span><span class="p">,</span> <span class="n">rz</span><span class="p">,</span> <span class="n">msort</span><span class="p">,</span> <span class="n">qsort</span><span class="p">,</span> <span class="n">zsort</span><span class="p">,</span> <span class="n">normal_threshold</span><span class="o">=</span><span class="mf">1e10</span><span class="p">):</span></pre>
 <pre class='cython code score-127 '>/* Python wrapper */
 static PyObject *__pyx_pw_8holodeck_7cyutils_17loudest_hc_and_par_from_sorted(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted[] = "\n    Calculates the characteristic strain from loud single sources and a background of all other sources.\n\n    Parameters\n    ------------------------\n    number : [M, Q, Z, F] NDarray\n        number in each bin\n    h2fdf : [M, Q, Z, F] NDarray\n        Strain amplitude squared x frequency / frequency bin width for each bin.\n    nreals\n        Number of realizations.\n    nloudest\n        Number of loudest sources to separate in each frequency bin.\n    mt : (M,) 1Darray of scalars\n        Total masses, M, of each bin center.\n    mr : (Q,) 1Darray of scalars\n        Mass ratios, q, of each bin center.\n    rz : (Z,) 1Darray of scalars\n        Redshifts, z, of each bin center.\n    msort : (M*Q*Z,) 1Darray\n        M indices of each bin, sorted from largest to smallest h2fdf.\n    qsort : (M*Q*Z,) 1Darray\n        q indices of each bin, sorted from largest to smallest h2fdf.\n    zsort : (M*Q*Z,) 1Darray\n        z indices of each bin, sorted from largest to smallest h2fdf.\n    normal_threshold : float\n        Threshold for approximating poisson sampling as normal.\n\n    Returns\n    --------------------------\n    hc2ls : (F, R, L) Ndarray of scalars\n        Char strain squared of the loudest single sources.\n    hc2bg : (F, R) Ndarray of scalars\n        Char strain squared of the background.\n    lspar : (3, F, R) NDarray of scalars\n        Average effective M, q, z parameters of the loudest L sources.\n    bgpar : (3, F, R) NDarray of scalars\n        Average effective M, q, z parameters of the background.\n    lsidx : (3, F, R, L) NDarray of ints\n        Indices of the loudest single sources.\n    ";
+static char __pyx_doc_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted[] = "\n    Calculates the characteristic strain from loud single sources and a background of all other sources.\n\n    Parameters\n    ------------------------\n    number : [M, Q, Z, F] NDarray\n        number in each bin\n    h2fdf : [M, Q, Z, F] NDarray\n        Strain amplitude squared x frequency / frequency bin width for each bin.\n    nreals\n        Number of realizations.\n    nloudest\n        Number of loudest sources to separate in each frequency bin.\n    mt : (M,) 1Darray of scalars\n        Total masses, M, of each bin center.\n    mr : (Q,) 1Darray of scalars\n        Mass ratios, q, of each bin center.\n    rz : (Z,) 1Darray of scalars\n        Redshifts, z, of each bin center.\n    msort : (M*Q*Z,) 1Darray\n        M indices of each bin, sorted from largest to smallest h2fdf.\n    qsort : (M*Q*Z,) 1Darray\n        q indices of each bin, sorted from largest to smallest h2fdf.\n    zsort : (M*Q*Z,) 1Darray\n        z indices of each bin, sorted from largest to smallest h2fdf.\n    normal_threshold : float\n        Threshold for approximating poisson sampling as normal.\n\n    Returns\n    --------------------------\n    hc2ss : (F, R, L) Ndarray of scalars\n        Char strain squared of the loudest single sources.\n    hc2bg : (F, R) Ndarray of scalars\n        Char strain squared of the background.\n    lspar : (3, F, R) NDarray of scalars\n        Average effective M, q, z parameters of the loudest L sources.\n    bgpar : (3, F, R) NDarray of scalars\n        Average effective M, q, z parameters of the background.\n    ssidx : (3, F, R, L) NDarray of ints\n        Indices of the loudest single sources.\n    ";
 static PyMethodDef __pyx_mdef_8holodeck_7cyutils_17loudest_hc_and_par_from_sorted = {"loudest_hc_and_par_from_sorted", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_8holodeck_7cyutils_17loudest_hc_and_par_from_sorted, METH_VARARGS|METH_KEYWORDS, __pyx_doc_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted};
 static PyObject *__pyx_pw_8holodeck_7cyutils_17loudest_hc_and_par_from_sorted(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_number = 0;
@@ -6777,28 +6777,28 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   PyObject *__pyx_v_F = NULL;
   PyObject *__pyx_v_R = NULL;
   PyObject *__pyx_v_L = NULL;
-  PyArrayObject *__pyx_v_hc2ls = 0;
+  PyArrayObject *__pyx_v_hc2ss = 0;
   PyArrayObject *__pyx_v_hc2bg = 0;
   PyArrayObject *__pyx_v_lspar = 0;
   PyArrayObject *__pyx_v_bgpar = 0;
-  PyArrayObject *__pyx_v_lsidx = 0;
+  PyArrayObject *__pyx_v_ssidx = 0;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_bgpar;
   __Pyx_Buffer __pyx_pybuffer_bgpar;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_hc2bg;
   __Pyx_Buffer __pyx_pybuffer_hc2bg;
-  __Pyx_LocalBuf_ND __pyx_pybuffernd_hc2ls;
-  __Pyx_Buffer __pyx_pybuffer_hc2ls;
-  __Pyx_LocalBuf_ND __pyx_pybuffernd_lsidx;
-  __Pyx_Buffer __pyx_pybuffer_lsidx;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_hc2ss;
+  __Pyx_Buffer __pyx_pybuffer_hc2ss;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_lspar;
   __Pyx_Buffer __pyx_pybuffer_lspar;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_ssidx;
+  __Pyx_Buffer __pyx_pybuffer_ssidx;
   PyObject *__pyx_r = NULL;
   <span class='refnanny'>__Pyx_RefNannyDeclarations</span>
   <span class='refnanny'>__Pyx_RefNannySetupContext</span>("loudest_hc_and_par_from_sorted", 0);
-  __pyx_pybuffer_hc2ls.pybuffer.buf = NULL;
-  __pyx_pybuffer_hc2ls.refcount = 0;
-  __pyx_pybuffernd_hc2ls.data = NULL;
-  __pyx_pybuffernd_hc2ls.rcbuffer = &amp;__pyx_pybuffer_hc2ls;
+  __pyx_pybuffer_hc2ss.pybuffer.buf = NULL;
+  __pyx_pybuffer_hc2ss.refcount = 0;
+  __pyx_pybuffernd_hc2ss.data = NULL;
+  __pyx_pybuffernd_hc2ss.rcbuffer = &amp;__pyx_pybuffer_hc2ss;
   __pyx_pybuffer_hc2bg.pybuffer.buf = NULL;
   __pyx_pybuffer_hc2bg.refcount = 0;
   __pyx_pybuffernd_hc2bg.data = NULL;
@@ -6811,10 +6811,10 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   __pyx_pybuffer_bgpar.refcount = 0;
   __pyx_pybuffernd_bgpar.data = NULL;
   __pyx_pybuffernd_bgpar.rcbuffer = &amp;__pyx_pybuffer_bgpar;
-  __pyx_pybuffer_lsidx.pybuffer.buf = NULL;
-  __pyx_pybuffer_lsidx.refcount = 0;
-  __pyx_pybuffernd_lsidx.data = NULL;
-  __pyx_pybuffernd_lsidx.rcbuffer = &amp;__pyx_pybuffer_lsidx;
+  __pyx_pybuffer_ssidx.pybuffer.buf = NULL;
+  __pyx_pybuffer_ssidx.refcount = 0;
+  __pyx_pybuffernd_ssidx.data = NULL;
+  __pyx_pybuffernd_ssidx.rcbuffer = &amp;__pyx_pybuffer_ssidx;
 /* … */
   /* function exit code */
   __pyx_L1_error:;
@@ -6841,9 +6841,9 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
     <span class='pyx_c_api'>__Pyx_ErrFetch</span>(&amp;__pyx_type, &amp;__pyx_value, &amp;__pyx_tb);
     <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_bgpar.rcbuffer-&gt;pybuffer);
     <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_hc2bg.rcbuffer-&gt;pybuffer);
-    <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer);
-    <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_lsidx.rcbuffer-&gt;pybuffer);
+    <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer);
     <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_lspar.rcbuffer-&gt;pybuffer);
+    <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_ssidx.rcbuffer-&gt;pybuffer);
   <span class='pyx_c_api'>__Pyx_ErrRestore</span>(__pyx_type, __pyx_value, __pyx_tb);}
   <span class='pyx_c_api'>__Pyx_AddTraceback</span>("holodeck.cyutils.loudest_hc_and_par_from_sorted", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
@@ -6851,25 +6851,25 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   __pyx_L0:;
   <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_bgpar.rcbuffer-&gt;pybuffer);
   <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_hc2bg.rcbuffer-&gt;pybuffer);
-  <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer);
-  <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_lsidx.rcbuffer-&gt;pybuffer);
+  <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer);
   <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_lspar.rcbuffer-&gt;pybuffer);
+  <span class='pyx_c_api'>__Pyx_SafeReleaseBuffer</span>(&amp;__pyx_pybuffernd_ssidx.rcbuffer-&gt;pybuffer);
   __pyx_L2:;
   __PYX_XDEC_MEMVIEW(&amp;__pyx_v_shape, 1);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_v_F);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_v_R);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_v_L);
-  <span class='pyx_macro_api'>__Pyx_XDECREF</span>((PyObject *)__pyx_v_hc2ls);
+  <span class='pyx_macro_api'>__Pyx_XDECREF</span>((PyObject *)__pyx_v_hc2ss);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>((PyObject *)__pyx_v_hc2bg);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>((PyObject *)__pyx_v_lspar);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>((PyObject *)__pyx_v_bgpar);
-  <span class='pyx_macro_api'>__Pyx_XDECREF</span>((PyObject *)__pyx_v_lsidx);
+  <span class='pyx_macro_api'>__Pyx_XDECREF</span>((PyObject *)__pyx_v_ssidx);
   <span class='refnanny'>__Pyx_XGIVEREF</span>(__pyx_r);
   <span class='refnanny'>__Pyx_RefNannyFinishContext</span>();
   return __pyx_r;
 }
 /* … */
-  __pyx_tuple__39 = <span class='py_c_api'>PyTuple_Pack</span>(20, __pyx_n_s_number, __pyx_n_s_h2fdf, __pyx_n_s_nreals, __pyx_n_s_nloudest, __pyx_n_s_mt, __pyx_n_s_mr, __pyx_n_s_rz, __pyx_n_s_msort, __pyx_n_s_qsort, __pyx_n_s_zsort, __pyx_n_s_normal_threshold, __pyx_n_s_shape, __pyx_n_s_F, __pyx_n_s_R, __pyx_n_s_L, __pyx_n_s_hc2ls, __pyx_n_s_hc2bg, __pyx_n_s_lspar, __pyx_n_s_bgpar, __pyx_n_s_lsidx);<span class='error_goto'> if (unlikely(!__pyx_tuple__39)) __PYX_ERR(0, 1346, __pyx_L1_error)</span>
+  __pyx_tuple__39 = <span class='py_c_api'>PyTuple_Pack</span>(20, __pyx_n_s_number, __pyx_n_s_h2fdf, __pyx_n_s_nreals, __pyx_n_s_nloudest, __pyx_n_s_mt, __pyx_n_s_mr, __pyx_n_s_rz, __pyx_n_s_msort, __pyx_n_s_qsort, __pyx_n_s_zsort, __pyx_n_s_normal_threshold, __pyx_n_s_shape, __pyx_n_s_F, __pyx_n_s_R, __pyx_n_s_L, __pyx_n_s_hc2ss, __pyx_n_s_hc2bg, __pyx_n_s_lspar, __pyx_n_s_bgpar, __pyx_n_s_ssidx);<span class='error_goto'> if (unlikely(!__pyx_tuple__39)) __PYX_ERR(0, 1346, __pyx_L1_error)</span>
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_tuple__39);
   <span class='refnanny'>__Pyx_GIVEREF</span>(__pyx_tuple__39);
 /* … */
@@ -6908,7 +6908,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
 <pre class="cython line score-0">&#xA0;<span class="">1374</span>: </pre>
 <pre class="cython line score-0">&#xA0;<span class="">1375</span>: <span class="sd">    Returns</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1376</span>: <span class="sd">    --------------------------</span></pre>
-<pre class="cython line score-0">&#xA0;<span class="">1377</span>: <span class="sd">    hc2ls : (F, R, L) Ndarray of scalars</span></pre>
+<pre class="cython line score-0">&#xA0;<span class="">1377</span>: <span class="sd">    hc2ss : (F, R, L) Ndarray of scalars</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1378</span>: <span class="sd">        Char strain squared of the loudest single sources.</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1379</span>: <span class="sd">    hc2bg : (F, R) Ndarray of scalars</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1380</span>: <span class="sd">        Char strain squared of the background.</span></pre>
@@ -6916,7 +6916,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
 <pre class="cython line score-0">&#xA0;<span class="">1382</span>: <span class="sd">        Average effective M, q, z parameters of the loudest L sources.</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1383</span>: <span class="sd">    bgpar : (3, F, R) NDarray of scalars</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1384</span>: <span class="sd">        Average effective M, q, z parameters of the background.</span></pre>
-<pre class="cython line score-0">&#xA0;<span class="">1385</span>: <span class="sd">    lsidx : (3, F, R, L) NDarray of ints</span></pre>
+<pre class="cython line score-0">&#xA0;<span class="">1385</span>: <span class="sd">    ssidx : (3, F, R, L) NDarray of ints</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1386</span>: <span class="sd">        Indices of the loudest single sources.</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1387</span>: <span class="sd">    &quot;&quot;&quot;</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1388</span>: </pre>
@@ -6970,7 +6970,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
 </pre><pre class="cython line score-1" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1392</span>:     <span class="n">L</span> <span class="o">=</span> <span class="n">nloudest</span></pre>
 <pre class='cython code score-1 '>  <span class='pyx_macro_api'>__Pyx_INCREF</span>(__pyx_v_nloudest);
   __pyx_v_L = __pyx_v_nloudest;
-</pre><pre class="cython line score-36" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1393</span>:     <span class="k">cdef</span> <span class="kt">np</span>.<span class="kt">ndarray</span>[<span class="kt">np</span>.<span class="nf">double_t</span><span class="p">,</span> <span class="nf">ndim</span><span class="o">=</span><span class="mf">3</span><span class="p">]</span> <span class="n">hc2ls</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">F</span><span class="p">,</span><span class="n">R</span><span class="p">,</span><span class="n">L</span><span class="p">))</span></pre>
+</pre><pre class="cython line score-36" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1393</span>:     <span class="k">cdef</span> <span class="kt">np</span>.<span class="kt">ndarray</span>[<span class="kt">np</span>.<span class="nf">double_t</span><span class="p">,</span> <span class="nf">ndim</span><span class="o">=</span><span class="mf">3</span><span class="p">]</span> <span class="n">hc2ss</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">F</span><span class="p">,</span><span class="n">R</span><span class="p">,</span><span class="n">L</span><span class="p">))</span></pre>
 <pre class='cython code score-36 '>  <span class='pyx_c_api'>__Pyx_GetModuleGlobalName</span>(__pyx_t_3, __pyx_n_s_np);<span class='error_goto'> if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1393, __pyx_L1_error)</span>
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_t_3);
   __pyx_t_2 = <span class='pyx_c_api'>__Pyx_PyObject_GetAttrStr</span>(__pyx_t_3, __pyx_n_s_zeros);<span class='error_goto'> if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1393, __pyx_L1_error)</span>
@@ -7007,14 +7007,14 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   __pyx_t_8 = ((PyArrayObject *)__pyx_t_1);
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(<span class='pyx_c_api'>__Pyx_GetBufferAndValidate</span>(&amp;__pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer, (PyObject*)__pyx_t_8, &amp;__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_STRIDES, 3, 0, __pyx_stack) == -1)) {
-      __pyx_v_hc2ls = ((PyArrayObject *)Py_None); <span class='pyx_macro_api'>__Pyx_INCREF</span>(Py_None); __pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer.buf = NULL;
+    if (unlikely(<span class='pyx_c_api'>__Pyx_GetBufferAndValidate</span>(&amp;__pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer, (PyObject*)__pyx_t_8, &amp;__Pyx_TypeInfo_nn___pyx_t_5numpy_double_t, PyBUF_FORMAT| PyBUF_STRIDES, 3, 0, __pyx_stack) == -1)) {
+      __pyx_v_hc2ss = ((PyArrayObject *)Py_None); <span class='pyx_macro_api'>__Pyx_INCREF</span>(Py_None); __pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer.buf = NULL;
       <span class='error_goto'>__PYX_ERR(0, 1393, __pyx_L1_error)</span>
-    } else {__pyx_pybuffernd_hc2ls.diminfo[0].strides = __pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer.strides[0]; __pyx_pybuffernd_hc2ls.diminfo[0].shape = __pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer.shape[0]; __pyx_pybuffernd_hc2ls.diminfo[1].strides = __pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer.strides[1]; __pyx_pybuffernd_hc2ls.diminfo[1].shape = __pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer.shape[1]; __pyx_pybuffernd_hc2ls.diminfo[2].strides = __pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer.strides[2]; __pyx_pybuffernd_hc2ls.diminfo[2].shape = __pyx_pybuffernd_hc2ls.rcbuffer-&gt;pybuffer.shape[2];
+    } else {__pyx_pybuffernd_hc2ss.diminfo[0].strides = __pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer.strides[0]; __pyx_pybuffernd_hc2ss.diminfo[0].shape = __pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer.shape[0]; __pyx_pybuffernd_hc2ss.diminfo[1].strides = __pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer.strides[1]; __pyx_pybuffernd_hc2ss.diminfo[1].shape = __pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer.shape[1]; __pyx_pybuffernd_hc2ss.diminfo[2].strides = __pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer.strides[2]; __pyx_pybuffernd_hc2ss.diminfo[2].shape = __pyx_pybuffernd_hc2ss.rcbuffer-&gt;pybuffer.shape[2];
     }
   }
   __pyx_t_8 = 0;
-  __pyx_v_hc2ls = ((PyArrayObject *)__pyx_t_1);
+  __pyx_v_hc2ss = ((PyArrayObject *)__pyx_t_1);
   __pyx_t_1 = 0;
 </pre><pre class="cython line score-34" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1394</span>:     <span class="k">cdef</span> <span class="kt">np</span>.<span class="kt">ndarray</span>[<span class="kt">np</span>.<span class="nf">double_t</span><span class="p">,</span> <span class="nf">ndim</span><span class="o">=</span><span class="mf">2</span><span class="p">]</span> <span class="n">hc2bg</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">F</span><span class="p">,</span><span class="n">R</span><span class="p">))</span></pre>
 <pre class='cython code score-34 '>  <span class='pyx_c_api'>__Pyx_GetModuleGlobalName</span>(__pyx_t_2, __pyx_n_s_np);<span class='error_goto'> if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1394, __pyx_L1_error)</span>
@@ -7151,7 +7151,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   __pyx_t_11 = 0;
   __pyx_v_bgpar = ((PyArrayObject *)__pyx_t_1);
   __pyx_t_1 = 0;
-</pre><pre class="cython line score-41" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1397</span>:     <span class="k">cdef</span> <span class="kt">np</span>.<span class="kt">ndarray</span>[<span class="kt">np</span>.<span class="nf">long_t</span><span class="p">,</span> <span class="nf">ndim</span><span class="o">=</span><span class="mf">4</span><span class="p">]</span> <span class="n">lsidx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mf">3</span><span class="p">,</span><span class="n">F</span><span class="p">,</span><span class="n">R</span><span class="p">,</span><span class="n">L</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span></pre>
+</pre><pre class="cython line score-41" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1397</span>:     <span class="k">cdef</span> <span class="kt">np</span>.<span class="kt">ndarray</span>[<span class="kt">np</span>.<span class="nf">long_t</span><span class="p">,</span> <span class="nf">ndim</span><span class="o">=</span><span class="mf">4</span><span class="p">]</span> <span class="n">ssidx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mf">3</span><span class="p">,</span><span class="n">F</span><span class="p">,</span><span class="n">R</span><span class="p">,</span><span class="n">L</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span></pre>
 <pre class='cython code score-41 '>  <span class='pyx_c_api'>__Pyx_GetModuleGlobalName</span>(__pyx_t_1, __pyx_n_s_np);<span class='error_goto'> if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1397, __pyx_L1_error)</span>
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_t_1);
   __pyx_t_3 = <span class='pyx_c_api'>__Pyx_PyObject_GetAttrStr</span>(__pyx_t_1, __pyx_n_s_zeros);<span class='error_goto'> if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 1397, __pyx_L1_error)</span>
@@ -7188,14 +7188,14 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   __pyx_t_12 = ((PyArrayObject *)__pyx_t_4);
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(<span class='pyx_c_api'>__Pyx_GetBufferAndValidate</span>(&amp;__pyx_pybuffernd_lsidx.rcbuffer-&gt;pybuffer, (PyObject*)__pyx_t_12, &amp;__Pyx_TypeInfo_nn___pyx_t_5numpy_long_t, PyBUF_FORMAT| PyBUF_STRIDES, 4, 0, __pyx_stack) == -1)) {
-      __pyx_v_lsidx = ((PyArrayObject *)Py_None); <span class='pyx_macro_api'>__Pyx_INCREF</span>(Py_None); __pyx_pybuffernd_lsidx.rcbuffer-&gt;pybuffer.buf = NULL;
+    if (unlikely(<span class='pyx_c_api'>__Pyx_GetBufferAndValidate</span>(&amp;__pyx_pybuffernd_ssidx.rcbuffer-&gt;pybuffer, (PyObject*)__pyx_t_12, &amp;__Pyx_TypeInfo_nn___pyx_t_5numpy_long_t, PyBUF_FORMAT| PyBUF_STRIDES, 4, 0, __pyx_stack) == -1)) {
+      __pyx_v_ssidx = ((PyArrayObject *)Py_None); <span class='pyx_macro_api'>__Pyx_INCREF</span>(Py_None); __pyx_pybuffernd_ssidx.rcbuffer-&gt;pybuffer.buf = NULL;
       <span class='error_goto'>__PYX_ERR(0, 1397, __pyx_L1_error)</span>
-    } else {__pyx_pybuffernd_lsidx.diminfo[0].strides = __pyx_pybuffernd_lsidx.rcbuffer-&gt;pybuffer.strides[0]; __pyx_pybuffernd_lsidx.diminfo[0].shape = __pyx_pybuffernd_lsidx.rcbuffer-&gt;pybuffer.shape[0]; __pyx_pybuffernd_lsidx.diminfo[1].strides = __pyx_pybuffernd_lsidx.rcbuffer-&gt;pybuffer.strides[1]; __pyx_pybuffernd_lsidx.diminfo[1].shape = __pyx_pybuffernd_lsidx.rcbuffer-&gt;pybuffer.shape[1]; __pyx_pybuffernd_lsidx.diminfo[2].strides = __pyx_pybuffernd_lsidx.rcbuffer-&gt;pybuffer.strides[2]; __pyx_pybuffernd_lsidx.diminfo[2].shape = __pyx_pybuffernd_lsidx.rcbuffer-&gt;pybuffer.shape[2]; __pyx_pybuffernd_lsidx.diminfo[3].strides = __pyx_pybuffernd_lsidx.rcbuffer-&gt;pybuffer.strides[3]; __pyx_pybuffernd_lsidx.diminfo[3].shape = __pyx_pybuffernd_lsidx.rcbuffer-&gt;pybuffer.shape[3];
+    } else {__pyx_pybuffernd_ssidx.diminfo[0].strides = __pyx_pybuffernd_ssidx.rcbuffer-&gt;pybuffer.strides[0]; __pyx_pybuffernd_ssidx.diminfo[0].shape = __pyx_pybuffernd_ssidx.rcbuffer-&gt;pybuffer.shape[0]; __pyx_pybuffernd_ssidx.diminfo[1].strides = __pyx_pybuffernd_ssidx.rcbuffer-&gt;pybuffer.strides[1]; __pyx_pybuffernd_ssidx.diminfo[1].shape = __pyx_pybuffernd_ssidx.rcbuffer-&gt;pybuffer.shape[1]; __pyx_pybuffernd_ssidx.diminfo[2].strides = __pyx_pybuffernd_ssidx.rcbuffer-&gt;pybuffer.strides[2]; __pyx_pybuffernd_ssidx.diminfo[2].shape = __pyx_pybuffernd_ssidx.rcbuffer-&gt;pybuffer.shape[2]; __pyx_pybuffernd_ssidx.diminfo[3].strides = __pyx_pybuffernd_ssidx.rcbuffer-&gt;pybuffer.strides[3]; __pyx_pybuffernd_ssidx.diminfo[3].shape = __pyx_pybuffernd_ssidx.rcbuffer-&gt;pybuffer.shape[3];
     }
   }
   __pyx_t_12 = 0;
-  __pyx_v_lsidx = ((PyArrayObject *)__pyx_t_4);
+  __pyx_v_ssidx = ((PyArrayObject *)__pyx_t_4);
   __pyx_t_4 = 0;
 </pre><pre class="cython line score-25" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1398</span>:     <span class="n">_loudest_hc_and_par_from_sorted</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">h2fdf</span><span class="p">,</span> <span class="n">number</span><span class="p">,</span> <span class="n">nreals</span><span class="p">,</span> <span class="n">nloudest</span><span class="p">,</span> <span class="n">normal_threshold</span><span class="p">,</span></pre>
 <pre class='cython code score-25 '>  __pyx_t_13 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_double</span>(__pyx_v_h2fdf, PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_13.memview)) __PYX_ERR(0, 1398, __pyx_L1_error)</span>
@@ -7251,19 +7251,19 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   __pyx_t_5 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_ds_long</span>(__pyx_v_msort, PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_5.memview)) __PYX_ERR(0, 1399, __pyx_L1_error)</span>
   __pyx_t_21 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_ds_long</span>(__pyx_v_qsort, PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_21.memview)) __PYX_ERR(0, 1399, __pyx_L1_error)</span>
   __pyx_t_22 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_ds_long</span>(__pyx_v_zsort, PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_22.memview)) __PYX_ERR(0, 1399, __pyx_L1_error)</span>
-</pre><pre class="cython line score-10" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1400</span>:                             <span class="n">hc2ls</span><span class="p">,</span> <span class="n">hc2bg</span><span class="p">,</span> <span class="n">lspar</span><span class="p">,</span> <span class="n">bgpar</span><span class="p">,</span> <span class="n">lsidx</span><span class="p">)</span></pre>
-<pre class='cython code score-10 '>  __pyx_t_23 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_dsdsds_double</span>(((PyObject *)__pyx_v_hc2ls), PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_23.memview)) __PYX_ERR(0, 1400, __pyx_L1_error)</span>
+</pre><pre class="cython line score-10" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1400</span>:                             <span class="n">hc2ss</span><span class="p">,</span> <span class="n">hc2bg</span><span class="p">,</span> <span class="n">lspar</span><span class="p">,</span> <span class="n">bgpar</span><span class="p">,</span> <span class="n">ssidx</span><span class="p">)</span></pre>
+<pre class='cython code score-10 '>  __pyx_t_23 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_dsdsds_double</span>(((PyObject *)__pyx_v_hc2ss), PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_23.memview)) __PYX_ERR(0, 1400, __pyx_L1_error)</span>
   __pyx_t_24 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_dsds_double</span>(((PyObject *)__pyx_v_hc2bg), PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_24.memview)) __PYX_ERR(0, 1400, __pyx_L1_error)</span>
   __pyx_t_25 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_dsdsds_double</span>(((PyObject *)__pyx_v_lspar), PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_25.memview)) __PYX_ERR(0, 1400, __pyx_L1_error)</span>
   __pyx_t_26 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_dsdsds_double</span>(((PyObject *)__pyx_v_bgpar), PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_26.memview)) __PYX_ERR(0, 1400, __pyx_L1_error)</span>
-  __pyx_t_27 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_long</span>(((PyObject *)__pyx_v_lsidx), PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_27.memview)) __PYX_ERR(0, 1400, __pyx_L1_error)</span>
-</pre><pre class="cython line score-16" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1401</span>:     <span class="k">return</span> <span class="n">hc2ls</span><span class="p">,</span> <span class="n">hc2bg</span><span class="p">,</span> <span class="n">lspar</span><span class="p">,</span> <span class="n">bgpar</span><span class="p">,</span> <span class="n">lsidx</span></pre>
+  __pyx_t_27 = <span class='pyx_c_api'>__Pyx_PyObject_to_MemoryviewSlice_dsdsdsds_long</span>(((PyObject *)__pyx_v_ssidx), PyBUF_WRITABLE);<span class='error_goto'> if (unlikely(!__pyx_t_27.memview)) __PYX_ERR(0, 1400, __pyx_L1_error)</span>
+</pre><pre class="cython line score-16" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1401</span>:     <span class="k">return</span> <span class="n">hc2ss</span><span class="p">,</span> <span class="n">hc2bg</span><span class="p">,</span> <span class="n">lspar</span><span class="p">,</span> <span class="n">bgpar</span><span class="p">,</span> <span class="n">ssidx</span></pre>
 <pre class='cython code score-16 '>  <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_r);
   __pyx_t_4 = <span class='py_c_api'>PyTuple_New</span>(5);<span class='error_goto'> if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1401, __pyx_L1_error)</span>
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_t_4);
-  <span class='pyx_macro_api'>__Pyx_INCREF</span>(((PyObject *)__pyx_v_hc2ls));
-  <span class='refnanny'>__Pyx_GIVEREF</span>(((PyObject *)__pyx_v_hc2ls));
-  <span class='py_macro_api'>PyTuple_SET_ITEM</span>(__pyx_t_4, 0, ((PyObject *)__pyx_v_hc2ls));
+  <span class='pyx_macro_api'>__Pyx_INCREF</span>(((PyObject *)__pyx_v_hc2ss));
+  <span class='refnanny'>__Pyx_GIVEREF</span>(((PyObject *)__pyx_v_hc2ss));
+  <span class='py_macro_api'>PyTuple_SET_ITEM</span>(__pyx_t_4, 0, ((PyObject *)__pyx_v_hc2ss));
   <span class='pyx_macro_api'>__Pyx_INCREF</span>(((PyObject *)__pyx_v_hc2bg));
   <span class='refnanny'>__Pyx_GIVEREF</span>(((PyObject *)__pyx_v_hc2bg));
   <span class='py_macro_api'>PyTuple_SET_ITEM</span>(__pyx_t_4, 1, ((PyObject *)__pyx_v_hc2bg));
@@ -7273,9 +7273,9 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
   <span class='pyx_macro_api'>__Pyx_INCREF</span>(((PyObject *)__pyx_v_bgpar));
   <span class='refnanny'>__Pyx_GIVEREF</span>(((PyObject *)__pyx_v_bgpar));
   <span class='py_macro_api'>PyTuple_SET_ITEM</span>(__pyx_t_4, 3, ((PyObject *)__pyx_v_bgpar));
-  <span class='pyx_macro_api'>__Pyx_INCREF</span>(((PyObject *)__pyx_v_lsidx));
-  <span class='refnanny'>__Pyx_GIVEREF</span>(((PyObject *)__pyx_v_lsidx));
-  <span class='py_macro_api'>PyTuple_SET_ITEM</span>(__pyx_t_4, 4, ((PyObject *)__pyx_v_lsidx));
+  <span class='pyx_macro_api'>__Pyx_INCREF</span>(((PyObject *)__pyx_v_ssidx));
+  <span class='refnanny'>__Pyx_GIVEREF</span>(((PyObject *)__pyx_v_ssidx));
+  <span class='py_macro_api'>PyTuple_SET_ITEM</span>(__pyx_t_4, 4, ((PyObject *)__pyx_v_ssidx));
   __pyx_r = __pyx_t_4;
   __pyx_t_4 = 0;
   goto __pyx_L0;
@@ -7285,7 +7285,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
 <pre class="cython line score-0">&#xA0;<span class="">1405</span>: <span class="nd">@cython</span><span class="o">.</span><span class="n">nonecheck</span><span class="p">(</span><span class="bp">True</span><span class="p">)</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1406</span>: <span class="nd">@cython</span><span class="o">.</span><span class="n">cdivision</span><span class="p">(</span><span class="bp">True</span><span class="p">)</span></pre>
 <pre class="cython line score-18" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1407</span>: <span class="k">cdef</span> <span class="kt">void</span> <span class="nf">_loudest_hc_and_par_from_sorted</span><span class="p">(</span><span class="nb">long</span><span class="p">[:]</span> <span class="n">shape</span><span class="p">,</span> <span class="n">double</span><span class="p">[:,:,:,:]</span> <span class="n">h2fdf</span><span class="p">,</span> <span class="n">double</span><span class="p">[:,:,:,:]</span> <span class="n">number</span><span class="p">,</span></pre>
-<pre class='cython code score-18 '>static void __pyx_f_8holodeck_7cyutils__loudest_hc_and_par_from_sorted(__Pyx_memviewslice __pyx_v_shape, __Pyx_memviewslice __pyx_v_h2fdf, __Pyx_memviewslice __pyx_v_number, long __pyx_v_nreals, long __pyx_v_nloudest, long __pyx_v_thresh, __Pyx_memviewslice __pyx_v_mt, __Pyx_memviewslice __pyx_v_mr, __Pyx_memviewslice __pyx_v_rz, __Pyx_memviewslice __pyx_v_msort, __Pyx_memviewslice __pyx_v_qsort, __Pyx_memviewslice __pyx_v_zsort, __Pyx_memviewslice __pyx_v_hc2ls, __Pyx_memviewslice __pyx_v_hc2bg, __Pyx_memviewslice __pyx_v_lspar, __Pyx_memviewslice __pyx_v_bgpar, __Pyx_memviewslice __pyx_v_lsidx) {
+<pre class='cython code score-18 '>static void __pyx_f_8holodeck_7cyutils__loudest_hc_and_par_from_sorted(__Pyx_memviewslice __pyx_v_shape, __Pyx_memviewslice __pyx_v_h2fdf, __Pyx_memviewslice __pyx_v_number, long __pyx_v_nreals, long __pyx_v_nloudest, long __pyx_v_thresh, __Pyx_memviewslice __pyx_v_mt, __Pyx_memviewslice __pyx_v_mr, __Pyx_memviewslice __pyx_v_rz, __Pyx_memviewslice __pyx_v_msort, __Pyx_memviewslice __pyx_v_qsort, __Pyx_memviewslice __pyx_v_zsort, __Pyx_memviewslice __pyx_v_hc2ss, __Pyx_memviewslice __pyx_v_hc2bg, __Pyx_memviewslice __pyx_v_lspar, __Pyx_memviewslice __pyx_v_bgpar, __Pyx_memviewslice __pyx_v_ssidx) {
   int __pyx_v_M;
   int __pyx_v_Q;
   int __pyx_v_Z;
@@ -7350,7 +7350,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
 </pre><pre class="cython line score-0">&#xA0;<span class="">1408</span>:             <span class="nb">long</span> <span class="n">nreals</span><span class="p">,</span> <span class="nb">long</span> <span class="n">nloudest</span><span class="p">,</span> <span class="nb">long</span> <span class="n">thresh</span><span class="p">,</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1409</span>:             <span class="n">double</span><span class="p">[:]</span> <span class="n">mt</span><span class="p">,</span> <span class="n">double</span><span class="p">[:]</span> <span class="n">mr</span><span class="p">,</span> <span class="n">double</span><span class="p">[:]</span> <span class="n">rz</span><span class="p">,</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1410</span>:             <span class="nb">long</span><span class="p">[:]</span> <span class="n">msort</span><span class="p">,</span> <span class="nb">long</span><span class="p">[:]</span> <span class="n">qsort</span><span class="p">,</span> <span class="nb">long</span><span class="p">[:]</span> <span class="n">zsort</span><span class="p">,</span></pre>
-<pre class="cython line score-0">&#xA0;<span class="">1411</span>:             <span class="n">double</span><span class="p">[:,:,:]</span> <span class="n">hc2ls</span><span class="p">,</span> <span class="n">double</span><span class="p">[:,:]</span> <span class="n">hc2bg</span><span class="p">,</span> <span class="n">double</span><span class="p">[:,:,:]</span> <span class="n">lspar</span><span class="p">,</span> <span class="n">double</span><span class="p">[:,:,:]</span> <span class="n">bgpar</span><span class="p">,</span> <span class="nb">long</span><span class="p">[:,:,:,:]</span> <span class="n">lsidx</span><span class="p">):</span></pre>
+<pre class="cython line score-0">&#xA0;<span class="">1411</span>:             <span class="n">double</span><span class="p">[:,:,:]</span> <span class="n">hc2ss</span><span class="p">,</span> <span class="n">double</span><span class="p">[:,:]</span> <span class="n">hc2bg</span><span class="p">,</span> <span class="n">double</span><span class="p">[:,:,:]</span> <span class="n">lspar</span><span class="p">,</span> <span class="n">double</span><span class="p">[:,:,:]</span> <span class="n">bgpar</span><span class="p">,</span> <span class="nb">long</span><span class="p">[:,:,:,:]</span> <span class="n">ssidx</span><span class="p">):</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1412</span>: <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1413</span>: <span class="sd">    Calculates the characteristic strain from loud single sources and a background of all other sources.</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1414</span>: </pre>
@@ -7378,7 +7378,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
 <pre class="cython line score-0">&#xA0;<span class="">1436</span>: <span class="sd">        q indices of each bin, sorted from largest to smallest h2fdf.</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1437</span>: <span class="sd">    zsort : (M*Q*Z,) 1Darray</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1438</span>: <span class="sd">        z indices of each bin, sorted from largest to smallest h2fdf.</span></pre>
-<pre class="cython line score-0">&#xA0;<span class="">1439</span>: <span class="sd">    hc2ls : double[:,:,:] array</span></pre>
+<pre class="cython line score-0">&#xA0;<span class="">1439</span>: <span class="sd">    hc2ss : double[:,:,:] array</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1440</span>: <span class="sd">        (Memory address of) single source characteristic strain squared array.</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1441</span>: <span class="sd">    hc2bg : double[:,:] array</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1442</span>: <span class="sd">        (Memory address of) background characteristic strain squared array.</span></pre>
@@ -7386,7 +7386,7 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
 <pre class="cython line score-0">&#xA0;<span class="">1444</span>: <span class="sd">        Average effective M, q, z parameters of the loudest L sources.</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1445</span>: <span class="sd">    bgpar : (3, F, R) NDarray of scalars</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1446</span>: <span class="sd">        Average effective M, q, z parameters of the background.</span></pre>
-<pre class="cython line score-0">&#xA0;<span class="">1447</span>: <span class="sd">    lsidx : (3, F, R, L) NDarray of ints</span></pre>
+<pre class="cython line score-0">&#xA0;<span class="">1447</span>: <span class="sd">    ssidx : (3, F, R, L) NDarray of ints</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1448</span>: <span class="sd">        Indices of the loudest sources.</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1449</span>: <span class="sd">    </span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1450</span>: <span class="sd">    Returns</span></pre>
@@ -7739,8 +7739,8 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
           __pyx_L14_bool_binop_done:;
           if (!__pyx_t_23) break;
 </pre><pre class="cython line score-0">&#xA0;<span class="">1503</span>:                     <span class="c"># store ll loudest source strain</span></pre>
-<pre class="cython line score-7" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1504</span>:                     <span class="n">hc2ls</span><span class="p">[</span><span class="n">ff</span><span class="p">,</span><span class="n">rr</span><span class="p">,</span><span class="n">ll</span><span class="p">]</span> <span class="o">=</span> <span class="n">cur</span></pre>
-<pre class='cython code score-7 '>          if (unlikely(((PyObject *) __pyx_v_hc2ls.memview) == Py_None)) {
+<pre class="cython line score-7" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1504</span>:                     <span class="n">hc2ss</span><span class="p">[</span><span class="n">ff</span><span class="p">,</span><span class="n">rr</span><span class="p">,</span><span class="n">ll</span><span class="p">]</span> <span class="o">=</span> <span class="n">cur</span></pre>
+<pre class='cython code score-7 '>          if (unlikely(((PyObject *) __pyx_v_hc2ss.memview) == Py_None)) {
             <span class='py_c_api'>PyErr_SetString</span>(PyExc_TypeError, "Cannot index None memoryview slice");
             <span class='error_goto'>__PYX_ERR(0, 1504, __pyx_L1_error)</span>
           }
@@ -7749,26 +7749,26 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
           __pyx_t_21 = __pyx_v_ll;
           __pyx_t_19 = -1;
           if (__pyx_t_1 &lt; 0) {
-            __pyx_t_1 += __pyx_v_hc2ls.shape[0];
+            __pyx_t_1 += __pyx_v_hc2ss.shape[0];
             if (unlikely(__pyx_t_1 &lt; 0)) __pyx_t_19 = 0;
-          } else if (unlikely(__pyx_t_1 &gt;= __pyx_v_hc2ls.shape[0])) __pyx_t_19 = 0;
+          } else if (unlikely(__pyx_t_1 &gt;= __pyx_v_hc2ss.shape[0])) __pyx_t_19 = 0;
           if (__pyx_t_20 &lt; 0) {
-            __pyx_t_20 += __pyx_v_hc2ls.shape[1];
+            __pyx_t_20 += __pyx_v_hc2ss.shape[1];
             if (unlikely(__pyx_t_20 &lt; 0)) __pyx_t_19 = 1;
-          } else if (unlikely(__pyx_t_20 &gt;= __pyx_v_hc2ls.shape[1])) __pyx_t_19 = 1;
+          } else if (unlikely(__pyx_t_20 &gt;= __pyx_v_hc2ss.shape[1])) __pyx_t_19 = 1;
           if (__pyx_t_21 &lt; 0) {
-            __pyx_t_21 += __pyx_v_hc2ls.shape[2];
+            __pyx_t_21 += __pyx_v_hc2ss.shape[2];
             if (unlikely(__pyx_t_21 &lt; 0)) __pyx_t_19 = 2;
-          } else if (unlikely(__pyx_t_21 &gt;= __pyx_v_hc2ls.shape[2])) __pyx_t_19 = 2;
+          } else if (unlikely(__pyx_t_21 &gt;= __pyx_v_hc2ss.shape[2])) __pyx_t_19 = 2;
           if (unlikely(__pyx_t_19 != -1)) {
             <span class='pyx_c_api'>__Pyx_RaiseBufferIndexError</span>(__pyx_t_19);
             <span class='error_goto'>__PYX_ERR(0, 1504, __pyx_L1_error)</span>
           }
-          *((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_hc2ls.data + __pyx_t_1 * __pyx_v_hc2ls.strides[0]) ) + __pyx_t_20 * __pyx_v_hc2ls.strides[1]) ) + __pyx_t_21 * __pyx_v_hc2ls.strides[2]) )) = __pyx_v_cur;
+          *((double *) ( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_hc2ss.data + __pyx_t_1 * __pyx_v_hc2ss.strides[0]) ) + __pyx_t_20 * __pyx_v_hc2ss.strides[1]) ) + __pyx_t_21 * __pyx_v_hc2ss.strides[2]) )) = __pyx_v_cur;
 </pre><pre class="cython line score-0">&#xA0;<span class="">1505</span>: </pre>
 <pre class="cython line score-0">&#xA0;<span class="">1506</span>:                     <span class="c"># store indices of ll loudest source</span></pre>
-<pre class="cython line score-7" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1507</span>:                     <span class="n">lsidx</span><span class="p">[</span><span class="mf">0</span><span class="p">,</span><span class="n">ff</span><span class="p">,</span><span class="n">rr</span><span class="p">,</span><span class="n">ll</span><span class="p">]</span> <span class="o">=</span> <span class="n">mm</span></pre>
-<pre class='cython code score-7 '>          if (unlikely(((PyObject *) __pyx_v_lsidx.memview) == Py_None)) {
+<pre class="cython line score-7" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1507</span>:                     <span class="n">ssidx</span><span class="p">[</span><span class="mf">0</span><span class="p">,</span><span class="n">ff</span><span class="p">,</span><span class="n">rr</span><span class="p">,</span><span class="n">ll</span><span class="p">]</span> <span class="o">=</span> <span class="n">mm</span></pre>
+<pre class='cython code score-7 '>          if (unlikely(((PyObject *) __pyx_v_ssidx.memview) == Py_None)) {
             <span class='py_c_api'>PyErr_SetString</span>(PyExc_TypeError, "Cannot index None memoryview slice");
             <span class='error_goto'>__PYX_ERR(0, 1507, __pyx_L1_error)</span>
           }
@@ -7778,28 +7778,28 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
           __pyx_t_22 = __pyx_v_ll;
           __pyx_t_19 = -1;
           if (__pyx_t_21 &lt; 0) {
-            __pyx_t_21 += __pyx_v_lsidx.shape[0];
+            __pyx_t_21 += __pyx_v_ssidx.shape[0];
             if (unlikely(__pyx_t_21 &lt; 0)) __pyx_t_19 = 0;
-          } else if (unlikely(__pyx_t_21 &gt;= __pyx_v_lsidx.shape[0])) __pyx_t_19 = 0;
+          } else if (unlikely(__pyx_t_21 &gt;= __pyx_v_ssidx.shape[0])) __pyx_t_19 = 0;
           if (__pyx_t_20 &lt; 0) {
-            __pyx_t_20 += __pyx_v_lsidx.shape[1];
+            __pyx_t_20 += __pyx_v_ssidx.shape[1];
             if (unlikely(__pyx_t_20 &lt; 0)) __pyx_t_19 = 1;
-          } else if (unlikely(__pyx_t_20 &gt;= __pyx_v_lsidx.shape[1])) __pyx_t_19 = 1;
+          } else if (unlikely(__pyx_t_20 &gt;= __pyx_v_ssidx.shape[1])) __pyx_t_19 = 1;
           if (__pyx_t_1 &lt; 0) {
-            __pyx_t_1 += __pyx_v_lsidx.shape[2];
+            __pyx_t_1 += __pyx_v_ssidx.shape[2];
             if (unlikely(__pyx_t_1 &lt; 0)) __pyx_t_19 = 2;
-          } else if (unlikely(__pyx_t_1 &gt;= __pyx_v_lsidx.shape[2])) __pyx_t_19 = 2;
+          } else if (unlikely(__pyx_t_1 &gt;= __pyx_v_ssidx.shape[2])) __pyx_t_19 = 2;
           if (__pyx_t_22 &lt; 0) {
-            __pyx_t_22 += __pyx_v_lsidx.shape[3];
+            __pyx_t_22 += __pyx_v_ssidx.shape[3];
             if (unlikely(__pyx_t_22 &lt; 0)) __pyx_t_19 = 3;
-          } else if (unlikely(__pyx_t_22 &gt;= __pyx_v_lsidx.shape[3])) __pyx_t_19 = 3;
+          } else if (unlikely(__pyx_t_22 &gt;= __pyx_v_ssidx.shape[3])) __pyx_t_19 = 3;
           if (unlikely(__pyx_t_19 != -1)) {
             <span class='pyx_c_api'>__Pyx_RaiseBufferIndexError</span>(__pyx_t_19);
             <span class='error_goto'>__PYX_ERR(0, 1507, __pyx_L1_error)</span>
           }
-          *((long *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_lsidx.data + __pyx_t_21 * __pyx_v_lsidx.strides[0]) ) + __pyx_t_20 * __pyx_v_lsidx.strides[1]) ) + __pyx_t_1 * __pyx_v_lsidx.strides[2]) ) + __pyx_t_22 * __pyx_v_lsidx.strides[3]) )) = __pyx_v_mm;
-</pre><pre class="cython line score-7" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1508</span>:                     <span class="n">lsidx</span><span class="p">[</span><span class="mf">1</span><span class="p">,</span><span class="n">ff</span><span class="p">,</span><span class="n">rr</span><span class="p">,</span><span class="n">ll</span><span class="p">]</span> <span class="o">=</span> <span class="n">qq</span></pre>
-<pre class='cython code score-7 '>          if (unlikely(((PyObject *) __pyx_v_lsidx.memview) == Py_None)) {
+          *((long *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_ssidx.data + __pyx_t_21 * __pyx_v_ssidx.strides[0]) ) + __pyx_t_20 * __pyx_v_ssidx.strides[1]) ) + __pyx_t_1 * __pyx_v_ssidx.strides[2]) ) + __pyx_t_22 * __pyx_v_ssidx.strides[3]) )) = __pyx_v_mm;
+</pre><pre class="cython line score-7" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1508</span>:                     <span class="n">ssidx</span><span class="p">[</span><span class="mf">1</span><span class="p">,</span><span class="n">ff</span><span class="p">,</span><span class="n">rr</span><span class="p">,</span><span class="n">ll</span><span class="p">]</span> <span class="o">=</span> <span class="n">qq</span></pre>
+<pre class='cython code score-7 '>          if (unlikely(((PyObject *) __pyx_v_ssidx.memview) == Py_None)) {
             <span class='py_c_api'>PyErr_SetString</span>(PyExc_TypeError, "Cannot index None memoryview slice");
             <span class='error_goto'>__PYX_ERR(0, 1508, __pyx_L1_error)</span>
           }
@@ -7809,28 +7809,28 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
           __pyx_t_21 = __pyx_v_ll;
           __pyx_t_19 = -1;
           if (__pyx_t_22 &lt; 0) {
-            __pyx_t_22 += __pyx_v_lsidx.shape[0];
+            __pyx_t_22 += __pyx_v_ssidx.shape[0];
             if (unlikely(__pyx_t_22 &lt; 0)) __pyx_t_19 = 0;
-          } else if (unlikely(__pyx_t_22 &gt;= __pyx_v_lsidx.shape[0])) __pyx_t_19 = 0;
+          } else if (unlikely(__pyx_t_22 &gt;= __pyx_v_ssidx.shape[0])) __pyx_t_19 = 0;
           if (__pyx_t_1 &lt; 0) {
-            __pyx_t_1 += __pyx_v_lsidx.shape[1];
+            __pyx_t_1 += __pyx_v_ssidx.shape[1];
             if (unlikely(__pyx_t_1 &lt; 0)) __pyx_t_19 = 1;
-          } else if (unlikely(__pyx_t_1 &gt;= __pyx_v_lsidx.shape[1])) __pyx_t_19 = 1;
+          } else if (unlikely(__pyx_t_1 &gt;= __pyx_v_ssidx.shape[1])) __pyx_t_19 = 1;
           if (__pyx_t_20 &lt; 0) {
-            __pyx_t_20 += __pyx_v_lsidx.shape[2];
+            __pyx_t_20 += __pyx_v_ssidx.shape[2];
             if (unlikely(__pyx_t_20 &lt; 0)) __pyx_t_19 = 2;
-          } else if (unlikely(__pyx_t_20 &gt;= __pyx_v_lsidx.shape[2])) __pyx_t_19 = 2;
+          } else if (unlikely(__pyx_t_20 &gt;= __pyx_v_ssidx.shape[2])) __pyx_t_19 = 2;
           if (__pyx_t_21 &lt; 0) {
-            __pyx_t_21 += __pyx_v_lsidx.shape[3];
+            __pyx_t_21 += __pyx_v_ssidx.shape[3];
             if (unlikely(__pyx_t_21 &lt; 0)) __pyx_t_19 = 3;
-          } else if (unlikely(__pyx_t_21 &gt;= __pyx_v_lsidx.shape[3])) __pyx_t_19 = 3;
+          } else if (unlikely(__pyx_t_21 &gt;= __pyx_v_ssidx.shape[3])) __pyx_t_19 = 3;
           if (unlikely(__pyx_t_19 != -1)) {
             <span class='pyx_c_api'>__Pyx_RaiseBufferIndexError</span>(__pyx_t_19);
             <span class='error_goto'>__PYX_ERR(0, 1508, __pyx_L1_error)</span>
           }
-          *((long *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_lsidx.data + __pyx_t_22 * __pyx_v_lsidx.strides[0]) ) + __pyx_t_1 * __pyx_v_lsidx.strides[1]) ) + __pyx_t_20 * __pyx_v_lsidx.strides[2]) ) + __pyx_t_21 * __pyx_v_lsidx.strides[3]) )) = __pyx_v_qq;
-</pre><pre class="cython line score-7" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1509</span>:                     <span class="n">lsidx</span><span class="p">[</span><span class="mf">2</span><span class="p">,</span><span class="n">ff</span><span class="p">,</span><span class="n">rr</span><span class="p">,</span><span class="n">ll</span><span class="p">]</span> <span class="o">=</span> <span class="n">zz</span></pre>
-<pre class='cython code score-7 '>          if (unlikely(((PyObject *) __pyx_v_lsidx.memview) == Py_None)) {
+          *((long *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_ssidx.data + __pyx_t_22 * __pyx_v_ssidx.strides[0]) ) + __pyx_t_1 * __pyx_v_ssidx.strides[1]) ) + __pyx_t_20 * __pyx_v_ssidx.strides[2]) ) + __pyx_t_21 * __pyx_v_ssidx.strides[3]) )) = __pyx_v_qq;
+</pre><pre class="cython line score-7" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1509</span>:                     <span class="n">ssidx</span><span class="p">[</span><span class="mf">2</span><span class="p">,</span><span class="n">ff</span><span class="p">,</span><span class="n">rr</span><span class="p">,</span><span class="n">ll</span><span class="p">]</span> <span class="o">=</span> <span class="n">zz</span></pre>
+<pre class='cython code score-7 '>          if (unlikely(((PyObject *) __pyx_v_ssidx.memview) == Py_None)) {
             <span class='py_c_api'>PyErr_SetString</span>(PyExc_TypeError, "Cannot index None memoryview slice");
             <span class='error_goto'>__PYX_ERR(0, 1509, __pyx_L1_error)</span>
           }
@@ -7840,26 +7840,26 @@ static PyObject *__pyx_pf_8holodeck_7cyutils_16loudest_hc_and_par_from_sorted(CY
           __pyx_t_22 = __pyx_v_ll;
           __pyx_t_19 = -1;
           if (__pyx_t_21 &lt; 0) {
-            __pyx_t_21 += __pyx_v_lsidx.shape[0];
+            __pyx_t_21 += __pyx_v_ssidx.shape[0];
             if (unlikely(__pyx_t_21 &lt; 0)) __pyx_t_19 = 0;
-          } else if (unlikely(__pyx_t_21 &gt;= __pyx_v_lsidx.shape[0])) __pyx_t_19 = 0;
+          } else if (unlikely(__pyx_t_21 &gt;= __pyx_v_ssidx.shape[0])) __pyx_t_19 = 0;
           if (__pyx_t_20 &lt; 0) {
-            __pyx_t_20 += __pyx_v_lsidx.shape[1];
+            __pyx_t_20 += __pyx_v_ssidx.shape[1];
             if (unlikely(__pyx_t_20 &lt; 0)) __pyx_t_19 = 1;
-          } else if (unlikely(__pyx_t_20 &gt;= __pyx_v_lsidx.shape[1])) __pyx_t_19 = 1;
+          } else if (unlikely(__pyx_t_20 &gt;= __pyx_v_ssidx.shape[1])) __pyx_t_19 = 1;
           if (__pyx_t_1 &lt; 0) {
-            __pyx_t_1 += __pyx_v_lsidx.shape[2];
+            __pyx_t_1 += __pyx_v_ssidx.shape[2];
             if (unlikely(__pyx_t_1 &lt; 0)) __pyx_t_19 = 2;
-          } else if (unlikely(__pyx_t_1 &gt;= __pyx_v_lsidx.shape[2])) __pyx_t_19 = 2;
+          } else if (unlikely(__pyx_t_1 &gt;= __pyx_v_ssidx.shape[2])) __pyx_t_19 = 2;
           if (__pyx_t_22 &lt; 0) {
-            __pyx_t_22 += __pyx_v_lsidx.shape[3];
+            __pyx_t_22 += __pyx_v_ssidx.shape[3];
             if (unlikely(__pyx_t_22 &lt; 0)) __pyx_t_19 = 3;
-          } else if (unlikely(__pyx_t_22 &gt;= __pyx_v_lsidx.shape[3])) __pyx_t_19 = 3;
+          } else if (unlikely(__pyx_t_22 &gt;= __pyx_v_ssidx.shape[3])) __pyx_t_19 = 3;
           if (unlikely(__pyx_t_19 != -1)) {
             <span class='pyx_c_api'>__Pyx_RaiseBufferIndexError</span>(__pyx_t_19);
             <span class='error_goto'>__PYX_ERR(0, 1509, __pyx_L1_error)</span>
           }
-          *((long *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_lsidx.data + __pyx_t_21 * __pyx_v_lsidx.strides[0]) ) + __pyx_t_20 * __pyx_v_lsidx.strides[1]) ) + __pyx_t_1 * __pyx_v_lsidx.strides[2]) ) + __pyx_t_22 * __pyx_v_lsidx.strides[3]) )) = __pyx_v_zz;
+          *((long *) ( /* dim=3 */ (( /* dim=2 */ (( /* dim=1 */ (( /* dim=0 */ (__pyx_v_ssidx.data + __pyx_t_21 * __pyx_v_ssidx.strides[0]) ) + __pyx_t_20 * __pyx_v_ssidx.strides[1]) ) + __pyx_t_1 * __pyx_v_ssidx.strides[2]) ) + __pyx_t_22 * __pyx_v_ssidx.strides[3]) )) = __pyx_v_zz;
 </pre><pre class="cython line score-0">&#xA0;<span class="">1510</span>: </pre>
 <pre class="cython line score-0">&#xA0;<span class="">1511</span>: </pre>
 <pre class="cython line score-0" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1512</span>:                     <span class="n">sum_ls</span> <span class="o">+=</span> <span class="n">cur</span> <span class="c"># tot ls h2fdf</span></pre>
