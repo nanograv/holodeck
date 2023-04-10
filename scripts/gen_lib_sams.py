@@ -29,7 +29,6 @@ __version__ = '0.2.2'
 
 import argparse
 import os
-import logging
 import shutil
 import sys
 import warnings
@@ -205,21 +204,9 @@ def main():
         if args.test:
             continue
 
-        try:
-            rv = holo.librarian.run_sam_at_pspace_num(args, space, par_num, PATH_OUTPUT)
-            if rv is False:
-                failures += 1
-
-        except Exception as err:
+        rv = holo.librarian.run_sam_at_pspace_num(args, space, par_num, PATH_OUTPUT)
+        if rv is False:
             failures += 1
-            logging.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{par_num}")
-            logging.warning(err)
-            log.warning(f"\n\nWARNING: error on rank:{comm.rank}, index:{par_num}")
-            log.warning(err)
-            import traceback
-            traceback.print_exc()
-            print("\n\n")
-            raise
 
         if failures > MAX_FAILURES:
             err = f"Failed {failures} times on rank:{comm.rank}!"
