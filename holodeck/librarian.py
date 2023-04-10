@@ -23,7 +23,10 @@ from holodeck import log, utils
 from holodeck.constants import YR
 
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
+
+FITS_NBINS_PLAW = [2, 3, 4, 5, 8, 9, 14]
+FITS_NBINS_TURN = [4, 9, 14]
 
 
 class _Param_Space(abc.ABC):
@@ -414,98 +417,147 @@ def sam_lib_combine(path_output, log, debug=False):
     return
 
 
-def fit_spectra(freqs, gwb, nbins=[5, 10, 15]):
-    nf, nreals = np.shape(gwb)
-    assert len(freqs) == nf
+def fit_spectra_plaw_hc(freqs, gwb, nbins):
+    nfreq, nreals = np.shape(gwb)
+    assert len(freqs) == nfreq
 
-    num_snaps = len(nbins)
-    fit_lamp = np.zeros((nreals, num_snaps))
-    fit_plaw = np.zeros((nreals, num_snaps))
-    fit_med_lamp = np.zeros((num_snaps))
-    fit_med_plaw = np.zeros((num_snaps))
+    def fit_if_all_finite(xx, yy):
+        if np.any(~np.isfinite(yy)):
+            pars = np.nan, np.nan
+        else:
+            pars = utils.fit_powerlaw(xx, yy)
+        return pars
+
+    nfreq_bins = len(nbins)
+    fit_pars = np.zeros((nfreq_bins, nreals, 2))
+    fit_med_pars = np.zeros((nfreq_bins, 2))
     for ii, num in enumerate(nbins):
-        if (num is not None) and (num > nf):
-            continue
+        if num > nfreq:
+            raise ValueError(f"Cannot fit for {num=} bins, data has {nfreq=} frequencies!")
+
         num = None if (num == 0) else num
         cut = slice(None, num)
-        try:
-            xx = freqs[cut]*YR
-        except:
-            print(f"{freqs=}, {nbins=}")
-            raise
+        xx = freqs[cut]*YR
 
-        yy = np.median(gwb, axis=-1)
-        log10_amp, plaw = _fit_powerlaw(xx, yy[cut], min_val_frac=0.75)
+        # fit the median spectra
+        yy = np.median(gwb, axis=-1)[cut]
+        fit_med_pars[ii] = fit_if_all_finite(xx, yy)
 
-        fit_med_lamp[ii] = log10_amp
-        fit_med_plaw[ii] = plaw
+        # fit each realization of the spectra
         for rr in range(nreals):
-            yy = gwb[:, rr]
-            log10_amp, plaw = _fit_powerlaw(xx, yy[cut], min_val_frac=0.75)
-            fit_lamp[rr, ii] = log10_amp
-            fit_plaw[rr, ii] = plaw
+            yy = gwb[cut, rr]
+            fit_pars[ii, rr, :] = fit_if_all_finite(xx, yy)
 
-    return nbins, fit_lamp, fit_plaw, fit_med_lamp, fit_med_plaw
+    return nbins, fit_pars, fit_med_pars
 
 
-def _fit_powerlaw(xx, yy, min_val_frac=0.75):
-    if (min_val_frac is not None):
-        idx = np.isfinite(yy) & (yy > 0.0)
-        frac_val = np.count_nonzero(idx) / idx.size
-        if frac_val > min_val_frac:
-            xx = xx[idx]
-            yy = yy[idx]
+def fit_spectra_plaw(freqs, gwb, nbins):
+    nfreq, nreals = np.shape(gwb)
+    assert len(freqs) == nfreq
+
+    def fit_if_all_finite(xx, yy):
+        if np.any(~np.isfinite(yy)):
+            pars = np.nan, np.nan
         else:
-            xx = []
-            yy = []
+            pars = utils.fit_powerlaw_psd(xx, yy, 1/YR)
+        return pars
 
-    if len(xx) >= 2:
-        log10_amp, plaw = utils.fit_powerlaw(xx, yy)
-    else:
-        log10_amp, plaw = np.nan, np.nan
+    nfreq_bins = len(nbins)
+    fit_pars = np.zeros((nfreq_bins, nreals, 2))
+    fit_med_pars = np.zeros((nfreq_bins, 2))
+    for ii, num in enumerate(nbins):
+        if num > nfreq:
+            raise ValueError(f"Cannot fit for {num=} bins, data has {nfreq=} frequencies!")
 
-    return log10_amp, plaw
+        num = None if (num == 0) else num
+        cut = slice(None, num)
+        xx = freqs[cut]
 
+        # fit the median spectra
+        yy = np.median(gwb, axis=-1)[cut]
+        fit_med_pars[ii] = fit_if_all_finite(xx, yy)
 
-def get_gwb_fits_data(fobs_cents, gwb):
-    # these values must match label construction!
-    nbins = [5, 10, 15, 0]
+        # fit each realization of the spectra
+        for rr in range(nreals):
+            yy = gwb[cut, rr]
+            fit_pars[ii, rr, :] = fit_if_all_finite(xx, yy)
 
-    nbins, lamp, plaw, med_lamp, med_plaw = fit_spectra(fobs_cents, gwb, nbins=nbins)
-
-    label = (
-        f"log10(A10)={med_lamp[1]:.2f}, G10={med_plaw[1]:.4f}"
-        " | "
-        f"log10(A)={med_lamp[-1]:.2f}, G={med_plaw[-1]:.4f}"
-    )
-
-    fits_data = dict(
-        fit_nbins=nbins, fit_lamp=lamp, fit_plaw=plaw, fit_med_lamp=med_lamp, fit_med_plaw=med_plaw, fit_label=label
-    )
-    return fits_data
+    return nbins, fit_pars, fit_med_pars
 
 
-def make_gwb_plot(fobs, gwb, fits_data):
+def fit_spectra_turn(freqs, gwb, nbins):
+    nfreq, nreals = np.shape(gwb)
+    assert len(freqs) == nfreq
+
+    def fit_if_all_finite(xx, yy):
+        if np.any(~np.isfinite(yy)):
+            pars = np.nan, np.nan
+        else:
+            pars = utils.fit_turnover_psd(xx, yy, 1/YR)
+        return pars
+
+    nfreq_bins = len(nbins)
+    fit_pars = np.zeros((nfreq_bins, nreals, 4))
+    fit_med_pars = np.zeros((nfreq_bins, 4))
+    for ii, num in enumerate(nbins):
+        if num > nfreq:
+            raise ValueError(f"Cannot fit for {num=} bins, data has {nfreq=} frequencies!")
+
+        num = None if (num == 0) else num
+        cut = slice(None, num)
+        xx = freqs[cut]
+
+        # fit the median spectra
+        yy = np.median(gwb, axis=-1)[cut]
+        fit_med_pars[ii, :] = fit_if_all_finite(xx, yy)
+
+        # fit each realization of the spectra
+        for rr in range(nreals):
+            yy = gwb[cut, rr]
+            fit_pars[ii, rr, :] = fit_if_all_finite(xx, yy)
+
+    return nbins, fit_pars, fit_med_pars
+
+
+def make_gwb_plot(fobs, gwb, fit_plaw_data, fit_turn_data):
     fig = holo.plot.plot_gwb(fobs, gwb)
     ax = fig.axes[0]
 
-    if len(fits_data):
-        xx = fobs * YR
-        yy = 1e-15 * np.power(xx, -2.0/3.0)
-        ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
+    xx = fobs * YR
+    yy = 1e-15 * np.power(xx, -2.0/3.0)
+    ax.plot(xx, yy, 'k--', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
 
-        fits = get_gwb_fits_data(fobs, gwb)
+    if len(fit_plaw_data) > 0:
+        fit_nbins = fit_plaw_data['fit_plaw_nbins']
+        med_pars = fit_plaw_data['fit_plaw_med']
 
-        for ls, idx in zip([":", "--"], [1, -1]):
-            med_lamp = fits['fit_med_lamp'][idx]
-            med_plaw = fits['fit_med_plaw'][idx]
-            yy = (10.0 ** med_lamp) * (xx ** med_plaw)
-            label = fits['fit_nbins'][idx]
-            label = 'all' if label in [0, None] else label
-            ax.plot(xx, yy, color='k', ls=ls, alpha=0.5, lw=2.0, label=str(label) + " bins")
+        plot_nbins = [4, 14]
 
-        label = fits['fit_label'].replace(" | ", "\n")
-        fig.text(0.99, 0.99, label, fontsize=6, ha='right', va='top')
+        for nbins in plot_nbins:
+            idx = fit_nbins.index(nbins)
+            pars = med_pars[idx]
+            yy = 10.0 ** holo.utils._func_line(np.log10(xx), *pars)
+            label = fit_nbins[idx]
+            label = 'all' if label in [0, None] else f"{label:02d}"
+            ax.plot(xx, yy, alpha=0.75, lw=1.0, label="plaw: " + str(label) + " bins", ls='--')
+
+    if len(fit_turn_data) > 0:
+        fit_nbins = fit_turn_data['fit_turn_nbins']
+        med_pars = fit_turn_data['fit_turn_med']
+
+        plot_nbins = [14, 30]
+
+        for nbins in plot_nbins:
+            idx = fit_nbins.index(nbins)
+            pars = med_pars[idx]
+
+            pars[0] = 10.0 ** pars[0]
+            zz = holo.utils._func_turnover_psd(fobs, 1/YR, *pars)
+            label = fit_nbins[idx]
+            label = 'all' if label in [0, None] else f"{label:02d}"
+            ax.plot(xx, zz, alpha=0.75, lw=1.0, label="turn: " + str(label) + " bins")
+
+    ax.legend(fontsize=6, loc='upper right')
 
     return fig
 
@@ -519,14 +571,7 @@ def run_sam_at_pspace_num(args, space, pnum, path_output):
     if fname.exists():
         log.warning(f"File {fname} already exists.")
 
-    def log_mem():
-        # results.ru_maxrss is KB on Linux, B on macos
-        mem_max = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 2)
-        process = psutil.Process(os.getpid())
-        mem_rss = process.memory_info().rss / 1024**3
-        mem_vms = process.memory_info().vms / 1024**3
-        log.info(f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB")
-
+    # ---- Setup PTA frequencies
     pta_dur = args.pta_dur * YR
     nfreqs = args.nfreqs
     hifr = nfreqs/pta_dur
@@ -536,55 +581,61 @@ def run_sam_at_pspace_num(args, space, pnum, path_output):
     log.info(f"Created {fobs_cents.size} frequency bins")
     log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
     log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
-    log_mem()
+    _log_mem_usage(log)
     assert nfreqs == fobs_cents.size
 
+    # ---- Calculate GWB from SAM
     try:
         log.debug("Selecting `sam` and `hard` instances")
         sam, hard = space(pnum)
-        log_mem()
+        _log_mem_usage(log)
         log.debug(f"Calculating GWB for shape ({fobs_cents.size}, {args.nreals})")
         gwb = sam.gwb(fobs_edges, realize=args.nreals, hard=hard)
-        log_mem()
+        _log_mem_usage(log)
         log.debug(f"{holo.utils.stats(gwb)=}")
         legend = space.param_dict(pnum)
         log.debug(f"Saving {pnum} to file")
         data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb)
         rv = True
     except Exception as err:
-        log.exception("\n\n")
-        log.exception("="*100)
         log.exception(f"`run_sam` FAILED on {pnum=}\n")
         log.exception(err)
-        log.exception("="*100)
-        log.exception("\n\n")
         rv = False
         legend = {}
         data = dict(fail=str(err))
 
+    # ---- Fit GWB spectra
     if rv:
         try:
-            fits_data = get_gwb_fits_data(fobs_cents, gwb)
+            nbins_plaw, fit_plaw, fit_plaw_med = fit_spectra_plaw(fobs_cents, gwb, FITS_NBINS_PLAW)
+            nbins_turn, fit_turn, fit_turn_med = fit_spectra_turn(fobs_cents, gwb, FITS_NBINS_TURN)
+
+            fit_data = dict(
+                fit_nbins_plaw=nbins_plaw, fit_plaw=fit_plaw, fit_plaw_med=fit_plaw_med,
+                fit_nbins_turn=nbins_turn, fit_turn=fit_turn, fit_turn_med=fit_turn_med,
+            )
         except Exception as err:
             log.exception("Failed to load gwb fits data!")
             log.exception(err)
-            fits_data = {}
+            fit_data = {}
 
     else:
-        fits_data = {}
+        fit_data = {}
 
     meta_data = dict(
         pnum=pnum, pdim=space.ndims, nsamples=args.nsamples, librarian_version=__version__,
         param_names=space.names, params=space._params, samples=space._samples,
     )
 
-    np.savez(fname, **data, **meta_data, **fits_data, **legend)
+    # ---- Save data to file
+    np.savez(fname, **data, **meta_data, **fit_data, **legend)
     log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-beg)}")
 
+    # ---- Plot GWB spectra
     if rv:
         try:
             fname = fname.with_suffix('.png')
-            fig = make_gwb_plot(fobs_cents, gwb, fits_data)
+            fig = make_gwb_plot(fobs_cents, gwb, fit_plaw_data)
             fig.savefig(fname, dpi=300)
             log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)}")
             plt.close('all')
@@ -595,196 +646,14 @@ def run_sam_at_pspace_num(args, space, pnum, path_output):
     return rv
 
 
-'''
-class _Parameter_Space(abc.ABC):
-
-    _PARAM_NAMES = []
-
-    def __init__(self, log, nsamples, sam_shape, **kwargs):
-
-        self.log = log
-        self.nsamples = nsamples
-        self.sam_shape = sam_shape
-
-        names = []
-        params = []
-
-        log.debug(f"Loading parameters: {self._PARAM_NAMES}")
-        for par in self._PARAM_NAMES:
-            if par not in kwargs:
-                err = f"Parameter '{par}' missing from kwargs={kwargs}!"
-                log.exception(err)
-                raise ValueError(err)
-
-            vv = kwargs.pop(par)
-            msg = f"{par}: {vv}"
-            log.debug(f"\t{msg}")
-            try:
-                vv = np.linspace(*vv)
-            except Exception as err:
-                log.exception(f"Failed to create spacing from: {msg} ({err})")
-                raise
-
-            names.append(par)
-            params.append(vv)
-
-        self.paramdimen = len(params)
-        self.params = params
-        self.names = names
-        maxints = [tmparr.size for tmparr in params]
-
-        sampleindxs = pyDOE.lhs(n=self.paramdimen, samples=nsamples, criterion='m')
-
-        for i in range(self.paramdimen):
-            sampleindxs[:, i] = np.floor(maxints[i] * sampleindxs[:, i])
-
-        sampleindxs = sampleindxs.astype(int)
-        log.debug(f"d={len(params)} samplelims={maxints} nsamples={nsamples}")
-        self.sampleindxs = sampleindxs
-
-        # self.param_grid = np.meshgrid(*params, indexing='ij')
-        # self.shape = self.param_grid[0].shape
-        self.shape = tuple([len(pp) for pp in params])
-        self.size = np.product(self.shape)
-        if self.size < nsamples:
-            err = (
-                f"There are only {self.size} gridpoints in parameter space but you are requesting "
-                f"{nsamples} samples of them. They will be over-sampled!"
-            )
-            log.warning(err)
-
-        return
-
-    def number_to_index(self, num):
-        idx = np.unravel_index(num, self.shape)
-        return idx
-
-    def lhsnumber_to_index(self, lhsnum):
-        idx = tuple(self.sampleindxs[lhsnum])
-        return idx
-
-    def index_to_number(self, idx):
-        num = np.ravel_multi_index(idx, self.shape)
-        return num
-
-    def params_at_index(self, index):
-        assert len(index) == len(self.params)
-        pars = [pp[ii] for pp, ii in zip(self.params, index)]
-        return pars
-
-    def param_dict_for_number(self, num):
-        idx = self.number_to_index(num)
-        pars = self.params_at_index(idx)
-        rv = {nn: pp for nn, pp in zip(self.names, pars)}
-        return rv
-
-    def param_dict_for_lhsnumber(self, lhsnum):
-        idx = self.lhsnumber_to_index(lhsnum)
-        pars = self.params_at_index(idx)
-        rv = {nn: pp for nn, pp in zip(self.names, pars)}
-        return rv
-
-    def params_for_number(self, num):
-        idx = self.number_to_index(num)
-        pars = self.params_at_index(idx)
-        return pars
-
-    def params_for_lhsnumber(self, lhsnum):
-        idx = self.lhsnumber_to_index(lhsnum)
-        pars = self.params_at_index(idx)
-        return pars
-
-    # @abc.abstractmethod
-    def sam_for_number(self, num):
-        raise
-        return
-
-    @abc.abstractmethod
-    def sam_for_lhsnumber(self, lhsnum):
-        return
-
-
-class _LHS_Parameter_Space(_Parameter_Space):
-
-    _PARAM_NAMES = []
-
-    def __init__(self, log, nsamples, sam_shape, lhs_sampler='scipy', seed=None, **kwargs):
-
-        self.log = log
-        self.nsamples = nsamples
-        self.sam_shape = sam_shape
-        self.lhs_sampler = lhs_sampler
-        self.seed = seed
-
-        names = []
-        param_ranges = []
-
-        log.debug(f"Loading parameters: {self._PARAM_NAMES}")
-        for par in self._PARAM_NAMES:
-            if par not in kwargs:
-                err = f"Parameter '{par}' missing from kwargs={kwargs}!"
-                log.exception(err)
-                raise ValueError(err)
-
-            vv = kwargs.pop(par)
-            msg = f"{par}: {vv}"
-            log.debug(f"\t{msg}")
-            if len(vv) > 3 or len(vv) < 2:
-                err = f"Wanted 2 arguments in {par}, but got {len(vv)}: {vv}"
-                log.exception(err)
-                raise ValueError(err)
-            elif len(vv) == 3:
-                msg = f"Wanted 2 arguments in {par}, but got {len(vv)}: {vv}. I will assume you are using the NON-LHS initialization scheme. Bad scientist!  For LHS, give min and max values, not grid size. I will guess that the first two values are min and max values and ignore the third."
-                log.warning(msg)
-                vv = vv[0:2]
-
-            names.append(par)
-            param_ranges.append(vv)
-
-        self.paramdimen = len(param_ranges)
-        self.param_ranges = np.array(param_ranges)
-        self.names = names
-        self.params = np.zeros((self.nsamples, self.paramdimen))
-        # Below is done out of laziness and backwards compatibility but should be deprecated
-        self.sampleindxs = -1
-
-        if self.seed is not None:
-            log.info(f"Generated with random seed: {self.seed}")
-        else:
-            log.info(f"Did not use seed. Initializing random state explicitly for reproducibility.")
-            np.random.seed(None)
-            st0 = np.random.get_state()
-            log.info(f"Random state is:\n{st0}")
-
-        # do scipy LHS
-        if self.lhs_sampler == 'scipy':
-            LHS = qmc.LatinHypercube(d=self.paramdimen, centered=False, strength=1, seed=self.seed)
-            # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
-            sample_rvs = LHS.random(n=nsamples)
-        # do pyDOE LHS
-        elif self.lhs_sampler == 'pydoe':
-            sample_rvs = pyDOE.lhs(n=self.paramdimen, samples=nsamples, criterion='m')
-        else:
-            err = f"unknown LHS sampler: {self.lhs_sampler}"
-            log.exception(err)
-            raise ValueError(err)
-
-        for i in range(self.paramdimen):
-            # Assume uniform sampling from min to max of each parameter
-            self.params[:, i] = sample_rvs[:, i] * (self.param_ranges[i][1] - self.param_ranges[i][0]) + self.param_ranges[i][0]
-
-    def param_dict_for_lhsnumber(self, num):
-        rv = {nn: pp for nn, pp in zip(self.names, self.params[num, :])}
-        return rv
-
-    def params_for_lhsnumber(self, num):
-        pars = self.params[num, :]
-        return pars
-
-    # Below are done out of laziness and backwards compatibility but should be deprecated
-    def lhsnumber_to_index(self, pnum):
-        return pnum
-'''
+def _log_mem_usage(log):
+    # results.ru_maxrss is KB on Linux, B on macos
+    mem_max = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 2)
+    process = psutil.Process(os.getpid())
+    mem_rss = process.memory_info().rss / 1024**3
+    mem_vms = process.memory_info().vms / 1024**3
+    log.info(f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB")
+    return
 
 
 def main():
