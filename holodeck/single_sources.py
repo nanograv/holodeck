@@ -1848,7 +1848,7 @@ def plot_percentiles(ax, xx, BG=None, SS=None, LABEL='',
         ax.fill_between(xx, Q25_ss, Q75_ss, alpha=0.2, color=SS_COLOR)
       
 
-def plot_params(axs, xx, grid, REALS=1, LABEL='',
+def plot_params(axs, xx, REALS=1, LABEL='', grid=None, 
                 BG_PARAMS=None, SS_PARAMS=None,
                 BG_MEDIAN=True, SS_MEDIAN=True,
                 BG_ERRORS=True, SS_ERRORS=True,
@@ -1856,7 +1856,7 @@ def plot_params(axs, xx, grid, REALS=1, LABEL='',
                 TITLES = np.array([['Total Mass $M/M_\odot$', 'Mass Ratio $q$'], 
                                    ['Redshift $z$', 'Characteristic Strain $h_c$']]),
                 XLABEL = 'Frequency $f_\mathrm{obs}$ (1/yr)',
-                SHOW_LEGEND = True, SHOW_GRID = True):             
+                SHOW_LEGEND = True):             
     """
     Plot mass, ratio, redshift, and strain in 4 separate subplots.
 
@@ -1883,10 +1883,10 @@ def plot_params(axs, xx, grid, REALS=1, LABEL='',
     #         edgecolor='k', alpha=0.5, label='single source'+LABEL)
             if(ii==0 or jj==0): # mass, ratio, or redshift
                 # bin edges
-                for kk in range(len(grid[ii,jj])):
-                    if(kk==0): edgelabel='edges'
-                    else: edgelabel=None 
-                    if(SHOW_GRID == True):
+                if(grid is not None):
+                    for kk in range(len(grid[ii,jj])):
+                        if(kk==0): edgelabel='edges'
+                        else: edgelabel=None 
                         axs[ii,jj].axhline(grid[ii,jj][kk], color='k', alpha=0.6, lw=0.15, label=edgelabel)
                 
             if(BG_PARAMS is not None):

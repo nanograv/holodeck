@@ -240,7 +240,7 @@ if __name__ == "__main__":
 
     if (comm.rank == 0) and (not args.test):
         log.info("Concatenating outputs into single file")
-        holo.librarian.sam_lib_combine(PATH_OUTPUT, log)
+        holo.librarian.sam_lib_combine_ss(PATH_OUTPUT, log)
         log.info("Concatenating completed")
 
     if comm.rank == 0:
