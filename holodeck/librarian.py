@@ -414,6 +414,175 @@ def sam_lib_combine(path_output, log, debug=False):
     log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
     return
 
+def sam_lib_combine_ss(path_output, log, debug=False):
+    path_output = Path(path_output)
+    log.info(f"Path output = {path_output}")
+
+    regex = "lib_sams__p*.npz"
+    files = sorted(path_output.glob(regex))
+    num_files = len(files)
+    log.info(f"\texists={path_output.exists()}, found {num_files} files")
+
+    # ---- Make sure that no file numbers are missing
+    all_exist = True
+    log.info("Checking files")
+    ii = 0
+    for ii in tqdm.tqdm(range(num_files)):
+        temp = path_output.joinpath(regex.replace('*', f"{ii:06d}"))
+        exists = temp.exists()
+        if not exists:
+            all_exist = False
+            break
+
+    if num_files < 2:
+        all_exist = False
+
+    if not all_exist:
+        err = f"Missing at least file number {ii} out of {num_files} files!"
+        log.exception(err)
+        raise ValueError(err)
+
+    # ---- Find and check an example data file
+    idx_template = 0
+    temp = files[idx_template]
+    data = np.load(temp, allow_pickle=True)
+    while ('fail' in data) or ('hc_bg' not in data) or ('hc_ss' not in data):
+        idx_template += 1
+        try:
+            temp = files[idx_template]
+        except IndexError as err:
+            log.error(err)
+            log.exception("All {len(files)} files are failed! Cannot find a template!")
+            raise # do we not specify what to raise, e.g. "raise IndexError(err)" since we already defined it?
+        data = np.load(temp, allow_pickle=True)
+
+    log.info(f"Test file: {temp}\n\tkeys: {list(data.keys())}")
+    fobs = data['fobs']
+    fobs_edges = data['fobs_edges']
+    nfreqs = fobs.size
+
+    temp_hc_ss = data['hc_ss'][:]
+    temp_hc_bg = data['hc_bg'][:]
+    temp_sspar = data['sspar'][:]
+    temp_bgpar = data['bgpar'][:]
+    assert np.ndim(temp_hc_bg) == 2
+    assert np.ndim(temp_hc_ss) == 3
+    assert np.ndim(temp_sspar) == 4
+    assert np.ndim(temp_bgpar) == 3
+    _nfreqs, nreals = temp_hc_bg.shape
+    assert nfreqs == _nfreqs
+    all_sample_vals = data['samples']   # uniform [0.0, 1.0] samples in each dimension, converted to parameters
+    all_param_vals = data['params']     # physical parameters
+    param_names = data['param_names']
+    nsamples = data['nsamples']
+    pdim = data['pdim']
+    lib_vers = str(data['librarian_version'])
+    log.info(f"Sample file uses librarian.py version {lib_vers}")
+    new_lib_vers = __version__
+    if lib_vers != new_lib_vers:
+        log.warning(f"Loaded file {temp} uses librarian.py version {lib_vers}, current version is {new_lib_vers}!")
+
+    lib_vers = [lib_vers]
+    assert all_sample_vals.shape == (nsamples, pdim)
+    assert all_param_vals.shape == (nsamples, pdim)
+    if num_files != nsamples:
+        raise ValueError(f"nsamples={nsamples} but num_files={num_files} !!")
+
+    fit_nbins = data['fit_nbins']
+    fit_shape = data['fit_lamp'].shape
+    fit_med_shape = data['fit_med_lamp'].shape
+    fit_keys = ['fit_lamp', 'fit_plaw']
+    fit_med_keys = ['fit_med_lamp', 'fit_med_plaw']
+    for fk in fit_keys + fit_med_keys:
+        log.info(f"\t{fk:>40s}: {data[fk].shape}")
+
+    # ---- Store results from all files
+
+    gwb_shape = [num_files, nfreqs, nreals]
+    shape_names = ['params', 'freqs', 'reals']
+    gwb = np.zeros(gwb_shape)
+    sample_params = np.zeros((num_files, pdim))
+    fit_shape = (num_files,) + fit_shape
+    fit_med_shape = (num_files,) + fit_med_shape
+    fit_data = {kk: np.zeros(fit_shape) for kk in fit_keys}
+    fit_data.update({kk: np.zeros(fit_med_shape) for kk in fit_med_keys})
+
+    log.info(f"Collecting data from {len(files)} files")
+    good_samp = np.ones(nsamples, dtype=bool)
+    all_nonzero = np.zeros(nsamples, dtype=bool)
+    any_nonzero = np.zeros_like(all_nonzero)
+    tot_nonzero = np.zeros((nsamples, nreals), dtype=bool)
+    for ii, file in enumerate(tqdm.tqdm(files)):
+        temp = np.load(file, allow_pickle=True)
+        # When a processor fails for a given parameter, the output file is still created with the 'fail' key added
+        if ('fail' in temp) or ('gwb' not in temp):
+            msg = f"file {ii=:06d} is a failure file, setting values to NaN ({file})"
+            log.warning(msg)
+            gwb[ii, :, :] = np.nan
+            for fk in fit_keys + fit_med_keys:
+                fit_data[fk][ii, ...] = np.nan
+
+            good_samp[ii] = False
+            continue
+
+        this_gwb = temp['gwb']
+        all_nonzero[ii] = np.all(this_gwb > 0.0)
+        any_nonzero[ii] = np.any(this_gwb > 0.0)
+        tot_nonzero[ii, :] = np.all(this_gwb > 0.0, axis=0)
+
+        # Make sure basic parameters match from this file to the test file
+        assert ii == temp['pnum']
+        assert np.allclose(fobs, temp['fobs'])
+        assert np.allclose(fobs_edges, temp['fobs_edges'])
+        check = str(temp['librarian_version'])
+        if check not in lib_vers:
+            log.warning("Mismatch in librarian.py version in saved files!  {ii} {file} with version {check}")
+            lib_vers.append(check)
+
+        # Make sure the individual parameters are consistent with the test file
+        for jj, nam in enumerate(param_names):
+            check = temp[nam]
+            expect = all_param_vals[ii, jj]
+            if not np.isclose(check, expect):
+                err = f"Expected {expect} from all parameters [{ii}, {jj}={nam}], but got {check}!"
+                log.exception(f"error in file {ii} {file}")
+                log.exception(err)
+                raise ValueError(err)
+
+            sample_params[ii, jj] = check
+
+        for fk in fit_keys + fit_med_keys:
+            fit_data[fk][ii, ...] = temp[fk][...]
+
+        # Store the GWB from this file
+        gwb[ii, :, :] = temp['gwb'][...]
+        if debug:
+            break
+
+    log.info(f"{utils.frac_str(~good_samp)} files are failures")
+    log.info(f"GWB")
+    log.info(f"\tall nonzero: {utils.frac_str(all_nonzero)} ")
+    log.info(f"\tany nonzero: {utils.frac_str(any_nonzero)} ")
+    log.info(f"\ttot nonzero: {utils.frac_str(tot_nonzero)} (realizations)")
+
+    # ---- Save to concatenated output file ----
+    out_filename = path_output.joinpath('sam_lib.hdf5')
+    log.info(f"Writing collected data to file {out_filename}")
+    with h5py.File(out_filename, 'w') as h5:
+        h5.create_dataset('fobs', data=fobs)
+        h5.create_dataset('fobs_edges', data=fobs_edges)
+        h5.create_dataset('gwb', data=gwb)
+        h5.create_dataset('sample_params', data=sample_params)
+        for fk in fit_keys + fit_med_keys:
+            h5.create_dataset(fk, data=fit_data[fk])
+        h5.attrs['fit_nbins'] = fit_nbins
+        h5.attrs['param_names'] = np.array(param_names).astype('S')
+        h5.attrs['shape_names'] = np.array(shape_names).astype('S')
+        h5.attrs['librarian_version'] = ", ".join(lib_vers)
+
+    log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
+    return
+
 
 def fit_spectra(freqs, gwb, nbins=[5, 10, 15]):
     nf, nreals = np.shape(gwb)
@@ -634,7 +803,7 @@ def run_ss_at_pspace_num(args, space, pnum, path_output):
         fobs_orb_edges = fobs_edges / 2.0 
         fobs_orb_cents = fobs_cents/ 2.0
         # edges
-        edges, dnum = sam.dynamic_binary_number(holo.hardening.Hard_GW, fobs_orb=fobs_orb_cents, zero_stalled=False) # should the zero stalled option be part of the parameter space?
+        edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents) # should the zero stalled option be part of the parameter space?
         edges[-1] = fobs_orb_edges
         # integrate for number
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
