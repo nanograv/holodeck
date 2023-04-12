@@ -28,6 +28,7 @@ FITS_NBINS_PLAW = [2, 3, 4, 5, 8, 9, 14]
 FITS_NBINS_TURN = [4, 9, 14, 30]
 
 FNAME_SIM_FILE = "lib_sams__p{pnum:06d}.npz"
+PSPACE_FILE_SUFFIX = ".pspace.npz"
 
 
 class _Param_Space(abc.ABC):
@@ -85,10 +86,33 @@ class _Param_Space(abc.ABC):
         return
 
     def save(self, path_output):
+        """Save the generated samples and parameter-space info from this instance to an output file.
+
+        This data can then be loaded using the `_Param_Space.from_save` method.
+
+        Arguments
+        ---------
+        path_output : str
+            Path in which to save file.  This must be an existing directory.
+
+        Returns
+        -------
+        fname : str
+            Output path including filename in which this parameter-space was saved.
+
+        """
         log = self._log
         my_name = self.__class__.__name__
         vers = __version__
-        fname = f"{my_name.lower()}.pspace.npz"
+
+        # make sure `path_output` is a directory, and that it exists
+        path_output = Path(path_output)
+        if not path_output.exists() or not path_output.is_dir():
+            err = f"save path {path_output} does not exist, or is not a directory!"
+            log.exception(err)
+            raise ValueError(err)
+
+        fname = f"{my_name.lower()}.{PSPACE_FILE_SUFFIX}"
         fname = path_output.joinpath(fname)
         log.debug(f"{my_name=} {vers=} {fname=}")
 
@@ -106,22 +130,39 @@ class _Param_Space(abc.ABC):
 
     @classmethod
     def from_save(cls, fname, log):
+        """Create a new _Param_Space instance loaded from the given file.
+
+        Arguments
+        ---------
+        fname : str
+            Filename containing parameter-space save information, generated form `_Param_Space.save`.
+
+        Returns
+        -------
+        space : `_Param_Space` instance
+
+        """
         log.debug(f"loading parameter space from {fname}")
         data = np.load(fname)
-        class_name = data['class_name'][()]
 
+        # get the name of the parameter-space class from the file, and try to find this class in the
+        # `holodeck.param_spaces` module
+        class_name = data['class_name'][()]
+        log.debug(f"loaded: {class_name=}, vers={data['librarian_version']}")
         pspace_class = getattr(holo.param_spaces, class_name, None)
+        # if it is not found, default to the current class/subclass
         if pspace_class is None:
             log.warning(f"pspace file {fname} has {class_name=}, not found in `holo.param_spaces`!")
             pspace_class = cls
 
+        # construct instance with dummy/temporary values (which will be overwritten)
         space = pspace_class(log, 10, 10, None)
-        log.debug(f"loaded: {class_name=}, vers={data['librarian_version']}")
         if class_name != space.__class__.__name__:
             err = "loaded class name '{class_name}' does not match this class name '{space.__name__}'!"
             log.warning(err)
             # raise RuntimeError(err)
 
+        # Store loaded parameters into the parameter-space instance
         for key in space._SAVED_ATTRIBUTES:
             setattr(space, key, data[key][()])
 
@@ -325,17 +366,28 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
         Path to file containing _Param_Space subclass instance.
         If `None` then `path_output` is searched for a `_Param_Space` save file.
 
+    Returns
+    -------
+    out_filename : Path,
+        Path to library output filename (typically ending with 'sam_lib.hdf5').
+
     """
+
+    # ---- setup paths
+
     path_output = Path(path_output)
     log.info(f"Path output = {path_output}")
+    # if dedicated simulation path is not given, assume same as general output path
     if path_sims is None:
         path_sims = path_output
     path_sims = Path(path_sims)
     log.info(f"Path sims = {path_sims}")
 
     # ---- load parameter space from save file
+
     if path_pspace is None:
-        regex = "*.pspace.npz"
+        # look for parameter-space save files
+        regex = "*." + PSPACE_FILE_SUFFIX   # "pspace.npz"
         files = sorted(path_output.glob(regex))
         num_files = len(files)
         msg = f"found {num_files} pspace.npz files in {path_output}"
@@ -351,11 +403,14 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
     param_names = pspace.param_names
     param_samples = pspace.param_samples
     nsamp, ndim = param_samples.shape
-    log.info(f"{nsamp=}, {ndim=}, {param_names=}")
+    log.debug(f"{nsamp=}, {ndim=}, {param_names=}")
 
     # ---- make sure all files exist; get shape information from files
 
-    fobs, nfreqs, nreals, fit_data = _check_files_and_load_shapes(path_sims, nsamp)
+    log.info(f"checking that all {nsamp} files exist")
+    fobs, nreals, fit_data = _check_files_and_load_shapes(path_sims, nsamp)
+    nfreqs = fobs.size
+    log.debug(f"{nfreqs=}, {nreals=}")
 
     # ---- Store results from all files
 
@@ -363,6 +418,7 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
     gwb, fit_data = _load_library_from_all_files(path_sims, gwb, fit_data, log)
 
     # ---- Save to concatenated output file ----
+
     out_filename = path_output.joinpath('sam_lib.hdf5')
     log.info(f"Writing collected data to file {out_filename}")
     with h5py.File(out_filename, 'w') as h5:
@@ -374,22 +430,46 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
         h5.attrs['param_names'] = np.array(param_names).astype('S')
 
     log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
+
     return out_filename
 
 
 def _check_files_and_load_shapes(path_sims, nsamp):
+    """Check that all `nsamp` files exist in the given path, and load info about array shapes.
+
+    Arguments
+    ---------
+    path_sims : str
+        Path in which individual simulation files can be found.
+    nsamp : int
+        Number of simulations/files that should be found.
+        This should typically be loaded from the parameter-space object used to generate the library.
+
+    Returns
+    -------
+    fobs : (F,) ndarray
+        Observer-frame frequency bin centers at which GW signals are calculated.
+    nreals : int
+        Number of realizations in the output files.
+    fit_data : dict
+        Dictionary where each key is a fit-parameter in all of the output files.  The values are
+        'ndarray's of the appropriate shapes to store fit-parameters from all files.
+        The 0th dimension is always for the number-of-files.
+
+    """
+
     fobs = None
-    nfreqs = None
     nreals = None
     fit_data = None
     for ii in tqdm.trange(nsamp):
         temp = _sim_fname(path_sims, ii)
-        exists = temp.exists()
-        if not exists:
+        if not temp.exists():
             err = f"Missing at least file number {ii} out of {nsamp} files!  {temp}"
             log.exception(err)
             raise ValueError(err)
-        if (fobs is not None) and (nfreqs is not None) and (nreals is not None) and (fit_data is not None):
+
+        # if we've already loaded all of the necessary info, then move on to the next file
+        if (fobs is not None) and (nreals is not None) and (fit_data is not None):
             continue
 
         temp = np.load(temp)
@@ -397,13 +477,13 @@ def _check_files_and_load_shapes(path_sims, nsamp):
 
         if fobs is None:
             fobs = temp['fobs'][()]
-            nfreqs = fobs.size
 
-        # find a file that has GWB data in it
+        # find a file that has GWB data in it (not all of them do, if the file was a 'failure' file)
         if (nreals is None) and ('gwb' in data_keys):
             nreals = temp['gwb'].shape[-1]
 
-        # find a file that has fits data in it
+        # find a file that has fits data in it (it's possible for the fits portion to fail by itself)
+        # initialize arrays to store output data for all files
         if (fit_data is None) and np.any([kk.startswith('fit_') for kk in data_keys]):
             fit_data = {}
             for kk in data_keys:
@@ -411,20 +491,36 @@ def _check_files_and_load_shapes(path_sims, nsamp):
                     continue
 
                 vv = temp[kk]
+                # arrays need to store values for 'nsamp' files
                 shape = (nsamp,) + vv.shape
                 fit_data[kk] = np.zeros(shape)
 
-    log.info(f"{nfreqs=}, {nreals=}")
     for kk, vv in fit_data.items():
-        log.info(f"\t{kk:>40s}: {vv.shape}")
+        log.debug(f"\t{kk:>20s}: {vv.shape}")
 
-    return fobs, nfreqs, nreals, fit_data
+    return fobs, nreals, fit_data
 
 
 def _load_library_from_all_files(path_sims, gwb, fit_data, log):
+    """Load data from all individual simulation files.
+
+    Arguments
+    ---------
+    path_sims : str
+        Path to find individual simulation files.
+    gwb : (S, F, R) ndarray
+        Array in which to store GWB data from all of 'S' files.
+        S: num-samples/simulations,  F: num-frequencies,  R: num-realizations.
+    fit_data : dict
+        Dictionary of ndarrays in which to store fit-parameters.
+    log : `logging.Logger`
+        Logging instance.
+
+    """
+
     nsamp = gwb.shape[0]
     log.info(f"Collecting data from {nsamp} files")
-    good_file = np.ones(nsamp, dtype=bool)
+    good_file = np.ones(nsamp, dtype=bool)     #: track which files contain useable data
     for pnum in tqdm.trange(nsamp):
         fname = _sim_fname(path_sims, pnum)
         temp = np.load(fname, allow_pickle=True)
@@ -432,6 +528,7 @@ def _load_library_from_all_files(path_sims, gwb, fit_data, log):
         if ('fail' in temp) or ('gwb' not in temp):
             msg = f"file {pnum=:06d} is a failure file, setting values to NaN ({fname})"
             log.warning(msg)
+            # set all parameters to NaN for failure files.  Note that this is distinct from gwb=0.0 which can be real.
             gwb[pnum, :, :] = np.nan
             for fk in fit_data.keys():
                 fit_data[fk][pnum, ...] = np.nan
@@ -554,7 +651,6 @@ def fit_spectra_turn(freqs, gwb, nbins):
 
 
 def make_gwb_plot(fobs, gwb, fit_data):
-    # psd =
     fig = holo.plot.plot_gwb(fobs, gwb)
     ax = fig.axes[0]
 
@@ -571,7 +667,7 @@ def make_gwb_plot(fobs, gwb, fit_data):
         for nbins in plot_nbins:
             idx = fit_nbins.index(nbins)
             pars = med_pars[idx]
-            # yy = 10.0 ** holo.utils._func_line(np.log10(fobs), *pars)
+
             pars[0] = 10.0 ** pars[0]
             yy = holo.utils._func_powerlaw_psd(fobs, 1/YR, *pars)
             label = fit_nbins[idx]
@@ -599,16 +695,40 @@ def make_gwb_plot(fobs, gwb, fit_data):
 
 
 def run_sam_at_pspace_num(args, space, pnum):
+    """Run the SAM simulation for sample-parameter `pnum` in the `space` parameter-space.
+
+    Arguments
+    ---------
+    args : `argparse.ArgumentParser` instance
+        Arguments from the `gen_lib_sams.py` script.
+        NOTE: this should be improved.
+    space : _Param_Space instance
+        Parameter space from which to load `sam` and `hard` instances.
+    pnum : int
+        Which parameter-sample from `space` should be run.
+
+    Returns
+    -------
+    rv : bool
+        True if this simulation was successfully run.
+
+    """
+
     log = args.log
+
+    # ---- get output filename for this simulation, check if already exists
+
     sim_fname = _sim_fname(args.output_sims, pnum)
     beg = datetime.now()
     log.info(f"{pnum=} :: {sim_fname=} beginning at {beg}")
     if sim_fname.exists():
         log.info(f"File {sim_fname} already exists.  {args.recreate=}")
+        # skip existing files unless we specifically want to recreate them
         if not args.recreate:
             return True
 
     # ---- Setup PTA frequencies
+
     pta_dur = args.pta_dur * YR
     nfreqs = args.nfreqs
     hifr = nfreqs/pta_dur
@@ -622,6 +742,7 @@ def run_sam_at_pspace_num(args, space, pnum):
     assert nfreqs == fobs_cents.size
 
     # ---- Calculate GWB from SAM
+
     try:
         log.debug("Selecting `sam` and `hard` instances")
         sam, hard = space(pnum)
@@ -640,6 +761,8 @@ def run_sam_at_pspace_num(args, space, pnum):
         data = dict(fail=str(err))
 
     # ---- Fit GWB spectra
+
+    fit_data = {}
     if rv:
         log.info("calculating spectra fits")
         try:
@@ -653,16 +776,14 @@ def run_sam_at_pspace_num(args, space, pnum):
         except Exception as err:
             log.exception("Failed to load gwb fits data!")
             log.exception(err)
-            fit_data = {}
-
-    else:
-        fit_data = {}
 
     # ---- Save data to file
+
     np.savez(sim_fname, **data, **fit_data)
     log.info(f"Saved to {sim_fname}, size {holo.utils.get_file_size(sim_fname)} after {(datetime.now()-beg)}")
 
     # ---- Plot GWB spectra
+
     if rv and args.plot:
         log.info("generating spectra plots")
         try:
