@@ -56,10 +56,11 @@ class _Param_Space(abc.ABC):
                 raise ValueError(err)
 
             try:
-                vv = val(0.0)
+                test = 0.5
+                vv = val(test)
                 f"{vv:.4e}"
             except Exception as err:
-                log.exception(f"Failed to call {val}(0.0)!")
+                log.exception(f"Failed to call {val}({test})!")
                 log.exception(err)
                 raise err
 
@@ -68,11 +69,11 @@ class _Param_Space(abc.ABC):
         # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
         LHS = qmc.LatinHypercube(d=ndims, centered=False, strength=1, seed=seed)
         # (S, D) - samples, dimensions
-        samples = LHS.random(n=nsamples)
-        params = np.zeros_like(samples)
+        uniform_samples = LHS.random(n=nsamples)
+        param_samples = np.zeros_like(uniform_samples)
 
         for ii, dist in enumerate(dists):
-            params[:, ii] = dist(samples[:, ii])
+            param_samples[:, ii] = dist(uniform_samples[:, ii])
 
         self._log = log
         self.names = names
@@ -81,28 +82,45 @@ class _Param_Space(abc.ABC):
         self.sam_shape = sam_shape
         self._seed = seed
         self._random_state = random_state
-        self._samples = samples
-        self._params = params
-
+        self._uniform_samples = uniform_samples
+        self._param_samples = param_samples
         return
 
-    def params(self, num):
-        return self._params[num]
+    def save(self, path_output):
+        log = self._log
+        my_name = self.__class__.__name__.lower()
+        fname = f"{my_name}.npz"
+        fname = path_output.joinpath(fname)
+        log.debug(f"{my_name=} {fname=}")
 
-    def param_dict(self, num):
-        rv = {nn: pp for nn, pp in zip(self.names, self.params(num))}
+        np.savez(
+            fname, param_names=self.names, sam_shape=self.sam_shape,
+            uniform_samples=self._uniform_samples, param_samples=self._param_samples,
+        )
+
+        log.info(f"Saved to {fname} size {utils.get_file_size(fname)}")
+        return fname
+
+    def params(self, samp_num):
+        return self._param_samples[samp_num]
+
+    def samples(self, param_num):
+        return self._param_samples[:, param_num]
+
+    def param_dict(self, samp_num):
+        rv = {nn: pp for nn, pp in zip(self.names, self.params(samp_num))}
         return rv
 
-    def __call__(self, num):
-        return self.model_for_number(num)
+    def __call__(self, samp_num):
+        return self.model_for_number(samp_num)
 
     @property
     def shape(self):
-        return self._samples.shape
+        return self._params.shape
 
-    def model_for_number(self, num):
-        params = self.param_dict(num)
-        self._log.debug(f"params {num} :: {params}")
+    def model_for_number(self, samp_num):
+        params = self.param_dict(samp_num)
+        self._log.debug(f"params {samp_num} :: {params}")
         return self.model_for_params(params, self.sam_shape)
 
     @classmethod
@@ -562,8 +580,9 @@ def make_gwb_plot(fobs, gwb, fit_plaw_data, fit_turn_data):
     return fig
 
 
-def run_sam_at_pspace_num(args, space, pnum, path_output):
+def run_sam_at_pspace_num(args, space, pnum):
     log = args.log
+    path_output = args.output
     fname = f"lib_sams__p{pnum:06d}.npz"
     fname = Path(path_output, fname)
     beg = datetime.now()
