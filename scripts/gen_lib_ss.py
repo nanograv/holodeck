@@ -3,17 +3,18 @@
 Usage
 -----
 
-mpirun -n <NPROCS> python ./scripts/gen_lib_sams.py <PATH> -n <SAMPS> -r <REALS> -f <FREQS>
+mpirun -n <NPROCS> python ./scripts/gen_lib_sams.py <PATH> -n <SAMPS> -r <REALS> -f <FREQS> -p <GET_PARS>
 
     <NPROCS> : number of processors to run on
     <PATH> : output directory to save data to
     <SAMPS> : number of parameter-space samples for latin hyper-cube
     <REALS> : number of realizations at each parameter-space location
     <FREQS> : number of frequencies (multiples of PTA observing baseline)
+    <GET_PARS> : whether or not to calculate sspar and bgpar
 
 Example:
 
-    mpirun -n 8 python ./scripts/gen_lib_sams.py output/2022-12-05_01 -n 32 -r 10 -f 20
+    mpirun -n 8 python ./scripts/gen_lib_sams.py output/2022-12-05_01 -n 32 -r 10 -f 20 -p True
 
 
 To-Do
@@ -53,6 +54,7 @@ DEF_SAM_SHAPE = (61, 81, 101)
 DEF_NUM_REALS = 100
 DEF_NUM_FBINS = 40
 DEF_PTA_DUR = 16.03     # [yrs]
+DEF_GET_PARS = False
 
 DEF_ECCEN_NUM_STEPS = 123
 DEF_ECCEN_NHARMS = 100
@@ -80,6 +82,8 @@ def setup_argparse():
                         help='Number of frequency bins', default=DEF_NUM_FBINS)
     parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
                         help='Shape of SAM grid', default=DEF_SAM_SHAPE)
+    parser.add_argument('-p', '--pars', action='store', dest='get_pars', type=bool,
+                        help='Whether or not to get pars', default=DEF_GET_PARS)
 
     parser.add_argument('--seed', action='store', type=int, default=None,
                         help='Random seed to use')
@@ -204,7 +208,7 @@ def main():
             continue
 
         try:
-            rv = holo.librarian.run_ss_at_pspace_num(args, space, par_num, PATH_OUTPUT) # CHANGE THIS TO SINGLE SOURCES
+            rv = holo.librarian.run_ss_at_pspace_num(args, space, par_num, PATH_OUTPUT) 
             if rv is False:
                 failures += 1
 
@@ -240,7 +244,7 @@ if __name__ == "__main__":
 
     if (comm.rank == 0) and (not args.test):
         log.info("Concatenating outputs into single file")
-        holo.librarian.sam_lib_combine_ss(PATH_OUTPUT, log)
+        holo.librarian.ss_lib_combine(PATH_OUTPUT, log, args.get_pars)
         log.info("Concatenating completed")
 
     if comm.rank == 0:
