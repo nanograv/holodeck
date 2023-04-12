@@ -20,7 +20,8 @@ Example:
 
 To-Do
 -----
-* #! IMPORTANT: mark output directories as incomplete until all runs have been finished.  Merged libraries from incomplete directories should also get some sort of flag! !#
+* mark output directories as incomplete until all runs have been finished.
+  Merged libraries from incomplete directories should also get some sort of flag!
 
 """
 
@@ -80,11 +81,13 @@ def main():
 
     indices = comm.scatter(indices, root=0)
 
-    iterator = holo.utils.tqdm(indices) if comm.rank == 0 else np.atleast_1d(indices)
+    iterator = holo.utils.tqdm(indices) if (comm.rank == 0) else np.atleast_1d(indices)
 
-    if args.test:
-        log.info("Running in testing mode. Outputting parameters:")
+    if comm.rank == 0:
+        space_fname = space.save(args.output)
+        log.info(f"saved parameter space {space} to {space_fname}")
 
+    comm.barrier()
     beg = datetime.now()
     log.info(f"beginning tasks at {beg}")
     failures = 0
@@ -96,9 +99,6 @@ def main():
         for kk, vv in pdict.items():
             msg += f"{kk}={vv}\n"
         log.info(msg)
-
-        if args.test:
-            continue
 
         rv = holo.librarian.run_sam_at_pspace_num(args, space, par_num)
         if rv is False:
@@ -116,7 +116,7 @@ def main():
     # Make sure all processes are done so that all files are ready for merging
     comm.barrier()
 
-    if (comm.rank == 0) and (not args.test):
+    if (comm.rank == 0):
         log.info("Concatenating outputs into single file")
         holo.librarian.sam_lib_combine(args.output, log)
         log.info("Concatenating completed")
@@ -135,6 +135,7 @@ def setup_basics():
 
     # setup log instance, separate for all processes
     log = _setup_log(args)
+    args.log = log
 
     if comm.rank == 0:
         # copy certain files to output directory
@@ -169,7 +170,7 @@ def setup_basics():
     return args, space, log
 
 
-def _setup_argparse():
+def _setup_argparse(*args, **kwargs):
     assert comm.rank == 0
 
     parser = argparse.ArgumentParser()
@@ -179,10 +180,10 @@ def _setup_argparse():
     parser.add_argument('output', metavar='output', type=str,
                         help='output path [created if doesnt exist]')
 
-    parser.add_argument('-n', '--nsamples', action='store', dest='nsamples', type=int, default=25,
-                        help='number of parameter space samples, must be square of prime')
+    parser.add_argument('-n', '--nsamples', action='store', dest='nsamples', type=int, default=1000,
+                        help='number of parameter space samples')
     parser.add_argument('-r', '--nreals', action='store', dest='nreals', type=int,
-                        help='number of realizations', default=DEF_NUM_REALS)
+                        help='number of realiz  ations', default=DEF_NUM_REALS)
     parser.add_argument('-d', '--dur', action='store', dest='pta_dur', type=float,
                         help='PTA observing duration [yrs]', default=DEF_PTA_DUR)
     parser.add_argument('-f', '--nfreqs', action='store', dest='nfreqs', type=int,
@@ -190,28 +191,36 @@ def _setup_argparse():
     parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
                         help='Shape of SAM grid', default=DEF_SAM_SHAPE)
 
+    parser.add_argument('--recreate', action='store_true', default=False,
+                        help='recreate existing simulation files')
+    parser.add_argument('--plot', action='store_true', default=False,
+                        help='produce plots for each simulation configuration')
     parser.add_argument('--seed', action='store', type=int, default=None,
                         help='Random seed to use')
-    parser.add_argument('-t', '--test', action='store_true', default=False, dest='test',
-                        help='Do not actually run, just output what parameters would have been done.')
+    # parser.add_argument('-t', '--test', action='store_true', default=False, dest='test',
+    #                     help='Do not actually run, just output what parameters would have been done.')
     parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
                         help='verbose output [INFO]')
 
-    args = parser.parse_args()
-
-    if args.test:
-        args.verbose = True
+    args = parser.parse_args(*args, **kwargs)
 
     output = Path(args.output).resolve()
     if not output.is_absolute:
         output = Path('.').resolve() / output
         output = output.resolve()
 
-    if not args.test:
-        output.mkdir(parents=True, exist_ok=True)
-
+    output.mkdir(parents=True, exist_ok=True)
     my_print(f"output path: {output}")
     args.output = output
+
+    output_sims = output.joinpath("sims")
+    output_sims.mkdir(parents=True, exist_ok=True)
+    args.output_sims = output_sims
+
+    if args.plot:
+        output_plots = output.joinpath("figs")
+        output_plots.mkdir(parents=True, exist_ok=True)
+        args.output_plots = output_plots
 
     return args
 
