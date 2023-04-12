@@ -26,29 +26,12 @@ from holodeck.constants import YR
 __version__ = "0.1.1"
 
 FITS_NBINS_PLAW = [2, 3, 4, 5, 8, 9, 14]
-FITS_NBINS_TURN = [4, 9, 14]
+FITS_NBINS_TURN = [4, 9, 14, 30]
 
 
 class _Param_Space(abc.ABC):
 
-    _SAVED_ATTRIBUTES = ["_sam_shape", "param_names", "_uniform_samples", "_param_samples"]
-
-    @classmethod
-    def from_save(cls, fname, log):
-        space = cls(log, 10, 10, None)
-        log.debug(f"loading parameter space from {fname}")
-        data = np.load(fname)
-        class_name = data['class_name']
-        log.debug(f"loaded: {class_name=}, vers={data['librarian_version']}")
-        if class_name != space.__class__.__name__:
-            err = "loaded class name '{class_name}' does not match this class name '{space.__name__}'!"
-            log.exception(err)
-            raise RuntimeError(err)
-
-        for key in space._SAVED_ATTRIBUTES:
-            setattr(space, key, data[key][()])
-
-        return space
+    _SAVED_ATTRIBUTES = ["sam_shape", "param_names", "_uniform_samples", "param_samples"]
 
     def __init__(self, log, nsamples, sam_shape, seed, **kwargs):
         log.debug(f"seed = {seed}")
@@ -86,11 +69,11 @@ class _Param_Space(abc.ABC):
 
         self._log = log
         self.param_names = param_names
-        self._sam_shape = sam_shape
+        self.sam_shape = sam_shape
+        self.param_samples = param_samples
+        self._uniform_samples = uniform_samples
         self._seed = seed
         self._random_state = random_state
-        self._uniform_samples = uniform_samples
-        self._param_samples = param_samples
         return
 
     def save(self, path_output):
@@ -113,8 +96,25 @@ class _Param_Space(abc.ABC):
         log.info(f"Saved to {fname} size {utils.get_file_size(fname)}")
         return fname
 
+    @classmethod
+    def from_save(cls, fname, log):
+        space = cls(log, 10, 10, None)
+        log.debug(f"loading parameter space from {fname}")
+        data = np.load(fname)
+        class_name = data['class_name']
+        log.debug(f"loaded: {class_name=}, vers={data['librarian_version']}")
+        if class_name != space.__class__.__name__:
+            err = "loaded class name '{class_name}' does not match this class name '{space.__name__}'!"
+            log.exception(err)
+            raise RuntimeError(err)
+
+        for key in space._SAVED_ATTRIBUTES:
+            setattr(space, key, data[key][()])
+
+        return space
+
     def params(self, samp_num):
-        return self._param_samples[samp_num]
+        return self.param_samples[samp_num]
 
     def param_dict(self, samp_num):
         rv = {nn: pp for nn, pp in zip(self.param_names, self.params(samp_num))}
@@ -125,7 +125,7 @@ class _Param_Space(abc.ABC):
 
     @property
     def shape(self):
-        return self._param_samples.shape
+        return self.param_samples.shape
 
     def model_for_number(self, samp_num):
         params = self.param_dict(samp_num)
@@ -546,7 +546,8 @@ def fit_spectra_turn(freqs, gwb, nbins):
     return nbins, fit_pars, fit_med_pars
 
 
-def make_gwb_plot(fobs, gwb, fit_plaw_data, fit_turn_data):
+def make_gwb_plot(fobs, gwb, fit_data):
+    # psd =
     fig = holo.plot.plot_gwb(fobs, gwb)
     ax = fig.axes[0]
 
@@ -554,23 +555,24 @@ def make_gwb_plot(fobs, gwb, fit_plaw_data, fit_turn_data):
     yy = 1e-15 * np.power(xx, -2.0/3.0)
     ax.plot(xx, yy, 'k--', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
 
-    if len(fit_plaw_data) > 0:
-        fit_nbins = fit_plaw_data['fit_plaw_nbins']
-        med_pars = fit_plaw_data['fit_plaw_med']
+    if len(fit_data) > 0:
+        fit_nbins = fit_data['fit_plaw_nbins']
+        med_pars = fit_data['fit_plaw_med']
 
         plot_nbins = [4, 14]
 
         for nbins in plot_nbins:
             idx = fit_nbins.index(nbins)
             pars = med_pars[idx]
-            yy = 10.0 ** holo.utils._func_line(np.log10(xx), *pars)
+            # yy = 10.0 ** holo.utils._func_line(np.log10(fobs), *pars)
+            pars[0] = 10.0 ** pars[0]
+            yy = holo.utils._func_powerlaw_psd(fobs, 1/YR, *pars)
             label = fit_nbins[idx]
             label = 'all' if label in [0, None] else f"{label:02d}"
             ax.plot(xx, yy, alpha=0.75, lw=1.0, label="plaw: " + str(label) + " bins", ls='--')
 
-    if len(fit_turn_data) > 0:
-        fit_nbins = fit_turn_data['fit_turn_nbins']
-        med_pars = fit_turn_data['fit_turn_med']
+        fit_nbins = fit_data['fit_turn_nbins']
+        med_pars = fit_data['fit_turn_med']
 
         plot_nbins = [14, 30]
 
@@ -591,13 +593,14 @@ def make_gwb_plot(fobs, gwb, fit_plaw_data, fit_turn_data):
 
 def run_sam_at_pspace_num(args, space, pnum):
     log = args.log
-    path_output = args.output
-    fname = f"lib_sams__p{pnum:06d}.npz"
-    fname = Path(path_output, fname)
+    fname_base = f"lib_sams__p{pnum:06d}.npz"
+    fname = Path(args.output_sims, fname_base)
     beg = datetime.now()
     log.info(f"{pnum=} :: {fname=} beginning at {beg}")
     if fname.exists():
-        log.warning(f"File {fname} already exists.")
+        log.info(f"File {fname} already exists.  {args.recreate=}")
+        if not args.recreate:
+            return True
 
     # ---- Setup PTA frequencies
     pta_dur = args.pta_dur * YR
@@ -623,7 +626,7 @@ def run_sam_at_pspace_num(args, space, pnum):
         log.debug(f"{holo.utils.stats(gwb)=}")
         legend = space.param_dict(pnum)
         log.debug(f"Saving {pnum} to file")
-        data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, gwb=gwb)
+        data = dict(fobs=fobs_cents, gwb=gwb)
         rv = True
     except Exception as err:
         log.exception(f"`run_sam` FAILED on {pnum=}\n")
@@ -634,13 +637,14 @@ def run_sam_at_pspace_num(args, space, pnum):
 
     # ---- Fit GWB spectra
     if rv:
+        log.info("calculating spectra fits")
         try:
-            nbins_plaw, fit_plaw, fit_plaw_med = fit_spectra_plaw(fobs_cents, gwb, FITS_NBINS_PLAW)
-            nbins_turn, fit_turn, fit_turn_med = fit_spectra_turn(fobs_cents, gwb, FITS_NBINS_TURN)
+            plaw_nbins, fit_plaw, fit_plaw_med = fit_spectra_plaw(fobs_cents, gwb, FITS_NBINS_PLAW)
+            turn_nbins, fit_turn, fit_turn_med = fit_spectra_turn(fobs_cents, gwb, FITS_NBINS_TURN)
 
             fit_data = dict(
-                fit_nbins_plaw=nbins_plaw, fit_plaw=fit_plaw, fit_plaw_med=fit_plaw_med,
-                fit_nbins_turn=nbins_turn, fit_turn=fit_turn, fit_turn_med=fit_turn_med,
+                fit_plaw_nbins=plaw_nbins, fit_plaw=fit_plaw, fit_plaw_med=fit_plaw_med,
+                fit_turn_nbins=turn_nbins, fit_turn=fit_turn, fit_turn_med=fit_turn_med,
             )
         except Exception as err:
             log.exception("Failed to load gwb fits data!")
@@ -650,23 +654,22 @@ def run_sam_at_pspace_num(args, space, pnum):
     else:
         fit_data = {}
 
-    meta_data = dict(
-        pnum=pnum, pdim=space.ndims, nsamples=args.nsamples, librarian_version=__version__,
-        param_names=space.names, params=space._params, samples=space._samples,
-    )
-
     # ---- Save data to file
-    np.savez(fname, **data, **meta_data, **fit_data, **legend)
+    np.savez(fname, **data, **fit_data, **legend)
     log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-beg)}")
 
     # ---- Plot GWB spectra
-    if rv:
+    if rv and args.plot:
+        log.info("generating spectra plots")
         try:
+            fname_base = f"lib_sams__p{pnum:06d}.npz"
+            fname = Path(args.output_plots, fname_base)
             fname = fname.with_suffix('.png')
-            fig = make_gwb_plot(fobs_cents, gwb, fit_plaw_data)
-            fig.savefig(fname, dpi=300)
+
+            fig = make_gwb_plot(fobs_cents, gwb, fit_data)
+            fig.savefig(fname, dpi=100)
             log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)}")
-            plt.close('all')
+            # plt.close('all')
         except Exception as err:
             log.exception("Failed to make gwb plot!")
             log.exception(err)
