@@ -31,38 +31,47 @@ FITS_NBINS_TURN = [4, 9, 14]
 
 class _Param_Space(abc.ABC):
 
-    def __init__(self, log, nsamples, sam_shape, seed, **kwargs):
+    _SAVED_ATTRIBUTES = ["_sam_shape", "param_names", "_uniform_samples", "_param_samples"]
 
+    @classmethod
+    def from_save(cls, fname, log):
+        space = cls(log, 10, 10, None)
+        log.debug(f"loading parameter space from {fname}")
+        data = np.load(fname)
+        class_name = data['class_name']
+        log.debug(f"loaded: {class_name=}, vers={data['librarian_version']}")
+        if class_name != space.__class__.__name__:
+            err = "loaded class name '{class_name}' does not match this class name '{space.__name__}'!"
+            log.exception(err)
+            raise RuntimeError(err)
+
+        for key in space._SAVED_ATTRIBUTES:
+            setattr(space, key, data[key][()])
+
+        return space
+
+    def __init__(self, log, nsamples, sam_shape, seed, **kwargs):
         log.debug(f"seed = {seed}")
         np.random.seed(seed)
-        #! NOTE: this should be saved to output!!!
+        # NOTE: this should be saved to output
         random_state = np.random.get_state()
         log.debug(f"Random state is:\n{random_state}")
 
-        names = list(kwargs.keys())
-        ndims = len(names)
+        param_names = list(kwargs.keys())
+        ndims = len(param_names)
         if ndims == 0:
             err = f"No parameters passed to {self}!"
             log.exception(err)
             raise RuntimeError(err)
 
         dists = []
-        for nam in names:
+        for nam in param_names:
             val = kwargs[nam]
 
             if not isinstance(val, _Param_Dist):
                 err = f"{nam}: {val} is not a `_Param_Dist` object!"
                 log.exception(err)
                 raise ValueError(err)
-
-            try:
-                test = 0.5
-                vv = val(test)
-                f"{vv:.4e}"
-            except Exception as err:
-                log.exception(f"Failed to call {val}({test})!")
-                log.exception(err)
-                raise err
 
             dists.append(val)
 
@@ -76,10 +85,8 @@ class _Param_Space(abc.ABC):
             param_samples[:, ii] = dist(uniform_samples[:, ii])
 
         self._log = log
-        self.names = names
-        self.nsamples = nsamples
-        self.ndims = ndims
-        self.sam_shape = sam_shape
+        self.param_names = param_names
+        self._sam_shape = sam_shape
         self._seed = seed
         self._random_state = random_state
         self._uniform_samples = uniform_samples
@@ -88,14 +95,19 @@ class _Param_Space(abc.ABC):
 
     def save(self, path_output):
         log = self._log
-        my_name = self.__class__.__name__.lower()
-        fname = f"{my_name}.npz"
+        my_name = self.__class__.__name__
+        vers = __version__
+        fname = f"{my_name.lower()}.npz"
         fname = path_output.joinpath(fname)
-        log.debug(f"{my_name=} {fname=}")
+        log.debug(f"{my_name=} {vers=} {fname=}")
+
+        data = {}
+        for key in self._SAVED_ATTRIBUTES:
+            data[key] = getattr(self, key)
 
         np.savez(
-            fname, param_names=self.names, sam_shape=self.sam_shape,
-            uniform_samples=self._uniform_samples, param_samples=self._param_samples,
+            fname, class_name=my_name, librarian_version=vers,
+            **data,
         )
 
         log.info(f"Saved to {fname} size {utils.get_file_size(fname)}")
@@ -104,11 +116,8 @@ class _Param_Space(abc.ABC):
     def params(self, samp_num):
         return self._param_samples[samp_num]
 
-    def samples(self, param_num):
-        return self._param_samples[:, param_num]
-
     def param_dict(self, samp_num):
-        rv = {nn: pp for nn, pp in zip(self.names, self.params(samp_num))}
+        rv = {nn: pp for nn, pp in zip(self.param_names, self.params(samp_num))}
         return rv
 
     def __call__(self, samp_num):
@@ -116,7 +125,7 @@ class _Param_Space(abc.ABC):
 
     @property
     def shape(self):
-        return self._params.shape
+        return self._param_samples.shape
 
     def model_for_number(self, samp_num):
         params = self.param_dict(samp_num)
