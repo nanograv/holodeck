@@ -414,7 +414,7 @@ def sam_lib_combine(path_output, log, debug=False):
     log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
     return
 
-def sam_lib_combine_ss(path_output, log, debug=False):
+def ss_lib_combine(path_output, log, get_pars, debug=False):
     path_output = Path(path_output)
     log.info(f"Path output = {path_output}")
 
@@ -463,12 +463,13 @@ def sam_lib_combine_ss(path_output, log, debug=False):
 
     temp_hc_ss = data['hc_ss'][:]
     temp_hc_bg = data['hc_bg'][:]
-    temp_sspar = data['sspar'][:]
-    temp_bgpar = data['bgpar'][:]
     assert np.ndim(temp_hc_bg) == 2
     assert np.ndim(temp_hc_ss) == 3
-    assert np.ndim(temp_sspar) == 4
-    assert np.ndim(temp_bgpar) == 3
+    if(get_pars):
+        temp_sspar = data['sspar'][:]
+        temp_bgpar = data['bgpar'][:]
+        assert np.ndim(temp_sspar) == 4
+        assert np.ndim(temp_bgpar) == 3
     _nfreqs, nreals = temp_hc_bg.shape
     assert nfreqs == _nfreqs
     all_sample_vals = data['samples']   # uniform [0.0, 1.0] samples in each dimension, converted to parameters
@@ -792,6 +793,7 @@ def run_ss_at_pspace_num(args, space, pnum, path_output):
     log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
     log_mem()
     assert nfreqs == fobs_cents.size
+    get_pars = args.get_pars
 
     try:
         log.debug("Selecting `sam` and `hard` instances")
@@ -809,14 +811,22 @@ def run_ss_at_pspace_num(args, space, pnum, path_output):
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
         number = number * np.diff(np.log(fobs_edges))
         # gws
-        hc_ss, hc_bg, sspar, bgpar = ss.ss_gws(edges, number, realize=args.nreals, 
-                                               loudest = 5, params = True) # replace 5 with args.nloudest
+        if(get_pars):
+            hc_ss, hc_bg, sspar, bgpar = ss.ss_gws(edges, number, realize=args.nreals, 
+                                               loudest = 5, params = True) 
+        else:
+            hc_ss, hc_bg = ss.ss_gws(edges, number, realize=args.nreals, 
+                                               loudest = 5, params = False) # replace 5 with args.nloudest
         log_mem()
         log.debug(f"{holo.utils.stats(hc_ss)=}")
         legend = space.param_dict(pnum)
         log.debug(f"Saving {pnum} to file")
-        data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
+        if(get_pars):
+            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
                     hc_ss = hc_ss, hc_bg = hc_bg, sspar = sspar, bgpar = bgpar)
+        else:
+            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
+                    hc_ss = hc_ss, hc_bg = hc_bg)
         ### EDITED UP TO HERE ###
 
         rv = True
