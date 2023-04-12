@@ -676,7 +676,7 @@ class Semi_Analytic_Model:
                 log.info(f"zeroing out {utils.frac_str(idx_stalled)} systems stalled from GMT")
                 dens[idx_stalled] = 0.0
             else:
-                log.warning("NOT zeroing out systems with GMTs extending past redshift zero!")
+                log.info("NOT zeroing out systems with GMTs extending past redshift zero!")
 
             self._density = dens
 
@@ -917,13 +917,13 @@ class Semi_Analytic_Model:
             log.info(f"fraction of binaries stalled at all xvals: {utils.frac_str(stalled)}")
             stalled_frac = np.count_nonzero(stalled) / stalled.size
             if stalled_frac > 0.8:
-                log.warning(f"A large fraction of binaries are stalled at all xvals!  {stalled_frac:.4e}")
+                log.info(f"A large fraction of binaries are stalled at all xvals!  {stalled_frac:.4e}")
 
             dnum[stall] = 0.0
             self._stall = stall
 
         else:
-            log.warning("WARNING: _stalled_ binaries are not being accounted for in `dynamic_binary_number`!")
+            log.info("stalled binaries are not being accounted for in `dynamic_binary_number`!")
 
         self._dynamic_binary_number = dnum
 
