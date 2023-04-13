@@ -483,16 +483,6 @@ def eccen_func(cent: float, width: float, size: int) -> np.ndarray:
     return eccen
 
 
-def _func_gaussian(xx, aa, mm, ss):
-    yy = aa * np.exp(-(xx - mm)**2 / (2.0 * ss**2))
-    return yy
-
-
-def fit_gaussian(xx, yy, guess=[1.0, 0.0, 1.0]):
-    popt, pcov = sp.optimize.curve_fit(_func_gaussian, xx, yy, p0=guess, maxfev=10000)
-    return popt, pcov
-
-
 def frac_str(vals, prec=2):
     """Return a string with the fraction and decimal of non-zero elements of the given array.
 
@@ -1295,6 +1285,133 @@ def _integrate_grid_differential_number(edges, dnum, freq=False):
 
 
 # =================================================================================================
+# ====    Fitting Functions    ====
+# =================================================================================================
+
+
+def _func_gaussian(xx, aa, mm, ss):
+    yy = aa * np.exp(-(xx - mm)**2 / (2.0 * ss**2))
+    return yy
+
+
+def fit_gaussian(xx, yy, guess=[1.0, 0.0, 1.0]):
+    popt, pcov = sp.optimize.curve_fit(_func_gaussian, xx, yy, p0=guess, maxfev=10000)
+    return popt, pcov
+
+
+def _func_line(xx, amp, slope):
+    yy = amp + slope * xx
+    return yy
+
+
+def fit_powerlaw(xx, yy, init=[-15.0, -2.0/3.0]):
+    """
+
+    Returns
+    -------
+    log10_amp
+    plaw
+
+    """
+
+    popt, pcov = sp.optimize.curve_fit(_func_line, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
+    log10_amp = popt[0]
+    gamma = popt[1]
+    return log10_amp, gamma
+
+
+def _func_powerlaw_psd(freqs, fref, amp, index):
+    aa = (amp**2) / (12.0 * np.pi**2)
+    yy = aa * np.power(freqs/fref, index) * np.power(fref, -3)
+    return yy
+
+
+def fit_powerlaw_psd(xx, yy, fref, init=[-15.0, -13.0/3.0]):
+    def fit_func(xx, log10_amp, index):
+        amp = 10.0 ** log10_amp
+        yy = _func_powerlaw_psd(xx, fref, amp, index)
+        return np.log10(yy)
+
+    popt, pcov = sp.optimize.curve_fit(
+        fit_func, xx, np.log10(yy),
+        p0=init, maxfev=10000, full_output=False
+    )
+    return popt
+
+
+def fit_powerlaw_fixed_index(xx, yy, index=-2.0/3.0, init=[-15.0]):
+    """
+
+    Returns
+    -------
+    log10_amp
+    plaw
+
+    """
+    _func_fixed = lambda xx, amp: _func_line(xx, amp, index)
+    popt, pcov = sp.optimize.curve_fit(_func_fixed, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
+    log10_amp = popt[0]
+    return log10_amp
+
+
+def _func_turnover_hc(freqs, fref, amp, gamma, fbreak, kappa):
+    alpha = (3.0 + gamma) / 2.0
+    bend = np.power(fbreak/freqs, kappa)
+    yy = amp * np.power(freqs/fref, alpha) * np.power(1.0 + bend, -0.5)
+    return yy
+
+
+def _func_turnover_loglog_hc(xx, amp, gamma, fbreak, kappa):
+    alpha = (3.0 + gamma) / 2.0
+    uu = np.power(10.0, xx*kappa)
+    bb = np.power(fbreak, kappa)
+    yy = amp + alpha*xx - 0.5 * np.log10(1.0 + bb/uu)
+    return yy
+
+
+def fit_turnover_hc(xx, yy, init=[-16.0, -13/3, 0.3, 2.5]):
+    """
+    """
+    popt, pcov = sp.optimize.curve_fit(
+        _func_turnover_loglog_hc, np.log10(xx), np.log10(yy),
+        p0=init, maxfev=10000, full_output=False
+    )
+    return popt
+
+
+def _func_turnover_psd(freqs, fref, amp, gamma, fbreak, kappa):
+    bend = np.power(fbreak/freqs, kappa)
+    bend = np.power(1.0 + bend, -1.0)
+    aa = (amp**2) / (12 * np.pi**2)
+    yy = aa * np.power(freqs/fref, gamma) * bend * np.power(fref, -3)
+    return yy
+
+
+def fit_turnover_psd(xx, yy, fref, init=[-16, -13/3, 0.3/YR, 2.5]):
+    """
+
+    Parameters
+    ----------
+    xx : (F,)
+        Frequencies in units of reference-frequency (e.g. 1/yr)
+    yy : (F,)
+        GWB PSD
+
+    """
+
+    def fit_func(xx, log10_amp, *args):
+        amp = 10.0 ** log10_amp
+        yy = _func_turnover_psd(xx, fref, amp, *args)
+        return np.log10(yy)
+
+    popt, pcov = sp.optimize.curve_fit(
+        fit_func, xx, np.log10(yy),
+        p0=init, maxfev=10000, full_output=False
+    )
+    return popt
+
+
+# =================================================================================================
 # ====    General Astronomy    ====
 # =================================================================================================
 
@@ -1534,6 +1651,7 @@ def redz_after(time, redz=None, age=None):
         new_redz[idx] = cosmo.tage_to_z(new_age[idx])
 
     return new_redz
+
 
 def schwarzschild_radius(mass):
     """Return the Schwarschild radius [cm] for the given mass [grams].
@@ -2029,6 +2147,47 @@ def gamma_strain_to_psd(gamma_strain):
 def gamma_strain_to_omega(gamma_strain):
     gamma_omega = (gamma_strain - 2.0) / 2.0
     return gamma_omega
+
+
+def char_strain_to_psd(freqs, hc):
+    """
+
+    Arguments
+    ---------
+    freqs : array_like
+        Frequencies of interest in [1/sec].
+        Note: these should NOT be in units of reference frequency, but in units of [Hz] = [1/sec].
+    hc : array_like
+        Characteristic strain.
+
+    Returns
+    -------
+    psd : array_like
+        Power spectral density of gravitational waves.
+
+
+    """
+    psd = hc**2 / (12*np.pi**2)
+    psd = psd * np.power(freqs, -3)
+    # psd = psd * np.power(freqs/fref, -3) * np.power(fref, -3)
+    return psd
+
+
+def psd_to_char_strain(freqs, psd):
+    hc = np.sqrt(psd * (12*np.pi**2 * freqs**3))
+    return hc
+
+
+def char_strain_to_rho(freqs, hc, tspan):
+    psd = char_strain_to_psd(freqs, hc)
+    rho = np.sqrt(psd/tspan)
+    return rho
+
+
+def rho_to_char_strain(freqs, rho, tspan):
+    psd = tspan * rho**2
+    hc = psd_to_char_strain(freqs, psd)
+    return hc
 
 
 @numba.njit
