@@ -381,14 +381,37 @@ def draw_gwb(ax, xx, gwb, nsamp=10, color=None, label=None, **kwargs):
 
     return hh
 
+def draw_ss_and_gwb(ax, xx, gwb, hc_ss, nsamp=10, color=None, label=None, **kwargs):
+    if color is None:
+        color = ax._get_lines.get_next_color()
 
-def plot_gwb(fobs, gwb, **kwargs):
+    kw_plot = kwargs.get('plot', {})
+    kw_plot.setdefault('color', color)
+    hh = draw_med_conf(ax, xx, gwb, plot=kw_plot, **kwargs)
+
+    if (nsamp is not None) and (nsamp > 0):
+        nsamp_max = gwb.shape[1]
+        idx = np.random.choice(nsamp_max, np.min([nsamp, nsamp_max]), replace=False)
+        for ii in idx:
+            ax.plot(xx, gwb[:, ii], color=color, alpha=0.25, lw=1.0, ls='-')
+            for ll in range(len(hc_ss[0,0])):
+                if(ll==0): edgecolor='k'
+                else: edgecolor=None
+                ax.scatter(xx, hc_ss[:, ii, ll], color=color, alpha=0.25,
+                           edgecolor=edgecolor)
+
+    return hh
+
+def plot_gwb(fobs, gwb, hc_ss=None, **kwargs):
     xx = fobs * YR
     fig, ax = figax(
         xlabel=LABEL_GW_FREQUENCY_YR,
         ylabel=LABEL_CHARACTERISTIC_STRAIN
     )
-    draw_gwb(ax, xx, gwb, **kwargs)
+    if(hc_ss is not None):
+        draw_ss_and_gwb(ax, xx, gwb, hc_ss)
+    else: 
+        draw_gwb(ax, xx, gwb, **kwargs)
     _twin_hz(ax)
     return fig
 
