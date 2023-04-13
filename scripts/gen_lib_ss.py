@@ -10,11 +10,11 @@ mpirun -n <NPROCS> python ./scripts/gen_lib_sams.py <PATH> -n <SAMPS> -r <REALS>
     <SAMPS> : number of parameter-space samples for latin hyper-cube
     <REALS> : number of realizations at each parameter-space location
     <FREQS> : number of frequencies (multiples of PTA observing baseline)
-    <GET_PARS> : whether or not to calculate sspar and bgpar
+    <GET_PARS> : int of whether or not to calculate sspar and bgpar (0 for False, 1 for True)
 
 Example:
 
-    mpirun -n 8 python ./scripts/gen_lib_sams.py output/2022-12-05_01 -n 32 -r 10 -f 20 -p True
+    mpirun -n 8 python ./scripts/gen_lib_sams.py output/2022-12-05_01 -n 32 -r 10 -f 20 -p 1
 
 
 To-Do
@@ -54,7 +54,6 @@ DEF_SAM_SHAPE = (61, 81, 101)
 DEF_NUM_REALS = 100
 DEF_NUM_FBINS = 40
 DEF_PTA_DUR = 16.03     # [yrs]
-DEF_GET_PARS = False
 
 DEF_ECCEN_NUM_STEPS = 123
 DEF_ECCEN_NHARMS = 100
@@ -82,8 +81,8 @@ def setup_argparse():
                         help='Number of frequency bins', default=DEF_NUM_FBINS)
     parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
                         help='Shape of SAM grid', default=DEF_SAM_SHAPE)
-    parser.add_argument('-p', '--pars', action='store', dest='get_pars', type=bool,
-                        help='Whether or not to get pars', default=DEF_GET_PARS)
+    parser.add_argument('-p', '--pars', action='store', dest='get_pars', type=int,
+                        help='Whether or not to get pars', default=0)
 
     parser.add_argument('--seed', action='store', type=int, default=None,
                         help='Random seed to use')
@@ -174,6 +173,7 @@ log.info(
 
 
 def main():
+    print('args.get_pars =', args.get_pars)
     failures = 0
     npars = args.nsamples
 

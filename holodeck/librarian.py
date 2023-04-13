@@ -680,6 +680,31 @@ def make_gwb_plot(fobs, gwb, fits_data):
 
     return fig
 
+def make_ss_gws_plot(fobs, hc_ss, hc_bg, fits_data, INCLUDE_MEDIANS = False):
+    fig, ax = holo.plot.figax(xlabel=holo.plot.LABEL_GW_FREQUENCY_YR,
+        ylabel=holo.plot.LABEL_CHARACTERISTIC_STRAIN)
+
+    xx = fobs * YR
+
+    if len(fits_data):
+        xx = fobs * YR
+        yy = 1e-15 * np.power(xx, -2.0/3.0)
+        ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
+
+        fits = get_gwb_fits_data(fobs, hc_bg) # I should make a ss version of this
+
+        for ls, idx in zip([":", "--"], [1, -1]):
+            med_lamp = fits['fit_med_lamp'][idx]
+            med_plaw = fits['fit_med_plaw'][idx]
+            yy = (10.0 ** med_lamp) * (xx ** med_plaw)
+            label = fits['fit_nbins'][idx]
+            label = 'all' if label in [0, None] else label
+            ax.plot(xx, yy, color='k', ls=ls, alpha=0.5, lw=2.0, label=str(label) + " bins")
+
+        label = fits['fit_label'].replace(" | ", "\n")
+        fig.text(0.99, 0.99, label, fontsize=6, ha='right', va='top')
+
+    return fig
 
 def run_sam_at_pspace_num(args, space, pnum, path_output):
     log = args.log
@@ -793,7 +818,7 @@ def run_ss_at_pspace_num(args, space, pnum, path_output):
     log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
     log_mem()
     assert nfreqs == fobs_cents.size
-    get_pars = args.get_pars
+    get_pars = bool(args.get_pars)
 
     try:
         log.debug("Selecting `sam` and `hard` instances")
