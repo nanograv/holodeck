@@ -889,7 +889,7 @@ class PS_Broad_Uniform_03_GW(_Param_Space):
         return sam, hard
 
 
-class PS_Simplest_2Par_01(_Param_Space):
+class PS_Simple_2Par_01(_Param_Space):
     """Updated version of the old 2Par and 2Par_Wider parameter-spaces.
     """
 
