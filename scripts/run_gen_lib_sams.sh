@@ -6,6 +6,7 @@
 
 echo "================================================================================"
 echo "==================    HOLODECK - run_gen_lib_sams.sh    ========================"
+echo "==================         $(date +'%Y-%m-%d|%H:%M:%S')         ========================"
 echo "================================================================================"
 echo ""
 
@@ -33,15 +34,25 @@ echo "logs: ${LOG_OUT} ${LOG_ERR}"
 echo "PWD:"
 pwd
 ls $SCRIPT
-echo "Running `mpirun`"
-
 set -x
+
+echo "Running python script $(date +'%Y-%m-%d|%H:%M:%S')"
+echo ""
 
 # mpirun -np 80  python $SCRIPT $OUTPUT -n 4000 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR
 # mpirun -n 4  python $SCRIPT $OUTPUT -n 8 -s 10 -r 20 -f 40  1> $LOG_OUT 2> $LOG_ERR
 python $SCRIPT $OUTPUT -n 8 -s 10 -r 20 -f 40  1> $LOG_OUT 2> $LOG_ERR
 
+echo "Completed python script $(date +'%Y-%m-%d|%H:%M:%S')"
+echo "Copying files"
+echo ""
+
 SHARE_OUTPUT=$OUTPUT"_SHARE"
 mkdir -p $SHARE_OUTPUT
 cp $OUTPUT/{*.py,holodeck*.log,*.hdf5} $SHARE_OUTPUT/
 cp {$LOG_ERR,$LOG_OUT} $SHARE_OUTPUT/
+
+echo ""
+echo "==================         $(date +'%Y-%m-%d|%H:%M:%S')         ========================"
+echo "================================================================================"
+echo ""
