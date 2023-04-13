@@ -680,18 +680,16 @@ def make_gwb_plot(fobs, gwb, fits_data):
 
     return fig
 
-def make_ss_gws_plot(fobs, hc_ss, hc_bg, fits_data, INCLUDE_MEDIANS = False):
-    fig, ax = holo.plot.figax(xlabel=holo.plot.LABEL_GW_FREQUENCY_YR,
-        ylabel=holo.plot.LABEL_CHARACTERISTIC_STRAIN)
-
-    xx = fobs * YR
+def make_ss_plot(fobs, hc_ss, hc_bg, fits_data, INCLUDE_MEDIANS = False):
+    fig = holo.plot.plot_gwb(fobs, hc_bg, hc_ss)
+    ax = fig.axes[0]
 
     if len(fits_data):
         xx = fobs * YR
         yy = 1e-15 * np.power(xx, -2.0/3.0)
         ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
 
-        fits = get_gwb_fits_data(fobs, hc_bg) # I should make a ss version of this
+        fits = get_gwb_fits_data(fobs, hc_bg)
 
         for ls, idx in zip([":", "--"], [1, -1]):
             med_lamp = fits['fit_med_lamp'][idx]
@@ -888,7 +886,7 @@ def run_ss_at_pspace_num(args, space, pnum, path_output):
     if rv:
         try:
             fname = fname.with_suffix('.png')
-            fig = make_gwb_plot(fobs_cents, hc_bg, fits_data)
+            fig = make_ss_plot(fobs_cents, hc_ss, hc_bg, fits_data)
             fig.savefig(fname, dpi=300)
             log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)}")
             plt.close('all')

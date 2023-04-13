@@ -173,7 +173,6 @@ log.info(
 
 
 def main():
-    print('args.get_pars =', args.get_pars)
     failures = 0
     npars = args.nsamples
 
