@@ -582,8 +582,8 @@ def fit_spectra_plaw_hc(freqs, gwb, nbins):
     return nbins, fit_pars, fit_med_pars
 
 
-def fit_spectra_plaw(freqs, gwb, nbins):
-    nfreq, nreals = np.shape(gwb)
+def fit_spectra_plaw(freqs, psd, nbins):
+    nfreq, nreals = np.shape(psd)
     assert len(freqs) == nfreq
 
     def fit_if_all_finite(xx, yy):
@@ -605,19 +605,19 @@ def fit_spectra_plaw(freqs, gwb, nbins):
         xx = freqs[cut]
 
         # fit the median spectra
-        yy = np.median(gwb, axis=-1)[cut]
+        yy = np.median(psd, axis=-1)[cut]
         fit_med_pars[ii] = fit_if_all_finite(xx, yy)
 
         # fit each realization of the spectra
         for rr in range(nreals):
-            yy = gwb[cut, rr]
+            yy = psd[cut, rr]
             fit_pars[ii, rr, :] = fit_if_all_finite(xx, yy)
 
     return nbins, fit_pars, fit_med_pars
 
 
-def fit_spectra_turn(freqs, gwb, nbins):
-    nfreq, nreals = np.shape(gwb)
+def fit_spectra_turn(freqs, psd, nbins):
+    nfreq, nreals = np.shape(psd)
     assert len(freqs) == nfreq
 
     def fit_if_all_finite(xx, yy):
@@ -639,12 +639,12 @@ def fit_spectra_turn(freqs, gwb, nbins):
         xx = freqs[cut]
 
         # fit the median spectra
-        yy = np.median(gwb, axis=-1)[cut]
+        yy = np.median(psd, axis=-1)[cut]
         fit_med_pars[ii, :] = fit_if_all_finite(xx, yy)
 
         # fit each realization of the spectra
         for rr in range(nreals):
-            yy = gwb[cut, rr]
+            yy = psd[cut, rr]
             fit_pars[ii, rr, :] = fit_if_all_finite(xx, yy)
 
     return nbins, fit_pars, fit_med_pars
@@ -766,8 +766,9 @@ def run_sam_at_pspace_num(args, space, pnum):
     if rv:
         log.info("calculating spectra fits")
         try:
-            plaw_nbins, fit_plaw, fit_plaw_med = fit_spectra_plaw(fobs_cents, gwb, FITS_NBINS_PLAW)
-            turn_nbins, fit_turn, fit_turn_med = fit_spectra_turn(fobs_cents, gwb, FITS_NBINS_TURN)
+            psd = utils.char_strain_to_psd(fobs_cents, gwb)
+            plaw_nbins, fit_plaw, fit_plaw_med = fit_spectra_plaw(fobs_cents, psd, FITS_NBINS_PLAW)
+            turn_nbins, fit_turn, fit_turn_med = fit_spectra_turn(fobs_cents, psd, FITS_NBINS_TURN)
 
             fit_data = dict(
                 fit_plaw_nbins=plaw_nbins, fit_plaw=fit_plaw, fit_plaw_med=fit_plaw_med,
