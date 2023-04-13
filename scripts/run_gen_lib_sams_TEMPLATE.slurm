@@ -27,7 +27,33 @@
 #SBATCH --mail-type=ALL               # {ALL, BEGIN, END, NONE, FAIL, REQUEUE}
 # --------------------
 
-echo -e "\n====    "$0"    ====\n"
+echo -e "\n====    "$0"    ===="
+echo -e "====    $(date +'%Y-%m-%d|%H:%M:%S')    ====\n"
+
+# ====    setup parameters    ====
+
+SPACE="PS_Simple_2Par_01"
+
+PARS="n1k_s61-81-101_r1k_f40"
+
+NAME=${SPACE,,}   # convert to lower-case
+NAME=${NAME/PS_/}   # remove "PS_"
+NAME=${NAME//_/-}  # replace all occurrences of '_' with '-'
+DATE=$(date +'%Y-%m-%d')
+NAME=$NAME"_"$DATE
+NAME=$NAME"_"$PARS
+
+NAME="TEST_"$NAME
+
+echo "run name: " $NAME
+
+# This is the script that will be run, make sure the path works
+SCRIPT="./scripts/gen_lib_sams.py"
+# This will be the name of the stdout and stderr logs
+LOG_NAME=$NAME"_job-log"
+
+# Output directory, make sure it has enough space
+OUTPUT="/global/scratch/users/lzkelley/holodeck_output/"$NAME
 
 # ====    setup environment    ====
 
@@ -42,23 +68,6 @@ echo $PATH
 conda info -e
 which python
 python --version
-
-
-# ====    setup parameters    ====
-
-SPACE="PS_Astro_Tight_03"           # NOTE: this must match exactly the class name in `holodeck/param_spaces.py`
-
-# Specify the run name, these are used in creating the log-name and the output folder
-NAME="astro-tight-03_2023-03-09"    # This is an arbitrary string specification for the job
-PARS="n10000_s61-81-101_r100_f40"   # This is an additional arbitrary string specification for the job
-
-# This is the script that will be run, make sure the path works
-SCRIPT="./scripts/gen_lib_sams.py"
-# This will be the name of the stdout and stderr logs
-LOG_NAME=$NAME"_job-log"
-
-# Output directory, make sure it has enough space
-OUTPUT="/global/scratch/users/lzkelley/holodeck_output/"$NAME"_"$PARS
 
 # Create the output directory if it doesn't already exist
 mkdir -p $OUTPUT
@@ -76,20 +85,27 @@ echo "logs: ${LOG_OUT} ${LOG_ERR}"
 echo "PWD:"
 pwd
 ls $SCRIPT
-echo "Running `mpirun`"
-
 set -x
 
-# Real jobs
-mpirun -np 120  python $SCRIPT $SPACE $OUTPUT -n 10000 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR
+echo -e "Running mpiexec $(date +'%Y-%m-%d|%H:%M:%S')\n"
+echo ""
 
-# Trivial test case to make sure the code runs
-# mpirun -np 4  python $SCRIPT $SPACE $OUTPUT -n 8 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR
+# mpiexec -n 144  python $SCRIPT $SPACE $OUTPUT -n 40000 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR
+mpirun -np 12  python $SCRIPT $SPACE $OUTPUT -n 24 -r 11 -f 4  1> $LOG_OUT 2> $LOG_ERR
 
+echo -e "Completed python script $(date +'%Y-%m-%d|%H:%M:%S')\n"
 
 # ====    copy final products to share folder for uploading    ====
 
-SHARE_OUTPUT=$OUTPUT"_SHARE"
-mkdir -p $SHARE_OUTPUT
-cp $OUTPUT/{*.py,holodeck*.log,*.hdf5} $SHARE_OUTPUT/
-cp {$LOG_ERR,$LOG_OUT} $SHARE_OUTPUT/
+echo -e "Copying files\n"
+
+#SHARE_OUTPUT=$OUTPUT"_SHARE"
+#mkdir -p $SHARE_OUTPUT
+#cp $OUTPUT/{*.py,holodeck*.log,*.hdf5} $SHARE_OUTPUT/
+#cp {$LOG_ERR,$LOG_OUT} $SHARE_OUTPUT/
+
+cp {$LOG_ERR,$LOG_OUT} $OUTPUT/
+
+echo -e "====    $(date +'%Y-%m-%d|%H:%M:%S')    ====\n"
+echo -e "============================\n"
+
