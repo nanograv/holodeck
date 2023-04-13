@@ -15,6 +15,8 @@ from holodeck import cosmo, utils, observations, log
 from holodeck.constants import MSOL, PC, YR
 
 LABEL_GW_FREQUENCY_YR = "GW Frequency $[\mathrm{yr}^{-1}]$"
+LABEL_GW_FREQUENCY_HZ = "GW Frequency $[\mathrm{Hz}]$"
+LABEL_GW_FREQUENCY_NHZ = "GW Frequency $[\mathrm{nHz}]$"
 LABEL_CHARACTERISTIC_STRAIN = "GW Characteristic Strain"
 
 
@@ -461,14 +463,25 @@ def _twin_hz(ax, nano=True, fs=8, **kw):
     tw = ax.twiny()
     xlim = np.array(ax.get_xlim()) / YR
     if nano:
-        label = "nHz"
+        label = LABEL_GW_FREQUENCY_NHZ
         xlim *= 1e9
     else:
-        label = "Hz"
+        label = LABEL_GW_FREQUENCY_HZ
 
     label = fr"GW Frequency $[\mathrm{{{label}}}]$"
-    tw.set(xlim=xlim, xscale='log')
+    tw.set(xlim=xlim, xscale=ax.get_xscale())
     tw.set_xlabel(label, fontsize=fs, **kw)
+    return
+
+
+def _twin_yr(ax, nano=True, fs=8, **kw):
+    tw = ax.twiny()
+    xlim = np.array(ax.get_xlim()) * YR
+    if nano:
+        xlim /= 1e9
+
+    tw.set(xlim=xlim, xscale=ax.get_xscale())
+    tw.set_xlabel(LABEL_GW_FREQUENCY_YR, fontsize=fs, **kw)
     return
 
 
@@ -494,9 +507,13 @@ def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill=
     # 2*P, X ==> (P, 2, X)
     conf = np.array(conf).reshape(len(percs), 2, xx.size)
 
+    kw = dict(color=hh.get_color())
+    kw.update(fill)
+    fill = kw
+
     # plot each confidence interval
     for lo, hi in conf:
-        gg = ax.fill_between(xx, lo, hi, color=hh.get_color(), **fill)
+        gg = ax.fill_between(xx, lo, hi, **fill)
 
     return (hh, gg)
 
