@@ -118,7 +118,7 @@ def main():
 
     if (comm.rank == 0):
         log.info("Concatenating outputs into single file")
-        holo.librarian.sam_lib_combine(args.output, log)
+        holo.librarian.sam_lib_combine(args.output, log, path_sims=args.output_sims)
         log.info("Concatenating completed")
 
     return
@@ -236,7 +236,6 @@ def _setup_log(args):
     log_lvl = holo.logger.INFO if args.verbose else holo.logger.WARNING
     tostr = sys.stdout if comm.rank == 0 else False
     log = holo.logger.get_logger(name=log_name, level_stream=log_lvl, tofile=fname, tostr=tostr)
-    log.info(head)
     log.info(f"Output path: {output}")
     log.info(f"        log: {fname}")
     log.info(args)
@@ -247,9 +246,16 @@ def my_print(*args, **kwargs):
     return print(*args, flush=True, **kwargs)
 
 
+def mpiabort_excepthook(type, value, traceback):
+    sys.__excepthook__(type, value, traceback)
+    comm.Abort()
+    return
+
+
 if __name__ == "__main__":
     np.seterr(divide='ignore', invalid='ignore', over='ignore')
     warnings.filterwarnings("ignore", category=UserWarning)
+    sys.excepthook = mpiabort_excepthook
     beg_time = datetime.now()
     beg_time = comm.bcast(beg_time, root=0)
 
