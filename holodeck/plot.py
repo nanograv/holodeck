@@ -468,7 +468,6 @@ def _twin_hz(ax, nano=True, fs=8, **kw):
     else:
         label = LABEL_GW_FREQUENCY_HZ
 
-    label = fr"GW Frequency $[\mathrm{{{label}}}]$"
     tw.set(xlim=xlim, xscale=ax.get_xscale())
     tw.set_xlabel(label, fontsize=fs, **kw)
     return
