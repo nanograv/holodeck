@@ -544,6 +544,8 @@ def _load_library_from_all_files(path_sims, gwb, fit_data, log):
     nsamp = gwb.shape[0]
     log.info(f"Collecting data from {nsamp} files")
     good_file = np.ones(nsamp, dtype=bool)     #: track which files contain useable data
+    num_fits_failed = 0
+    msg = None
     for pnum in tqdm.trange(nsamp):
         fname = _sim_fname(path_sims, pnum)
         temp = np.load(fname, allow_pickle=True)
@@ -563,8 +565,24 @@ def _load_library_from_all_files(path_sims, gwb, fit_data, log):
         gwb[pnum, :, :] = temp['gwb'][...]
 
         # store all of the fit data
+        fits_bad = False
         for fk in fit_data.keys():
-            fit_data[fk][pnum, ...] = temp[fk][...]
+            try:
+                fit_data[fk][pnum, ...] = temp[fk][...]
+            except Exception as err:
+                # only count the first time it fails
+                if not fits_bad:
+                    num_fits_failed += 1
+                fits_bad = True
+                fit_data[fk][pnum, ...] = np.nan
+                msg = str(err)
+
+        if fits_bad:
+            log.warning(f"Missing fit keys in file {pnum} = {fname.name}")
+
+    if num_fits_failed > 0:
+        log.warning(f"Missing fit keys in {num_fits_failed}/{nsamp} = {num_fits_failed/nsamp:.2e} files!")
+        log.warning(msg)
 
     log.info(f"{utils.frac_str(~good_file)} files are failures")
 
@@ -674,7 +692,9 @@ def fit_spectra_turn(freqs, psd, nbins):
 
 
 def make_gwb_plot(fobs, gwb, fit_data):
-    fig = holo.plot.plot_gwb(fobs, gwb)
+    # fig = holo.plot.plot_gwb(fobs, gwb)
+    psd = utils.char_strain_to_psd(fobs[:, np.newaxis], gwb)
+    fig = holo.plot.plot_gwb(fobs, psd)
     ax = fig.axes[0]
 
     xx = fobs * YR
