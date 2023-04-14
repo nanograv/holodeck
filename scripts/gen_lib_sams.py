@@ -218,7 +218,7 @@ def _setup_argparse(*args, **kwargs):
     args.output_sims = output_sims
 
     output_logs = output.joinpath("logs")
-    output_sims.mkdir(parents=True, exist_ok=True)
+    output_logs.mkdir(parents=True, exist_ok=True)
     args.output_logs = output_logs
 
     if args.plot:
