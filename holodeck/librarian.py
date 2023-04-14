@@ -222,8 +222,12 @@ class PD_Uniform(_Param_Dist):
         super().__init__(**kwargs)
         self._lo = lo
         self._hi = hi
-        self._dist_func = lambda xx: self._lo + (self._hi - self._lo) * xx
+        # self._dist_func = lambda xx: self._lo + (self._hi - self._lo) * xx
         return
+
+    def _dist_func(self, xx):
+        yy = self._lo + (self._hi - self._lo) * xx
+        return yy
 
 
 class PD_Uniform_Log(_Param_Dist):
@@ -233,8 +237,12 @@ class PD_Uniform_Log(_Param_Dist):
         assert lo > 0.0 and hi > 0.0
         self._lo = np.log10(lo)
         self._hi = np.log10(hi)
-        self._dist_func = lambda xx: np.power(10.0, self._lo + (self._hi - self._lo) * xx)
+        # self._dist_func = lambda xx: np.power(10.0, self._lo + (self._hi - self._lo) * xx)
         return
+
+    def _dist_func(self, xx):
+        yy = np.power(10.0, self._lo + (self._hi - self._lo) * xx)
+        return yy
 
 
 class PD_Normal(_Param_Dist):
@@ -242,19 +250,34 @@ class PD_Normal(_Param_Dist):
     def __init__(self, mean, stdev, clip=None, **kwargs):
         super().__init__(**kwargs)
         assert stdev > 0.0
-        self._mean = mean
-        self._stdev = stdev
-        self._clip = clip
-        self._dist = sp.stats.norm(loc=mean, scale=stdev)
         if clip is not None:
             if len(clip) != 2:
                 err = f"{clip=} | `clip` must be (2,) values of lo and hi bounds at which to clip!"
                 log.exception(err)
                 raise ValueError(err)
-            self._dist_func = lambda xx: np.clip(self._dist.ppf(xx), *clip)
-        else:
-            self._dist_func = lambda xx: self._dist.ppf(xx)
+
+        self._mean = mean
+        self._stdev = stdev
+        self._clip = clip
+        self._dist = sp.stats.norm(loc=mean, scale=stdev)
+        # if clip is not None:
+        #     if len(clip) != 2:
+        #         err = f"{clip=} | `clip` must be (2,) values of lo and hi bounds at which to clip!"
+        #         log.exception(err)
+        #         raise ValueError(err)
+        #     self._dist_func = lambda xx: np.clip(self._dist.ppf(xx), *clip)
+        # else:
+        #     self._dist_func = lambda xx: self._dist.ppf(xx)
+
         return
+
+    def _dist_func(self, xx):
+        clip = self.clip
+        if clip is not None:
+            yy = np.clip(self._dist.ppf(xx), *clip)
+        else:
+            yy = self._dist.ppf(xx)
+        return yy
 
 
 class PD_Lin_Log(_Param_Dist):
@@ -656,7 +679,7 @@ def make_gwb_plot(fobs, gwb, fit_data):
 
     xx = fobs * YR
     yy = 1e-15 * np.power(xx, -2.0/3.0)
-    ax.plot(xx, yy, 'k--', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
+    ax.plot(xx, yy, 'k--', alpha=0.5, lw=1.0, label=r"$10^{-15} \cdot f_\mathrm{yr}^{-2/3}$")
 
     if len(fit_data) > 0:
         fit_nbins = fit_data['fit_plaw_nbins']
@@ -766,7 +789,7 @@ def run_sam_at_pspace_num(args, space, pnum):
     if rv:
         log.info("calculating spectra fits")
         try:
-            psd = utils.char_strain_to_psd(fobs_cents, gwb)
+            psd = utils.char_strain_to_psd(fobs_cents[:, np.newaxis], gwb)
             plaw_nbins, fit_plaw, fit_plaw_med = fit_spectra_plaw(fobs_cents, psd, FITS_NBINS_PLAW)
             turn_nbins, fit_turn, fit_turn_med = fit_spectra_turn(fobs_cents, psd, FITS_NBINS_TURN)
 
@@ -833,7 +856,7 @@ def main():
     log.debug(f"{args=}")
 
     if args.subcommand == 'combine':
-        sam_lib_combine(args.path, log, args.debug)
+        sam_lib_combine(args.path, log, path_sims=Path(args.path).joinpath('sims'))
     else:
         raise
 
