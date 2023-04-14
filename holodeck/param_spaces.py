@@ -639,6 +639,24 @@ class PS_Broad_Uniform_03_GW(_Param_Space):
         return sam, hard
 
 
+class PS_Broad_Uniform_04(PS_Broad_Uniform_02B):
+    """Expand the mmb_scatter parameter from PS_Broad_Uniform_02B
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super(PS_Broad_Uniform_02B, self).__init__(
+            log, nsamples, sam_shape, seed,
+
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+
+            mmb_amp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
+            mmb_scatter=PD_Uniform(+0.0, +1.2),
+        )
+
+
 class PS_Simple_2Par_01(_Param_Space):
     """Updated version of the old 2Par and 2Par_Wider parameter-spaces.
     """
