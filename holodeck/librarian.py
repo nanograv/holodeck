@@ -680,7 +680,7 @@ def make_gwb_plot(fobs, gwb, fits_data):
 
     return fig
 
-def make_ss_plot(fobs, hc_ss, hc_bg, fits_data, INCLUDE_MEDIANS = False):
+def make_ss_plot(fobs, hc_ss, hc_bg, fits_data):
     fig = holo.plot.plot_gwb(fobs, hc_bg, hc_ss)
     ax = fig.axes[0]
 
@@ -701,6 +701,31 @@ def make_ss_plot(fobs, hc_ss, hc_bg, fits_data, INCLUDE_MEDIANS = False):
 
         label = fits['fit_label'].replace(" | ", "\n")
         fig.text(0.99, 0.99, label, fontsize=6, ha='right', va='top')
+
+    return fig
+
+def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar, fits_data):
+    fig = holo.plot.plot_pars(fobs, hc_ss, hc_bg, sspar, bgpar)
+    # add plaw and fits to hc plot
+    ax = fig.axes[3]
+    if len(fits_data):
+        xx = fobs * YR
+        yy = 1e-15 * np.power(xx, -2.0/3.0)
+        ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
+
+        fits = get_gwb_fits_data(fobs, hc_bg)
+
+        for ls, idx in zip([":", "--"], [1, -1]):
+            med_lamp = fits['fit_med_lamp'][idx]
+            med_plaw = fits['fit_med_plaw'][idx]
+            yy = (10.0 ** med_lamp) * (xx ** med_plaw)
+            label = fits['fit_nbins'][idx]
+            label = 'all' if label in [0, None] else label
+            ax.plot(xx, yy, color='k', ls=ls, alpha=0.5, lw=2.0, label=str(label) + " bins")
+
+        label = fits['fit_label'].replace(" | ", "\n")
+        fig.text(0.93, 0.93, label, fontsize=6, ha='right', va='top')
+        # fig.tight_layout()
 
     return fig
 
@@ -885,6 +910,11 @@ def run_ss_at_pspace_num(args, space, pnum, path_output):
 
     if rv:
         try:
+            if(get_pars):
+                pname = str(fname.with_suffix('')) + "_pars.png"
+                fig = make_pars_plot(fobs_cents, hc_ss, hc_bg, sspar, bgpar, fits_data)
+                fig.savefig(pname, dpi=300)
+                log.info(f"Saved to {pname}, size {holo.utils.get_file_size(pname)}")
             fname = fname.with_suffix('.png')
             fig = make_ss_plot(fobs_cents, hc_ss, hc_bg, fits_data)
             fig.savefig(fname, dpi=300)
