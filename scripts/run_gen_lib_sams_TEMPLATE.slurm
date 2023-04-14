@@ -72,6 +72,10 @@ python --version
 # Create the output directory if it doesn't already exist
 mkdir -p $OUTPUT
 echo "Output directory: ${OUTPUT}"
+if [ ! -d "$OUTPUT" ]; then
+    echo "$OUTPUT does not exist."
+    exit(123)
+fi
 
 # copy this job script to the output directory
 cp $0 "$OUTPUT/runtime_job-script.slurm"
