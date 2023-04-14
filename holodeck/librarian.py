@@ -40,7 +40,7 @@ class _Param_Space(abc.ABC):
         np.random.seed(seed)
         # NOTE: this should be saved to output
         random_state = np.random.get_state()
-        log.debug(f"Random state is:\n{random_state}")
+        # log.debug(f"Random state is:\n{random_state}")
 
         param_names = list(kwargs.keys())
         ndims = len(param_names)
@@ -410,14 +410,16 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
 
     if path_pspace is None:
         # look for parameter-space save files
-        regex = "*." + PSPACE_FILE_SUFFIX   # "pspace.npz"
+        regex = "*" + PSPACE_FILE_SUFFIX   # "*.pspace.npz"
         files = sorted(path_output.glob(regex))
         num_files = len(files)
         msg = f"found {num_files} pspace.npz files in {path_output}"
         log.info(msg)
         if num_files != 1:
+            log.exception(f"")
             log.exception(msg)
-            log.exception(f"{files}")
+            log.exception(f"{files=}")
+            log.exception(f"{regex=}")
             raise RuntimeError(f"{msg}")
         path_pspace = files[0]
 
