@@ -112,7 +112,7 @@ class _Param_Space(abc.ABC):
             log.exception(err)
             raise ValueError(err)
 
-        fname = f"{my_name.lower()}.{PSPACE_FILE_SUFFIX}"
+        fname = f"{my_name.lower()}{PSPACE_FILE_SUFFIX}"
         fname = path_output.joinpath(fname)
         log.debug(f"{my_name=} {vers=} {fname=}")
 

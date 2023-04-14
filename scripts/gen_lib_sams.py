@@ -217,6 +217,10 @@ def _setup_argparse(*args, **kwargs):
     output_sims.mkdir(parents=True, exist_ok=True)
     args.output_sims = output_sims
 
+    output_logs = output.joinpath("logs")
+    output_sims.mkdir(parents=True, exist_ok=True)
+    args.output_logs = output_logs
+
     if args.plot:
         output_plots = output.joinpath("figs")
         output_plots.mkdir(parents=True, exist_ok=True)
@@ -231,7 +235,7 @@ def _setup_log(args):
     if comm.rank > 0:
         log_name = f"_{log_name}_r{comm.rank}"
 
-    output = args.output
+    output = args.output_logs
     fname = f"{output.joinpath(log_name)}.log"
     log_lvl = holo.logger.INFO if args.verbose else holo.logger.WARNING
     tostr = sys.stdout if comm.rank == 0 else False
