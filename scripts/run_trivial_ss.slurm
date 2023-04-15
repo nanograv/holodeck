@@ -2,7 +2,7 @@
 #    run with `sbatch <SCRIPT>`
 
 #SBATCH --account=fc_lzkhpc              # Allocation/Account 'fc_lzkhpc'
-#SBATCH --job-name=ecg_test02_sam            # Name of job    `-J`
+#SBATCH --job-name=ecg_test02_ss            # Name of job    `-J`
 #SBATCH --mail-user=emikogardiner@berkeley.edu           # Designate email address for job communications
 #SBATCH --output=slurm-%x.%j.out            # Path for output must already exist   `-o`
 #SBATCH --error=slurm-%x.%j.err             # Path for errors must already exist   `-e`
