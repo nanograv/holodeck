@@ -815,7 +815,7 @@ def run_sam_at_pspace_num(args, space, pnum, path_output):
 
 def run_ss_at_pspace_num(args, space, pnum, path_output):
     log = args.log
-    fname = f"lib_sams__p{pnum:06d}.npz"
+    fname = f"lib_ss__p{pnum:06d}.npz"
     fname = Path(path_output, fname)
     beg = datetime.now()
     log.info(f"{pnum=} :: {fname=} beginning at {beg}")
