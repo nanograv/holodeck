@@ -418,7 +418,7 @@ def ss_lib_combine(path_output, log, get_pars, debug=False):
     path_output = Path(path_output)
     log.info(f"Path output = {path_output}")
 
-    regex = "lib_sams__p*.npz"
+    regex = "lib_ss__p*.npz"
     files = sorted(path_output.glob(regex))
     num_files = len(files)
     log.info(f"\texists={path_output.exists()}, found {num_files} files")
@@ -881,7 +881,7 @@ def run_ss_at_pspace_num(args, space, pnum, path_output):
     except Exception as err:
         log.exception("\n\n")
         log.exception("="*100)
-        log.exception(f"`run_sam` FAILED on {pnum=}\n")
+        log.exception(f"`run_ss` FAILED on {pnum=}\n")
         log.exception(err)
         log.exception("="*100)
         log.exception("\n\n")
@@ -893,7 +893,7 @@ def run_ss_at_pspace_num(args, space, pnum, path_output):
         try:
             fits_data = get_gwb_fits_data(fobs_cents, hc_bg)
         except Exception as err:
-            log.exception("Failed to load gwb fits data!")
+            log.exception("Failed to load hc_bg fits data!")
             log.exception(err)
             fits_data = {}
 
@@ -921,7 +921,7 @@ def run_ss_at_pspace_num(args, space, pnum, path_output):
             log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)}")
             plt.close('all')
         except Exception as err:
-            log.exception("Failed to make gwb plot!")
+            log.exception("Failed to make plots!")
             log.exception(err)
 
     return rv
