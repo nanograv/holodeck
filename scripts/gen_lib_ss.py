@@ -3,13 +3,14 @@
 Usage
 -----
 
-mpirun -n <NPROCS> python ./scripts/gen_lib_sams.py <PATH> -n <SAMPS> -r <REALS> -f <FREQS> -p <GET_PARS>
+mpirun -n <NPROCS> python ./scripts/gen_lib_sams.py <PATH> -n <SAMPS> -r <REALS> -f <FREQS> -l <LOUDEST> -p <GET_PARS>
 
     <NPROCS> : number of processors to run on
     <PATH> : output directory to save data to
     <SAMPS> : number of parameter-space samples for latin hyper-cube
     <REALS> : number of realizations at each parameter-space location
     <FREQS> : number of frequencies (multiples of PTA observing baseline)
+    <LOUDEST> : number of loudest single source to separate
     <GET_PARS> : int of whether or not to calculate sspar and bgpar (0 for False, 1 for True)
 
 Example:
@@ -81,6 +82,8 @@ def setup_argparse():
                         help='Number of frequency bins', default=DEF_NUM_FBINS)
     parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
                         help='Shape of SAM grid', default=DEF_SAM_SHAPE)
+    parser.add_argument('-l', '--loudest', action='store', dest='nloudest', type=int,
+                        help='Number of loudest single sources', default=1)
     parser.add_argument('-p', '--pars', action='store', dest='get_pars', type=int,
                         help='Whether or not to get pars', default=0)
 
