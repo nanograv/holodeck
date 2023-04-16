@@ -861,10 +861,10 @@ def run_ss_at_pspace_num(args, space, pnum, path_output):
         # gws
         if(get_pars):
             hc_ss, hc_bg, sspar, bgpar = ss.ss_gws(edges, number, realize=args.nreals, 
-                                               loudest = 5, params = True) 
+                                               loudest = args.nloudest, params = True) 
         else:
             hc_ss, hc_bg = ss.ss_gws(edges, number, realize=args.nreals, 
-                                               loudest = 5, params = False) # replace 5 with args.nloudest
+                                               loudest = args.nloudest, params = False) # replace 5 with args.nloudest
         log_mem()
         log.debug(f"{holo.utils.stats(hc_ss)=}")
         legend = space.param_dict(pnum)
