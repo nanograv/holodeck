@@ -452,8 +452,8 @@ def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=c
         for ii in idx:
             # background
             axs[0,0].plot(xx, m_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # masses (upper left)
-            axs[1,0].plot(xx, q_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # ratios (upper right)
-            axs[0,1].plot(xx, d_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # distances (lower left)
+            axs[0,1].plot(xx, q_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # ratios (upper right)
+            axs[1,0].plot(xx, d_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # distances (lower left)
             axs[1,1].plot(xx, hc_bg[:, ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # strains (lower right)
             
             # single sources
