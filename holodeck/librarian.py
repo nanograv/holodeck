@@ -414,6 +414,7 @@ def sam_lib_combine(path_output, log, debug=False):
     log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
     return
 
+
 def ss_lib_combine(path_output, log, get_pars, debug=False):
     path_output = Path(path_output)
     log.info(f"Path output = {path_output}")
@@ -470,7 +471,7 @@ def ss_lib_combine(path_output, log, get_pars, debug=False):
         temp_bgpar = data['bgpar'][:]
         assert np.ndim(temp_sspar) == 4
         assert np.ndim(temp_bgpar) == 3
-    _nfreqs, nreals = temp_hc_bg.shape
+    _nfreqs, nreals, nloudest = temp_hc_ss.shape
     assert nfreqs == _nfreqs
     all_sample_vals = data['samples']   # uniform [0.0, 1.0] samples in each dimension, converted to parameters
     all_param_vals = data['params']     # physical parameters
@@ -499,9 +500,15 @@ def ss_lib_combine(path_output, log, get_pars, debug=False):
 
     # ---- Store results from all files
 
-    gwb_shape = [num_files, nfreqs, nreals]
-    shape_names = ['params', 'freqs', 'reals']
-    gwb = np.zeros(gwb_shape)
+    bg_shape = [num_files, nfreqs, nreals]
+    bg_shape_names = ['params', 'freqs', 'reals']
+    ss_shape = [num_files, nfreqs, nreals, nloudest]
+    ss_shape_names = ['params', 'freqs', 'reals', 'loudest']
+    hc_ss = np.zeros(ss_shape)
+    hc_bg = np.zeros(bg_shape)
+    if(get_pars):
+        sspar = np.zeros([num_files, 3, nfreqs, nreals, nloudest])
+        bgpar = np.zeros([num_files, 3, nfreqs, nreals])
     sample_params = np.zeros((num_files, pdim))
     fit_shape = (num_files,) + fit_shape
     fit_med_shape = (num_files,) + fit_med_shape
@@ -516,20 +523,21 @@ def ss_lib_combine(path_output, log, get_pars, debug=False):
     for ii, file in enumerate(tqdm.tqdm(files)):
         temp = np.load(file, allow_pickle=True)
         # When a processor fails for a given parameter, the output file is still created with the 'fail' key added
-        if ('fail' in temp) or ('gwb' not in temp):
+        # NOTE: This is currently only checking for hc_bg, not hc_ss, sspar, or bgpar.
+        if ('fail' in temp) or ('hc_bg' not in temp):
             msg = f"file {ii=:06d} is a failure file, setting values to NaN ({file})"
             log.warning(msg)
-            gwb[ii, :, :] = np.nan
+            hc_bg[ii, :, :] = np.nan
             for fk in fit_keys + fit_med_keys:
                 fit_data[fk][ii, ...] = np.nan
 
             good_samp[ii] = False
             continue
 
-        this_gwb = temp['gwb']
-        all_nonzero[ii] = np.all(this_gwb > 0.0)
-        any_nonzero[ii] = np.any(this_gwb > 0.0)
-        tot_nonzero[ii, :] = np.all(this_gwb > 0.0, axis=0)
+        this_hc_bg = temp['hc_bg']
+        all_nonzero[ii] = np.all(this_hc_bg > 0.0)
+        any_nonzero[ii] = np.any(this_hc_bg > 0.0)
+        tot_nonzero[ii, :] = np.all(this_hc_bg > 0.0, axis=0)
 
         # Make sure basic parameters match from this file to the test file
         assert ii == temp['pnum']
@@ -555,8 +563,12 @@ def ss_lib_combine(path_output, log, get_pars, debug=False):
         for fk in fit_keys + fit_med_keys:
             fit_data[fk][ii, ...] = temp[fk][...]
 
-        # Store the GWB from this file
-        gwb[ii, :, :] = temp['gwb'][...]
+        # Store the hc_ss, hc_bg, sspar, bgpar from this file
+        hc_ss[ii, :, :, :] = temp['hc_ss'][...]
+        hc_bg[ii, :, :] = temp['hc_bg'][...]
+        if(get_pars):
+            sspar[ii, :, :, :, :] = temp['sspar'][...]
+            bgpar[ii, :, :, :] = temp['bgpar'][...]
         if debug:
             break
 
@@ -572,13 +584,19 @@ def ss_lib_combine(path_output, log, get_pars, debug=False):
     with h5py.File(out_filename, 'w') as h5:
         h5.create_dataset('fobs', data=fobs)
         h5.create_dataset('fobs_edges', data=fobs_edges)
-        h5.create_dataset('gwb', data=gwb)
+        h5.create_dataset('hc_ss', data=hc_ss)
+        h5.create_dataset('hc_bg', data=hc_bg)
+        if(get_pars):
+            h5.create_dataset('sspar', data=sspar)
+            h5.create_dataset('bgpar', data=bgpar)
+
         h5.create_dataset('sample_params', data=sample_params)
         for fk in fit_keys + fit_med_keys:
             h5.create_dataset(fk, data=fit_data[fk])
         h5.attrs['fit_nbins'] = fit_nbins
         h5.attrs['param_names'] = np.array(param_names).astype('S')
-        h5.attrs['shape_names'] = np.array(shape_names).astype('S')
+        h5.attrs['ss_shape_names'] = np.array(ss_shape_names).astype('S')
+        h5.attrs['bg_shape_names'] = np.array(bg_shape_names).astype('S')
         h5.attrs['librarian_version'] = ", ".join(lib_vers)
 
     log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
@@ -681,7 +699,7 @@ def make_gwb_plot(fobs, gwb, fits_data):
     return fig
 
 def make_ss_plot(fobs, hc_ss, hc_bg, fits_data):
-    fig = holo.plot.plot_gwb(fobs, hc_bg, hc_ss)
+    fig = holo.plot.plot_gwb(fobs, gwb=hc_bg, hc_ss=hc_ss)
     ax = fig.axes[0]
 
     if len(fits_data):
@@ -857,14 +875,15 @@ def run_ss_at_pspace_num(args, space, pnum, path_output):
         edges[-1] = fobs_orb_edges
         # integrate for number
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
-        number = number * np.diff(np.log(fobs_edges))
+        number = number * np.diff(np.log(fobs_edges))  
         # gws
         if(get_pars):
             hc_ss, hc_bg, sspar, bgpar = ss.ss_gws(edges, number, realize=args.nreals, 
                                                loudest = args.nloudest, params = True) 
         else:
             hc_ss, hc_bg = ss.ss_gws(edges, number, realize=args.nreals, 
-                                               loudest = args.nloudest, params = False) # replace 5 with args.nloudest
+                                               loudest = args.nloudest, params = False) 
+            
         log_mem()
         log.debug(f"{holo.utils.stats(hc_ss)=}")
         legend = space.param_dict(pnum)
@@ -910,20 +929,24 @@ def run_ss_at_pspace_num(args, space, pnum, path_output):
 
     if rv:
         try:
-            if(get_pars):
+            hname = str(fname.with_suffix('')) + "_strain.png"
+            fig = make_ss_plot(fobs_cents, hc_ss, hc_bg, fits_data)
+            fig.savefig(hname, dpi=300)
+            log.info(f"Saved to {hname}, size {holo.utils.get_file_size(hname)}")
+            plt.close('all')
+        except Exception as err:
+            log.exception("Failed to make strain plots!")
+            log.exception(err)
+        if(get_pars):
+            try:
                 pname = str(fname.with_suffix('')) + "_pars.png"
                 fig = make_pars_plot(fobs_cents, hc_ss, hc_bg, sspar, bgpar, fits_data)
                 fig.savefig(pname, dpi=300)
                 log.info(f"Saved to {pname}, size {holo.utils.get_file_size(pname)}")
-            fname = fname.with_suffix('.png')
-            fig = make_ss_plot(fobs_cents, hc_ss, hc_bg, fits_data)
-            fig.savefig(fname, dpi=300)
-            log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)}")
-            plt.close('all')
-        except Exception as err:
-            log.exception("Failed to make plots!")
-            log.exception(err)
-
+            except Exception as err:
+                log.exception("Failed to make pars plots!")
+                log.exception(err)
+            
     return rv
 
 '''

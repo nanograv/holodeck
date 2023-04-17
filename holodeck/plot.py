@@ -383,27 +383,30 @@ def draw_gwb(ax, xx, gwb, nsamp=10, color=None, label=None, **kwargs):
 
     return hh
 
-def draw_ss_and_gwb(ax, xx, gwb, hc_ss, nsamp=10, color=None, cmap = cm.rainbow, label=None, **kwargs):
+def draw_ss_and_gwb(ax, xx, hc_ss, gwb, nsamp=10, color=None, cmap = cm.rainbow, label=None, **kwargs):
     if color is None:
         color = ax._get_lines.get_next_color()
 
     kw_plot = kwargs.get('plot', {})
     kw_plot.setdefault('color', color)
-    hh = draw_med_conf(ax, xx, gwb, plot=kw_plot, **kwargs)
+    # hh = draw_med_conf(ax, xx, gwb, plot=kw_plot, **kwargs)
 
     if (nsamp is not None) and (nsamp > 0):
         nsamp_max = gwb.shape[1]
-        colors = cmap(np.linspace(0,1,np.min([nsamp, nsamp_max])))
-        idx = np.random.choice(nsamp_max, np.min([nsamp, nsamp_max]), replace=False)
+        nsize = np.min([nsamp, nsamp_max])
+        colors = cmap(np.linspace(0,1,nsize))
+        ci = 0
+        idx = np.random.choice(nsamp_max, nsize, replace=False)
         for ii in idx:
-            ax.plot(xx, gwb[:, ii], color=colors[ii], alpha=0.25, lw=1.0, ls='-')
+            ax.plot(xx, gwb[:, ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-')
             for ll in range(len(hc_ss[0,0])):
                 if(ll==0): edgecolor='k'
                 else: edgecolor=None
-                ax.scatter(xx, hc_ss[:, ii, ll], color=colors[ii], alpha=0.25,
+                ax.scatter(xx, hc_ss[:, ii, ll], color=colors[ci], alpha=0.25,
                            edgecolor=edgecolor)
+            ci+=1
 
-    return hh
+    # return hh
 
 def plot_gwb(fobs, gwb, hc_ss=None, **kwargs):
     xx = fobs * YR
@@ -412,7 +415,7 @@ def plot_gwb(fobs, gwb, hc_ss=None, **kwargs):
         ylabel=LABEL_CHARACTERISTIC_STRAIN
     )
     if(hc_ss is not None):
-        draw_ss_and_gwb(ax, xx, gwb, hc_ss)
+        draw_ss_and_gwb(ax, xx, hc_ss, gwb, **kwargs)
     else: 
         draw_gwb(ax, xx, gwb, **kwargs)
     _twin_hz(ax)
@@ -442,31 +445,33 @@ def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=c
 
     if (nsamp is not None) and (nsamp > 0):
         nsamp_max = hc_bg.shape[1]
-        colors = cmap(np.linspace(0,1,np.min([nsamp, nsamp_max])))
-        idx = np.random.choice(nsamp_max, np.min([nsamp, nsamp_max]), replace=False)
+        nsize = np.min([nsamp, nsamp_max])
+        colors = cmap(np.linspace(0,1,nsize))
+        ci = 0
+        idx = np.random.choice(nsamp_max, nsize, replace=False)
         for ii in idx:
             # background
-            axs[0,0].plot(xx, m_bg[:,ii], color=colors[ii], alpha=0.25, lw=1.0, ls='-') # masses (upper left)
-            axs[1,0].plot(xx, q_bg[:,ii], color=colors[ii], alpha=0.25, lw=1.0, ls='-') # ratios (upper right)
-            axs[0,1].plot(xx, d_bg[:,ii], color=colors[ii], alpha=0.25, lw=1.0, ls='-') # distances (lower left)
-            axs[1,1].plot(xx, hc_bg[:, ii], color=colors[ii], alpha=0.25, lw=1.0, ls='-') # strains (lower right)
+            axs[0,0].plot(xx, m_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # masses (upper left)
+            axs[1,0].plot(xx, q_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # ratios (upper right)
+            axs[0,1].plot(xx, d_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # distances (lower left)
+            axs[1,1].plot(xx, hc_bg[:, ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # strains (lower right)
             
             # single sources
             for ll in range(len(hc_ss[0,0])):
                 if(ll==0): edgecolor='k'
                 else: edgecolor=None
-                axs[0,0].scatter(xx, m_ss[:, ii, ll], color=colors[ii], alpha=0.25,
+                axs[0,0].scatter(xx, m_ss[:, ii, ll], color=colors[ci], alpha=0.25,
                            edgecolor=edgecolor) # ss masses (upper left)
-                axs[0,1].scatter(xx, q_ss[:, ii, ll], color=colors[ii], alpha=0.25,
+                axs[0,1].scatter(xx, q_ss[:, ii, ll], color=colors[ci], alpha=0.25,
                            edgecolor=edgecolor) # ss ratios (upper right)
-                axs[1,0].scatter(xx, d_ss[:, ii, ll], color=colors[ii], alpha=0.25,
+                axs[1,0].scatter(xx, d_ss[:, ii, ll], color=colors[ci], alpha=0.25,
                            edgecolor=edgecolor) # ss distances (lower left)
-                axs[1,1].scatter(xx, hc_ss[:, ii, ll], color=colors[ii], alpha=0.25,
+                axs[1,1].scatter(xx, hc_ss[:, ii, ll], color=colors[ci], alpha=0.25,
                            edgecolor=edgecolor) # ss strains (lower right)
+            ci +=1
     # return mm_med, qq_med, dd_med, hh_med
 
 def plot_pars(fobs, hc_ss, hc_bg, sspar, bgpar, **kwargs):
-    cmap = cm.gist_rainbow
     xx= fobs * YR
     fig, axs = figax(figsize = (11,6), ncols=2, nrows=2, sharex = True)
     axs[0,0].set_ylabel('Total Mass $M/M_\odot$')
@@ -475,7 +480,7 @@ def plot_pars(fobs, hc_ss, hc_bg, sspar, bgpar, **kwargs):
     axs[1,0].set_xlabel(LABEL_GW_FREQUENCY_YR)
     axs[1,1].set_ylabel(LABEL_CHARACTERISTIC_STRAIN)
     axs[1,1].set_xlabel(LABEL_GW_FREQUENCY_YR)
-    draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, cmap=cmap, color='coral')
+    draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, color='coral')
     # fig.tight_layout()
     return fig
 
