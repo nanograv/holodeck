@@ -98,7 +98,6 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
     # hsfdf = hsamp^2 * f/df
     h2fdf = hsamp**2 * (fc[np.newaxis, np.newaxis, np.newaxis,:]
                     /df[np.newaxis, np.newaxis, np.newaxis,:]) 
-    
     # indices of bins sorted by h2fdf
     indices = np.argsort(-h2fdf[...,0].flatten()) # just sort for first frequency
     unraveled = np.array(np.unravel_index(indices, (len(mt),len(mr),len(rz))))
@@ -119,10 +118,8 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
                                                             mt, mr, rz, msort, qsort, zsort)
             hc_ss = np.sqrt(hc2ss) # calculate single source strain
             hc_bg = np.sqrt(hc2bg) # calculate background strain
-
             # calulate parameters of single sources
             sspar = np.array([mt[ssidx[0,...]], mr[ssidx[1,...]], rz[ssidx[2,...]]])
-            
             return hc_ss, hc_bg, sspar, bgpar
             
         else:
