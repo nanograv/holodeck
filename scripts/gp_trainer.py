@@ -9,7 +9,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-import gp_utils as gu
+import holodeck.gps.gp_utils as gu
 
 # Emcee doesn't like multithreading
 os.environ["OMP_NUM_THREADS"] = "1"
