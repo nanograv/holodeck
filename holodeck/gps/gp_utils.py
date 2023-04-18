@@ -626,7 +626,8 @@ def pars_linspace_dict(gp_george, num_points=5):
     return pars_linspace
 
 
-def hc_from_gp(gp_george, gp_list, env_pars):
+def hc_from_gp(gp_george, gp_list, gp_george_variance, gp_list_variance,
+               env_pars):
     """Calculate the characteristic strain using a GP.
 
     Parameters
@@ -656,16 +657,17 @@ def hc_from_gp(gp_george, gp_list, env_pars):
     """
     rho_pred = np.zeros((len(gp_george), 2))
     for ii, freq in enumerate(gp_george):
-        mu_pred, cov_pred = gp_list[ii].predict(gp_george[ii].y, [env_pars])
-        if np.diag(cov_pred) < 0.0:
-            rho_pred[ii, 0], rho_pred[ii, 1] = mu_pred, 1e-5 * mu_pred
-        else:
-            rho_pred[ii, 0], rho_pred[ii,
-                                      1] = mu_pred, np.sqrt(np.diag(cov_pred))
+        # Get mean and variance predictions
+        # Variance was trained on log10(std(log10(spectra))), while mean was trained on log10(mean(spectra)))
+        # Convert variance back to log10(spectra) so that it can be combined with the mean
+        rho_pred[ii, 0], rho_pred[ii, 1] = gp_list[ii].predict(
+            gp_george[ii].y, [env_pars])[0], 10**gp_list_variance[ii].predict(
+                gp_george_variance[ii].y, [env_pars])[0]
 
-    # transforming from zero-mean unit-variance variable to rho
-    rho = (np.array([gp_george[ii].mean_spectra
-                     for ii in range(len(gp_list))]) + rho_pred[:, 0])
+        # transforming from zero-mean unit-variance variable to rho
+        rho = (np.array(
+            [gp_george[ii].mean_spectra
+             for ii in range(len(gp_list))]) + rho_pred[:, 0])
     hc = np.sqrt(10**rho)
     return hc, rho, rho_pred
 
