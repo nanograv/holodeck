@@ -492,8 +492,8 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
 
         # Initialize the walkers.
         p0 = [
-            # np.log(np.full(ndim, 1.0)) + 1e-4 * np.random.randn(ndim)
-            1.0e-4 * np.random.randn(ndim)
+            np.random.uniform(gp_george[freq_ind].pmin[0],
+                              gp_george[freq_ind].pmax[0], ndim)
             for _ in range(nwalkers)
         ]
 
