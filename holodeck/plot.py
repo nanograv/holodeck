@@ -383,7 +383,9 @@ def draw_gwb(ax, xx, gwb, nsamp=10, color=None, label=None, **kwargs):
 
     return hh
 
-def draw_ss_and_gwb(ax, xx, hc_ss, gwb, nsamp=10, color=None, cmap = cm.rainbow, label=None, **kwargs):
+def draw_ss_and_gwb(ax, xx, hc_ss, gwb, nsamp=10, 
+                    color=None, cmap = cm.rainbow, 
+                    sslabel=None, bglabel=None, **kwargs):
     if color is None:
         color = ax._get_lines.get_next_color()
 
@@ -398,24 +400,33 @@ def draw_ss_and_gwb(ax, xx, hc_ss, gwb, nsamp=10, color=None, cmap = cm.rainbow,
         ci = 0
         idx = np.random.choice(nsamp_max, nsize, replace=False)
         for ii in idx:
+            if(ii==0):
+                label=bglabel
+            else: label=None
             ax.plot(xx, gwb[:, ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-')
             for ll in range(len(hc_ss[0,0])):
-                if(ll==0): edgecolor='k'
-                else: edgecolor=None
+                if(ll==0): 
+                    edgecolor='k'
+                    if(ii==0): label=sslabel # first source of first realization
+                    else: label=None
+                else: 
+                    edgecolor=None
+                    label=None
                 ax.scatter(xx, hc_ss[:, ii, ll], color=colors[ci], alpha=0.25,
-                           edgecolor=edgecolor)
+                           edgecolor=edgecolor, label=label)
             ci+=1
 
     # return hh
 
-def plot_gwb(fobs, gwb, hc_ss=None, **kwargs):
+def plot_gwb(fobs, gwb, hc_ss=None, bglabel=None, sslabel=None, **kwargs):
     xx = fobs * YR
     fig, ax = figax(
         xlabel=LABEL_GW_FREQUENCY_YR,
         ylabel=LABEL_CHARACTERISTIC_STRAIN
     )
     if(hc_ss is not None):
-        draw_ss_and_gwb(ax, xx, hc_ss, gwb, **kwargs)
+        draw_ss_and_gwb(ax, xx, hc_ss, gwb, sslabel=sslabel,
+                        bglabel=bglabel, **kwargs)
     else: 
         draw_gwb(ax, xx, gwb, **kwargs)
     _twin_hz(ax)
