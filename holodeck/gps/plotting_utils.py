@@ -158,6 +158,8 @@ def get_smooth_center(env_pars,
 
 def plot_individual_parameter(gp_george,
                               gp_list,
+                              gp_george_variance,
+                              gp_list_variance,
                               pars_const,
                               par_interest,
                               spectra,
@@ -262,6 +264,8 @@ def plot_individual_parameter(gp_george,
         hc[:, i], rho[:,
                       i], rho_pred[:, :,
                                    i] = gu.hc_from_gp(gp_george, gp_list,
+                                                      gp_george_variance,
+                                                      gp_list_variance,
                                                       list(env_pars.values()))
 
     # Get smoothed mean of GWB if using SAM
@@ -321,6 +325,8 @@ def plot_individual_parameter(gp_george,
 def plot_parameter_variances(
         gp_george,
         gp_list,
+        gp_george_variance,
+        gp_list_variance,
         pars_const,
         spectra,
         color_map=plt.cm.Dark2,
@@ -367,6 +373,8 @@ def plot_parameter_variances(
     for i, par_interest in enumerate(pars_const):
         result = plot_individual_parameter(gp_george,
                                            gp_list,
+                                           gp_george_variance,
+                                           gp_list_variance,
                                            pars_const,
                                            par_interest,
                                            spectra,
@@ -403,6 +411,8 @@ def plot_over_realizations(ind,
                            spectra,
                            gp_george,
                            gp_list,
+                           gp_george_variance,
+                           gp_list_variance,
                            center_measure="median",
                            plot_dir=Path.cwd(),
                            test_frac=0.0):
@@ -441,7 +451,7 @@ def plot_over_realizations(ind,
 
     # Test frac is purposefully left out here so you can make plots using the
     # test set
-    freqs, xobs, yerr, yobs, yobs_mean = gu.get_smoothed_gwb(
+    freqs, xobs, yerr, yobs, yobs_mean = gu.get_gwb(
         spectra, len(gp_george), center_measure=center_measure)
 
     # Alert if in test set
@@ -451,9 +461,13 @@ def plot_over_realizations(ind,
     smooth_center = yobs + yobs_mean
 
     # Take the test set offset into account for xobs
-    env_param = xobs[ind - int(yobs.shape[0] * test_frac), :].copy()
+    #env_param = xobs[ind - int(yobs.shape[0] * test_frac), :].copy()
+    env_param = xobs[ind, :].copy()
+    #env_param = xobs.copy()
 
-    hc, rho, rho_pred = gu.hc_from_gp(gp_george, gp_list, env_param)
+    #env_param[3]+=1e-3
+
+    hc, rho, rho_pred = gu.hc_from_gp(gp_george, gp_list, gp_george_variance, gp_list_variance, env_param)
 
     # Convert to Hz
     freqs /= YR
