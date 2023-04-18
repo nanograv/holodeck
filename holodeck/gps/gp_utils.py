@@ -210,10 +210,9 @@ def train_gp(spectra_file,
     if VERBOSE:
         print(f"Loaded spectra from {spectra_file}")
 
-    # Get smoothed GWB
-    gp_freqs, xobs, yerr, yobs, yobs_mean = get_smoothed_gwb(spectra, nfreqs,
-                                                             test_frac,
-                                                             center_measure)
+    # Get GWB
+    gp_freqs, xobs, yerr, yobs, yobs_mean = get_gwb(spectra, nfreqs, test_frac,
+                                                    center_measure)
 
     pars = list(spectra.attrs["param_names"].astype(str))
 
@@ -231,8 +230,8 @@ def train_gp(spectra_file,
     return gp_george
 
 
-def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
-    """Get the smoothed GWB from a number of realizations.
+def get_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
+    """Get the GWB from a number of realizations.
 
     Parameters
     ----------
@@ -456,7 +455,7 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
     ndim = nkpars
     print(f"{mpi=}")
     pool = schwimmbad.choose_pool(
-        mpi=mpi)  #, processes=min(nwalkers // 2, cpu_count()) )
+        mpi=mpi)  # processes=min(nwalkers // 2, cpu_count()) )
 
     # Schwimmbad docs are not clear if this needs to be here if we are passing the pool to
     # EnsembleSampler, but I've added it just in case.
