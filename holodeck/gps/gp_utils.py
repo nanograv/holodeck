@@ -53,12 +53,15 @@ class GaussProc(object):
                  x,
                  y,
                  yerr=None,
+                 y_is_variance=False,
                  par_dict=None,
                  kernel="ExpSquaredKernel"):
         self.x = x
         self.y = y
+        self.y_is_variance = y_is_variance
         self.yerr = yerr
         self.par_dict = par_dict
+        self.par_list = list(par_dict.keys())
 
         # Validate kernel
         # Get kernels available as list[str]
@@ -166,8 +169,8 @@ def train_gp(spectra_file,
              burn_frac=0.25,
              test_frac=0.0,
              center_measure="median",
+             y_is_variance=False,
              kernel="ExpSquaredKernel",
-             kernel_opts={},
              mpi=True):
     """Train gaussian processes on the first `nfreqs` of the GWB in `spectra_file`.
 
@@ -218,8 +221,22 @@ def train_gp(spectra_file,
 
     # xobs = get_parameter_values(spectra, test_frac)
 
-    gp_george, num_kpars = create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs,
-                                             kernel, kernel_opts)
+    # Check if we want the training data to be the center `yobs` or the variance `yerr`
+    # In the `if` conditional, I've included the arguments as keyword arguments
+    # to make this distinction clearer
+    if y_is_variance:
+        gp_george, num_kpars = create_gp_kernels(gp_freqs,
+                                                 pars,
+                                                 xobs,
+                                                 np.zeros_like(yerr),
+                                                 yobs=np.log10(yerr),
+                                                 y_is_variance=y_is_variance,
+                                                 kernel=kernel)
+
+    else:
+        gp_george, num_kpars = create_gp_kernels(gp_freqs, pars, xobs,
+                                                 np.zeros_like(yobs), yobs,
+                                                 y_is_variance, kernel)
 
     # Sample the posterior distribution of the kernel parameters
     # to find MAP value for each frequency.
@@ -371,7 +388,7 @@ def get_parameter_values(spectra, test_frac=0.0):
 '''
 
 
-def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts):
+def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, y_is_variance, kernel):
     """Instantiate GP kernel for each frequency.
 
     Parameters
@@ -403,7 +420,6 @@ def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts):
     """
     # Instantiate a list of GP kernels and models [one for each frequency]
     gp_george = []
-    k = []
     # Create the parameter dictionary for the gp objects
     par_dict = dict()
     for ind, par in enumerate(pars):
@@ -414,8 +430,8 @@ def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts):
 
     for freq_ind in range(len(gp_freqs)):
         gp_george.append(
-            GaussProc(xobs, yobs[:, freq_ind], yerr[:, freq_ind], par_dict,
-                      kernel, kernel_opts))
+            GaussProc(xobs, yobs[:, freq_ind], yerr[:, freq_ind], y_is_variance, par_dict,
+                      kernel))
 
     # get the length of one of the prior bound lists
     # this is the number of kernel parameters
