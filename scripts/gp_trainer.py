@@ -51,8 +51,7 @@ def main(config):
     """
             # Split up config into sections
     train_opts = config['Training Options']
-    kern_opts = config['Kernel Options']
-
+    kern = dict(config['Kernel'])
     # Make sure the library exists
     spectra_file = Path(train_opts.get('spectra_file'))
     if not spectra_file.exists():
@@ -68,9 +67,7 @@ def main(config):
                               center_measure=train_opts.get(
                                   'center_measure', 'median'),
                               mpi=train_opts.getboolean('mpi', True),
-                              kernel=kern_opts.pop('kernel',
-                                                   'ExpSquaredKernel'),
-                              kernel_opts=dict(kern_opts))
+                              kernel=kern)
 
     # Add datestring to ensure unique name
     datestr = datetime.now().strftime('%Y%m%d_%H%M%S')

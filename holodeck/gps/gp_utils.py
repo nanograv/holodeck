@@ -2,6 +2,7 @@
 import sys
 import time
 import warnings
+from functools import reduce
 from multiprocessing import Pool, cpu_count
 
 import emcee
@@ -53,9 +54,7 @@ class GaussProc(object):
                  y,
                  yerr=None,
                  par_dict=None,
-                 kernel="ExpSquaredKernel",
-                 kernel_opts={}):
-
+                 kernel="ExpSquaredKernel"):
         self.x = x
         self.y = y
         self.yerr = yerr
@@ -67,18 +66,27 @@ class GaussProc(object):
         # Lowercase them
         kernel_lcase = list(map(str.lower, kernel_list))
         try:
-            self.kernel = kernel_list[kernel_lcase.index(kernel.lower())]
-            self.kernel_class = getattr(kernels, self.kernel)
-        except ValueError:
-            print(f"Unexpected kernel '{kernel}'.")
+            self.kernel = {
+                par: kernel_list[kernel_lcase.index(kernel[par].lower())]
+                for par in kernel.keys()
+            }
+            self.kernel_class = {
+                par: getattr(kernels, self.kernel[par])
+                for par in self.kernel.keys()
+            }
+        # This will only print the first kernel error, but subsequent runs will
+        # catch the rest
+        except ValueError as e:
+            print(f"Unexpected kernel given'{str(e)}'.")
             print("Acceptable values are:\n", *kernel_list, sep="\n")
             raise
 
-        self.kernel_opts = kernel_opts
-
-        # The number of GP parameters is one more than the number of spectra parameters.
-        self.pmax = np.full(len(self.par_dict) + 1, 20.0)  # sampling ranges
-        self.pmin = np.full(len(self.par_dict) + 1, -20.0)  # sampling ranges
+        # The number of GP parameters is equal to the number of spectra parameters
+        # + the number of kernel-specific parameters (per spectra parameter) + one.
+        self.uses_rational_quadratic = [par for par in self.kernel.keys()
+                                        if self.kernel[par] == 'RationalQuadraticKernel']
+        self.pmax = np.full(len(self.par_dict) + 1 + len(self.uses_rational_quadratic), 20.0)  # sampling ranges
+        self.pmin = np.full(len(self.par_dict) + 1 + len(self.uses_rational_quadratic), -20.0)  # sampling ranges
         self.emcee_flatchain = None
         self.emcee_flatlnprob = None
         self.emcee_kernel_map = None
@@ -97,14 +105,46 @@ class GaussProc(object):
 
         return logp
 
+    def create_kernel(self, p):
+        # Get parameters for kernel
+        additional_pars = len(self.uses_rational_quadratic)
+        if additional_pars == 0:
+            a, tau = np.exp(p[0]), np.exp(p[1:])
+
+            # Use list comprehension to generate list of kernels, one for each parameter
+            kernel_list = [
+                self.kernel_class[par](metric=tau[self.par_list.index(par)],
+                                       ndim=len(self.par_list),
+                                       axes=self.par_list.index(par))
+                for par in self.par_list
+            ]
+
+        else:
+            a, tau, log_alpha = np.exp(p[0]), np.exp(
+                p[1:-additional_pars]), p[-additional_pars:]
+            # Use list comprehension to generate list of kernels, one for each parameter
+            kernel_list = [
+                self.kernel_class[par](log_alpha=log_alpha[
+                                       self.uses_rational_quadratic.index(par)],
+                                       metric=tau[self.par_list.index(par)],
+                                       ndim=len(self.par_list),
+                                       axes=self.par_list.index(par))
+                if self.kernel[par] == "RationalQuadraticKernel" else
+                self.kernel_class[par](metric=tau[self.par_list.index(par)],
+                                       ndim=len(self.par_list),
+                                       axes=self.par_list.index(par))
+                for par in self.par_list
+            ]
+
+        # Add scale parameter and sum the kernel list
+        kernel = a * reduce(lambda k1, k2: k1+k2, kernel_list)
+
+        return kernel
+
     def lnlike(self, p):
 
-        # Update the kernel and compute the lnlikelihood.
-        a, tau = np.exp(p[0]), np.exp(p[1:])
-
         try:
-            gp = george.GP(a * self.kernel_class(**self.kernel_opts, metric=tau,
-                                                 ndim=len(tau)))
+            gp = george.GP(self.create_kernel(p))
             gp.compute(self.x, self.yerr)
 
             # lnlike = gp.lnlikelihood(self.y, quiet=True)
@@ -378,10 +418,9 @@ def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts):
             GaussProc(xobs, yobs[:, freq_ind], yerr[:, freq_ind], par_dict,
                       kernel, kernel_opts))
 
-        k.append(1.0 * getattr(kernels, gp_george[freq_ind].kernel)(
-            np.full(len(pars), 2.0), ndim=len(pars)))
-
-        num_kpars = len(k[freq_ind])
+    # get the length of one of the prior bound lists
+    # this is the number of kernel parameters
+    num_kpars = len(gp_george[0].pmax)
 
     return gp_george, num_kpars
 
@@ -499,24 +538,11 @@ def set_up_predictions(spectra, gp_george):
     gp_list = []
     gp_freqs = spectra["fobs"][:len(gp_george)].copy()
 
-    # Check which attribute holds the kernel map. In older versions, we used
-    # self.kernel_map. However, to be consistent we have switched to
-    # self.emcee_kernel_map. The following lines are just for backwards
-    # compatibility.
-
-    if getattr(gp_george[0], "kernel_map", None) is not None:
-        kernel_map_attr = "kernel_map"
-    elif getattr(gp_george[0], "emcee_kernel_map", None) is not None:
-        kernel_map_attr = "emcee_kernel_map"
-
     for ii in range(len(gp_freqs)):
-        gp_kparams = np.exp(getattr(gp_george[ii], kernel_map_attr))
+        gp = gp_george[ii]
 
         # Try to use the kernel attribute. If it doesn't exist, default to ExpSquaredKernel
-        gp_list.append(
-            george.GP(gp_kparams[0] * getattr(
-                kernels, getattr(gp_george[ii], "kernel", "ExpSquaredKernel"))(
-                    gp_kparams[1:], ndim=len(gp_kparams[1:]))))
+        gp_list.append(george.GP(gp.create_kernel(gp.emcee_kernel_map)))
 
         gp_list[ii].compute(gp_george[ii].x, gp_george[ii].yerr)
 
