@@ -83,7 +83,7 @@ def main(config):
 
     # Copy config file to same directory, use same datestring so that we can
     # match GPs with the config files later
-    conf_copy_dest = spectra_file.parent / (args.config_path.stem + datestr +
+    conf_copy_dest = spectra_file.parent / (args.config_path.stem + datestr + '_' +
                                             args.config_path.suffix)
     shutil.copy(args.config_path, conf_copy_dest)
     print(f"Config file copied {args.config_path} -> {conf_copy_dest}")
