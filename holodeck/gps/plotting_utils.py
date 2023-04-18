@@ -130,30 +130,30 @@ def get_smooth_center(env_pars,
             f"`center_measure` must be 'mean' or 'median', not '{center_measure}'"
         )
 
-    # Smooth Mean Spectra
-    filter_window = FILTER_DEF_WINDOW_LENGTH
-    filter_poly_order = FILTER_DEF_POLY_ORDER
-    nfreqs = len(fobs_edges)-1
-    if (filter_window is not None) and (nfreqs < filter_window):
-        print(
-            f"WARNING: {nfreqs=} < {filter_window=}, resetting default value"
-        )
-        if nfreqs < 4:
-            filter_window = None
-            filter_poly_order = None
-        else:
-            filter_window = nfreqs // 2 + 1 if (nfreqs//2)%2==0 else nfreqs // 2
-            filter_poly_order = filter_window // 2
-        print(f"         {filter_window=} {filter_poly_order=}")
+    # # Smooth Mean Spectra
+    # filter_window = FILTER_DEF_WINDOW_LENGTH
+    # filter_poly_order = FILTER_DEF_POLY_ORDER
+    # nfreqs = len(fobs_edges)-1
+    # if (filter_window is not None) and (nfreqs < filter_window):
+    #     print(
+    #         f"WARNING: {nfreqs=} < {filter_window=}, resetting default value"
+    #     )
+    #     if nfreqs < 4:
+    #         filter_window = None
+    #         filter_poly_order = None
+    #     else:
+    #         filter_window = nfreqs // 2 + 1 if (nfreqs//2)%2==0 else nfreqs // 2
+    #         filter_poly_order = filter_window // 2
+    #     print(f"         {filter_window=} {filter_poly_order=}")
 
-    if filter_window is not None:
-        smooth_center = ssig.savgol_filter(center, filter_window, filter_poly_order)
-    else:
-        if VERBOSE:
-            print("Not using any smoothing on center spectrum.")
-        smooth_center = center
+    # if filter_window is not None:
+    #     smooth_center = ssig.savgol_filter(center, filter_window, filter_poly_order)
+    # else:
+    #     if VERBOSE:
+    #         print("Not using any smoothing on center spectrum.")
+    #     smooth_center = center
 
-    return smooth_center
+    return center
 
 
 def plot_individual_parameter(gp_george,

@@ -10,18 +10,13 @@ import george.kernels as kernels
 import h5py
 import numpy as np
 import schwimmbad
-import scipy.signal as ssig
-
 from holodeck import utils
 from holodeck.constants import YR
-
 
 VERBOSE = True
 
 FLOOR_STRAIN_SQUARED = 1e-40
 FLOOR_ERR = 1.0
-FILTER_DEF_WINDOW_LENGTH = 7
-FILTER_DEF_POLY_ORDER = 3
 
 
 class GaussProc(object):
@@ -221,16 +216,15 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     yerr : numpy.array
         The error on the GWB training data
     yobs : numpy.array
-        The smoothed, zero-mean GWB training data
+        The zero-mean GWB training data
     yobs_mean : numpy.array
-        The original smoothed mean of the GWB training data
+        The original mean of the GWB training data
 
     Examples
     --------
     FIXME: Add docs.
 
     """
-
     # Filter out NaN values which signify a failed sample point
     # shape: (samples, freqs, realizations)
     gwb_spectra = spectra['gwb']
@@ -270,26 +264,6 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
             f"`center_measure` must be 'mean' or 'median', not '{center_measure}'"
         )
 
-    # Smooth Mean Spectra
-    filter_window = FILTER_DEF_WINDOW_LENGTH
-    filter_poly_order = FILTER_DEF_POLY_ORDER
-    if (filter_window is not None) and (nfreqs < filter_window):
-        print(f"WARNING: {nfreqs=} < {filter_window=}, resetting default value")
-        if nfreqs < 4:
-            filter_window = None
-            filter_poly_order = None
-        else:
-            filter_window = nfreqs // 2
-            filter_poly_order = filter_window // 2
-        print(f"         {filter_window=} {filter_poly_order=}")
-
-    if filter_window is not None:
-        smooth_center = ssig.savgol_filter(center, filter_window, filter_poly_order)
-    else:
-        if VERBOSE:
-            print("Not using any smoothing on center spectrum.")
-        smooth_center = center
-
     # Get realizations that are all low. We will later use this
     # boolean array to set a noise floor
     # I've done it this way in case only certain frequencies have
@@ -302,7 +276,7 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     err = np.where(low_real, FLOOR_ERR, np.std(np.log10(gwb_spectra), axis=-1))
 
     # The "y" data are the medians or means and errors for the spectra at each point in parameter space
-    yobs = smooth_center.copy()  # mean.copy()
+    yobs = center.copy()  # mean.copy()
     yerr = err.copy()
     gp_freqs = spectra["fobs"][:nfreqs].copy()
     gp_freqs *= YR
@@ -372,7 +346,7 @@ def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts):
     yerr : numpy.array
         The error on the GWB data
     yobs : numpy.array
-        The smoothed, zero-mean GWB data
+        The zero-mean GWB data
     kernel : str, optional
         The type of kernel to use for the GP
 
@@ -421,7 +395,7 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
     gp_freqs : numpy.array
         The frequencies corresponding to the GWB data
     yobs_mean : numpy.array
-        The smoothed mean of the GWB data
+        The mean of the GWB data
     gp_george : list[GaussProc]
         The GP model that has been read in from a .PKL file
     nkpars : int
