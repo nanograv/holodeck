@@ -181,6 +181,11 @@ def plot_individual_parameter(gp_george,
         The GP model that has been read in from a .PKL file
     gp_list : list[george.gp.GP]
         The configured GPs ready for predictions
+    gp_george_variance : list[GaussProc]
+        The variance GP model that has been read in from a .PKL file
+    gp_list_variance : list[george.gp.GP]
+        The configured variance GPs ready for predictions
+
     pars_const : dict
         Dictionary of constant parameter values
     par_interest : str
@@ -341,6 +346,10 @@ def plot_parameter_variances(
         The GP model that has been read in from a .PKL file
     gp_list : list[george.gp.GP]
         The configured GPs ready for predictions
+    gp_george_variance : list[GaussProc]
+        The variance GP model that has been read in from a .PKL file
+    gp_list_variance : list[george.gp.GP]
+        The configured variance GPs ready for predictions
     pars_const : dict
         Dictionary of constant parameter values
     spectra : h5py._hl.files.File
@@ -429,6 +438,10 @@ def plot_over_realizations(ind,
         The GP model that has been read in from a .PKL file
     gp_list : list[george.gp.GP]
         The configured GPs ready for predictions
+    gp_george_variance : list[GaussProc]
+        The variance GP model that has been read in from a .PKL file
+    gp_list_variance : list[george.gp.GP]
+        The configured variance GPs ready for predictions
     center_measure: str, optional
         The measure of center to use when returning a zero-center data. Can be
         either "mean" or "median"
