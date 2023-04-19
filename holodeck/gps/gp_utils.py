@@ -403,14 +403,16 @@ def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, y_is_variance, kernel):
         The error on the GWB data
     yobs : numpy.array
         The zero-mean GWB data
-    kernel : str, optional
-        The type of kernel to use for the GP
+    y_is_variance: bool
+        Whether or not this GP is trained on the variance of the data
+    kernel : dict
+        The dictionary mapping parameters to the kernels that will be used {par:kernel}
 
     Returns
     -------
     gp_george : list[george.gp.GP]
         The created GP kernels
-    nkpars : int
+    num_kpars : int
         Numer of kernel parameters
 
     Examples
@@ -636,6 +638,10 @@ def hc_from_gp(gp_george, gp_list, gp_george_variance, gp_list_variance,
         The GP model that has been read in from a .PKL file
     gp_list : list[george.gp.GP]
         The configured GPs ready for predictions
+    gp_george_variance : list[GaussProc]
+        The variance GP model that has been read in from a .PKL file
+    gp_list_variance : list[george.gp.GP]
+        The configured variance GPs ready for predictions
     env_pars : list
         List of ordered parameters for GP to use as input
 
