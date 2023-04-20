@@ -440,7 +440,8 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
     # ---- Store results from all files
 
     gwb = np.zeros((nsamp, nfreqs, nreals))
-    gwb, fit_data = _load_library_from_all_files(path_sims, gwb, fit_data, log)
+    gwb, fit_data, bad_files = _load_library_from_all_files(path_sims, gwb, fit_data, log)
+    param_samples[bad_files] = 0.0
 
     # ---- Save to concatenated output file ----
 
@@ -545,7 +546,7 @@ def _load_library_from_all_files(path_sims, gwb, fit_data, log):
 
     nsamp = gwb.shape[0]
     log.info(f"Collecting data from {nsamp} files")
-    good_file = np.ones(nsamp, dtype=bool)     #: track which files contain useable data
+    bad_files = np.zeros(nsamp, dtype=bool)     #: track which files contain UN-useable data
     num_fits_failed = 0
     msg = None
     for pnum in tqdm.trange(nsamp):
@@ -560,7 +561,7 @@ def _load_library_from_all_files(path_sims, gwb, fit_data, log):
             for fk in fit_data.keys():
                 fit_data[fk][pnum, ...] = np.nan
 
-            good_file[pnum] = False
+            bad_files[pnum] = True
             continue
 
         # store the GWB from this file
@@ -586,9 +587,9 @@ def _load_library_from_all_files(path_sims, gwb, fit_data, log):
         log.warning(f"Missing fit keys in {num_fits_failed}/{nsamp} = {num_fits_failed/nsamp:.2e} files!")
         log.warning(msg)
 
-    log.info(f"{utils.frac_str(~good_file)} files are failures")
+    log.info(f"{utils.frac_str(bad_files)} files are failures")
 
-    return gwb, fit_data
+    return gwb, fit_data, bad_files
 
 
 def fit_spectra_plaw_hc(freqs, gwb, nbins):
