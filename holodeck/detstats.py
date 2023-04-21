@@ -84,14 +84,12 @@ def _orf_ij(i, j, theta_ij):
     
     Parameters
     ----------
-    theta_i : scalar
-        Angular position of the ith pulsar.
-    theta_j : scalar
-        Angular position of the jth pulsar.
     i : int
         index of the ith pulsar
     j : int
         index of the jth pulsar
+    theta_ij : scalar
+        Relative angular position between the ith and jth pulsars.
 
     Returns
     -------
@@ -135,7 +133,6 @@ def _orf_pta(pulsars):
                 # calculate angle between two vectors.
                 theta_ij =  _relative_angle(pulsars[ii].theta, pulsars[ii].phi,
                                            pulsars[jj].theta, pulsars[jj].phi)
-                print('theta_ij', theta_ij)
                 # find ORF
                 Gamma[ii,jj] = _orf_ij(ii, jj, theta_ij)
     
@@ -145,22 +142,24 @@ def _orf_pta(pulsars):
 ######################## Noise Spectral Density ########################
 
 def _white_noise(delta_t, sigma_i):
-    """ Calculate the white noise for a given pulsar 2 /Delta t sigma_i^2
+    """ Calculate the white noise for a given pulsar (or array of pulsars) 
+    2 * Delta_t sigma_i^2
     
     Parameters
     ----------
     delta_t : scalar
         Detection cadence, in seconds.
-    sigma_i : scalar
+    sigma_i : arraylike
         Error/stdev/variance? for the ith pulsar, in seconds.
 
     Returns
     -------
-    P_i : scalar
+    P_i : arraylike
         Noise spectral density for the ith pulsar, for bg detection.
         For single source detections, the noise spectral density S_i must also 
         include red noise from all but the loudest single sources, S_h,rest.
 
+    Follows Eq. (23) from Rosado et al. 2015.
     """
     P_i = 2 * delta_t * sigma_i**2
     return P_i
@@ -178,66 +177,28 @@ def _power_spectral_density(hc_bg, freqs):
 
     Parameters
     ----------
-    hc_bg : (F,) 1D array of scalars
-        Characteristic strain of the background at each frequency. 
+    hc_bg : (F,R) NDarray of scalars
+        Characteristic strain of the background at each frequency, for
+        R realizations. 
     freqs : (F,) 1Darray of scalars
         Frequency bin centers corresponding to each strain
 
     Returns
     -------
-    S_h : (F,) 1Darray of scalars
-        Actual (S_h) or ~construction (S_h0) value of the background spectral density. 
-        In units of [freqs]^-3
+    S_h : (F,R) 1Darray of scalars
+        Actual (S_h) or ~construction (S_h0) value of the background spectral density,
+        in units of [freqs]^-3, for R realizations.
+
+    Follows Eq. (25) of Rosado et al. 2015
     """
 
-    S_h = hc_bg**2 / (12 * np.pi**2 * freqs**3)
+    S_h = hc_bg**2 / (12 * np.pi**2 * freqs[:,np.newaxis]**3)
     return S_h
 
 
 ######################## mu_1, sigma_0, sigma_1 ########################
 
-def _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
-    """ Calculate mu_1 for the background, by summing over all pulsars and frequencies.
-    Assuming the B statistic, which maximizes S/N_B = mu_1/sigma_1
-    
-    Parameters
-    ----------
-    noise : (P,) 1darray of scalars
-        Noise spectral density of each pulsar.
-    Gamma : (P,P,) 2Darray of scalars
-        Overlap reduction function for jj>ii, 0 otherwise.
-    Sh_bg : (F,) 1Darray of scalars
-        Spectral density in the background.
-    Sh0_bg : (F,) 1Darray of scalars
-        Value of spectral density used to construct the statistic.
-
-    Returns
-    -------
-    mu_1B : 
-        Expected value for the B statistic
-
-    Follows Eq. (A16) from Rosado et al. 2015.
-    """
-    
-    # to get sum term in shape (P,P,F) for ii,jj,kk we want:
-    # Gamma in shape (P,P,1)
-    # Sh0 and Sh in shape (1,1,F)
-    # P_i in shape (P,1,1)
-    # P_j in shape (1,P,1)
-
-    numer = (Gamma[:,:,np.newaxis] **2 
-            * Sh_bg[np.newaxis, np.newaxis, :]
-            * Sh0_bg[np.newaxis, np.newaxis, :])
-    denom = ((noise[:, np.newaxis, np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
-               * (noise[np.newaxis, :, np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
-               + Gamma[:,:,np.newaxis]**2 * Sh0_bg[np.newaxis, np.newaxis, :]**2)
-    
-    # should not need this part if Gamma takes all jj<=ii parts to zero
-    sum = np.sum(numer/denom)
-    mu_1B = 2*sum
-    return mu_1B
-
-def _sigma0_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
+def _sigma0_Bstatistic(noise, Gamma, Sh0_bg):
     """ Calculate sigma_1 for the background, by summing over all pulsars and frequencies.
     Assuming the B statistic, which maximizes S/N_B = mu_1/sigma_1
     
@@ -247,32 +208,36 @@ def _sigma0_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
         Noise spectral density of each pulsar.
     Gamma : (P,P,) 2Darray of scalars
         Overlap reduction function for j>i, 0 otherwise.
-    Sh_bg : (F,) 1Darray of scalars
-        Spectral density in the background.
-    Sh0_bg : (F,) 1Darray of scalars
+    Sh0_bg : (F,R) 1Darray of scalars
         Value of spectral density used to construct the statistic.
 
     Returns
     -------
-    sigma_0B : Scalar
+    sigma_0B : (R,) 1Darray
+        Standard deviation of the null PDF assuming the B-statistic.
         
 
     Follows Eq. (A17) from Rosado et al. 2015.
     """
-
-    # to get sum term in shape (P,P,F) for ii,jj,kk we want:
-    # Gamma in shape (P,P,1)
-    # Sh0 and Sh in shape (1,1,F)
-    # P_i in shape (P,1,1)
-    # P_j in shape (1,P,1)
-
-    numer = (Gamma[:,:,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2 
-             * noise[:,np.newaxis,np.newaxis] * noise[np.newaxis,:,np.newaxis])
-    denom = ((noise[:,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis, np.newaxis,:])
-              * (noise[np.newaxis,:,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
-             + Gamma[:,:,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2)**2
     
-    sum = np.sum(numer/denom)
+    # Check that Gamma_{j<=i} = 
+    for ii in range(len(noise)):
+        for jj in range(ii+1): 
+            assert Gamma[ii,jj] == 0, f'Gamma[{ii},{jj}] = {Gamma[ii,jj]}, but it should be 0!'
+
+    # to get sum term in shape (P,P,F,R) we want:
+    # Gamma in shape (P,P,1,1)
+    # Sh0 and Sh in shape (1,1,F,R)
+    # P_i in shape (P,1,1,1)
+    # P_j in shape (1,P,1,1)
+
+    numer = (Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2 
+             * noise[:,np.newaxis,np.newaxis,np.newaxis] * noise[np.newaxis,:,np.newaxis,np.newaxis])
+    denom = ((noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis, np.newaxis,:])
+              * (noise[np.newaxis,:,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
+             + Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2)**2
+    
+    sum = np.sum(numer/denom, axis=(0,1,2))
     sigma_0B = np.sqrt(2*sum)
     return sigma_0B
 
@@ -286,37 +251,89 @@ def _sigma1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
         Noise spectral density of each pulsar.
     Gamma : (P,P,) 2Darray of scalars
         Overlap reduction function for j>i, 0 otherwise.
-    Sh_bg : (F,) 1Darray of scalars
+    Sh_bg : (F,R) 1Darray of scalars
         Spectral density in the background.
-    Sh0_bg : (F,) 1Darray of scalars
+    Sh0_bg : (F,R) 1Darray of scalars
         Value of spectral density used to construct the statistic.
 s
     Returns
     -------
-    sigma_1B : Scalar
+    sigma_1B : (R,) 1Darray
+        Standard deviation of the PDf with a GWB, assuming the B-statistic.
         
 
     Follows Eq. (A18) from Rosado et al. 2015.
     """
 
-    # to get sum term in shape (P,P,F) for ii,jj,kk we want:
-    # Gamma in shape (P,P,1)
-    # Sh0 and Sh in shape (1,1,F)
-    # P_i in shape (P,1,1)
-    # P_j in shape (1,P,1)
+    # Check that Gamma_{j<=i} = 
+    for ii in range(len(noise)):
+        for jj in range(ii+1): 
+            assert Gamma[ii,jj] == 0, f'Gamma[{ii},{jj}] = {Gamma[ii,jj]}, but it should be 0!'
 
-    numer = (Gamma[:,:,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2 
-             * ((noise[:,np.newaxis,np.newaxis] + Sh_bg[np.newaxis,np.newaxis,:])
-                * (noise[np.newaxis,:,np.newaxis] + Sh_bg[np.newaxis,np.newaxis,:])
-                + Gamma[:,:,np.newaxis]**2 * Sh_bg[np.newaxis,np.newaxis,:]**2))
+    # to get sum term in shape (P,P,F,R) we want:
+    # Gamma in shape (P,P,1,1)
+    # Sh0 and Sh in shape (1,1,F,R)
+    # P_i in shape (P,1,1,1)
+    # P_j in shape (1,P,1,1)
+
+    numer = (Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2 
+             * ((noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh_bg[np.newaxis,np.newaxis,:])
+                * (noise[np.newaxis,:,np.newaxis,np.newaxis] + Sh_bg[np.newaxis,np.newaxis,:])
+                + Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh_bg[np.newaxis,np.newaxis,:]**2))
              
-    denom = ((noise[:,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis, np.newaxis,:])
-              * (noise[np.newaxis,:,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
-             + Gamma[:,:,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2)**2
+    denom = ((noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis, np.newaxis,:])
+              * (noise[np.newaxis,:,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
+             + Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2)**2
     
-    sum = np.sum(numer/denom)
+    sum = np.sum(numer/denom, axis=(0,1,2))
     sigma_1B = np.sqrt(2*sum)
     return sigma_1B
+
+def _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
+    """ Calculate mu_1 for the background, by summing over all pulsars and frequencies.
+    Assuming the B statistic, which maximizes S/N_B = mu_1/sigma_1
+    
+    Parameters
+    ----------
+    noise : (P,) 1darray of scalars
+        Noise spectral density of each pulsar.
+    Gamma : (P,P,) 2Darray of scalars
+        Overlap reduction function for j>i, 0 otherwise.
+    Sh_bg : (F,R) 2Darray of scalars
+        Spectral density in the background.
+    Sh0_bg : (F,R) 2Darray of scalars
+        Value of spectral density used to construct the statistic.
+
+    Returns
+    -------
+    mu_1B : (R) 1Darray of scalars
+        Expected value for the B statistic
+
+    Follows Eq. (A16) from Rosado et al. 2015.
+    """
+    
+    # Check that Gamma_{j<=i} = 
+    for ii in range(len(noise)):
+        for jj in range(ii+1): 
+            assert Gamma[ii,jj] == 0, f'Gamma[{ii},{jj}] = {Gamma[ii,jj]}, but it should be 0!'
+
+    # to get sum term in shape (P,P,F,R) for ii,jj,kk we want:
+    # Gamma in shape (P,P,1,1)
+    # Sh0 and Sh in shape (1,1,F,R)
+    # P_i in shape (P,1,1,1)
+    # P_j in shape (1,P,1,1)
+
+    numer = (Gamma[:,:,np.newaxis,np.newaxis] **2 
+            * Sh_bg[np.newaxis,np.newaxis,:]
+            * Sh0_bg[np.newaxis,np.newaxis,:])
+    denom = ((noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
+               * (noise[np.newaxis,:,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
+               + Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis, np.newaxis, :]**2)
+    
+    # Requires Gamma have all jj<=ii parts to zero
+    sum = np.sum(numer/denom, axis=(0,1,2))
+    mu_1B = 2*sum
+    return mu_1B
 
 
 ######################## Signal-to-Noise Ratio ########################
@@ -331,14 +348,12 @@ def _snr_bg_B(noise, Gamma, Sh_bg):
         Noise spectral density of each pulsar.
     Gamma : (P,P,) 2Darray of scalars
         Overlap reduction function for j>i, 0 otherwise.
-    Sh_bg : (F,) 1Darray of scalars
+    Sh_bg : (F,R,) 2Darray of scalars
         Spectral density in the background.
-    Sh0_bg : (F,) 1Darray of scalars
-        Value of spectral density used to construct the statistic.
-
+    
     Returns
     -------
-    SNR_B : Scalar
+    SNR_B : (R,) 2Darray of scalars
         Signal to noise ratio assuming the B statistic, mu_1B/sigma_1B
         
 
@@ -347,16 +362,17 @@ def _snr_bg_B(noise, Gamma, Sh_bg):
     """
 
 
-    # to get sum term in shape (P,P,F) for ii,jj,kk we want:
-    # Gamma in shape (P,P,1)
-    # Sh0 and Sh in shape (1,1,F)
-    # P_i in shape (P,1,1)
-    # P_j in shape (1,P,1)
+    # to get sum term in shape (P,P,F,R) we want:
+    # Gamma in shape (P,P,1,1)
+    # Sh in shape (1,1,F,R)
+    # P_i in shape (P,1,1,1)
+    # P_j in shape (1,P,1,1)
 
-    numer = Gamma[:,:,np.newaxis]**2 * Sh_bg[np.newaxis,np.newaxis,:]**2
-    denom = (noise[:,np.newaxis,np.newaxis] * noise[np.newaxis,:,np.newaxis]
-             + Sh_bg[np.newaxis,np.newaxis,:] * (noise[:,np.newaxis,np.newaxis]+noise[np.newaxis,:,np.newaxis])
-             + Sh_bg[np.newaxis,np.newaxis,:]**2 * (1 + Gamma[:,:,np.newaxis]**2))
+    numer = Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh_bg[np.newaxis,np.newaxis,:]**2
+    denom = (noise[:,np.newaxis,np.newaxis,np.newaxis] * noise[np.newaxis,:,np.newaxis,np.newaxis]
+             + Sh_bg[np.newaxis,np.newaxis,:] * (noise[:,np.newaxis,np.newaxis,np.newaxis]
+                                                 +noise[np.newaxis,:,np.newaxis,np.newaxis])
+             + Sh_bg[np.newaxis,np.newaxis,:]**2 * (1 + Gamma[:,:,np.newaxis,np.newaxis]**2))
 
     sum = np.sum(numer/denom)
     SNR_B = np.sqrt(2*sum)
@@ -370,46 +386,127 @@ def _bg_detection_probability(sigma_0, sigma_1, mu_1, alpha_0=0.001):
 
     Parameters
     ----------
-    sigma_0 : scalar
-        Standard deviation of stochastic noise processes.
-    sigma_1 : scalar
-        Standard deviation of GWB PDF.
-    mu_1 : scalar
-        Mean of GWB PDF.
+    sigma_0 : (R,) 1Darray
+        Standard deviation of stochastic noise processes, for R realizations.
+    sigma_1 : (R,) 1Darray
+        Standard deviation of GWB PDF, for R realizations.
+    mu_1 : (R,) 1Darray
+        Mean of GWB PDF, for R realizations.
     alpha_0 : scalar
         False alarm probability max.
 
     Returns
     -------
-    dp_bg : scalar
-        Background detection probability.
+    dp_bg : (R,) 1Darray
+        Background detection probability, for R realizations.
 
         
     Follows Rosado et al. 2015 Eq. (15)
     """
+    alpha_0 = np.array([alpha_0])
     temp = ((np.sqrt(2) * sigma_0 * sp.special.erfcinv(2*alpha_0) - mu_1)
             /(np.sqrt(2) * sigma_1))
     dp_bg = .5 * sp.special.erfc(temp)
     return dp_bg
 
 
-def detect_bg(THETAS, SIGMAS, fobs, cad, hc_bg, alpha_0=0.001, return_all = False):
+def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret_all = False):
     """ Calculate the background detection probability, and all intermediary steps.
 
     Parameters
     ----------
-    THETAS : (P,) 1Darray of scalars
+    thetas : (P,) 1Darray of scalars
         Angular position of each pulsar in radians.
-    SIGMAS : (P,) 1Darray of scalars
+    phis : (P,) 1Darray of scalars
+        Angular position of each pulsar in radians.
+    sigmas : (P,) 1Darray of scalars
         Sigma_i of each pulsar in seconds.
     fobs : (F,) 1Darray of scalars
         Frequency bin centers in hertz.
     cad : scalar
         Cadence of observations in seconds.
-    hc_bg : (F,)
-        Characteristic strain of the background at each frequency.
+    hc_bg : (F,R)
+        Characteristic strain of the background at each frequency, 
+        for R realizations.
+    alpha_0 : scalar
+        False alarm probability
     return_all : Bool
         Whether to return all parameters or just dp_bg
+
+    Returns
+    -------
+    dp_bg : (R,) 1Darray
+        Background detection probability, for R realizations.
+    Gamma : (P, P) 2D Array
+        Overlap reduction function for j>i, 0 otherwise.
+        Only returned if return_all = True.
+    Sh_bg : (F,R,) 1Darray
+        Spectral density, for R realizations
+        Only returned if return_all = True.
+    noise : (P,) 1Darray
+        Spectral noise density of each pulsar.
+        Only returned if return_all = True.
+    mu_1B : (R,) 1Darray
+        Expected value for the B statistic.
+        Only returned if return_all = True.
+    sigma_0B : (R,) 1Darray
+    sigma_1B : (R,) 1Darray
+
+    """
+    # Overlap Reduction Function
+    num = len(thetas) # number of pulsars, P
+    Gamma = np.zeros((num, num)) # (P,P) 2Darray of scalars, Overlap reduction function between all puolsar
+    for ii in range(num):
+        for jj in range(num):
+            if (jj>ii): # 0 otherwise, allows sum over all
+                theta_ij =  _relative_angle(thetas[ii], phis[ii],
+                                            thetas[jj], phis[jj])
+                Gamma[ii,jj] = _orf_ij(ii, jj, theta_ij)
+
+    # Spectral Density
+    Sh_bg = _power_spectral_density(hc_bg, fobs) # spectral density of bg, using 0th realization
+    Sh0_bg = Sh_bg # approximation used in Rosado et al. 2015
+
+    # Noise 
+    noise = _white_noise(cad, sigmas) 
+
+    sigma_0B = _sigma0_Bstatistic(noise, Gamma, Sh0_bg)
+
+    sigma_1B = _sigma1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
+
+    mu_1B = _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
+
+    dp_bg = _bg_detection_probability(sigma_0B, sigma_1B, mu_1B, alpha_0)
+
+    if(ret_all):
+        return dp_bg, Gamma, Sh_bg, noise, mu_1B, sigma_0B, sigma_1B
+    else:
+        return dp_bg
+    
+
+
+
+# NOTE: Could modify this to take hc_bg[F,R], and return dp[R]
+
+def detect_bg_pta(pulsars, spectra, cad, hc_bg, alpha_0=0.001, ret_all = False):
+    """ Calculate the background detection probability, and all the intermediary steps
+    from a list of hasasia.Pulsar objects.
+    
+    Parameters
+    ----------
+    pulsars : (P,) list of hasasia.Pulsar objects
+        A set of pulsars generated by hasasia.sim.sim_pta()
+    spectra : (P,) list of hasasia.Spectrum objects
+        The spectrum for each pulsar.
+    cad : scalar
+        Cadence of observations in seconds.
+    hc_bg : (F,R)
+        Characteristic strain of the background at each frequency,
+        for R realizations.
+    alpha_0 : scalar
+        Falsa alarm probability
+    return_all : Bool
+        Whether or not to return intermediate variables.
 
     Returns
     -------
@@ -430,30 +527,41 @@ def detect_bg(THETAS, SIGMAS, fobs, cad, hc_bg, alpha_0=0.001, return_all = Fals
     sigma_0B : scalar
     sigma_1B : scalar
 
+
+    If a pulsar had differing toaerrs, the mean of that pulsar's 
+    toaerrs is used as the pulsar's sigma.
+    TODO: implement red noise
     """
-    # Overlap Reduction Function
-    num = len(THETAS) # number of pulsars, P
-    Gamma = np.zeros((num, num)) # (P,P) 2Darray of scalars, Overlap reduction function between all puolsar
-    for ii in range(num):
-        for jj in range(num):
-            Gamma[ii,jj] = _orf_ij(THETAS[ii], THETAS[jj], ii, jj)
 
-    # Spectral Density
-    Sh_bg = _power_spectral_density(hc_bg[:], fobs) # spectral density of bg, using 0th realization
-    Sh0_bg = Sh_bg # approximation used in Rosado et al. 2015
+    # check inputs
+    assert len(pulsars) == len(spectra), f"'pulsars ({len(pulsars)}) does not match 'spectra' ({len(spectra)}) !"
+    # get pulsar properties
+    thetas = np.zeros(len(pulsars))
+    phis = np.zeros(len(pulsars))
+    sigmas = np.zeros(len(pulsars))
+    for ii in range(len(pulsars)):
+        thetas[ii] = pulsars[ii].theta
+        phis[ii] = pulsars[ii].phi
+        sigmas[ii] = np.mean(pulsars[ii].toaerrs)
 
-    # Noise 
-    noise = _white_noise(cad, SIGMAS) 
+    fobs = spectra[0].freqs
+
+    Gamma = _orf_pta(pulsars)
+
+    Sh_bg = _power_spectral_density(hc_bg[:], fobs)
+    Sh0_bg = Sh_bg # note this refers to same object, not a copy
+
+    noise = _white_noise(cad, sigmas)
 
     mu_1B = _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
 
-    sigma_0B = _sigma0_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
+    sigma_0B = _sigma0_Bstatistic(noise, Gamma, Sh0_bg)
 
     sigma_1B = _sigma1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
 
     dp_bg = _bg_detection_probability(sigma_0B, sigma_1B, mu_1B, alpha_0)
 
-    if(return_all):
+    if(ret_all):
         return dp_bg, Gamma, Sh_bg, noise, mu_1B, sigma_0B, sigma_1B
     else:
         return dp_bg
