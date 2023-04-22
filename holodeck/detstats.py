@@ -486,7 +486,6 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret_all = F
 
 
 
-# NOTE: Could modify this to take hc_bg[F,R], and return dp[R]
 
 def detect_bg_pta(pulsars, spectra, cad, hc_bg, alpha_0=0.001, ret_all = False):
     """ Calculate the background detection probability, and all the intermediary steps
