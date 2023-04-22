@@ -336,47 +336,6 @@ def _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
     return mu_1B
 
 
-######################## Signal-to-Noise Ratio ########################
-
-
-def _snr_bg_B(noise, Gamma, Sh_bg):
-    """ Calculate S/N_B for the background, using P_i, Gamma, S_h and S_h0
-    
-    Parameters
-    ----------
-    noise : (P,) 1darray of scalars
-        Noise spectral density of each pulsar.
-    Gamma : (P,P,) 2Darray of scalars
-        Overlap reduction function for j>i, 0 otherwise.
-    Sh_bg : (F,R,) 2Darray of scalars
-        Spectral density in the background.
-    
-    Returns
-    -------
-    SNR_B : (R,) 2Darray of scalars
-        Signal to noise ratio assuming the B statistic, mu_1B/sigma_1B
-        
-
-    Follows Eq. (A19) from Rosado et al. 2015. This should be equal to 
-    mu_1B/sigma_1B, and can be used as a sanity check.
-    """
-
-
-    # to get sum term in shape (P,P,F,R) we want:
-    # Gamma in shape (P,P,1,1)
-    # Sh in shape (1,1,F,R)
-    # P_i in shape (P,1,1,1)
-    # P_j in shape (1,P,1,1)
-
-    numer = Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh_bg[np.newaxis,np.newaxis,:]**2
-    denom = (noise[:,np.newaxis,np.newaxis,np.newaxis] * noise[np.newaxis,:,np.newaxis,np.newaxis]
-             + Sh_bg[np.newaxis,np.newaxis,:] * (noise[:,np.newaxis,np.newaxis,np.newaxis]
-                                                 +noise[np.newaxis,:,np.newaxis,np.newaxis])
-             + Sh_bg[np.newaxis,np.newaxis,:]**2 * (1 + Gamma[:,:,np.newaxis,np.newaxis]**2))
-
-    sum = np.sum(numer/denom)
-    SNR_B = np.sqrt(2*sum)
-    return SNR_B
 
 
 ######################## Detection Probability #########################
@@ -566,3 +525,127 @@ def detect_bg_pta(pulsars, spectra, cad, hc_bg, alpha_0=0.001, ret_all = False):
         return dp_bg
     
 
+
+######################## Signal-to-Noise Ratio ########################
+
+def SNR_bg_B(noise, Gamma, Sh_bg):
+    """ Calculate S/N_B for the background, using P_i, Gamma, S_h and S_h0
+    
+    Parameters
+    ----------
+    noise : (P,) 1darray of scalars
+        Noise spectral density of each pulsar, P_i.
+    Gamma : (P,P,) 2Darray of scalars
+        Overlap reduction function for j>i, 0 otherwise.
+    Sh_bg : (F,R,) 2Darray of scalars
+        Spectral density in the background.
+    
+    Returns
+    -------
+    SNR_B : (R,) 1Darray of scalars
+        Signal to noise ratio assuming the B statistic, mu_1B/sigma_1B, for each realization.
+        
+
+    Follows Eq. (A19) from Rosado et al. 2015. This should be equal to 
+    mu_1B/sigma_1B, and can be used as a sanity check.
+    """
+
+
+    # to get sum term in shape (P,P,F,R) we want:
+    # Gamma in shape (P,P,1,1)
+    # Sh in shape (1,1,F,R)
+    # P_i in shape (P,1,1,1)
+    # P_j in shape (1,P,1,1)
+
+    P_i = noise[:,np.newaxis,np.newaxis,np.newaxis]
+    P_j = noise[np.newaxis,:,np.newaxis,np.newaxis]
+    Sh_bg = Sh_bg[np.newaxis,np.newaxis,:,:]
+    Gamma = Gamma[:,:,np.newaxis,np.newaxis]
+
+    numer = Gamma**2 * Sh_bg**2
+    denom = (P_i*P_j + Sh_bg*(P_i+P_j) + Sh_bg**2 *(1 + Gamma**2))
+
+    sum = np.sum(numer/denom, axis=(0,1,2))
+    SNR_B = np.sqrt(2*sum)
+    return SNR_B
+
+def _Sh_hasasia_generic_bg(scGWB):
+    """ Calculate the signal strain power spectral density, 
+        `Sh` for hasasia's SNR calculation
+        
+    Parameters
+    ----------
+    scGWB : hasasia.sensitivity.GWBSensitivityCurve object
+        GWB sensitivity curve object.
+        
+    Returns
+    -------
+    Sh_h : (F,) 1Darray
+        Sh as used in hasasia's SNR calculation, for each frequency.
+    
+    """
+    freqs = scGWB.freqs
+    H0 = scGWB._H_0.to('Hz').value
+    Omega_gw = scGWB.Omega_gw
+    Sh_h = 3*H0**2 / (2*np.pi**2) * Omega_gw / freqs**3
+    return Sh_h
+
+def SNR_hasasia_generic_bg(scGWB):
+    """ Calculate the GWB signal to noise ratio with hasasia.
+    
+    Parameters
+    ----------
+    scGWB : hasasia.sensitivity.GWBSensitivityCurve object
+        GWB sensitivity curve object.
+        
+    Returns
+    -------
+    SNR_h : scalar
+        Signal to noise ratio from hasasia.
+    """
+    Sh_h = _Sh_hasasia_generic_bg(scGWB)
+    SNR_h = scGWB.SNR(Sh_h)
+    return SNR_h
+    
+
+def _Sh_hasasia_modeled_bg(freqs, hc_bg):
+    """ Calculate Sh for hsen.GWBSensitivityCurve.SNR(Sh) from a 
+    modeled GWB characteristic strain.
+    
+    Parameters
+    ----------
+    freqs : (F,) 1Darray
+        Frequencies of char strain.
+    hc_bg : (F,R,) NDarray
+        GWB characteristic strain for each frequency and realization.
+    
+    Returns
+    -------
+    Sh_h : (F,R,) NDarray
+        Sh as used in hasasia's SNR calculation, for each frequency.
+    """
+
+    Sh_h = hc_bg**2 / freqs[:,np.newaxis]
+    return Sh_h    
+
+def SNR_hasasia_modeled_bg(scGWB, hc_bg):
+    """ Calculate the GWB signal to noise ratio with hasasia.
+    
+    Parameters
+    ----------
+    scGWB : hasasia.sensitivity.GWBSensitivityCurve object
+        GWB sensitivity curve object.
+    hc_bg : (F,R,) NDarray
+        Realistic characteristic strain of the background.
+        
+    Returns
+    -------
+    SNR_h : (R,) 1Darray)
+        Signal to noise ratio from hasasia, for each realization.
+    """
+    Sh_h = _Sh_hasasia_modeled_bg(scGWB.freqs, hc_bg)
+    SNR_h = np.zeros(len(hc_bg[0]))
+    for rr in range(len(hc_bg[0])):
+        SNR_h[rr] = scGWB.SNR(Sh_h[:,rr])
+    return SNR_h
+    
