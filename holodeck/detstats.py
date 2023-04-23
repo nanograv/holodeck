@@ -6,7 +6,8 @@ for Hasasia PTA's.
 """
 
 import numpy as np
-import scipy as sp
+from scipy import special, integrate
+from sympy import nsolve, Symbol
 
 import holodeck as holo
 from holodeck import utils, cosmo, log
@@ -59,13 +60,13 @@ def _relative_angle(theta_i, phi_i, theta_j, phi_j):
     Parameters
     ----------
     theta_i : scalar 
-        Polar angular position in the sky of the ith pulsar.
+        Polar (latitudinal) angular position in the sky of the ith pulsar.
     phi_i : scalar
-        Azimuthal angular position in the sky of the ith pulsar.
+        Azimuthal (longitudinal) angular position in the sky of the ith pulsar.
     theta_j : scalar 
-        Polar angular position in the sky of the jth pulsar.
+        Polar (latitudinal) angular position in the sky of the jth pulsar.
     phi_j : scalara
-        Azimuthal angular position in the sky of the jth pulsar.
+        Azimuthal (longitudinal) angular position in the sky of the jth pulsar.
 
     Returns
     -------
@@ -206,7 +207,7 @@ def _sigma0_Bstatistic(noise, Gamma, Sh0_bg):
     ----------
     noise : (P,) 1darray of scalars
         Noise spectral density of each pulsar.
-    Gamma : (P,P,) 2Darray of scalars
+    Gamma : (P,P) 2Darray of scalars
         Overlap reduction function for j>i, 0 otherwise.
     Sh0_bg : (F,R) 1Darray of scalars
         Value of spectral density used to construct the statistic.
@@ -249,7 +250,7 @@ def _sigma1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
     ----------
     noise : (P,) 1darray of scalars
         Noise spectral density of each pulsar.
-    Gamma : (P,P,) 2Darray of scalars
+    Gamma : (P,P) 2Darray of scalars
         Overlap reduction function for j>i, 0 otherwise.
     Sh_bg : (F,R) 1Darray of scalars
         Spectral density in the background.
@@ -297,7 +298,7 @@ def _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
     ----------
     noise : (P,) 1darray of scalars
         Noise spectral density of each pulsar.
-    Gamma : (P,P,) 2Darray of scalars
+    Gamma : (P,P) 2Darray of scalars
         Overlap reduction function for j>i, 0 otherwise.
     Sh_bg : (F,R) 2Darray of scalars
         Spectral density in the background.
@@ -363,9 +364,9 @@ def _bg_detection_probability(sigma_0, sigma_1, mu_1, alpha_0=0.001):
     Follows Rosado et al. 2015 Eq. (15)
     """
     alpha_0 = np.array([alpha_0])
-    temp = ((np.sqrt(2) * sigma_0 * sp.special.erfcinv(2*alpha_0) - mu_1)
+    temp = ((np.sqrt(2) * sigma_0 * special.erfcinv(2*alpha_0) - mu_1)
             /(np.sqrt(2) * sigma_1))
-    dp_bg = .5 * sp.special.erfc(temp)
+    dp_bg = .5 * special.erfc(temp)
     return dp_bg
 
 
@@ -389,7 +390,7 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret_all = F
         for R realizations.
     alpha_0 : scalar
         False alarm probability
-    return_all : Bool
+    ret_all : Bool
         Whether to return all parameters or just dp_bg
 
     Returns
@@ -399,7 +400,7 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret_all = F
     Gamma : (P, P) 2D Array
         Overlap reduction function for j>i, 0 otherwise.
         Only returned if return_all = True.
-    Sh_bg : (F,R,) 1Darray
+    Sh_bg : (F,R) 1Darray
         Spectral density, for R realizations
         Only returned if return_all = True.
     noise : (P,) 1Darray
@@ -535,9 +536,9 @@ def SNR_bg_B(noise, Gamma, Sh_bg):
     ----------
     noise : (P,) 1darray of scalars
         Noise spectral density of each pulsar, P_i.
-    Gamma : (P,P,) 2Darray of scalars
+    Gamma : (P,P) 2Darray of scalars
         Overlap reduction function for j>i, 0 otherwise.
-    Sh_bg : (F,R,) 2Darray of scalars
+    Sh_bg : (F,R) 2Darray of scalars
         Spectral density in the background.
     
     Returns
@@ -616,12 +617,12 @@ def _Sh_hasasia_modeled_bg(freqs, hc_bg):
     ----------
     freqs : (F,) 1Darray
         Frequencies of char strain.
-    hc_bg : (F,R,) NDarray
+    hc_bg : (F,R) NDarray
         GWB characteristic strain for each frequency and realization.
     
     Returns
     -------
-    Sh_h : (F,R,) NDarray
+    Sh_h : (F,R) NDarray
         Sh as used in hasasia's SNR calculation, for each frequency.
     """
 
@@ -635,7 +636,7 @@ def SNR_hasasia_modeled_bg(scGWB, hc_bg):
     ----------
     scGWB : hasasia.sensitivity.GWBSensitivityCurve object
         GWB sensitivity curve object.
-    hc_bg : (F,R,) NDarray
+    hc_bg : (F,R) NDarray
         Realistic characteristic strain of the background.
         
     Returns
@@ -649,3 +650,474 @@ def SNR_hasasia_modeled_bg(scGWB, hc_bg):
         SNR_h[rr] = scGWB.SNR(Sh_h[:,rr])
     return SNR_h
     
+
+
+
+########################################################################
+##################### Functions for Single Sources #####################
+########################################################################
+
+########################### Unitary Vectors  ###########################
+
+def _m_unitary_vector(theta, phi, xi):
+    """ Calculate the unitary vector m-hat for the antenna pattern functions.
+    
+    Parameters
+    ----------
+    theta : (F,R,L) NDarray
+        Spherical coordinate position of each single source.
+    phi : (F,R,L) NDarray
+        Spherical coordinate position of each single source.
+    xi : (F,R,L) NDarray
+        Inclination of binary? But thought that's what iota was?    
+    
+    Returns
+    -------
+    m_hat : (3,F,R,L) NDarray 
+        Unitary vector m-hat with x, y, and z components at 
+        index 0, 1, and 2, respectively.
+        
+    """
+    mhat_x = (np.sin(phi) * np.cos(xi) 
+              - np.sin(xi) * np.cos(phi) * np.cos(theta))
+    mhat_y = -(np.cos(phi) * np.cos(xi)
+               + np.sin(xi) * np.sin(phi) * np.cos(theta))
+    mhat_z = (np.sin(xi) * np.sin(theta))
+
+    m_hat = np.array([mhat_x, mhat_y, mhat_z])
+    return m_hat
+
+def _n_unitary_vector(theta, phi, xi):
+    """ Calculate the unitary vector n-hat for the antenna pattern functions.
+    
+    Paramters
+    ---------
+    theta : (F,R,L) NDarray
+        Spherical coordinate position of each single source.
+    phi : (F,R,L) NDarray
+        Spherical coordinate position of each single source.
+    xi : (F,R,L) 1Darray
+        Inclination of binary? But thought that's what iota was?    
+    
+    Returns
+    -------
+    n_hat : (3,F,R,L) NDarray
+        Unitary vector n-hat.
+        
+    """
+
+    nhat_x = (- np.sin(phi) * np.sin(xi) 
+              - np.cos(xi) * np.cos(phi) * np.cos(theta))
+    nhat_y = (np.cos(phi) * np.sin(xi) 
+              - np.cos(xi) * np.sin(phi) * np.cos(theta))
+    nhat_z = np.cos(xi) * np.sin(theta)
+
+    n_hat = np.array([nhat_x, nhat_y, nhat_z])
+    return n_hat
+
+def _Omega_unitary_vector(theta, phi):
+    """ Calculate the unitary vector n-hat for the antenna pattern functions.
+    
+    Paramters
+    ---------
+    theta : (F,R,L) NDarray
+        Spherical coordinate position of each single source.
+    phi : (F,R,L) NDarray
+        Spherical coordinate position of each single source.
+    
+    Returns
+    -------
+    Omega_hat : (3,F,R,L) NDarray
+        Unitary vector Omega-hat.
+    """
+
+    Omegahat_x = - np.sin(theta) * np.cos(phi)
+    Omegahat_y = - np.sin(theta) * np.sin(phi)
+    Omegahat_z = - np.cos(theta)
+
+    Omega_hat = np.array([Omegahat_x, Omegahat_y, Omegahat_z])
+    return Omega_hat
+
+def _pi_unitary_vector(phi_i, theta_i):
+    """ Calculate the unitary vector p_i-hat for the ith pulsar.
+    
+    Parameters
+    ----------
+    phi : (P,) 1Darray
+        Spherical coordinate position of each pulsar.
+    theta : (P,) 1Darray
+        Spherical coordinate position of each pulsar.
+    Returns
+    -------
+    pi_hat : (3,P) vector
+        pulsar unitary vector
+    
+    """
+
+    pihat_x = np.sin(theta_i) * np.cos(phi_i)
+    pihat_y = np.sin(theta_i) * np.sin(phi_i)
+    pihat_z = np.cos(theta_i)
+
+    pi_hat = np.array([pihat_x, pihat_y, pihat_z])
+    return pi_hat
+
+
+###################### Antenna Pattern Functions  ######################
+
+def dotprod(vec1, vec2):
+    """ Calculate the dot product for NDarrays of 3D vectors, with
+     vector elements specified by the first index. 
+     
+     Parameters
+     ----------
+     vec1 : (3,N1,N2,N3,...N) NDarray
+     vec2 : (3,N1,N2,N3,...N) NDarray
+
+     Returns
+     -------
+     dotted : (N1,N2,N3,...N) NDarray
+        The dot product of the vectors specified by the first dimension,
+        for every N1, N2, N3,...N.
+
+    Example: find the dot product of 3D vectors for every P,F,R, using NDarrays
+    of shape (3,P,F,R)
+     """
+    
+    dotted = vec1[0,...]*vec2[0,...] + vec1[1,...]*vec2[1,...] + vec1[2,...]*vec2[2,...]
+    return dotted
+
+
+def _antenna_pattern_functions(m_hat, n_hat, Omega_hat, pi_hat):
+    """ + antenna pattern function for the ith pulsar.
+    
+    Parameters
+    ----------
+    m_hat : (3,F,R,L) NDarray
+        Single source m_hat unitary vector for each frequency and realization.
+    n_hat : (3,F,R,L) NDarray
+        Single source mnhat unitary vector for each frequency and realization.
+    Omega_hat : (3,F,R,L) NDarray
+        Single source Omega_hat unitary vector for each frequency and realization.
+    pi_hat : (3,P) NDarray
+        Pulsar term unitary vector for the ith pulsar.
+        
+    Returns
+    -------
+    F_iplus : (P,F,R,L) NDarray
+        Plus antenna pattern function for each pulsar and binary of each realization.
+    F_icross : (P,F,R,L) NDarray
+        Cross antenna pattern function for each pulsar and binary of each realization. 
+    
+    """
+    mh = m_hat[:,np.newaxis,:,:]
+    nh = n_hat[:,np.newaxis,:,:]
+    Oh = Omega_hat[:,np.newaxis,:,:]
+    ph = pi_hat[:,:,np.newaxis,np.newaxis,np.newaxis]
+    denom = 1 + dotprod(Oh, ph)
+    F_iplus = ((dotprod(mh, ph)**2 - dotprod(nh, ph)**2) 
+               / denom / 2)
+    F_icross = dotprod(mh, ph) * dotprod(nh, ph) / denom
+    
+    return F_iplus, F_icross
+    
+
+######################## Noise Spectral Density ########################
+
+def _Sh_rest_noise(hc_ss, hc_bg, freqs):
+    """ Calculate the noise spectral density contribution from all but the current single source.
+
+    Parameters
+    ----------
+    hc_ss : (F,R,L) NDarray
+        Characteristic strain from all loud single sources.
+    hc_bg : (F,R) NDarray
+        Characteristic strain from all but loudest source at each frequency.
+    freqs : (F,) 1Darray
+        Frequency bin centers.
+        
+    Returns
+    -------
+    ss_noise : (F,R,L) NDarray of scalars
+        The noise in a single pulsar from other GW sources for detecting each single source.
+
+    Follows Eq. (45) in Rosado et al. 2015.
+    TODO: modify this to allow for multiple loud sources.
+    """
+    hc2_louds = np.sum(hc_ss**2, axis=2) # (F,R) 
+    # subtract the single source from rest of loud sources and the background, for each single source
+    hc2_rest = hc_bg[:,:,np.newaxis]**2 + hc2_louds[:,:,np.newaxis] - hc_ss**2 # (F,R,L)
+    Sh_rest = hc2_rest / freqs[:,np.newaxis,np.newaxis]**3 /(12 * np.pi**2) # (F,R,L)
+    return Sh_rest
+
+def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs):
+    """ Calculate the noise spectral density of each pulsar, as it pertains to single
+    source detections, i.e., including the background as a noise source. 
+
+    Parameters
+    ----------
+    delta_t : scalar
+        Detection cadence, in seconds.
+    sigmas : (P,) 1Darray
+        Variance for the ith pulsar, in seconds
+    hc_ss : (F,R,L) NDarray
+        Characteristic strain from all loud single sources.
+    hc_bg : (F,R) NDarray
+        Characteristic strain from all but loudest source at each frequency.
+    freqs : (F,) 1Darray
+        Frequency bin centers.
+        
+    Returns
+    -------
+    noise : (P,F,R,L) NDarray of scalars
+        The total noise in each pulsar for detecting each single source
+
+    Follows Eq. (44) in Rosado et al. 2015.
+    """
+
+    noise = _white_noise(delta_t, sigmas) # (P,)
+    Sh_rest = _Sh_rest_noise(hc_ss, hc_bg, freqs) # (F,R,L,)
+    noise = noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh_rest[np.newaxis,:,:,:] # (P,F,R,L)
+    return noise
+
+
+################### GW polarization, phase, amplitude ###################
+
+def _a_b_polarization(iotas):
+    """ Polarization contribution variables a and b.
+    
+    Parameters
+    ----------
+    iotas : scalar or NDarray
+        Typically will be (F,R,L) NDarray
+
+    Returns
+    -------
+    a_pol : scalar or NDarray
+        Same shape as iota
+    b_pol : scalar or NDarray
+        Same shape as iota
+
+    """
+    a_pol = 1 + np.cos(iotas) **2
+    b_pol = -2 * np.cos(iotas)
+    return a_pol, b_pol
+
+def _gw_phase(dur, freqs):
+    """ Calculate the detected gravitational wave phase at each frequency.
+
+    Parameters
+    ----------
+    dur : scalar
+        Duration (time elapsed from initial phase to detection)
+    freqs : (F,) 1Darray
+        Frequency of each single source.
+
+    Returns
+    -------
+    Phi_T : (F,) NDarray
+        Detected GW phase of each single source.
+    """
+
+    Phi_T = 2 * np.pi * freqs * dur
+    return Phi_T
+
+def _amplitude(hc_ss, f, df):
+    """ Calculate the amplitude from the single source to use in DP calculations
+    
+    Parameters
+    ----------
+    hc_ss : (F,R,L) NDarray
+        Characteristic strain of each single source at each realization.
+    f : (F,) 1Darray
+        Frequency
+    df : (F,) 1Darray
+        Frequency bin widths.
+
+    Returns
+    -------
+    Amp : (F,R,L)
+        Dimensionless amplitude, A, of each single source at each frequency and realization.
+    
+    """
+
+    Amp = hc_ss * np.sqrt(5) / 4 / 2**(1/6) *np.sqrt(df[:,np.newaxis,np.newaxis]/f[:,np.newaxis,np.newaxis])
+    return Amp
+
+
+####################### SS Signal to Noise Ratio  #######################
+
+def _SNR_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
+    """ Calculate the SNR for each pulsar wrt each single source detection.
+
+    Paramters
+    ---------
+    amp : (F,R,L) NDarray 
+        Dimensionless strain amplitude for loudest source at each frequency.
+    F_iplus : (P,F,R,L) NDarray
+        Antenna pattern function for each pulsar.
+    F_icross : (P,F,R,L) NDarray
+        Antenna pattern function for each pulsar.
+    iotas : (F,R,L) NDarray
+        Is this inclination? or what?
+        Gives the wave polarizations a and b.
+    dur : scalar
+        Duration of observations.
+    Phi_0 : (F,R,L) NDarray
+        Initial GW Phase.
+    S_i : (P,F,R,L) NDarray
+        Total noise of each pulsar wrt detection of each single source, in s^3
+    freqs : (F,) 1Darray 
+
+    Returns
+    -------
+    SNR_ss : (F,R,L) NDarray
+        SNR from the whole PTA for each single source.
+
+    """
+    
+    amp = amp[np.newaxis,:,:,:]  # (F,R,L) to (P,F,R,L)
+    # print('amp', amp.shape)
+
+    a_pol, b_pol = _a_b_polarization(iotas)
+    a_pol = a_pol[np.newaxis,:,:,:] # (F,R,L) to (P,F,R,L)
+    b_pol = b_pol[np.newaxis,:,:,:] # (F,R,L) to (P,F,R,L)
+    # print('a_pol', a_pol.shape)
+    # print('b_pol', b_pol.shape)
+
+    Phi_T = _gw_phase(dur, freqs) # (F,)
+    # print('Phi_T', Phi_T.shape)
+    Phi_T = Phi_T[np.newaxis,:,np.newaxis,np.newaxis] # (F,) to (P,F,R,L)
+    # print('Phi_T', Phi_T.shape)
+
+    Phi_0 = Phi_0[np.newaxis,:,:,:] # (P,F,R,L)
+    # print('Phi_0', Phi_0.shape)
+
+    freqs = freqs[np.newaxis,:,np.newaxis,np.newaxis] # (F,) to (P,F,R,L)
+    # print('freqs', freqs.shape)
+
+    coef = amp**2 / (S_i * 8 * np.pi**3 * freqs**3) # [S_i] s^3 and [freqs^3] Hz^3 cancel
+    
+    term1 = a_pol**2 * F_iplus**2 * (Phi_T * (1 + 2 * np.sin(Phi_0)**2) 
+                                     + np.cos(Phi_T)*(-np.sin(Phi_T) + 4 * np.sin(Phi_0)) 
+                                     - 4*np.sin(Phi_0))
+    
+    term2 = b_pol**2 * F_icross**2 * (Phi_T*(1+2*np.cos(Phi_0)**2) 
+                                      + np.sin(Phi_T)*(np.cos(Phi_T) - 4 * np.cos(Phi_0)))
+    
+    term3 = - (2*a_pol*b_pol*F_iplus*F_icross 
+               * (2*Phi_T*np.sin(Phi_0)*np.cos(Phi_0)
+                  + np.sin(Phi_T)*(np.sin(Phi_T) - 2*np.sin(Phi_0) 
+                                   + 2*np.cos(Phi_T)*np.cos(Phi_0) 
+                                   - 2*np.cos(Phi_0))))
+    
+    SNR2_pulsar_ss = coef*(term1 + term2 + term3) # (P,F,R,L)
+
+    SNR_ss = np.sqrt(np.sum(SNR2_pulsar_ss, axis=0)) # (F,R,L), sum over the pulsars
+    return SNR_ss
+
+
+######################### Detection Probability #########################
+
+def _Fe_thresh(Num, alpha_0=0.001):
+    """ Calculate the threshold F_e statistic using sympy.nsolve
+    
+    Parameters
+    ----------
+    Num : int
+        Number of single sources to detect.
+    alpha_0 : scalar
+        False alarm probability max.
+
+    Returns
+    -------
+    Fe_bar : scalar
+        Threshold Fe statistic
+    """
+    Fe_bar = Symbol('Fe_bar')
+    func = 1 - (1 - (1 + Fe_bar)*np.e**(-Fe_bar))**Num - alpha_0
+    Fe_bar = nsolve(func, Fe_bar, 10)
+    return(Fe_bar)
+
+def _integrand_gamma_ss_i(Fe, rho):
+
+    I_1 = special.i1(rho*np.sqrt(2*Fe))
+    rv = (2*Fe)**(1/2) /rho * I_1 * np.exp(-Fe - rho**2 /2)
+    return rv
+
+def _gamma_ssi(Fe_bar, rho):
+    """ Calculate the detection probability for each single source in each realization.
+    
+    Parameters
+    ----------
+    rho : (F,R,L) NDarray
+        Given by the total PTA signal to noise ratio, S/N_S, for each single source
+    Fe_bar : scalar
+        The threshold F_e statistic
+
+    Returns
+    -------
+    gamma_ssi : (F,R,L) NDarray
+        The detection probability for each single source, i, at each frequency and realization.
+
+    TODO: Find a way to do this without the embedded for-loops.
+    """
+    gamma_ssi = np.zeros((rho.shape))
+    for ff in range(len(rho)):
+        for rr in range(len(rho[0])):
+            for ll in range(len(rho[0,0])):
+                gamma_ssi[ff,rr,ll] = integrate.quad(_integrand_gamma_ss_i, Fe_bar, np.inf, args=(rho[ff,rr,ll]))[0]
+                if(np.isnan(gamma_ssi[ff,rr,ll])):
+                    print(f'gamma_ssi[{ff},{rr},{ll}] is nan, setting to 0.')
+                    gamma_ssi[ff,rr,ll] = 0
+   
+
+    return gamma_ssi
+
+
+def _gamma_ssi(Fe_bar, rho):
+    """ Calculate the detection probability for each single source in each realization.
+    
+    Parameters
+    ----------
+    rho : (F,R,L) NDarray
+        Given by the total PTA signal to noise ratio, S/N_S, for each single source
+    Fe_bar : scalar
+        The threshold F_e statistic
+
+    Returns
+    -------
+    gamma_ssi : (F,R,L) NDarray
+        The detection probability for each single source, i, at each frequency and realization.
+
+    TODO: Find a way to do this without the embedded for loops!
+    """
+    gamma_ssi = np.zeros((rho.shape))
+    for ff in range(len(rho)):
+        for rr in range(len(rho[0])):
+            for ll in range(len(rho[0,0])):
+                gamma_ssi[ff,rr,ll] = integrate.quad(_integrand_gamma_ss_i, Fe_bar, np.inf, args=(rho[ff,rr,ll]))[0]
+                if(np.isnan(gamma_ssi[ff,rr,ll])):
+                    print(f'gamma_ssi[{ff},{rr},{ll}] is nan, setting to 0.')
+                    gamma_ssi[ff,rr,ll] = 0
+   
+
+    return gamma_ssi
+
+def _ss_detection_probability(gamma_ss_i):
+    """ Calculate the probability of detecting any single source, given individual single 
+    source detection probabilities.
+    
+    
+    Parameters
+    ----------
+    gamma_ss_i : (F,R,L) NDarray
+        Detection probability of each single source, at each frequency and realization.
+
+    Returns
+    -------
+    gamma_ss : (R) 1Darray
+        Detection probability of any single source, for each realization
+    """
+    
+    gamma_ss = 1 - np.product(1-gamma_ss_i, axis=(0,2))
+    return gamma_ss
