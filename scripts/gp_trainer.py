@@ -66,7 +66,7 @@ def main(config):
                               test_frac=train_opts.getfloat('test_frac', 0.0),
                               center_measure=train_opts.get(
                                   'center_measure', 'median'),
-                              y_is_variance=train_opts.getboolean('y_is_variance', False),
+                              y_is_variance=train_opts.getboolean('train_on_variance', False),
                               mpi=train_opts.getboolean('mpi', True),
                               kernel=kern)
 
