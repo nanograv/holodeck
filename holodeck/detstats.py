@@ -902,7 +902,7 @@ def _a_b_polarization(iotas):
     b_pol = -2 * np.cos(iotas)
     return a_pol, b_pol
 
-def _gw_phase(dur, freqs):
+def _gw_phase(dur, freqs, Phi_0):
     """ Calculate the detected gravitational wave phase at each frequency.
 
     Parameters
@@ -911,14 +911,16 @@ def _gw_phase(dur, freqs):
         Duration (time elapsed from initial phase to detection)
     freqs : (F,) 1Darray
         Frequency of each single source.
+    Phi_0 : (F,R,L) NDarray
+        Initial GW phase of each binary.
 
     Returns
     -------
-    Phi_T : (F,) NDarray
+    Phi_T : (F,R,L) NDarray
         Detected GW phase of each single source.
     """
 
-    Phi_T = 2 * np.pi * freqs * dur
+    Phi_T = 2 * np.pi * freqs[:,np.newaxis,np.newaxis] * dur + Phi_0
     return Phi_T
 
 def _amplitude(hc_ss, f, df):
@@ -984,9 +986,9 @@ def _SNR_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
     # print('a_pol', a_pol.shape)
     # print('b_pol', b_pol.shape)
 
-    Phi_T = _gw_phase(dur, freqs) # (F,)
+    Phi_T = _gw_phase(dur, freqs, Phi_0) # (F,)
     # print('Phi_T', Phi_T.shape)
-    Phi_T = Phi_T[np.newaxis,:,np.newaxis,np.newaxis] # (F,) to (P,F,R,L)
+    Phi_T = Phi_T[np.newaxis,:] # (F,R,L) to (P,F,R,L)
     # print('Phi_T', Phi_T.shape)
 
     Phi_0 = Phi_0[np.newaxis,:,:,:] # (P,F,R,L)
@@ -1121,3 +1123,319 @@ def _ss_detection_probability(gamma_ss_i):
     
     gamma_ss = 1 - np.product(1-gamma_ss_i, axis=(0,2))
     return gamma_ss
+
+
+######################## Detection Probability #########################
+
+def detect_ss(thetas, phis, sigmas, cad, dur, 
+              fobs, dfobs, hc_ss, hc_bg, alpha_0=0.001, ret_SNR=False,
+              theta_ss=None, phi_ss=None, iota_ss=None, xi_ss=None, Phi0_ss=None):
+    """ Calculate the single source detection probability, and all intermediary steps.
+    
+    Parameters
+    ----------
+    thetas : (P,) 1Darray of scalars
+        Polar (latitudinal) angular position of each pulsar in radians.
+    phis : (P,) 1Darray of scalars
+        Azimuthal (longitudinal) angular position of each pulsar in radians.
+    sigmas : (P,) 1Darray of scalars
+        Sigma_i of each pulsar in seconds.
+    cad : scalar
+        Cadence of observations in seconds.
+    dur : scalar
+        Duration of observations in seconds. 
+    fobs : (F,) 1Darray of scalars
+        Frequency bin centers in hertz.
+    dfobs : (F-1,) 1Darray of scalars
+        Frequency bin widths in hertz.
+    hc_ss : (F,R,L) NDarray of scalars
+        Characteristic strain of the L loudest single sources at 
+        each frequency, for R realizations.
+    hc_bg : (F,R)
+        Characteristic strain of the background at each frequency, 
+        for R realizations.
+    alpha_0 : scalar
+        False alarm probability
+    ret_SNR : Bool
+        Whether or not to also return SNR_ss.
+    theta_ss : (F,R,L) NDarray or None
+        Polar (latitudinal) angular position in the sky of each single source.
+        If None, random values between 0 and pi will be assigned.
+    phi_ss : (F,R,L) NDarray or None
+        Azimuthal (longitudinal) angular position in the sky of each single source.
+        If None, random values between 0 and 2pi will be assigned.
+    iota_ss : (F,R,L) NDarray or None
+        Inclination of each single source with respect to the line of sight.
+        If None, random values between 0 and pi will be assigned.
+    xi_ss : (F,R,L) NDarray or None
+        ???
+        If None, assigned same random values as iota_ss, because I think these
+        might both be referring to the same thing.
+    Phi0_ss : (F,R,L) NDarray or None
+        Initial GW phase.
+        If None, random values between 0 and 2pi will be assigned.
+
+    Returns
+    -------
+    gamma_ss : (R,) 1Darray
+        Probability of detecting any single source, for each realization.
+    SNR_ss : (F,R,L) NDarray
+        SNR of each single source.
+
+    """
+
+    # Assign random single source sky positions, if not provided.
+    if theta_ss is None:
+        theta_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+    if phi_ss is None:
+        phi_ss = np.random.uniform(0, 2*np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+    if iota_ss is None:
+        iota_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+    if xi_ss is None:
+        xi_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+    if Phi0_ss is None:
+        Phi0_ss = np.random.uniform(0,2*np.pi, size=hc_ss).reshape(hc_ss.shape)
+
+    # unitary vectors
+    m_hat = _m_unitary_vector(theta_ss, phi_ss, xi_ss) # (3,F,R,L)
+    n_hat = _n_unitary_vector(theta_ss, phi_ss, xi_ss) # (3,F,R,L)
+    Omega_hat = _Omega_unitary_vector(theta_ss, phi_ss) # (3,F,R,L)
+    pi_hat = _pi_unitary_vector(phis, thetas) # (3,P)
+
+    # antenna pattern functions
+    F_iplus, F_icross = _antenna_pattern_functions(m_hat, n_hat, Omega_hat, 
+                                                   pi_hat) # (P,F,R,L)
+    
+    # noise spectral density
+    S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs)
+
+    # amplitudw
+    amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
+
+    # SNR (includes a_pol, b_pol, and Phi_T calculations internally)
+    SNR_ss = _SNR_ss(amp, F_iplus, F_icross, iota_ss, dur, Phi0_ss, S_i, fobs) # (F,R,L)
+    
+    Num = hc_ss[:,0,:].size
+    Fe_bar = _Fe_thresh(Num, alpha_0=alpha_0) # scalar
+
+    gamma_ssi = _gamma_ssi(Fe_bar, rho=SNR_ss) # (F,R,L)
+    gamma_ss = _ss_detection_probability(gamma_ssi) # (R,)
+
+    if ret_SNR:
+        return gamma_ss, SNR_ss
+    else:
+        return gamma_ss
+
+
+
+
+def detect_ss_pta(pulsars, cad, dur, fobs,
+              dfobs, hc_ss, hc_bg, alpha_0=0.001, ret_SNR=False,
+              theta_ss=None, phi_ss=None, iota_ss=None, xi_ss=None, Phi0_ss=None):
+    """ Calculate the single source detection probability, and all intermediary steps.
+    
+    Parameters
+    ----------
+    pulsars : (P,) list of hasasia.Pulsar objects
+        A set of pulsars generated by hasasia.sim.sim_pta()
+    spectra : (P,) list of hasasia.Spectrum objects
+        The spectrum for each pulsar.
+    cad : scalar
+        Cadence of observations in seconds.
+    dur : scalar
+        Duration of observations in seconds. 
+    fobs : (F,) 1Darray of scalars
+        Frequency bin centers in Hz.
+    dfobs : (F-1,) 1Darray of scalars
+        Frequency bin widths in Hz.
+    hc_ss : (F,R,L) NDarray of scalars
+        Characteristic strain of the L loudest single sources at 
+        each frequency, for R realizations.
+    hc_bg : (F,R)
+        Characteristic strain of the background at each frequency, 
+        for R realizations.
+    alpha_0 : scalar
+        False alarm probability
+    ret_SNR : Bool
+        Whether or not to also return SNR_ss.
+    theta_ss : (F,R,L) NDarray or None
+        Polar (latitudinal) angular position in the sky of each single source.
+        If None, random values between 0 and pi will be assigned.
+    phi_ss : (F,R,L) NDarray or None
+        Azimuthal (longitudinal) angular position in the sky of each single source.
+        If None, random values between 0 and 2pi will be assigned.
+    iota_ss : (F,R,L) NDarray or None
+        Inclination of each single source with respect to the line of sight.
+        If None, random values between 0 and pi will be assigned.
+    xi_ss : (F,R,L) NDarray or None
+        ???
+        If None, assigned same random values as iota_ss, because I think these
+        might both be referring to the same thing.
+    Phi0_ss : (F,R,L) NDarray or None
+        Initial GW phase.
+        If None, random values between 0 and 2pi will be assigned.
+
+    Returns
+    -------
+    gamma_ss : (R,) 1Darray
+        Probability of detecting any single source, for each realization.
+    SNR_ss : (F,R,L) NDarray
+        SNR of each single source.
+
+    """
+    # Assign random single source sky positions, if not provided.
+    if theta_ss is None:
+        theta_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+    if phi_ss is None:
+        phi_ss = np.random.uniform(0, 2*np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+    if iota_ss is None:
+        iota_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+    if xi_ss is None:
+        xi_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+    if Phi0_ss is None:
+        Phi0_ss = np.random.uniform(0,2*np.pi, size=hc_ss.size).reshape(hc_ss.shape)
+
+    # unitary vectors
+    m_hat = _m_unitary_vector(theta_ss, phi_ss, xi_ss) # (3,F,R,L)
+    n_hat = _n_unitary_vector(theta_ss, phi_ss, xi_ss) # (3,F,R,L)
+    Omega_hat = _Omega_unitary_vector(theta_ss, phi_ss) # (3,F,R,L)
+
+
+    # check pulsar inputs
+    # get pulsar properties
+    thetas = np.zeros(len(pulsars))
+    phis = np.zeros(len(pulsars))
+    sigmas = np.zeros(len(pulsars))
+    for ii in range(len(pulsars)):
+        thetas[ii] = pulsars[ii].theta
+        phis[ii] = pulsars[ii].phi
+        sigmas[ii] = np.mean(pulsars[ii].toaerrs)
+
+    pi_hat = _pi_unitary_vector(phis, thetas) # (3,P)
+
+    # antenna pattern functions
+    F_iplus, F_icross = _antenna_pattern_functions(m_hat, n_hat, Omega_hat, 
+                                                   pi_hat) # (P,F,R,L)
+    
+    # noise spectral density
+    S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs)
+
+    # amplitudw
+    amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
+
+    # SNR (includes a_pol, b_pol, and Phi_T calculations internally)
+    SNR_ss = _SNR_ss(amp, F_iplus, F_icross, iota_ss, dur, Phi0_ss, S_i, fobs) # (F,R,L)
+    
+    Num = hc_ss[:,0,:].size
+    Fe_bar = _Fe_thresh(Num, alpha_0=alpha_0) # scalar
+
+    gamma_ssi = _gamma_ssi(Fe_bar, rho=SNR_ss) # (F,R,L)
+    gamma_ss = _ss_detection_probability(gamma_ssi) # (R,)
+
+    if ret_SNR:
+        return gamma_ss, SNR_ss
+    else:
+        return gamma_ss
+
+
+def detect_ss_scDeter(pulsars, scDeter, hc_ss, alpha_0=0.001, ret_SNR=False,
+              theta_ss=None, phi_ss=None, iota_ss=None, xi_ss=None, Phi0_ss=None):
+    """ Calculate the single source detection probability, and all intermediary steps.
+    
+    Parameters
+    ----------
+    \
+    sigmas : (P,) 1Darray of scalars
+        Sigma_i of each pulsar in seconds.
+    cad : scalar
+        Cadence of observations in seconds.
+    dur : scalar
+        Duration of observations in seconds. 
+    fobs : (F,) 1Darray of scalars
+        Frequency bin centers in hertz.
+    dfobs : (F-1,) 1Darray of scalars
+        Frequency bin widths in hertz.
+    hc_ss : (F,R,L) NDarray of scalars
+        Characteristic strain of the L loudest single sources at 
+        each frequency, for R realizations.
+    hc_bg : (F,R)
+        Characteristic strain of the background at each frequency, 
+        for R realizations.
+    alpha_0 : scalar
+        False alarm probability
+    ret_SNR : Bool
+        Whether or not to also return SNR_ss.
+    theta_ss : (F,R,L) NDarray or None
+        Polar (latitudinal) angular position in the sky of each single source.
+        If None, random values between 0 and pi will be assigned.
+    phi_ss : (F,R,L) NDarray or None
+        Azimuthal (longitudinal) angular position in the sky of each single source.
+        If None, random values between 0 and 2pi will be assigned.
+    iota_ss : (F,R,L) NDarray or None
+        Inclination of each single source with respect to the line of sight.
+        If None, random values between 0 and pi will be assigned.
+    xi_ss : (F,R,L) NDarray or None
+        ???
+        If None, assigned same random values as iota_ss, because I think these
+        might both be referring to the same thing.
+    Phi0_ss : (F,R,L) NDarray or None
+        Initial GW phase.
+        If None, random values between 0 and 2pi will be assigned.
+
+    Returns
+    -------
+    gamma_ss : (R,) 1Darray
+        Probability of detecting any single source, for each realization.
+    SNR_ss : (F,R,L) NDarray
+        SNR of each single source.
+
+    """
+
+    # get pulsar properties
+    thetas = np.zeros(len(pulsars))
+    phis = np.zeros(len(pulsars))
+    sigmas = np.zeros(len(pulsars))
+    for ii in range(len(pulsars)):
+        thetas[ii] = pulsars[ii].theta
+        phis[ii] = pulsars[ii].phi
+        sigmas[ii] = np.mean(pulsars[ii].toaerrs)
+
+    # Assign random single source sky positions, if not provided.
+    if theta_ss is None:
+        theta_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+    if phi_ss is None:
+        phi_ss = np.random.uniform(0, 2*np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+    if iota_ss is None:
+        iota_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+    if xi_ss is None:
+        xi_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+    if Phi0_ss is None:
+        Phi0_ss = np.random.uniform(0,2*np.pi, size=hc_ss.size).reshape(hc_ss.shape)
+
+    # unitary vectors
+    m_hat = _m_unitary_vector(theta_ss, phi_ss, xi_ss) # (3,F,R,L)
+    n_hat = _n_unitary_vector(theta_ss, phi_ss, xi_ss) # (3,F,R,L)
+    Omega_hat = _Omega_unitary_vector(theta_ss, phi_ss) # (3,F,R,L)
+    pi_hat = _pi_unitary_vector(phis, thetas) # (3,P)
+
+    # antenna pattern functions
+    F_iplus, F_icross = _antenna_pattern_functions(m_hat, n_hat, Omega_hat, 
+                                                   pi_hat) # (P,F,R,L)
+
+    # rho_ss (corresponds to SNR)
+    rho_h_ss = np.zeros(hc_ss.shape) # (F,R,L)
+    for rr in range(len(hc_ss[0])):
+        for ll in range(len(hc_ss[0,0])):
+            rho_h_ss[:,rr,ll] =   scDeter.SNR(hc_ss[:,rr,ll]) 
+    
+    Num = hc_ss[:,0,:].size
+    Fe_bar = _Fe_thresh(Num, alpha_0=alpha_0) # scalar
+
+    gamma_ssi = _gamma_ssi(Fe_bar, rho=rho_h_ss) # (F,R,L)
+    gamma_ss = _ss_detection_probability(gamma_ssi) # (R,)
+
+    if ret_SNR:
+        return gamma_ss, rho_h_ss,
+    else:
+        return gamma_ss
+
