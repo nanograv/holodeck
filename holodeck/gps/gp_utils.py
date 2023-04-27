@@ -664,11 +664,12 @@ def hc_from_gp(gp_george, gp_list, gp_george_variance, gp_list_variance,
     rho_pred = np.zeros((len(gp_george), 2))
     for ii, freq in enumerate(gp_george):
         # Get mean and variance predictions
-        # Variance was trained on log10(std(log10(spectra))), while mean was trained on log10(mean(spectra)))
-        # Convert variance back to log10(spectra) so that it can be combined with the mean
-        rho_pred[ii, 0], rho_pred[ii, 1] = gp_list[ii].predict(
-            gp_george[ii].y, [env_pars])[0], 10**gp_list_variance[ii].predict(
-                gp_george_variance[ii].y, [env_pars])[0]
+        # Add uncertainties in quadrature, return total
+        mean_pred, mean_pred_unc = gp_list[ii].predict(gp_george[ii].y, [env_pars])
+        std_pred, std_pred_unc = gp_list_variance[ii].predict(gp_george_variance[ii].y, [env_pars])
+
+        total_pred_unc = np.sqrt(std_pred**2 + std_pred_unc**2 + mean_pred_unc**2)
+        rho_pred[ii, 0], rho_pred[ii, 1] = mean_pred, total_pred_unc
 
         # transforming from zero-mean unit-variance variable to rho
         rho = (np.array(
