@@ -382,6 +382,81 @@ def sampled_gws_from_sam(sam, fobs_gw, hard=holo.hardening.Hard_GW, **kwargs):
     return gff, gwf, gwb
 
 
+def _gws_from_number_grid_integrated_redz(edges, redz, number, realize, sum=True):
+    """
+
+    Parameters
+    ----------
+    edges : (4,) list of 1darrays
+        A list containing the edges along each dimension.  The four dimensions correspond to
+        total mass, mass ratio, redshift, and observer-frame orbital frequency.
+        The length of each of the four arrays is M, Q, Z, F.
+    redz :
+    number : (M-1, Q-1, Z-1, F-1) ndarray
+        The number of binaries in each bin of parameter space.  This is calculated by integrating
+        `dnum` over each bin.
+    realize : bool or int,
+        Specification of how to construct one or more discrete realizations.
+        If a `bool` value, then whether or not to construct a realization.
+        If an `int` value, then how many discrete realizations to construct.
+    sum : bool,
+        Whether or not to sum over axes {0, 1, 2}.
+
+    Returns
+    -------
+    hc : ndarray
+        Characteristic strain of the GWB.
+        The shape depends on whether `sum` is true or false.
+        sum = True:  shape is (F-1,)
+        sum = False: shape is (M-1, Q-1, Z-1, F-1)
+
+    """
+
+    hc2 = char_strain_sq_from_bin_edges_redz(edges, redz)
+
+    # Create a single realization
+    if realize is True:
+        hc2 = hc2 * poisson_as_needed(number)
+        # Sum over M, Q, Z bins  ::  (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])
+        if sum:
+            hc2 = np.sum(hc2, axis=(0, 1, 2))
+
+    # Do not create a discrete realization, use the expectation values directly
+    elif realize in [None, False]:
+        hc2 = hc2 * number
+        # Sum over M, Q, Z bins  ::  (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])
+        if sum:
+            hc2 = np.sum(hc2, axis=(0, 1, 2))
+
+    # Create multiple discrete realizations
+    elif utils.isinteger(realize):
+        if sum:
+            import holodeck.cyutils   # noqa
+            # This function reate
+            hc2 = holo.cyutils.sam_poisson_gwb(number, hc2, realize)
+
+        else:
+            log.warning(f"`sum`={sum} :: this requires a large amount of memory!")
+            shape = number.shape + (realize,)
+            hc2 = hc2[..., np.newaxis] * poisson_as_needed(number[..., np.newaxis] * np.ones(shape))
+            if holo.sam._DEBUG:
+                log.info(f"number = {utils.stats(number)}")
+                log.info(f"hc2 = {utils.stats(hc2)}")
+                holo.sam._check_bads(edges + [np.arange(realize),], hc2, "hc2")
+
+    else:
+        err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
+        log.error(err)
+        raise ValueError(err)
+
+    # convert from hc^2 to hc
+    hc2 = np.sqrt(hc2)
+    # this is for clarity, note that it does not duplicate the memory
+    hc = hc2
+
+    return hc
+
+
 def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
     """
 
@@ -529,6 +604,40 @@ def poisson_as_needed(values, thresh=1e10):
     # output[~idx] = np.floor(np.random.normal(tt, np.sqrt(tt))).astype(int)
     output[~idx] = np.floor(np.random.normal(tt, np.sqrt(tt)))
     return output
+
+
+def char_strain_sq_from_bin_edges_redz(edges, redz):
+    assert len(edges) == 4
+    assert np.all([np.ndim(ee) == 1 for ee in edges])
+
+    foo = edges[-1]                   #: should be observer-frame orbital-frequencies
+    df = np.diff(foo)                 #: frequency bin widths
+    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+
+    # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)
+    #    where M, Q, Z are edges and Fc is frequency centers
+    # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
+    for dd in range(3):
+        redz = np.moveaxis(redz, dd, 0)
+        redz = kale.utils.midpoints(redz, axis=0)
+        redz = np.moveaxis(redz, 0, dd)
+
+    # ---- calculate GW strain ----
+    mt = kale.utils.midpoints(edges[0])
+    mr = kale.utils.midpoints(edges[1])
+    # rz = kale.utils.midpoints(edges[2])
+    mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
+    mc = mc[:, :, np.newaxis, np.newaxis]
+    dc = +np.inf * np.ones_like(redz)
+    sel = (redz > 0.0)
+    dc[sel] = cosmo.comoving_distance(redz[sel]).cgs.value
+
+    # convert from observer-frame to rest-frame; still using frequency-bin centers
+    fr = utils.frst_from_fobs(fc[np.newaxis, np.newaxis, np.newaxis, :], redz)
+
+    hs = utils.gw_strain_source(mc, dc, fr)
+    hc2 = (hs ** 2) * (fc / df)
+    return hc2
 
 
 def char_strain_sq_from_bin_edges(edges):

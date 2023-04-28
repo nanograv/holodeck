@@ -55,7 +55,7 @@ from holodeck import cosmo, utils, log
 from holodeck.constants import GYR, SPLC, MSOL, MPC, YR, PC
 from holodeck import relations, gravwaves
 
-_DEBUG = True
+_DEBUG = False
 _DEBUG_LVL = log.DEBUG
 # _DEBUG_LVL = log.WARNING
 
@@ -849,15 +849,21 @@ class Semi_Analytic_Model:
             log.info(f"fraction of coalesced binaries: {utils.frac_str(coal)}")
             dnum[coal] = 0.0
             self._coal = coal
+            if return_details:
+                details['coal'] = coal
+                details['fisco'] = fisco
+
         else:
             log.warning("WARNING: _coalesced_ binaries are not being accounted for in `dynamic_binary_number`!")
 
         # ---- Check that binaries reach each frequency bin before redshift zero
         if zero_stalled:
             # Calculate the time it takes binaries to evolve along a series of steps in separation
+
             # number of steps in the integration, refer to this as X below
             STEPS = 123
-            # () start from the hardening model's initial separation
+
+            # start from the hardening model's initial separation
             try:
                 rmax = hard._sepa_init
             except AttributeError as err:
@@ -875,9 +881,9 @@ class Semi_Analytic_Model:
             # (M,) end at the ISCO
             rmin = utils.rad_isco(self.mtot)
             # Choose steps for each binary, log-spaced between rmin and rmax
-            extr = np.log10([rmax * np.ones_like(rmin), rmin])
-            rads = np.linspace(0.0, 1.0, STEPS)[np.newaxis, :]
-            # (M, X)
+            extr = np.log10([rmax * np.ones_like(rmin), rmin])     # (2,M,)
+            rads = np.linspace(0.0, 1.0, STEPS)[np.newaxis, :]     # (1,X)
+            # (M, X)  =  (M,1) * (1,X)
             rads = extr[0][:, np.newaxis] + (extr[1] - extr[0])[:, np.newaxis] * rads
             rads = 10.0 ** rads
             # (M, Q, Z, X)
@@ -906,12 +912,15 @@ class Semi_Analytic_Model:
             # Combine the binary-evolution time, with the galaxy-merger time
             # (X, M*Q*Z)
             time_tot = times + self._gmt_time.reshape(-1)[np.newaxis, :]
+
             # Find the redshift when each binary reaches these frequencies, -1 for after z=0
-            redz_tot = utils.redz_after(time_tot, redz=rz[0, np.newaxis, :])
-            # Find systems not reaching these frequencies before redshift zero
-            stall = (redz_tot < 0.0)
+            redz_final = utils.redz_after(time_tot, redz=rz[0, np.newaxis, :])
+
             # reshape to match `dnum`  (X, M*Q*Z) ==> (M*Q*Z, X) ==> (M, Q, Z, X)
-            stall = stall.T.reshape(dnum.shape)
+            redz_final = redz_final.T.reshape(dnum.shape)
+            # Find systems not reaching these frequencies before redshift zero
+            stall = (redz_final < 0.0)
+
             log.info(f"fraction of stalled binary-xvals: {utils.frac_str(stall)}")
             stalled = np.any(stall, axis=-1)
             log.info(f"fraction of binaries stalled at all xvals: {utils.frac_str(stalled)}")
@@ -921,6 +930,11 @@ class Semi_Analytic_Model:
 
             dnum[stall] = 0.0
             self._stall = stall
+            self._redz_final = redz_final
+            if return_details:
+                details['stall'] = stall
+                details['time_tot'] = time_tot
+                details['redz_final'] = redz_final
 
         else:
             log.info("stalled binaries are not being accounted for in `dynamic_binary_number`!")
@@ -932,7 +946,7 @@ class Semi_Analytic_Model:
 
         return edges, dnum
 
-    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW,
+    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, use_evo_redz=2,
             realize=False, zero_coalesced=None, zero_stalled=None, return_details=False):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
@@ -1006,10 +1020,25 @@ class Semi_Analytic_Model:
             _check_bads(edges, number, "number")
 
         # ---- Get the GWB spectrum from number of binaries over grid
-        gwb = gravwaves._gws_from_number_grid_integrated(edges, number, realize)
+        if use_evo_redz == 0:
+            gwb = gravwaves._gws_from_number_grid_integrated(edges, number, realize)
+        else:
+            if use_evo_redz == 1:
+                use_redz = self._redz_prime[:, :, :, np.newaxis] * np.ones_like(dnum)
+            elif use_evo_redz == 2:
+                use_redz = self._redz_final
+            else:
+                raise
+
+            gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, realize)
 
         if _DEBUG:
-            _check_bads(edges, gwb, "gwb")
+            _rr = np.arange(realize)
+            if len(_rr) > 1:
+                check_edges = [edges[-1], np.arange(realize)]
+            else:
+                check_edges = [edges[-1]]
+            _check_bads(check_edges, gwb, "gwb")
 
         if squeeze:
             gwb = gwb.squeeze()
@@ -1475,13 +1504,14 @@ def _check_bads(edges, vals, name):
 
     err = f"Found {utils.frac_str(bads)} bad '{name}' values!"
 
-    bads = np.where(bads)
-    assert len(bads) == len(edges), f"`bads` ({len(bads)=}) does not match `edges` ({len(edges)=}) !"
-    for ii, (edge, bad) in enumerate(zip(edges, bads)):
-        idx = np.unique(bad)
-        log.error(ii)
-        log.error(idx)
-        log.error(edge[idx])
+    if not np.all(bads):
+        bads = np.where(bads)
+        assert len(bads) == len(edges), f"`bads` ({len(bads)=}) does not match `edges` ({len(edges)=}) !"
+        for ii, (edge, bad) in enumerate(zip(edges, bads)):
+            idx = np.unique(bad)
+            log.error(ii)
+            log.error(idx)
+            log.error(edge[idx])
 
     log.exception(err)
     raise ValueError(err)
