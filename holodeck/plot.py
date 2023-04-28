@@ -371,7 +371,7 @@ def draw_gwb(ax, xx, gwb, nsamp=10, color=None, label=None, **kwargs):
     if color is None:
         color = ax._get_lines.get_next_color()
 
-    kw_plot = kwargs.get('plot', {})
+    kw_plot = kwargs.pop('plot', {})
     kw_plot.setdefault('color', color)
     hh = draw_med_conf(ax, xx, gwb, plot=kw_plot, **kwargs)
 
