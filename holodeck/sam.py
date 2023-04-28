@@ -386,6 +386,7 @@ class Semi_Analytic_Model:
     ZERO_GMT_STALLED_SYSTEMS = False
     ZERO_DYNAMIC_STALLED_SYSTEMS = True
     ZERO_DYNAMIC_COALESCED_SYSTEMS = True
+    USE_REDZ_AFTER_HARD = True
 
     def __init__(
         self, mtot=(1.0e4*MSOL, 1.0e11*MSOL, 61), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
@@ -946,8 +947,8 @@ class Semi_Analytic_Model:
 
         return edges, dnum
 
-    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, use_evo_redz=2,
-            realize=False, zero_coalesced=None, zero_stalled=None, return_details=False):
+    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=False,
+            zero_coalesced=None, zero_stalled=None, use_redz_after_hard=None, return_details=False):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
         Parameters
@@ -974,6 +975,9 @@ class Semi_Analytic_Model:
 
 
         """
+
+        if use_redz_after_hard is None:
+            use_redz_after_hard = self.USE_REDZ_AFTER_HARD
 
         squeeze = True
         fobs_gw_edges = np.atleast_1d(fobs_gw_edges)
@@ -1020,17 +1024,17 @@ class Semi_Analytic_Model:
             _check_bads(edges, number, "number")
 
         # ---- Get the GWB spectrum from number of binaries over grid
-        if use_evo_redz == 0:
-            gwb = gravwaves._gws_from_number_grid_integrated(edges, number, realize)
-        else:
-            if use_evo_redz == 1:
-                use_redz = self._redz_prime[:, :, :, np.newaxis] * np.ones_like(dnum)
-            elif use_evo_redz == 2:
-                use_redz = self._redz_final
-            else:
-                raise
 
-            gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, realize)
+        # Use the redshift based on initial redshift + galaxy-merger-time + evolution-time
+        log.debug(f"{use_redz_after_hard=}")
+        if use_redz_after_hard:
+            use_redz = self._redz_final
+        # Use the redshift based on initial redshift + galaxy-merger-time (without evo time)
+        else:
+            log.warning(f"Using `redz_prime` for redshift (includes galaxy merger time, but not evolution time)")
+            use_redz = self._redz_prime[:, :, :, np.newaxis] * np.ones_like(dnum)
+
+        gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, realize)
 
         if _DEBUG:
             _rr = np.arange(realize)
