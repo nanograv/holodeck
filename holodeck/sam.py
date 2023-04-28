@@ -992,6 +992,9 @@ class Semi_Analytic_Model:
         fobs_orb_edges = fobs_gw_edges / 2.0
         fobs_orb_cents = fobs_gw_cents / 2.0
 
+        print("GWB 1: ")
+        holo.librarian._log_mem_usage(None)
+        
         # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
         #! NOTE: using frequency-bin _centers_ produces more accurate results than frequency-bin _edges_ !#
@@ -999,6 +1002,10 @@ class Semi_Analytic_Model:
             hard, fobs_orb=fobs_orb_cents,
             zero_coalesced=zero_coalesced, zero_stalled=zero_stalled, return_details=return_details,
         )
+
+        print("GWB 2: ")
+        holo.librarian._log_mem_usage(None)
+        
         if return_details:
             edges, dnum, details = vals
         else:
@@ -1020,6 +1027,9 @@ class Semi_Analytic_Model:
         log.debug(f"number: {utils.stats(number)}")
         log.debug(f"number.sum(): {number.sum():.4e}")
 
+        print("GWB 3: ")
+        holo.librarian._log_mem_usage(None)
+        
         if _DEBUG:
             _check_bads(edges, number, "number")
 
@@ -1035,6 +1045,9 @@ class Semi_Analytic_Model:
             use_redz = self._redz_prime[:, :, :, np.newaxis] * np.ones_like(dnum)
 
         gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, realize)
+
+        print("GWB 4: ")
+        holo.librarian._log_mem_usage(None)        
 
         if _DEBUG:
             _rr = np.arange(realize)
