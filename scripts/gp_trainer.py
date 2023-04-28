@@ -9,7 +9,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-import gp_utils as gu
+import holodeck.gps.gp_utils as gu
 
 # Emcee doesn't like multithreading
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -51,8 +51,7 @@ def main(config):
     """
             # Split up config into sections
     train_opts = config['Training Options']
-    kern_opts = config['Kernel Options']
-
+    kern = dict(config['Kernel'])
     # Make sure the library exists
     spectra_file = Path(train_opts.get('spectra_file'))
     if not spectra_file.exists():
@@ -67,10 +66,9 @@ def main(config):
                               test_frac=train_opts.getfloat('test_frac', 0.0),
                               center_measure=train_opts.get(
                                   'center_measure', 'median'),
+                              y_is_variance=train_opts.getboolean('train_on_variance', False),
                               mpi=train_opts.getboolean('mpi', True),
-                              kernel=kern_opts.pop('kernel',
-                                                   'ExpSquaredKernel'),
-                              kernel_opts=dict(kern_opts))
+                              kernel=kern)
 
     # Add datestring to ensure unique name
     datestr = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -86,7 +84,7 @@ def main(config):
 
     # Copy config file to same directory, use same datestring so that we can
     # match GPs with the config files later
-    conf_copy_dest = spectra_file.parent / (args.config_path.stem + datestr +
+    conf_copy_dest = spectra_file.parent / (args.config_path.stem + datestr + '_' +
                                             args.config_path.suffix)
     shutil.copy(args.config_path, conf_copy_dest)
     print(f"Config file copied {args.config_path} -> {conf_copy_dest}")
