@@ -442,7 +442,11 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
     gwb = np.zeros((nsamp, nfreqs, nreals))
     gwb, fit_data, bad_files = _load_library_from_all_files(path_sims, gwb, fit_data, log)
     param_samples[bad_files] = 0.0
-
+    if fit_data is None:
+        msg = "`fit_data` is None, fits have failed.  Attempting to combine data anyway."
+        log.error(msg)
+        fit_data = {}
+    
     # ---- Save to concatenated output file ----
 
     out_filename = path_output.joinpath('sam_lib.hdf5')
@@ -521,8 +525,9 @@ def _check_files_and_load_shapes(path_sims, nsamp):
                 shape = (nsamp,) + vv.shape
                 fit_data[kk] = np.zeros(shape)
 
-    for kk, vv in fit_data.items():
-        log.debug(f"\t{kk:>20s}: {vv.shape}")
+    if fit_data is not None:
+        for kk, vv in fit_data.items():
+            log.debug(f"\t{kk:>20s}: {vv.shape}")
 
     return fobs, nreals, fit_data
 
