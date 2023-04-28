@@ -1078,7 +1078,7 @@ class PS_Generic(_Param_Space):
         # Update parameters specified in sub-classes
 
         for kk, vv in new_def_params.items():
-            if kk not in params:
+            if kk not in defaults:
                 err = f"`new_def_params` has key '{kk}' not found in defaults!  ({defaults.keys()})!"
                 raise ValueError(err)
             defaults[kk] = vv
@@ -1086,7 +1086,7 @@ class PS_Generic(_Param_Space):
         # Update parameters passes in using the `params` dict, typically from LHC sampling
 
         for kk, vv in params.items():
-            if kk not in params:
+            if kk not in defaults:
                 err = f"`params` has key '{kk}' not found in defaults!  ({defaults.keys()})!"
                 raise ValueError(err)
             if kk in new_def_params:
@@ -1144,6 +1144,99 @@ class PS_Generic(_Param_Space):
         return sam, hard
 
 
+class _PS_Uniform_05(PS_Generic):
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +1.2),
+        )
+
+
+class PS_Uniform_05A(_PS_Uniform_05):
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        new_def_params = dict(
+            hard_gamma_inner=-1.0,
+            hard_rchar=10.0*PC,
+            hard_gamma_outer=+2.5,
+        )
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+
+
+class PS_Uniform_05B(_PS_Uniform_05):
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        new_def_params = dict(
+            hard_gamma_inner=-1.0,
+            hard_rchar=100.0*PC,
+            hard_gamma_outer=+2.5,
+        )
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+
+
+class PS_Uniform_05C(_PS_Uniform_05):
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        new_def_params = dict(
+            hard_gamma_inner=-1.0,
+            hard_rchar=10.0*PC,
+            hard_gamma_outer=+1.0,
+        )
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+
+
+class PS_Uniform_05D(_PS_Uniform_05):
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        new_def_params = dict(
+            hard_gamma_inner=-1.0,
+            hard_rchar=100.0*PC,
+            hard_gamma_outer=+1.0,
+        )
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+
+
+class PS_Uniform_05E(_PS_Uniform_05):
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        new_def_params = dict(
+            hard_gamma_inner=0.0,
+            hard_rchar=10.0*PC,
+            hard_gamma_outer=+1.0,
+        )
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+
+
+class PS_Uniform_05F(_PS_Uniform_05):
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        new_def_params = dict(
+            hard_gamma_inner=0.0,
+            hard_rchar=10.0*PC,
+            hard_gamma_outer=+2.5,
+        )
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+
+
+
+
 # ==============================================================================
 # ==============================================================================
 # ==============================================================================
@@ -1178,7 +1271,7 @@ def fiducial_model_for_params(sam_shape=None, **kwargs):
         gmt_zbeta=-0.5,
 
         # averages of MM2013 and KH2013
-        mmb_amp_log10=8.575,        # [log10(Msol)]
+        mmb_mamp_log10=8.575,        # [log10(Msol)]
         mmb_plaw=1.10,
         mmb_scatter=0.31,
     )
@@ -1212,7 +1305,7 @@ def fiducial_model_for_params(sam_shape=None, **kwargs):
         zbeta=params['gmt_zbeta'],
     )
     mmbulge = holo.relations.MMBulge_KH2013(
-        mamp_log10=params['mmb_amp_log10'],
+        mamp_log10=params['mmb_mamp_log10'],
         mplaw=params['mmb_plaw'],
         scatter_dex=params['mmb_scatter'],
     )
@@ -1238,301 +1331,3 @@ def fiducial_model_for_params(sam_shape=None, **kwargs):
     return sam, hard, params
 
 
-# ==============================================================================
-# ====    OLD    ====
-# ==============================================================================
-
-'''
-class Parameter_Space_Hard04(_Parameter_Space):
-
-    _PARAM_NAMES = [
-        'hard_time',
-        'hard_gamma_inner',
-        'hard_gamma_outer',
-        'hard_rchar',
-        'gsmf_phi0',
-        'mmb_amp',
-    ]
-
-    def __init__(self, log, nsamples, sam_shape):
-        super().__init__(
-            log, nsamples, sam_shape,
-            hard_time=[-1.0, +1.0, 5],   # [log10(Gyr)]
-            hard_gamma_inner=[-1.5, -0.5, 5],
-            hard_gamma_outer=[+2.0, +3.0, 5],
-            hard_rchar=[1.0, 3.0, 5],
-            gsmf_phi0=[-3.0, -2.0, 5],
-            mmb_amp=[0.1e9, 1.0e9, 5],
-        )
-
-    def sam_for_lhsnumber(self, lhsnum):
-        param_grid = self.params_for_lhsnumber(lhsnum)
-
-        time, gamma_inner, gamma_outer, rchar, gsmf_phi0, mmb_amp = param_grid
-        time = (10.0 ** time) * GYR
-        rchar = (10.0 ** rchar) * PC
-        mmb_amp = mmb_amp*MSOL
-
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
-        gpf = holo.sam.GPF_Power_Law()
-        gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
-
-        sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
-            shape=self.sam_shape
-        )
-        hard = holo.hardening.Fixed_Time.from_sam(
-            sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
-            exact=True, progress=False
-        )
-        return sam, hard
-
-
-class LHS_Parameter_Space_Hard04(_LHS_Parameter_Space):
-
-    _PARAM_NAMES = [
-        'hard_time',
-        'hard_gamma_inner',
-        'hard_gamma_outer',
-        'hard_rchar',
-        'gsmf_phi0',
-        'mmb_amp',
-    ]
-
-    def __init__(self, log, nsamples, sam_shape, lhs_sampler, seed):
-        super().__init__(
-            log, nsamples, sam_shape, lhs_sampler, seed,
-            hard_time=[-1.0, +1.0],   # [log10(Gyr)]
-            hard_gamma_inner=[-1.5, -0.5],
-            hard_gamma_outer=[+2.0, +3.0],
-            hard_rchar=[1.0, 3.0],
-            gsmf_phi0=[-3.0, -2.0],
-            mmb_amp=[0.1e9, 1.0e9],
-        )
-
-    def sam_for_lhsnumber(self, lhsnum):
-        param_grid = self.params_for_lhsnumber(lhsnum)
-
-        time, gamma_inner, gamma_outer, rchar, gsmf_phi0, mmb_amp = param_grid
-        time = (10.0 ** time) * GYR
-        rchar = (10.0 ** rchar) * PC
-        mmb_amp = mmb_amp*MSOL
-
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
-        gpf = holo.sam.GPF_Power_Law()
-        gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
-
-        sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
-            shape=self.sam_shape
-        )
-        hard = holo.evolution.Fixed_Time.from_sam(
-            sam, time, rchar=rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
-            exact=True, progress=False
-        )
-        return sam, hard
-
-
-class LHS_PSpace_Eccen_01(_LHS_Parameter_Space):
-
-    _PARAM_NAMES = [
-        'eccen_init',
-        'gsmf_phi0',
-        'gpf_zbeta',
-        'mmb_amp',
-    ]
-
-    SEPA_INIT = 1.0 * PC
-
-    def __init__(self, log, nsamples, sam_shape, lhs_sampler, seed):
-        super().__init__(
-            log, nsamples, sam_shape, lhs_sampler, seed,
-            eccen_init=[0.0, +0.975],
-            gsmf_phi0=[-3.0, -2.0],
-            gpf_zbeta=[+0.0, +2.0],
-            mmb_amp=[0.1e9, 1.0e9],
-        )
-
-    def sam_for_lhsnumber(self, lhsnum):
-        param_grid = self.params_for_lhsnumber(lhsnum)
-
-        eccen, gsmf_phi0, gpf_zbeta, mmb_amp = param_grid
-        mmb_amp = mmb_amp*MSOL
-
-        # favor higher values of eccentricity instead of uniformly distributed
-        eccen = eccen ** (1.0/5.0)
-
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
-        gpf = holo.sam.GPF_Power_Law(zbeta=gpf_zbeta)
-        gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
-
-        sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
-            shape=self.sam_shape
-        )
-
-        sepa_evo, eccen_evo = holo.sam.evolve_eccen_uniform_single(sam, eccen, self.SEPA_INIT, DEF_ECCEN_NUM_STEPS)
-
-        return sam, sepa_evo, eccen_evo
-
-
-class PSpace_Big_Circ_01(_LHS_Parameter_Space):
-
-    _PARAM_NAMES = [
-        'hard_time',
-        'hard_rchar',
-        'hard_gamma_inner',
-        'hard_gamma_outer',
-
-        'gsmf_phi0',
-        'gsmf_phiz',
-        'gsmf_alpha0',
-        'gpf_malpha',
-        'gpf_zbeta',
-        'gpf_qgamma',
-
-        'gmt_malpha',
-        'gmt_zbeta',
-        'gmt_qgamma',
-        'mmb_amp',
-        'mmb_plaw',
-    ]
-
-    def __init__(self, log, nsamples, sam_shape, lhs_sampler, seed):
-        super().__init__(
-            log, nsamples, sam_shape, lhs_sampler, seed,
-            hard_time =[-2.0, +2.0],   # [log10(Gyr)]
-            hard_rchar=[+0.0, +4.0],   # [log10(pc)]
-            hard_gamma_inner=[-1.5, +0.0],
-            hard_gamma_outer=[+2.0, +3.0],
-
-            gsmf_phi0 =[-3.5, -1.5],
-            gsmf_phiz =[-1.5, +0.5],
-            gsmf_alpha0=[-2.5, -0.5],
-            gpf_malpha=[-1.0, +1.0],
-            gpf_zbeta =[-0.5, +2.5],
-            gpf_qgamma=[-1.0, +1.0],
-
-            gmt_malpha=[-1.0, +1.0],
-            gmt_zbeta =[-3.0, +2.0],
-            gmt_qgamma=[-1.0, +1.0],
-            mmb_amp   =[+7.0, +10.0],   # [log10(Msol)]
-            mmb_plaw  =[+0.25, +2.5],
-        )
-
-    def sam_for_lhsnumber(self, lhsnum):
-        param_grid = self.params_for_lhsnumber(lhsnum)
-
-        hard_time, hard_rchar, gamma_inner, gamma_outer, \
-            gsmf_phi0, gsmf_phiz, gsmf_alpha0, \
-            gpf_malpha, gpf_zbeta, gpf_qgamma, \
-            gmt_malpha, gmt_zbeta, gmt_qgamma, \
-            mmb_amp, mmb_plaw = param_grid
-
-        mmb_amp = (10.0 ** mmb_amp) * MSOL
-        hard_time = (10.0 ** hard_time) * GYR
-        hard_rchar = (10.0 ** hard_rchar) * PC
-
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0, phiz=gsmf_phiz, alpha0=gsmf_alpha0)
-        gpf = holo.sam.GPF_Power_Law(malpha=gpf_malpha, qgamma=gpf_qgamma, zbeta=gpf_zbeta)
-        gmt = holo.sam.GMT_Power_Law(malpha=gmt_malpha, qgamma=gmt_qgamma, zbeta=gmt_zbeta)
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
-
-        sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
-            shape=self.sam_shape
-        )
-        hard = holo.hardening.Fixed_Time.from_sam(
-            sam, hard_time, rchar=hard_rchar, gamma_sc=gamma_inner, gamma_df=gamma_outer,
-            exact=True, progress=False
-        )
-        return sam, hard
-
-
-class PS_Circ_01(_LHS_Parameter_Space):
-
-    _PARAM_NAMES = [
-        'hard_time',
-        'hard_gamma_inner',
-
-        'gsmf_phi0',
-        # 'gsmf_phiz',
-        'gsmf_mchar0',
-        # 'gsmf_mcharz',
-        'gsmf_alpha0',
-        # 'gsmf_alphaz',
-
-        # 'gpf_malpha',
-        'gpf_zbeta',
-        'gpf_qgamma',
-
-        'gmt_norm',
-        # 'gmt_malpha',
-        'gmt_zbeta',
-        # 'gmt_qgamma',
-
-        'mmb_amp',
-        'mmb_plaw',
-        'mmb_scatter',
-    ]
-
-    def __init__(self, log, nsamples, sam_shape, lhs_sampler, seed):
-        super().__init__(
-            log, nsamples, sam_shape, lhs_sampler, seed,
-
-            hard_time=[-2.0, +1.12],   # [log10(Gyr)]
-            hard_gamma_inner=[-1.5, +0.0],
-            # hard_rchar=[+0.0, +4.0],   # [log10(pc)]
-            # hard_gamma_outer=[+2.0, +3.0],
-
-            gsmf_phi0=[-3.5, -1.5],
-            # gsmf_phiz =[-1.5, +0.5],
-            gsmf_mchar0=[10.0, 12.5],   # [log10(Msol)]
-            gsmf_alpha0=[-2.5, -0.5],
-
-            # gpf_malpha=[-1.0, +1.0],
-            gpf_zbeta=[-0.5, +2.5],
-            gpf_qgamma=[-1.5, +1.5],
-
-            gmt_norm=[0.1, +10.0],    # [Gyr]
-            # gmt_malpha=[-1.0, +1.0],
-            gmt_zbeta=[-3.0, +2.0],
-            # gmt_qgamma=[-1.0, +1.0],
-
-            mmb_amp=[+7.0, +10.0],   # [log10(Msol)]
-            mmb_plaw=[+0.25, +2.5],
-            mmb_scatter=[+0.0, +0.6],
-        )
-
-    def sam_for_lhsnumber(self, lhsnum):
-        param_grid = self.params_for_lhsnumber(lhsnum)
-        self.log.debug("params at {lhsnum}:: {param_grid}")
-
-        hard_time, hard_gamma_inner, \
-            gsmf_phi0, gsmf_mchar0, gsmf_alpha0, \
-            gpf_zbeta, gpf_qgamma, \
-            gmt_norm, gmt_zbeta, \
-            mmb_amp, mmb_plaw, mmb_scatter = param_grid
-
-        mmb_amp = (10.0 ** mmb_amp) * MSOL
-        hard_time = (10.0 ** hard_time) * GYR
-        gmt_norm = gmt_norm * GYR
-
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0, mchar0_log10=gsmf_mchar0, alpha0=gsmf_alpha0)
-        gpf = holo.sam.GPF_Power_Law(qgamma=gpf_qgamma, zbeta=gpf_zbeta)
-        gmt = holo.sam.GMT_Power_Law(time_norm=gmt_norm, zbeta=gmt_zbeta)
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw, scatter_dex=mmb_scatter)
-
-        sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
-            shape=self.sam_shape
-        )
-        hard = holo.hardening.Fixed_Time.from_sam(
-            sam, hard_time, gamma_sc=hard_gamma_inner,
-            progress=False
-        )
-        return sam, hard
-'''
