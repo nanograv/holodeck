@@ -2,6 +2,7 @@
 import sys
 import time
 import warnings
+from functools import reduce
 from multiprocessing import Pool, cpu_count
 
 import emcee
@@ -10,18 +11,13 @@ import george.kernels as kernels
 import h5py
 import numpy as np
 import schwimmbad
-import scipy.signal as ssig
-
 from holodeck import utils
 from holodeck.constants import YR
-
 
 VERBOSE = True
 
 FLOOR_STRAIN_SQUARED = 1e-40
 FLOOR_ERR = 1.0
-FILTER_DEF_WINDOW_LENGTH = 7
-FILTER_DEF_POLY_ORDER = 3
 
 
 class GaussProc(object):
@@ -57,14 +53,15 @@ class GaussProc(object):
                  x,
                  y,
                  yerr=None,
+                 y_is_variance=False,
                  par_dict=None,
-                 kernel="ExpSquaredKernel",
-                 kernel_opts={}):
-
+                 kernel="ExpSquaredKernel"):
         self.x = x
         self.y = y
+        self.y_is_variance = y_is_variance
         self.yerr = yerr
         self.par_dict = par_dict
+        self.par_list = list(par_dict.keys())
 
         # Validate kernel
         # Get kernels available as list[str]
@@ -72,18 +69,27 @@ class GaussProc(object):
         # Lowercase them
         kernel_lcase = list(map(str.lower, kernel_list))
         try:
-            self.kernel = kernel_list[kernel_lcase.index(kernel.lower())]
-            self.kernel_class = getattr(kernels, self.kernel)
-        except ValueError:
-            print(f"Unexpected kernel '{kernel}'.")
+            self.kernel = {
+                par: kernel_list[kernel_lcase.index(kernel[par].lower())]
+                for par in kernel.keys()
+            }
+            self.kernel_class = {
+                par: getattr(kernels, self.kernel[par])
+                for par in self.kernel.keys()
+            }
+        # This will only print the first kernel error, but subsequent runs will
+        # catch the rest
+        except ValueError as e:
+            print(f"Unexpected kernel given'{str(e)}'.")
             print("Acceptable values are:\n", *kernel_list, sep="\n")
             raise
 
-        self.kernel_opts = kernel_opts
-
-        # The number of GP parameters is one more than the number of spectra parameters.
-        self.pmax = np.full(len(self.par_dict) + 1, 20.0)  # sampling ranges
-        self.pmin = np.full(len(self.par_dict) + 1, -20.0)  # sampling ranges
+        # The number of GP parameters is equal to the number of spectra parameters
+        # + the number of kernel-specific parameters (per spectra parameter) + one.
+        self.uses_rational_quadratic = [par for par in self.kernel.keys()
+                                        if self.kernel[par] == 'RationalQuadraticKernel']
+        self.pmax = np.full(len(self.par_dict) + 1 + len(self.uses_rational_quadratic), 20.0)  # sampling ranges
+        self.pmin = np.full(len(self.par_dict) + 1 + len(self.uses_rational_quadratic), -20.0)  # sampling ranges
         self.emcee_flatchain = None
         self.emcee_flatlnprob = None
         self.emcee_kernel_map = None
@@ -102,14 +108,46 @@ class GaussProc(object):
 
         return logp
 
+    def create_kernel(self, p):
+        # Get parameters for kernel
+        additional_pars = len(self.uses_rational_quadratic)
+        if additional_pars == 0:
+            a, tau = np.exp(p[0]), np.exp(p[1:])
+
+            # Use list comprehension to generate list of kernels, one for each parameter
+            kernel_list = [
+                self.kernel_class[par](metric=tau[self.par_list.index(par)],
+                                       ndim=len(self.par_list),
+                                       axes=self.par_list.index(par))
+                for par in self.par_list
+            ]
+
+        else:
+            a, tau, log_alpha = np.exp(p[0]), np.exp(
+                p[1:-additional_pars]), p[-additional_pars:]
+            # Use list comprehension to generate list of kernels, one for each parameter
+            kernel_list = [
+                self.kernel_class[par](log_alpha=log_alpha[
+                                       self.uses_rational_quadratic.index(par)],
+                                       metric=tau[self.par_list.index(par)],
+                                       ndim=len(self.par_list),
+                                       axes=self.par_list.index(par))
+                if self.kernel[par] == "RationalQuadraticKernel" else
+                self.kernel_class[par](metric=tau[self.par_list.index(par)],
+                                       ndim=len(self.par_list),
+                                       axes=self.par_list.index(par))
+                for par in self.par_list
+            ]
+
+        # Add scale parameter and sum the kernel list
+        kernel = a * reduce(lambda k1, k2: k1+k2, kernel_list)
+
+        return kernel
+
     def lnlike(self, p):
 
-        # Update the kernel and compute the lnlikelihood.
-        a, tau = np.exp(p[0]), np.exp(p[1:])
-
         try:
-            gp = george.GP(a * self.kernel_class(**self.kernel_opts, metric=tau,
-                                                 ndim=len(tau)))
+            gp = george.GP(self.create_kernel(p))
             gp.compute(self.x, self.yerr)
 
             # lnlike = gp.lnlikelihood(self.y, quiet=True)
@@ -131,8 +169,8 @@ def train_gp(spectra_file,
              burn_frac=0.25,
              test_frac=0.0,
              center_measure="median",
+             y_is_variance=False,
              kernel="ExpSquaredKernel",
-             kernel_opts={},
              mpi=True):
     """Train gaussian processes on the first `nfreqs` of the GWB in `spectra_file`.
 
@@ -175,17 +213,30 @@ def train_gp(spectra_file,
     if VERBOSE:
         print(f"Loaded spectra from {spectra_file}")
 
-    # Get smoothed GWB
-    gp_freqs, xobs, yerr, yobs, yobs_mean = get_smoothed_gwb(spectra, nfreqs,
-                                                             test_frac,
-                                                             center_measure)
+    # Get GWB
+    gp_freqs, xobs, yerr, yobs, yobs_mean = get_gwb(spectra, nfreqs, test_frac,
+                                                    center_measure)
 
     pars = list(spectra.attrs["param_names"].astype(str))
 
     # xobs = get_parameter_values(spectra, test_frac)
 
-    gp_george, num_kpars = create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs,
-                                             kernel, kernel_opts)
+    # Check if we want the training data to be the center `yobs` or the variance `yerr`
+    # In the `if` conditional, I've included the arguments as keyword arguments
+    # to make this distinction clearer
+    if y_is_variance:
+        gp_george, num_kpars = create_gp_kernels(gp_freqs,
+                                                 pars,
+                                                 xobs,
+                                                 np.zeros_like(yerr),
+                                                 yobs=np.log10(yerr),
+                                                 y_is_variance=y_is_variance,
+                                                 kernel=kernel)
+
+    else:
+        gp_george, num_kpars = create_gp_kernels(gp_freqs, pars, xobs,
+                                                 np.zeros_like(yobs), yobs,
+                                                 y_is_variance, kernel)
 
     # Sample the posterior distribution of the kernel parameters
     # to find MAP value for each frequency.
@@ -196,8 +247,8 @@ def train_gp(spectra_file,
     return gp_george
 
 
-def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
-    """Get the smoothed GWB from a number of realizations.
+def get_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
+    """Get the GWB from a number of realizations.
 
     Parameters
     ----------
@@ -221,16 +272,15 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     yerr : numpy.array
         The error on the GWB training data
     yobs : numpy.array
-        The smoothed, zero-mean GWB training data
+        The zero-mean GWB training data
     yobs_mean : numpy.array
-        The original smoothed mean of the GWB training data
+        The original mean of the GWB training data
 
     Examples
     --------
     FIXME: Add docs.
 
     """
-
     # Filter out NaN values which signify a failed sample point
     # shape: (samples, freqs, realizations)
     gwb_spectra = spectra['gwb']
@@ -270,26 +320,6 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
             f"`center_measure` must be 'mean' or 'median', not '{center_measure}'"
         )
 
-    # Smooth Mean Spectra
-    filter_window = FILTER_DEF_WINDOW_LENGTH
-    filter_poly_order = FILTER_DEF_POLY_ORDER
-    if (filter_window is not None) and (nfreqs < filter_window):
-        print(f"WARNING: {nfreqs=} < {filter_window=}, resetting default value")
-        if nfreqs < 4:
-            filter_window = None
-            filter_poly_order = None
-        else:
-            filter_window = nfreqs // 2
-            filter_poly_order = filter_window // 2
-        print(f"         {filter_window=} {filter_poly_order=}")
-
-    if filter_window is not None:
-        smooth_center = ssig.savgol_filter(center, filter_window, filter_poly_order)
-    else:
-        if VERBOSE:
-            print("Not using any smoothing on center spectrum.")
-        smooth_center = center
-
     # Get realizations that are all low. We will later use this
     # boolean array to set a noise floor
     # I've done it this way in case only certain frequencies have
@@ -302,7 +332,7 @@ def get_smoothed_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     err = np.where(low_real, FLOOR_ERR, np.std(np.log10(gwb_spectra), axis=-1))
 
     # The "y" data are the medians or means and errors for the spectra at each point in parameter space
-    yobs = smooth_center.copy()  # mean.copy()
+    yobs = center.copy()  # mean.copy()
     yerr = err.copy()
     gp_freqs = spectra["fobs"][:nfreqs].copy()
     gp_freqs *= YR
@@ -358,7 +388,7 @@ def get_parameter_values(spectra, test_frac=0.0):
 '''
 
 
-def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts):
+def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, y_is_variance, kernel):
     """Instantiate GP kernel for each frequency.
 
     Parameters
@@ -372,15 +402,17 @@ def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts):
     yerr : numpy.array
         The error on the GWB data
     yobs : numpy.array
-        The smoothed, zero-mean GWB data
-    kernel : str, optional
-        The type of kernel to use for the GP
+        The zero-mean GWB data
+    y_is_variance: bool
+        Whether or not this GP is trained on the variance of the data
+    kernel : dict
+        The dictionary mapping parameters to the kernels that will be used {par:kernel}
 
     Returns
     -------
     gp_george : list[george.gp.GP]
         The created GP kernels
-    nkpars : int
+    num_kpars : int
         Numer of kernel parameters
 
     Examples
@@ -390,7 +422,6 @@ def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts):
     """
     # Instantiate a list of GP kernels and models [one for each frequency]
     gp_george = []
-    k = []
     # Create the parameter dictionary for the gp objects
     par_dict = dict()
     for ind, par in enumerate(pars):
@@ -401,13 +432,12 @@ def create_gp_kernels(gp_freqs, pars, xobs, yerr, yobs, kernel, kernel_opts):
 
     for freq_ind in range(len(gp_freqs)):
         gp_george.append(
-            GaussProc(xobs, yobs[:, freq_ind], yerr[:, freq_ind], par_dict,
-                      kernel, kernel_opts))
+            GaussProc(xobs, yobs[:, freq_ind], yerr[:, freq_ind], y_is_variance, par_dict,
+                      kernel))
 
-        k.append(1.0 * getattr(kernels, gp_george[freq_ind].kernel)(
-            np.full(len(pars), 2.0), ndim=len(pars)))
-
-        num_kpars = len(k[freq_ind])
+    # get the length of one of the prior bound lists
+    # this is the number of kernel parameters
+    num_kpars = len(gp_george[0].pmax)
 
     return gp_george, num_kpars
 
@@ -421,7 +451,7 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
     gp_freqs : numpy.array
         The frequencies corresponding to the GWB data
     yobs_mean : numpy.array
-        The smoothed mean of the GWB data
+        The mean of the GWB data
     gp_george : list[GaussProc]
         The GP model that has been read in from a .PKL file
     nkpars : int
@@ -443,7 +473,7 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
     ndim = nkpars
     print(f"{mpi=}")
     pool = schwimmbad.choose_pool(
-        mpi=mpi)  #, processes=min(nwalkers // 2, cpu_count()) )
+        mpi=mpi)  # processes=min(nwalkers // 2, cpu_count()) )
 
     # Schwimmbad docs are not clear if this needs to be here if we are passing the pool to
     # EnsembleSampler, but I've added it just in case.
@@ -464,8 +494,8 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
 
         # Initialize the walkers.
         p0 = [
-            # np.log(np.full(ndim, 1.0)) + 1e-4 * np.random.randn(ndim)
-            1.0e-4 * np.random.randn(ndim)
+            np.random.uniform(gp_george[freq_ind].pmin[0],
+                              gp_george[freq_ind].pmax[0], ndim)
             for _ in range(nwalkers)
         ]
 
@@ -525,24 +555,11 @@ def set_up_predictions(spectra, gp_george):
     gp_list = []
     gp_freqs = spectra["fobs"][:len(gp_george)].copy()
 
-    # Check which attribute holds the kernel map. In older versions, we used
-    # self.kernel_map. However, to be consistent we have switched to
-    # self.emcee_kernel_map. The following lines are just for backwards
-    # compatibility.
-
-    if getattr(gp_george[0], "kernel_map", None) is not None:
-        kernel_map_attr = "kernel_map"
-    elif getattr(gp_george[0], "emcee_kernel_map", None) is not None:
-        kernel_map_attr = "emcee_kernel_map"
-
     for ii in range(len(gp_freqs)):
-        gp_kparams = np.exp(getattr(gp_george[ii], kernel_map_attr))
+        gp = gp_george[ii]
 
         # Try to use the kernel attribute. If it doesn't exist, default to ExpSquaredKernel
-        gp_list.append(
-            george.GP(gp_kparams[0] * getattr(
-                kernels, getattr(gp_george[ii], "kernel", "ExpSquaredKernel"))(
-                    gp_kparams[1:], ndim=len(gp_kparams[1:]))))
+        gp_list.append(george.GP(gp.create_kernel(gp.emcee_kernel_map)))
 
         gp_list[ii].compute(gp_george[ii].x, gp_george[ii].yerr)
 
@@ -611,7 +628,8 @@ def pars_linspace_dict(gp_george, num_points=5):
     return pars_linspace
 
 
-def hc_from_gp(gp_george, gp_list, env_pars):
+def hc_from_gp(gp_george, gp_list, gp_george_variance, gp_list_variance,
+               env_pars):
     """Calculate the characteristic strain using a GP.
 
     Parameters
@@ -620,6 +638,10 @@ def hc_from_gp(gp_george, gp_list, env_pars):
         The GP model that has been read in from a .PKL file
     gp_list : list[george.gp.GP]
         The configured GPs ready for predictions
+    gp_george_variance : list[GaussProc]
+        The variance GP model that has been read in from a .PKL file
+    gp_list_variance : list[george.gp.GP]
+        The configured variance GPs ready for predictions
     env_pars : list
         List of ordered parameters for GP to use as input
 
@@ -641,16 +663,18 @@ def hc_from_gp(gp_george, gp_list, env_pars):
     """
     rho_pred = np.zeros((len(gp_george), 2))
     for ii, freq in enumerate(gp_george):
-        mu_pred, cov_pred = gp_list[ii].predict(gp_george[ii].y, [env_pars])
-        if np.diag(cov_pred) < 0.0:
-            rho_pred[ii, 0], rho_pred[ii, 1] = mu_pred, 1e-5 * mu_pred
-        else:
-            rho_pred[ii, 0], rho_pred[ii,
-                                      1] = mu_pred, np.sqrt(np.diag(cov_pred))
+        # Get mean and variance predictions
+        # Add uncertainties in quadrature, return total
+        mean_pred, mean_pred_unc = gp_list[ii].predict(gp_george[ii].y, [env_pars])
+        std_pred, std_pred_unc = gp_list_variance[ii].predict(gp_george_variance[ii].y, [env_pars])
 
-    # transforming from zero-mean unit-variance variable to rho
-    rho = (np.array([gp_george[ii].mean_spectra
-                     for ii in range(len(gp_list))]) + rho_pred[:, 0])
+        total_pred_unc = np.sqrt(std_pred**2 + std_pred_unc**2 + mean_pred_unc**2)
+        rho_pred[ii, 0], rho_pred[ii, 1] = mean_pred, total_pred_unc
+
+        # transforming from zero-mean unit-variance variable to rho
+        rho = (np.array(
+            [gp_george[ii].mean_spectra
+             for ii in range(len(gp_list))]) + rho_pred[:, 0])
     hc = np.sqrt(10**rho)
     return hc, rho, rho_pred
 

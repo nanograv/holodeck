@@ -130,34 +130,36 @@ def get_smooth_center(env_pars,
             f"`center_measure` must be 'mean' or 'median', not '{center_measure}'"
         )
 
-    # Smooth Mean Spectra
-    filter_window = FILTER_DEF_WINDOW_LENGTH
-    filter_poly_order = FILTER_DEF_POLY_ORDER
-    nfreqs = len(fobs_edges)-1
-    if (filter_window is not None) and (nfreqs < filter_window):
-        print(
-            f"WARNING: {nfreqs=} < {filter_window=}, resetting default value"
-        )
-        if nfreqs < 4:
-            filter_window = None
-            filter_poly_order = None
-        else:
-            filter_window = nfreqs // 2 + 1 if (nfreqs//2)%2==0 else nfreqs // 2
-            filter_poly_order = filter_window // 2
-        print(f"         {filter_window=} {filter_poly_order=}")
+    # # Smooth Mean Spectra
+    # filter_window = FILTER_DEF_WINDOW_LENGTH
+    # filter_poly_order = FILTER_DEF_POLY_ORDER
+    # nfreqs = len(fobs_edges)-1
+    # if (filter_window is not None) and (nfreqs < filter_window):
+    #     print(
+    #         f"WARNING: {nfreqs=} < {filter_window=}, resetting default value"
+    #     )
+    #     if nfreqs < 4:
+    #         filter_window = None
+    #         filter_poly_order = None
+    #     else:
+    #         filter_window = nfreqs // 2 + 1 if (nfreqs//2)%2==0 else nfreqs // 2
+    #         filter_poly_order = filter_window // 2
+    #     print(f"         {filter_window=} {filter_poly_order=}")
 
-    if filter_window is not None:
-        smooth_center = ssig.savgol_filter(center, filter_window, filter_poly_order)
-    else:
-        if VERBOSE:
-            print("Not using any smoothing on center spectrum.")
-        smooth_center = center
+    # if filter_window is not None:
+    #     smooth_center = ssig.savgol_filter(center, filter_window, filter_poly_order)
+    # else:
+    #     if VERBOSE:
+    #         print("Not using any smoothing on center spectrum.")
+    #     smooth_center = center
 
-    return smooth_center
+    return center
 
 
 def plot_individual_parameter(gp_george,
                               gp_list,
+                              gp_george_variance,
+                              gp_list_variance,
                               pars_const,
                               par_interest,
                               spectra,
@@ -179,6 +181,11 @@ def plot_individual_parameter(gp_george,
         The GP model that has been read in from a .PKL file
     gp_list : list[george.gp.GP]
         The configured GPs ready for predictions
+    gp_george_variance : list[GaussProc]
+        The variance GP model that has been read in from a .PKL file
+    gp_list_variance : list[george.gp.GP]
+        The configured variance GPs ready for predictions
+
     pars_const : dict
         Dictionary of constant parameter values
     par_interest : str
@@ -262,6 +269,8 @@ def plot_individual_parameter(gp_george,
         hc[:, i], rho[:,
                       i], rho_pred[:, :,
                                    i] = gu.hc_from_gp(gp_george, gp_list,
+                                                      gp_george_variance,
+                                                      gp_list_variance,
                                                       list(env_pars.values()))
 
     # Get smoothed mean of GWB if using SAM
@@ -321,6 +330,8 @@ def plot_individual_parameter(gp_george,
 def plot_parameter_variances(
         gp_george,
         gp_list,
+        gp_george_variance,
+        gp_list_variance,
         pars_const,
         spectra,
         color_map=plt.cm.Dark2,
@@ -335,6 +346,10 @@ def plot_parameter_variances(
         The GP model that has been read in from a .PKL file
     gp_list : list[george.gp.GP]
         The configured GPs ready for predictions
+    gp_george_variance : list[GaussProc]
+        The variance GP model that has been read in from a .PKL file
+    gp_list_variance : list[george.gp.GP]
+        The configured variance GPs ready for predictions
     pars_const : dict
         Dictionary of constant parameter values
     spectra : h5py._hl.files.File
@@ -367,6 +382,8 @@ def plot_parameter_variances(
     for i, par_interest in enumerate(pars_const):
         result = plot_individual_parameter(gp_george,
                                            gp_list,
+                                           gp_george_variance,
+                                           gp_list_variance,
                                            pars_const,
                                            par_interest,
                                            spectra,
@@ -403,6 +420,8 @@ def plot_over_realizations(ind,
                            spectra,
                            gp_george,
                            gp_list,
+                           gp_george_variance,
+                           gp_list_variance,
                            center_measure="median",
                            plot_dir=Path.cwd(),
                            test_frac=0.0):
@@ -419,6 +438,10 @@ def plot_over_realizations(ind,
         The GP model that has been read in from a .PKL file
     gp_list : list[george.gp.GP]
         The configured GPs ready for predictions
+    gp_george_variance : list[GaussProc]
+        The variance GP model that has been read in from a .PKL file
+    gp_list_variance : list[george.gp.GP]
+        The configured variance GPs ready for predictions
     center_measure: str, optional
         The measure of center to use when returning a zero-center data. Can be
         either "mean" or "median"
@@ -441,7 +464,7 @@ def plot_over_realizations(ind,
 
     # Test frac is purposefully left out here so you can make plots using the
     # test set
-    freqs, xobs, yerr, yobs, yobs_mean = gu.get_smoothed_gwb(
+    freqs, xobs, yerr, yobs, yobs_mean = gu.get_gwb(
         spectra, len(gp_george), center_measure=center_measure)
 
     # Alert if in test set
@@ -451,9 +474,13 @@ def plot_over_realizations(ind,
     smooth_center = yobs + yobs_mean
 
     # Take the test set offset into account for xobs
-    env_param = xobs[ind - int(yobs.shape[0] * test_frac), :].copy()
+    #env_param = xobs[ind - int(yobs.shape[0] * test_frac), :].copy()
+    env_param = xobs[ind, :].copy()
+    #env_param = xobs.copy()
 
-    hc, rho, rho_pred = gu.hc_from_gp(gp_george, gp_list, env_param)
+    #env_param[3]+=1e-3
+
+    hc, rho, rho_pred = gu.hc_from_gp(gp_george, gp_list, gp_george_variance, gp_list_variance, env_param)
 
     # Convert to Hz
     freqs /= YR
