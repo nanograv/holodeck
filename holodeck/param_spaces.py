@@ -544,6 +544,100 @@ class PS_Broad_Uniform_02B(_Param_Space):
         return sam, hard
 
 
+class PS_Broad_Uniform_02C(_Param_Space):
+    """Change the hard_gamma_outer default parameter.
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+
+            hard_time=PD_Uniform(0.2, 10.0),   # [Gyr]
+
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.0),   # [log10(Msol)]
+
+            mmb_amp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
+            mmb_scatter=PD_Uniform(+0.0, +0.6),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None):
+
+        hard_time = params['hard_time'] * GYR
+        hard_gamma_inner = -1.0
+        hard_rchar = 10.0 * PC
+        hard_gamma_outer = +1.0
+        hard_sepa_init = 1e4 * PC
+
+        # Parameters are based on `sam-parameters.ipynb` fit to [Tomczak+2014]
+        gsmf_phiz = -0.6
+        gsmf_mcharz = 0.11
+        gsmf_alpha0 = -1.21
+        gsmf_alphaz = -0.03
+
+        gpf_frac_norm_allq = 0.025
+        gpf_malpha = 0.0
+        gpf_qgamma = 0.0
+        gpf_zbeta = 1.0
+        gpf_max_frac = 1.0
+
+        gmt_norm = 0.5 * GYR
+        gmt_malpha = 0.0
+        gmt_qgamma = -1.0   # Boylan-Kolchin+2008
+        gmt_zbeta = -0.5
+
+        mmb_plaw = 1.10   # average MM2013 and KH2013
+
+        gsmf = holo.sam.GSMF_Schechter(
+            phi0=params['gsmf_phi0'],
+            phiz=gsmf_phiz,
+            mchar0_log10=params['gsmf_mchar0_log10'],
+            mcharz=gsmf_mcharz,
+            alpha0=gsmf_alpha0,
+            alphaz=gsmf_alphaz,
+        )
+        gpf = holo.sam.GPF_Power_Law(
+            frac_norm_allq=gpf_frac_norm_allq,
+            malpha=gpf_malpha,
+            qgamma=gpf_qgamma,
+            zbeta=gpf_zbeta,
+            max_frac=gpf_max_frac,
+        )
+        gmt = holo.sam.GMT_Power_Law(
+            time_norm=gmt_norm,
+            malpha=gmt_malpha,
+            qgamma=gmt_qgamma,
+            zbeta=gmt_zbeta,
+        )
+        mmbulge = holo.relations.MMBulge_KH2013(
+            mamp_log10=params['mmb_amp_log10'],
+            mplaw=mmb_plaw,
+            scatter_dex=params['mmb_scatter'],
+        )
+
+        kw = {} if sam_shape is None else dict(shape=sam_shape)
+        sam = holo.sam.Semi_Analytic_Model(
+            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            ZERO_DYNAMIC_STALLED_SYSTEMS=True,
+            ZERO_GMT_STALLED_SYSTEMS=False,
+            **kw
+        )
+
+        hard = holo.hardening.Fixed_Time.from_sam(
+            sam,
+            hard_time,
+            sepa_init=hard_sepa_init,
+            rchar=hard_rchar,
+            gamma_sc=hard_gamma_inner,
+            gamma_df=hard_gamma_outer,
+            progress=False,
+        )
+
+        return sam, hard
+
+
+
 class PS_Broad_Uniform_02_GW(_Param_Space):
 
     def __init__(self, log, nsamples, sam_shape, seed):
@@ -980,22 +1074,95 @@ class PS_Simple_2Par_01(_Param_Space):
         return sam, hard
 
 
-class PS_Broad_Uniform_04(PS_Broad_Uniform_02B):
-    """Expand the mmb_scatter parameter from PS_Broad_Uniform_02B
-    """
+class PS_Simple_2Par_02(_Param_Space):
 
     def __init__(self, log, nsamples, sam_shape, seed):
-        super(PS_Broad_Uniform_02B, self).__init__(
+        super().__init__(
             log, nsamples, sam_shape, seed,
-
-            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
-
-            gsmf_phi0=PD_Uniform(-3.5, -1.5),
-            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
 
             mmb_amp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
             mmb_scatter=PD_Uniform(+0.0, +1.2),
         )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None):
+
+        hard_time = 3.0 * GYR
+        hard_gamma_inner = -1.0
+        hard_rchar = 10.0 * PC
+        hard_gamma_outer = +2.5
+        hard_sepa_init = 1e4 * PC
+
+        # Parameters are based on `sam-parameters.ipynb` fit to [Tomczak+2014]
+        gsmf_phi0 = -2.57
+        gsmf_phiz = -0.6
+        gsmf_mchar0_log10 = 11.24,
+        gsmf_mcharz = 0.11
+        gsmf_alpha0 = -1.21
+        gsmf_alphaz = -0.03
+
+        gpf_frac_norm_allq = 0.025
+        gpf_malpha = 0.0
+        gpf_qgamma = 0.0
+        gpf_zbeta = 1.0
+        gpf_max_frac = 1.0
+
+        gmt_norm = 0.5 * GYR
+        gmt_malpha = 0.0
+        gmt_qgamma = -1.0   # Boylan-Kolchin+2008
+        gmt_zbeta = -0.5
+
+        # averages of MM2013 and KH2013
+        mmb_amp_log10 = params['mmb_amp_log10']   # 8.575            # [log10(Msol)]
+        mmb_plaw = 1.10
+        mmb_scatter = params['mmb_scatter']  # 0.31
+
+        gsmf = holo.sam.GSMF_Schechter(
+            phi0=gsmf_phi0,
+            phiz=gsmf_phiz,
+            mchar0_log10=gsmf_mchar0_log10,
+            mcharz=gsmf_mcharz,
+            alpha0=gsmf_alpha0,
+            alphaz=gsmf_alphaz,
+        )
+        gpf = holo.sam.GPF_Power_Law(
+            frac_norm_allq=gpf_frac_norm_allq,
+            malpha=gpf_malpha,
+            qgamma=gpf_qgamma,
+            zbeta=gpf_zbeta,
+            max_frac=gpf_max_frac,
+        )
+        gmt = holo.sam.GMT_Power_Law(
+            time_norm=gmt_norm,
+            malpha=gmt_malpha,
+            qgamma=gmt_qgamma,
+            zbeta=gmt_zbeta,
+        )
+        mmbulge = holo.relations.MMBulge_KH2013(
+            mamp_log10=mmb_amp_log10,
+            mplaw=mmb_plaw,
+            scatter_dex=mmb_scatter,
+        )
+
+        kw = {} if sam_shape is None else dict(shape=sam_shape)
+        sam = holo.sam.Semi_Analytic_Model(
+            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            ZERO_DYNAMIC_STALLED_SYSTEMS=True,
+            ZERO_GMT_STALLED_SYSTEMS=False,
+            **kw
+        )
+
+        hard = holo.hardening.Fixed_Time.from_sam(
+            sam,
+            hard_time,
+            sepa_init=hard_sepa_init,
+            rchar=hard_rchar,
+            gamma_sc=hard_gamma_inner,
+            gamma_df=hard_gamma_outer,
+            progress=False,
+        )
+
+        return sam, hard
 
 
 class PS_Generic(_Param_Space):
@@ -1233,101 +1400,5 @@ class PS_Uniform_05F(_PS_Uniform_05):
             hard_gamma_outer=+2.5,
         )
         return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
-
-
-
-
-# ==============================================================================
-# ==============================================================================
-# ==============================================================================
-
-
-def fiducial_model_for_params(sam_shape=None, **kwargs):
-
-    params = dict(
-        hard_time=3.0 * GYR,
-        hard_gamma_inner=-1.0,
-        hard_rchar=30.0 * PC,
-        hard_gamma_outer=+2.5,
-        hard_sepa_init=1e4 * PC,
-
-        # Parameters are based on `sam-parameters.ipynb` fit to [Tomczak+2014]
-        gsmf_phi0=-2.57,
-        gsmf_phiz=-0.6,
-        gsmf_mchar0_log10=11.24,
-        gsmf_mcharz=0.11,
-        gsmf_alpha0=-1.21,
-        gsmf_alphaz=-0.03,
-
-        gpf_frac_norm_allq=0.025,
-        gpf_malpha=0.0,
-        gpf_qgamma=0.0,
-        gpf_zbeta=1.0,
-        gpf_max_frac=1.0,
-
-        gmt_norm=0.5 * GYR,
-        gmt_malpha=0.0,
-        gmt_qgamma=-1.0,   # Boylan-Kolchin+2008
-        gmt_zbeta=-0.5,
-
-        # averages of MM2013 and KH2013
-        mmb_mamp_log10=8.575,        # [log10(Msol)]
-        mmb_plaw=1.10,
-        mmb_scatter=0.31,
-    )
-
-    for kk in kwargs.keys():
-        if kk not in params:
-            raise KeyError(f"kwargs includes key '{kk}' unexpected in parameters!")
-
-    # Update parameters with `kwargs` values
-    params.update(kwargs)
-
-    gsmf = holo.sam.GSMF_Schechter(
-        phi0=params['gsmf_phi0'],
-        phiz=params['gsmf_phiz'],
-        mchar0_log10=params['gsmf_mchar0_log10'],
-        mcharz=params['gsmf_mcharz'],
-        alpha0=params['gsmf_alpha0'],
-        alphaz=params['gsmf_alphaz'],
-    )
-    gpf = holo.sam.GPF_Power_Law(
-        frac_norm_allq=params['gpf_frac_norm_allq'],
-        malpha=params['gpf_malpha'],
-        qgamma=params['gpf_qgamma'],
-        zbeta=params['gpf_zbeta'],
-        max_frac=params['gpf_max_frac'],
-    )
-    gmt = holo.sam.GMT_Power_Law(
-        time_norm=params['gmt_norm'],
-        malpha=params['gmt_malpha'],
-        qgamma=params['gmt_qgamma'],
-        zbeta=params['gmt_zbeta'],
-    )
-    mmbulge = holo.relations.MMBulge_KH2013(
-        mamp_log10=params['mmb_mamp_log10'],
-        mplaw=params['mmb_plaw'],
-        scatter_dex=params['mmb_scatter'],
-    )
-
-    kw = {} if sam_shape is None else dict(shape=sam_shape)
-    sam = holo.sam.Semi_Analytic_Model(
-        gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
-        ZERO_DYNAMIC_STALLED_SYSTEMS=True,
-        ZERO_GMT_STALLED_SYSTEMS=False,
-        **kw
-    )
-
-    hard = holo.hardening.Fixed_Time.from_sam(
-        sam,
-        params['hard_time'],
-        gamma_sc=params['hard_gamma_inner'],
-        rchar=params['hard_rchar'],
-        gamma_df=params['hard_gamma_outer'],
-        sepa_init=params['hard_sepa_init'],
-        progress=False,
-    )
-
-    return sam, hard, params
 
 
