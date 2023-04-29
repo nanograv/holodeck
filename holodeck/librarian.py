@@ -874,7 +874,7 @@ def _log_mem_usage(log):
 
     msg = f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB"
     if log is None:
-        print(msg)
+        print(msg, flush=True)
     else:
         log.info(msg)
 

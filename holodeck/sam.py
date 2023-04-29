@@ -849,7 +849,7 @@ class Semi_Analytic_Model:
             coal = coal.T.reshape(dnum.shape)
             log.info(f"fraction of coalesced binaries: {utils.frac_str(coal)}")
             dnum[coal] = 0.0
-            self._coal = coal
+            # self._coal = coal
             if return_details:
                 details['coal'] = coal
                 details['fisco'] = fisco
@@ -939,7 +939,7 @@ class Semi_Analytic_Model:
                 log.info(f"A large fraction of binaries are stalled at all xvals!  {stalled_frac:.4e}")
 
             dnum[stall] = 0.0
-            self._stall = stall
+            # self._stall = stall
             self._redz_final = redz_final
             if return_details:
                 details['stall'] = stall
@@ -1001,7 +1001,7 @@ class Semi_Analytic_Model:
         fobs_orb_edges = fobs_gw_edges / 2.0
         fobs_orb_cents = fobs_gw_cents / 2.0
 
-        print("GWB 1: ")
+        print("GWB 1: ", flush=True)
         holo.librarian._log_mem_usage(None)
 
         # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
@@ -1012,7 +1012,7 @@ class Semi_Analytic_Model:
             zero_coalesced=zero_coalesced, zero_stalled=zero_stalled, return_details=return_details,
         )
 
-        print("GWB 2: ")
+        print("GWB 2: ", flush=True)
         holo.librarian._log_mem_usage(None)
 
         if return_details:
@@ -1036,7 +1036,7 @@ class Semi_Analytic_Model:
         log.debug(f"number: {utils.stats(number)}")
         log.debug(f"number.sum(): {number.sum():.4e}")
 
-        print("GWB 3: ")
+        print("GWB 3: ", flush=True)
         holo.librarian._log_mem_usage(None)
 
         if _DEBUG:
@@ -1055,7 +1055,7 @@ class Semi_Analytic_Model:
 
         gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, realize)
 
-        print("GWB 4: ")
+        print("GWB 4: ", flush=True)
         holo.librarian._log_mem_usage(None)
 
         if _DEBUG:
