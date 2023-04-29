@@ -900,8 +900,13 @@ class Semi_Analytic_Model:
             # (X, M*Q*Z) --- `Fixed_Time.dadt` will only accept this shape
             dadt_evo = hard.dadt(mt, mr, rads)
             # Integrate (inverse) hardening rates to calculate total lifetime to each separation
-            times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=0, cumsum=True)
+
+            # NOTE: this saves some overall memory usage by casting to float32
+            # times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=0, cumsum=True)
+            times_evo = -utils.trapz_loglog(-1.0 / dadt_evo.astype('float32'), rads.astype('float32'), axis=0, cumsum=True)
             del dadt_evo
+            # NOTE: cyutils.interp_2d doesn't currently work for the float32, so use 64, still saves memory overall
+            # times_evo = times_evo.astype('float64')
 
             # (X, M*Q*Z)   convert from separations to rest-frame orbital frequencies
             frst_orb_evo = utils.kepler_freq_from_sepa(mt, rads)
@@ -917,10 +922,10 @@ class Semi_Analytic_Model:
 
             # Combine the binary-evolution time, with the galaxy-merger time
             # (X, M*Q*Z)
-            time_tot = times + self._gmt_time.reshape(-1)[np.newaxis, :]
+            times = times + self._gmt_time.reshape(-1)[np.newaxis, :]
 
             # Find the redshift when each binary reaches these frequencies, -1 for after z=0
-            redz_final = utils.redz_after(time_tot, redz=rz[0, np.newaxis, :])
+            redz_final = utils.redz_after(times, redz=rz[0, np.newaxis, :])
 
             # reshape to match `dnum`  (X, M*Q*Z) ==> (M*Q*Z, X) ==> (M, Q, Z, X)
             redz_final = redz_final.T.reshape(dnum.shape)
@@ -939,7 +944,7 @@ class Semi_Analytic_Model:
             self._redz_final = redz_final
             if return_details:
                 details['stall'] = stall
-                details['time_tot'] = time_tot
+                details['time_tot'] = times
                 details['redz_final'] = redz_final
 
         else:
