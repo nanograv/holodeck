@@ -859,7 +859,7 @@ class Fixed_Time(_Hardening):
 
         xx = sepa / rchar
         dadt = cls.function(norm, xx, g1, g2)
-        dadt = dadt + dadt_gw
+        dadt += dadt_gw
 
         dedt = None
         return dadt, dedt

@@ -905,8 +905,6 @@ class Semi_Analytic_Model:
             # times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=0, cumsum=True)
             times_evo = -utils.trapz_loglog(-1.0 / dadt_evo.astype('float32'), rads.astype('float32'), axis=0, cumsum=True)
             del dadt_evo
-            # NOTE: cyutils.interp_2d doesn't currently work for the float32, so use 64, still saves memory overall
-            # times_evo = times_evo.astype('float64')
 
             # (X, M*Q*Z)   convert from separations to rest-frame orbital frequencies
             frst_orb_evo = utils.kepler_freq_from_sepa(mt, rads)
@@ -914,15 +912,16 @@ class Semi_Analytic_Model:
             # interpolate to target frequencies
             # `frst_orb` is shaped (X, M*Q*Z)  `ndinterp` interpolates over 1th dimension
             # times = utils.ndinterp(frst_orb.T, frst_orb_evo[1:, :].T, times_evo.T, xlog=True, ylog=True).T
+            # NOTE: cyutils.interp_2d doesn't currently work for the float32, so use 64, still saves memory overall
             times = holo.cyutils.interp_2d(
-                frst_orb.T, frst_orb_evo[1:, :].T, times_evo.T,
+                frst_orb.T, frst_orb_evo[1:, :].T, times_evo.T.astype('float64'),
                 xlog=True, ylog=True, extrap=False
             ).T
             del frst_orb_evo, times_evo
 
             # Combine the binary-evolution time, with the galaxy-merger time
             # (X, M*Q*Z)
-            times = times + self._gmt_time.reshape(-1)[np.newaxis, :]
+            times += self._gmt_time.reshape(-1)[np.newaxis, :]
 
             # Find the redshift when each binary reaches these frequencies, -1 for after z=0
             redz_final = utils.redz_after(times, redz=rz[0, np.newaxis, :])
