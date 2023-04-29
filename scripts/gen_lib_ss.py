@@ -3,7 +3,7 @@
 Usage
 -----
 
-mpirun -n <NPROCS> python ./scripts/gen_lib_sams.py <PATH> -n <SAMPS> -r <REALS> -f <FREQS> -l <LOUDEST> -p <GET_PARS>
+mpirun -n <NPROCS> python ./scripts/gen_lib_ss.py <PATH> -n <SAMPS> -r <REALS> -f <FREQS> -l <LOUDEST> -p <GET_PARS>
 
     <NPROCS> : number of processors to run on
     <PATH> : output directory to save data to
@@ -15,7 +15,7 @@ mpirun -n <NPROCS> python ./scripts/gen_lib_sams.py <PATH> -n <SAMPS> -r <REALS>
 
 Example:
 
-    mpirun -n 8 python ./scripts/gen_lib_sams.py output/2022-12-05_01 -n 32 -r 10 -f 20 -p 1
+    mpirun -n 8 python ./scripts/gen_lib_ss.py output/2022-12-05_01 -n 32 -r 10 -f 20 -p 1
 
 
 To-Do
@@ -130,7 +130,7 @@ comm.barrier()
 
 # ---- setup logger ----
 
-log_name = f"holodeck__gen_lib_sams_{BEG.strftime('%Y%m%d-%H%M%S')}"
+log_name = f"holodeck__gen_lib_ss_{BEG.strftime('%Y%m%d-%H%M%S')}"
 if comm.rank > 0:
     log_name = f"_{log_name}_r{comm.rank}"
 
