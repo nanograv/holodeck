@@ -579,7 +579,7 @@ def ss_lib_combine(path_output, log, get_pars, debug=False):
     log.info(f"\ttot nonzero: {utils.frac_str(tot_nonzero)} (realizations)")
 
     # ---- Save to concatenated output file ----
-    out_filename = path_output.joinpath('sam_lib.hdf5')
+    out_filename = path_output.joinpath('ss_lib.hdf5')
     log.info(f"Writing collected data to file {out_filename}")
     with h5py.File(out_filename, 'w') as h5:
         h5.create_dataset('fobs', data=fobs)

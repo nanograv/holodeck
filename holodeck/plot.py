@@ -432,12 +432,12 @@ def plot_gwb(fobs, gwb, hc_ss=None, bglabel=None, sslabel=None, **kwargs):
     _twin_hz(ax)
     return fig
 
-def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=cm.rainbow, color = None, label=None, **kwargs):
-    if color is None:
-        color = axs[0,0]._get_lines.get_next_color()
+def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=cm.rainbow_r, color = None, label=None, **kwargs):
+    # if color is None:
+    #     color = axs[0,0]._get_lines.get_next_color()
 
-    kw_plot = kwargs.get('plot', {})
-    kw_plot.setdefault('color', color)
+    # kw_plot = kwargs.get('plot', {})
+    # kw_plot.setdefault('color', color)
 
 
     m_bg = bgpar[0,:,:]/MSOL # bg avg masses in solar masses
@@ -491,7 +491,7 @@ def plot_pars(fobs, hc_ss, hc_bg, sspar, bgpar, **kwargs):
     axs[1,0].set_xlabel(LABEL_GW_FREQUENCY_YR)
     axs[1,1].set_ylabel(LABEL_CHARACTERISTIC_STRAIN)
     axs[1,1].set_xlabel(LABEL_GW_FREQUENCY_YR)
-    draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, color='coral')
+    draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, color='pink')
     # fig.tight_layout()
     return fig
 
