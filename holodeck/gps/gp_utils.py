@@ -139,8 +139,8 @@ class GaussProc(object):
                 for par in self.par_list
             ]
 
-        # Add scale parameter and sum the kernel list
-        kernel = a * reduce(lambda k1, k2: k1+k2, kernel_list)
+        # Add scale parameter and take the product of the kernels
+        kernel = a * reduce(lambda k1, k2: k1 * k2, kernel_list)
 
         return kernel
 
