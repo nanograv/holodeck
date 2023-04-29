@@ -7,6 +7,7 @@ from datetime import datetime
 import psutil
 import resource
 import os
+import sys
 
 import h5py
 import numpy as np
@@ -446,7 +447,7 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
         msg = "`fit_data` is None, fits have failed.  Attempting to combine data anyway."
         log.error(msg)
         fit_data = {}
-    
+
     # ---- Save to concatenated output file ----
 
     out_filename = path_output.joinpath('sam_lib.hdf5')
@@ -861,7 +862,12 @@ def _sim_fname(path, pnum):
 
 def _log_mem_usage(log):
     # results.ru_maxrss is KB on Linux, B on macos
-    mem_max = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 2)
+    mem_max = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    if sys.platform.lower().startswith('darwin'):
+        mem_max = (mem_max / 1024 ** 3)
+    else:
+        mem_max = (mem_max / 1024 ** 2)
+
     process = psutil.Process(os.getpid())
     mem_rss = process.memory_info().rss / 1024**3
     mem_vms = process.memory_info().vms / 1024**3
@@ -871,7 +877,7 @@ def _log_mem_usage(log):
         print(msg)
     else:
         log.info(msg)
-    
+
     return
 
 
