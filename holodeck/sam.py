@@ -859,6 +859,7 @@ class Semi_Analytic_Model:
 
         # ---- Check that binaries reach each frequency bin before redshift zero
         if zero_stalled:
+            import holodeck.cyutils
             # Calculate the time it takes binaries to evolve along a series of steps in separation
 
             # number of steps in the integration, refer to this as X below
@@ -907,7 +908,11 @@ class Semi_Analytic_Model:
             del rads, mt, mr
             # interpolate to target frequencies
             # `frst_orb` is shaped (X, M*Q*Z)  `ndinterp` interpolates over 1th dimension
-            times = utils.ndinterp(frst_orb.T, frst_orb_evo[1:, :].T, times_evo.T, xlog=True, ylog=True).T
+            # times = utils.ndinterp(frst_orb.T, frst_orb_evo[1:, :].T, times_evo.T, xlog=True, ylog=True).T
+            times = holo.cyutils.interp_2d(
+                frst_orb.T, frst_orb_evo[1:, :].T, times_evo.T,
+                xlog=True, ylog=True, extrap=False
+            ).T
             del frst_orb_evo, times_evo
 
             # Combine the binary-evolution time, with the galaxy-merger time
@@ -994,7 +999,7 @@ class Semi_Analytic_Model:
 
         print("GWB 1: ")
         holo.librarian._log_mem_usage(None)
-        
+
         # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
         #! NOTE: using frequency-bin _centers_ produces more accurate results than frequency-bin _edges_ !#
@@ -1005,7 +1010,7 @@ class Semi_Analytic_Model:
 
         print("GWB 2: ")
         holo.librarian._log_mem_usage(None)
-        
+
         if return_details:
             edges, dnum, details = vals
         else:
@@ -1029,7 +1034,7 @@ class Semi_Analytic_Model:
 
         print("GWB 3: ")
         holo.librarian._log_mem_usage(None)
-        
+
         if _DEBUG:
             _check_bads(edges, number, "number")
 
@@ -1047,7 +1052,7 @@ class Semi_Analytic_Model:
         gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, realize)
 
         print("GWB 4: ")
-        holo.librarian._log_mem_usage(None)        
+        holo.librarian._log_mem_usage(None)
 
         if _DEBUG:
             _rr = np.arange(realize)
