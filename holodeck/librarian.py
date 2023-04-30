@@ -7,6 +7,7 @@ from datetime import datetime
 import psutil
 import resource
 import os
+import sys
 
 import h5py
 import numpy as np
@@ -446,7 +447,7 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
         msg = "`fit_data` is None, fits have failed.  Attempting to combine data anyway."
         log.error(msg)
         fit_data = {}
-    
+
     # ---- Save to concatenated output file ----
 
     out_filename = path_output.joinpath('sam_lib.hdf5')
@@ -639,7 +640,11 @@ def fit_spectra_plaw(freqs, psd, nbins):
         if np.any(~np.isfinite(yy)):
             pars = np.nan, np.nan
         else:
-            pars = utils.fit_powerlaw_psd(xx, yy, 1/YR)
+            sel = (yy > 0.0)
+            if not np.any(sel):
+                pars = np.nan, np.nan
+            else:
+                pars = utils.fit_powerlaw_psd(xx, yy, 1/YR)
         return pars
 
     nfreq_bins = len(nbins)
@@ -673,7 +678,11 @@ def fit_spectra_turn(freqs, psd, nbins):
         if np.any(~np.isfinite(yy)):
             pars = np.nan, np.nan
         else:
-            pars = utils.fit_turnover_psd(xx, yy, 1/YR)
+            sel = (yy > 0.0)
+            if not np.any(sel):
+                pars = np.nan, np.nan
+            else:
+                pars = utils.fit_turnover_psd(xx, yy, 1/YR)
         return pars
 
     nfreq_bins = len(nbins)
@@ -861,11 +870,22 @@ def _sim_fname(path, pnum):
 
 def _log_mem_usage(log):
     # results.ru_maxrss is KB on Linux, B on macos
-    mem_max = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 2)
+    mem_max = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    if sys.platform.lower().startswith('darwin'):
+        mem_max = (mem_max / 1024 ** 3)
+    else:
+        mem_max = (mem_max / 1024 ** 2)
+
     process = psutil.Process(os.getpid())
     mem_rss = process.memory_info().rss / 1024**3
     mem_vms = process.memory_info().vms / 1024**3
-    log.info(f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB")
+
+    msg = f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB"
+    if log is None:
+        print(msg, flush=True)
+    else:
+        log.info(msg)
+
     return
 
 
