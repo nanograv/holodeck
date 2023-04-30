@@ -23,7 +23,7 @@ from holodeck import log, utils
 from holodeck.constants import YR
 
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 FITS_NBINS_PLAW = [2, 3, 4, 5, 8, 9, 14]
 FITS_NBINS_TURN = [4, 9, 14, 30]
@@ -598,114 +598,63 @@ def _load_library_from_all_files(path_sims, gwb, fit_data, log):
     return gwb, fit_data, bad_files
 
 
-def fit_spectra_plaw_hc(freqs, gwb, nbins):
-    nfreq, nreals = np.shape(gwb)
+def _fit_spectra(freqs, psd, nbins, nfit_pars, fit_func, min_nfreq_valid):
+    nfreq, nreals = np.shape(psd)
     assert len(freqs) == nfreq
 
     def fit_if_all_finite(xx, yy):
         if np.any(~np.isfinite(yy)):
-            pars = np.nan, np.nan
+            pars = [np.nan] * nfit_pars
         else:
-            pars = utils.fit_powerlaw(xx, yy)
+            sel = (yy > 0.0)
+            if np.count_nonzero(sel) < min_nfreq_valid:
+                pars = [np.nan] * nfit_pars
+            else:
+                pars = fit_func(xx[sel], yy[sel])
         return pars
 
     nfreq_bins = len(nbins)
-    fit_pars = np.zeros((nfreq_bins, nreals, 2))
-    fit_med_pars = np.zeros((nfreq_bins, 2))
+    fit_pars = np.zeros((nfreq_bins, nreals, nfit_pars))
+    fit_med_pars = np.zeros((nfreq_bins, nfit_pars))
     for ii, num in enumerate(nbins):
         if num > nfreq:
             raise ValueError(f"Cannot fit for {num=} bins, data has {nfreq=} frequencies!")
 
         num = None if (num == 0) else num
         cut = slice(None, num)
-        xx = freqs[cut]*YR
+        xx = freqs[cut]
 
         # fit the median spectra
-        yy = np.median(gwb, axis=-1)[cut]
+        yy = np.median(psd, axis=-1)[cut]
         fit_med_pars[ii] = fit_if_all_finite(xx, yy)
 
         # fit each realization of the spectra
         for rr in range(nreals):
-            yy = gwb[cut, rr]
+            yy = psd[cut, rr]
             fit_pars[ii, rr, :] = fit_if_all_finite(xx, yy)
 
     return nbins, fit_pars, fit_med_pars
 
 
 def fit_spectra_plaw(freqs, psd, nbins):
-    nfreq, nreals = np.shape(psd)
-    assert len(freqs) == nfreq
-
-    def fit_if_all_finite(xx, yy):
-        if np.any(~np.isfinite(yy)):
-            pars = np.nan, np.nan
-        else:
-            sel = (yy > 0.0)
-            if not np.any(sel):
-                pars = np.nan, np.nan
-            else:
-                pars = utils.fit_powerlaw_psd(xx, yy, 1/YR)
-        return pars
-
-    nfreq_bins = len(nbins)
-    fit_pars = np.zeros((nfreq_bins, nreals, 2))
-    fit_med_pars = np.zeros((nfreq_bins, 2))
-    for ii, num in enumerate(nbins):
-        if num > nfreq:
-            raise ValueError(f"Cannot fit for {num=} bins, data has {nfreq=} frequencies!")
-
-        num = None if (num == 0) else num
-        cut = slice(None, num)
-        xx = freqs[cut]
-
-        # fit the median spectra
-        yy = np.median(psd, axis=-1)[cut]
-        fit_med_pars[ii] = fit_if_all_finite(xx, yy)
-
-        # fit each realization of the spectra
-        for rr in range(nreals):
-            yy = psd[cut, rr]
-            fit_pars[ii, rr, :] = fit_if_all_finite(xx, yy)
-
-    return nbins, fit_pars, fit_med_pars
+    fit_func = lambda xx, yy: utils.fit_powerlaw_psd(xx, yy, 1/YR)
+    nfit_pars = 2
+    min_nfreq_valid = 2
+    return _fit_spectra(freqs, psd, nbins, nfit_pars, fit_func, min_nfreq_valid)
 
 
 def fit_spectra_turn(freqs, psd, nbins):
-    nfreq, nreals = np.shape(psd)
-    assert len(freqs) == nfreq
+    fit_func = lambda xx, yy: utils.fit_turnover_psd(xx, yy, 1/YR)
+    min_nfreq_valid = 3
+    nfit_pars = 4
+    return _fit_spectra(freqs, psd, nbins, nfit_pars, fit_func, min_nfreq_valid)
 
-    def fit_if_all_finite(xx, yy):
-        if np.any(~np.isfinite(yy)):
-            pars = np.nan, np.nan
-        else:
-            sel = (yy > 0.0)
-            if not np.any(sel):
-                pars = np.nan, np.nan
-            else:
-                pars = utils.fit_turnover_psd(xx, yy, 1/YR)
-        return pars
 
-    nfreq_bins = len(nbins)
-    fit_pars = np.zeros((nfreq_bins, nreals, 4))
-    fit_med_pars = np.zeros((nfreq_bins, 4))
-    for ii, num in enumerate(nbins):
-        if num > nfreq:
-            raise ValueError(f"Cannot fit for {num=} bins, data has {nfreq=} frequencies!")
-
-        num = None if (num == 0) else num
-        cut = slice(None, num)
-        xx = freqs[cut]
-
-        # fit the median spectra
-        yy = np.median(psd, axis=-1)[cut]
-        fit_med_pars[ii, :] = fit_if_all_finite(xx, yy)
-
-        # fit each realization of the spectra
-        for rr in range(nreals):
-            yy = psd[cut, rr]
-            fit_pars[ii, rr, :] = fit_if_all_finite(xx, yy)
-
-    return nbins, fit_pars, fit_med_pars
+def fit_spectra_plaw_hc(freqs, gwb, nbins):
+    fit_func = lambda xx, yy: utils.fit_powerlaw(xx, yy)
+    min_nfreq_valid = 2
+    nfit_pars = 2
+    return _fit_spectra(freqs, gwb, nbins, nfit_pars, fit_func, min_nfreq_valid)
 
 
 def make_gwb_plot(fobs, gwb, fit_data):
@@ -835,8 +784,12 @@ def run_sam_at_pspace_num(args, space, pnum):
                 fit_turn_nbins=turn_nbins, fit_turn=fit_turn, fit_turn_med=fit_turn_med,
             )
         except Exception as err:
-            log.exception("Failed to load gwb fits data!")
-            log.exception(err)
+            log.error("Failed to load gwb fits data!")
+            log.error(err)
+            if "Number of calls to function has reached maxfev" in err.value:
+                log.exception("fit did not converge.")
+            else:
+                log.exception(err)
 
     # ---- Save data to file
 
