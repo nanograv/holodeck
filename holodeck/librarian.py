@@ -640,7 +640,11 @@ def fit_spectra_plaw(freqs, psd, nbins):
         if np.any(~np.isfinite(yy)):
             pars = np.nan, np.nan
         else:
-            pars = utils.fit_powerlaw_psd(xx, yy, 1/YR)
+            sel = (yy > 0.0)
+            if not np.any(sel):
+                pars = np.nan, np.nan
+            else:
+                pars = utils.fit_powerlaw_psd(xx, yy, 1/YR)
         return pars
 
     nfreq_bins = len(nbins)
@@ -674,7 +678,11 @@ def fit_spectra_turn(freqs, psd, nbins):
         if np.any(~np.isfinite(yy)):
             pars = np.nan, np.nan
         else:
-            pars = utils.fit_turnover_psd(xx, yy, 1/YR)
+            sel = (yy > 0.0)
+            if not np.any(sel):
+                pars = np.nan, np.nan
+            else:
+                pars = utils.fit_turnover_psd(xx, yy, 1/YR)
         return pars
 
     nfreq_bins = len(nbins)
