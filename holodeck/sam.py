@@ -849,7 +849,7 @@ class Semi_Analytic_Model:
             coal = coal.T.reshape(dnum.shape)
             log.info(f"fraction of coalesced binaries: {utils.frac_str(coal)}")
             dnum[coal] = 0.0
-            self._coal = coal
+            # self._coal = coal
             if return_details:
                 details['coal'] = coal
                 details['fisco'] = fisco
@@ -859,6 +859,7 @@ class Semi_Analytic_Model:
 
         # ---- Check that binaries reach each frequency bin before redshift zero
         if zero_stalled:
+            import holodeck.cyutils
             # Calculate the time it takes binaries to evolve along a series of steps in separation
 
             # number of steps in the integration, refer to this as X below
@@ -899,7 +900,10 @@ class Semi_Analytic_Model:
             # (X, M*Q*Z) --- `Fixed_Time.dadt` will only accept this shape
             dadt_evo = hard.dadt(mt, mr, rads)
             # Integrate (inverse) hardening rates to calculate total lifetime to each separation
-            times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=0, cumsum=True)
+
+            # NOTE: this saves some overall memory usage by casting to float32
+            # times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=0, cumsum=True)
+            times_evo = -utils.trapz_loglog(-1.0 / dadt_evo.astype('float32'), rads.astype('float32'), axis=0, cumsum=True)
             del dadt_evo
 
             # (X, M*Q*Z)   convert from separations to rest-frame orbital frequencies
@@ -907,15 +911,20 @@ class Semi_Analytic_Model:
             del rads, mt, mr
             # interpolate to target frequencies
             # `frst_orb` is shaped (X, M*Q*Z)  `ndinterp` interpolates over 1th dimension
-            times = utils.ndinterp(frst_orb.T, frst_orb_evo[1:, :].T, times_evo.T, xlog=True, ylog=True).T
+            # times = utils.ndinterp(frst_orb.T, frst_orb_evo[1:, :].T, times_evo.T, xlog=True, ylog=True).T
+            # NOTE: cyutils.interp_2d doesn't currently work for the float32, so use 64, still saves memory overall
+            times = holo.cyutils.interp_2d(
+                frst_orb.T, frst_orb_evo[1:, :].T, times_evo.T.astype('float64'),
+                xlog=True, ylog=True, extrap=False
+            ).T
             del frst_orb_evo, times_evo
 
             # Combine the binary-evolution time, with the galaxy-merger time
             # (X, M*Q*Z)
-            time_tot = times + self._gmt_time.reshape(-1)[np.newaxis, :]
+            times += self._gmt_time.reshape(-1)[np.newaxis, :]
 
             # Find the redshift when each binary reaches these frequencies, -1 for after z=0
-            redz_final = utils.redz_after(time_tot, redz=rz[0, np.newaxis, :])
+            redz_final = utils.redz_after(times, redz=rz[0, np.newaxis, :])
 
             # reshape to match `dnum`  (X, M*Q*Z) ==> (M*Q*Z, X) ==> (M, Q, Z, X)
             redz_final = redz_final.T.reshape(dnum.shape)
@@ -930,11 +939,11 @@ class Semi_Analytic_Model:
                 log.info(f"A large fraction of binaries are stalled at all xvals!  {stalled_frac:.4e}")
 
             dnum[stall] = 0.0
-            self._stall = stall
+            # self._stall = stall
             self._redz_final = redz_final
             if return_details:
                 details['stall'] = stall
-                details['time_tot'] = time_tot
+                details['time_tot'] = times
                 details['redz_final'] = redz_final
 
         else:
@@ -992,6 +1001,9 @@ class Semi_Analytic_Model:
         fobs_orb_edges = fobs_gw_edges / 2.0
         fobs_orb_cents = fobs_gw_cents / 2.0
 
+        print("GWB 1: ", flush=True)
+        holo.librarian._log_mem_usage(None)
+
         # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
         #! NOTE: using frequency-bin _centers_ produces more accurate results than frequency-bin _edges_ !#
@@ -999,6 +1011,10 @@ class Semi_Analytic_Model:
             hard, fobs_orb=fobs_orb_cents,
             zero_coalesced=zero_coalesced, zero_stalled=zero_stalled, return_details=return_details,
         )
+
+        print("GWB 2: ", flush=True)
+        holo.librarian._log_mem_usage(None)
+
         if return_details:
             edges, dnum, details = vals
         else:
@@ -1020,6 +1036,9 @@ class Semi_Analytic_Model:
         log.debug(f"number: {utils.stats(number)}")
         log.debug(f"number.sum(): {number.sum():.4e}")
 
+        print("GWB 3: ", flush=True)
+        holo.librarian._log_mem_usage(None)
+
         if _DEBUG:
             _check_bads(edges, number, "number")
 
@@ -1035,6 +1054,9 @@ class Semi_Analytic_Model:
             use_redz = self._redz_prime[:, :, :, np.newaxis] * np.ones_like(dnum)
 
         gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, realize)
+
+        print("GWB 4: ", flush=True)
+        holo.librarian._log_mem_usage(None)
 
         if _DEBUG:
             _rr = np.arange(realize)
