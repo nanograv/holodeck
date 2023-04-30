@@ -529,6 +529,9 @@ def _check_files_and_load_shapes(path_sims, nsamp):
     if fit_data is not None:
         for kk, vv in fit_data.items():
             log.debug(f"\t{kk:>20s}: {vv.shape}")
+    else:
+        log.warning("Unable to load `fit_data` from any files!")
+        fit_data = {}
 
     return fobs, nreals, fit_data
 
@@ -850,7 +853,10 @@ def main():
     subparsers = parser.add_subparsers(dest="subcommand")
 
     combine = subparsers.add_parser('combine', help='combine output files')
-    combine.add_argument('path', default=None)
+    combine.add_argument(
+        'path', default=None,
+        help='library directory to run combination on; must contain the `sims` subdirectory'
+    )
     combine.add_argument('--debug', '-d', action='store_true', default=False)
 
     args = parser.parse_args()
@@ -859,7 +865,8 @@ def main():
     if args.subcommand == 'combine':
         sam_lib_combine(args.path, log, path_sims=Path(args.path).joinpath('sims'))
     else:
-        raise
+        parser.print_help()
+        sys.exit()
 
     return
 
