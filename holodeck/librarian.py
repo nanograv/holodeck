@@ -442,6 +442,8 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
 
     gwb = np.zeros((nsamp, nfreqs, nreals))
     gwb, fit_data, bad_files = _load_library_from_all_files(path_sims, gwb, fit_data, log)
+    log.info(f"Loaded data from all library files | {utils.stats(gwb)=}")
+
     param_samples[bad_files] = 0.0
     if fit_data is None:
         msg = "`fit_data` is None, fits have failed.  Attempting to combine data anyway."
@@ -792,7 +794,7 @@ def run_sam_at_pspace_num(args, space, pnum):
         except Exception as err:
             log.error("Failed to load gwb fits data!")
             log.error(err)
-            if "Number of calls to function has reached maxfev" in err.value:
+            if "Number of calls to function has reached maxfev" in str(err):
                 log.exception("fit did not converge.")
             else:
                 log.exception(err)
