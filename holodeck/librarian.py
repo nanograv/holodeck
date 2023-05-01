@@ -642,21 +642,24 @@ def _fit_spectra(freqs, psd, nbins, nfit_pars, fit_func, min_nfreq_valid):
 def fit_spectra_plaw(freqs, psd, nbins):
     fit_func = lambda xx, yy: utils.fit_powerlaw_psd(xx, yy, 1/YR)
     nfit_pars = 2
-    min_nfreq_valid = 2
+    # min_nfreq_valid = 2
+    min_nfreq_valid = nfit_pars
     return _fit_spectra(freqs, psd, nbins, nfit_pars, fit_func, min_nfreq_valid)
 
 
 def fit_spectra_turn(freqs, psd, nbins):
     fit_func = lambda xx, yy: utils.fit_turnover_psd(xx, yy, 1/YR)
-    min_nfreq_valid = 3
     nfit_pars = 4
+    # min_nfreq_valid = 3
+    min_nfreq_valid = nfit_pars
     return _fit_spectra(freqs, psd, nbins, nfit_pars, fit_func, min_nfreq_valid)
 
 
 def fit_spectra_plaw_hc(freqs, gwb, nbins):
     fit_func = lambda xx, yy: utils.fit_powerlaw(xx, yy)
-    min_nfreq_valid = 2
     nfit_pars = 2
+    # min_nfreq_valid = 2
+    min_nfreq_valid = nfit_pars
     return _fit_spectra(freqs, gwb, nbins, nfit_pars, fit_func, min_nfreq_valid)
 
 
