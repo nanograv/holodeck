@@ -721,6 +721,7 @@ class Fixed_Time(_Hardening):
 
         self._gamma_sc = gamma_sc
         self._gamma_df = gamma_df
+        self._time = time
         self._norm = norm
         self._rchar = rchar
         return
