@@ -864,11 +864,11 @@ class PS_Generic(_Param_Space):
         # ---- Set default parameters
 
         defaults = dict(
-            hard_time=3.0*GYR,
+            hard_time=3.0,               # [Gyr]
             hard_gamma_inner=-1.0,
-            hard_rchar=10.0*PC,
+            hard_rchar=10.0,             # [pc]
             hard_gamma_outer=+2.5,
-            hard_sepa_init=1e4*PC,
+            hard_sepa_init=1e4,       # [pc]
 
             # Parameters are based on `sam-parameters.ipynb` fit to [Tomczak+2014]
             gsmf_phi0=-2.77,
@@ -884,7 +884,7 @@ class PS_Generic(_Param_Space):
             gpf_zbeta=1.0,
             gpf_max_frac=1.0,
 
-            gmt_norm=0.5 * GYR,
+            gmt_norm=0.5,      # [Gyr]
             gmt_malpha=0.0,
             gmt_qgamma=-1.0,        # Boylan-Kolchin+2008
             gmt_zbeta=-0.5,
@@ -938,7 +938,7 @@ class PS_Generic(_Param_Space):
             max_frac=defaults['gpf_max_frac'],
         )
         gmt = holo.sam.GMT_Power_Law(
-            time_norm=defaults['gmt_norm'],
+            time_norm=defaults['gmt_norm']*GYR,
             malpha=defaults['gmt_malpha'],
             qgamma=defaults['gmt_qgamma'],
             zbeta=defaults['gmt_zbeta'],
@@ -958,9 +958,9 @@ class PS_Generic(_Param_Space):
 
         hard = holo.hardening.Fixed_Time.from_sam(
             sam,
-            defaults['hard_time'],
-            sepa_init=defaults['hard_sepa_init'],
-            rchar=defaults['hard_rchar'],
+            defaults['hard_time']*GYR,
+            sepa_init=defaults['hard_sepa_init']*PC,
+            rchar=defaults['hard_rchar']*PC,
             gamma_sc=defaults['hard_gamma_inner'],
             gamma_df=defaults['hard_gamma_outer'],
             progress=False,
@@ -994,7 +994,7 @@ class PS_Uniform_05A(_PS_Uniform_05):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
         new_def_params = dict(
             hard_gamma_inner=-1.0,
-            hard_rchar=10.0*PC,
+            hard_rchar=10.0,            # [pc]
             hard_gamma_outer=+2.5,
         )
         return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
@@ -1007,7 +1007,7 @@ class PS_Uniform_05B(_PS_Uniform_05):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
         new_def_params = dict(
             hard_gamma_inner=-1.0,
-            hard_rchar=100.0*PC,
+            hard_rchar=100.0,               # [pc]
             hard_gamma_outer=+2.5,
         )
         return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
@@ -1020,7 +1020,7 @@ class PS_Uniform_05C(_PS_Uniform_05):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
         new_def_params = dict(
             hard_gamma_inner=-1.0,
-            hard_rchar=10.0*PC,
+            hard_rchar=10.0,            # [pc]
             hard_gamma_outer=+1.0,
         )
         return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
@@ -1033,7 +1033,7 @@ class PS_Uniform_05D(_PS_Uniform_05):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
         new_def_params = dict(
             hard_gamma_inner=-1.0,
-            hard_rchar=100.0*PC,
+            hard_rchar=100.0,            # [pc]
             hard_gamma_outer=+1.0,
         )
         return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
@@ -1046,7 +1046,7 @@ class PS_Uniform_05E(_PS_Uniform_05):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
         new_def_params = dict(
             hard_gamma_inner=0.0,
-            hard_rchar=10.0*PC,
+            hard_rchar=10.0,            # [pc]
             hard_gamma_outer=+1.0,
         )
         return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
@@ -1059,7 +1059,7 @@ class PS_Uniform_05F(_PS_Uniform_05):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
         new_def_params = dict(
             hard_gamma_inner=0.0,
-            hard_rchar=10.0*PC,
+            hard_rchar=10.0,            # [pc]
             hard_gamma_outer=+2.5,
         )
         return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
