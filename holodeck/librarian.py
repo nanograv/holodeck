@@ -1270,6 +1270,154 @@ def run_sam_at_pspace_num(args, space, pnum):
 
     return rv
 
+def run_ss_at_pspace_num(args, space, pnum):
+    """Run single source and background strain calculations for the SAM simulation 
+    for sample-parameter `pnum` in the `space` parameter-space.
+
+    Arguments
+    ---------
+    args : `argparse.ArgumentParser` instance
+        Arguments from the `gen_lib_sams.py` script.
+        NOTE: this should be improved.
+    space : _Param_Space instance
+        Parameter space from which to load `sam` and `hard` instances.
+    pnum : int
+        Which parameter-sample from `space` should be run.
+
+    Returns
+    -------
+    rv : bool
+        True if this simulation was successfully run.
+
+    """
+
+    log = args.log
+
+    # ---- get output filename for this simulation, check if already exists
+
+    sim_fname = _sim_fname(args.output_sims, pnum)
+    beg = datetime.now()
+    log.info(f"{pnum=} :: {sim_fname=} beginning at {beg}")
+    if sim_fname.exists():
+        log.info(f"File {sim_fname} already exists.  {args.recreate=}")
+        # skip existing files unless we specifically want to recreate them
+        if not args.recreate:
+            return True
+
+    # ---- Setup PTA frequencies
+
+    pta_dur = args.pta_dur * YR
+    nfreqs = args.nfreqs
+    hifr = nfreqs/pta_dur
+    pta_cad = 1.0 / (2 * hifr)
+    fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
+    fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
+    log.info(f"Created {fobs_cents.size} frequency bins")
+    log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
+    log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
+    _log_mem_usage(log)
+    assert nfreqs == fobs_cents.size
+    get_pars = bool(args.get_pars)
+
+    # ---- Calculate hc_ss, hc_bg, sspar, and bgpar from SAM
+
+    try:
+        log.debug("Selecting `sam` and `hard` instances")
+        sam, hard = space(pnum)
+        _log_mem_usage(log)
+
+        log.debug(f"Calculating 'edges' and 'number' for this SAM.")
+        fobs_orb_edges = fobs_edges / 2.0 
+        fobs_orb_cents = fobs_cents/ 2.0
+        # edges
+        edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents) # should the zero stalled option be part of the parameter space?
+        edges[-1] = fobs_orb_edges
+        # integrate for number
+        number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
+        number = number * np.diff(np.log(fobs_edges))  
+        _log_mem_usage(log)
+        
+        if(get_pars):
+            log.debug(f"Calculating 'hc_ss', 'hc_bg', 'sspar', and 'bgpar' for shape ({fobs_cents.size}, {args.nreals})")
+            hc_ss, hc_bg, sspar, bgpar = ss.ss_gws(edges, number, realize=args.nreals, 
+                                               loudest = args.nloudest, params = True)
+        else:
+            log.debug(f"Calculating 'hc_ss' and 'hc_bg' only for shape ({fobs_cents.size}, {args.nreals})")
+            hc_ss, hc_bg = ss.ss_gws(edges, number, realize=args.nreals, 
+                                               loudest = args.nloudest, params = False) 
+        _log_mem_usage(log)
+        log.debug(f"{holo.utils.stats(hc_ss)=}")
+        log.debug(f"{holo.utils.stats(hc_bg)=}")
+        if(get_pars):
+            log.debug(f"{holo.utils.stats(sspar)=}")
+            log.debug(f"{holo.utils.stats(bgpar)=}")
+
+        log.debug(f"Saving {pnum} to file")
+        if(get_pars):
+            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
+                    hc_ss = hc_ss, hc_bg = hc_bg, sspar = sspar, bgpar = bgpar)
+        else:
+            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
+                    hc_ss = hc_ss, hc_bg = hc_bg)
+        rv = True
+    except Exception as err:
+        log.exception(f"`run_ss` FAILED on {pnum=}\n")
+        log.exception(err)
+        rv = False
+        data = dict(fail=str(err))
+
+    # ---- Fit hc_bg spectra
+
+    fit_data = {}
+    if rv:
+        log.info("calculating hc_bg spectra fits")
+        try:
+            psd = utils.char_strain_to_psd(fobs_cents[:, np.newaxis], hc_bg)
+            plaw_nbins, fit_plaw, fit_plaw_med = fit_spectra_plaw(fobs_cents, psd, FITS_NBINS_PLAW)
+            turn_nbins, fit_turn, fit_turn_med = fit_spectra_turn(fobs_cents, psd, FITS_NBINS_TURN)
+
+            fit_data = dict(
+                fit_plaw_nbins=plaw_nbins, fit_plaw=fit_plaw, fit_plaw_med=fit_plaw_med,
+                fit_turn_nbins=turn_nbins, fit_turn=fit_turn, fit_turn_med=fit_turn_med,
+            )
+        except Exception as err:
+            log.exception("Failed to load hc_bg fits data!")
+            log.exception(err)
+
+    # ---- Save data to file
+
+    np.savez(sim_fname, **data, **fit_data)
+    log.info(f"Saved to {sim_fname}, size {holo.utils.get_file_size(sim_fname)} after {(datetime.now()-beg)}")
+
+    # STILL NEED TO EDIT BELOW HERE
+    # ---- Plot GWB spectra
+
+    if rv and args.plot:
+        log.info("generating spectra plots")
+        try:
+            plot_fname = args.output_plots.joinpath(sim_fname.name)
+            hc_fname = str(plot_fname.with_suffix('')) + "_strain.png"
+            fig = make_ss_plot(fobs_cents, hc_ss, hc_bg, fit_data)
+            fig.savefig(hc_fname, dpi=100)
+            log.info(f"Saved to {hc_fname}, size {holo.utils.get_file_size(hc_fname)}")
+            plt.close('all')
+        except Exception as err:
+            log.exception("Failed to make strain plot!")
+            log.exception(err)
+        if(get_pars):
+            try:
+                pars_fname = str(plot_fname.with_suffix('')) + "_pars.png"
+                fig = make_pars_plot(fobs_cents, hc_ss, hc_bg, sspar, bgpar, fit_data)
+                fig.savefig(pars_fname, dpi=100)
+                log.info(f"Saved to {pars_fname}, size {holo.utils.get_file_size(pars_fname)}")
+                plt.close('all')
+            except Exception as err:
+                log.exception("Failed to make pars plot!")
+                log.exception(err)
+
+
+    return rv
+
 
 def _sim_fname(path, pnum):
     temp = FNAME_SIM_FILE.format(pnum=pnum)
@@ -1286,123 +1434,123 @@ def _log_mem_usage(log):
     log.info(f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB")
     return
 
-def run_ss_at_pspace_num(args, space, pnum, path_output):
-    log = args.log
-    fname = f"lib_ss__p{pnum:06d}.npz"
-    fname = Path(path_output, fname)
-    beg = datetime.now()
-    log.info(f"{pnum=} :: {fname=} beginning at {beg}")
-    if fname.exists():
-        log.warning(f"File {fname} already exists.")
+# def run_ss_at_pspace_num(args, space, pnum, path_output):
+#     log = args.log
+#     fname = f"lib_ss__p{pnum:06d}.npz"
+#     fname = Path(path_output, fname)
+#     beg = datetime.now()
+#     log.info(f"{pnum=} :: {fname=} beginning at {beg}")
+#     if fname.exists():
+#         log.warning(f"File {fname} already exists.")
 
-    def log_mem():
-        # results.ru_maxrss is KB on Linux, B on macos
-        mem_max = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 2)
-        process = psutil.Process(os.getpid())
-        mem_rss = process.memory_info().rss / 1024**3
-        mem_vms = process.memory_info().vms / 1024**3
-        log.info(f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB")
+#     def log_mem():
+#         # results.ru_maxrss is KB on Linux, B on macos
+#         mem_max = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 2)
+#         process = psutil.Process(os.getpid())
+#         mem_rss = process.memory_info().rss / 1024**3
+#         mem_vms = process.memory_info().vms / 1024**3
+#         log.info(f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB")
 
-    pta_dur = args.pta_dur * YR
-    nfreqs = args.nfreqs
-    hifr = nfreqs/pta_dur
-    pta_cad = 1.0 / (2 * hifr)
-    fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
-    fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
-    log.info(f"Created {fobs_cents.size} frequency bins")
-    log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
-    log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
-    log_mem()
-    assert nfreqs == fobs_cents.size
-    get_pars = bool(args.get_pars)
+#     pta_dur = args.pta_dur * YR
+#     nfreqs = args.nfreqs
+#     hifr = nfreqs/pta_dur
+#     pta_cad = 1.0 / (2 * hifr)
+#     fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
+#     fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
+#     log.info(f"Created {fobs_cents.size} frequency bins")
+#     log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
+#     log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
+#     log_mem()
+#     assert nfreqs == fobs_cents.size
+#     get_pars = bool(args.get_pars)
 
-    try:
-        log.debug("Selecting `sam` and `hard` instances")
-        sam, hard = space(pnum)
-        log_mem()
+#     try:
+#         log.debug("Selecting `sam` and `hard` instances")
+#         sam, hard = space(pnum)
+#         log_mem()
 
-        ### HERE IS WHERE THINGS CHANGE FOR SS ###
-        log.debug(f"Calculating SS and BG GWs for shape ({fobs_cents.size}, {args.nreals})")
-        fobs_orb_edges = fobs_edges / 2.0 
-        fobs_orb_cents = fobs_cents/ 2.0
-        # edges
-        edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents) # should the zero stalled option be part of the parameter space?
-        edges[-1] = fobs_orb_edges
-        # integrate for number
-        number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
-        number = number * np.diff(np.log(fobs_edges))  
-        # gws
-        if(get_pars):
-            hc_ss, hc_bg, sspar, bgpar = ss.ss_gws(edges, number, realize=args.nreals, 
-                                               loudest = args.nloudest, params = True) 
-        else:
-            hc_ss, hc_bg = ss.ss_gws(edges, number, realize=args.nreals, 
-                                               loudest = args.nloudest, params = False) 
+#         ### HERE IS WHERE THINGS CHANGE FOR SS ###
+#         log.debug(f"Calculating SS and BG GWs for shape ({fobs_cents.size}, {args.nreals})")
+#         fobs_orb_edges = fobs_edges / 2.0 
+#         fobs_orb_cents = fobs_cents/ 2.0
+#         # edges
+#         edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents) # should the zero stalled option be part of the parameter space?
+#         edges[-1] = fobs_orb_edges
+#         # integrate for number
+#         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
+#         number = number * np.diff(np.log(fobs_edges))  
+#         # gws
+#         if(get_pars):
+#             hc_ss, hc_bg, sspar, bgpar = ss.ss_gws(edges, number, realize=args.nreals, 
+#                                                loudest = args.nloudest, params = True) 
+#         else:
+#             hc_ss, hc_bg = ss.ss_gws(edges, number, realize=args.nreals, 
+#                                                loudest = args.nloudest, params = False) 
             
-        log_mem()
-        log.debug(f"{holo.utils.stats(hc_ss)=}")
-        legend = space.param_dict(pnum)
-        log.debug(f"Saving {pnum} to file")
-        if(get_pars):
-            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
-                    hc_ss = hc_ss, hc_bg = hc_bg, sspar = sspar, bgpar = bgpar)
-        else:
-            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
-                    hc_ss = hc_ss, hc_bg = hc_bg)
-        ### EDITED UP TO HERE ###
+#         log_mem()
+#         log.debug(f"{holo.utils.stats(hc_ss)=}")
+#         legend = space.param_dict(pnum)
+#         log.debug(f"Saving {pnum} to file")
+#         if(get_pars):
+#             data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
+#                     hc_ss = hc_ss, hc_bg = hc_bg, sspar = sspar, bgpar = bgpar)
+#         else:
+#             data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
+#                     hc_ss = hc_ss, hc_bg = hc_bg)
+#         ### EDITED UP TO HERE ###
 
-        rv = True
-    except Exception as err:
-        log.exception("\n\n")
-        log.exception("="*100)
-        log.exception(f"`run_ss` FAILED on {pnum=}\n")
-        log.exception(err)
-        log.exception("="*100)
-        log.exception("\n\n")
-        rv = False
-        legend = {}
-        data = dict(fail=str(err))
+#         rv = True
+#     except Exception as err:
+#         log.exception("\n\n")
+#         log.exception("="*100)
+#         log.exception(f"`run_ss` FAILED on {pnum=}\n")
+#         log.exception(err)
+#         log.exception("="*100)
+#         log.exception("\n\n")
+#         rv = False
+#         legend = {}
+#         data = dict(fail=str(err))
 
-    if rv:
-        try:
-            fits_data = get_gwb_fits_data(fobs_cents, hc_bg)
-        except Exception as err:
-            log.exception("Failed to load hc_bg fits data!")
-            log.exception(err)
-            fits_data = {}
+#     if rv:
+#         try:
+#             fits_data = get_gwb_fits_data(fobs_cents, hc_bg)
+#         except Exception as err:
+#             log.exception("Failed to load hc_bg fits data!")
+#             log.exception(err)
+#             fits_data = {}
 
-    else:
-        fits_data = {}
+#     else:
+#         fits_data = {}
 
-    meta_data = dict(
-        pnum=pnum, pdim=space.ndims, nsamples=args.nsamples, librarian_version=__version__,
-        param_names=space.names, params=space._params, samples=space._samples, # prob don't need these for all of them
-    )
+#     meta_data = dict(
+#         pnum=pnum, pdim=space.ndims, nsamples=args.nsamples, librarian_version=__version__,
+#         param_names=space.names, params=space._params, samples=space._samples, # prob don't need these for all of them
+#     )
 
-    np.savez(fname, **data, **meta_data, **fits_data, **legend)
-    log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-beg)}")
+#     np.savez(fname, **data, **meta_data, **fits_data, **legend)
+#     log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-beg)}")
 
-    if rv:
-        try:
-            hname = str(fname.with_suffix('')) + "_strain.png"
-            fig = make_ss_plot(fobs_cents, hc_ss, hc_bg, fits_data)
-            fig.savefig(hname, dpi=300)
-            log.info(f"Saved to {hname}, size {holo.utils.get_file_size(hname)}")
-            plt.close('all')
-        except Exception as err:
-            log.exception("Failed to make strain plots!")
-            log.exception(err)
-        if(get_pars):
-            try:
-                pname = str(fname.with_suffix('')) + "_pars.png"
-                fig = make_pars_plot(fobs_cents, hc_ss, hc_bg, sspar, bgpar, fits_data)
-                fig.savefig(pname, dpi=300)
-                log.info(f"Saved to {pname}, size {holo.utils.get_file_size(pname)}")
-            except Exception as err:
-                log.exception("Failed to make pars plots!")
-                log.exception(err)
+#     if rv:
+#         try:
+#             hname = str(fname.with_suffix('')) + "_strain.png"
+#             fig = make_ss_plot(fobs_cents, hc_ss, hc_bg, fits_data)
+#             fig.savefig(hname, dpi=300)
+#             log.info(f"Saved to {hname}, size {holo.utils.get_file_size(hname)}")
+#             plt.close('all')
+#         except Exception as err:
+#             log.exception("Failed to make strain plots!")
+#             log.exception(err)
+#         if(get_pars):
+#             try:
+#                 pname = str(fname.with_suffix('')) + "_pars.png"
+#                 fig = make_pars_plot(fobs_cents, hc_ss, hc_bg, sspar, bgpar, fits_data)
+#                 fig.savefig(pname, dpi=300)
+#                 log.info(f"Saved to {pname}, size {holo.utils.get_file_size(pname)}")
+#             except Exception as err:
+#                 log.exception("Failed to make pars plots!")
+#                 log.exception(err)
             
-    return rv
+#     return rv
 
 def main():
 
