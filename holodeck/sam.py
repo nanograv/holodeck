@@ -676,7 +676,7 @@ class Semi_Analytic_Model:
                 log.info(f"zeroing out {utils.frac_str(idx_stalled)} systems stalled from GMT")
                 dens[idx_stalled] = 0.0
             else:
-                log.warning("NOT zeroing out systems with GMTs extending past redshift zero!")
+                log.info("NOT zeroing out systems with GMTs extending past redshift zero!")
 
             self._density = dens
 
@@ -917,13 +917,13 @@ class Semi_Analytic_Model:
             log.info(f"fraction of binaries stalled at all xvals: {utils.frac_str(stalled)}")
             stalled_frac = np.count_nonzero(stalled) / stalled.size
             if stalled_frac > 0.8:
-                log.warning(f"A large fraction of binaries are stalled at all xvals!  {stalled_frac:.4e}")
+                log.info(f"A large fraction of binaries are stalled at all xvals!  {stalled_frac:.4e}")
 
             dnum[stall] = 0.0
             self._stall = stall
 
         else:
-            log.warning("WARNING: _stalled_ binaries are not being accounted for in `dynamic_binary_number`!")
+            log.info("stalled binaries are not being accounted for in `dynamic_binary_number`!")
 
         self._dynamic_binary_number = dnum
 
@@ -932,7 +932,8 @@ class Semi_Analytic_Model:
 
         return edges, dnum
 
-    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=False, zero_coalesced=None, zero_stalled=None):
+    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW,
+            realize=False, zero_coalesced=None, zero_stalled=None, return_details=False):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
         Parameters
@@ -955,6 +956,8 @@ class Semi_Analytic_Model:
             Dimensionless, characteristic strain at each frequency.
             If `realize` is an integer with value R, then R realizations of the GWB are returned,
             such that `hc` has shape (F,R,).
+        [details]
+
 
         """
 
@@ -974,10 +977,15 @@ class Semi_Analytic_Model:
         # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
         #! NOTE: using frequency-bin _centers_ produces more accurate results than frequency-bin _edges_ !#
-        edges, dnum = self.dynamic_binary_number(
+        vals = self.dynamic_binary_number(
             hard, fobs_orb=fobs_orb_cents,
-            zero_coalesced=zero_coalesced, zero_stalled=zero_stalled
+            zero_coalesced=zero_coalesced, zero_stalled=zero_stalled, return_details=return_details,
         )
+        if return_details:
+            edges, dnum, details = vals
+        else:
+            edges, dnum = vals
+
         edges[-1] = fobs_orb_edges
         log.debug(f"dnum: {utils.stats(dnum)}")
 
@@ -1007,6 +1015,12 @@ class Semi_Analytic_Model:
             gwb = gwb.squeeze()
 
         self._gwb = gwb
+        if return_details:
+            details['edges'] = edges
+            details['dnum'] = dnum
+            details['number'] = number
+            self._details = details
+            return gwb, details
 
         return gwb
 
