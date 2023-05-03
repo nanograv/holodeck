@@ -975,6 +975,9 @@ cdef void _ss_bg_hc(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number
         for ff in range(F):
             max=0
             sum=0
+            m_max=-1
+            q_max=-1
+            z_max=-1
             for mm in range(M):
                 for qq in range(Q):
                     for zz in range(Z):
@@ -987,9 +990,9 @@ cdef void _ss_bg_hc(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number
                             num = <double>random_poisson(rng, num)
                         if(cur > max and num > 0):
                             max = h2fdf[mm,qq,zz,ff]
-                            m_max = mm
-                            q_max = qq
-                            z_max = zz
+                            m_max = mm # -1 if no single sources
+                            q_max = qq # -1 if no single sources
+                            z_max = zz # -1 if no single sources
                         sum += num * cur
             hc2ss[ff,rr] = max
             hc2bg[ff,rr] = sum - max
