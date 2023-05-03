@@ -1114,6 +1114,23 @@ def make_gwb_plot(fobs, gwb, fit_data):
 
     return fig
 
+def get_hc_bg_fits_data(fobs_cents, gwb):
+    # these values must match label construction!
+    nbins = [5, 10, 15, 0]
+
+    nbins, lamp, plaw, med_lamp, med_plaw = fit_spectra_plaw_hc(fobs_cents, gwb, nbins=nbins)
+
+    label = (
+        f"log10(A10)={med_lamp[1]:.2f}, G10={med_plaw[1]:.4f}"
+        " | "
+        f"log10(A)={med_lamp[-1]:.2f}, G={med_plaw[-1]:.4f}"
+    )
+
+    fits_data = dict(
+        fit_nbins=nbins, fit_lamp=lamp, fit_plaw=plaw, fit_med_lamp=med_lamp, fit_med_plaw=med_plaw, fit_label=label
+    )
+    return fits_data
+
 def make_ss_plot(fobs, hc_ss, hc_bg, fits_data):
     fig = holo.plot.plot_gwb(fobs, gwb=hc_bg, hc_ss=hc_ss)
     ax = fig.axes[0]
@@ -1123,7 +1140,7 @@ def make_ss_plot(fobs, hc_ss, hc_bg, fits_data):
         yy = 1e-15 * np.power(xx, -2.0/3.0)
         ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
 
-        fits = get_gwb_fits_data(fobs, hc_bg)
+        fits = get_hc_bg_fits_data(fobs, hc_bg)
 
         for ls, idx in zip([":", "--"], [1, -1]):
             med_lamp = fits['fit_med_lamp'][idx]
@@ -1147,7 +1164,7 @@ def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar, fits_data):
         yy = 1e-15 * np.power(xx, -2.0/3.0)
         ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
 
-        fits = get_gwb_fits_data(fobs, hc_bg)
+        fits = get_hc_bg_fits_data(fobs, hc_bg)
 
         for ls, idx in zip([":", "--"], [1, -1]):
             med_lamp = fits['fit_med_lamp'][idx]
