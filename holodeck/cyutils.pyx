@@ -904,6 +904,7 @@ def ss_bg_hc(number, h2fdf, nreals, normal_threshold=1e10):
     hc2ss : (F, R) Ndarray of scalars
     hc2bg : (F, R) Ndarray of scalars
     ssidx : (3, F, R) Ndarray of ints
+        Index of the loudest single source, -1 if there are none at the frequency/realization.
 
     """
     
@@ -1029,7 +1030,8 @@ def ss_bg_hc_and_par(number, h2fdf, nreals, mt, mr, rz, normal_threshold=1e10):
     hc2bg : (F, R) Ndarray of scalars
         Char strain squared of the background.
     ssidx : (3, F, R) NDarray of ints
-        Indices of the loudest single sources.
+        Indices of the loudest single sources. -1 if there are 
+        no single sources at that frequency/realization.
     bgpar : (3, F, R) NDarray of scalars
         Average effective M, q, z parameters of the background.
     sspar : (3, F, R) NDarray of scalars
@@ -1116,6 +1118,9 @@ cdef void _ss_bg_hc_and_par(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:
             m_avg=0
             q_avg=0
             z_avg=0
+            m_max=-1
+            q_max=-1
+            z_max=-1
             for mm in range(M):
                 for qq in range(Q):
                     for zz in range(Z):
@@ -1140,9 +1145,11 @@ cdef void _ss_bg_hc_and_par(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:
             hc2bg[ff,rr] = sum - max
 
             # single source indices
-            ssidx[0,ff,rr] = m_max
-            ssidx[1,ff,rr] = q_max
-            ssidx[2,ff,rr] = z_max
+            if (m_max<0):
+                raise 
+            ssidx[0,ff,rr] = m_max # -1 if no single sources
+            ssidx[1,ff,rr] = q_max # -1 if no single sources
+            ssidx[2,ff,rr] = z_max # -1 if no single sources
 
             # background average parameters
             bgpar[0,ff,rr] = ((m_avg - h2fdf[m_max, q_max, z_max, ff] * mt[m_max])
