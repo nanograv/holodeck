@@ -688,7 +688,7 @@ def ss_lib_combine(path_output, log, get_pars, path_sims=None, path_pspace=None)
             h5.create_dataset(kk, data=vv)
         h5.attrs['param_names'] = np.array(param_names).astype('S')
 
-    log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
+    log.info(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
 
     return out_filename
 
@@ -1011,69 +1011,128 @@ def make_gwb_plot(fobs, gwb, fit_data):
 
     return fig
 
-def get_hc_bg_fits_data(fobs_cents, gwb):
-    # these values must match label construction!
-    nbins = [5, 10, 15, 0]
+# def get_hc_bg_fits_data(fobs_cents, gwb):
+#     # these values must match label construction!
+#     nbins = [5, 10, 15, 0]
+#     nbins, fit_pars, fit_med_pars  = fit_spectra_plaw_hc(fobs_cents, gwb, nbins=nbins)
+#     # nbins, lamp, plaw, med_lamp, med_plaw
 
-    nbins, lamp, plaw, med_lamp, med_plaw = fit_spectra_plaw_hc(fobs_cents, gwb, nbins=nbins)
+#     label = (
+#         f"log10(A10)={med_lamp[1]:.2f}, G10={med_plaw[1]:.4f}"
+#         " | "
+#         f"log10(A)={med_lamp[-1]:.2f}, G={med_plaw[-1]:.4f}"
+#     )
 
-    label = (
-        f"log10(A10)={med_lamp[1]:.2f}, G10={med_plaw[1]:.4f}"
-        " | "
-        f"log10(A)={med_lamp[-1]:.2f}, G={med_plaw[-1]:.4f}"
-    )
+#     fits_data = dict(
+#         fit_nbins=nbins, fit_lamp=lamp, fit_plaw=plaw, fit_med_lamp=med_lamp, fit_med_plaw=med_plaw, fit_label=label
+#     )
+#     return fits_data
 
-    fits_data = dict(
-        fit_nbins=nbins, fit_lamp=lamp, fit_plaw=plaw, fit_med_lamp=med_lamp, fit_med_plaw=med_plaw, fit_label=label
-    )
-    return fits_data
+# def make_ss_plot(fobs, hc_ss, hc_bg, fits_data):
+#     fig = holo.plot.plot_gwb(fobs, gwb=hc_bg, hc_ss=hc_ss)
+#     ax = fig.axes[0]
 
-def make_ss_plot(fobs, hc_ss, hc_bg, fits_data):
-    fig = holo.plot.plot_gwb(fobs, gwb=hc_bg, hc_ss=hc_ss)
+#     if len(fits_data):
+#         xx = fobs * YR
+#         yy = 1e-15 * np.power(xx, -2.0/3.0)
+#         ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
+
+#         fits = get_hc_bg_fits_data(fobs, hc_bg)
+
+#         for ls, idx in zip([":", "--"], [1, -1]):
+#             med_lamp = fits['fit_med_lamp'][idx]
+#             med_plaw = fits['fit_med_plaw'][idx]
+#             yy = (10.0 ** med_lamp) * (xx ** med_plaw)
+#             label = fits['fit_nbins'][idx]
+#             label = 'all' if label in [0, None] else label
+#             ax.plot(xx, yy, color='k', ls=ls, alpha=0.5, lw=2.0, label=str(label) + " bins")
+
+#         label = fits['fit_label'].replace(" | ", "\n")
+#         fig.text(0.99, 0.99, label, fontsize=6, ha='right', va='top')
+
+#     return fig
+
+def make_ss_plot(fobs, hc_ss, hc_bg, fit_data):
+    # fig = holo.plot.plot_gwb(fobs, gwb)
+    psd_bg = utils.char_strain_to_psd(fobs[:, np.newaxis], hc_bg)
+    psd_ss = utils.char_strain_to_psd(fobs[:, np.newaxis, np.newaxis], hc_ss)
+    fig = holo.plot.plot_bg_ss(fobs, bg=psd_bg, ss=psd_ss, ylabel='GW Power Spectral Density')
     ax = fig.axes[0]
 
-    if len(fits_data):
-        xx = fobs * YR
-        yy = 1e-15 * np.power(xx, -2.0/3.0)
-        ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
+    xx = fobs * YR
+    yy = 1e-15 * np.power(xx, -2.0/3.0)
+    ax.plot(xx, yy, 'k--', alpha=0.5, lw=1.0, label=r"$10^{-15} \cdot f_\mathrm{yr}^{-2/3}$")
 
-        fits = get_hc_bg_fits_data(fobs, hc_bg)
+    if len(fit_data) > 0:
+        fit_nbins = fit_data['fit_plaw_nbins']
+        med_pars = fit_data['fit_plaw_med']
 
-        for ls, idx in zip([":", "--"], [1, -1]):
-            med_lamp = fits['fit_med_lamp'][idx]
-            med_plaw = fits['fit_med_plaw'][idx]
-            yy = (10.0 ** med_lamp) * (xx ** med_plaw)
-            label = fits['fit_nbins'][idx]
-            label = 'all' if label in [0, None] else label
-            ax.plot(xx, yy, color='k', ls=ls, alpha=0.5, lw=2.0, label=str(label) + " bins")
+        plot_nbins = [4, 14]
 
-        label = fits['fit_label'].replace(" | ", "\n")
-        fig.text(0.99, 0.99, label, fontsize=6, ha='right', va='top')
+        for nbins in plot_nbins:
+            idx = fit_nbins.index(nbins)
+            pars = med_pars[idx]
+
+            pars[0] = 10.0 ** pars[0]
+            yy = holo.utils._func_powerlaw_psd(fobs, 1/YR, *pars)
+            label = fit_nbins[idx]
+            label = 'all' if label in [0, None] else f"{label:02d}"
+            ax.plot(xx, yy, alpha=0.75, lw=1.0, label="plaw: " + str(label) + " bins", ls='--')
+
+        fit_nbins = fit_data['fit_turn_nbins']
+        med_pars = fit_data['fit_turn_med']
+
+        plot_nbins = [14, 30]
+
+        for nbins in plot_nbins:
+            idx = fit_nbins.index(nbins)
+            pars = med_pars[idx]
+
+            pars[0] = 10.0 ** pars[0]
+            zz = holo.utils._func_turnover_psd(fobs, 1/YR, *pars)
+            label = fit_nbins[idx]
+            label = 'all' if label in [0, None] else f"{label:02d}"
+            ax.plot(xx, zz, alpha=0.75, lw=1.0, label="turn: " + str(label) + " bins")
+
+    ax.legend(fontsize=6, loc='upper right')
 
     return fig
 
-def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar, fits_data):
+# def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar, fits_data):
+#     fig = holo.plot.plot_pars(fobs, hc_ss, hc_bg, sspar, bgpar)
+#     # add plaw and fits to hc plot
+#     ax = fig.axes[3]
+#     if len(fits_data):
+#         xx = fobs * YR
+#         yy = 1e-15 * np.power(xx, -2.0/3.0)
+#         ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
+
+#         fits = get_hc_bg_fits_data(fobs, hc_bg)
+
+#         for ls, idx in zip([":", "--"], [1, -1]):
+#             med_lamp = fits['fit_med_lamp'][idx]
+#             med_plaw = fits['fit_med_plaw'][idx]
+#             yy = (10.0 ** med_lamp) * (xx ** med_plaw)
+#             label = fits['fit_nbins'][idx]
+#             label = 'all' if label in [0, None] else label
+#             ax.plot(xx, yy, color='k', ls=ls, alpha=0.5, lw=2.0, label=str(label) + " bins")
+
+#         label = fits['fit_label'].replace(" | ", "\n")
+#         fig.text(0.93, 0.93, label, fontsize=6, ha='right', va='top')
+#         # fig.tight_layout()
+
+#     return fig
+
+def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar):
+    # fig = holo.plot.plot_gwb(fobs, gwb)
     fig = holo.plot.plot_pars(fobs, hc_ss, hc_bg, sspar, bgpar)
-    # add plaw and fits to hc plot
     ax = fig.axes[3]
-    if len(fits_data):
-        xx = fobs * YR
-        yy = 1e-15 * np.power(xx, -2.0/3.0)
-        ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
 
-        fits = get_hc_bg_fits_data(fobs, hc_bg)
+    xx = fobs * YR
+    yy = 1e-15 * np.power(xx, -2.0/3.0)
+    ax.plot(xx, yy, 'k--', alpha=0.5, lw=1.0, label=r"$10^{-15} \cdot f_\mathrm{yr}^{-2/3}$")
 
-        for ls, idx in zip([":", "--"], [1, -1]):
-            med_lamp = fits['fit_med_lamp'][idx]
-            med_plaw = fits['fit_med_plaw'][idx]
-            yy = (10.0 ** med_lamp) * (xx ** med_plaw)
-            label = fits['fit_nbins'][idx]
-            label = 'all' if label in [0, None] else label
-            ax.plot(xx, yy, color='k', ls=ls, alpha=0.5, lw=2.0, label=str(label) + " bins")
-
-        label = fits['fit_label'].replace(" | ", "\n")
-        fig.text(0.93, 0.93, label, fontsize=6, ha='right', va='top')
-        # fig.tight_layout()
+    ax.legend(fontsize=6, loc='upper right')
 
     return fig
 
@@ -1209,11 +1268,11 @@ def run_ss_at_pspace_num(args, space, pnum):
 
     # ---- get output filename for this simulation, check if already exists
 
-    sim_fname = _ss_fname(args.output_sims, pnum)
+    ss_fname = _ss_fname(args.output_sims, pnum)
     beg = datetime.now()
-    log.info(f"{pnum=} :: {sim_fname=} beginning at {beg}")
-    if sim_fname.exists():
-        log.info(f"File {sim_fname} already exists.  {args.recreate=}")
+    log.info(f"{pnum=} :: {ss_fname=} beginning at {beg}")
+    if ss_fname.exists():
+        log.info(f"File {ss_fname} already exists.  {args.recreate=}")
         # skip existing files unless we specifically want to recreate them
         if not args.recreate:
             return True
@@ -1300,28 +1359,31 @@ def run_ss_at_pspace_num(args, space, pnum):
 
     # ---- Save data to file
 
-    np.savez(sim_fname, **data, **fit_data)
-    log.info(f"Saved to {sim_fname}, size {holo.utils.get_file_size(sim_fname)} after {(datetime.now()-beg)}")
+    np.savez(ss_fname, **data, **fit_data)
+    log.info(f"Saved to {ss_fname}, size {holo.utils.get_file_size(ss_fname)} after {(datetime.now()-beg)}")
 
-    # STILL NEED TO EDIT BELOW HERE
-    # ---- Plot GWB spectra
+    # ---- Plot hc and pars
 
     if rv and args.plot:
-        log.info("generating spectra plots")
+        log.info("generating characteristic strain/psd plots")
         try:
-            plot_fname = args.output_plots.joinpath(sim_fname.name)
-            hc_fname = str(plot_fname.with_suffix('')) + "_strain.png"
-            fig = make_ss_plot(fobs_cents, hc_ss, hc_bg, fit_data)
+            plot_fname = args.output_plots.joinpath(ss_fname.name)
+            hc_fname = str(plot_fname.with_suffix(''))+"_strain.png"
+            fig = holo.plot.plot_bg_ss(fobs_cents, bg=hc_bg, ss=hc_ss)
             fig.savefig(hc_fname, dpi=100)
-            log.info(f"Saved to {hc_fname}, size {holo.utils.get_file_size(hc_fname)}")
+            psd_fname = str(plot_fname.with_suffix('')) + "_psd.png"
+            fig = make_ss_plot(fobs_cents, hc_ss, hc_bg, fit_data)
+            fig.savefig(psd_fname, dpi=100)
+            log.info(f"Saved to {psd_fname}, size {holo.utils.get_file_size(psd_fname)}")
             plt.close('all')
         except Exception as err:
             log.exception("Failed to make strain plot!")
             log.exception(err)
         if(get_pars):
+            log.info("generating pars plots")
             try:
                 pars_fname = str(plot_fname.with_suffix('')) + "_pars.png"
-                fig = make_pars_plot(fobs_cents, hc_ss, hc_bg, sspar, bgpar, fit_data)
+                fig = make_pars_plot(fobs_cents, hc_ss, hc_bg, sspar, bgpar)
                 fig.savefig(pars_fname, dpi=100)
                 log.info(f"Saved to {pars_fname}, size {holo.utils.get_file_size(pars_fname)}")
                 plt.close('all')

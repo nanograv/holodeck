@@ -434,6 +434,23 @@ def plot_gwb(fobs, gwb, hc_ss=None, bglabel=None, sslabel=None, **kwargs):
     _twin_hz(ax)
     return fig
 
+def plot_bg_ss(fobs, bg, ss=None, bglabel=None, sslabel=None,
+             xlabel=LABEL_GW_FREQUENCY_YR, ylabel=LABEL_CHARACTERISTIC_STRAIN, **kwargs):
+    """ Can plot strain or power spectral density, just need to set ylabel accordingly
+    """
+    xx = fobs * YR
+    fig, ax = figax(
+        xlabel=xlabel,
+        ylabel=ylabel
+    )
+    if(ss is not None):
+        draw_ss_and_gwb(ax, xx, ss, bg, sslabel=sslabel,
+                        bglabel=bglabel, **kwargs)
+    else: 
+        draw_gwb(ax, xx, bg, **kwargs)
+    _twin_hz(ax)
+    return fig
+
 def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=cm.rainbow_r, color = None, label=None, **kwargs):
     # if color is None:
     #     color = axs[0,0]._get_lines.get_next_color()
