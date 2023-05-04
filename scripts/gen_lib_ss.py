@@ -121,7 +121,7 @@ def main():
 
     if (comm.rank == 0):
         log.info("Concatenating outputs into single file")
-        holo.librarian.ss_lib_combine(args.output, log, path_sims=args.output_sims)
+        holo.librarian.ss_lib_combine(args.output, log, bool(args.get_pars), path_sims=args.output_sims)
         log.info("Concatenating completed")
 
     return
