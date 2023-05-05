@@ -18,7 +18,7 @@ import kalepy as kale # noqa
 # import kalepy.plot
 
 import holodeck as holo
-from holodeck import cosmo, utils, plot
+from holodeck import cosmo, utils, plot, cyutils
 from holodeck.constants import MSOL, PC, YR, MPC, GYR
 
 # Silence annoying numpy errors
