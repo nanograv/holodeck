@@ -570,8 +570,8 @@ def SNR_bg_B(noise, Gamma, Sh_bg):
     SNR_B = np.sqrt(2*sum)
     return SNR_B
 
-def _Sh_hasasia_generic_bg(scGWB):
-    """ Calculate the signal strain power spectral density, 
+def _Sh_hasasia_noise_bg(scGWB):
+    """ Calculate the noise strain power spectral density, 
         `Sh` for hasasia's SNR calculation
         
     Parameters
@@ -584,6 +584,8 @@ def _Sh_hasasia_generic_bg(scGWB):
     Sh_h : (F,) 1Darray
         Sh as used in hasasia's SNR calculation, for each frequency.
     
+    This function may not be working as we expect, since it does not produce SNR
+    of noise to be 1.
     """
     freqs = scGWB.freqs
     H0 = scGWB._H_0.to('Hz').value 
@@ -591,8 +593,8 @@ def _Sh_hasasia_generic_bg(scGWB):
     Sh_h = 3*H0**2 / (2*np.pi**2) * Omega_gw / freqs**3
     return Sh_h
 
-def SNR_hasasia_generic_bg(scGWB):
-    """ Calculate the GWB signal to noise ratio with hasasia.
+def SNR_hasasia_noise_bg(scGWB):
+    """ Calculate the effective noise signal to noise ratio with hasasia.
     
     Parameters
     ----------
@@ -603,8 +605,11 @@ def SNR_hasasia_generic_bg(scGWB):
     -------
     SNR_h : scalar
         Signal to noise ratio from hasasia.
+
+    This function may not be working as we expect, since it does not produce SNR
+    of noise to be 1.
     """
-    Sh_h = _Sh_hasasia_generic_bg(scGWB)
+    Sh_h = _Sh_hasasia_noise_bg(scGWB)
     SNR_h = scGWB.SNR(Sh_h)
     return SNR_h
     
