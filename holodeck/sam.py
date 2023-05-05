@@ -670,7 +670,12 @@ class Semi_Analytic_Model:
                 dm = (mass_aft - mass_bef) / mass_bef
                 log.info(f"Scatter added after {dur.total_seconds()} sec")
                 log.info(f"\tdens aft: ({utils.stats(dens)})")
-                log.info(f"\tmass: {mass_bef:.2e} ==> {mass_aft:.2e} || change = {dm:.4e}")
+                msg = f"mass: {mass_bef:.2e} ==> {mass_aft:.2e} || change = {dm:.4e}"
+                log.info(f"\t{msg}")
+                if np.fabs(dm) > 0.05:
+                    err = f"Warning, significant change in number-mass!  {msg}"
+                    log.error(err)
+                    print(err, flush=True)
 
             # set values after redshift zero to have zero density
             if self.ZERO_GMT_STALLED_SYSTEMS:
@@ -1001,8 +1006,8 @@ class Semi_Analytic_Model:
         fobs_orb_edges = fobs_gw_edges / 2.0
         fobs_orb_cents = fobs_gw_cents / 2.0
 
-        print("GWB 1: ", flush=True)
-        holo.librarian._log_mem_usage(None)
+        # print("GWB 1: ", flush=True)
+        # holo.librarian._log_mem_usage(None)
 
         # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
@@ -1012,8 +1017,8 @@ class Semi_Analytic_Model:
             zero_coalesced=zero_coalesced, zero_stalled=zero_stalled, return_details=return_details,
         )
 
-        print("GWB 2: ", flush=True)
-        holo.librarian._log_mem_usage(None)
+        # print("GWB 2: ", flush=True)
+        # holo.librarian._log_mem_usage(None)
 
         if return_details:
             edges, dnum, details = vals
@@ -1036,8 +1041,8 @@ class Semi_Analytic_Model:
         log.debug(f"number: {utils.stats(number)}")
         log.debug(f"number.sum(): {number.sum():.4e}")
 
-        print("GWB 3: ", flush=True)
-        holo.librarian._log_mem_usage(None)
+        # print("GWB 3: ", flush=True)
+        # holo.librarian._log_mem_usage(None)
 
         if _DEBUG:
             _check_bads(edges, number, "number")
@@ -1047,7 +1052,17 @@ class Semi_Analytic_Model:
         # Use the redshift based on initial redshift + galaxy-merger-time + evolution-time
         log.debug(f"{use_redz_after_hard=}")
         if use_redz_after_hard:
-            use_redz = self._redz_final
+            try:
+                use_redz = self._redz_final
+            except AttributeError as err:
+                msg = (f"Failed to access `_redz_final` attribute.  If `zero_stalled`/`ZERO_DYNAMIC_STALLED_SYSTEMS` "
+                       "is False, then this attribute is not created!  You can disable this usage by also setting "
+                       "`use_redz_after_hard=False`.  Yes, it's a stupid way that this is setup "
+                       "right now.  Sorry.  LZK")
+                log.error(msg)
+                log.error(str(err))
+                raise
+
         # Use the redshift based on initial redshift + galaxy-merger-time (without evo time)
         else:
             log.warning(f"Using `redz_prime` for redshift (includes galaxy merger time, but not evolution time)")
@@ -1055,8 +1070,8 @@ class Semi_Analytic_Model:
 
         gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, realize)
 
-        print("GWB 4: ", flush=True)
-        holo.librarian._log_mem_usage(None)
+        # print("GWB 4: ", flush=True)
+        # holo.librarian._log_mem_usage(None)
 
         if _DEBUG:
             _rr = np.arange(realize)
