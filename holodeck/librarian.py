@@ -19,6 +19,7 @@ import tqdm
 from scipy.stats import qmc
 
 import holodeck as holo
+import holodeck.single_sources as ss
 from holodeck import log, utils
 from holodeck.constants import YR
 
@@ -29,6 +30,7 @@ FITS_NBINS_PLAW = [2, 3, 4, 5, 8, 9, 14]
 FITS_NBINS_TURN = [4, 9, 14, 30]
 
 FNAME_SIM_FILE = "lib_sams__p{pnum:06d}.npz"
+FNAME_SS_FILE = "lib_ss__p{pnum:06d}.npz"
 PSPACE_FILE_SUFFIX = ".pspace.npz"
 
 
@@ -602,6 +604,267 @@ def _load_library_from_all_files(path_sims, gwb, fit_data, log):
 
     return gwb, fit_data, bad_files
 
+def ss_lib_combine(path_output, log, get_pars, path_sims=None, path_pspace=None):
+    """
+    Arguments
+    ---------
+    path_output : str or Path,
+        Path to output directory where combined library will be saved.
+    log : `logging.Logger`
+        Logging instance.
+    get_pars : bool
+        Whether or not to include binary parameters, 'sspar' and 'bgpar'.
+    path_sims : str or None,
+        Path to output directory containing simulation files.
+        If `None` this is set to be the same as `path_output`.
+    path_pspace : str or None,
+        Path to file containing _Param_Space subclass instance.
+        If `None` then `path_output` is searched for a `_Param_Space` save file.
+    Returns
+    -------
+    out_filename : Path,
+        Path to library output filename (typically ending with 'sam_lib.hdf5').
+    """
+
+    # ---- setup paths
+
+    path_output = Path(path_output)
+    log.info(f"Path output = {path_output}")
+    # if dedicated simulation path is not given, assume same as general output path
+    if path_sims is None:
+        path_sims = path_output
+    path_sims = Path(path_sims)
+    log.info(f"Path sims = {path_sims}")
+
+    # ---- load parameter space from save file
+
+    if path_pspace is None:
+        # look for parameter-space save files
+        regex = "*" + PSPACE_FILE_SUFFIX   # "*.pspace.npz"
+        files = sorted(path_output.glob(regex))
+        num_files = len(files)
+        msg = f"found {num_files} pspace.npz files in {path_output}"
+        log.info(msg)
+        if num_files != 1:
+            log.exception(f"")
+            log.exception(msg)
+            log.exception(f"{files=}")
+            log.exception(f"{regex=}")
+            raise RuntimeError(f"{msg}")
+        path_pspace = files[0]
+
+    pspace = _Param_Space.from_save(path_pspace, log)
+    log.info(f"loaded param space: {pspace}")
+    param_names = pspace.param_names
+    param_samples = pspace.param_samples
+    nsamp, ndim = param_samples.shape
+    log.debug(f"{nsamp=}, {ndim=}, {param_names=}")
+
+    # ---- make sure all files exist; get shape information from files
+
+    log.info(f"checking that all {nsamp} files exist")
+    fobs, nreals, nloudest, fit_data = _check_ss_files_and_load_shapes(path_sims, nsamp)
+    nfreqs = fobs.size
+    log.debug(f"{nfreqs=}, {nreals=}")
+
+    # ---- Store results from all files
+
+    hc_ss = np.zeros((nsamp, nfreqs, nreals, nloudest))
+    hc_bg = np.zeros((nsamp, nfreqs, nreals))
+    if(get_pars):
+        sspar = np.zeros((nsamp, 3, nfreqs, nreals, nloudest))
+        bgpar = np.zeros((nsamp, 3, nfreqs, nreals))
+    else:
+        sspar = None
+        bgpar = None
+    hc_ss, hc_bg, fit_data, sspar, bgpar = _load_ss_library_from_all_files(path_sims, hc_ss, hc_bg, fit_data, log, sspar, bgpar)
+
+
+    # ---- Save to concatenated output file ----
+
+    out_filename = path_output.joinpath('ss_lib.hdf5')
+    log.info(f"Writing collected data to file {out_filename}")
+    with h5py.File(out_filename, 'w') as h5:
+        h5.create_dataset('fobs', data=fobs)
+        h5.create_dataset('hc_ss', data=hc_ss)
+        h5.create_dataset('hc_bg', data=hc_bg)
+        if get_pars:
+            h5.create_dataset('sspar', data=sspar)
+            h5.create_dataset('bgpar', data=bgpar)
+        h5.create_dataset('sample_params', data=param_samples)
+        for kk, vv in fit_data.items():
+            h5.create_dataset(kk, data=vv)
+        h5.attrs['param_names'] = np.array(param_names).astype('S')
+
+    log.info(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
+
+    return out_filename
+
+def _check_ss_files_and_load_shapes(path_sims, nsamp):
+    """Check that all `nsamp` files exist in the given path, and load info about array shapes.
+    Arguments
+    ---------
+    path_sims : str
+        Path in which individual simulation files can be found.
+    nsamp : int
+        Number of simulations/files that should be found.
+        This should typically be loaded from the parameter-space object used to generate the library.
+    Returns
+    -------
+    fobs : (F,) ndarray
+        Observer-frame frequency bin centers at which GW signals are calculated.
+    nreals : int
+        Number of realizations in the output files.
+    nloudest : int
+        Number of loudest single sources in the output files.
+    fit_data : dict
+        Dictionary where each key is a fit-parameter in all of the output files.  The values are
+        'ndarray's of the appropriate shapes to store fit-parameters from all files.
+        The 0th dimension is always for the number-of-files.
+    """
+
+    fobs = None
+    nreals = None
+    nloudest = None
+    fit_data = None
+    for ii in tqdm.trange(nsamp):
+        temp = _ss_fname(path_sims, ii)
+        if not temp.exists():
+            err = f"Missing at least file number {ii} out of {nsamp} files!  {temp}"
+            log.exception(err)
+            raise ValueError(err)
+
+        # if we've already loaded all of the necessary info, then move on to the next file
+        if (fobs is not None) and (nreals is not None) and (fit_data is not None) and (nloudest is not None):
+            continue
+
+        temp = np.load(temp)
+        data_keys = temp.keys()
+
+        if fobs is None:
+            fobs = temp['fobs'][()]
+
+        # find a file that has GWB data in it (not all of them do, if the file was a 'failure' file)
+        if (nreals is None) and ('hc_bg' in data_keys):
+            nreals = temp['hc_bg'].shape[-1]
+        if (nloudest is None) and ('hc_ss' in data_keys):
+            nloudest = temp['hc_ss'].shape[-1]
+
+        # find a file that has fits data in it (it's possible for the fits portion to fail by itself)
+        # initialize arrays to store output data for all files
+        if (fit_data is None) and np.any([kk.startswith('fit_') for kk in data_keys]):
+            fit_data = {}
+            for kk in data_keys:
+                if not kk.startswith('fit_'):
+                    continue
+
+                vv = temp[kk]
+                # arrays need to store values for 'nsamp' files
+                shape = (nsamp,) + vv.shape
+                fit_data[kk] = np.zeros(shape)
+
+    for kk, vv in fit_data.items():
+        log.debug(f"\t{kk:>20s}: {vv.shape}")
+
+    return fobs, nreals, nloudest, fit_data
+
+
+def _load_ss_library_from_all_files(path_sims, hc_ss, hc_bg, fit_data, log, sspar=None, bgpar=None):
+    """Load data from all individual simulation files.
+    Arguments
+    ---------
+    path_sims : str
+        Path to find individual simulation files.
+    hc_ss : (S, F, R, L) NDarray
+        Array in which to store hc_ss data from all of 'S' files.
+        S: num-samples/simulations,  F: num-frequencies,  R: num-realizations, L: num-loudest.
+    hc_bg : (S, F, R) NDarray
+        Array in which to store hc_bg data from all of 'S' files.
+        S: num-samples/simulations,  F: num-frequencies,  R: num-realizations.
+    fit_data : dict
+        Dictionary of ndarrays in which to store fit-parameters.
+    log : `logging.Logger`
+        Logging instance.
+    sspar : (S, 3, F, R, L) NDarray or None
+        Array in which to store 'sspar' data from all of 'S' files.
+    bgpar : (S, 3, F, R) NDarray or None
+        Array in which to store 'bgpar' data from all of 'S' files.
+    """
+
+    nsamp = hc_ss.shape[0]
+    if (sspar is not None) and (bgpar is not None):
+        get_pars = True
+        log.info(f"Collecting hc and pars data from {nsamp} files")
+    else:
+        get_pars = False
+        log.info(f"Collecting hc data from {nsamp} files")
+    good_file = np.ones(nsamp, dtype=bool)     #: track which files contain useable data
+    num_fits_failed = 0
+    num_pars_failed = 0
+    msg = None
+    for pnum in tqdm.trange(nsamp):
+        fname = _ss_fname(path_sims, pnum)
+        temp = np.load(fname, allow_pickle=True)
+        # When a processor fails for a given parameter, the output file is still created with the 'fail' key added
+        if ('fail' in temp) or ('hc_ss' not in temp) or ('hc_bg' not in temp):
+            msg = f"file {pnum=:06d} is a failure file, setting values to NaN ({fname})"
+            log.warning(msg)
+            # set all parameters to NaN for failure files.  Note that this is distinct from gwb=0.0 which can be real.
+            hc_ss[pnum, :, :, :] = np.nan
+            hc_bg[pnum, :, :] = np.nan
+            for fk in fit_data.keys():
+                fit_data[fk][pnum, ...] = np.nan
+            if get_pars:
+                sspar[pnum, :, :, :, :] = np.nan
+                bgpar[pnum, :, :, :] = np.nan
+
+            good_file[pnum] = False
+            continue
+
+        # store the char strain from this file
+        hc_ss[pnum, :, :, :] = temp['hc_ss'][...]
+        hc_bg[pnum, :, :] = temp['hc_bg'][...]
+
+        # store all of the fit data
+        fits_bad = False
+        for fk in fit_data.keys():
+            try:
+                fit_data[fk][pnum, ...] = temp[fk][...]
+            except Exception as err:
+                # only count the first time it fails
+                if not fits_bad:
+                    num_fits_failed += 1
+                fits_bad = True
+                fit_data[fk][pnum, ...] = np.nan
+                msg = str(err)
+
+        if fits_bad:
+            log.warning(f"Missing fit keys in file {pnum} = {fname.name}")
+        
+        # store the pars from this file
+        if(get_pars):
+            if ('sspar' not in temp) or ('bgpar' not in temp):
+                num_pars_failed += 1
+                sspar[pnum, :, :, :, :] = np.nan
+                bgpar[pnum, :, :, :] = np.nan
+                log.warning(f"Missing pars in file {pnum} = {fname.name}")
+            else:
+                sspar[pnum, :, :, :, :] = temp['sspar'][...]
+                bgpar[pnum, :, :, :] = temp['bgpar'][...]
+        
+
+    if num_fits_failed > 0:
+        log.warning(f"Missing fit keys in {num_fits_failed}/{nsamp} = {num_fits_failed/nsamp:.2e} files!")
+        log.warning(msg)
+    if num_pars_failed > 0:
+        log.warning(f"Missing pars in {num_pars_failed}/{nsamp} = {num_pars_failed/nsamp:.2e} files!")
+        log.warning(msg)
+
+
+    log.info(f"{utils.frac_str(~good_file)} files are failures")
+
+    return hc_ss, hc_bg, fit_data, sspar, bgpar
+
 
 def _fit_spectra(freqs, psd, nbins, nfit_pars, fit_func, min_nfreq_valid):
     nfreq, nreals = np.shape(psd)
@@ -705,6 +968,65 @@ def make_gwb_plot(fobs, gwb, fit_data):
             label = fit_nbins[idx]
             label = 'all' if label in [0, None] else f"{label:02d}"
             ax.plot(xx, zz, alpha=0.75, lw=1.0, label="turn: " + str(label) + " bins")
+
+    ax.legend(fontsize=6, loc='upper right')
+
+    return fig
+
+def make_ss_plot(fobs, hc_ss, hc_bg, fit_data):
+    # fig = holo.plot.plot_gwb(fobs, gwb)
+    psd_bg = utils.char_strain_to_psd(fobs[:, np.newaxis], hc_bg)
+    psd_ss = utils.char_strain_to_psd(fobs[:, np.newaxis, np.newaxis], hc_ss)
+    fig = holo.plot.plot_bg_ss(fobs, bg=psd_bg, ss=psd_ss, ylabel='GW Power Spectral Density')
+    ax = fig.axes[0]
+
+    xx = fobs * YR
+    yy = 1e-15 * np.power(xx, -2.0/3.0)
+    ax.plot(xx, yy, 'k--', alpha=0.5, lw=1.0, label=r"$10^{-15} \cdot f_\mathrm{yr}^{-2/3}$")
+
+    if len(fit_data) > 0:
+        fit_nbins = fit_data['fit_plaw_nbins']
+        med_pars = fit_data['fit_plaw_med']
+
+        plot_nbins = [4, 14]
+
+        for nbins in plot_nbins:
+            idx = fit_nbins.index(nbins)
+            pars = med_pars[idx]
+
+            pars[0] = 10.0 ** pars[0]
+            yy = holo.utils._func_powerlaw_psd(fobs, 1/YR, *pars)
+            label = fit_nbins[idx]
+            label = 'all' if label in [0, None] else f"{label:02d}"
+            ax.plot(xx, yy, alpha=0.75, lw=1.0, label="plaw: " + str(label) + " bins", ls='--')
+
+        fit_nbins = fit_data['fit_turn_nbins']
+        med_pars = fit_data['fit_turn_med']
+
+        plot_nbins = [14, 30]
+
+        for nbins in plot_nbins:
+            idx = fit_nbins.index(nbins)
+            pars = med_pars[idx]
+
+            pars[0] = 10.0 ** pars[0]
+            zz = holo.utils._func_turnover_psd(fobs, 1/YR, *pars)
+            label = fit_nbins[idx]
+            label = 'all' if label in [0, None] else f"{label:02d}"
+            ax.plot(xx, zz, alpha=0.75, lw=1.0, label="turn: " + str(label) + " bins")
+
+    ax.legend(fontsize=6, loc='upper right')
+
+    return fig
+
+def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar):
+    # fig = holo.plot.plot_gwb(fobs, gwb)
+    fig = holo.plot.plot_pars(fobs, hc_ss, hc_bg, sspar, bgpar)
+    ax = fig.axes[3]
+
+    xx = fobs * YR
+    yy = 1e-15 * np.power(xx, -2.0/3.0)
+    ax.plot(xx, yy, 'k--', alpha=0.5, lw=1.0, label=r"$10^{-15} \cdot f_\mathrm{yr}^{-2/3}$")
 
     ax.legend(fontsize=6, loc='upper right')
 
@@ -822,12 +1144,168 @@ def run_sam_at_pspace_num(args, space, pnum):
 
     return rv
 
+def run_ss_at_pspace_num(args, space, pnum):
+    """Run single source and background strain calculations for the SAM simulation 
+    for sample-parameter `pnum` in the `space` parameter-space.
+    Arguments
+    ---------
+    args : `argparse.ArgumentParser` instance
+        Arguments from the `gen_lib_sams.py` script.
+        NOTE: this should be improved.
+    space : _Param_Space instance
+        Parameter space from which to load `sam` and `hard` instances.
+    pnum : int
+        Which parameter-sample from `space` should be run.
+    Returns
+    -------
+    rv : bool
+        True if this simulation was successfully run.
+    """
+
+    log = args.log
+
+    # ---- get output filename for this simulation, check if already exists
+
+    ss_fname = _ss_fname(args.output_sims, pnum)
+    beg = datetime.now()
+    log.info(f"{pnum=} :: {ss_fname=} beginning at {beg}")
+    if ss_fname.exists():
+        log.info(f"File {ss_fname} already exists.  {args.recreate=}")
+        # skip existing files unless we specifically want to recreate them
+        if not args.recreate:
+            return True
+
+    # ---- Setup PTA frequencies
+
+    pta_dur = args.pta_dur * YR
+    nfreqs = args.nfreqs
+    hifr = nfreqs/pta_dur
+    pta_cad = 1.0 / (2 * hifr)
+    fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
+    fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
+    log.info(f"Created {fobs_cents.size} frequency bins")
+    log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
+    log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
+    _log_mem_usage(log)
+    assert nfreqs == fobs_cents.size
+    get_pars = bool(args.get_pars)
+
+    # ---- Calculate hc_ss, hc_bg, sspar, and bgpar from SAM
+
+    try:
+        log.debug("Selecting `sam` and `hard` instances")
+        sam, hard = space(pnum)
+        _log_mem_usage(log)
+
+        log.debug(f"Calculating 'edges' and 'number' for this SAM.")
+        fobs_orb_edges = fobs_edges / 2.0 
+        fobs_orb_cents = fobs_cents/ 2.0
+        # edges
+        edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents) # should the zero stalled option be part of the parameter space?
+        edges[-1] = fobs_orb_edges
+        # integrate for number
+        number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
+        number = number * np.diff(np.log(fobs_edges))  
+        _log_mem_usage(log)
+        
+        if(get_pars):
+            log.debug(f"Calculating 'hc_ss', 'hc_bg', 'sspar', and 'bgpar' for shape ({fobs_cents.size}, {args.nreals})")
+            hc_ss, hc_bg, sspar, bgpar = ss.ss_gws(edges, number, realize=args.nreals, 
+                                               loudest = args.nloudest, params = True)
+        else:
+            log.debug(f"Calculating 'hc_ss' and 'hc_bg' only for shape ({fobs_cents.size}, {args.nreals})")
+            hc_ss, hc_bg = ss.ss_gws(edges, number, realize=args.nreals, 
+                                               loudest = args.nloudest, params = False) 
+        _log_mem_usage(log)
+        log.debug(f"{holo.utils.stats(hc_ss)=}")
+        log.debug(f"{holo.utils.stats(hc_bg)=}")
+        if(get_pars):
+            log.debug(f"{holo.utils.stats(sspar)=}")
+            log.debug(f"{holo.utils.stats(bgpar)=}")
+
+        log.debug(f"Saving {pnum} to file")
+        if(get_pars):
+            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
+                    hc_ss = hc_ss, hc_bg = hc_bg, sspar = sspar, bgpar = bgpar)
+        else:
+            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
+                    hc_ss = hc_ss, hc_bg = hc_bg)
+        rv = True
+    except Exception as err:
+        log.exception(f"`run_ss` FAILED on {pnum=}\n")
+        log.exception(err)
+        rv = False
+        data = dict(fail=str(err))
+
+    # ---- Fit hc_bg spectra
+
+    fit_data = {}
+    if rv:
+        log.info("calculating hc_bg spectra fits")
+        try:
+            psd = utils.char_strain_to_psd(fobs_cents[:, np.newaxis], hc_bg)
+            plaw_nbins, fit_plaw, fit_plaw_med = fit_spectra_plaw(fobs_cents, psd, FITS_NBINS_PLAW)
+            turn_nbins, fit_turn, fit_turn_med = fit_spectra_turn(fobs_cents, psd, FITS_NBINS_TURN)
+
+            fit_data = dict(
+                fit_plaw_nbins=plaw_nbins, fit_plaw=fit_plaw, fit_plaw_med=fit_plaw_med,
+                fit_turn_nbins=turn_nbins, fit_turn=fit_turn, fit_turn_med=fit_turn_med,
+            )
+        except Exception as err:
+            log.exception("Failed to load hc_bg fits data!")
+            log.exception(err)
+            if "Number of calls to function has reached maxfev" in str(err):
+                log.exception("fit did not converge.")
+            else:
+                log.exception(err)
+
+    # ---- Save data to file
+
+    np.savez(ss_fname, **data, **fit_data)
+    log.info(f"Saved to {ss_fname}, size {holo.utils.get_file_size(ss_fname)} after {(datetime.now()-beg)}")
+
+    # ---- Plot hc and pars
+
+    if rv and args.plot:
+        log.info("generating characteristic strain/psd plots")
+        try:
+            plot_fname = args.output_plots.joinpath(ss_fname.name)
+            hc_fname = str(plot_fname.with_suffix(''))+"_strain.png"
+            fig = holo.plot.plot_bg_ss(fobs_cents, bg=hc_bg, ss=hc_ss)
+            fig.savefig(hc_fname, dpi=100)
+            psd_fname = str(plot_fname.with_suffix('')) + "_psd.png"
+            fig = make_ss_plot(fobs_cents, hc_ss, hc_bg, fit_data)
+            fig.savefig(psd_fname, dpi=100)
+            log.info(f"Saved to {psd_fname}, size {holo.utils.get_file_size(psd_fname)}")
+            plt.close('all')
+        except Exception as err:
+            log.exception("Failed to make strain plot!")
+            log.exception(err)
+        if(get_pars):
+            log.info("generating pars plots")
+            try:
+                pars_fname = str(plot_fname.with_suffix('')) + "_pars.png"
+                fig = make_pars_plot(fobs_cents, hc_ss, hc_bg, sspar, bgpar)
+                fig.savefig(pars_fname, dpi=100)
+                log.info(f"Saved to {pars_fname}, size {holo.utils.get_file_size(pars_fname)}")
+                plt.close('all')
+            except Exception as err:
+                log.exception("Failed to make pars plot!")
+                log.exception(err)
+
+
+    return rv
+
 
 def _sim_fname(path, pnum):
     temp = FNAME_SIM_FILE.format(pnum=pnum)
     temp = path.joinpath(temp)
     return temp
 
+def _ss_fname(path, pnum):
+    temp = FNAME_SS_FILE.format(pnum=pnum)
+    temp = path.joinpath(temp)
+    return temp
 
 def _log_mem_usage(log):
     # results.ru_maxrss is KB on Linux, B on macos
