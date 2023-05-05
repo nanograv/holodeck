@@ -383,8 +383,10 @@ class Semi_Analytic_Model:
 
     """
 
-    ZERO_GMT_STALLED_SYSTEMS = False
-    ZERO_DYNAMIC_STALLED_SYSTEMS = True
+    # ZERO_GMT_STALLED_SYSTEMS = False
+    # ZERO_DYNAMIC_STALLED_SYSTEMS = True
+    ZERO_GMT_STALLED_SYSTEMS = True
+    ZERO_DYNAMIC_STALLED_SYSTEMS = False # must be false to use Hard_GW
     ZERO_DYNAMIC_COALESCED_SYSTEMS = True
     USE_REDZ_AFTER_HARD = True
 
