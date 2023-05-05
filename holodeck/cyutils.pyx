@@ -20,10 +20,10 @@ np.import_array()
 # There is a special implementation of `scipy.special` for use with cython
 cimport scipy.special.cython_special as sp_special
 
-# from libc.stdio cimport printf
+from libc.stdio cimport printf
 from libc.stdlib cimport malloc, free, qsort
 # make sure to use c-native math functions instead of python/numpy
-from libc.math cimport pow, sqrt, abs, M_PI
+from libc.math cimport pow, sqrt, abs, M_PI, NAN
 
 from cpython.pycapsule cimport PyCapsule_IsValid, PyCapsule_GetPointer
 from numpy.random cimport bitgen_t
@@ -323,6 +323,15 @@ cdef void argsort(double *values, int size, int **indices):
 @cython.wraparound(False)
 @cython.nonecheck(False)
 @cython.cdivision(True)
+cdef double _interp_between_vals(double xnew, double xl, double xr, double yl, double yr):
+    cdef double ynew = yl + (yr - yl) * (xnew - xl) / (xr - xl)
+    return ynew
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
 cdef double interp_at_index(int idx, double xnew, double[:] xold, double[:] yold):
     """Perform linear interpolation at the given index in a pair of arrays.
 
@@ -344,8 +353,9 @@ cdef double interp_at_index(int idx, double xnew, double[:] xold, double[:] yold
         Interpolated function value.
 
     """
-    cdef double ynew = yold[idx] + (yold[idx+1] - yold[idx])/(xold[idx+1] - xold[idx]) * (xnew - xold[idx])
-    return ynew
+    # cdef double ynew = yold[idx] + (yold[idx+1] - yold[idx])/(xold[idx+1] - xold[idx]) * (xnew - xold[idx])
+    # return ynew
+    return _interp_between_vals(xnew, xold[idx], xold[idx+1], yold[idx], yold[idx+1])
 
 
 def sam_calc_gwb_single_eccen(ndens, mtot_log10, mrat, redz, dcom, gwfobs, sepa_evo, eccen_evo, nharms=100):
@@ -1547,3 +1557,51 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
             lspar[2,ff,rr] = z_ls/sum_ls # ls avg redshift
 
 
+
+def interp_2d(xnew, xold, yold, xlog=False, ylog=False, extrap=False):
+    if xlog:
+        xnew = np.log10(xnew)
+        xold = np.log10(xold)
+    if ylog:
+        yold = np.log10(yold)
+
+    assert xnew.shape[0] == xold.shape[0]
+    assert xold.shape == yold.shape
+
+    extrap_flag = 1 if extrap else 0
+    ynew = _interp_2d(xnew, xold, yold, extrap_flag)
+
+    if ylog:
+        ynew = np.power(10.0, ynew)
+    return ynew
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef double[:, :] _interp_2d(
+    double[:, :] xnew, double[:, :] xold, double[:, :] yold, int extrap,
+):
+    cdef int num = xnew.shape[0]
+    cdef int new_size = xnew.shape[1]
+    cdef int old_size = xold.shape[1]
+    cdef int last = old_size - 1
+
+    cdef int ii, nn, oo
+    cdef double newval
+
+    cdef np.ndarray[np.double_t, ndim=2] ynew = np.empty((num, new_size))
+    for ii in range(num):
+        oo = 0
+        for nn in range(new_size):
+            newval = xnew[ii, nn]
+            while (xold[ii, oo+1] < newval) and (oo < last-1):
+                oo += 1
+
+            if extrap == 1 or ((xold[ii, oo] < newval) and (newval < xold[ii, oo+1])):
+                ynew[ii, nn] = _interp_between_vals(newval, xold[ii, oo], xold[ii, oo+1], yold[ii, oo], yold[ii, oo+1])
+            else:
+                ynew[ii, nn] = NAN
+
+    return ynew
