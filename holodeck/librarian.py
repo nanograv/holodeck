@@ -198,9 +198,40 @@ class _Param_Space(abc.ABC):
         self._log.debug(f"params {samp_num} :: {params}")
         return self.model_for_params(params, self.sam_shape)
 
+    def model_for_normalized_params(self, vals, **kwargs):
+        """Construct a model from this space by specifying fractional parameter values [0.0, 1.0].
+
+        Arguments
+        ---------
+        vals : (P,) array_like  or  scalar
+            Specification for each of `P` parameters varied in the parameter-space.  Each `vals` gives the
+            location in uniform space between [0.0, 1.0] that will be converted to the parameter values
+            based on the mapping the corresponding _Param_Dist instances (stored in `space._dists`).
+            For example, if the 0th parameter uses a PD_Uniform_Log distribution, then a `vals` of 0.5
+            for that parameter will correspond to half-way in log-space of the range of parameter values.
+            If a scalar value is given, then it is used for each of the `P` parameters in the space.
+
+        Returns
+        -------
+        sam : `holodeck.sam.Semi_Analytic_Model` instance
+        hard : `holodeck.hardening._Hardening` instance
+
+        """
+        if np.ndim(vals) == 0:
+            vals = self.npars * [vals]
+        assert len(vals) == self.npars
+
+        params = {}
+        for ii, pname in enumerate(self.param_names):
+            vv = vals[ii]    # desired fractional parameter value [0.0, 1.0]
+            ss = self._dists[ii](vv)    # convert to actual parameter values
+            params[pname] = ss           # store to dictionary
+
+        return self.model_for_params(params, **kwargs)
+
     @classmethod
     @abc.abstractmethod
-    def model_for_params(cls, params):
+    def model_for_params(cls, params, **kwargs):
         raise
 
 
