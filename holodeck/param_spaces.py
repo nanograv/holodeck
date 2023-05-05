@@ -4,9 +4,8 @@
 import holodeck as holo
 from holodeck.constants import PC, GYR
 from holodeck.librarian import (
-    _Param_Space,
-    PD_Normal, PD_Uniform,
-    # _Parameter_Space, _LHS_Parameter_Space,
+    _Param_Space, PD_Uniform, PD_Piecewise_Uniform_Density,
+    # PD_Normal,
     # PD_Uniform_Log,
 )
 
@@ -1100,4 +1099,40 @@ class PS_Uniform_06(PS_Generic):
             gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
             mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
             mmb_scatter_dex=PD_Uniform(+0.0, +1.2),
+        )
+
+
+class PS_Uniform_06B(PS_Generic):
+    """NON-Uniform spacing in `hard_time`
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            # hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            hard_time=PD_Piecewise_Uniform_Density([0.1, 1.0, 2.0, 9.0, 11.0], [2.5, 1.5, 1.0, 1.5]),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +1.2),
+        )
+
+
+class PS_Uniform_06C(PS_Generic):
+    """NON-Uniform spacing in all parameters.
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            # hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            hard_time=PD_Piecewise_Uniform_Density([0.1, 1.0, 2.0, 9.0, 11.0], [2.5, 1.5, 1.0, 1.5]),   # [Gyr]
+            # gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_phi0=PD_Piecewise_Uniform_Density([-3.5, -3.0, -2.0, -1.5], [2.0, 1.0, 2.0]),
+            # gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            gsmf_mchar0_log10=PD_Piecewise_Uniform_Density([10.5, 11.0, 12.0, 12.5], [2.0, 1.0, 2.0]),   # [log10(Msol)]
+            # mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Piecewise_Uniform_Density([7.5, 8.0, 9.0, 9.5], [1.5, 1.0, 2.0]),   # [log10(Msol)]
+            # mmb_scatter_dex=PD_Uniform(+0.0, +1.2),
+            mmb_scatter_dex=PD_Piecewise_Uniform_Density([0.0, 0.2, 1.0, 1.2], [1.5, 1.0, 2.0]),
         )
