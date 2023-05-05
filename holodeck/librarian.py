@@ -7,6 +7,7 @@ from datetime import datetime
 import psutil
 import resource
 import os
+import sys
 
 import h5py
 import numpy as np
@@ -23,7 +24,7 @@ from holodeck import log, utils
 from holodeck.constants import YR
 
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 FITS_NBINS_PLAW = [2, 3, 4, 5, 8, 9, 14]
 FITS_NBINS_TURN = [4, 9, 14, 30]
@@ -442,7 +443,14 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
     # ---- Store results from all files
 
     gwb = np.zeros((nsamp, nfreqs, nreals))
-    gwb, fit_data = _load_library_from_all_files(path_sims, gwb, fit_data, log)
+    gwb, fit_data, bad_files = _load_library_from_all_files(path_sims, gwb, fit_data, log)
+    log.info(f"Loaded data from all library files | {utils.stats(gwb)=}")
+
+    param_samples[bad_files] = 0.0
+    if fit_data is None:
+        msg = "`fit_data` is None, fits have failed.  Attempting to combine data anyway."
+        log.error(msg)
+        fit_data = {}
 
     # ---- Save to concatenated output file ----
 
@@ -522,8 +530,12 @@ def _check_files_and_load_shapes(path_sims, nsamp):
                 shape = (nsamp,) + vv.shape
                 fit_data[kk] = np.zeros(shape)
 
-    for kk, vv in fit_data.items():
-        log.debug(f"\t{kk:>20s}: {vv.shape}")
+    if fit_data is not None:
+        for kk, vv in fit_data.items():
+            log.debug(f"\t{kk:>20s}: {vv.shape}")
+    else:
+        log.warning("Unable to load `fit_data` from any files!")
+        fit_data = {}
 
     return fobs, nreals, fit_data
 
@@ -547,7 +559,7 @@ def _load_library_from_all_files(path_sims, gwb, fit_data, log):
 
     nsamp = gwb.shape[0]
     log.info(f"Collecting data from {nsamp} files")
-    good_file = np.ones(nsamp, dtype=bool)     #: track which files contain useable data
+    bad_files = np.zeros(nsamp, dtype=bool)     #: track which files contain UN-useable data
     num_fits_failed = 0
     msg = None
     for pnum in tqdm.trange(nsamp):
@@ -562,7 +574,7 @@ def _load_library_from_all_files(path_sims, gwb, fit_data, log):
             for fk in fit_data.keys():
                 fit_data[fk][pnum, ...] = np.nan
 
-            good_file[pnum] = False
+            bad_files[pnum] = True
             continue
 
         # store the GWB from this file
@@ -588,14 +600,12 @@ def _load_library_from_all_files(path_sims, gwb, fit_data, log):
         log.warning(f"Missing fit keys in {num_fits_failed}/{nsamp} = {num_fits_failed/nsamp:.2e} files!")
         log.warning(msg)
 
-    log.info(f"{utils.frac_str(~good_file)} files are failures")
+    log.info(f"{utils.frac_str(bad_files)} files are failures")
 
-    return gwb, fit_data
-
+    return gwb, fit_data, bad_files
 
 def ss_lib_combine(path_output, log, get_pars, path_sims=None, path_pspace=None):
     """
-
     Arguments
     ---------
     path_output : str or Path,
@@ -610,12 +620,10 @@ def ss_lib_combine(path_output, log, get_pars, path_sims=None, path_pspace=None)
     path_pspace : str or None,
         Path to file containing _Param_Space subclass instance.
         If `None` then `path_output` is searched for a `_Param_Space` save file.
-
     Returns
     -------
     out_filename : Path,
         Path to library output filename (typically ending with 'sam_lib.hdf5').
-
     """
 
     # ---- setup paths
@@ -694,7 +702,6 @@ def ss_lib_combine(path_output, log, get_pars, path_sims=None, path_pspace=None)
 
 def _check_ss_files_and_load_shapes(path_sims, nsamp):
     """Check that all `nsamp` files exist in the given path, and load info about array shapes.
-
     Arguments
     ---------
     path_sims : str
@@ -702,7 +709,6 @@ def _check_ss_files_and_load_shapes(path_sims, nsamp):
     nsamp : int
         Number of simulations/files that should be found.
         This should typically be loaded from the parameter-space object used to generate the library.
-
     Returns
     -------
     fobs : (F,) ndarray
@@ -715,7 +721,6 @@ def _check_ss_files_and_load_shapes(path_sims, nsamp):
         Dictionary where each key is a fit-parameter in all of the output files.  The values are
         'ndarray's of the appropriate shapes to store fit-parameters from all files.
         The 0th dimension is always for the number-of-files.
-
     """
 
     fobs = None
@@ -766,7 +771,6 @@ def _check_ss_files_and_load_shapes(path_sims, nsamp):
 
 def _load_ss_library_from_all_files(path_sims, hc_ss, hc_bg, fit_data, log, sspar=None, bgpar=None):
     """Load data from all individual simulation files.
-
     Arguments
     ---------
     path_sims : str
@@ -785,7 +789,6 @@ def _load_ss_library_from_all_files(path_sims, hc_ss, hc_bg, fit_data, log, sspa
         Array in which to store 'sspar' data from all of 'S' files.
     bgpar : (S, 3, F, R) NDarray or None
         Array in which to store 'bgpar' data from all of 'S' files.
-
     """
 
     nsamp = hc_ss.shape[0]
@@ -863,107 +866,69 @@ def _load_ss_library_from_all_files(path_sims, hc_ss, hc_bg, fit_data, log, sspa
     return hc_ss, hc_bg, fit_data, sspar, bgpar
 
 
-
-def fit_spectra_plaw_hc(freqs, gwb, nbins):
-    nfreq, nreals = np.shape(gwb)
+def _fit_spectra(freqs, psd, nbins, nfit_pars, fit_func, min_nfreq_valid):
+    nfreq, nreals = np.shape(psd)
     assert len(freqs) == nfreq
 
     def fit_if_all_finite(xx, yy):
         if np.any(~np.isfinite(yy)):
-            pars = np.nan, np.nan
+            pars = [np.nan] * nfit_pars
         else:
-            pars = utils.fit_powerlaw(xx, yy)
+            sel = (yy > 0.0)
+            if np.count_nonzero(sel) < min_nfreq_valid:
+                pars = [np.nan] * nfit_pars
+            else:
+                pars = fit_func(xx[sel], yy[sel])
         return pars
 
     nfreq_bins = len(nbins)
-    fit_pars = np.zeros((nfreq_bins, nreals, 2))
-    fit_med_pars = np.zeros((nfreq_bins, 2))
+    fit_pars = np.zeros((nfreq_bins, nreals, nfit_pars))
+    fit_med_pars = np.zeros((nfreq_bins, nfit_pars))
     for ii, num in enumerate(nbins):
         if num > nfreq:
             raise ValueError(f"Cannot fit for {num=} bins, data has {nfreq=} frequencies!")
 
         num = None if (num == 0) else num
         cut = slice(None, num)
-        xx = freqs[cut]*YR
+        xx = freqs[cut]
 
         # fit the median spectra
-        yy = np.median(gwb, axis=-1)[cut]
+        yy = np.median(psd, axis=-1)[cut]
         fit_med_pars[ii] = fit_if_all_finite(xx, yy)
 
         # fit each realization of the spectra
         for rr in range(nreals):
-            yy = gwb[cut, rr]
+            yy = psd[cut, rr]
             fit_pars[ii, rr, :] = fit_if_all_finite(xx, yy)
 
     return nbins, fit_pars, fit_med_pars
 
 
 def fit_spectra_plaw(freqs, psd, nbins):
-    nfreq, nreals = np.shape(psd)
-    assert len(freqs) == nfreq
-
-    def fit_if_all_finite(xx, yy):
-        if np.any(~np.isfinite(yy)):
-            pars = np.nan, np.nan
-        else:
-            pars = utils.fit_powerlaw_psd(xx, yy, 1/YR)
-        return pars
-
-    nfreq_bins = len(nbins)
-    fit_pars = np.zeros((nfreq_bins, nreals, 2))
-    fit_med_pars = np.zeros((nfreq_bins, 2))
-    for ii, num in enumerate(nbins):
-        if num > nfreq:
-            raise ValueError(f"Cannot fit for {num=} bins, data has {nfreq=} frequencies!")
-
-        num = None if (num == 0) else num
-        cut = slice(None, num)
-        xx = freqs[cut]
-
-        # fit the median spectra
-        yy = np.median(psd, axis=-1)[cut]
-        fit_med_pars[ii] = fit_if_all_finite(xx, yy)
-
-        # fit each realization of the spectra
-        for rr in range(nreals):
-            yy = psd[cut, rr]
-            fit_pars[ii, rr, :] = fit_if_all_finite(xx, yy)
-
-    return nbins, fit_pars, fit_med_pars
+    fit_func = lambda xx, yy: utils.fit_powerlaw_psd(xx, yy, 1/YR)
+    nfit_pars = 2
+    # min_nfreq_valid = 2
+    min_nfreq_valid = nfit_pars
+    return _fit_spectra(freqs, psd, nbins, nfit_pars, fit_func, min_nfreq_valid)
 
 
 def fit_spectra_turn(freqs, psd, nbins):
-    nfreq, nreals = np.shape(psd)
-    assert len(freqs) == nfreq
-
-    def fit_if_all_finite(xx, yy):
-        if np.any(~np.isfinite(yy)):
-            pars = np.nan, np.nan
-        else:
-            pars = utils.fit_turnover_psd(xx, yy, 1/YR)
-        return pars
-
-    nfreq_bins = len(nbins)
-    fit_pars = np.zeros((nfreq_bins, nreals, 4))
-    fit_med_pars = np.zeros((nfreq_bins, 4))
-    for ii, num in enumerate(nbins):
-        if num > nfreq:
-            raise ValueError(f"Cannot fit for {num=} bins, data has {nfreq=} frequencies!")
+    fit_func = lambda xx, yy: utils.fit_turnover_psd(xx, yy, 1/YR)
+    nfit_pars = 4
+    # min_nfreq_valid = 3
+    min_nfreq_valid = nfit_pars
+    return _fit_spectra(freqs, psd, nbins, nfit_pars, fit_func, min_nfreq_valid)
 
         num = None if (num == 0) else num
         cut = slice(None, num)
         xx = freqs[cut]
 
-        # fit the median spectra
-        yy = np.median(psd, axis=-1)[cut]
-        fit_med_pars[ii, :] = fit_if_all_finite(xx, yy)
-
-        # fit each realization of the spectra
-        for rr in range(nreals):
-            yy = psd[cut, rr]
-            fit_pars[ii, rr, :] = fit_if_all_finite(xx, yy)
-
-    return nbins, fit_pars, fit_med_pars
+def fit_spectra_plaw_hc(freqs, gwb, nbins):
+    fit_func = lambda xx, yy: utils.fit_powerlaw(xx, yy)
+    nfit_pars = 2
+    # min_nfreq_valid = 2
+    min_nfreq_valid = nfit_pars
+    return _fit_spectra(freqs, gwb, nbins, nfit_pars, fit_func, min_nfreq_valid)
 
 
 def make_gwb_plot(fobs, gwb, fit_data):
@@ -1011,47 +976,6 @@ def make_gwb_plot(fobs, gwb, fit_data):
 
     return fig
 
-# def get_hc_bg_fits_data(fobs_cents, gwb):
-#     # these values must match label construction!
-#     nbins = [5, 10, 15, 0]
-#     nbins, fit_pars, fit_med_pars  = fit_spectra_plaw_hc(fobs_cents, gwb, nbins=nbins)
-#     # nbins, lamp, plaw, med_lamp, med_plaw
-
-#     label = (
-#         f"log10(A10)={med_lamp[1]:.2f}, G10={med_plaw[1]:.4f}"
-#         " | "
-#         f"log10(A)={med_lamp[-1]:.2f}, G={med_plaw[-1]:.4f}"
-#     )
-
-#     fits_data = dict(
-#         fit_nbins=nbins, fit_lamp=lamp, fit_plaw=plaw, fit_med_lamp=med_lamp, fit_med_plaw=med_plaw, fit_label=label
-#     )
-#     return fits_data
-
-# def make_ss_plot(fobs, hc_ss, hc_bg, fits_data):
-#     fig = holo.plot.plot_gwb(fobs, gwb=hc_bg, hc_ss=hc_ss)
-#     ax = fig.axes[0]
-
-#     if len(fits_data):
-#         xx = fobs * YR
-#         yy = 1e-15 * np.power(xx, -2.0/3.0)
-#         ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
-
-#         fits = get_hc_bg_fits_data(fobs, hc_bg)
-
-#         for ls, idx in zip([":", "--"], [1, -1]):
-#             med_lamp = fits['fit_med_lamp'][idx]
-#             med_plaw = fits['fit_med_plaw'][idx]
-#             yy = (10.0 ** med_lamp) * (xx ** med_plaw)
-#             label = fits['fit_nbins'][idx]
-#             label = 'all' if label in [0, None] else label
-#             ax.plot(xx, yy, color='k', ls=ls, alpha=0.5, lw=2.0, label=str(label) + " bins")
-
-#         label = fits['fit_label'].replace(" | ", "\n")
-#         fig.text(0.99, 0.99, label, fontsize=6, ha='right', va='top')
-
-#     return fig
-
 def make_ss_plot(fobs, hc_ss, hc_bg, fit_data):
     # fig = holo.plot.plot_gwb(fobs, gwb)
     psd_bg = utils.char_strain_to_psd(fobs[:, np.newaxis], hc_bg)
@@ -1098,31 +1022,6 @@ def make_ss_plot(fobs, hc_ss, hc_bg, fit_data):
 
     return fig
 
-# def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar, fits_data):
-#     fig = holo.plot.plot_pars(fobs, hc_ss, hc_bg, sspar, bgpar)
-#     # add plaw and fits to hc plot
-#     ax = fig.axes[3]
-#     if len(fits_data):
-#         xx = fobs * YR
-#         yy = 1e-15 * np.power(xx, -2.0/3.0)
-#         ax.plot(xx, yy, 'r-', alpha=0.5, lw=1.0, label="$10^{-15} \cdot f_\\mathrm{yr}^{-2/3}$")
-
-#         fits = get_hc_bg_fits_data(fobs, hc_bg)
-
-#         for ls, idx in zip([":", "--"], [1, -1]):
-#             med_lamp = fits['fit_med_lamp'][idx]
-#             med_plaw = fits['fit_med_plaw'][idx]
-#             yy = (10.0 ** med_lamp) * (xx ** med_plaw)
-#             label = fits['fit_nbins'][idx]
-#             label = 'all' if label in [0, None] else label
-#             ax.plot(xx, yy, color='k', ls=ls, alpha=0.5, lw=2.0, label=str(label) + " bins")
-
-#         label = fits['fit_label'].replace(" | ", "\n")
-#         fig.text(0.93, 0.93, label, fontsize=6, ha='right', va='top')
-#         # fig.tight_layout()
-
-#     return fig
-
 def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar):
     # fig = holo.plot.plot_gwb(fobs, gwb)
     fig = holo.plot.plot_pars(fobs, hc_ss, hc_bg, sspar, bgpar)
@@ -1135,6 +1034,7 @@ def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar):
     ax.legend(fontsize=6, loc='upper right')
 
     return fig
+
 
 def run_sam_at_pspace_num(args, space, pnum):
     """Run the SAM simulation for sample-parameter `pnum` in the `space` parameter-space.
@@ -1217,8 +1117,12 @@ def run_sam_at_pspace_num(args, space, pnum):
                 fit_turn_nbins=turn_nbins, fit_turn=fit_turn, fit_turn_med=fit_turn_med,
             )
         except Exception as err:
-            log.exception("Failed to load gwb fits data!")
-            log.exception(err)
+            log.error("Failed to load gwb fits data!")
+            log.error(err)
+            if "Number of calls to function has reached maxfev" in str(err):
+                log.exception("fit did not converge.")
+            else:
+                log.exception(err)
 
     # ---- Save data to file
 
@@ -1246,7 +1150,6 @@ def run_sam_at_pspace_num(args, space, pnum):
 def run_ss_at_pspace_num(args, space, pnum):
     """Run single source and background strain calculations for the SAM simulation 
     for sample-parameter `pnum` in the `space` parameter-space.
-
     Arguments
     ---------
     args : `argparse.ArgumentParser` instance
@@ -1256,12 +1159,10 @@ def run_ss_at_pspace_num(args, space, pnum):
         Parameter space from which to load `sam` and `hard` instances.
     pnum : int
         Which parameter-sample from `space` should be run.
-
     Returns
     -------
     rv : bool
         True if this simulation was successfully run.
-
     """
 
     log = args.log
@@ -1400,137 +1301,27 @@ def _sim_fname(path, pnum):
     temp = path.joinpath(temp)
     return temp
 
-def _ss_fname(path, pnum):
-    temp = FNAME_SS_FILE.format(pnum=pnum)
-    temp = path.joinpath(temp)
-    return temp
 
 def _log_mem_usage(log):
     # results.ru_maxrss is KB on Linux, B on macos
-    mem_max = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 2)
+    mem_max = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    if sys.platform.lower().startswith('darwin'):
+        mem_max = (mem_max / 1024 ** 3)
+    else:
+        mem_max = (mem_max / 1024 ** 2)
+
     process = psutil.Process(os.getpid())
     mem_rss = process.memory_info().rss / 1024**3
     mem_vms = process.memory_info().vms / 1024**3
-    log.info(f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB")
+
+    msg = f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB"
+    if log is None:
+        print(msg, flush=True)
+    else:
+        log.info(msg)
+
     return
 
-# def run_ss_at_pspace_num(args, space, pnum, path_output):
-#     log = args.log
-#     fname = f"lib_ss__p{pnum:06d}.npz"
-#     fname = Path(path_output, fname)
-#     beg = datetime.now()
-#     log.info(f"{pnum=} :: {fname=} beginning at {beg}")
-#     if fname.exists():
-#         log.warning(f"File {fname} already exists.")
-
-#     def log_mem():
-#         # results.ru_maxrss is KB on Linux, B on macos
-#         mem_max = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 2)
-#         process = psutil.Process(os.getpid())
-#         mem_rss = process.memory_info().rss / 1024**3
-#         mem_vms = process.memory_info().vms / 1024**3
-#         log.info(f"Current memory usage: max={mem_max:.2f} GB, RSS={mem_rss:.2f} GB, VMS={mem_vms:.2f} GB")
-
-#     pta_dur = args.pta_dur * YR
-#     nfreqs = args.nfreqs
-#     hifr = nfreqs/pta_dur
-#     pta_cad = 1.0 / (2 * hifr)
-#     fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
-#     fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
-#     log.info(f"Created {fobs_cents.size} frequency bins")
-#     log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
-#     log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
-#     log_mem()
-#     assert nfreqs == fobs_cents.size
-#     get_pars = bool(args.get_pars)
-
-#     try:
-#         log.debug("Selecting `sam` and `hard` instances")
-#         sam, hard = space(pnum)
-#         log_mem()
-
-#         ### HERE IS WHERE THINGS CHANGE FOR SS ###
-#         log.debug(f"Calculating SS and BG GWs for shape ({fobs_cents.size}, {args.nreals})")
-#         fobs_orb_edges = fobs_edges / 2.0 
-#         fobs_orb_cents = fobs_cents/ 2.0
-#         # edges
-#         edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents) # should the zero stalled option be part of the parameter space?
-#         edges[-1] = fobs_orb_edges
-#         # integrate for number
-#         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
-#         number = number * np.diff(np.log(fobs_edges))  
-#         # gws
-#         if(get_pars):
-#             hc_ss, hc_bg, sspar, bgpar = ss.ss_gws(edges, number, realize=args.nreals, 
-#                                                loudest = args.nloudest, params = True) 
-#         else:
-#             hc_ss, hc_bg = ss.ss_gws(edges, number, realize=args.nreals, 
-#                                                loudest = args.nloudest, params = False) 
-            
-#         log_mem()
-#         log.debug(f"{holo.utils.stats(hc_ss)=}")
-#         legend = space.param_dict(pnum)
-#         log.debug(f"Saving {pnum} to file")
-#         if(get_pars):
-#             data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
-#                     hc_ss = hc_ss, hc_bg = hc_bg, sspar = sspar, bgpar = bgpar)
-#         else:
-#             data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
-#                     hc_ss = hc_ss, hc_bg = hc_bg)
-#         ### EDITED UP TO HERE ###
-
-#         rv = True
-#     except Exception as err:
-#         log.exception("\n\n")
-#         log.exception("="*100)
-#         log.exception(f"`run_ss` FAILED on {pnum=}\n")
-#         log.exception(err)
-#         log.exception("="*100)
-#         log.exception("\n\n")
-#         rv = False
-#         legend = {}
-#         data = dict(fail=str(err))
-
-#     if rv:
-#         try:
-#             fits_data = get_gwb_fits_data(fobs_cents, hc_bg)
-#         except Exception as err:
-#             log.exception("Failed to load hc_bg fits data!")
-#             log.exception(err)
-#             fits_data = {}
-
-#     else:
-#         fits_data = {}
-
-#     meta_data = dict(
-#         pnum=pnum, pdim=space.ndims, nsamples=args.nsamples, librarian_version=__version__,
-#         param_names=space.names, params=space._params, samples=space._samples, # prob don't need these for all of them
-#     )
-
-#     np.savez(fname, **data, **meta_data, **fits_data, **legend)
-#     log.info(f"Saved to {fname}, size {holo.utils.get_file_size(fname)} after {(datetime.now()-beg)}")
-
-#     if rv:
-#         try:
-#             hname = str(fname.with_suffix('')) + "_strain.png"
-#             fig = make_ss_plot(fobs_cents, hc_ss, hc_bg, fits_data)
-#             fig.savefig(hname, dpi=300)
-#             log.info(f"Saved to {hname}, size {holo.utils.get_file_size(hname)}")
-#             plt.close('all')
-#         except Exception as err:
-#             log.exception("Failed to make strain plots!")
-#             log.exception(err)
-#         if(get_pars):
-#             try:
-#                 pname = str(fname.with_suffix('')) + "_pars.png"
-#                 fig = make_pars_plot(fobs_cents, hc_ss, hc_bg, sspar, bgpar, fits_data)
-#                 fig.savefig(pname, dpi=300)
-#                 log.info(f"Saved to {pname}, size {holo.utils.get_file_size(pname)}")
-#             except Exception as err:
-#                 log.exception("Failed to make pars plots!")
-#                 log.exception(err)
-            
-#     return rv
 
 def main():
 
@@ -1540,7 +1331,10 @@ def main():
     subparsers = parser.add_subparsers(dest="subcommand")
 
     combine = subparsers.add_parser('combine', help='combine output files')
-    combine.add_argument('path', default=None)
+    combine.add_argument(
+        'path', default=None,
+        help='library directory to run combination on; must contain the `sims` subdirectory'
+    )
     combine.add_argument('--debug', '-d', action='store_true', default=False)
 
     args = parser.parse_args()
@@ -1549,7 +1343,8 @@ def main():
     if args.subcommand == 'combine':
         sam_lib_combine(args.path, log, path_sims=Path(args.path).joinpath('sims'))
     else:
-        raise
+        parser.print_help()
+        sys.exit()
 
     return
 
