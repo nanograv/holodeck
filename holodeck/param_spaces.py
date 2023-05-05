@@ -1081,3 +1081,23 @@ class PS_Uniform_05F(_PS_Uniform_05):
             hard_gamma_outer=+2.5,
         )
         return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+
+
+# ==============================================================================
+# ====    Uniform 06    ====
+# ==============================================================================
+
+
+class PS_Uniform_06(PS_Generic):
+    """New version of PS_Broad_Uniform_04 after updating redshifts used in the GWB calculation.
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +1.2),
+        )
