@@ -203,6 +203,11 @@ class _Param_Space(abc.ABC):
 
 
 class _Param_Dist(abc.ABC):
+    """Parameter Distribution classes for use in Latin HyperCube sampling.
+
+    These classes are passed uniform random variables, and return the desired distributions of parameters.
+
+    """
 
     def __init__(self, clip=None):
         if clip is not None:
@@ -372,6 +377,46 @@ class PD_Log_Lin(_Param_Dist):
         # transform to lin-scaling between [crit, hi]
         yy[hiidx] = crit + (hi - crit) * (xx[hiidx] - lofrac) / (1.0 - lofrac)
         return yy
+
+
+class PD_Piecewise_Uniform_Mass(_Param_Dist):
+
+    def __init__(self, edges, weights, **kwargs):
+        super().__init__(**kwargs)
+        edges = np.asarray(edges)
+        self._edges = edges
+        weights = np.asarray(weights)
+        self._weights = weights / weights.sum()
+        assert edges.size == weights.size + 1
+        assert np.ndim(edges) == 1
+        assert np.ndim(weights) == 1
+        assert np.all(np.diff(edges) > 0.0)
+        assert np.all(weights > 0.0)
+        return
+
+    def _dist_func(self, xx):
+        yy = np.zeros_like(xx)
+        xlo = 0.0
+        for ii, ww in enumerate(self._weights):
+            ylo = self._edges[ii]
+            yhi = self._edges[ii+1]
+
+            xhi = xlo + ww
+            sel = (xlo < xx) & (xx <= xhi)
+            yy[sel] = ylo + (xx[sel] - xlo) * (yhi - ylo) / (xhi - xlo)
+
+            xlo = xhi
+
+        return yy
+
+
+class PD_Piecewise_Uniform_Density(PD_Piecewise_Uniform_Mass):
+
+    def __init__(self, edges, densities, **kwargs):
+        dx = np.diff(edges)
+        weights = dx * np.asarray(densities)
+        super().__init__(edges, weights)
+        return
 
 
 def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
