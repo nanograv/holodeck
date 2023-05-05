@@ -919,9 +919,6 @@ def fit_spectra_turn(freqs, psd, nbins):
     min_nfreq_valid = nfit_pars
     return _fit_spectra(freqs, psd, nbins, nfit_pars, fit_func, min_nfreq_valid)
 
-        num = None if (num == 0) else num
-        cut = slice(None, num)
-        xx = freqs[cut]
 
 def fit_spectra_plaw_hc(freqs, gwb, nbins):
     fit_func = lambda xx, yy: utils.fit_powerlaw(xx, yy)
@@ -1257,6 +1254,10 @@ def run_ss_at_pspace_num(args, space, pnum):
         except Exception as err:
             log.exception("Failed to load hc_bg fits data!")
             log.exception(err)
+            if "Number of calls to function has reached maxfev" in str(err):
+                log.exception("fit did not converge.")
+            else:
+                log.exception(err)
 
     # ---- Save data to file
 
@@ -1301,6 +1302,10 @@ def _sim_fname(path, pnum):
     temp = path.joinpath(temp)
     return temp
 
+def _ss_fname(path, pnum):
+    temp = FNAME_SS_FILE.format(pnum=pnum)
+    temp = path.joinpath(temp)
+    return temp
 
 def _log_mem_usage(log):
     # results.ru_maxrss is KB on Linux, B on macos
