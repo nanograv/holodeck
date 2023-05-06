@@ -1079,7 +1079,7 @@ def _integrand_gamma_ss_i(Fe, rho):
     rv = (2*Fe)**(1/2) /rho * I_1 * np.exp(-Fe - rho**2 /2)
     return rv
 
-def _gamma_ssi(Fe_bar, rho):
+def _gamma_ssi(Fe_bar, rho, warn = False):
     """ Calculate the detection probability for each single source in each realization.
     
     Parameters
@@ -1088,6 +1088,8 @@ def _gamma_ssi(Fe_bar, rho):
         Given by the total PTA signal to noise ratio, S/N_S, for each single source
     Fe_bar : scalar
         The threshold F_e statistic
+    warn : Bool
+        Whether or not to print warnings for nan values
 
     Returns
     -------
@@ -1102,41 +1104,12 @@ def _gamma_ssi(Fe_bar, rho):
             for ll in range(len(rho[0,0])):
                 gamma_ssi[ff,rr,ll] = integrate.quad(_integrand_gamma_ss_i, Fe_bar, np.inf, args=(rho[ff,rr,ll]))[0]
                 if(np.isnan(gamma_ssi[ff,rr,ll])):
-                    print(f'gamma_ssi[{ff},{rr},{ll}] is nan, setting to 0.')
+                    if warn: print(f'gamma_ssi[{ff},{rr},{ll}] is nan, setting to 0.')
                     gamma_ssi[ff,rr,ll] = 0
    
 
     return gamma_ssi
 
-
-def _gamma_ssi(Fe_bar, rho):
-    """ Calculate the detection probability for each single source in each realization.
-    
-    Parameters
-    ----------
-    rho : (F,R,L) NDarray
-        Given by the total PTA signal to noise ratio, S/N_S, for each single source
-    Fe_bar : scalar
-        The threshold F_e statistic
-
-    Returns
-    -------
-    gamma_ssi : (F,R,L) NDarray
-        The detection probability for each single source, i, at each frequency and realization.
-
-    TODO: Find a way to do this without the embedded for loops!
-    """
-    gamma_ssi = np.zeros((rho.shape))
-    for ff in range(len(rho)):
-        for rr in range(len(rho[0])):
-            for ll in range(len(rho[0,0])):
-                gamma_ssi[ff,rr,ll] = integrate.quad(_integrand_gamma_ss_i, Fe_bar, np.inf, args=(rho[ff,rr,ll]))[0]
-                if(np.isnan(gamma_ssi[ff,rr,ll])):
-                    print(f'gamma_ssi[{ff},{rr},{ll}] is nan, setting to 0.')
-                    gamma_ssi[ff,rr,ll] = 0
-   
-
-    return gamma_ssi
 
 def _ss_detection_probability(gamma_ss_i):
     """ Calculate the probability of detecting any single source, given individual single 
@@ -1163,7 +1136,7 @@ def _ss_detection_probability(gamma_ss_i):
 def detect_ss(thetas, phis, sigmas, cad, dur, 
               fobs, dfobs, hc_ss, hc_bg, alpha_0=0.001, ret_SNR=False,
               theta_ss=None, phi_ss=None, iota_ss=None, psi_ss=None, Phi0_ss=None,
-              Amp_red=None, gamma_red=None):
+              Amp_red=None, gamma_red=None, warn=False):
     """ Calculate the single source detection probability, and all intermediary steps.
     
     Parameters
@@ -1212,6 +1185,8 @@ def detect_ss(thetas, phis, sigmas, cad, dur,
         Amplitude of pulsar red noise.
     gamma_red : scalar or None
         Power law index of pulsar red noise.
+    warn : Bool
+        Whether or not to print warnings for nan values
 
     Returns
     -------
@@ -1256,7 +1231,7 @@ def detect_ss(thetas, phis, sigmas, cad, dur,
     Num = hc_ss[:,0,:].size
     Fe_bar = _Fe_thresh(Num, alpha_0=alpha_0) # scalar
 
-    gamma_ssi = _gamma_ssi(Fe_bar, rho=SNR_ss) # (F,R,L)
+    gamma_ssi = _gamma_ssi(Fe_bar, rho=SNR_ss, warn=warn) # (F,R,L)
     gamma_ss = _ss_detection_probability(gamma_ssi) # (R,)
 
     if ret_SNR:
@@ -1554,8 +1529,7 @@ def detect_ss_scDeter_full(pulsars, scDeter, fobs, dfobs, hc_ss, alpha_0=0.001, 
     else:
         return gamma_ss
 
-def snr_scDeter(scDeter, fobs, dfobs, hc_ss, iota_ss=None, psi_ss=None, 
-              debug=False):
+def snr_scDeter(scDeter, fobs, dfobs, hc_ss, debug=False):
     """ Calculate the single source detection probability, and all intermediary steps.
     
     Parameters
@@ -1569,13 +1543,6 @@ def snr_scDeter(scDeter, fobs, dfobs, hc_ss, iota_ss=None, psi_ss=None,
     hc_ss : (F,R,L) NDarray of scalars
         Characteristic strain of the L loudest single sources at 
         each frequency, for R realizations.
-    iota_ss : (F,R,L) NDarray or None
-        Inclination of each single source with respect to the line of sight.
-        If None, random values between 0 and pi will be assigned.
-    psi_ss : (F,R,L) NDarray or None
-        ???
-        If None, assigned same random values as iota_ss, because I think these
-        might both be referring to the same thing.
 
     Returns
     -------
@@ -1589,28 +1556,8 @@ def snr_scDeter(scDeter, fobs, dfobs, hc_ss, iota_ss=None, psi_ss=None,
     rho_h_ss = np.zeros(hc_ss.shape) # (F,R,L)
     for rr in range(len(hc_ss[0])):
         for ll in range(len(hc_ss[0,0])):
-            if debug: print('hc_ss[:,rr,ll]', hc_ss[:,rr,ll].shape) #, hc_ss[:,rr,ll])
-            if(iota_ss is not None): 
-                assert (psi_ss is None), "Only one of 'iota_ss' or 'psi_ss' should be provided."    
-                iota=iota_ss[:,rr,ll] 
-            else: 
-                iota = None
-            if(psi_ss is not None): 
-                psi = psi_ss[:,rr,ll] # otherwise 
-            else: 
-                psi = None
-            rho = scDeter.SNR(hs[:,rr,ll], iota=iota, psi=psi) # calcutes SNR for every phi theta combo
-            rho = np.diagonal(rho) # SNR only for the corresponding phis and thetas
-            try:
-                rho_h_ss[:,rr,ll]  = rho
-                if (rr==0) and (ll==0):
-                    if debug: print('rho', rho.shape) #, rho)
-            except Exception:
-                if debug: print('rho', rho.shape) #, rho)
-                if debug: print("'rho_h_ss[:,rr,ll]  = rho' failed")
-                raise
-                # return rho_h_ss
-    
+            rho_h_ss[:,rr,ll]  = scDeter.SNR(hs[:,rr,ll]) # calcutes SNR
+               
     return rho_h_ss
 
 
@@ -1711,6 +1658,7 @@ def snr_skymap(skymap, fobs, dfobs, hc_ss, iota_ss=None, psi_ss=None,
                 psi = psi_ss[:,rr,ll] # otherwise 
             else: 
                 psi = None
+            if debug: print('iota =', iota, 'psi =', psi)
             rho = skymap.SNR(hs[:,rr,ll], iota=iota, psi=psi) # calcutes SNR for every phi theta combo
             rho = np.diagonal(rho) # SNR only for the corresponding phis and thetas
             try:
