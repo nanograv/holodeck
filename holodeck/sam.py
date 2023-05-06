@@ -389,7 +389,7 @@ class Semi_Analytic_Model:
     USE_REDZ_AFTER_HARD = True
 
     def __init__(
-        self, mtot=(1.0e4*MSOL, 1.0e11*MSOL, 61), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
+        self, mtot=(1.0e4*MSOL, 1.0e12*MSOL, 111), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
         shape=None,
         gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013,
         **kwargs
@@ -575,6 +575,7 @@ class Semi_Analytic_Model:
             # Convert to shape (M, Q, Z)
             mstar_pri, mstar_rat, mstar_tot, redz = np.broadcast_arrays(*args)
 
+            # choose whether the primary mass, or total mass, is used in different calculations
             mass_gsmf = mstar_tot if GSMF_USES_MTOT else mstar_pri
             mass_gpf = mstar_tot if GPF_USES_MTOT else mstar_pri
             mass_gmt = mstar_tot if GMT_USES_MTOT else mstar_pri
@@ -603,7 +604,6 @@ class Semi_Analytic_Model:
             # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]
             dens = self._gsmf(mass_gsmf, redz) * self._gpf(mass_gpf, mstar_rat, redz) * cosmo.dtdz(redz)
             # `gmt` returns [sec]
-            # dens /= self._gmt(mass_gmt, mstar_rat, redz)
             dens /= gmt_time
             # now `dens` is  ``dn_gal / [dlog10(Mstar) dq_gal dz]``  with units of [Mpc^-3]
 
@@ -625,7 +625,9 @@ class Semi_Analytic_Model:
 
             # ---- Convert to MBH Binary density
 
+            # we want ``dn_mbhb / [dlog10(M_bh) dq_bh qz]``
             # so far we have ``dn_gal / [dlog10(M_gal) dq_gal dz]``
+
             # dn / [dM dq dz] = (dn_gal / [dM_gal dq_gal dz]) * (dM_gal/dM_bh) * (dq_gal / dq_bh)
             mplaw = self._mmbulge._mplaw
             dqbh_dqgal = mplaw * np.power(mstar_rat, mplaw - 1.0)
@@ -637,7 +639,7 @@ class Semi_Analytic_Model:
             qterm = (1.0 + mstar_rat) / (1.0 + self.mrat[np.newaxis, :, np.newaxis])
             dmstar_dmbh = dmstar_dmbh_pri * qterm
 
-            dens *= self.mtot[:, np.newaxis, np.newaxis] * dmstar_dmbh / dqbh_dqgal / mstar_tot
+            dens *= (self.mtot[:, np.newaxis, np.newaxis] / mstar_tot) * (dmstar_dmbh / dqbh_dqgal)
 
             if _DEBUG:
                 dens_check = self._ndens_mbh(mass_gsmf, mstar_rat, redz)
@@ -663,7 +665,9 @@ class Semi_Analytic_Model:
                 log.info(f"\tdens bef: ({utils.stats(dens)})")
                 dur = datetime.now()
                 mass_bef = self._integrated_binary_density(dens, sum=True)
+                self._dens_bef = np.copy(dens)
                 dens = add_scatter_to_masses(self.mtot, self.mrat, dens, scatter)
+                self._dens_aft = np.copy(dens)
 
                 mass_aft = self._integrated_binary_density(dens, sum=True)
                 dur = datetime.now() - dur
@@ -775,7 +779,7 @@ class Semi_Analytic_Model:
         log.info(f"{zero_coalesced=}, {zero_stalled=}")
 
         # shape: (M, Q, Z)
-        dens = self.static_binary_density   # d3n/[dz dlog10(M) dq]  units: [Mpc^-3]
+        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
 
         # (Z,) comoving-distance in [Mpc]
         dc = cosmo.comoving_distance(self.redz).to('Mpc').value
