@@ -149,7 +149,7 @@ def setup_basics():
         # get parameter-space class
         try:
             # `param_space` attribute must match the name of one of the classes in `holo.param_spaces`
-            space = getattr(holo.param_spaces, args.param_space)
+            space_class = getattr(holo.param_spaces, args.param_space)
         except Exception as err:
             log.exception(f"Failed to load '{args.param_space}' from holo.param_spaces!")
             log.exception(err)
@@ -158,16 +158,17 @@ def setup_basics():
         # instantiate the parameter space class
         if args.resume:
             # Look for existing pspace files
-            pattern = "*" + holo.librarian.PSPACE_FILE_SUFFIX
-            space_fname = list(args.output.glob(pattern))
-            if len(space_fname) != 1:
-                raise FileNotFoundError(f"found {len(space_fname)} matches to {pattern} in output {args.output}!")
+            # pattern = "*" + holo.librarian.PSPACE_FILE_SUFFIX
+            # space_fname = list(args.output.glob(pattern))
+            # if len(space_fname) != 1:
+            #     raise FileNotFoundError(f"found {len(space_fname)} matches to {pattern} in output {args.output}!")
 
-            space_fname = space_fname[0]
+            # space_fname = space_fname[0]
+            # space = space_class.from_save(space_fname, log)
+            space, space_fname = holo.librarian.load_pspace_from_dir(args.output, space)
             log.warning(f"resume={args.resume} :: Loaded param-space save from {space_fname}")
-            space = space.from_save(space_fname, log)
         else:
-            space = space(log, args.nsamples, args.sam_shape, args.seed)
+            space = space_class(log, args.nsamples, args.sam_shape, args.seed)
     else:
         space = None
 
@@ -226,9 +227,9 @@ def _setup_argparse(*args, **kwargs):
             raise FileNotFoundError(f"`--resume` is active but output path does not exist! '{output}'")
     elif output.exists():
         raise RuntimeError(f"Output {output} already exists!  Overwritting not currently supported!")
-    
+
     # ---- Create output directories as needed
-            
+
     output.mkdir(parents=True, exist_ok=True)
     my_print(f"output path: {output}")
     args.output = output
