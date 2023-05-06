@@ -83,7 +83,7 @@ def main():
 
     iterator = holo.utils.tqdm(indices) if (comm.rank == 0) else np.atleast_1d(indices)
 
-    if comm.rank == 0:
+    if (comm.rank == 0) and (not args.resume):
         space_fname = space.save(args.output)
         log.info(f"saved parameter space {space} to {space_fname}")
 
@@ -139,13 +139,14 @@ def setup_basics():
 
     if comm.rank == 0:
         # copy certain files to output directory
-        for fname in FILES_COPY_TO_OUTPUT:
-            src_file = Path(fname)
-            dst_file = args.output.joinpath("runtime_" + src_file.name)
-            shutil.copyfile(src_file, dst_file)
-            log.info(f"Copied {fname} to {dst_file}")
+        if not args.resume:
+            for fname in FILES_COPY_TO_OUTPUT:
+                src_file = Path(fname)
+                dst_file = args.output.joinpath("runtime_" + src_file.name)
+                shutil.copyfile(src_file, dst_file)
+                log.info(f"Copied {fname} to {dst_file}")
 
-        # setup parameter-space instance
+        # get parameter-space class
         try:
             # `param_space` attribute must match the name of one of the classes in `holo.param_spaces`
             space = getattr(holo.param_spaces, args.param_space)
@@ -155,7 +156,18 @@ def setup_basics():
             raise err
 
         # instantiate the parameter space class
-        space = space(log, args.nsamples, args.sam_shape, args.seed)
+        if args.resume:
+            # Look for existing pspace files
+            pattern = "*" + holo.librarian.PSPACE_FILE_SUFFIX
+            space_fname = list(args.output.glob(pattern))
+            if len(space_fname) != 1:
+                raise FileNotFoundError(f"found {len(space_fname)} matches to {pattern} in output {args.output}!")
+
+            space_fname = space_fname[0]
+            log.warning(f"resume={args.resume} :: Loaded param-space save from {space_fname}")
+            space = space.from_save(space_fname, log)
+        else:
+            space = space(log, args.nsamples, args.sam_shape, args.seed)
     else:
         space = None
 
@@ -191,8 +203,8 @@ def _setup_argparse(*args, **kwargs):
     parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
                         help='Shape of SAM grid', default=DEF_SAM_SHAPE)
 
-    parser.add_argument('--recreate', action='store_true', default=False,
-                        help='recreate existing simulation files')
+    parser.add_argument('--resume', action='store_true', default=False,
+                        help='resume production of a library by loading previous parameter-space from output directory')
     parser.add_argument('--plot', action='store_true', default=False,
                         help='produce plots for each simulation configuration')
     parser.add_argument('--seed', action='store', type=int, default=None,
@@ -209,6 +221,14 @@ def _setup_argparse(*args, **kwargs):
         output = Path('.').resolve() / output
         output = output.resolve()
 
+    if args.resume:
+        if not output.exists() or not output.is_dir():
+            raise FileNotFoundError(f"`--resume` is active but output path does not exist! '{output}'")
+    elif output.exists():
+        raise RuntimeError(f"Output {output} already exists!  Overwritting not currently supported!")
+    
+    # ---- Create output directories as needed
+            
     output.mkdir(parents=True, exist_ok=True)
     my_print(f"output path: {output}")
     args.output = output
