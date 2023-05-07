@@ -959,12 +959,12 @@ class Semi_Analytic_Model:
             # Find systems not reaching these frequencies before redshift zero
             stall = (redz_final < 0.0)
 
-            log.info(f"fraction of stalled binary-xvals: {utils.frac_str(stall)}")
+            log.info(f"fraction of stalled bins-xvals: {utils.frac_str(stall)}")
             stalled = np.any(stall, axis=-1)
-            log.info(f"fraction of binaries stalled at all xvals: {utils.frac_str(stalled)}")
+            log.info(f"fraction of bins stalled at all xvals: {utils.frac_str(stalled)}")
             stalled_frac = np.count_nonzero(stalled) / stalled.size
             if stalled_frac > 0.8:
-                log.info(f"A large fraction of binaries are stalled at all xvals!  {stalled_frac:.4e}")
+                log.info(f"A large fraction of bins are stalled at all xvals!  {stalled_frac:.4e}")
 
             dnum[stall] = 0.0
             # self._stall = stall
