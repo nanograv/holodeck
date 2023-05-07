@@ -1,29 +1,20 @@
-"""
+"""Binary evolution hardening submodules.
+
 To-Do
 -----
-
 *   Dynamical_Friction_NFW
-
     *   Allow stellar-density profiles to also be specified (instead of using a hard-coded
         Dehnen profile)
     *   Generalize calculation of stellar characteristic radius.  Make self-consistent with
         stellar-profile, and user-specifiable.
-
 *   Evolution
-
     *   `_sample_universe()` : sample in comoving-volume instead of redshift
-
 *   Sesana_Scattering
-
     *   Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
         and flexible.  Currently hard-coded to Dehnen profile estimate.
-
 *   _SHM06
-
     *   Interpolants of hardening parameters return 1D arrays.
-
 *   Fixed_Time
-
     *   Handle `rchar` better with respect to interpolation.  Currently not an interpolation
         variable, which restricts it's usage.
     *   This class should be separated into a generic `_Fixed_Time` class that can use any
@@ -31,7 +22,6 @@ To-Do
         normalization.  When they're combined, it will produce the same effect.  Another good
         functional form to implement would be GW + log-uniform hardening time, the same as the
         current phenomenological model but with both power-laws set to 0.
-
 
 References
 ----------
@@ -43,6 +33,7 @@ References
 * [Sesana2010]_ Sesana 2010.
 
 """
+
 from __future__ import annotations
 
 import abc
@@ -865,14 +856,14 @@ class Fixed_Time(_Hardening):
         dedt = None
         return dadt, dedt
 
-    # ====     Internal Functions    ====
-
     @classmethod
     def function(cls, norm, xx, g1, g2):
         """Hardening rate given the parameters for this hardening model.
 
         The functional form is,
+
         .. math::
+
             \\dot{a} = - A * (1.0 + x)^{-g_2 - 1} / x^{g_1 - 1},
 
         Where $A$ is an overall normalization, and x \\equiv a / r_\\mathrm{char}$ is the binary
@@ -894,8 +885,10 @@ class Fixed_Time(_Hardening):
             (large separations: r > rchar).
 
         """
-        dadt = - norm * np.power(1.0 + xx, -g2-1) / np.power(xx, g1-1)
+        dadt = - norm * np.power(1.0 + xx, -g2+g1) / np.power(xx, g1-1)
         return dadt
+
+    # ====     Internal Functions    ====
 
     @classmethod
     def _calculate_norm_interpolant(cls, rchar, gamma_sc, gamma_df):
