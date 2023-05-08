@@ -48,13 +48,9 @@ from holodeck import log as _log     #: import the default holodeck log just so 
 _log.setLevel(_log.WARNING)
 
 # Default argparse parameters
-DEF_SAM_SHAPE = (61, 81, 101)
 DEF_NUM_REALS = 100
 DEF_NUM_FBINS = 40
 DEF_PTA_DUR = 16.03     # [yrs]
-
-DEF_ECCEN_NUM_STEPS = 123
-DEF_ECCEN_NHARMS = 100
 
 MAX_FAILURES = 5
 
@@ -195,7 +191,7 @@ def _setup_argparse(*args, **kwargs):
     parser.add_argument('-f', '--nfreqs', action='store', dest='nfreqs', type=int,
                         help='Number of frequency bins', default=DEF_NUM_FBINS)
     parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
-                        help='Shape of SAM grid', default=DEF_SAM_SHAPE)
+                        help='Shape of SAM grid', default=None)
 
     parser.add_argument('--resume', action='store_true', default=False,
                         help='resume production of a library by loading previous parameter-space from output directory')
