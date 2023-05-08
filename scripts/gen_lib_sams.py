@@ -44,6 +44,7 @@ import holodeck.sam
 import holodeck.logger
 # from holodeck.constants import YR
 from holodeck import log as _log     #: import the default holodeck log just so that we can silence it
+from holodeck import utils
 # silence default holodeck log
 _log.setLevel(_log.WARNING)
 
@@ -220,7 +221,7 @@ def _setup_argparse(*args, **kwargs):
     # ---- Create output directories as needed
 
     output.mkdir(parents=True, exist_ok=True)
-    my_print(f"output path: {output}")
+    utils.my_print(f"output path: {output}")
     args.output = output
 
     output_sims = output.joinpath("sims")
@@ -256,10 +257,6 @@ def _setup_log(args):
     return log
 
 
-def my_print(*args, **kwargs):
-    return print(*args, flush=True, **kwargs)
-
-
 def mpiabort_excepthook(type, value, traceback):
     sys.__excepthook__(type, value, traceback)
     comm.Abort()
@@ -277,7 +274,7 @@ if __name__ == "__main__":
         this_fname = os.path.abspath(__file__)
         head = f"holodeck :: {this_fname} : {str(beg_time)} - rank: {comm.rank}/{comm.size}"
         head = "\n" + head + "\n" + "=" * len(head) + "\n"
-        my_print(head)
+        utils.my_print(head)
 
     main()
 
@@ -285,6 +282,6 @@ if __name__ == "__main__":
         end = datetime.now()
         dur = end - beg_time
         tail = f"Done at {str(end)} after {str(dur)} = {dur.total_seconds()}"
-        my_print("\n" + "=" * len(tail) + "\n" + tail + "\n")
+        utils.my_print("\n" + "=" * len(tail) + "\n" + tail + "\n")
 
     sys.exit(0)
