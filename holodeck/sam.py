@@ -1038,7 +1038,7 @@ class Semi_Analytic_Model:
 
         # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
-        #! NOTE: using frequency-bin _centers_ produces more accurate results than frequency-bin _edges_ !#
+        # ! NOTE: using frequency-bin _centers_ produces more accurate results than frequency-bin _edges_ !#
         vals = self.dynamic_binary_number(
             hard, fobs_orb=fobs_orb_cents,
             zero_coalesced=zero_coalesced, zero_stalled=zero_stalled, return_details=return_details,
@@ -1062,7 +1062,7 @@ class Semi_Analytic_Model:
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
         #       after poisson calculation, need to convert back to dN/dlogf
         #       to get proper characteristic strain measurement
-        #! doing  ``dn/dlnf * Delta(ln[f])``  seems to be more accurate than trapz over log(freq) !#
+        # ! doing  ``dn/dlnf * Delta(ln[f])``  seems to be more accurate than trapz over log(freq) !#
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
         number = number * np.diff(np.log(fobs_gw_edges))
         log.debug(f"number: {utils.stats(number)}")
