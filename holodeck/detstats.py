@@ -974,7 +974,6 @@ def _amplitude(hc_ss, f, df):
         Dimensionless amplitude, A, of each single source at each frequency and realization.
     
     """
-
     Amp = hc_ss * np.sqrt(5) / 4 / 2**(1/6) *np.sqrt(df[:,np.newaxis,np.newaxis]/f[:,np.newaxis,np.newaxis])
     return Amp
 
@@ -1591,7 +1590,7 @@ def detect_ss_skymap(skymap, fobs, dfobs, hc_ss, iota_ss=None, psi_ss=None,
     -------
     gamma_ss : (R,) 1Darray
         Probability of detecting any single source, for each realization.
-    rho_h_ss : (F,F,R,L) NDarray
+    rho_h_ss : (F,R,L) NDarray
         SNR of each single source.
 
     """
