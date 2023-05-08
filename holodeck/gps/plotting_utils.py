@@ -76,7 +76,9 @@ def get_smooth_center(env_pars,
                       nreal=50,
                       sam_shape=40,
                       center_measure="median",
-                      returninterval=False):
+                      returninterval=False,
+                      comparetogwbonly=False,
+                      pari=None):
     """Calculate `nreal` GWB realizations and get the smoothed center (mean or median).
 
     Parameters
@@ -114,7 +116,12 @@ def get_smooth_center(env_pars,
 
     """
     sam, hard = model(env_pars, sam_shape)
-    gwb = sam.gwb(fobs_edges, realize=nreal, hard=hard)
+    if comparetogwbonly:
+        sam.ZERO_DYNAMIC_STALLED_SYSTEMS = False
+        sam.ZERO_GMT_STALLED_SYSTEMS = True
+        gwb = sam.gwb(fobs_edges, realize=nreal, hard=holo.hardening.Hard_GW())
+    else:
+        gwb = sam.gwb(fobs_edges, realize=nreal, hard=hard)
 
     print("Done with SAM")
     bads = np.any(np.isnan(gwb), axis=(0, 1))
@@ -170,10 +177,20 @@ def get_smooth_center(env_pars,
             smooth_gwbup = gwbup
             smooth_gwblo = gwblo
 
-    if returninterval:
-        return smooth_center, gwbup, gwblo
-    else:
-        return smooth_center
+    if comparetogwbonly:
+        with open(f"smooth_center_gwhard_{pari}_{nreal}.npy", 'wb') as f:
+            np.save(f, np.array([smooth_center, smooth_gwbup, smooth_gwblo]).T.squeeze())
+        comparisonspectra = np.load(f"smooth_center_hard_time_{nreal}.npy")
+        #print(comparisonspectra.shape)
+        #print(comparisonspectra[:, 0, pari]) # look in correct spot to get correct spectrum.
+
+    if comparetogwbonly:
+        return comparisonspectra[:, 0, pari] - smooth_center, comparisonspectra[:, 1, pari] / 10.0**(smooth_center), comparisonspectra[:, 2, pari] / 10.0**(smooth_center)
+    else:     
+        if returninterval:
+            return smooth_center, smooth_gwbup, smooth_gwblo
+        else:
+            return smooth_center
 
 
 def plot_individual_parameter(gp_george,
@@ -353,7 +370,8 @@ def pub_plot_individual_parameter(gp_george,
                               color_map=plt.cm.Dark2,
                               multiprocessing=False,
                               return_results=False,
-                              ax=None):
+                              ax=None,
+                              panelnumb=None):
     """Plot GWBs while varying a single parameter.
 
     Parameters
@@ -418,7 +436,7 @@ def pub_plot_individual_parameter(gp_george,
             f"{plot_dir.absolute()} does not exist. Please create it first.")
 
     # Conversion dictionary between holodeck parameter names and Astro Interp symbols
-    par_to_symbol = {'gsmf_phi0' : r"$\Phi_0$", 'gsmf_mchar0_log10' : r"$\log{M_0}$", 'mmb_amp_log10' : r"$\alpha_{\mathrm{MM}}$", 'mmb_scatter' : r"$\epsilon_{\mathrm{MM}}$", 'hard_time' : r"$\tau$"}
+    par_to_symbol = {'gsmf_phi0' : r"$\log(\Phi_0 / \mathrm{Mpc^{-3}\ dex^{-1}})$", 'gsmf_mchar0_log10' : r"$\log{(M_0 / M_{\odot})}$", 'mmb_amp_log10' : r"$\alpha_{\mathrm{MM}}$", 'mmb_scatter' : r"$\epsilon_{\mathrm{MM}}$", 'hard_time' : r"$\tau / \mathrm{Gyr}$"}
     # _G_alaxies are _G_reen, _B_lack holes are _B_lood orange, _T_ime is _T_otally purple
     galaxy_params = ['gsmf_phi0', 'gsmf_mchar0_log10']
     blackhole_params = ['mmb_amp_log10', 'mmb_scatter']
@@ -428,7 +446,7 @@ def pub_plot_individual_parameter(gp_george,
     elif par_interest in blackhole_params:
         colors = plt.cm.Oranges(np.linspace(0.5, 1, num=num_points))
     elif par_interest in time_params:
-        colors = plt.cm.Purples(np.linspace(0.5, 1, num=num_points))
+        colors = plt.cm.Purples(np.linspace(0.7, 1, num=num_points))
     else:
         colors = color_map(np.linspace(0, 1, num=num_points))
 
@@ -467,18 +485,31 @@ def pub_plot_individual_parameter(gp_george,
     if find_sam_mean:
         fobs_edges = spectra["fobs_edges"][:] # [:len(gp_freqs) + 1]
         if multiprocessing:
-            args = [(env_pars_list[i], model, fobs_edges, nreal, sam_shape,
-                     center_measure, True)
-                    for i, _ in enumerate(pars_linspace[par_interest])]
-            with Pool(cpu_count() - 1) as pool:
-                smooth_center = np.array(pool.starmap(get_smooth_center, args)).T.squeeze()
+            if panelnumb == 5:
+                args = [(env_pars_list[i], model, fobs_edges, nreal, sam_shape,
+                         center_measure, True, True, i)
+                        for i, _ in enumerate(pars_linspace[par_interest])]
+                with Pool(cpu_count() - 1) as pool:
+                    smooth_center = np.array(pool.starmap(get_smooth_center, args)).T.squeeze()
+            else:
+                args = [(env_pars_list[i], model, fobs_edges, nreal, sam_shape,
+                         center_measure, True, False, i)
+                        for i, _ in enumerate(pars_linspace[par_interest])]
+                with Pool(cpu_count() - 1) as pool:
+                    smooth_center = np.array(pool.starmap(get_smooth_center, args)).T.squeeze()
         else:
             smooth_center = []
             for i, _ in enumerate(pars_linspace[par_interest]):
                 smooth_center.append(get_smooth_center(env_pars_list[i], model, fobs_edges, nreal, sam_shape, center_measure))
             smooth_center = np.array(smooth_center)
 
-    print(f"{smooth_center.shape=}")
+#     print(f"{smooth_center.shape=}")
+    if panelnumb != 5:
+        with open(f"smooth_center_{par_interest}_{nreal}.npy", 'wb') as f:
+            np.save(f, smooth_center)
+    else:
+        with open(f"smooth_center_{par_interest}_compare_{nreal}.npy", 'wb') as f:
+            np.save(f, smooth_center)
     # Make plot
     if plot:
         plt.rcParams.update({'font.size': 11})
@@ -489,28 +520,40 @@ def pub_plot_individual_parameter(gp_george,
             ax = plt.gca()
         if find_sam_mean:
             # the smoothed mean
+            centerj = num_points // 2
             for j in range(num_points):
-                plt.loglog(
-                    spectra['fobs'][:] * YR,
-                    10**smooth_center[:, 0, j],
+                linew = 1
+                if j == centerj:
+                    linew = 3
+                plt.plot(
+                    np.log10(spectra['fobs'][:]),
+                    smooth_center[:, 0, j],
                     color=colors[j],
-                    lw=1,
+                    lw=linew,
                     label=f"${pars_linspace[par_interest][j]:.2f}$",
                 )
+                if j == centerj:
+                    plt.plot(
+                        np.log10(spectra['fobs'][:]),
+                        smooth_center[:, 0, j],
+                        color='k',
+                        lw=1,
+                        linestyle="dashed",
+                    )
                 if j % 2 == 0:
                     plt.fill_between(
-                        spectra['fobs'][:] * YR,
-                        smooth_center[:, 2, j],
-                        smooth_center[:, 1, j],
+                        np.log10(spectra['fobs'][:]),
+                        np.log10(smooth_center[:, 2, j]),
+                        np.log10(smooth_center[:, 1, j]),
                         color=colors[j],
                         alpha=0.25,
                     )  
         plotgps = False
         if plotgps:
             for j in range(num_points):
-                plt.semilogx(
-                    gp_freqs * YR,
-                    hc[:, j],
+                plt.plot(
+                    np.log10(gp_freqs),
+                    np.log10(hc[:, j]),
                     lw=1,
                     c=colors[j],
                     alpha=1,
@@ -524,18 +567,27 @@ def pub_plot_individual_parameter(gp_george,
 #                 color=colors[j],
 #                 alpha=0.25,
 #             )
+        #plt.yscale("log")
+        #plt.xlim(6.0e-2, 3.0e0)
+        #plt.xlim(spectra['fobs'][:].min() * YR, spectra['fobs'][:].max() * YR)
+        if panelnumb != 5:
+            plt.ylim(-16.30, -13.30)
+        #secax = ax.secondary_xaxis('top', functions=(lambda x:  1. / (x * 1.0e-9 * YR), lambda x: 1. / (x / YR * 1.0e9)))
+#        secax.label("Observed GW Frequency [nHz]")
+#        secax.set_scale('linear')
+#        secax.label_outer()
         
         if par_interest == 'hard_time':
-            xvals = np.array([7.0e-2, 7.0e-2, 4.0e-1, 8.0e-1, 8.0e-1])
-            labelLines(plt.gca().get_lines(), xvals=xvals, zorder=2.5)
+            xvals = np.log10(np.array([1.0e-1, 1.0e-1, 4.0e-1, 1.5e0, 8.0e-1]) / YR)
+        elif par_interest == 'mmb_scatter':
+            xvals = np.log10(np.array([1.0e-1, 4.0e-1, 2.0e-1, 8.0e-1, 1.5e0]) / YR)
+        elif par_interest == 'gsmf_mchar0_log10':
+            xvals = np.log10(np.array([0.1, 0.15, 0.2, 0.5, 1.5]) /YR)
         else:
-            labelLines(plt.gca().get_lines(), zorder=2.5)
+            xvals = np.log10(np.logspace(np.log10(1.0e-1), np.log10(1.5), 5) / YR)
+        labelLines(plt.gca().get_lines(), xvals=xvals, zorder=2.5)
         #plt.xlabel("Observed GW Frequency [1/yr]")
         #plt.ylabel(r"$h_{c} (f)$")
-        plt.yscale("log")
-        #plt.xlim(6.0e-2, 3.0e0)
-        plt.xlim(spectra['fobs'][:].min() * YR, spectra['fobs'][:].max() * YR)
-        plt.ylim(5.0e-17, 5e-14)
         plt.text(0.97, 0.9, par_to_symbol[par_interest], transform=ax.transAxes, horizontalalignment='right')
         #plt.title(f"{par_interest}")
         #plt.legend(loc=3)
