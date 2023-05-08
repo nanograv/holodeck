@@ -1198,7 +1198,18 @@ class Fixed_Time(Fixed_Time_2PL):
 
     def __init__(self, *args, **kwargs):
         log.warning("class `Fixed_Time` has been deprecated!  Please use `Fixed_Time_2PL` with new parametrization!")
-        super().__init__(self, *args, **kwargs)
+
+        # Convert from old to new parameter names
+        replace_kwargs = [['gamma_sc', 'gamma_inner'], ['gamma_df', 'gamma_outer']]
+        for replace in replace_kwargs:
+            val = kwargs.pop(replace[0], None)
+            if replace[1] in kwargs:
+                err = f"Cannot accept kwargs for both {replace[0]} and {replace[1]}!"
+                log.exception(err)
+                raise ValueError(err)
+            kwargs[replace[1]] = val
+
+        super().__init__(*args, **kwargs)
         return
 
     @classmethod
