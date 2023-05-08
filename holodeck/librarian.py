@@ -24,7 +24,7 @@ from holodeck import log, utils
 from holodeck.constants import YR
 
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 FITS_NBINS_PLAW = [2, 3, 4, 5, 8, 9, 14]
 FITS_NBINS_TURN = [4, 9, 14, 30]
@@ -115,7 +115,7 @@ class _Param_Space(abc.ABC):
             log.exception(err)
             raise ValueError(err)
 
-        fname = f"{my_name.lower()}{PSPACE_FILE_SUFFIX}"
+        fname = f"{my_name}{PSPACE_FILE_SUFFIX}"
         fname = path_output.joinpath(fname)
         log.debug(f"{my_name=} {vers=} {fname=}")
 
@@ -254,6 +254,10 @@ class _Param_Dist(abc.ABC):
             rv = np.clip(rv, *self._clip)
         return rv
 
+    @property
+    def extrema(self):
+        return self(np.asarray([0.0, 1.0]))
+
 
 class PD_Uniform(_Param_Dist):
 
@@ -285,37 +289,28 @@ class PD_Uniform_Log(_Param_Dist):
 
 
 class PD_Normal(_Param_Dist):
+    """
+
+    NOTE: use `clip` parameter to avoid extreme values.
+
+    """
 
     def __init__(self, mean, stdev, clip=None, **kwargs):
-        super().__init__(**kwargs)
-        assert stdev > 0.0
-        if clip is not None:
-            if len(clip) != 2:
-                err = f"{clip=} | `clip` must be (2,) values of lo and hi bounds at which to clip!"
-                log.exception(err)
-                raise ValueError(err)
+        """
 
+        Arguments
+        ---------
+
+        """
+        assert stdev > 0.0
+        super().__init__(clip=clip, **kwargs)
         self._mean = mean
         self._stdev = stdev
-        self._clip = clip
-        self._dist = sp.stats.norm(loc=mean, scale=stdev)
-        # if clip is not None:
-        #     if len(clip) != 2:
-        #         err = f"{clip=} | `clip` must be (2,) values of lo and hi bounds at which to clip!"
-        #         log.exception(err)
-        #         raise ValueError(err)
-        #     self._dist_func = lambda xx: np.clip(self._dist.ppf(xx), *clip)
-        # else:
-        #     self._dist_func = lambda xx: self._dist.ppf(xx)
-
+        self._frozen_dist = sp.stats.norm(loc=mean, scale=stdev)
         return
 
     def _dist_func(self, xx):
-        clip = self.clip
-        if clip is not None:
-            yy = np.clip(self._dist.ppf(xx), *clip)
-        else:
-            yy = self._dist.ppf(xx)
+        yy = self._frozen_dist.ppf(xx)
         return yy
 
 
@@ -714,6 +709,7 @@ def _load_library_from_all_files(path_sims, gwb, fit_data, log):
 
     return gwb, fit_data, bad_files
 
+
 def ss_lib_combine(path_output, log, get_pars, path_sims=None, path_pspace=None):
     """
     Arguments
@@ -809,6 +805,7 @@ def ss_lib_combine(path_output, log, get_pars, path_sims=None, path_pspace=None)
     log.info(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
 
     return out_filename
+
 
 def _check_ss_files_and_load_shapes(path_sims, nsamp):
     """Check that all `nsamp` files exist in the given path, and load info about array shapes.
@@ -1083,6 +1080,7 @@ def make_gwb_plot(fobs, gwb, fit_data):
 
     return fig
 
+
 def make_ss_plot(fobs, hc_ss, hc_bg, fit_data):
     # fig = holo.plot.plot_gwb(fobs, gwb)
     psd_bg = utils.char_strain_to_psd(fobs[:, np.newaxis], hc_bg)
@@ -1128,6 +1126,7 @@ def make_ss_plot(fobs, hc_ss, hc_bg, fit_data):
     ax.legend(fontsize=6, loc='upper right')
 
     return fig
+
 
 def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar):
     # fig = holo.plot.plot_gwb(fobs, gwb)
@@ -1253,6 +1252,7 @@ def run_sam_at_pspace_num(args, space, pnum):
             log.exception(err)
 
     return rv
+
 
 def run_ss_at_pspace_num(args, space, pnum):
     """Run single source and background strain calculations for the SAM simulation
@@ -1403,7 +1403,6 @@ def run_ss_at_pspace_num(args, space, pnum):
                 log.exception("Failed to make pars plot!")
                 log.exception(err)
 
-
     return rv
 
 
@@ -1412,10 +1411,12 @@ def _sim_fname(path, pnum):
     temp = path.joinpath(temp)
     return temp
 
+
 def _ss_fname(path, pnum):
     temp = FNAME_SS_FILE.format(pnum=pnum)
     temp = path.joinpath(temp)
     return temp
+
 
 def _log_mem_usage(log):
     # results.ru_maxrss is KB on Linux, B on macos
@@ -1436,7 +1437,6 @@ def _log_mem_usage(log):
         log.info(msg)
 
     return
-
 
 
 def main():

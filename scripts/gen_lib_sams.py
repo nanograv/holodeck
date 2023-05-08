@@ -157,15 +157,8 @@ def setup_basics():
 
         # instantiate the parameter space class
         if args.resume:
-            # Look for existing pspace files
-            # pattern = "*" + holo.librarian.PSPACE_FILE_SUFFIX
-            # space_fname = list(args.output.glob(pattern))
-            # if len(space_fname) != 1:
-            #     raise FileNotFoundError(f"found {len(space_fname)} matches to {pattern} in output {args.output}!")
-
-            # space_fname = space_fname[0]
-            # space = space_class.from_save(space_fname, log)
-            space, space_fname = holo.librarian.load_pspace_from_dir(args.output, space)
+            # Load pspace object from previous save
+            space, space_fname = holo.librarian.load_pspace_from_dir(args.output, space_class)
             log.warning(f"resume={args.resume} :: Loaded param-space save from {space_fname}")
         else:
             space = space_class(log, args.nsamples, args.sam_shape, args.seed)
