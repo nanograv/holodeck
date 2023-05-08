@@ -798,11 +798,21 @@ class Semi_Analytic_Model:
 
         # Make sure we have both `frst_orb` and binary separation `sa`; shapes (X, M*Q*Z)
         if fobs_orb is not None:
+            if not np.all(np.diff(fobs_orb) > 0.0):
+                err = f"Values of `frst_orb` must all be increasing!  {fobs_orb}"
+                log.exception(err)
+                raise ValueError(err)
+
             # Convert from observer-frame orbital freq, to rest-frame orbital freq
             # (X, M*Q*Z)
             frst_orb = fobs_orb[:, np.newaxis] * (1.0 + rz[np.newaxis, :])
             sa = utils.kepler_sepa_from_freq(mt[np.newaxis, :], frst_orb)
         else:
+            if not np.all(np.diff(sepa) < 0.0):
+                err = f"Values of `sepa` must all be decreasing!  {sepa}"
+                log.exception(err)
+                raise ValueError(err)
+
             sa = sepa[:, np.newaxis]
             # (X, M*Q*Z), this is the _orbital_ frequency (not GW), and in rest-frame
             frst_orb = utils.kepler_freq_from_sepa(mt[np.newaxis, :], sa)
@@ -897,6 +907,7 @@ class Semi_Analytic_Model:
             # (M, X)  =  (M,1) * (1,X)
             rads = extr[0][:, np.newaxis] + (extr[1] - extr[0])[:, np.newaxis] * rads
             rads = 10.0 ** rads
+            # print(f"{rads[-1, :]/PC=}")
             # (M, Q, Z, X)
             mt, mr, rz, rads = np.broadcast_arrays(
                 self.mtot[:, np.newaxis, np.newaxis, np.newaxis],
@@ -906,26 +917,33 @@ class Semi_Analytic_Model:
             )
             # (X, M*Q*Z)
             mt, mr, rz, rads = [mm.reshape(-1, STEPS).T for mm in [mt, mr, rz, rads]]
+            # print(f"{rads[:, -1]/PC=}")
             # (X, M*Q*Z) --- `Fixed_Time.dadt` will only accept this shape
             dadt_evo = hard.dadt(mt, mr, rads)
+            # print(f"{dadt_evo[:, -1]*YR/PC=}")
+
             # Integrate (inverse) hardening rates to calculate total lifetime to each separation
 
             # NOTE: this saves some overall memory usage by casting to float32
             # times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=0, cumsum=True)
             times_evo = -utils.trapz_loglog(-1.0 / dadt_evo.astype('float32'), rads.astype('float32'), axis=0, cumsum=True)
+            # print(f"{times_evo[:, -1]/GYR=}")
             del dadt_evo
 
             # (X, M*Q*Z)   convert from separations to rest-frame orbital frequencies
             frst_orb_evo = utils.kepler_freq_from_sepa(mt, rads)
+            # print(f"{frst_orb_evo[:, -1]*YR=}")
             del rads, mt, mr
             # interpolate to target frequencies
             # `frst_orb` is shaped (X, M*Q*Z)  `ndinterp` interpolates over 1th dimension
             # times = utils.ndinterp(frst_orb.T, frst_orb_evo[1:, :].T, times_evo.T, xlog=True, ylog=True).T
             # NOTE: cyutils.interp_2d doesn't currently work for the float32, so use 64, still saves memory overall
+            # print(f"{frst_orb[:, -1]*YR=}")
             times = holo.cyutils.interp_2d(
                 frst_orb.T, frst_orb_evo[1:, :].T, times_evo.T.astype('float64'),
                 xlog=True, ylog=True, extrap=False
             ).T
+            # print(f"{times[:, -1]/GYR=}")
             del frst_orb_evo, times_evo
 
             # Combine the binary-evolution time, with the galaxy-merger time
@@ -933,19 +951,24 @@ class Semi_Analytic_Model:
             times += self._gmt_time.reshape(-1)[np.newaxis, :]
 
             # Find the redshift when each binary reaches these frequencies, -1 for after z=0
-            redz_final = utils.redz_after(times, redz=rz[0, np.newaxis, :])
+            #    `rz` is shaped (X, M*Q*Z) where all entries across X are the same
+            # redz_final = utils.redz_after(times, redz=rz[0, np.newaxis, :])
+
+            times = times.T.reshape(dnum.shape)
+            # rz = rz.T.reshape(dnum.shape)
+            redz_final = utils.redz_after(times, redz=self.redz[np.newaxis, np.newaxis, :, np.newaxis])
 
             # reshape to match `dnum`  (X, M*Q*Z) ==> (M*Q*Z, X) ==> (M, Q, Z, X)
-            redz_final = redz_final.T.reshape(dnum.shape)
+            # redz_final = redz_final.T.reshape(dnum.shape)
             # Find systems not reaching these frequencies before redshift zero
             stall = (redz_final < 0.0)
 
-            log.info(f"fraction of stalled binary-xvals: {utils.frac_str(stall)}")
+            log.info(f"fraction of stalled bins-xvals: {utils.frac_str(stall)}")
             stalled = np.any(stall, axis=-1)
-            log.info(f"fraction of binaries stalled at all xvals: {utils.frac_str(stalled)}")
+            log.info(f"fraction of bins stalled at all xvals: {utils.frac_str(stalled)}")
             stalled_frac = np.count_nonzero(stalled) / stalled.size
             if stalled_frac > 0.8:
-                log.info(f"A large fraction of binaries are stalled at all xvals!  {stalled_frac:.4e}")
+                log.info(f"A large fraction of bins are stalled at all xvals!  {stalled_frac:.4e}")
 
             dnum[stall] = 0.0
             # self._stall = stall
