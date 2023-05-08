@@ -389,7 +389,7 @@ class Semi_Analytic_Model:
     USE_REDZ_AFTER_HARD = True
 
     def __init__(
-        self, mtot=(1.0e4*MSOL, 1.0e11*MSOL, 61), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
+        self, mtot=(1.0e4*MSOL, 1.0e13*MSOL, 81), mrat=(1e-3, 1.0, 61), redz=(1e-3, 10.0, 101),
         shape=None,
         gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013,
         **kwargs
