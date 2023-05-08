@@ -385,8 +385,9 @@ def draw_gwb(ax, xx, gwb, nsamp=10, color=None, label=None, **kwargs):
 
     return hh
 
-def draw_ss_and_gwb(ax, xx, hc_ss, gwb, nsamp=10, 
-                    color=None, cmap = cm.rainbow, 
+
+def draw_ss_and_gwb(ax, xx, hc_ss, gwb, nsamp=10,
+                    color=None, cmap = cm.rainbow,
                     sslabel=None, bglabel=None, **kwargs):
     if color is None:
         color = ax._get_lines.get_next_color()
@@ -407,11 +408,11 @@ def draw_ss_and_gwb(ax, xx, hc_ss, gwb, nsamp=10,
             else: label=None
             ax.plot(xx, gwb[:, ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-')
             for ll in range(len(hc_ss[0,0])):
-                if(ll==0): 
+                if(ll==0):
                     edgecolor='k'
                     if(ii==0): label=sslabel # first source of first realization
                     else: label=None
-                else: 
+                else:
                     edgecolor=None
                     label=None
                 ax.scatter(xx, hc_ss[:, ii, ll], color=colors[ci], alpha=0.25,
@@ -429,7 +430,7 @@ def plot_gwb(fobs, gwb, hc_ss=None, bglabel=None, sslabel=None, **kwargs):
     if(hc_ss is not None):
         draw_ss_and_gwb(ax, xx, hc_ss, gwb, sslabel=sslabel,
                         bglabel=bglabel, **kwargs)
-    else: 
+    else:
         draw_gwb(ax, xx, gwb, **kwargs)
     _twin_hz(ax)
     return fig
@@ -446,7 +447,7 @@ def plot_bg_ss(fobs, bg, ss=None, bglabel=None, sslabel=None,
     if(ss is not None):
         draw_ss_and_gwb(ax, xx, ss, bg, sslabel=sslabel,
                         bglabel=bglabel, **kwargs)
-    else: 
+    else:
         draw_gwb(ax, xx, bg, **kwargs)
     _twin_hz(ax)
     return fig
@@ -485,7 +486,7 @@ def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=c
             axs[0,1].plot(xx, q_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # ratios (upper right)
             axs[1,0].plot(xx, d_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # distances (lower left)
             axs[1,1].plot(xx, hc_bg[:, ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # strains (lower right)
-            
+
             # single sources
             for ll in range(len(hc_ss[0,0])):
                 if(ll==0): edgecolor='k'
