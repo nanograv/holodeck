@@ -129,3 +129,4 @@ slurm*
 run_gen_lib_sams__*
 *.npz
 *.bin
+*.ini

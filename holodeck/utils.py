@@ -171,6 +171,10 @@ def load_hdf5(fname, keys=None):
     return header, data
 
 
+def my_print(*args, **kwargs):
+    return print(*args, flush=True, **kwargs)
+
+
 def python_environment():
     """Tries to determine the current python environment, one of: 'jupyter', 'ipython', 'terminal'.
 
@@ -2188,6 +2192,32 @@ def rho_to_char_strain(freqs, rho, tspan):
     psd = tspan * rho**2
     hc = psd_to_char_strain(freqs, psd)
     return hc
+
+
+def char_strain_to_strain_amp(hc, fc, df):
+    """ Calculate the strain amplitude of single sources given 
+    their characteristic strains.
+    
+    Parameters
+    ----------
+    hc : (F,R,L) NDarray
+        Characteristic strain of the single sources.
+    fc : (F,) 1Darray
+        Frequency bin centers.
+    df : (F,) 1Darray
+        Frequency bin widths.
+
+    Returns
+    -------
+    hs : (F,R,L)
+        Strain amplitude of the single sources.
+
+    """
+    hs = hc * np.sqrt(df[:,np.newaxis,np.newaxis] / fc[:,np.newaxis,np.newaxis])
+    return hs
+
+
+
 
 
 @numba.njit

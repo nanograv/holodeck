@@ -44,17 +44,14 @@ import holodeck.sam
 import holodeck.logger
 # from holodeck.constants import YR
 from holodeck import log as _log     #: import the default holodeck log just so that we can silence it
+from holodeck import utils
 # silence default holodeck log
 _log.setLevel(_log.WARNING)
 
 # Default argparse parameters
-DEF_SAM_SHAPE = (61, 81, 101)
 DEF_NUM_REALS = 100
 DEF_NUM_FBINS = 40
 DEF_PTA_DUR = 16.03     # [yrs]
-
-DEF_ECCEN_NUM_STEPS = 123
-DEF_ECCEN_NHARMS = 100
 
 MAX_FAILURES = 5
 
@@ -83,7 +80,7 @@ def main():
 
     iterator = holo.utils.tqdm(indices) if (comm.rank == 0) else np.atleast_1d(indices)
 
-    if comm.rank == 0:
+    if (comm.rank == 0) and (not args.resume):
         space_fname = space.save(args.output)
         log.info(f"saved parameter space {space} to {space_fname}")
 
@@ -139,23 +136,29 @@ def setup_basics():
 
     if comm.rank == 0:
         # copy certain files to output directory
-        for fname in FILES_COPY_TO_OUTPUT:
-            src_file = Path(fname)
-            dst_file = args.output.joinpath("runtime_" + src_file.name)
-            shutil.copyfile(src_file, dst_file)
-            log.info(f"Copied {fname} to {dst_file}")
+        if not args.resume:
+            for fname in FILES_COPY_TO_OUTPUT:
+                src_file = Path(fname)
+                dst_file = args.output.joinpath("runtime_" + src_file.name)
+                shutil.copyfile(src_file, dst_file)
+                log.info(f"Copied {fname} to {dst_file}")
 
-        # setup parameter-space instance
+        # get parameter-space class
         try:
             # `param_space` attribute must match the name of one of the classes in `holo.param_spaces`
-            space = getattr(holo.param_spaces, args.param_space)
+            space_class = getattr(holo.param_spaces, args.param_space)
         except Exception as err:
             log.exception(f"Failed to load '{args.param_space}' from holo.param_spaces!")
             log.exception(err)
             raise err
 
         # instantiate the parameter space class
-        space = space(log, args.nsamples, args.sam_shape, args.seed)
+        if args.resume:
+            # Load pspace object from previous save
+            space, space_fname = holo.librarian.load_pspace_from_dir(args.output, space_class)
+            log.warning(f"resume={args.resume} :: Loaded param-space save from {space_fname}")
+        else:
+            space = space_class(log, args.nsamples, args.sam_shape, args.seed)
     else:
         space = None
 
@@ -189,10 +192,10 @@ def _setup_argparse(*args, **kwargs):
     parser.add_argument('-f', '--nfreqs', action='store', dest='nfreqs', type=int,
                         help='Number of frequency bins', default=DEF_NUM_FBINS)
     parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
-                        help='Shape of SAM grid', default=DEF_SAM_SHAPE)
+                        help='Shape of SAM grid', default=None)
 
-    parser.add_argument('--recreate', action='store_true', default=False,
-                        help='recreate existing simulation files')
+    parser.add_argument('--resume', action='store_true', default=False,
+                        help='resume production of a library by loading previous parameter-space from output directory')
     parser.add_argument('--plot', action='store_true', default=False,
                         help='produce plots for each simulation configuration')
     parser.add_argument('--seed', action='store', type=int, default=None,
@@ -209,8 +212,16 @@ def _setup_argparse(*args, **kwargs):
         output = Path('.').resolve() / output
         output = output.resolve()
 
+    if args.resume:
+        if not output.exists() or not output.is_dir():
+            raise FileNotFoundError(f"`--resume` is active but output path does not exist! '{output}'")
+    elif output.exists():
+        raise RuntimeError(f"Output {output} already exists!  Overwritting not currently supported!")
+
+    # ---- Create output directories as needed
+
     output.mkdir(parents=True, exist_ok=True)
-    my_print(f"output path: {output}")
+    utils.my_print(f"output path: {output}")
     args.output = output
 
     output_sims = output.joinpath("sims")
@@ -246,10 +257,6 @@ def _setup_log(args):
     return log
 
 
-def my_print(*args, **kwargs):
-    return print(*args, flush=True, **kwargs)
-
-
 def mpiabort_excepthook(type, value, traceback):
     sys.__excepthook__(type, value, traceback)
     comm.Abort()
@@ -267,7 +274,7 @@ if __name__ == "__main__":
         this_fname = os.path.abspath(__file__)
         head = f"holodeck :: {this_fname} : {str(beg_time)} - rank: {comm.rank}/{comm.size}"
         head = "\n" + head + "\n" + "=" * len(head) + "\n"
-        my_print(head)
+        utils.my_print(head)
 
     main()
 
@@ -275,6 +282,6 @@ if __name__ == "__main__":
         end = datetime.now()
         dur = end - beg_time
         tail = f"Done at {str(end)} after {str(dur)} = {dur.total_seconds()}"
-        my_print("\n" + "=" * len(tail) + "\n" + tail + "\n")
+        utils.my_print("\n" + "=" * len(tail) + "\n" + tail + "\n")
 
     sys.exit(0)

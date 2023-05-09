@@ -77,11 +77,11 @@ class GaussProc(object):
                 par: getattr(kernels, self.kernel[par])
                 for par in self.kernel.keys()
             }
-        # This will only print the first kernel error, but subsequent runs will
+        # This will only utils.my_print the first kernel error, but subsequent runs will
         # catch the rest
         except ValueError as e:
-            print(f"Unexpected kernel given'{str(e)}'.")
-            print("Acceptable values are:\n", *kernel_list, sep="\n")
+            utils.my_print(f"Unexpected kernel given'{str(e)}'.")
+            utils.my_print("Acceptable values are:\n", *kernel_list, sep="\n")
             raise
 
         # The number of GP parameters is equal to the number of spectra parameters
@@ -211,7 +211,7 @@ def train_gp(spectra_file,
     spectra = h5py.File(spectra_file, "r")
 
     if VERBOSE:
-        print(f"Loaded spectra from {spectra_file}")
+        utils.my_print(f"Loaded spectra from {spectra_file}")
 
     # Get GWB
     gp_freqs, xobs, yerr, yobs, yobs_mean = get_gwb(spectra, nfreqs, test_frac,
@@ -287,7 +287,7 @@ def get_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     xobs = spectra['sample_params']
     bads = np.any(np.isnan(gwb_spectra), axis=(1, 2))
     if VERBOSE:
-        print(f"Found {utils.frac_str(bads)} samples with NaN entries.  Removing them from library.")
+        utils.my_print(f"Found {utils.frac_str(bads)} samples with NaN entries.  Removing them from library.")
     # when sample points fail, all parameters are set to zero.  Make sure this is consistent
     if not np.all(xobs[bads] == 0.0):
         raise RuntimeError(f"NaN elements of `gwb` did not correspond to zero elements of `sample_params`!")
@@ -301,7 +301,7 @@ def get_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     # Cut out portion for test set later
     test_ind = int(gwb_spectra.shape[0] * test_frac)
     if VERBOSE:
-        print(f"setting aside {test_frac} of samples ({test_ind}) for testing, and choosing {nfreqs} frequencies")
+        utils.my_print(f"setting aside {test_frac} of samples ({test_ind}) for testing, and choosing {nfreqs} frequencies")
 
     gwb_spectra = gwb_spectra[test_ind:, :nfreqs, :]**2
     xobs = xobs[test_ind:, :]
@@ -471,7 +471,7 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
     """
     sampler = [0.0] * len(gp_freqs)
     ndim = nkpars
-    print(f"{mpi=}")
+    utils.my_print(f"{mpi=}")
     pool = schwimmbad.choose_pool(
         mpi=mpi)  # processes=min(nwalkers // 2, cpu_count()) )
 
@@ -499,20 +499,20 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
             for _ in range(nwalkers)
         ]
 
-        print(freq_ind, "Running burn-in")
+        utils.my_print(freq_ind, "Running burn-in")
         p0, lnp, _ = sampler[freq_ind].run_mcmc(p0, int(burn_frac * nsamples), **sample_kwargs)
         sampler[freq_ind].reset()
 
-        print(freq_ind, "Running second burn-in")
+        utils.my_print(freq_ind, "Running second burn-in")
         p = p0[np.argmax(lnp)]
         p0 = [p + 1e-8 * np.random.randn(ndim) for _ in range(nwalkers)]
         p0, _, _ = sampler[freq_ind].run_mcmc(p0, int(burn_frac * nsamples))
         sampler[freq_ind].reset()
 
-        print(freq_ind, "Running production")
+        utils.my_print(freq_ind, "Running production")
         p0, _, _ = sampler[freq_ind].run_mcmc(p0, int(nsamples))
 
-        print(
+        utils.my_print(
             f"Completed {freq_ind} out of {len(gp_freqs)-1} in {(time.time() - t_start) / 60.0:.2f} min\n"
         )
 
@@ -629,7 +629,7 @@ def pars_linspace_dict(gp_george, num_points=5):
 
 
 def hc_from_gp(gp_george, gp_list, gp_george_variance, gp_list_variance,
-               env_pars):
+               env_pars,include_gp_unc=True):
     """Calculate the characteristic strain using a GP.
 
     Parameters
@@ -668,7 +668,11 @@ def hc_from_gp(gp_george, gp_list, gp_george_variance, gp_list_variance,
         mean_pred, mean_pred_unc = gp_list[ii].predict(gp_george[ii].y, [env_pars])
         std_pred, std_pred_unc = gp_list_variance[ii].predict(gp_george_variance[ii].y, [env_pars])
 
-        total_pred_unc = np.sqrt(std_pred**2 + std_pred_unc**2 + mean_pred_unc**2)
+        if include_gp_unc:
+            total_pred_unc = np.sqrt(std_pred**2 + std_pred_unc**2 + mean_pred_unc**2)
+        else:
+            total_pred_unc = std_pred
+        
         rho_pred[ii, 0], rho_pred[ii, 1] = mean_pred, total_pred_unc
 
         # transforming from zero-mean unit-variance variable to rho
@@ -762,7 +766,7 @@ def _sample_hc_from_gp_helper(gp_at_freq, gp_george_at_freq, env_pars,
     elif getattr(gp_george_at_freq, "emcee_flatchain", None) is not None:
         chain_var = "emcee_flatchain"
     else:
-        print("Chains are not saved!")
+        utils.my_print("Chains are not saved!")
 
     # Get the samples
     samples = getattr(gp_george_at_freq, chain_var)
