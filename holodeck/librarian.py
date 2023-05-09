@@ -870,8 +870,13 @@ def _check_ss_files_and_load_shapes(path_sims, nsamp):
                 shape = (nsamp,) + vv.shape
                 fit_data[kk] = np.zeros(shape)
 
-    for kk, vv in fit_data.items():
-        log.debug(f"\t{kk:>20s}: {vv.shape}")
+    if fit_data is not None:
+        for kk, vv in fit_data.items():
+            log.debug(f"\t{kk:>20s}: {vv.shape}")
+    else:
+        log.warning("Unable to load `fit_data` from any files!")
+        fit_data = {}
+
 
     return fobs, nreals, nloudest, fit_data
 
