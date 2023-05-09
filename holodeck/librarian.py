@@ -1299,32 +1299,20 @@ def run_ss_at_pspace_num(args, space, pnum):
     _log_mem_usage(log)
     assert nfreqs == fobs_cents.size
     get_pars = bool(args.get_pars)
-
+        
     # ---- Calculate hc_ss, hc_bg, sspar, and bgpar from SAM
 
     try:
         log.debug("Selecting `sam` and `hard` instances")
         sam, hard = space(pnum)
         _log_mem_usage(log)
-
-        log.debug(f"Calculating 'edges' and 'number' for this SAM.")
-        fobs_orb_edges = fobs_edges / 2.0
-        fobs_orb_cents = fobs_cents/ 2.0
-        # edges
-        edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents) # should the zero stalled option be part of the parameter space?
-        edges[-1] = fobs_orb_edges
-        # integrate for number
-        number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
-        number = number * np.diff(np.log(fobs_edges))
-        _log_mem_usage(log)
-
         if(get_pars):
             log.debug(f"Calculating 'hc_ss', 'hc_bg', 'sspar', and 'bgpar' for shape ({fobs_cents.size}, {args.nreals})")
-            hc_ss, hc_bg, sspar, bgpar = ss.ss_gws(edges, number, realize=args.nreals,
-                                               loudest = args.nloudest, params = True)
+            hc_ss, hc_bg, sspar, bgpar = sam.ss_gwb(fobs_edges, hard=hard, realize=args.nreals,
+                                             loudest = args.nloudest, params = True)
         else:
             log.debug(f"Calculating 'hc_ss' and 'hc_bg' only for shape ({fobs_cents.size}, {args.nreals})")
-            hc_ss, hc_bg = ss.ss_gws(edges, number, realize=args.nreals,
+            hc_ss, hc_bg = sam.ss_gwb(fobs_edges, hard=hard, realize=args.nreals,
                                                loudest = args.nloudest, params = False)
         _log_mem_usage(log)
         log.debug(f"{holo.utils.stats(hc_ss)=}")
