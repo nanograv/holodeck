@@ -1246,6 +1246,47 @@ class Fixed_Time(Fixed_Time_2PL):
         return dadt
 
 
+class Test(_Hardening):
+
+    def __init__(self, time, mtot, mrat,
+                 sepa_init=1.0e3*PC, rchar=100.0*PC, gamma_inner=-1.0, gamma_outer=+1.5):
+
+        self._gamma_inner = gamma_inner
+        self._gamma_outer = gamma_outer
+        self._time = time
+        self._rchar = rchar
+
+
+
+        self._norm = norm
+        return
+
+    # ====     Constructors    ====
+
+    @classmethod
+    def from_pop(cls, pop, time, **kwargs):
+        return cls(time, *pop.mtmr, pop.redz, pop.sepa, **kwargs)
+
+    @classmethod
+    def from_sam(cls, sam, time, **kwargs):
+        mtot, mrat, redz = [gg.ravel() for gg in sam.grid]
+        return cls(time, mtot, mrat, **kwargs)
+
+    def function(self, mtot, mrat, sepa, norm):
+        dadt = self._function(norm, sepa, self._rchar, self._gamma_inner, self._gamma_outer)
+        m1 = mtot / (1.0 + mrat)
+        m2 = mrat * m1
+        dadt += utils.gw_hardening_rate_dadt(m1, m2, sepa, eccen=None)
+        return dadt
+
+    @classmethod
+    def _function(cls, norm, sepa, rchar, gamma_inner, gamma_outer):
+        xx = sepa / rchar
+        dadt = - norm * np.power(1.0 + xx, -gamma_outer+gamma_inner) / np.power(xx, gamma_inner-1)
+        return dadt
+
+
+
 # =================================================================================================
 # ====    Utility Classes and Functions    ====
 # =================================================================================================

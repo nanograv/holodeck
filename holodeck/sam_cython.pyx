@@ -103,8 +103,30 @@ cdef double integrate_binary_evolution(norm, mt, mr, sepa_init, rchar, gamma_inn
         dt = 2.0 * (sepa_right - sepa_left) / (dadt_left + dadt_right)
         time += dt
 
+        sepa_left = sepa_right
+        dadt_left = dadt_right
+
     return time
 
+
+ctypedef struct integrate_params:
+    double target_time
+    double mt
+    double mr
+    double sepa_init
+    double rchar
+    double gamma_inner
+    double gamma_outer
+    int nsteps
+
+
+cdef double wrapper_integrate_binary_evolution(double norm, void *args):
+    cdef integrate_params *pars = <integrate_params *> args
+    cdef double time = integrate_binary_evolution(
+        pow(10.0, norm), pars.mt, pars.mr, pars.sepa_init, pars.rchar, pars.gamma_inner, pars.gamma_outer, pars.nsteps
+    )
+    time = time - pars.target_time
+    return time
 
 
 def find_hardening_norm(time, sam, hard, nsteps=100):
@@ -118,7 +140,7 @@ def find_hardening_norm(time, sam, hard, nsteps=100):
         norm,
     )
 
-    return
+    return norm
 
 
 cdef void _find_hardening_norm(
@@ -134,22 +156,87 @@ cdef void _find_hardening_norm(
     double[:, :] norm,
 ):
 
-    # cdef double inner_func(double nn, double mt, double mr):
-    #     return integrate_binary_evolution(nn, mt, mr, sepa_init, rchar, gamma_inner, gamma_outer, nsteps)
-
     cdef double XTOL = 1e-3
-    cdef double RTOL = 1e-3
-    cdef double MITR = 10
+    cdef double RTOL = 1e-5
+    cdef int MITR = 10
+    cdef double LO = -20.0
+    cdef double HI = +20.0
 
     cdef int nm = mtot.size
     cdef int nq = mrat.size
+
+    cdef integrate_params args
+    args.target_time = time
+    args.rchar = rchar
+    args.sepa_init = sepa_init
+    args.gamma_inner = gamma_inner
+    args.gamma_outer = gamma_outer
+    args.nsteps = nsteps
+
     cdef int ii, jj
     for ii in range(nm):
         for jj in range(nq):
-            # inner_func(1.0, mtot[ii], mrat[jj])
-            pass
-            # brentq(
-            #     f, xa, xb, <test_params *> &myargs, XTOL, RTOL, MITR, NULL)
+            args.mt = mtot[ii]
+            args.mr = mrat[ii]
+            norm[ii, jj] = brentq(
+                wrapper_integrate_binary_evolution, LO, HI, <integrate_params *> &args, XTOL, RTOL, MITR, NULL
+            )
+
+    return
+
+
+def find_hardening_norm_test(time, sam, hard, nsteps=100):
+
+    cdef np.ndarray[np.double_t, ndim=2] norm = np.zeros((sam.mtot.size, sam.mrat.size))
+
+    _find_hardening_norm_test(
+        time, sam.mtot, sam.mrat,
+        hard.function,
+        nsteps,
+        norm,
+    )
+
+    return norm
+
+
+cdef void _find_hardening_norm_test(
+    double time,
+    double[:] mtot,
+    double[:] mrat,
+    double rchar,
+    double sepa_init,
+    double gamma_inner,
+    double gamma_outer,
+    int nsteps,
+    # output
+    double[:, :] norm,
+):
+
+    cdef double XTOL = 1e-3
+    cdef double RTOL = 1e-5
+    cdef int MITR = 10
+    cdef double LO = -20.0
+    cdef double HI = +20.0
+
+    cdef int nm = mtot.size
+    cdef int nq = mrat.size
+
+    cdef integrate_params args
+    args.target_time = time
+    args.rchar = rchar
+    args.sepa_init = sepa_init
+    args.gamma_inner = gamma_inner
+    args.gamma_outer = gamma_outer
+    args.nsteps = nsteps
+
+    cdef int ii, jj
+    for ii in range(nm):
+        for jj in range(nq):
+            args.mt = mtot[ii]
+            args.mr = mrat[ii]
+            norm[ii, jj] = brentq(
+                wrapper_integrate_binary_evolution, LO, HI, <integrate_params *> &args, XTOL, RTOL, MITR, NULL
+            )
 
     return
 
