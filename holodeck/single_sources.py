@@ -1593,9 +1593,12 @@ def example(dur, cad, mtot, mrat, redz, print_test):
     # 2) Build Semi-Analytic-Model with super simple parameters 
     if(mtot==None or mrat==None or redz==None):
         print('using default mtot, mrat, and redz')
-        sam = holo.sam.Semi_Analytic_Model()
+        sam = holo.sam.Semi_Analytic_Model(ZERO_GMT_STALLED_SYSTEMS=True, 
+                                           ZERO_DYNAMIC_STALLED_SYSTEMS=False)
     else:
-        sam = holo.sam.Semi_Analytic_Model(mtot, mrat, redz)
+        sam = holo.sam.Semi_Analytic_Model(mtot, mrat, redz,
+                                           ZERO_GMT_STALLED_SYSTEMS=True, 
+                                           ZERO_DYNAMIC_STALLED_SYSTEMS=False)
     if(print_test):
         print('edges:', sam.edges)
     # get observed orbital frequency bin edges and centers 

@@ -171,6 +171,10 @@ def load_hdf5(fname, keys=None):
     return header, data
 
 
+def my_print(*args, **kwargs):
+    return print(*args, flush=True, **kwargs)
+
+
 def python_environment():
     """Tries to determine the current python environment, one of: 'jupyter', 'ipython', 'terminal'.
 

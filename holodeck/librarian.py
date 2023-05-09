@@ -24,7 +24,7 @@ from holodeck import log, utils
 from holodeck.constants import YR
 
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 FITS_NBINS_PLAW = [2, 3, 4, 5, 8, 9, 14]
 FITS_NBINS_TURN = [4, 9, 14, 30]
@@ -115,7 +115,7 @@ class _Param_Space(abc.ABC):
             log.exception(err)
             raise ValueError(err)
 
-        fname = f"{my_name.lower()}{PSPACE_FILE_SUFFIX}"
+        fname = f"{my_name}{PSPACE_FILE_SUFFIX}"
         fname = path_output.joinpath(fname)
         log.debug(f"{my_name=} {vers=} {fname=}")
 
@@ -198,13 +198,49 @@ class _Param_Space(abc.ABC):
         self._log.debug(f"params {samp_num} :: {params}")
         return self.model_for_params(params, self.sam_shape)
 
+    def model_for_normalized_params(self, vals, **kwargs):
+        """Construct a model from this space by specifying fractional parameter values [0.0, 1.0].
+
+        Arguments
+        ---------
+        vals : (P,) array_like  or  scalar
+            Specification for each of `P` parameters varied in the parameter-space.  Each `vals` gives the
+            location in uniform space between [0.0, 1.0] that will be converted to the parameter values
+            based on the mapping the corresponding _Param_Dist instances (stored in `space._dists`).
+            For example, if the 0th parameter uses a PD_Uniform_Log distribution, then a `vals` of 0.5
+            for that parameter will correspond to half-way in log-space of the range of parameter values.
+            If a scalar value is given, then it is used for each of the `P` parameters in the space.
+
+        Returns
+        -------
+        sam : `holodeck.sam.Semi_Analytic_Model` instance
+        hard : `holodeck.hardening._Hardening` instance
+
+        """
+        if np.ndim(vals) == 0:
+            vals = self.npars * [vals]
+        assert len(vals) == self.npars
+
+        params = {}
+        for ii, pname in enumerate(self.param_names):
+            vv = vals[ii]    # desired fractional parameter value [0.0, 1.0]
+            ss = self._dists[ii](vv)    # convert to actual parameter values
+            params[pname] = ss           # store to dictionary
+
+        return self.model_for_params(params, **kwargs)
+
     @classmethod
     @abc.abstractmethod
-    def model_for_params(cls, params):
+    def model_for_params(cls, params, **kwargs):
         raise
 
 
 class _Param_Dist(abc.ABC):
+    """Parameter Distribution classes for use in Latin HyperCube sampling.
+
+    These classes are passed uniform random variables, and return the desired distributions of parameters.
+
+    """
 
     def __init__(self, clip=None):
         if clip is not None:
@@ -217,6 +253,10 @@ class _Param_Dist(abc.ABC):
         if self._clip is not None:
             rv = np.clip(rv, *self._clip)
         return rv
+
+    @property
+    def extrema(self):
+        return self(np.asarray([0.0, 1.0]))
 
 
 class PD_Uniform(_Param_Dist):
@@ -249,37 +289,28 @@ class PD_Uniform_Log(_Param_Dist):
 
 
 class PD_Normal(_Param_Dist):
+    """
+
+    NOTE: use `clip` parameter to avoid extreme values.
+
+    """
 
     def __init__(self, mean, stdev, clip=None, **kwargs):
-        super().__init__(**kwargs)
-        assert stdev > 0.0
-        if clip is not None:
-            if len(clip) != 2:
-                err = f"{clip=} | `clip` must be (2,) values of lo and hi bounds at which to clip!"
-                log.exception(err)
-                raise ValueError(err)
+        """
 
+        Arguments
+        ---------
+
+        """
+        assert stdev > 0.0
+        super().__init__(clip=clip, **kwargs)
         self._mean = mean
         self._stdev = stdev
-        self._clip = clip
-        self._dist = sp.stats.norm(loc=mean, scale=stdev)
-        # if clip is not None:
-        #     if len(clip) != 2:
-        #         err = f"{clip=} | `clip` must be (2,) values of lo and hi bounds at which to clip!"
-        #         log.exception(err)
-        #         raise ValueError(err)
-        #     self._dist_func = lambda xx: np.clip(self._dist.ppf(xx), *clip)
-        # else:
-        #     self._dist_func = lambda xx: self._dist.ppf(xx)
-
+        self._frozen_dist = sp.stats.norm(loc=mean, scale=stdev)
         return
 
     def _dist_func(self, xx):
-        clip = self.clip
-        if clip is not None:
-            yy = np.clip(self._dist.ppf(xx), *clip)
-        else:
-            yy = self._dist.ppf(xx)
+        yy = self._frozen_dist.ppf(xx)
         return yy
 
 
@@ -374,6 +405,80 @@ class PD_Log_Lin(_Param_Dist):
         # transform to lin-scaling between [crit, hi]
         yy[hiidx] = crit + (hi - crit) * (xx[hiidx] - lofrac) / (1.0 - lofrac)
         return yy
+
+
+class PD_Piecewise_Uniform_Mass(_Param_Dist):
+
+    def __init__(self, edges, weights, **kwargs):
+        super().__init__(**kwargs)
+        edges = np.asarray(edges)
+        self._edges = edges
+        weights = np.asarray(weights)
+        self._weights = weights / weights.sum()
+        assert edges.size == weights.size + 1
+        assert np.ndim(edges) == 1
+        assert np.ndim(weights) == 1
+        assert np.all(np.diff(edges) > 0.0)
+        assert np.all(weights > 0.0)
+        return
+
+    def _dist_func(self, xx):
+        yy = np.zeros_like(xx)
+        xlo = 0.0
+        for ii, ww in enumerate(self._weights):
+            ylo = self._edges[ii]
+            yhi = self._edges[ii+1]
+
+            xhi = xlo + ww
+            sel = (xlo < xx) & (xx <= xhi)
+            yy[sel] = ylo + (xx[sel] - xlo) * (yhi - ylo) / (xhi - xlo)
+
+            xlo = xhi
+
+        return yy
+
+
+class PD_Piecewise_Uniform_Density(PD_Piecewise_Uniform_Mass):
+
+    def __init__(self, edges, densities, **kwargs):
+        dx = np.diff(edges)
+        weights = dx * np.asarray(densities)
+        super().__init__(edges, weights)
+        return
+
+
+def load_pspace_from_dir(path, space_class):
+    """Load a _Param_Space instance from the saved file in the given directory.
+
+    Arguments
+    ---------
+    path : str or pathlib.Path
+        Path to directory containing save file.
+        A single file matching "*.pspace.npz" is required in that directory.
+        NOTE: the specific glob pattern is specified by `holodeck.librarian.PSPACE_FILE_SUFFIX` e.g. '.pspace.npz'
+    space_class : _Param_Space subclass
+        Class with which to call the `from_save()` method to load a new _Param_Space instance.
+
+    Returns
+    -------
+    space : `_Param_Space` subclass instance
+        An instance of the `space_class` class.
+    space_fname : pathlib.Path
+        File that `space` was loaded from.
+
+    """
+    path = Path(path)
+    if not path.exists() or not path.is_dir():
+        raise RuntimeError(f"path {path} is not an existing directory!")
+
+    pattern = "*" + holo.librarian.PSPACE_FILE_SUFFIX
+    space_fname = list(path.glob(pattern))
+    if len(space_fname) != 1:
+        raise FileNotFoundError(f"found {len(space_fname)} matches to {pattern} in output {path}!")
+
+    space_fname = space_fname[0]
+    space = space_class.from_save(space_fname, log)
+    return space, space_fname
 
 
 def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
@@ -604,6 +709,7 @@ def _load_library_from_all_files(path_sims, gwb, fit_data, log):
 
     return gwb, fit_data, bad_files
 
+
 def ss_lib_combine(path_output, log, get_pars, path_sims=None, path_pspace=None):
     """
     Arguments
@@ -699,6 +805,7 @@ def ss_lib_combine(path_output, log, get_pars, path_sims=None, path_pspace=None)
     log.info(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
 
     return out_filename
+
 
 def _check_ss_files_and_load_shapes(path_sims, nsamp):
     """Check that all `nsamp` files exist in the given path, and load info about array shapes.
@@ -840,7 +947,7 @@ def _load_ss_library_from_all_files(path_sims, hc_ss, hc_bg, fit_data, log, sspa
 
         if fits_bad:
             log.warning(f"Missing fit keys in file {pnum} = {fname.name}")
-        
+
         # store the pars from this file
         if(get_pars):
             if ('sspar' not in temp) or ('bgpar' not in temp):
@@ -851,7 +958,7 @@ def _load_ss_library_from_all_files(path_sims, hc_ss, hc_bg, fit_data, log, sspa
             else:
                 sspar[pnum, :, :, :, :] = temp['sspar'][...]
                 bgpar[pnum, :, :, :] = temp['bgpar'][...]
-        
+
 
     if num_fits_failed > 0:
         log.warning(f"Missing fit keys in {num_fits_failed}/{nsamp} = {num_fits_failed/nsamp:.2e} files!")
@@ -973,6 +1080,7 @@ def make_gwb_plot(fobs, gwb, fit_data):
 
     return fig
 
+
 def make_ss_plot(fobs, hc_ss, hc_bg, fit_data):
     # fig = holo.plot.plot_gwb(fobs, gwb)
     psd_bg = utils.char_strain_to_psd(fobs[:, np.newaxis], hc_bg)
@@ -1018,6 +1126,7 @@ def make_ss_plot(fobs, hc_ss, hc_bg, fit_data):
     ax.legend(fontsize=6, loc='upper right')
 
     return fig
+
 
 def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar):
     # fig = holo.plot.plot_gwb(fobs, gwb)
@@ -1144,8 +1253,9 @@ def run_sam_at_pspace_num(args, space, pnum):
 
     return rv
 
+
 def run_ss_at_pspace_num(args, space, pnum):
-    """Run single source and background strain calculations for the SAM simulation 
+    """Run single source and background strain calculations for the SAM simulation
     for sample-parameter `pnum` in the `space` parameter-space.
     Arguments
     ---------
@@ -1198,24 +1308,24 @@ def run_ss_at_pspace_num(args, space, pnum):
         _log_mem_usage(log)
 
         log.debug(f"Calculating 'edges' and 'number' for this SAM.")
-        fobs_orb_edges = fobs_edges / 2.0 
+        fobs_orb_edges = fobs_edges / 2.0
         fobs_orb_cents = fobs_cents/ 2.0
         # edges
         edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents) # should the zero stalled option be part of the parameter space?
         edges[-1] = fobs_orb_edges
         # integrate for number
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
-        number = number * np.diff(np.log(fobs_edges))  
+        number = number * np.diff(np.log(fobs_edges))
         _log_mem_usage(log)
-        
+
         if(get_pars):
             log.debug(f"Calculating 'hc_ss', 'hc_bg', 'sspar', and 'bgpar' for shape ({fobs_cents.size}, {args.nreals})")
-            hc_ss, hc_bg, sspar, bgpar = ss.ss_gws(edges, number, realize=args.nreals, 
+            hc_ss, hc_bg, sspar, bgpar = ss.ss_gws(edges, number, realize=args.nreals,
                                                loudest = args.nloudest, params = True)
         else:
             log.debug(f"Calculating 'hc_ss' and 'hc_bg' only for shape ({fobs_cents.size}, {args.nreals})")
-            hc_ss, hc_bg = ss.ss_gws(edges, number, realize=args.nreals, 
-                                               loudest = args.nloudest, params = False) 
+            hc_ss, hc_bg = ss.ss_gws(edges, number, realize=args.nreals,
+                                               loudest = args.nloudest, params = False)
         _log_mem_usage(log)
         log.debug(f"{holo.utils.stats(hc_ss)=}")
         log.debug(f"{holo.utils.stats(hc_bg)=}")
@@ -1225,10 +1335,10 @@ def run_ss_at_pspace_num(args, space, pnum):
 
         log.debug(f"Saving {pnum} to file")
         if(get_pars):
-            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
+            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges,
                     hc_ss = hc_ss, hc_bg = hc_bg, sspar = sspar, bgpar = bgpar)
         else:
-            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
+            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges,
                     hc_ss = hc_ss, hc_bg = hc_bg)
         rv = True
     except Exception as err:
@@ -1293,7 +1403,6 @@ def run_ss_at_pspace_num(args, space, pnum):
                 log.exception("Failed to make pars plot!")
                 log.exception(err)
 
-
     return rv
 
 
@@ -1302,10 +1411,12 @@ def _sim_fname(path, pnum):
     temp = path.joinpath(temp)
     return temp
 
+
 def _ss_fname(path, pnum):
     temp = FNAME_SS_FILE.format(pnum=pnum)
     temp = path.joinpath(temp)
     return temp
+
 
 def _log_mem_usage(log):
     # results.ru_maxrss is KB on Linux, B on macos

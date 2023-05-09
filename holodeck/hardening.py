@@ -1,29 +1,20 @@
-"""
+"""Binary evolution hardening submodules.
+
 To-Do
 -----
-
 *   Dynamical_Friction_NFW
-
     *   Allow stellar-density profiles to also be specified (instead of using a hard-coded
         Dehnen profile)
     *   Generalize calculation of stellar characteristic radius.  Make self-consistent with
         stellar-profile, and user-specifiable.
-
 *   Evolution
-
     *   `_sample_universe()` : sample in comoving-volume instead of redshift
-
 *   Sesana_Scattering
-
     *   Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
         and flexible.  Currently hard-coded to Dehnen profile estimate.
-
 *   _SHM06
-
     *   Interpolants of hardening parameters return 1D arrays.
-
 *   Fixed_Time
-
     *   Handle `rchar` better with respect to interpolation.  Currently not an interpolation
         variable, which restricts it's usage.
     *   This class should be separated into a generic `_Fixed_Time` class that can use any
@@ -31,7 +22,6 @@ To-Do
         normalization.  When they're combined, it will produce the same effect.  Another good
         functional form to implement would be GW + log-uniform hardening time, the same as the
         current phenomenological model but with both power-laws set to 0.
-
 
 References
 ----------
@@ -43,6 +33,7 @@ References
 * [Sesana2010]_ Sesana 2010.
 
 """
+
 from __future__ import annotations
 
 import abc
@@ -582,7 +573,7 @@ class Dynamical_Friction_NFW(_Hardening):
         return atten
 
 
-class Fixed_Time(_Hardening):
+class Fixed_Time_2PL(_Hardening):
     """Provide a binary hardening rate such that the total lifetime matches a given value.
 
     This class uses a phenomenological functional form (defined in :meth:`Fixed_Time.function`) to
@@ -622,7 +613,8 @@ class Fixed_Time(_Hardening):
     CONSISTENT = True
 
     def __init__(self, time, mtot, mrat, redz, sepa,
-                 rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5, progress=False, interpolate_norm=False):
+                 rchar=100.0*PC, gamma_inner=-1.0, gamma_outer=+2.5,
+                 progress=False, interpolate_norm=False):
         """Initialize `Fixed_Time` instance for the given binary properties and function parameters.
 
         Parameters
@@ -646,10 +638,10 @@ class Fixed_Time(_Hardening):
             Characteristic radius dividing two power-law regimes, in units of [cm]:
             *   scalar : uniform radius for all binaries
             *   callable : function `rchar(mtot, mrat, redz)` which returns the radius
-        gamma_sc : scalar
+        gamma_inner : scalar
             Power-law of hardening timescale in the stellar-scattering regime,
             (small separations: r < rchar), at times referred to internally as `g1`.
-        gamma_df : scalar
+        gamma_outer : scalar
             Power-law of hardening timescale in the dynamical-friction regime
             (large separations: r > rchar), at times referred to internally as `g2`.
 
@@ -699,7 +691,7 @@ class Fixed_Time(_Hardening):
             # both are callable as `interp(args)`, with `args` shaped (N, 4),
             # the 4 parameters are:      [log10(M/MSOL), log10(q), time/Gyr, log10(Rmax/PC)]
             # the interpolants return the log10 of the norm values
-            interp, backup = self._calculate_norm_interpolant(rchar, gamma_sc, gamma_df)
+            interp, backup = self._calculate_norm_interpolant(rchar, gamma_inner, gamma_outer)
 
             log.debug("calculating normalization from interpolants")
             points = [np.log10(mtot/MSOL), np.log10(mrat), time/GYR, np.log10(sepa/PC)]
@@ -724,10 +716,10 @@ class Fixed_Time(_Hardening):
         # For small numbers of points, calculate the normalization directly
         else:
             log.info("calculating normalization exactly")
-            norm = self._get_norm_chunk(time, mtot, mrat, rchar, gamma_sc, gamma_df, sepa, progress=progress)
+            norm = self._get_norm_chunk(time, mtot, mrat, rchar, gamma_inner, gamma_outer, sepa, progress=progress)
 
-        self._gamma_sc = gamma_sc
-        self._gamma_df = gamma_df
+        self._gamma_inner = gamma_inner
+        self._gamma_outer = gamma_outer
         self._time = time
         self._norm = norm
         self._rchar = rchar
@@ -815,20 +807,20 @@ class Fixed_Time(_Hardening):
         mass = evo.mass[:, step, :]
         sepa = evo.sepa[:, step]
         mt, mr = utils.mtmr_from_m1m2(mass)
-        dadt, _dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_sc, self._gamma_df)
+        dadt, _dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_inner, self._gamma_outer)
         dedt = None if evo.eccen is None else np.zeros_like(dadt)
         return dadt, dedt
 
     def dadt(self, mt, mr, sepa):
-        dadt, _dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_sc, self._gamma_df)
+        dadt, _dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_inner, self._gamma_outer)
         return dadt
 
     def dedt(self, mt, mr, sepa):
-        _dadt, dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_sc, self._gamma_df)
+        _dadt, dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_inner, self._gamma_outer)
         return dedt
 
     @classmethod
-    def _dadt_dedt(cls, mtot, mrat, sepa, norm, rchar, g1, g2):
+    def _dadt_dedt(cls, mtot, mrat, sepa, norm, rchar, gamma_inner, gamma_outer):
         """Calculate hardening rate for the given raw parameters.
 
         Parameters
@@ -846,12 +838,10 @@ class Fixed_Time(_Hardening):
         rchar : array_like
             Characteristic transition radius between the two power-law indices of the hardening
             rate model, units of [cm].
-        g1 : scalar
-            Power-law of hardening timescale in the stellar-scattering regime,
-            (small separations: r < rchar).
-        g2 : scalar
-            Power-law of hardening timescale in the dynamical-friction regime,
-            (large separations: r > rchar).
+        gamma_inner : scalar
+            Power-law of hardening timescale in the inner regime (small separations: r < rchar).
+        gamma_outer : scalar
+            Power-law of hardening timescale in the outer regime (large separations: r > rchar).
 
         Returns
         -------
@@ -866,25 +856,25 @@ class Fixed_Time(_Hardening):
         dadt_gw = utils.gw_hardening_rate_dadt(m1, m2, sepa)
 
         xx = sepa / rchar
-        dadt = cls.function(norm, xx, g1, g2)
+        dadt = cls.function(norm, xx, gamma_inner, gamma_outer)
         dadt += dadt_gw
 
         dedt = None
         return dadt, dedt
 
-    # ====     Internal Functions    ====
-
     @classmethod
-    def function(cls, norm, xx, g1, g2):
+    def function(cls, norm, xx, gamma_inner, gamma_outer):
         """Hardening rate given the parameters for this hardening model.
 
         The functional form is,
+
         .. math::
-            \\dot{a} = - A * (1.0 + x)^{-g_2 - 1} / x^{g_1 - 1},
+
+            \dot{a} = - A * (1.0 + x)^{-g_out + g_in} / x^{g_in - 1},
 
         Where $A$ is an overall normalization, and x \\equiv a / r_\\mathrm{char}$ is the binary
         separation scaled to a characteristic transition radius ($r_\\mathrm{char}$) between two
-        power-law indices $g_1$ and $g_2$.
+        power-law indices $g_inner$ and $g_outer$.
 
         Parameters
         ----------
@@ -893,19 +883,19 @@ class Fixed_Time(_Hardening):
         xx : array_like
             Dimensionless binary separation, the semi-major axis in units of the characteristic
             (i.e. transition) radius of the model `rchar`.
-        g1 : scalar
-            Power-law of hardening timescale in the stellar-scattering regime,
-            (small separations: r < rchar).
-        g2 : scalar
-            Power-law of hardening timescale in the dynamical-friction regime,
-            (large separations: r > rchar).
+        gamma_inner : scalar
+            Power-law of hardening timescale in the inner regime (small separations: r < rchar).
+        gamma_outer : scalar
+            Power-law of hardening timescale in the outer regime (large separations: r > rchar).
 
         """
-        dadt = - norm * np.power(1.0 + xx, -g2-1) / np.power(xx, g1-1)
+        dadt = - norm * np.power(1.0 + xx, -gamma_outer+gamma_inner) / np.power(xx, gamma_inner-1)
         return dadt
 
+    # ====     Internal Functions    ====
+
     @classmethod
-    def _calculate_norm_interpolant(cls, rchar, gamma_sc, gamma_df):
+    def _calculate_norm_interpolant(cls, rchar, gamma_inner, gamma_outer):
         """Generate interpolants to map from binary parameters to hardening rate normalization.
 
         Interpolants are calculated as follows:
@@ -925,10 +915,10 @@ class Fixed_Time(_Hardening):
             Characteristic radius separating the two power-law regimes, in units of [cm]:
             *   scalar : uniform radius for all binaries
             *   array_like : characteristic radius for each binary.
-        gamma_sc : scalar
+        gamma_inner : scalar
             Power-law of hardening timescale in the stellar-scattering regime,
             (small separations: r < rchar), at times referred to internally as `g1`.
-        gamma_df : scalar
+        gamma_outer : scalar
             Power-law of hardening timescale in the dynamical-friction regime
             (large separations: r > rchar), at times referred to internally as `g1`.
 
@@ -963,7 +953,7 @@ class Fixed_Time(_Hardening):
             rm = 10.0 ** np.random.uniform(*np.log10(rm), num) * PC
 
             # ---- Get normalization for these parameters
-            norm = cls._get_norm_chunk(td, mt, mr, rchar, gamma_sc, gamma_df, rm)
+            norm = cls._get_norm_chunk(td, mt, mr, rchar, gamma_inner, gamma_outer, rm)
             points = [mt, mr, td, rm]
             bads = ~(np.isfinite(norm) & (norm > 0.0))
             fix_tries = 0
@@ -982,8 +972,8 @@ class Fixed_Time(_Hardening):
                 args = [aa[bads] for aa in [td, mt, mr, rm]]
                 num = args[0].size
                 args = [aa*np.random.normal(1.0, 0.05, num) for aa in args]
-                # args = [td, mt, mr, rchar, gamma_sc, gamma_df, rm]
-                args = args[:-1] + [rchar, gamma_sc, gamma_df] + [args[-1],]
+                # args = [td, mt, mr, rchar, gamma_inner, gamma_outer, rm]
+                args = args[:-1] + [rchar, gamma_inner, gamma_outer] + [args[-1],]
                 norm[bads] = cls._get_norm_chunk(*args)
                 fix_tries += 1
                 log.debug(f"fixing bad norm values: {fix_tries} :: {norm[bads]=}")
@@ -1148,7 +1138,7 @@ class Fixed_Time(_Hardening):
         return norm
 
     @classmethod
-    def _time_total(cls, norm, mt, mr, rchar, gamma_sc, gamma_df, rmax, num=123):
+    def _time_total(cls, norm, mt, mr, rchar, gamma_inner, gamma_outer, rmax, num=123):
         """For the given parameters, integrate the binary evolution to find total lifetime.
 
         Parameters
@@ -1162,10 +1152,10 @@ class Fixed_Time(_Hardening):
         rchar : float  or  array_like
             Characteristic transition radius between the two power-law indices of the hardening
             rate model, units of [cm].
-        gamma_sc : float  or  array_like
+        gamma_inner : float  or  array_like
             Power-law of hardening timescale in the stellar-scattering regime,
             (small separations: r < rchar).
-        gamma_df : float  or  array_like
+        gamma_outer : float  or  array_like
             Power-law of hardening timescale in the dynamical-friction regime,
             (large separations: r > rchar).
         rmax : float  or  array_like
@@ -1184,9 +1174,9 @@ class Fixed_Time(_Hardening):
         norm = np.atleast_1d(norm)
         rmin = utils.rad_isco(mt)
 
-        args = [norm, mt, mr, rchar, gamma_sc, gamma_df, rmax, rmin]
+        args = [norm, mt, mr, rchar, gamma_inner, gamma_outer, rmax, rmin]
         args = np.broadcast_arrays(*args)
-        norm, mt, mr, rchar, gamma_sc, gamma_df, rmax, rmin = args
+        norm, mt, mr, rchar, gamma_inner, gamma_outer, rmax, rmin = args
 
         # define separations (radii) for each binary's evolution
         rextr = np.log10([rmin, rmax]).T
@@ -1196,17 +1186,72 @@ class Fixed_Time(_Hardening):
         rads = 10.0 ** rads
 
         # Make hardening parameters broadcastable
-        args = [norm, mt, mr, rchar, gamma_sc, gamma_df]
+        args = [norm, mt, mr, rchar, gamma_inner, gamma_outer]
         args = [aa[:, np.newaxis] for aa in args]
-        norm, mt, mr, rchar, gamma_sc, gamma_df = args
+        norm, mt, mr, rchar, gamma_inner, gamma_outer = args
 
         # Calculate hardening rates along full evolutionary history
-        dadt, _ = cls._dadt_dedt(mt, mr, rads, norm, rchar, gamma_sc, gamma_df)
+        dadt, _ = cls._dadt_dedt(mt, mr, rads, norm, rchar, gamma_inner, gamma_outer)
 
         # Integrate (inverse) hardening rates to calculate total lifetime
         tt = utils.trapz_loglog(- 1.0 / dadt, rads, axis=-1)
         tt = tt[:, -1]
         return tt
+
+
+class Fixed_Time(Fixed_Time_2PL):
+    """Legacy Version of `Fixed_Time` class such that outer power-law in time (a/dadt) is g1+g2+1.
+    """
+
+    def __init__(self, *args, **kwargs):
+        log.warning("class `Fixed_Time` has been deprecated!  Please use `Fixed_Time_2PL` with new parametrization!")
+
+        # Convert from old to new parameter names
+        replace_kwargs = [['gamma_sc', 'gamma_inner'], ['gamma_df', 'gamma_outer']]
+        for replace in replace_kwargs:
+            val = kwargs.pop(replace[0], None)
+            if replace[1] in kwargs:
+                err = f"Cannot accept kwargs for both {replace[0]} and {replace[1]}!"
+                log.exception(err)
+                raise ValueError(err)
+
+            if val is not None:
+                kwargs[replace[1]] = val
+
+        super().__init__(*args, **kwargs)
+        return
+
+    @classmethod
+    def function(cls, norm, xx, g1, g2):
+        """Hardening rate given the parameters for this hardening model.
+
+        The functional form is,
+
+        .. math::
+
+            \\dot{a} = - A * (1.0 + x)^{-g_2 - 1} / x^{g_1 - 1},
+
+        Where $A$ is an overall normalization, and x \\equiv a / r_\\mathrm{char}$ is the binary
+        separation scaled to a characteristic transition radius ($r_\\mathrm{char}$) between two
+        power-law indices $g_1$ and $g_2$.
+
+        Parameters
+        ----------
+        norm : array_like
+            Hardening rate normalization, units of [cm/s].
+        xx : array_like
+            Dimensionless binary separation, the semi-major axis in units of the characteristic
+            (i.e. transition) radius of the model `rchar`.
+        g1 : scalar
+            Power-law of hardening timescale in the stellar-scattering regime,
+            (small separations: r < rchar).
+        g2 : scalar
+            Power-law of hardening timescale in the dynamical-friction regime,
+            (large separations: r > rchar).
+
+        """
+        dadt = - norm * np.power(1.0 + xx, -g2-1) / np.power(xx, g1-1)
+        return dadt
 
 
 # =================================================================================================

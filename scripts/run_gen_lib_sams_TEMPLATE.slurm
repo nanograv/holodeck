@@ -1,9 +1,9 @@
 #!/bin/bash -l
 #    run with `sbatch <SCRIPT>`
 
-#SBATCH --account=fc_lzkhpc              # Allocation/Account 'fc_lzkhpc'
-#SBATCH --job-name=ecg_test01            # Name of job    `-J`
-#SBATCH --mail-user=emikogardiner@berkeley.edu           # Designate email address for job communications
+#SBATCH --account=ACCOUNT_NAME              # Allocation/Account 'fc_lzkhpc'
+#SBATCH --job-name=JOB_NAME                 # Name of job    `-J`
+#SBATCH --mail-user=EMAIL@ADDRESS           # Designate email address for job communications
 #SBATCH --output=slurm-%x.%j.out            # Path for output must already exist   `-o`
 #SBATCH --error=slurm-%x.%j.err             # Path for errors must already exist   `-e`
 
@@ -69,26 +69,6 @@ conda info -e
 which python
 python --version
 
-<<<<<<<< HEAD:scripts/run_import_holodeck.slurm
-
-# ====    setup parameters    ====
-
-SPACE="PS_Broad_Uniform_02B"           # NOTE: this must match exactly the class name in `holodeck/param_spaces.py`
-
-# Specify the run name, these are used in creating the log-name and the output folder
-NAME="broad-uniform-02b_2023-04-14"    # This is an arbitrary string specification for the job
-PARS="n10000_s61-81-101_r100_f40"   # This is an additional arbitrary string specification for the job
-
-# This is the script that will be run, make sure the path works
-SCRIPT="./scripts/gen_lib_sams.py"
-# This will be the name of the stdout and stderr logs
-LOG_NAME=$NAME"_job-log"
-
-# Output directory, make sure it has enough space
-OUTPUT="/global/scratch/users/emikogardiner/holodeck_output/"$NAME"_"$PARS
-
-========
->>>>>>>> dev-lib-ecg:scripts/run_gen_lib_sams_TEMPLATE.slurm
 # Create the output directory if it doesn't already exist
 mkdir -p $OUTPUT
 echo "Output directory: ${OUTPUT}"
@@ -111,16 +91,8 @@ pwd
 ls $SCRIPT
 set -x
 
-<<<<<<<< HEAD:scripts/run_import_holodeck.slurm
-# Real jobs
-# mpirun -np 120  python $SCRIPT $SPACE $OUTPUT -n 10000 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR
-# do something basic
-mpirun -n 4 python -c “import holodeck”
-# mpirun -n 4 python $SCRIPT -h
-========
 echo -e "Running mpiexec $(date +'%Y-%m-%d|%H:%M:%S')\n"
 echo ""
->>>>>>>> dev-lib-ecg:scripts/run_gen_lib_sams_TEMPLATE.slurm
 
 # mpiexec -n 144  python $SCRIPT $SPACE $OUTPUT -n 40000 -r 100 -f 40  1> $LOG_OUT 2> $LOG_ERR
 mpirun -np 12  python $SCRIPT $SPACE $OUTPUT -n 24 -r 11 -f 4  1> $LOG_OUT 2> $LOG_ERR
