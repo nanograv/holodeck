@@ -606,7 +606,7 @@ class Fixed_Time_2PL(_Hardening):
     _NORM_CHUNK_SIZE = 1e3
 
     def __init__(self, time, mtot, mrat, redz, sepa,
-                 rchar=100.0*PC, gamma_inner=-1.0, gamma_outer=+2.5,
+                 rchar=100.0*PC, gamma_inner=-1.0, gamma_outer=+1.5,
                  progress=False, interpolate_norm=False):
         """Initialize `Fixed_Time` instance for the given binary properties and function parameters.
 
@@ -1207,7 +1207,8 @@ class Fixed_Time(Fixed_Time_2PL):
                 err = f"Cannot accept kwargs for both {replace[0]} and {replace[1]}!"
                 log.exception(err)
                 raise ValueError(err)
-            kwargs[replace[1]] = val
+            if val is not None:
+                kwargs[replace[1]] = val
 
         super().__init__(*args, **kwargs)
         return
