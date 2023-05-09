@@ -1207,7 +1207,9 @@ class Fixed_Time(Fixed_Time_2PL):
                 err = f"Cannot accept kwargs for both {replace[0]} and {replace[1]}!"
                 log.exception(err)
                 raise ValueError(err)
-            kwargs[replace[1]] = val
+
+            if val is not None:
+                kwargs[replace[1]] = val
 
         super().__init__(*args, **kwargs)
         return
