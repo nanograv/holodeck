@@ -113,7 +113,7 @@ def find_hardening_norm(time, sam, hard, nsteps=100):
 
     _find_hardening_norm(
         time, sam.mtot, sam.mrat,
-        hard._rchar, hard._gamma_inner, hard._gamma_outer,
+        hard._rchar, hard._sepa_init, hard._gamma_inner, hard._gamma_outer,
         nsteps,
         norm,
     )
@@ -146,7 +146,8 @@ cdef void _find_hardening_norm(
     cdef int ii, jj
     for ii in range(nm):
         for jj in range(nq):
-            inner_func(1.0, mtot[ii], mrat[jj])
+            # inner_func(1.0, mtot[ii], mrat[jj])
+            pass
             # brentq(
             #     f, xa, xb, <test_params *> &myargs, XTOL, RTOL, MITR, NULL)
 
@@ -154,7 +155,7 @@ cdef void _find_hardening_norm(
 
 
 
-def evolve_binaries(fobs_orb, sam, hard, cosmo, nsteps):
+def dynamic_binary_number(fobs_orb, sam, hard, cosmo, nsteps):
     dens = sam.static_binary_density
     # convert from flattened array back to grid shape  (M*Q*Z ==> (M, Q, Z,))
     norm = hard._norm.reshape(sam.shape)
@@ -165,7 +166,7 @@ def evolve_binaries(fobs_orb, sam, hard, cosmo, nsteps):
     cdef np.ndarray[np.double_t, ndim=4] diff_num = np.zeros(shape)
     # cdef np.ndarray[np.double_t, ndim=4] number = np.zeros(num_shape)
 
-    _evolve_binaries(
+    _dynamic_binary_number(
         fobs_orb, norm, hard._rchar, hard._gamma_inner, hard._gamma_outer,
         dens, sam.mtot, sam.mrat, sam.redz, sam._gmt_time, 1.0e4 * MY_PC, nsteps,
         cosmo._grid_z, cosmo._grid_dcom, cosmo._grid_age,
@@ -180,7 +181,7 @@ def evolve_binaries(fobs_orb, sam, hard, cosmo, nsteps):
 @cython.wraparound(False)
 @cython.nonecheck(False)
 @cython.cdivision(True)
-cdef void _evolve_binaries(
+cdef void _dynamic_binary_number(
     # input
     double[:] target_fobs_orb,
     double[:, :, :] hard_norm,
@@ -214,7 +215,7 @@ cdef void _evolve_binaries(
     cdef int ii, jj, kk, ss, fidx, interp_left, interp_right, ff
     cdef double mt, mr, rz, norm
     cdef double risco, risco_log10, dx, newz
-    cdef double sepa_log10, sepa_left, sepa_right, dadt_left, dadt_right
+    cdef double sepa_log10, sepa, sepa_left, sepa_right, dadt_left, dadt_right
     cdef double time_evo, redz_left, redz_right, time_left, time_right
     cdef double frst_orb_left, fobs_orb_left, frst_orb_right, fobs_orb_right, gmt, ftemp
     cdef double target_frst_orb
@@ -292,6 +293,9 @@ cdef void _evolve_binaries(
                     redz_left = interp_at_index(interp_left, time_left, tage_interp_grid, redz_interp_grid)
                     redz_right = interp_at_index(interp_right, time_right, tage_interp_grid, redz_interp_grid)
 
+                    # redz_left = redz[kk]
+                    # redz_right = redz[kk]
+
                     # convert to frequencies
                     fobs_orb_left = frst_orb_left / (1.0 + redz_left)
                     fobs_orb_right = frst_orb_right / (1.0 + redz_right)
@@ -309,21 +313,28 @@ cdef void _evolve_binaries(
                         # ---- TARGET FOUND ----
 
                         newz = _interp_between_vals(ftemp, fobs_orb_left, fobs_orb_right, redz_left, redz_right)
-                        redz_final[ii, jj, kk, ff] = newz
+                        if newz > 0.0:
 
-                        # dadt : interpolate left-right
-                        dadt = _interp_between_vals(ftemp, fobs_orb_left, fobs_orb_right, dadt_left, dadt_right)
-                        # calculate residence/hardening time = f/[df/dt] = -(2/3) a/[da/dt]
-                        target_frst_orb = ftemp * (1.0 + newz)
-                        tres = - (2.0/3.0) * kepler_sepa_from_freq(mt, target_frst_orb) / dadt
-                        # get comoving distance values at left and right step-edges
-                        dcom_left = interp_at_index(interp_left, time_left, tage_interp_grid, dcom_interp_grid)
-                        dcom_right = interp_at_index(interp_right, time_right, tage_interp_grid, dcom_interp_grid)
-                        # dcom : interpolate left-right
-                        dcom = _interp_between_vals(ftemp, fobs_orb_left, fobs_orb_right, dcom_left, dcom_right)
+                            redz_final[ii, jj, kk, ff] = newz
 
-                        cosmo_fact = FOUR_PI_SPLC_OVER_MPC * dcom * (1.0 + newz)
-                        diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
+                            target_frst_orb = ftemp * (1.0 + newz)
+                            sepa = kepler_sepa_from_freq(mt, target_frst_orb)
+
+                            # dadt : interpolate left-right
+                            # dadt = _interp_between_vals(ftemp, fobs_orb_left, fobs_orb_right, dadt_left, dadt_right)
+                            dadt = hard_func(norm, sepa/hard_rchar, hard_gamma_inner, hard_gamma_outer)
+                            dadt += hard_gw(mt, mr, sepa)
+
+                            # calculate residence/hardening time = f/[df/dt] = -(2/3) a/[da/dt]
+                            tres = - (2.0/3.0) * sepa / dadt
+                            # get comoving distance values at left and right step-edges
+                            dcom_left = interp_at_index(interp_left, time_left, tage_interp_grid, dcom_interp_grid)
+                            dcom_right = interp_at_index(interp_right, time_right, tage_interp_grid, dcom_interp_grid)
+                            # dcom : interpolate left-right
+                            dcom = _interp_between_vals(ftemp, fobs_orb_left, fobs_orb_right, dcom_left, dcom_right)
+
+                            cosmo_fact = FOUR_PI_SPLC_OVER_MPC * (1.0 + newz) * pow(dcom / MY_MPC, 2)
+                            diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
 
                         # ----------------------
 
