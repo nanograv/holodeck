@@ -629,7 +629,7 @@ def pars_linspace_dict(gp_george, num_points=5):
 
 
 def hc_from_gp(gp_george, gp_list, gp_george_variance, gp_list_variance,
-               env_pars):
+               env_pars,include_gp_unc=True):
     """Calculate the characteristic strain using a GP.
 
     Parameters
@@ -668,7 +668,11 @@ def hc_from_gp(gp_george, gp_list, gp_george_variance, gp_list_variance,
         mean_pred, mean_pred_unc = gp_list[ii].predict(gp_george[ii].y, [env_pars])
         std_pred, std_pred_unc = gp_list_variance[ii].predict(gp_george_variance[ii].y, [env_pars])
 
-        total_pred_unc = np.sqrt(std_pred**2 + std_pred_unc**2 + mean_pred_unc**2)
+        if include_gp_unc:
+            total_pred_unc = np.sqrt(std_pred**2 + std_pred_unc**2 + mean_pred_unc**2)
+        else:
+            total_pred_unc = std_pred
+        
         rho_pred[ii, 0], rho_pred[ii, 1] = mean_pred, total_pred_unc
 
         # transforming from zero-mean unit-variance variable to rho
