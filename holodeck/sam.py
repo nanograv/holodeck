@@ -384,9 +384,9 @@ class Semi_Analytic_Model:
     """
 
     # ZERO_GMT_STALLED_SYSTEMS = False
-    ZERO_DYNAMIC_STALLED_SYSTEMS = True # must be false to use Hard_GW
-    ZERO_DYNAMIC_COALESCED_SYSTEMS = True
-    USE_REDZ_AFTER_HARD = True
+    # ZERO_DYNAMIC_STALLED_SYSTEMS = True # must be false to use Hard_GW
+    # ZERO_DYNAMIC_COALESCED_SYSTEMS = True
+    # USE_REDZ_AFTER_HARD = True
 
     def __init__(
         self, mtot=(1.0e4*MSOL, 1.0e11*MSOL, 61), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
@@ -762,10 +762,24 @@ class Semi_Analytic_Model:
             edges = self.edges + [sepa, ]
 
         if zero_coalesced is None:
-            zero_coalesced = self.ZERO_DYNAMIC_COALESCED_SYSTEMS
+            if hard.CONSISTENT is True:
+                zero_coalesced = True
+            elif hard.CONSISTENT is False:
+                zero_coalesced = False
+            else:
+                err = "`hard.CONSISTENT` or 'zero_coalesced' must be one of {{True, False}}!"
+                log.error(err)
+                raise ValueError(err)
 
         if zero_stalled is None:
-            zero_stalled = self.ZERO_DYNAMIC_STALLED_SYSTEMS
+            if hard.CONSISTENT is True:
+                zero_stalled = False
+            elif hard.CONSISTENT is False:
+                zero_stalled = True
+            else:
+                err = "`hard.CONSISTENT` or 'zero_stalled must be one of {{True, False}}!"
+                log.error(err)
+                raise ValueError(err)
 
         log.info(f"{zero_coalesced=}, {zero_stalled=}")
 
@@ -986,7 +1000,14 @@ class Semi_Analytic_Model:
         """
 
         if use_redz_after_hard is None:
-            use_redz_after_hard = self.USE_REDZ_AFTER_HARD
+            if hard.CONSISTENT is True:
+                use_redz_after_hard = True
+            elif hard.CONSISTENT is False:
+                use_redz_after_hard = False
+            else:
+                err = "`hard.CONSISTENT` or 'use_redz_after_hard' must be one of {{True, False}}!"
+                log.error(err)
+                raise ValueError(err)
 
         squeeze = True
         fobs_gw_edges = np.atleast_1d(fobs_gw_edges)
