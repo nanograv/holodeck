@@ -41,10 +41,10 @@ cdef double KEPLER_CONST_SEPA = pow(MY_NWTG, 1.0/3.0) / pow(2.0*M_PI, 2.0/3.0)
 cdef double FOUR_PI_SPLC_OVER_MPC = 4 * M_PI * MY_SPLC / MY_MPC
 
 
-@cython.cdivision(True)
-cdef double hard_func(double norm, double xx, double gamma_inner, double gamma_outer):
-    cdef double dadt = - norm * pow(1.0 + xx, -gamma_outer+gamma_inner) / pow(xx, gamma_inner-1)
-    return dadt
+# @cython.cdivision(True)
+# cdef double hard_func(double norm, double xx, double gamma_inner, double gamma_outer):
+#     cdef double dadt = - norm * pow(1.0 + xx, -gamma_outer+gamma_inner) / pow(xx, gamma_inner-1)
+#     return dadt
 
 
 @cython.cdivision(True)
@@ -76,40 +76,50 @@ cdef int while_while(int start, int size, double val, double[:] edges):
     return index
 
 
-cdef double integrate_binary_evolution(norm, mt, mr, sepa_init, rchar, gamma_inner, gamma_outer, int nsteps):
-    cdef double risco_log10 = log10(3.0 * MY_SCHW * mt)
-    cdef double sepa_log10 = log10(sepa_init)
-
-    # step-size, in log10-space, to go from sepa_init to ISCO
-    cdef double dx = (sepa_log10 - risco_log10) / nsteps
-    cdef double time = 0.0
-
-    cdef int ii
-    cdef double sepa_right, dadt_right, dt
-
-    cdef double sepa_left = pow(10.0, sepa_log10)
-    cdef double dadt_left = hard_func(norm, sepa_left/rchar, gamma_inner, gamma_outer)
-    dadt_left += hard_gw(mt, mr, sepa_left)
-
-    for ii in range(nsteps):
-        sepa_log10 -= dx
-        sepa_right = pow(10.0, sepa_log10)
-
-        # Get total hardening rate at k+1 edge
-        dadt_right = hard_func(norm, sepa_right/rchar, gamma_inner, gamma_outer)
-        dadt_right += hard_gw(mt, mr, sepa_right)
-
-        # Find time to move from left to right
-        dt = 2.0 * (sepa_right - sepa_left) / (dadt_left + dadt_right)
-        time += dt
-
-        sepa_left = sepa_right
-        dadt_left = dadt_right
-
-    return time
 
 
-ctypedef struct integrate_params:
+# ==================================================================================================
+# ====    Fixed_Time_2PL_SAM - Hardening Model    ====
+# ==================================================================================================
+
+
+@cython.cdivision(True)
+cdef double _hard_func_2pwl(double norm, double xx, double gamma_inner, double gamma_outer):
+    cdef double dadt = - norm * pow(1.0 + xx, -gamma_outer+gamma_inner) / pow(xx, gamma_inner-1)
+    return dadt
+
+
+@cython.cdivision(True)
+cpdef double hard_func_2pwl_gw(
+    double mtot, double mrat, double sepa,
+    double norm, double rchar, double gamma_inner, double gamma_outer
+):
+    cdef double dadt = _hard_func_2pwl(norm, sepa/rchar, gamma_inner, gamma_outer)
+    dadt += hard_gw(mtot, mrat, sepa)
+    return dadt
+
+
+def find_2pl_hardening_norm(time, mtot, mrat, sepa_init, rchar, gamma_inner, gamma_outer, nsteps):
+    assert np.ndim(time) == 0
+    assert np.ndim(mtot) == 1
+    assert np.shape(mtot) == np.shape(mrat)
+
+    cdef np.ndarray[np.double_t, ndim=1] norm_log10 = np.zeros(mtot.size)
+
+    cdef integrate_2pl_params args
+    args.target_time = time
+    args.sepa_init = sepa_init
+    args.rchar = rchar
+    args.gamma_inner = gamma_inner
+    args.gamma_outer = gamma_outer
+    args.nsteps = nsteps
+
+    _find_2pl_hardening_norm(mtot, mrat, args, norm_log10)
+
+    return norm_log10
+
+
+ctypedef struct integrate_2pl_params:
     double target_time
     double mt
     double mr
@@ -120,145 +130,118 @@ ctypedef struct integrate_params:
     int nsteps
 
 
-cdef double wrapper_integrate_binary_evolution(double norm, void *args):
-    cdef integrate_params *pars = <integrate_params *> args
-    cdef double time = integrate_binary_evolution(
-        pow(10.0, norm), pars.mt, pars.mr, pars.sepa_init, pars.rchar, pars.gamma_inner, pars.gamma_outer, pars.nsteps
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef void _find_2pl_hardening_norm(
+    double[:] mtot,
+    double[:] mrat,
+    integrate_2pl_params args,
+    # output
+    double[:] norm_log10,
+):
+
+    cdef double XTOL = 1e-3
+    cdef double RTOL = 1e-5
+    cdef int MITR = 100    # note: the function doesn't return an error on failure, it still returns last try
+    cdef double NORM_LOG10_LO = -20.0
+    cdef double NORM_LOG10_HI = +20.0
+
+    cdef int num = mtot.size
+    assert mtot.size == mrat.size
+    cdef double time
+
+    cdef int ii
+    for ii in range(num):
+        args.mt = mtot[ii]
+        args.mr = mrat[ii]
+        norm_log10[ii] = brentq(
+            _integrate_binary_evolution_2pl, NORM_LOG10_LO, NORM_LOG10_HI,
+            <integrate_2pl_params *> &args, XTOL, RTOL, MITR, NULL
+        )
+        # time = _integrate_binary_evolution_2pl(norm_log10[ii], <integrate_2pl_params *> &args)
+        # printf("ii=%3d time=%.4e (%.4e)\n", ii, time/MY_GYR, args.target_time/MY_GYR)
+
+    return
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef double _integrate_binary_evolution_2pl(double norm_log10, void *args):
+    cdef integrate_2pl_params *pars = <integrate_2pl_params *> args
+
+    cdef double risco_log10 = log10(3.0 * MY_SCHW * pars.mt)
+    cdef double sepa_log10 = log10(pars.sepa_init)
+    cdef double norm = pow(10.0, norm_log10)
+
+    # step-size, in log10-space, to go from sepa_init to ISCO
+    cdef double dx = (sepa_log10 - risco_log10) / pars.nsteps
+    cdef double time = 0.0
+
+    cdef int ii
+    cdef double sepa_right, dadt_right, dt
+
+    cdef double sepa_left = pow(10.0, sepa_log10)
+    cdef double dadt_left = hard_func_2pwl_gw(
+        pars.mt, pars.mr, sepa_left,
+        norm, pars.rchar, pars.gamma_inner, pars.gamma_outer
     )
+
+    for ii in range(pars.nsteps):
+        sepa_log10 -= dx
+        sepa_right = pow(10.0, sepa_log10)
+
+        # Get total hardening rate at k+1 edge
+        dadt_right = hard_func_2pwl_gw(
+            pars.mt, pars.mr, sepa_right,
+            norm, pars.rchar, pars.gamma_inner, pars.gamma_outer
+        )
+
+        # Find time to move from left to right
+        dt = 2.0 * (sepa_right - sepa_left) / (dadt_left + dadt_right)
+        time += dt
+
+        sepa_left = sepa_right
+        dadt_left = dadt_right
+
     time = time - pars.target_time
     return time
 
 
-def find_hardening_norm(time, sam, hard, nsteps=100):
-
-    cdef np.ndarray[np.double_t, ndim=2] norm = np.zeros((sam.mtot.size, sam.mrat.size))
-
-    _find_hardening_norm(
-        time, sam.mtot, sam.mrat,
-        hard._rchar, hard._sepa_init, hard._gamma_inner, hard._gamma_outer,
-        nsteps,
-        norm,
-    )
-
-    return norm
-
-
-cdef void _find_hardening_norm(
-    double time,
-    double[:] mtot,
-    double[:] mrat,
-    double rchar,
-    double sepa_init,
-    double gamma_inner,
-    double gamma_outer,
-    int nsteps,
-    # output
-    double[:, :] norm,
-):
-
-    cdef double XTOL = 1e-3
-    cdef double RTOL = 1e-5
-    cdef int MITR = 10
-    cdef double LO = -20.0
-    cdef double HI = +20.0
-
-    cdef int nm = mtot.size
-    cdef int nq = mrat.size
-
-    cdef integrate_params args
-    args.target_time = time
-    args.rchar = rchar
+def integrate_binary_evolution_2pl(norm_log10, mtot, mrat, sepa_init, rchar, gamma_inner, gamma_outer, nsteps):
+    cdef integrate_2pl_params args
+    args.mt = mtot
+    args.mr = mrat
+    args.target_time = 0.0
     args.sepa_init = sepa_init
+    args.rchar = rchar
     args.gamma_inner = gamma_inner
     args.gamma_outer = gamma_outer
     args.nsteps = nsteps
 
-    cdef int ii, jj
-    for ii in range(nm):
-        for jj in range(nq):
-            args.mt = mtot[ii]
-            args.mr = mrat[ii]
-            norm[ii, jj] = brentq(
-                wrapper_integrate_binary_evolution, LO, HI, <integrate_params *> &args, XTOL, RTOL, MITR, NULL
-            )
-
-    return
-
-
-def find_hardening_norm_test(time, sam, hard, nsteps=100):
-
-    cdef np.ndarray[np.double_t, ndim=2] norm = np.zeros((sam.mtot.size, sam.mrat.size))
-
-    _find_hardening_norm_test(
-        time, sam.mtot, sam.mrat,
-        hard.function,
-        nsteps,
-        norm,
-    )
-
-    return norm
-
-
-cdef void _find_hardening_norm_test(
-    double time,
-    double[:] mtot,
-    double[:] mrat,
-    double rchar,
-    double sepa_init,
-    double gamma_inner,
-    double gamma_outer,
-    int nsteps,
-    # output
-    double[:, :] norm,
-):
-
-    cdef double XTOL = 1e-3
-    cdef double RTOL = 1e-5
-    cdef int MITR = 10
-    cdef double LO = -20.0
-    cdef double HI = +20.0
-
-    cdef int nm = mtot.size
-    cdef int nq = mrat.size
-
-    cdef integrate_params args
-    args.target_time = time
-    args.rchar = rchar
-    args.sepa_init = sepa_init
-    args.gamma_inner = gamma_inner
-    args.gamma_outer = gamma_outer
-    args.nsteps = nsteps
-
-    cdef int ii, jj
-    for ii in range(nm):
-        for jj in range(nq):
-            args.mt = mtot[ii]
-            args.mr = mrat[ii]
-            norm[ii, jj] = brentq(
-                wrapper_integrate_binary_evolution, LO, HI, <integrate_params *> &args, XTOL, RTOL, MITR, NULL
-            )
-
-    return
+    time = _integrate_binary_evolution_2pl(norm_log10, <integrate_2pl_params *> &args)
+    return time
 
 
 
-def dynamic_binary_number(fobs_orb, sam, hard, cosmo, nsteps):
+
+
+def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
     dens = sam.static_binary_density
-    # convert from flattened array back to grid shape  (M*Q*Z ==> (M, Q, Z,))
-    norm = hard._norm.reshape(sam.shape)
 
     shape = sam.shape + (fobs_orb.size,)
-    num_shape = tuple([ss-1 for ss in sam.shape]) + (fobs_orb.size,)
     cdef np.ndarray[np.double_t, ndim=4] redz_final = NAN * np.ones(shape)
     cdef np.ndarray[np.double_t, ndim=4] diff_num = np.zeros(shape)
-    # cdef np.ndarray[np.double_t, ndim=4] number = np.zeros(num_shape)
 
-    _dynamic_binary_number(
-        fobs_orb, norm, hard._rchar, hard._gamma_inner, hard._gamma_outer,
-        dens, sam.mtot, sam.mrat, sam.redz, sam._gmt_time, 1.0e4 * MY_PC, nsteps,
+    _dynamic_binary_number_at_fobs(
+        fobs_orb, hard._norm, hard._rchar, hard._gamma_inner, hard._gamma_outer,
+        dens, sam.mtot, sam.mrat, sam.redz, sam._gmt_time, hard._sepa_init, hard._num_steps,
         cosmo._grid_z, cosmo._grid_dcom, cosmo._grid_age,
 
-        redz_final, diff_num,
+        redz_final, diff_num
     )
 
     return redz_final, diff_num
@@ -268,10 +251,10 @@ def dynamic_binary_number(fobs_orb, sam, hard, cosmo, nsteps):
 @cython.wraparound(False)
 @cython.nonecheck(False)
 @cython.cdivision(True)
-cdef void _dynamic_binary_number(
+cdef void _dynamic_binary_number_at_fobs(
     # input
     double[:] target_fobs_orb,
-    double[:, :, :] hard_norm,
+    double[:, :] hard_norm,
     double hard_rchar,
     double hard_gamma_inner,
     double hard_gamma_outer,
@@ -293,8 +276,8 @@ cdef void _dynamic_binary_number(
 
     cdef int nf = target_fobs_orb.size
     cdef int nm = mtot.size
-    cdef int nq = mtot.size
-    cdef int nz = mtot.size
+    cdef int nq = mrat.size
+    cdef int nz = redz.size
     cdef int ninterp = redz_interp_grid.size
     cdef double age_universe = tage_interp_grid[ninterp - 1]
     cdef double sepa_init_log10 = log10(sepa_init)
@@ -330,12 +313,14 @@ cdef void _dynamic_binary_number(
         for jj in range(nq):
             mr = mrat[jj]
             sepa_log10 = sepa_init_log10
-            norm = hard_norm[ii, jj, 0]   # redshift doesn't change normalization, so grad 0th redshift
+            norm = hard_norm[ii, jj]
 
             # Get total hardening rate at 0th edge
             sepa_left = pow(10.0, sepa_log10)
-            dadt_left = hard_func(norm, sepa_left/hard_rchar, hard_gamma_inner, hard_gamma_outer)
-            dadt_left += hard_gw(mt, mr, sepa_left)
+            dadt_left = hard_func_2pwl_gw(
+                mt, mr, sepa_left,
+                norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
+            )
 
             # get rest-frame orbital frequency of binary at left edge
             frst_orb_left = kepler_freq_from_sepa(mt, sepa_left)
@@ -350,8 +335,10 @@ cdef void _dynamic_binary_number(
                 frst_orb_right = kepler_freq_from_sepa(mt, sepa_right)
 
                 # Get total hardening rate at k+1 edge
-                dadt_right = hard_func(norm, sepa_right/hard_rchar, hard_gamma_inner, hard_gamma_outer)
-                dadt_right += hard_gw(mt, mr, sepa_right)
+                dadt_right = hard_func_2pwl_gw(
+                    mt, mr, sepa_right,
+                    norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
+                )
 
                 # Find time to move from left to right
                 dt = 2.0 * (sepa_right - sepa_left) / (dadt_left + dadt_right)
@@ -409,8 +396,10 @@ cdef void _dynamic_binary_number(
 
                             # dadt : interpolate left-right
                             # dadt = _interp_between_vals(ftemp, fobs_orb_left, fobs_orb_right, dadt_left, dadt_right)
-                            dadt = hard_func(norm, sepa/hard_rchar, hard_gamma_inner, hard_gamma_outer)
-                            dadt += hard_gw(mt, mr, sepa)
+                            dadt = hard_func_2pwl_gw(
+                                mt, mr, sepa,
+                                norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
+                            )
 
                             # calculate residence/hardening time = f/[df/dt] = -(2/3) a/[da/dt]
                             tres = - (2.0/3.0) * sepa / dadt
