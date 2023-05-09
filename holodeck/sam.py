@@ -53,7 +53,7 @@ import kalepy as kale
 import holodeck as holo
 from holodeck import cosmo, utils, log
 from holodeck.constants import GYR, SPLC, MSOL, MPC, YR, PC
-from holodeck import relations, gravwaves
+from holodeck import relations, gravwaves, single_sources
 
 _DEBUG = False
 _DEBUG_LVL = log.DEBUG
@@ -389,7 +389,7 @@ class Semi_Analytic_Model:
     USE_REDZ_AFTER_HARD = True
 
     def __init__(
-        self, mtot=(1.0e4*MSOL, 1.0e11*MSOL, 61), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
+        self, mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91), mrat=(1e-3, 1.0, 71), redz=(1e-3, 10.0, 101),
         shape=None,
         gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013,
         **kwargs
@@ -575,6 +575,7 @@ class Semi_Analytic_Model:
             # Convert to shape (M, Q, Z)
             mstar_pri, mstar_rat, mstar_tot, redz = np.broadcast_arrays(*args)
 
+            # choose whether the primary mass, or total mass, is used in different calculations
             mass_gsmf = mstar_tot if GSMF_USES_MTOT else mstar_pri
             mass_gpf = mstar_tot if GPF_USES_MTOT else mstar_pri
             mass_gmt = mstar_tot if GMT_USES_MTOT else mstar_pri
@@ -603,7 +604,6 @@ class Semi_Analytic_Model:
             # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]
             dens = self._gsmf(mass_gsmf, redz) * self._gpf(mass_gpf, mstar_rat, redz) * cosmo.dtdz(redz)
             # `gmt` returns [sec]
-            # dens /= self._gmt(mass_gmt, mstar_rat, redz)
             dens /= gmt_time
             # now `dens` is  ``dn_gal / [dlog10(Mstar) dq_gal dz]``  with units of [Mpc^-3]
 
@@ -625,7 +625,9 @@ class Semi_Analytic_Model:
 
             # ---- Convert to MBH Binary density
 
+            # we want ``dn_mbhb / [dlog10(M_bh) dq_bh qz]``
             # so far we have ``dn_gal / [dlog10(M_gal) dq_gal dz]``
+
             # dn / [dM dq dz] = (dn_gal / [dM_gal dq_gal dz]) * (dM_gal/dM_bh) * (dq_gal / dq_bh)
             mplaw = self._mmbulge._mplaw
             dqbh_dqgal = mplaw * np.power(mstar_rat, mplaw - 1.0)
@@ -637,7 +639,7 @@ class Semi_Analytic_Model:
             qterm = (1.0 + mstar_rat) / (1.0 + self.mrat[np.newaxis, :, np.newaxis])
             dmstar_dmbh = dmstar_dmbh_pri * qterm
 
-            dens *= self.mtot[:, np.newaxis, np.newaxis] * dmstar_dmbh / dqbh_dqgal / mstar_tot
+            dens *= (self.mtot[:, np.newaxis, np.newaxis] / mstar_tot) * (dmstar_dmbh / dqbh_dqgal)
 
             if _DEBUG:
                 dens_check = self._ndens_mbh(mass_gsmf, mstar_rat, redz)
@@ -663,21 +665,28 @@ class Semi_Analytic_Model:
                 log.info(f"\tdens bef: ({utils.stats(dens)})")
                 dur = datetime.now()
                 mass_bef = self._integrated_binary_density(dens, sum=True)
+                self._dens_bef = np.copy(dens)
                 dens = add_scatter_to_masses(self.mtot, self.mrat, dens, scatter)
+                self._dens_aft = np.copy(dens)
 
                 mass_aft = self._integrated_binary_density(dens, sum=True)
                 dur = datetime.now() - dur
                 dm = (mass_aft - mass_bef) / mass_bef
                 log.info(f"Scatter added after {dur.total_seconds()} sec")
                 log.info(f"\tdens aft: ({utils.stats(dens)})")
-                log.info(f"\tmass: {mass_bef:.2e} ==> {mass_aft:.2e} || change = {dm:.4e}")
+                msg = f"mass: {mass_bef:.2e} ==> {mass_aft:.2e} || change = {dm:.4e}"
+                log.info(f"\t{msg}")
+                if np.fabs(dm) > 0.05:
+                    err = f"Warning, significant change in number-mass!  {msg}"
+                    log.error(err)
+                    print(err, flush=True)
 
             # set values after redshift zero to have zero density
-            if self.ZERO_GMT_STALLED_SYSTEMS:
-                log.info(f"zeroing out {utils.frac_str(idx_stalled)} systems stalled from GMT")
-                dens[idx_stalled] = 0.0
-            else:
-                log.info("NOT zeroing out systems with GMTs extending past redshift zero!")
+            # if self.ZERO_GMT_STALLED_SYSTEMS:
+            log.info(f"zeroing out {utils.frac_str(idx_stalled)} systems stalled from GMT")
+            dens[idx_stalled] = 0.0
+            # else:
+            #     log.info("NOT zeroing out systems with GMTs extending past redshift zero!")
 
             self._density = dens
 
@@ -762,15 +771,29 @@ class Semi_Analytic_Model:
             edges = self.edges + [sepa, ]
 
         if zero_coalesced is None:
-            zero_coalesced = self.ZERO_DYNAMIC_COALESCED_SYSTEMS
-
+            if hard.CONSISTENT is True:
+                zero_coalesced = False
+            elif hard.CONSISTENT is False:
+                zero_coalesced = True
+            else:
+                err = "`hard.CONSISTENT` or 'zero_coalesced' must be one of {{True, False}}!"
+                log.error(err)
+                raise ValueError(err)
+            
         if zero_stalled is None:
-            zero_stalled = self.ZERO_DYNAMIC_STALLED_SYSTEMS
+            if hard.CONSISTENT is True:
+                zero_stalled = True
+            elif hard.CONSISTENT is False:
+                zero_stalled = False
+            else:
+                err = "`hard.CONSISTENT` or 'zero_stalled must be one of {{True, False}}!"
+                log.error(err)
+                raise ValueError(err)
 
         log.info(f"{zero_coalesced=}, {zero_stalled=}")
 
         # shape: (M, Q, Z)
-        dens = self.static_binary_density   # d3n/[dz dlog10(M) dq]  units: [Mpc^-3]
+        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
 
         # (Z,) comoving-distance in [Mpc]
         dc = cosmo.comoving_distance(self.redz).to('Mpc').value
@@ -789,11 +812,21 @@ class Semi_Analytic_Model:
 
         # Make sure we have both `frst_orb` and binary separation `sa`; shapes (X, M*Q*Z)
         if fobs_orb is not None:
+            if not np.all(np.diff(fobs_orb) > 0.0):
+                err = f"Values of `frst_orb` must all be increasing!  {fobs_orb}"
+                log.exception(err)
+                raise ValueError(err)
+
             # Convert from observer-frame orbital freq, to rest-frame orbital freq
             # (X, M*Q*Z)
             frst_orb = fobs_orb[:, np.newaxis] * (1.0 + rz[np.newaxis, :])
             sa = utils.kepler_sepa_from_freq(mt[np.newaxis, :], frst_orb)
         else:
+            if not np.all(np.diff(sepa) < 0.0):
+                err = f"Values of `sepa` must all be decreasing!  {sepa}"
+                log.exception(err)
+                raise ValueError(err)
+
             sa = sepa[:, np.newaxis]
             # (X, M*Q*Z), this is the _orbital_ frequency (not GW), and in rest-frame
             frst_orb = utils.kepler_freq_from_sepa(mt[np.newaxis, :], sa)
@@ -888,6 +921,7 @@ class Semi_Analytic_Model:
             # (M, X)  =  (M,1) * (1,X)
             rads = extr[0][:, np.newaxis] + (extr[1] - extr[0])[:, np.newaxis] * rads
             rads = 10.0 ** rads
+            # print(f"{rads[-1, :]/PC=}")
             # (M, Q, Z, X)
             mt, mr, rz, rads = np.broadcast_arrays(
                 self.mtot[:, np.newaxis, np.newaxis, np.newaxis],
@@ -897,26 +931,33 @@ class Semi_Analytic_Model:
             )
             # (X, M*Q*Z)
             mt, mr, rz, rads = [mm.reshape(-1, STEPS).T for mm in [mt, mr, rz, rads]]
+            # print(f"{rads[:, -1]/PC=}")
             # (X, M*Q*Z) --- `Fixed_Time.dadt` will only accept this shape
             dadt_evo = hard.dadt(mt, mr, rads)
+            # print(f"{dadt_evo[:, -1]*YR/PC=}")
+
             # Integrate (inverse) hardening rates to calculate total lifetime to each separation
 
             # NOTE: this saves some overall memory usage by casting to float32
             # times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=0, cumsum=True)
             times_evo = -utils.trapz_loglog(-1.0 / dadt_evo.astype('float32'), rads.astype('float32'), axis=0, cumsum=True)
+            # print(f"{times_evo[:, -1]/GYR=}")
             del dadt_evo
 
             # (X, M*Q*Z)   convert from separations to rest-frame orbital frequencies
             frst_orb_evo = utils.kepler_freq_from_sepa(mt, rads)
+            # print(f"{frst_orb_evo[:, -1]*YR=}")
             del rads, mt, mr
             # interpolate to target frequencies
             # `frst_orb` is shaped (X, M*Q*Z)  `ndinterp` interpolates over 1th dimension
             # times = utils.ndinterp(frst_orb.T, frst_orb_evo[1:, :].T, times_evo.T, xlog=True, ylog=True).T
             # NOTE: cyutils.interp_2d doesn't currently work for the float32, so use 64, still saves memory overall
+            # print(f"{frst_orb[:, -1]*YR=}")
             times = holo.cyutils.interp_2d(
                 frst_orb.T, frst_orb_evo[1:, :].T, times_evo.T.astype('float64'),
                 xlog=True, ylog=True, extrap=False
             ).T
+            # print(f"{times[:, -1]/GYR=}")
             del frst_orb_evo, times_evo
 
             # Combine the binary-evolution time, with the galaxy-merger time
@@ -924,19 +965,24 @@ class Semi_Analytic_Model:
             times += self._gmt_time.reshape(-1)[np.newaxis, :]
 
             # Find the redshift when each binary reaches these frequencies, -1 for after z=0
-            redz_final = utils.redz_after(times, redz=rz[0, np.newaxis, :])
+            #    `rz` is shaped (X, M*Q*Z) where all entries across X are the same
+            # redz_final = utils.redz_after(times, redz=rz[0, np.newaxis, :])
+
+            times = times.T.reshape(dnum.shape)
+            # rz = rz.T.reshape(dnum.shape)
+            redz_final = utils.redz_after(times, redz=self.redz[np.newaxis, np.newaxis, :, np.newaxis])
 
             # reshape to match `dnum`  (X, M*Q*Z) ==> (M*Q*Z, X) ==> (M, Q, Z, X)
-            redz_final = redz_final.T.reshape(dnum.shape)
+            # redz_final = redz_final.T.reshape(dnum.shape)
             # Find systems not reaching these frequencies before redshift zero
             stall = (redz_final < 0.0)
 
-            log.info(f"fraction of stalled binary-xvals: {utils.frac_str(stall)}")
+            log.info(f"fraction of stalled bins-xvals: {utils.frac_str(stall)}")
             stalled = np.any(stall, axis=-1)
-            log.info(f"fraction of binaries stalled at all xvals: {utils.frac_str(stalled)}")
+            log.info(f"fraction of bins stalled at all xvals: {utils.frac_str(stalled)}")
             stalled_frac = np.count_nonzero(stalled) / stalled.size
             if stalled_frac > 0.8:
-                log.info(f"A large fraction of binaries are stalled at all xvals!  {stalled_frac:.4e}")
+                log.info(f"A large fraction of bins are stalled at all xvals!  {stalled_frac:.4e}")
 
             dnum[stall] = 0.0
             # self._stall = stall
@@ -986,7 +1032,14 @@ class Semi_Analytic_Model:
         """
 
         if use_redz_after_hard is None:
-            use_redz_after_hard = self.USE_REDZ_AFTER_HARD
+            if hard.CONSISTENT is True:
+                use_redz_after_hard = True
+            elif hard.CONSISTENT is False:
+                use_redz_after_hard = False
+            else:
+                err = "`hard.CONSISTENT` or 'use_redz_after_hard' must be one of {{True, False}}!"
+                log.error(err)
+                raise ValueError(err)
 
         squeeze = True
         fobs_gw_edges = np.atleast_1d(fobs_gw_edges)
@@ -1001,19 +1054,19 @@ class Semi_Analytic_Model:
         fobs_orb_edges = fobs_gw_edges / 2.0
         fobs_orb_cents = fobs_gw_cents / 2.0
 
-        print("GWB 1: ", flush=True)
-        holo.librarian._log_mem_usage(None)
+        # print("GWB 1: ", flush=True)
+        # holo.librarian._log_mem_usage(None)
 
         # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
-        #! NOTE: using frequency-bin _centers_ produces more accurate results than frequency-bin _edges_ !#
+        # ! NOTE: using frequency-bin _centers_ produces more accurate results than frequency-bin _edges_ !#
         vals = self.dynamic_binary_number(
             hard, fobs_orb=fobs_orb_cents,
             zero_coalesced=zero_coalesced, zero_stalled=zero_stalled, return_details=return_details,
         )
 
-        print("GWB 2: ", flush=True)
-        holo.librarian._log_mem_usage(None)
+        # print("GWB 2: ", flush=True)
+        # holo.librarian._log_mem_usage(None)
 
         if return_details:
             edges, dnum, details = vals
@@ -1030,14 +1083,14 @@ class Semi_Analytic_Model:
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
         #       after poisson calculation, need to convert back to dN/dlogf
         #       to get proper characteristic strain measurement
-        #! doing  ``dn/dlnf * Delta(ln[f])``  seems to be more accurate than trapz over log(freq) !#
+        # ! doing  ``dn/dlnf * Delta(ln[f])``  seems to be more accurate than trapz over log(freq) !#
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
         number = number * np.diff(np.log(fobs_gw_edges))
         log.debug(f"number: {utils.stats(number)}")
         log.debug(f"number.sum(): {number.sum():.4e}")
 
-        print("GWB 3: ", flush=True)
-        holo.librarian._log_mem_usage(None)
+        # print("GWB 3: ", flush=True)
+        # holo.librarian._log_mem_usage(None)
 
         if _DEBUG:
             _check_bads(edges, number, "number")
@@ -1047,7 +1100,17 @@ class Semi_Analytic_Model:
         # Use the redshift based on initial redshift + galaxy-merger-time + evolution-time
         log.debug(f"{use_redz_after_hard=}")
         if use_redz_after_hard:
-            use_redz = self._redz_final
+            try:
+                use_redz = self._redz_final
+            except AttributeError as err:
+                msg = (f"Failed to access `_redz_final` attribute.  If `zero_stalled`/`ZERO_DYNAMIC_STALLED_SYSTEMS` "
+                       "is False, then this attribute is not created!  You can disable this usage by also setting "
+                       "`use_redz_after_hard=False`.  Yes, it's a stupid way that this is setup "
+                       "right now.  Sorry.  LZK")
+                log.error(msg)
+                log.error(str(err))
+                raise
+
         # Use the redshift based on initial redshift + galaxy-merger-time (without evo time)
         else:
             log.warning(f"Using `redz_prime` for redshift (includes galaxy merger time, but not evolution time)")
@@ -1055,8 +1118,8 @@ class Semi_Analytic_Model:
 
         gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, realize)
 
-        print("GWB 4: ", flush=True)
-        holo.librarian._log_mem_usage(None)
+        # print("GWB 4: ", flush=True)
+        # holo.librarian._log_mem_usage(None)
 
         if _DEBUG:
             _rr = np.arange(realize)
@@ -1114,6 +1177,124 @@ class Semi_Analytic_Model:
         mr = self.mrat[np.newaxis, :, np.newaxis]
         gwb = gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
         return gwb
+
+    def ss_gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=1, loudest=1, params=False,
+            zero_coalesced=None, zero_stalled=None, use_redz_after_hard=None, return_details=False):
+        """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
+
+        Parameters
+        ----------
+        fobs_gw : (F,) array_like of scalar,
+            Observer-frame GW-frequencies. [1/sec]
+            These are the frequency bin edges, which are integrated across to get the number of binaries in each
+            frequency bin.
+        hard : holodeck.evolution._Hardening class or instance
+            Hardening mechanism to apply over the range of `fobs_gw`.
+        realize : bool or int,
+            Whether to construct a Poisson 'realization' (discretization) of the SAM distribution.
+            Realizations approximate the finite-source effects of a realistic population.
+        **kw_dynamic_binary_number : keyword-value pairs,
+            Additional arguments passed along to `Semi_Analytic_Model.dynamic_binary_number()`.
+
+        Returns
+        -------
+        gwb : (F,[R,]) ndarray of scalar
+            Dimensionless, characteristic strain at each frequency.
+            If `realize` is an integer with value R, then R realizations of the GWB are returned,
+            such that `hc` has shape (F,R,).
+        [details]
+
+
+        """
+
+        if use_redz_after_hard is None:
+            if hard.CONSISTENT is True:
+                use_redz_after_hard = True
+            elif hard.CONSISTENT is False:
+                use_redz_after_hard = False
+            else:
+                err = "`hard.CONSISTENT` or 'use_redz_after_hard' must be one of {{True, False}}!"
+                log.error(err)
+                raise ValueError(err)
+
+        fobs_gw_edges = np.atleast_1d(fobs_gw_edges)
+        if np.isscalar(fobs_gw_edges) or np.size(fobs_gw_edges) == 1:
+            err = "GWB can only be calculated across bins of frequency, `fobs_gw_edges` must provide bin edges!"
+            log.exception(err)
+            raise ValueError(err)
+
+        fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
+        # ---- Get the differential-number of binaries for each bin
+        # convert to orbital-frequency (from GW-frequency)
+        fobs_orb_edges = fobs_gw_edges / 2.0
+        fobs_orb_cents = fobs_gw_cents / 2.0
+
+        print("SS 1: ", flush=True)
+        holo.librarian._log_mem_usage(None)
+
+        # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
+        # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
+        edges, dnum = self.dynamic_binary_number(
+            hard, fobs_orb=fobs_orb_cents,
+            zero_coalesced=zero_coalesced, zero_stalled=zero_stalled, return_details=return_details,
+        )
+
+        print("SS 2: ", flush=True)
+        holo.librarian._log_mem_usage(None)
+
+
+        edges[-1] = fobs_orb_edges
+        log.debug(f"dnum: {utils.stats(dnum)}")
+
+
+        # "integrate" within each bin (i.e. multiply by bin volume)
+        number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
+        number = number * np.diff(np.log(fobs_gw_edges))
+        log.debug(f"number: {utils.stats(number)}")
+        log.debug(f"number.sum(): {number.sum():.4e}")
+
+        print("SS 3: ", flush=True)
+        holo.librarian._log_mem_usage(None)
+
+
+        # ---- Get the Single Source and GWB spectrum from number of binaries over grid
+
+        # Use the redshift based on initial redshift + galaxy-merger-time + evolution-time
+        log.debug(f"{use_redz_after_hard=}")
+        if use_redz_after_hard:
+            use_redz = self._redz_final
+        # Use the redshift based on initial redshift + galaxy-merger-time (without evo time)
+        else:
+            log.warning(f"Using `redz_prime` for redshift (includes galaxy merger time, but not evolution time)")
+            use_redz = self._redz_prime[:, :, :, np.newaxis] * np.ones_like(dnum)
+
+
+        ret_vals= single_sources.ss_gws_redz(edges, use_redz, number, 
+                                             realize=realize, loudest=loudest, params=params)
+        hc_ss = ret_vals[0]
+        hc_bg = ret_vals[1]
+        if params:
+            sspar = ret_vals[2]
+            bgpar = ret_vals[3]
+
+
+        print("SS 4: ", flush=True)
+        holo.librarian._log_mem_usage(None)
+
+
+        if _DEBUG:
+            _rr = np.arange(realize)
+            if len(_rr) > 1:
+                check_edges = [edges[-1], np.arange(realize)]
+            else:
+                check_edges = [edges[-1]]
+            _check_bads(check_edges, hc_bg, "hc_bg")
+
+        self._gwb = hc_bg
+        if params:
+            return hc_ss, hc_bg, sspar, bgpar
+
+        return hc_ss, hc_bg
 
     def _ndens_gal(self, mass_gal, mrat_gal, redz):
         if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
