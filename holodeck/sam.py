@@ -383,7 +383,7 @@ class Semi_Analytic_Model:
 
     """
 
-    ZERO_GMT_STALLED_SYSTEMS = False
+    # ZERO_GMT_STALLED_SYSTEMS = False
     ZERO_DYNAMIC_STALLED_SYSTEMS = True # must be false to use Hard_GW
     ZERO_DYNAMIC_COALESCED_SYSTEMS = True
     USE_REDZ_AFTER_HARD = True
@@ -673,11 +673,11 @@ class Semi_Analytic_Model:
                 log.info(f"\tmass: {mass_bef:.2e} ==> {mass_aft:.2e} || change = {dm:.4e}")
 
             # set values after redshift zero to have zero density
-            if self.ZERO_GMT_STALLED_SYSTEMS:
-                log.info(f"zeroing out {utils.frac_str(idx_stalled)} systems stalled from GMT")
-                dens[idx_stalled] = 0.0
-            else:
-                log.info("NOT zeroing out systems with GMTs extending past redshift zero!")
+            # if self.ZERO_GMT_STALLED_SYSTEMS:
+            log.info(f"zeroing out {utils.frac_str(idx_stalled)} systems stalled from GMT")
+            dens[idx_stalled] = 0.0
+            # else:
+            #     log.info("NOT zeroing out systems with GMTs extending past redshift zero!")
 
             self._density = dens
 
