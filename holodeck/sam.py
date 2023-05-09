@@ -763,19 +763,19 @@ class Semi_Analytic_Model:
 
         if zero_coalesced is None:
             if hard.CONSISTENT is True:
-                zero_coalesced = True
-            elif hard.CONSISTENT is False:
                 zero_coalesced = False
+            elif hard.CONSISTENT is False:
+                zero_coalesced = True
             else:
                 err = "`hard.CONSISTENT` or 'zero_coalesced' must be one of {{True, False}}!"
                 log.error(err)
                 raise ValueError(err)
-
+            
         if zero_stalled is None:
             if hard.CONSISTENT is True:
-                zero_stalled = False
-            elif hard.CONSISTENT is False:
                 zero_stalled = True
+            elif hard.CONSISTENT is False:
+                zero_stalled = False
             else:
                 err = "`hard.CONSISTENT` or 'zero_stalled must be one of {{True, False}}!"
                 log.error(err)
