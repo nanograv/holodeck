@@ -72,6 +72,8 @@ _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 class _Hardening(abc.ABC):
     """Base class for binary-hardening models, providing the `dadt_dedt(evo, step, ...)` method.
     """
+    
+    CONSISTENT = None
 
     @abc.abstractmethod
     def dadt_dedt(self, evo, step, *args, **kwargs):
@@ -85,10 +87,10 @@ class _Hardening(abc.ABC):
         _dadt, rv_dedt = self.dadt_dedt(*args, **kwargs)
         return rv_dedt
 
-
 class Hard_GW(_Hardening):
     """Gravitational-wave driven binary hardening.
     """
+    CONSISTENT = False
 
     @staticmethod
     def dadt_dedt(evo, step):
@@ -206,6 +208,10 @@ class Hard_GW(_Hardening):
         # rv = rv / (12 * sepa * fe)
         rv = 1.0 / utils.gw_dade(sepa, eccen)
         return rv
+    
+    @property
+    def consistent(self):
+        return False
 
 
 class Sesana_Scattering(_Hardening):
@@ -613,6 +619,7 @@ class Fixed_Time(_Hardening):
     _INTERP_NUM_POINTS = 3e4
     _INTERP_THRESH_PAD_FACTOR = 5.0      #: allowance for when to use chunking and when to process full array
     _NORM_CHUNK_SIZE = 1e3
+    CONSISTENT = True
 
     def __init__(self, time, mtot, mrat, redz, sepa,
                  rchar=100.0*PC, gamma_sc=-1.0, gamma_df=+2.5, progress=False, interpolate_norm=False):
