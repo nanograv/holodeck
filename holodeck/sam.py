@@ -383,10 +383,10 @@ class Semi_Analytic_Model:
 
     """
 
-    ZERO_GMT_STALLED_SYSTEMS = False
-    ZERO_DYNAMIC_STALLED_SYSTEMS = True
-    ZERO_DYNAMIC_COALESCED_SYSTEMS = True
-    USE_REDZ_AFTER_HARD = True
+    # ZERO_GMT_STALLED_SYSTEMS = False
+    # ZERO_DYNAMIC_STALLED_SYSTEMS = True
+    # ZERO_DYNAMIC_COALESCED_SYSTEMS = True
+    # USE_REDZ_AFTER_HARD = True
 
     def __init__(
         self, mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91), mrat=(1e-3, 1.0, 71), redz=(1e-3, 10.0, 101),
