@@ -23,28 +23,44 @@ SHAPE = 60
 TIME = 3 * GYR
 NREALS = 100
 
-print("0")
+fobs_edges = holo.utils.nyquist_freqs_edges()
+fobs_cents = holo.utils.midpoints(fobs_edges, log=False)
+
+print("0 begin")
 holo.librarian._log_mem_usage(None)
+
+# ---- initialization
 
 gsmf = holo.sam.GSMF_Schechter()               # Galaxy Stellar-Mass Function (GSMF)
 gpf = holo.sam.GPF_Power_Law()                 # Galaxy Pair Fraction         (GPF)
 gmt = holo.sam.GMT_Power_Law()                 # Galaxy Merger Time           (GMT)
 mmbulge = holo.relations.MMBulge_Standard()    # M-MBulge Relation            (MMB)
 
-print("1")
 holo.librarian._log_mem_usage(None)
 
 sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge, shape=SHAPE)
 hard = holo.hardening.Fixed_Time.from_sam(sam, TIME)
 
-print("2")
+print("1 init")
 holo.librarian._log_mem_usage(None)
 
-fobs_edges = holo.utils.nyquist_freqs_edges()
-fobs_cents = holo.utils.midpoints(fobs_edges, log=False)
-# gwb = sam.gwb(fobs_edges, hard=hard, realize=NREALS, use_redz_after_hard=False)
+# ---- static_binary_density
+
+dens = sam.static_binary_density
+
+print("2 static_binary_density")
+holo.librarian._log_mem_usage(None)
+
+# ---- dynamic_binary_number
 
 vals = sam.dynamic_binary_number(hard, fobs_orb=fobs_cents/2.0)
 
-print("3")
+print("3 dynamic_binary_number")
+holo.librarian._log_mem_usage(None)
+
+# ---- GWB
+
+gwb = sam.gwb(fobs_edges, hard=hard, realize=NREALS)
+
+print("4 GWB")
 holo.librarian._log_mem_usage(None)
