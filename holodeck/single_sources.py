@@ -44,7 +44,9 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
         A list containing the edges along each dimension.  The four dimensions correspond to
         total mass, mass ratio, redshift, and observer-frame orbital frequency.
         The length of each of the four arrays is M+1, Q+1, Z+1, F+1.
-    redz : 
+    redz : (M,Q,Z,F) NDarray
+        redz_final for self-consistent hardening models (Fixed_Time).
+        redz_prime for non self-consisten hardening models (Hard_GW).
     number : (M, Q, Z, F) ndarray of scalars
         The number of binaries in each bin of parameter space.  This is calculated by integrating
         `dnum` over each bin.
@@ -69,14 +71,14 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
         sources at each frequency and realization, 
         Returned only if params = True.
     """
-
+ 
     # All other bin midpoints
     mt = kale.utils.midpoints(edges[0]) #: total mass
     mr = kale.utils.midpoints(edges[1]) #: mass ratio
     rz = kale.utils.midpoints(edges[2]) #: redshift
 
 
-    # hsfdf = hsamp^2 * f/df # this is same as hc2 
+    # hsfdf = hsamp^2 * f/df # this is same as hc^2
     h2fdf = gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz)
 
     # indices of bins sorted by h2fdf

@@ -53,7 +53,7 @@ import kalepy as kale
 import holodeck as holo
 from holodeck import cosmo, utils, log
 from holodeck.constants import GYR, SPLC, MSOL, MPC, YR, PC
-from holodeck import relations, gravwaves
+from holodeck import relations, gravwaves, single_sources
 
 _DEBUG = False
 _DEBUG_LVL = log.DEBUG
@@ -1135,6 +1135,124 @@ class Semi_Analytic_Model:
         mr = self.mrat[np.newaxis, :, np.newaxis]
         gwb = gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
         return gwb
+
+    def ss_gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=1, loudest=1, params=False,
+            zero_coalesced=None, zero_stalled=None, use_redz_after_hard=None, return_details=False):
+        """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
+
+        Parameters
+        ----------
+        fobs_gw : (F,) array_like of scalar,
+            Observer-frame GW-frequencies. [1/sec]
+            These are the frequency bin edges, which are integrated across to get the number of binaries in each
+            frequency bin.
+        hard : holodeck.evolution._Hardening class or instance
+            Hardening mechanism to apply over the range of `fobs_gw`.
+        realize : bool or int,
+            Whether to construct a Poisson 'realization' (discretization) of the SAM distribution.
+            Realizations approximate the finite-source effects of a realistic population.
+        **kw_dynamic_binary_number : keyword-value pairs,
+            Additional arguments passed along to `Semi_Analytic_Model.dynamic_binary_number()`.
+
+        Returns
+        -------
+        gwb : (F,[R,]) ndarray of scalar
+            Dimensionless, characteristic strain at each frequency.
+            If `realize` is an integer with value R, then R realizations of the GWB are returned,
+            such that `hc` has shape (F,R,).
+        [details]
+
+
+        """
+
+        if use_redz_after_hard is None:
+            if hard.CONSISTENT is True:
+                use_redz_after_hard = True
+            elif hard.CONSISTENT is False:
+                use_redz_after_hard = False
+            else:
+                err = "`hard.CONSISTENT` or 'use_redz_after_hard' must be one of {{True, False}}!"
+                log.error(err)
+                raise ValueError(err)
+
+        fobs_gw_edges = np.atleast_1d(fobs_gw_edges)
+        if np.isscalar(fobs_gw_edges) or np.size(fobs_gw_edges) == 1:
+            err = "GWB can only be calculated across bins of frequency, `fobs_gw_edges` must provide bin edges!"
+            log.exception(err)
+            raise ValueError(err)
+
+        fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
+        # ---- Get the differential-number of binaries for each bin
+        # convert to orbital-frequency (from GW-frequency)
+        fobs_orb_edges = fobs_gw_edges / 2.0
+        fobs_orb_cents = fobs_gw_cents / 2.0
+
+        print("SS 1: ", flush=True)
+        holo.librarian._log_mem_usage(None)
+
+        # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
+        # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
+        edges, dnum = self.dynamic_binary_number(
+            hard, fobs_orb=fobs_orb_cents,
+            zero_coalesced=zero_coalesced, zero_stalled=zero_stalled, return_details=return_details,
+        )
+
+        print("SS 2: ", flush=True)
+        holo.librarian._log_mem_usage(None)
+
+
+        edges[-1] = fobs_orb_edges
+        log.debug(f"dnum: {utils.stats(dnum)}")
+
+
+        # "integrate" within each bin (i.e. multiply by bin volume)
+        number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
+        number = number * np.diff(np.log(fobs_gw_edges))
+        log.debug(f"number: {utils.stats(number)}")
+        log.debug(f"number.sum(): {number.sum():.4e}")
+
+        print("SS 3: ", flush=True)
+        holo.librarian._log_mem_usage(None)
+
+
+        # ---- Get the Single Source and GWB spectrum from number of binaries over grid
+
+        # Use the redshift based on initial redshift + galaxy-merger-time + evolution-time
+        log.debug(f"{use_redz_after_hard=}")
+        if use_redz_after_hard:
+            use_redz = self._redz_final
+        # Use the redshift based on initial redshift + galaxy-merger-time (without evo time)
+        else:
+            log.warning(f"Using `redz_prime` for redshift (includes galaxy merger time, but not evolution time)")
+            use_redz = self._redz_prime[:, :, :, np.newaxis] * np.ones_like(dnum)
+
+
+        ret_vals= single_sources.ss_gws_redz(edges, use_redz, number, 
+                                             realize=realize, loudest=loudest, params=params)
+        hc_ss = ret_vals[0]
+        hc_bg = ret_vals[1]
+        if params:
+            sspar = ret_vals[2]
+            bgpar = ret_vals[3]
+
+
+        print("SS 4: ", flush=True)
+        holo.librarian._log_mem_usage(None)
+
+
+        if _DEBUG:
+            _rr = np.arange(realize)
+            if len(_rr) > 1:
+                check_edges = [edges[-1], np.arange(realize)]
+            else:
+                check_edges = [edges[-1]]
+            _check_bads(check_edges, hc_bg, "hc_bg")
+
+        self._gwb = hc_bg
+        if params:
+            return hc_ss, hc_bg, sspar, bgpar
+
+        return hc_ss, hc_bg
 
     def _ndens_gal(self, mass_gal, mrat_gal, redz):
         if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
