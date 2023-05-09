@@ -1246,45 +1246,64 @@ class Fixed_Time(Fixed_Time_2PL):
         return dadt
 
 
-class Test(_Hardening):
+class Fixed_Time_2PL_SAM(_Hardening):
+    """Provide a binary hardening rate such that the total lifetime matches a given value.
+    """
 
-    def __init__(self, time, mtot, mrat,
-                 sepa_init=1.0e3*PC, rchar=100.0*PC, gamma_inner=-1.0, gamma_outer=+1.5):
+    def __init__(self, sam, time, sepa_init=1.0e3*PC, rchar=10.0*PC, gamma_inner=-1.0, gamma_outer=+1.5, num_steps=300):
+        """Initialize a `Fixed_Time` instance using a provided `Semi_Analytic_Model` instance.
 
+        Parameters
+        ----------
+        sam : `holodeck.sam.Semi_Analytic_Model`
+            Input population, from which to use masses, redshifts and separations.
+        time : float,
+            Total merger time of binaries, units of [sec].
+        sepa_init : float,
+            Initial binary separation.  Units of [cm].
+        **kwargs : dict
+            Additional keyword-argument pairs passed to the `Fixed_Time` initialization method.
+
+        Returns
+        -------
+        `Fixed_Time`
+            Instance configured for the given binary population.
+
+        """
+        assert np.ndim(time) == 0
+        mtot, mrat = np.meshgrid(sam.mtot, sam.mrat, indexing='ij')
+        shape = mtot.shape
+        mt, mr = [mm.flatten() for mm in [mtot, mrat]]
+
+        norm_log10 = holo.sam_cython.find_2pl_hardening_norm(
+            time, mt, mr,
+            sepa_init, rchar, gamma_inner, gamma_outer, num_steps,
+        )
+        # (M*Q,) ==> (M, Q)
+        norm_log10 = np.reshape(norm_log10, shape)
+
+        # for (ii, jj), mt in np.ndenumerate(mtot):
+        #     mr = mrat[ii, jj]
+        #     tt = holo.sam_cython.integrate_binary_evolution_2pl(
+        #         norm_log10[ii, jj], mt, mr, sepa_init, rchar, gamma_inner, gamma_outer, num_steps
+        #     )
+        #     print(ii, jj, tt/GYR)
+
+        self._time = time
+        self._norm = 10.0 ** norm_log10
+        self._num_steps = num_steps
+        self._sepa_init = sepa_init
+        self._rchar = rchar
         self._gamma_inner = gamma_inner
         self._gamma_outer = gamma_outer
-        self._time = time
-        self._rchar = rchar
 
-
-
-        self._norm = norm
         return
 
-    # ====     Constructors    ====
+    def dadt_dedt(self, evo, step, *args, **kwargs):
+        raise NotImplementedError()
 
-    @classmethod
-    def from_pop(cls, pop, time, **kwargs):
-        return cls(time, *pop.mtmr, pop.redz, pop.sepa, **kwargs)
-
-    @classmethod
-    def from_sam(cls, sam, time, **kwargs):
-        mtot, mrat, redz = [gg.ravel() for gg in sam.grid]
-        return cls(time, mtot, mrat, **kwargs)
-
-    def function(self, mtot, mrat, sepa, norm):
-        dadt = self._function(norm, sepa, self._rchar, self._gamma_inner, self._gamma_outer)
-        m1 = mtot / (1.0 + mrat)
-        m2 = mrat * m1
-        dadt += utils.gw_hardening_rate_dadt(m1, m2, sepa, eccen=None)
-        return dadt
-
-    @classmethod
-    def _function(cls, norm, sepa, rchar, gamma_inner, gamma_outer):
-        xx = sepa / rchar
-        dadt = - norm * np.power(1.0 + xx, -gamma_outer+gamma_inner) / np.power(xx, gamma_inner-1)
-        return dadt
-
+    def dadt(self, mtot, mrat, sepa):
+        raise NotImplementedError()
 
 
 # =================================================================================================
