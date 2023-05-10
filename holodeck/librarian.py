@@ -769,7 +769,7 @@ def ss_lib_combine(path_output, log, get_pars, path_sims=None, path_pspace=None)
     # ---- make sure all files exist; get shape information from files
 
     log.info(f"checking that all {nsamp} files exist")
-    fobs, nreals, nloudest, fit_data, pta_dur, pta_cad = _check_ss_files_and_load_shapes(path_sims, nsamp)
+    fobs, nreals, nloudest, fit_data, pta_dur, pta_cad, dfobs = _check_ss_files_and_load_shapes(path_sims, nsamp)
     nfreqs = fobs.size
     log.debug(f"{nfreqs=}, {nreals=}")
 
@@ -792,6 +792,7 @@ def ss_lib_combine(path_output, log, get_pars, path_sims=None, path_pspace=None)
     log.info(f"Writing collected data to file {out_filename}")
     with h5py.File(out_filename, 'w') as h5:
         h5.create_dataset('fobs', data=fobs)
+        h5.create_dataset('dfobs', data=dfobs)
         h5.create_dataset('pta_dur', data=[pta_dur,])
         h5.create_dataset('pta_cad', data=[pta_cad,])
         h5.create_dataset('hc_ss', data=hc_ss)
@@ -830,6 +831,12 @@ def _check_ss_files_and_load_shapes(path_sims, nsamp):
         Dictionary where each key is a fit-parameter in all of the output files.  The values are
         'ndarray's of the appropriate shapes to store fit-parameters from all files.
         The 0th dimension is always for the number-of-files.
+    pta_dur : scalar
+        Duration of the pta in seconds.
+    pta_cad : scalar
+        Cadence of pta observations in seconds.
+    dfobs : (F-1,) ndarray
+        Observer-frame frequency bin widths.
     """
 
     fobs = None
@@ -838,6 +845,8 @@ def _check_ss_files_and_load_shapes(path_sims, nsamp):
     fit_data = None
     pta_dur = None
     pta_cad = None
+    dfobs = None
+
     for ii in tqdm.trange(nsamp):
         temp = _ss_fname(path_sims, ii)
         if not temp.exists():
@@ -859,6 +868,9 @@ def _check_ss_files_and_load_shapes(path_sims, nsamp):
             pta_dur = temp['pta_dur']
         if pta_cad is None:
             pta_cad = temp['pta_cad']
+        if dfobs is None:
+            fobs_edges = temp['fobs_edges']
+            dfobs = np.diff(fobs_edges / 2.0 )
 
         # find a file that has GWB data in it (not all of them do, if the file was a 'failure' file)
         if (nreals is None) and ('hc_bg' in data_keys):
@@ -887,7 +899,7 @@ def _check_ss_files_and_load_shapes(path_sims, nsamp):
         fit_data = {}
 
 
-    return fobs, nreals, nloudest, fit_data, pta_dur, pta_cad
+    return fobs, nreals, nloudest, fit_data, pta_dur, pta_cad, dfobs
 
 
 def _load_ss_library_from_all_files(path_sims, hc_ss, hc_bg, fit_data, log, sspar=None, bgpar=None):
@@ -1307,6 +1319,9 @@ def run_ss_at_pspace_num(args, space, pnum):
     pta_cad = 1.0 / (2 * hifr)
     fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
     fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
+    # fobs_orb_edges = fobs_edges / 2.0 
+    # edges[-1] = fobs_orb_edges
+    # dfobs = np.diff(fobs_edges / 2.0 )
     log.info(f"Created {fobs_cents.size} frequency bins")
     log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
     log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
