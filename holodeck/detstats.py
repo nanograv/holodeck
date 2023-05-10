@@ -1019,24 +1019,28 @@ def _snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
     """
     
     amp = amp[np.newaxis,:,:,np.newaxis,:]  # (F,R,L) to (P,F,R,S,L)
-    # print('amp', amp.shape)
+    print('amp', amp.shape)
 
     a_pol, b_pol = _a_b_polarization(iotas) # (F,S,L)
     a_pol = a_pol[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
     b_pol = b_pol[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
-    # print('a_pol', a_pol.shape)
-    # print('b_pol', b_pol.shape)
+    print('a_pol', a_pol.shape)
+    print('b_pol', b_pol.shape)
 
     Phi_T = _gw_phase(dur, freqs, Phi_0) # (F,)
-    # print('Phi_T', Phi_T.shape)
+    print('Phi_T', Phi_T.shape)
     Phi_T = Phi_T[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
-    # print('Phi_T', Phi_T.shape)
+    print('Phi_T', Phi_T.shape)
 
     Phi_0 = Phi_0[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
-    # print('Phi_0', Phi_0.shape)
+    print('Phi_0', Phi_0.shape)
 
     freqs = freqs[np.newaxis,:,np.newaxis,np.newaxis,np.newaxis] # (F,) to (1,F,1,1,1)
-    # print('freqs', freqs.shape)
+    print('freqs', freqs.shape)
+
+    S_i = S_i[:,:,:,np.newaxis,:] # (P,F,R,L) to (P,F,R,1,L)
+    F_iplus = F_iplus[:,:,np.newaxis,:,:] # (P,F,S,L) to (P,F,1,S,L)
+    F_icross = F_icross[:,:,np.newaxis,:,:] # (P,F,S,L) to (P,F,1,S,L)
 
     coef = amp**2 / (S_i * 8 * np.pi**3 * freqs**3) # [S_i] s^3 and [freqs^3] Hz^3 cancel
     
