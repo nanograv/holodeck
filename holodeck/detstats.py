@@ -427,23 +427,23 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret_all = F
     # Spectral Density
     Sh_bg = _power_spectral_density(hc_bg, fobs) # spectral density of bg, using 0th realization
     Sh0_bg = Sh_bg # appropsimation used in Rosado et al. 2015
-    print('Sh_bg:', Sh_bg.shape)
+    # print('Sh_bg:', Sh_bg.shape)
 
     # Noise 
     noise = _white_noise(cad, sigmas) 
-    print('noise:', noise.shape)
+    # print('noise:', noise.shape)
 
     sigma_0B = _sigma0_Bstatistic(noise, Gamma, Sh0_bg)
-    print('sigma_0B:', sigma_0B.shape)
+    # print('sigma_0B:', sigma_0B.shape)
 
     sigma_1B = _sigma1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
-    print('sigma_1B:', sigma_1B.shape)
+    # print('sigma_1B:', sigma_1B.shape)
 
     mu_1B = _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
-    print('mu_1B:', mu_1B.shape)
+    # print('mu_1B:', mu_1B.shape)
 
     dp_bg = _bg_detection_probability(sigma_0B, sigma_1B, mu_1B, alpha_0)
-    print('dp_bg', dp_bg.shape)
+    # print('dp_bg', dp_bg.shape)
 
     if(ret_all):
         return dp_bg, Gamma, Sh_bg, noise, mu_1B, sigma_0B, sigma_1B
@@ -1019,24 +1019,24 @@ def _snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
     """
     
     amp = amp[np.newaxis,:,:,np.newaxis,:]  # (F,R,L) to (P,F,R,S,L)
-    print('amp', amp.shape)
+    # print('amp', amp.shape)
 
     a_pol, b_pol = _a_b_polarization(iotas) # (F,S,L)
     a_pol = a_pol[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
     b_pol = b_pol[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
-    print('a_pol', a_pol.shape)
-    print('b_pol', b_pol.shape)
+    # print('a_pol', a_pol.shape)
+    # print('b_pol', b_pol.shape)
 
     Phi_T = _gw_phase(dur, freqs, Phi_0) # (F,)
-    print('Phi_T', Phi_T.shape)
+    # print('Phi_T', Phi_T.shape)
     Phi_T = Phi_T[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
-    print('Phi_T', Phi_T.shape)
+    # print('Phi_T', Phi_T.shape)
 
     Phi_0 = Phi_0[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
-    print('Phi_0', Phi_0.shape)
+    # print('Phi_0', Phi_0.shape)
 
     freqs = freqs[np.newaxis,:,np.newaxis,np.newaxis,np.newaxis] # (F,) to (1,F,1,1,1)
-    print('freqs', freqs.shape)
+    # print('freqs', freqs.shape)
 
     S_i = S_i[:,:,:,np.newaxis,:] # (P,F,R,L) to (P,F,R,1,L)
     F_iplus = F_iplus[:,:,np.newaxis,:,:] # (P,F,S,L) to (P,F,1,S,L)
