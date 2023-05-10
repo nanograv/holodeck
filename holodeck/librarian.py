@@ -769,7 +769,7 @@ def ss_lib_combine(path_output, log, get_pars, path_sims=None, path_pspace=None)
     # ---- make sure all files exist; get shape information from files
 
     log.info(f"checking that all {nsamp} files exist")
-    fobs, nreals, nloudest, fit_data = _check_ss_files_and_load_shapes(path_sims, nsamp)
+    fobs, nreals, nloudest, fit_data, pta_dur, pta_cad = _check_ss_files_and_load_shapes(path_sims, nsamp)
     nfreqs = fobs.size
     log.debug(f"{nfreqs=}, {nreals=}")
 
@@ -792,6 +792,8 @@ def ss_lib_combine(path_output, log, get_pars, path_sims=None, path_pspace=None)
     log.info(f"Writing collected data to file {out_filename}")
     with h5py.File(out_filename, 'w') as h5:
         h5.create_dataset('fobs', data=fobs)
+        h5.create_dataset('pta_dur', data=[pta_dur,])
+        h5.create_dataset('pta_cad', data=[pta_cad,])
         h5.create_dataset('hc_ss', data=hc_ss)
         h5.create_dataset('hc_bg', data=hc_bg)
         if get_pars:
@@ -834,6 +836,8 @@ def _check_ss_files_and_load_shapes(path_sims, nsamp):
     nreals = None
     nloudest = None
     fit_data = None
+    pta_dur = None
+    pta_cad = None
     for ii in tqdm.trange(nsamp):
         temp = _ss_fname(path_sims, ii)
         if not temp.exists():
@@ -842,7 +846,8 @@ def _check_ss_files_and_load_shapes(path_sims, nsamp):
             raise ValueError(err)
 
         # if we've already loaded all of the necessary info, then move on to the next file
-        if (fobs is not None) and (nreals is not None) and (fit_data is not None) and (nloudest is not None):
+        if ((fobs is not None) and (nreals is not None) and (fit_data is not None) 
+            and (nloudest is not None) and (pta_dur is not None) and (pta_cad is not None)):
             continue
 
         temp = np.load(temp)
@@ -850,6 +855,10 @@ def _check_ss_files_and_load_shapes(path_sims, nsamp):
 
         if fobs is None:
             fobs = temp['fobs'][()]
+        if pta_dur is None:
+            pta_dur = temp['pta_dur']
+        if pta_cad is None:
+            pta_cad = temp['pta_cad']
 
         # find a file that has GWB data in it (not all of them do, if the file was a 'failure' file)
         if (nreals is None) and ('hc_bg' in data_keys):
@@ -878,7 +887,7 @@ def _check_ss_files_and_load_shapes(path_sims, nsamp):
         fit_data = {}
 
 
-    return fobs, nreals, nloudest, fit_data
+    return fobs, nreals, nloudest, fit_data, pta_dur, pta_cad
 
 
 def _load_ss_library_from_all_files(path_sims, hc_ss, hc_bg, fit_data, log, sspar=None, bgpar=None):
@@ -1328,10 +1337,10 @@ def run_ss_at_pspace_num(args, space, pnum):
 
         log.debug(f"Saving {pnum} to file")
         if(get_pars):
-            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges,
+            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, pta_dur=pta_dur, pta_cad=pta_cad,
                     hc_ss = hc_ss, hc_bg = hc_bg, sspar = sspar, bgpar = bgpar)
         else:
-            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges,
+            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, pta_dur=pta_dur, pta_cad=pta_cad,
                     hc_ss = hc_ss, hc_bg = hc_bg)
         rv = True
     except Exception as err:
