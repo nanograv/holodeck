@@ -1238,13 +1238,18 @@ class Semi_Analytic_Model:
             hard, fobs_orb=fobs_orb_cents,
             zero_coalesced=zero_coalesced, zero_stalled=zero_stalled, return_details=return_details,
         )
-
+        log.debug(f"dnum: {utils.stats(dnum)}")
+        
         print("SS 2: ", flush=True)
         holo.librarian._log_mem_usage(None)
 
 
+       
+        log.debug('changing edges[-1] to fobs_orb_edges')
+        log.debug(f"edges[-1]: {utils.stats(edges[-1])}")
         edges[-1] = fobs_orb_edges
-        log.debug(f"dnum: {utils.stats(dnum)}")
+        log.debug(f"fobs_orb_edges: {utils.stats(fobs_orb_edges)}")
+        
 
 
         # "integrate" within each bin (i.e. multiply by bin volume)
