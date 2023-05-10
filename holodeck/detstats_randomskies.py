@@ -530,7 +530,7 @@ def detect_bg_pta(pulsars, spectra, cad, hc_bg, alpha_0=0.001, ret_all = False):
 
 ######################## Signal-to-Noise Ratio ########################
 
-def snr_bg_B(noise, Gamma, Sh_bg):
+def SNR_bg_B(noise, Gamma, Sh_bg):
     """ Calculate S/N_B for the background, using P_i, Gamma, S_h and S_h0
     
     Parameters
@@ -544,7 +544,7 @@ def snr_bg_B(noise, Gamma, Sh_bg):
     
     Returns
     -------
-    snr_B : (R,) 1Darray of scalars
+    SNR_B : (R,) 1Darray of scalars
         Signal to noise ratio assuming the B statistic, mu_1B/sigma_1B, for each realization.
         
 
@@ -568,8 +568,8 @@ def snr_bg_B(noise, Gamma, Sh_bg):
     denom = (P_i*P_j + Sh_bg*(P_i+P_j) + Sh_bg**2 *(1 + Gamma**2))
 
     sum = np.sum(numer/denom, axis=(0,1,2))
-    snr_B = np.sqrt(2*sum)
-    return snr_B
+    SNR_B = np.sqrt(2*sum)
+    return SNR_B
 
 def _Sh_hasasia_noise_bg(scGWB):
     """ Calculate the noise strain power spectral density, 
@@ -594,7 +594,7 @@ def _Sh_hasasia_noise_bg(scGWB):
     Sh_h = 3*H0**2 / (2*np.pi**2) * Omega_gw / freqs**3
     return Sh_h
 
-def snr_hasasia_noise_bg(scGWB):
+def SNR_hasasia_noise_bg(scGWB):
     """ Calculate the effective noise signal to noise ratio with hasasia.
     
     Parameters
@@ -604,15 +604,15 @@ def snr_hasasia_noise_bg(scGWB):
         
     Returns
     -------
-    snr_h : scalar
+    SNR_h : scalar
         Signal to noise ratio from hasasia.
 
     This function may not be working as we expect, since it does not produce SNR
     of noise to be 1.
     """
     Sh_h = _Sh_hasasia_noise_bg(scGWB)
-    snr_h = scGWB.SNR(Sh_h)
-    return snr_h
+    SNR_h = scGWB.SNR(Sh_h)
+    return SNR_h
     
 
 def _Sh_hasasia_modeled_bg(freqs, hc_bg):
@@ -635,7 +635,7 @@ def _Sh_hasasia_modeled_bg(freqs, hc_bg):
     Sh_h = hc_bg**2 / freqs[:,np.newaxis]
     return Sh_h    
 
-def snr_hasasia_modeled_bg(scGWB, hc_bg):
+def SNR_hasasia_modeled_bg(scGWB, hc_bg):
     """ Calculate the GWB signal to noise ratio with hasasia.
     
     Parameters
@@ -647,14 +647,14 @@ def snr_hasasia_modeled_bg(scGWB, hc_bg):
         
     Returns
     -------
-    snr_h : (R,) 1Darray)
+    SNR_h : (R,) 1Darray)
         Signal to noise ratio from hasasia, for each realization.
     """
     Sh_h = _Sh_hasasia_modeled_bg(scGWB.freqs, hc_bg)
-    snr_h = np.zeros(len(hc_bg[0]))
+    SNR_h = np.zeros(len(hc_bg[0]))
     for rr in range(len(hc_bg[0])):
-        snr_h[rr] = scGWB.SNR(Sh_h[:,rr])
-    return snr_h
+        SNR_h[rr] = scGWB.SNR(Sh_h[:,rr])
+    return SNR_h
     
 
 
@@ -665,46 +665,44 @@ def snr_hasasia_modeled_bg(scGWB, hc_bg):
 
 ########################### Unitary Vectors  ###########################
 
-def _m_unitary_vector(theta, phi, xi):
-    """ Calculate the unitary vector m-hat for the antenna pattern functions 
-    for each of S sky realizations.
+def _m_unitary_vector(theta, phi, psi):
+    """ Calculate the unitary vector m-hat for the antenna pattern functions.
     
     Parameters
     ----------
-    theta : (F,S,L) NDarray
+    theta : (F,R,L) NDarray
         Spherical coordinate position of each single source.
-    phi : (F,S,L) NDarray
+    phi : (F,R,L) NDarray
         Spherical coordinate position of each single source.
-    xi : (F,S,L) NDarray
+    psi : (F,R,L) NDarray
         Inclination of binary? But thought that's what iota was?    
     
     Returns
     -------
-    m_hat : (3,F,S,L) NDarray 
+    m_hat : (3,F,R,L) NDarray 
         Unitary vector m-hat with x, y, and z components at 
         index 0, 1, and 2, respectively.
         
     """
-    mhat_x = (np.sin(phi) * np.cos(xi) 
-              - np.sin(xi) * np.cos(phi) * np.cos(theta))
-    mhat_y = -(np.cos(phi) * np.cos(xi)
-               + np.sin(xi) * np.sin(phi) * np.cos(theta))
-    mhat_z = (np.sin(xi) * np.sin(theta))
+    mhat_x = (np.sin(phi) * np.cos(psi) 
+              - np.sin(psi) * np.cos(phi) * np.cos(theta))
+    mhat_y = -(np.cos(phi) * np.cos(psi)
+               + np.sin(psi) * np.sin(phi) * np.cos(theta))
+    mhat_z = (np.sin(psi) * np.sin(theta))
 
     m_hat = np.array([mhat_x, mhat_y, mhat_z])
     return m_hat
 
-def _n_unitary_vector(theta, phi, xi):
-    """ Calculate the unitary vector n-hat for the antenna pattern functions 
-    for each of S sky realizations.
+def _n_unitary_vector(theta, phi, psi):
+    """ Calculate the unitary vector n-hat for the antenna pattern functions.
     
     Paramters
     ---------
-    theta : (F,S,L) NDarray
+    theta : (F,R,L) NDarray
         Spherical coordinate position of each single source.
-    phi : (F,S,L) NDarray
+    phi : (F,R,L) NDarray
         Spherical coordinate position of each single source.
-    xi : (F,S,L) 1Darray
+    psi : (F,R,L) 1Darray
         Inclination of binary? But thought that's what iota was?    
     
     Returns
@@ -714,24 +712,23 @@ def _n_unitary_vector(theta, phi, xi):
         
     """
 
-    nhat_x = (- np.sin(phi) * np.sin(xi) 
-              - np.cos(xi) * np.cos(phi) * np.cos(theta))
-    nhat_y = (np.cos(phi) * np.sin(xi) 
-              - np.cos(xi) * np.sin(phi) * np.cos(theta))
-    nhat_z = np.cos(xi) * np.sin(theta)
+    nhat_x = (- np.sin(phi) * np.sin(psi) 
+              - np.cos(psi) * np.cos(phi) * np.cos(theta))
+    nhat_y = (np.cos(phi) * np.sin(psi) 
+              - np.cos(psi) * np.sin(phi) * np.cos(theta))
+    nhat_z = np.cos(psi) * np.sin(theta)
 
     n_hat = np.array([nhat_x, nhat_y, nhat_z])
     return n_hat
 
 def _Omega_unitary_vector(theta, phi):
-    """ Calculate the unitary vector n-hat for the antenna pattern functions 
-    for each of S sky realizations.
+    """ Calculate the unitary vector n-hat for the antenna pattern functions.
     
     Paramters
     ---------
-    theta : (F,S,L) NDarray
+    theta : (F,R,L) NDarray
         Spherical coordinate position of each single source.
-    phi : (F,S,L) NDarray
+    phi : (F,R,L) NDarray
         Spherical coordinate position of each single source.
     
     Returns
@@ -801,20 +798,20 @@ def _antenna_pattern_functions(m_hat, n_hat, Omega_hat, pi_hat):
     
     Parameters
     ----------
-    m_hat : (3,F,S,L) NDarray
+    m_hat : (3,F,R,L) NDarray
         Single source m_hat unitary vector for each frequency and realization.
-    n_hat : (3,F,S,L) NDarray
+    n_hat : (3,F,R,L) NDarray
         Single source mnhat unitary vector for each frequency and realization.
-    Omega_hat : (3,F,S,L) NDarray
+    Omega_hat : (3,F,R,L) NDarray
         Single source Omega_hat unitary vector for each frequency and realization.
     pi_hat : (3,P) NDarray
         Pulsar term unitary vector for the ith pulsar.
         
     Returns
     -------
-    F_iplus : (P,F,S,L) NDarray
+    F_iplus : (P,F,R,L) NDarray
         Plus antenna pattern function for each pulsar and binary of each realization.
-    F_icross : (P,F,S,L) NDarray
+    F_icross : (P,F,R,L) NDarray
         Cross antenna pattern function for each pulsar and binary of each realization. 
     
     """
@@ -977,31 +974,29 @@ def _amplitude(hc_ss, f, df):
         Dimensionless amplitude, A, of each single source at each frequency and realization.
     
     """
-
     Amp = hc_ss * np.sqrt(5) / 4 / 2**(1/6) *np.sqrt(df[:,np.newaxis,np.newaxis]/f[:,np.newaxis,np.newaxis])
     return Amp
 
 
 ####################### SS Signal to Noise Ratio  #######################
 
-def _snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
-    """ Calculate the SNR for each pulsar wrt each single source detection,
-    for S sky realizations and R strain realizations.
+def _SNR_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
+    """ Calculate the SNR for each pulsar wrt each single source detection.
 
     Paramters
     ---------
     amp : (F,R,L) NDarray 
         Dimensionless strain amplitude for loudest source at each frequency.
-    F_iplus : (P,F,S,L) NDarray
+    F_iplus : (P,F,R,L) NDarray
         Antenna pattern function for each pulsar.
-    F_icross : (P,F,S,L) NDarray
+    F_icross : (P,F,R,L) NDarray
         Antenna pattern function for each pulsar.
-    iotas : (F,S,L) NDarray
+    iotas : (F,R,L) NDarray
         Is this inclination? or what?
         Gives the wave polarizations a and b.
     dur : scalar
         Duration of observations.
-    Phi_0 : (F,S,L) NDarray
+    Phi_0 : (F,R,L) NDarray
         Initial GW Phase.
     S_i : (P,F,R,L) NDarray
         Total noise of each pulsar wrt detection of each single source, in s^3
@@ -1009,30 +1004,29 @@ def _snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
 
     Returns
     -------
-    snr_ss : (F,R,S,L) NDarray
-        SNR from the whole PTA for each single source with each realized sky position (S) 
-        and realized strain (R).
+    SNR_ss : (F,R,L) NDarray
+        SNR from the whole PTA for each single source.
 
     """
     
-    amp = amp[np.newaxis,:,:,np.newaxis,:]  # (F,R,L) to (P,F,R,S,L)
+    amp = amp[np.newaxis,:,:,:]  # (F,R,L) to (P,F,R,L)
     # print('amp', amp.shape)
 
-    a_pol, b_pol = _a_b_polarization(iotas) # (F,S,L)
-    a_pol = a_pol[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
-    b_pol = b_pol[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
+    a_pol, b_pol = _a_b_polarization(iotas)
+    a_pol = a_pol[np.newaxis,:,:,:] # (F,R,L) to (P,F,R,L)
+    b_pol = b_pol[np.newaxis,:,:,:] # (F,R,L) to (P,F,R,L)
     # print('a_pol', a_pol.shape)
     # print('b_pol', b_pol.shape)
 
     Phi_T = _gw_phase(dur, freqs, Phi_0) # (F,)
     # print('Phi_T', Phi_T.shape)
-    Phi_T = Phi_T[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
+    Phi_T = Phi_T[np.newaxis,:] # (F,R,L) to (P,F,R,L)
     # print('Phi_T', Phi_T.shape)
 
-    Phi_0 = Phi_0[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
+    Phi_0 = Phi_0[np.newaxis,:,:,:] # (P,F,R,L)
     # print('Phi_0', Phi_0.shape)
 
-    freqs = freqs[np.newaxis,:,np.newaxis,np.newaxis,np.newaxis] # (F,) to (1,F,1,1,1)
+    freqs = freqs[np.newaxis,:,np.newaxis,np.newaxis] # (F,) to (P,F,R,L)
     # print('freqs', freqs.shape)
 
     coef = amp**2 / (S_i * 8 * np.pi**3 * freqs**3) # [S_i] s^3 and [freqs^3] Hz^3 cancel
@@ -1050,10 +1044,10 @@ def _snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
                                    + 2*np.cos(Phi_T)*np.cos(Phi_0) 
                                    - 2*np.cos(Phi_0))))
     
-    SNR2_pulsar_ss = coef*(term1 + term2 + term3) # (P,F,R,S,L)
+    SNR2_pulsar_ss = coef*(term1 + term2 + term3) # (P,F,R,L)
 
-    snr_ss = np.sqrt(np.sum(SNR2_pulsar_ss, axis=0)) # (F,R,S,L), sum over the pulsars
-    return snr_ss
+    SNR_ss = np.sqrt(np.sum(SNR2_pulsar_ss, axis=0)) # (F,R,L), sum over the pulsars
+    return SNR_ss
 
 
 ######################### Detection Probability #########################
@@ -1084,33 +1078,34 @@ def _integrand_gamma_ss_i(Fe, rho):
     rv = (2*Fe)**(1/2) /rho * I_1 * np.exp(-Fe - rho**2 /2)
     return rv
 
-def _gamma_ssi(Fe_bar, rho):
+def _gamma_ssi(Fe_bar, rho, warn = False):
     """ Calculate the detection probability for each single source in each realization.
     
     Parameters
     ----------
-    rho : (F,R,S,L) NDarray
+    rho : (F,R,L) NDarray
         Given by the total PTA signal to noise ratio, S/N_S, for each single source
     Fe_bar : scalar
         The threshold F_e statistic
+    warn : Bool
+        Whether or not to print warnings for nan values
 
     Returns
     -------
-    gamma_ssi : (F,R,S,L) NDarray
+    gamma_ssi : (F,R,L) NDarray
         The detection probability for each single source, i, at each frequency and realization.
 
-    TODO: Find a way to do this without the four embedded for-loops.
+    TODO: Find a way to do this without the embedded for-loops.
     """
     gamma_ssi = np.zeros((rho.shape))
     for ff in range(len(rho)):
         for rr in range(len(rho[0])):
-            for ss in range(len(rho[0,0]))
-                for ll in range(len(rho[0,0,0])):
-                    gamma_ssi[ff,rr,ss,ll] = integrate.quad(_integrand_gamma_ss_i, Fe_bar, np.inf, 
-                                                            args=(rho[ff,rr,ss,ll]))[0]
-                    if(np.isnan(gamma_ssi[ff,rr,ss,ll])):
-                        print(f'gamma_ssi[{ff},{rr},{ss},{ll}] is nan, setting to 0.')
-                        gamma_ssi[ff,rr,ss,ll] = 0
+            for ll in range(len(rho[0,0])):
+                gamma_ssi[ff,rr,ll] = integrate.quad(_integrand_gamma_ss_i, Fe_bar, np.inf, args=(rho[ff,rr,ll]))[0]
+                if(np.isnan(gamma_ssi[ff,rr,ll])):
+                    if warn: print(f'gamma_ssi[{ff},{rr},{ll}] is nan, setting to 0.')
+                    gamma_ssi[ff,rr,ll] = 0
+   
 
     return gamma_ssi
 
@@ -1122,24 +1117,25 @@ def _ss_detection_probability(gamma_ss_i):
     
     Parameters
     ----------
-    gamma_ss_i : (F,R,S,L) NDarray
+    gamma_ss_i : (F,R,L) NDarray
         Detection probability of each single source, at each frequency and realization.
 
     Returns
     -------
-    gamma_ss : (R,S) 2Darray
-        Detection probability of any single source, for each R and S realization.
+    gamma_ss : (R) 1Darray
+        Detection probability of any single source, for each realization
     """
     
-    gamma_ss = 1 - np.product(1-gamma_ss_i, axis=(0,3))
+    gamma_ss = 1 - np.product(1-gamma_ss_i, axis=(0,2))
     return gamma_ss
 
 
 ######################## Detection Probability #########################
 
-def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg, 
-              theta_ss, phi_ss=None, Phi0_ss=None, iota_ss=None, psi_ss=None, 
-              Amp_red=None, gamma_red=None, alpha_0=0.001, ret_SNR=False,):
+def detect_ss(thetas, phis, sigmas, cad, dur, 
+              fobs, dfobs, hc_ss, hc_bg, alpha_0=0.001, ret_SNR=False,
+              theta_ss=None, phi_ss=None, iota_ss=None, psi_ss=None, Phi0_ss=None,
+              Amp_red=None, gamma_red=None, warn=False):
     """ Calculate the single source detection probability, and all intermediary steps.
     
     Parameters
@@ -1164,58 +1160,63 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     hc_bg : (F,R)
         Characteristic strain of the background at each frequency, 
         for R realizations.
-    theta_ss : (F,S,L) NDarray 
+    alpha_0 : scalar
+        False alarm probability
+    ret_SNR : Bool
+        Whether or not to also return SNR_ss.
+    theta_ss : (F,R,L) NDarray or None
         Polar (latitudinal) angular position in the sky of each single source.
-        Must be provided, to give the shape for sky realizations.
-    phi_ss : (F,S,L) NDarray or None
+        If None, random values between 0 and pi will be assigned.
+    phi_ss : (F,R,L) NDarray or None
         Azimuthal (longitudinal) angular position in the sky of each single source.
         If None, random values between 0 and 2pi will be assigned.
-    Phi0_ss : (F,S,L) NDarray or None
-        Initial GW phase.
-        If None, random values between 0 and 2pi will be assigned.
-    iota_ss : (F,S,L) NDarray or None
+    iota_ss : (F,R,L) NDarray or None
         Inclination of each single source with respect to the line of sight.
         If None, random values between 0 and pi will be assigned.
-    psi_ss : (F,S,L) NDarray or None
+    psi_ss : (F,R,L) NDarray or None
         Polarization of each single source.
-        If None, random values between 0 and pi will be assigned.
+        If None, assigned same random values as iota_ss, because I think these
+        might both be referring to the same thing.
+    Phi0_ss : (F,R,L) NDarray or None
+        Initial GW phase.
+        If None, random values between 0 and 2pi will be assigned.
     A_red : scalar or None
         Amplitude of pulsar red noise.
     gamma_red : scalar or None
         Power law index of pulsar red noise.
-    alpha_0 : scalar
-        False alarm probability
-    ret_SNR : Bool
-        Whether or not to also return snr_ss.
-    
+    warn : Bool
+        Whether or not to print warnings for nan values
+
     Returns
     -------
-    gamma_ss : (R,S) NDarray
-        Probability of detecting any single source, for each R and S realization.
-    snr_ss : (F,R,S,L) NDarray
+    gamma_ss : (R,) 1Darray
+        Probability of detecting any single source, for each realization.
+    SNR_ss : (F,R,L) NDarray
         SNR of each single source.
 
     """
 
-    # Assign random single source sky params, if not provided.
+    # Assign random single source sky positions, if not provided.
+    if theta_ss is None:
+        theta_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
     if phi_ss is None:
-        phi_ss = np.random.uniform(0,2*np.pi, size=theta_ss).reshape(theta_ss.shape)
-    if Phi0_ss is None:
-        Phi0_ss = np.random.uniform(0,2*np.pi, size=theta_ss).reshape(theta_ss.shape)
+        phi_ss = np.random.uniform(0, 2*np.pi, size = hc_ss.size).reshape(hc_ss.shape)
     if iota_ss is None:
-        iota_ss = np.random.uniform(0, np.pi, size = theta_ss.size).reshape(theta_ss.shape)
+        iota_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
     if psi_ss is None:
-        psi_ss = np.random.uniform(0, np.pi, size = theta_ss.size).reshape(theta_ss.shape)
+        psi_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+    if Phi0_ss is None:
+        Phi0_ss = np.random.uniform(0,2*np.pi, size=hc_ss).reshape(hc_ss.shape)
 
     # unitary vectors
-    m_hat = _m_unitary_vector(theta_ss, phi_ss, psi_ss) # (3,F,S,L)
-    n_hat = _n_unitary_vector(theta_ss, phi_ss, psi_ss) # (3,F,S,L)
-    Omega_hat = _Omega_unitary_vector(theta_ss, phi_ss) # (3,F,S,L)
+    m_hat = _m_unitary_vector(theta_ss, phi_ss, psi_ss) # (3,F,R,L)
+    n_hat = _n_unitary_vector(theta_ss, phi_ss, psi_ss) # (3,F,R,L)
+    Omega_hat = _Omega_unitary_vector(theta_ss, phi_ss) # (3,F,R,L)
     pi_hat = _pi_unitary_vector(phis, thetas) # (3,P)
 
     # antenna pattern functions
     F_iplus, F_icross = _antenna_pattern_functions(m_hat, n_hat, Omega_hat, 
-                                                   pi_hat) # (P,F,S,L)
+                                                   pi_hat) # (P,F,R,L)
     
     # noise spectral density
     S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, Amp_red, gamma_red)
@@ -1224,25 +1225,27 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
 
     # SNR (includes a_pol, b_pol, and Phi_T calculations internally)
-    snr_ss = _snr_ss(amp, F_iplus, F_icross, iota_ss, dur, Phi0_ss, S_i, fobs) # (F,R,S,L)
+    SNR_ss = _SNR_ss(amp, F_iplus, F_icross, iota_ss, dur, Phi0_ss, S_i, fobs) # (F,R,L)
     
-    Num = hc_ss[:,0,:].size # number of single sources in a single strain realization (F*L)
+    Num = hc_ss[:,0,:].size
     Fe_bar = _Fe_thresh(Num, alpha_0=alpha_0) # scalar
 
-    gamma_ssi = _gamma_ssi(Fe_bar, rho=snr_ss) # (F,R,S,L)
-    gamma_ss = _ss_detection_probability(gamma_ssi) # (R,S)
+    gamma_ssi = _gamma_ssi(Fe_bar, rho=SNR_ss, warn=warn) # (F,R,L)
+    gamma_ss = _ss_detection_probability(gamma_ssi) # (R,)
 
     if ret_SNR:
-        return gamma_ss, snr_ss
+        return gamma_ss, SNR_ss
     else:
         return gamma_ss
 
 
-def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
+
+
+def detect_ss_pta(pulsars, cad, dur, fobs,
+              dfobs, hc_ss, hc_bg, alpha_0=0.001, ret_SNR=False,
               theta_ss=None, phi_ss=None, iota_ss=None, psi_ss=None, Phi0_ss=None,
-              Amp_red=None, gamma_red=None, alpha_0=0.001, ret_SNR=False,):
-    """ Calculate the single source detection probability, and all intermediary steps for
-    R strain realizations and S sky realizations.
+              Amp_red=None, gamma_red=None):
+    """ Calculate the single source detection probability, and all intermediary steps.
     
     Parameters
     ----------
@@ -1262,35 +1265,36 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     hc_bg : (F,R)
         Characteristic strain of the background at each frequency, 
         for R realizations.
-    theta_ss : (F,S,L) NDarray 
+    alpha_0 : scalar
+        False alarm probability
+    ret_SNR : Bool
+        Whether or not to also return SNR_ss.
+    theta_ss : (F,R,L) NDarray or None
         Polar (latitudinal) angular position in the sky of each single source.
-        Must be provided, to give the shape for sky realizations.
-    phi_ss : (F,S,L) NDarray or None
+        If None, random values between 0 and pi will be assigned.
+    phi_ss : (F,R,L) NDarray or None
         Azimuthal (longitudinal) angular position in the sky of each single source.
         If None, random values between 0 and 2pi will be assigned.
-    Phi0_ss : (F,S,L) NDarray or None
-        Initial GW phase.
-        If None, random values between 0 and 2pi will be assigned.
-    iota_ss : (F,S,L) NDarray or None
+    iota_ss : (F,R,L) NDarray or None
         Inclination of each single source with respect to the line of sight.
         If None, random values between 0 and pi will be assigned.
-    psi_ss : (F,S,L) NDarray or None
+    psi_ss : (F,R,L) NDarray or None
         Polarization of each single source.
-        If None, random values between 0 and pi will be assigned.
+        If None, assigned same random values as iota_ss, because I think these
+        might both be referring to the same thing.
+    Phi0_ss : (F,R,L) NDarray or None
+        Initial GW phase.
+        If None, random values between 0 and 2pi will be assigned.
     A_red : scalar or None
         Amplitude of pulsar red noise.
     gamma_red : scalar or None
         Power law index of pulsar red noise.
-    alpha_0 : scalar
-        False alarm probability
-    ret_SNR : Bool
-        Whether or not to also return snr_ss.
 
     Returns
     -------
-    gamma_ss : (R,S) NDarray
-        Probability of detecting any single source, for each R and S realization.
-    snr_ss : (F,R,S,L) NDarray
+    gamma_ss : (R,) 1Darray
+        Probability of detecting any single source, for each realization.
+    SNR_ss : (F,R,L) NDarray
         SNR of each single source.
 
     """
@@ -1299,17 +1303,17 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
         theta_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
     if phi_ss is None:
         phi_ss = np.random.uniform(0, 2*np.pi, size = hc_ss.size).reshape(hc_ss.shape)
-    if Phi0_ss is None:
-        Phi0_ss = np.random.uniform(0,2*np.pi, size=hc_ss.size).reshape(hc_ss.shape)
     if iota_ss is None:
         iota_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
     if psi_ss is None:
         psi_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+    if Phi0_ss is None:
+        Phi0_ss = np.random.uniform(0,2*np.pi, size=hc_ss.size).reshape(hc_ss.shape)
 
     # unitary vectors
-    m_hat = _m_unitary_vector(theta_ss, phi_ss, psi_ss) # (3,F,S,L)
-    n_hat = _n_unitary_vector(theta_ss, phi_ss, psi_ss) # (3,F,S,L)
-    Omega_hat = _Omega_unitary_vector(theta_ss, phi_ss) # (3,F,S,L)
+    m_hat = _m_unitary_vector(theta_ss, phi_ss, psi_ss) # (3,F,R,L)
+    n_hat = _n_unitary_vector(theta_ss, phi_ss, psi_ss) # (3,F,R,L)
+    Omega_hat = _Omega_unitary_vector(theta_ss, phi_ss) # (3,F,R,L)
 
 
     # check pulsar inputs
@@ -1326,7 +1330,7 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
 
     # antenna pattern functions
     F_iplus, F_icross = _antenna_pattern_functions(m_hat, n_hat, Omega_hat, 
-                                                   pi_hat) # (P,F,S,L)
+                                                   pi_hat) # (P,F,R,L)
     
     # noise spectral density
     S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, Amp_red, gamma_red)
@@ -1335,46 +1339,42 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
 
     # SNR (includes a_pol, b_pol, and Phi_T calculations internally)
-    snr_ss = _snr_ss(amp, F_iplus, F_icross, iota_ss, dur, Phi0_ss, S_i, fobs) # (F,R,S,L)
+    SNR_ss = _SNR_ss(amp, F_iplus, F_icross, iota_ss, dur, Phi0_ss, S_i, fobs) # (F,R,L)
     
-    Num = hc_ss[:,0,:].size # number of single sources in a single strain realization (F*L)
+    Num = hc_ss[:,0,:].size
     Fe_bar = _Fe_thresh(Num, alpha_0=alpha_0) # scalar
 
-    gamma_ssi = _gamma_ssi(Fe_bar, rho=snr_ss) # (F,R,S,L)
-    gamma_ss = _ss_detection_probability(gamma_ssi) # (R,S)
+    gamma_ssi = _gamma_ssi(Fe_bar, rho=SNR_ss) # (F,R,L)
+    gamma_ss = _ss_detection_probability(gamma_ssi) # (R,)
 
     if ret_SNR:
-        return gamma_ss, snr_ss
+        return gamma_ss, SNR_ss
     else:
         return gamma_ss
 
 
-
-
-
-##########################################################################
-####### The following are not updated for S and R realizations. ##########
-##########################################################################
-
-'''
-
-def detect_ss_scDeter(pulsars, scDeter, hc_ss, alpha_0=0.001, ret_SNR=False,
+def detect_ss_scDeter(pulsars, scDeter, fobs,
+              dfobs, hc_ss, alpha_0=0.001, ret_SNR=False,
               theta_ss=None, phi_ss=None, iota_ss=None, psi_ss=None, Phi0_ss=None):
-    """ Calculate the single source detection probability, and all intermediary steps.
+    """ (BUGS) Calculate the single source detection probability using scDeter object.
     
     Parameters
     ----------
     pulsars : (P,) list of hasasia.Pulsar objects
         A set of pulsars generated by hasasia.sim.sim_pta()
-    scDeter : 
-    
+    scDeter : hasasia.sensitivity.DeterSensitivityCurve object
+        Deterministic sensitivity curve from hasasia.
+    fobs : (F,) 1Darray of scalars
+        Frequency bin centers in Hz.
+    dfobs : (F-1,) 1Darray of scalars
+        Frequency bin widths in Hz.
     hc_ss : (F,R,L) NDarray of scalars
         Characteristic strain of the L loudest single sources at 
         each frequency, for R realizations.
     alpha_0 : scalar
         False alarm probability
     ret_SNR : Bool
-        Whether or not to also return snr_ss.
+        Whether or not to also return SNR_ss.
     theta_ss : (F,R,L) NDarray or None
         Polar (latitudinal) angular position in the sky of each single source.
         If None, random values between 0 and pi will be assigned.
@@ -1383,11 +1383,8 @@ def detect_ss_scDeter(pulsars, scDeter, hc_ss, alpha_0=0.001, ret_SNR=False,
         If None, random values between 0 and 2pi will be assigned.
     iota_ss : (F,R,L) NDarray or None
         Inclination of each single source with respect to the line of sight.
-        If None, random values between 0 and pi will be assigned.
     psi_ss : (F,R,L) NDarray or None
-        ???
-        If None, assigned same random values as iota_ss, because I think these
-        might both be referring to the same thing.
+        Polarization angle.
     Phi0_ss : (F,R,L) NDarray or None
         Initial GW phase.
         If None, random values between 0 and 2pi will be assigned.
@@ -1399,6 +1396,7 @@ def detect_ss_scDeter(pulsars, scDeter, hc_ss, alpha_0=0.001, ret_SNR=False,
     rho_h_ss: (F,R,L) NDarray
         SNR of each single source.
 
+    TODO: Need to fix SNR(h0) calculation. It currently uses hc_ss instead.
     """
 
     # get pulsar properties
@@ -1428,15 +1426,12 @@ def detect_ss_scDeter(pulsars, scDeter, hc_ss, alpha_0=0.001, ret_SNR=False,
     Omega_hat = _Omega_unitary_vector(theta_ss, phi_ss) # (3,F,R,L)
     pi_hat = _pi_unitary_vector(phis, thetas) # (3,P)
 
-    # antenna pattern functions
-    F_iplus, F_icross = _antenna_pattern_functions(m_hat, n_hat, Omega_hat, 
-                                                   pi_hat) # (P,F,R,L)
-
     # rho_ss (corresponds to SNR)
+    hs = holo.utils.char_strain_to_strain_amp(hc_ss, fobs, dfobs)
     rho_h_ss = np.zeros(hc_ss.shape) # (F,R,L)
     for rr in range(len(hc_ss[0])):
         for ll in range(len(hc_ss[0,0])):
-            rho_h_ss[:,rr,ll] =   scDeter.SNR(hc_ss[:,rr,ll]) 
+            rho_h_ss[:,rr,ll] =   scDeter.SNR(hs[:,rr,ll]) 
     
     Num = hc_ss[:,0,:].size
     Fe_bar = _Fe_thresh(Num, alpha_0=alpha_0) # scalar
@@ -1449,7 +1444,7 @@ def detect_ss_scDeter(pulsars, scDeter, hc_ss, alpha_0=0.001, ret_SNR=False,
     else:
         return gamma_ss
 
-def detect_ss_scDeter_full(pulsars, scDeter, hc_ss, alpha_0=0.001, ret_SNR=False,
+def detect_ss_scDeter_full(pulsars, scDeter, fobs, dfobs, hc_ss, alpha_0=0.001, ret_SNR=False,
               theta_ss=None, phi_ss=None, iota_ss=None, psi_ss=None, Phi0_ss=None):
     """ Calculate the single source detection probability, and all intermediary steps.
     
@@ -1457,15 +1452,19 @@ def detect_ss_scDeter_full(pulsars, scDeter, hc_ss, alpha_0=0.001, ret_SNR=False
     ----------
     pulsars : (P,) list of hasasia.Pulsar objects
         A set of pulsars generated by hasasia.sim.sim_pta()
-    scDeter : 
-       
+    scDeter : hasasia.sensitivity.DeterSensitivityCurve object
+        Deterministic sensitivity curve from hasasia.
+    fobs : (F,) 1Darray of scalars
+        Frequency bin centers in Hz.
+    dfobs : (F-1,) 1Darray of scalars
+        Frequency bin widths in Hz.   
     hc_ss : (F,R,L) NDarray of scalars
         Characteristic strain of the L loudest single sources at 
         each frequency, for R realizations.
     alpha_0 : scalar
         False alarm probability
     ret_SNR : Bool
-        Whether or not to also return snr_ss.
+        Whether or not to also return SNR_ss.
     theta_ss : (F,R,L) NDarray or None
         Polar (latitudinal) angular position in the sky of each single source.
         If None, random values between 0 and pi will be assigned.
@@ -1506,18 +1505,16 @@ def detect_ss_scDeter_full(pulsars, scDeter, hc_ss, alpha_0=0.001, ret_SNR=False
         theta_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
     if phi_ss is None:
         phi_ss = np.random.uniform(0, 2*np.pi, size = hc_ss.size).reshape(hc_ss.shape)
-    if iota_ss is None:
-        iota_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
-    if psi_ss is None:
-        psi_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
     if Phi0_ss is None:
         Phi0_ss = np.random.uniform(0,2*np.pi, size=hc_ss.size).reshape(hc_ss.shape)
 
     # rho_ss (corresponds to SNR)
+    hs = holo.utils.char_strain_to_strain_amp(hc_ss, fobs, dfobs)
     rho_h_ss = np.zeros(hc_ss.shape) # (F,R,L)
     for rr in range(len(hc_ss[0])):
         for ll in range(len(hc_ss[0,0])):
-            rho_h_ss[:,rr,ll] =   scDeter.SNR(hc_ss[:,rr,ll], iota=iota_ss[:,rr,ll], psi=psi_ss[:,rr,ll]) 
+            
+            rho_h_ss[:,rr,ll] =   scDeter.SNR(hs[:,rr,ll], iota=iota_ss[:,rr,ll], psi=psi_ss[:,rr,ll]) 
             # this doesn't work
     
     Num = hc_ss[:,0,:].size
@@ -1531,94 +1528,76 @@ def detect_ss_scDeter_full(pulsars, scDeter, hc_ss, alpha_0=0.001, ret_SNR=False
     else:
         return gamma_ss
 
-
-def detect_ss_skymap(pulsars, skymap, hc_ss, alpha_0=0.001, ret_SNR=False,
-              theta_ss=None, phi_ss=None, iota_ss=None, psi_ss=None, Phi0_ss=None,
-              debug=True):
+def snr_scDeter(scDeter, fobs, dfobs, hc_ss, debug=False):
     """ Calculate the single source detection probability, and all intermediary steps.
     
     Parameters
     ----------
-    pulsars : (P,) list of hasasia.Pulsar objects
-        A set of pulsars generated by hasasia.sim.sim_pta()
-    skymap : 
+    scDeter : hasasia.sensitivity.DeterSensitivityCurve object
+        Deterministic sensitivity curve from hasasia.
+    fobs : (F,) 1Darray of scalars
+        Frequency bin centers in Hz.
+    dfobs : (F-1,) 1Darray of scalars
+        Frequency bin widths in Hz.   
     hc_ss : (F,R,L) NDarray of scalars
         Characteristic strain of the L loudest single sources at 
         each frequency, for R realizations.
+
+    Returns
+    -------
+    rho_h_ss : (F,R,L) NDarray
+        SNR of each single source.
+
+    """
+
+    # rho_ss (corresponds to SNR)
+    hs = holo.utils.char_strain_to_strain_amp(hc_ss, fobs, dfobs)
+    rho_h_ss = np.zeros(hc_ss.shape) # (F,R,L)
+    for rr in range(len(hc_ss[0])):
+        for ll in range(len(hc_ss[0,0])):
+            rho_h_ss[:,rr,ll]  = scDeter.SNR(hs[:,rr,ll]) # calcutes SNR
+               
+    return rho_h_ss
+
+
+def detect_ss_skymap(skymap, fobs, dfobs, hc_ss, iota_ss=None, psi_ss=None, 
+                     alpha_0=0.001, ret_SNR=False, debug=True):
+    """ Calculate the single source detection probability, and all intermediary steps.
+    
+    Parameters
+    ----------
+    skymap : hasasia.skysensitivity.skymap object
+        Skymap from hasasia.
+    hc_ss : (F,R,L) NDarray of scalars
+        Characteristic strain of the L loudest single sources at 
+        each frequency, for R realizations.
+    fobs : (F,) 1Darray of scalars
+        Frequency bin centers in Hz.
+    dfobs : (F-1,) 1Darray of scalars
+        Frequency bin widths in Hz.   
     alpha_0 : scalar
         False alarm probability
     ret_SNR : Bool
-        Whether or not to also return snr_ss.
-    theta_ss : (F,R,L) NDarray or None
-        Polar (latitudinal) angular position in the sky of each single source.
-        If None, random values between 0 and pi will be assigned.
-    phi_ss : (F,R,L) NDarray or None
-        Azimuthal (longitudinal) angular position in the sky of each single source.
-        If None, random values between 0 and 2pi will be assigned.
+        Whether or not to also return SNR_ss.
     iota_ss : (F,R,L) NDarray or None
         Inclination of each single source with respect to the line of sight.
         If None, not included.
     psi_ss : (F,R,L) NDarray or None
         Polarizationof each single source.
         If None, not included.
-    Phi0_ss : (F,R,L) NDarray or None
-        Initial GW phase.
-        If None, random values between 0 and 2pi will be assigned.
 
     Returns
     -------
     gamma_ss : (R,) 1Darray
         Probability of detecting any single source, for each realization.
-    rho_h_ss : (F,F,R,L) NDarray
+    rho_h_ss : (F,R,L) NDarray
         SNR of each single source.
 
     """
 
-    # get pulsar properties
-    thetas = np.zeros(len(pulsars))
-    phis = np.zeros(len(pulsars))
-    sigmas = np.zeros(len(pulsars))
-    for ii in range(len(pulsars)):
-        thetas[ii] = pulsars[ii].theta
-        phis[ii] = pulsars[ii].phi
-        sigmas[ii] = np.mean(pulsars[ii].toaerrs)
-
-    # Assign random single source sky positions, if not provided.
-    if theta_ss is None:
-        theta_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
-    if phi_ss is None:
-        phi_ss = np.random.uniform(0, 2*np.pi, size = hc_ss.size).reshape(hc_ss.shape)
-    # if iota_ss is None:
-    #     iota_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
-    # if psi_ss is None:
-    #     psi_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
-    if Phi0_ss is None:
-        Phi0_ss = np.random.uniform(0,2*np.pi, size=hc_ss.size).reshape(hc_ss.shape)
-
     # rho_ss (corresponds to SNR)
-    rho_h_ss = np.zeros((hc_ss.shape[0],hc_ss.shape[0],
-                         hc_ss.shape[1], hc_ss.shape[2])) # (F,F,R,L)
-    for rr in range(len(hc_ss[0])):
-        for ll in range(len(hc_ss[0,0])):
-            # print('hc_ss[:,rr,ll]', hc_ss[:,rr,ll].shape, hc_ss[:,rr,ll])
-            if(iota_ss is not None): 
-                iota=iota_ss[:,rr,ll] 
-            else: 
-                iota = None
-            if(psi_ss is not None): 
-                psi = psi_ss[:,rr,ll] # otherwise 
-            else: 
-                psi = None
-            rho = skymap.SNR(hc_ss[:,rr,ll], iota=iota, psi=psi) 
-            try:
-                rho_h_ss[:,:,rr,ll]  = rho
-                if (rr==0) and (ll==0):
-                    if debug: print('rho', rho.shape) #, rho)
-            except Exception:
-                print('rho', rho.shape) #, rho)
-                print("'rho_h_ss[:,:,rr,ll]  = rho' failed")
-                raise
-    
+    rho_h_ss = snr_skymap(skymap, fobs, dfobs, hc_ss,
+                          iota_ss=iota_ss, psi_ss=psi_ss, debug=debug)
     Num = hc_ss[:,0,:].size
     Fe_bar = _Fe_thresh(Num, alpha_0=alpha_0) # scalar
 
@@ -1630,72 +1609,47 @@ def detect_ss_skymap(pulsars, skymap, hc_ss, alpha_0=0.001, ret_SNR=False,
     else:
         return gamma_ss
 
-def snr_skymap(pulsars, skymap, hc_ss, alpha_0=0.001, 
-              theta_ss=None, phi_ss=None, iota_ss=None, psi_ss=None, Phi0_ss=None,
-              debug=True):
+def snr_skymap(skymap, fobs, dfobs, hc_ss, iota_ss=None, psi_ss=None, 
+               debug=True):
     """ Calculate the single source detection probability, and all intermediary steps.
     
     Parameters
     ----------
-    pulsars : (P,) list of hasasia.Pulsar objects
-        A set of pulsars generated by hasasia.sim.sim_pta()
-    skymap : 
+    skymap : hasasia.skysensitivity.skymap Object
+        Skymap from hasasia.
+    fobs : (F,) 1Darray of scalars
+        Frequency bin centers in Hz.
+    dfobs : (F-1,) 1Darray of scalars
+        Frequency bin widths in Hz.   
     hc_ss : (F,R,L) NDarray of scalars
         Characteristic strain of the L loudest single sources at 
         each frequency, for R realizations.
-    alpha_0 : scalar
-        False alarm probability
-    theta_ss : (F,R,L) NDarray or None
-        Polar (latitudinal) angular position in the sky of each single source.
-        If None, random values between 0 and pi will be assigned.
-    phi_ss : (F,R,L) NDarray or None
-        Azimuthal (longitudinal) angular position in the sky of each single source.
-        If None, random values between 0 and 2pi will be assigned.
     iota_ss : (F,R,L) NDarray or None
         Inclination of each single source with respect to the line of sight.
-        If None, not included.
+        NOTE: either `iota_ss` or `psi_ss` can be provided (and not both).
     psi_ss : (F,R,L) NDarray or None
         Polarizationof each single source.
-        If None, not included.
-    Phi0_ss : (F,R,L) NDarray or None
-        Initial GW phase.
-        If None, random values between 0 and 2pi will be assigned.
+        NOTE: either `iota_ss` or `psi_ss` can be provided (and not both).
 
     Returns
     -------
-    rho_h_ss : (F,F,R,L) NDarray
-        SNR of each single source.??
+    rho_h_ss : (F,R,L) NDarray
+        SNR of each single source.
 
+    If neither 'iota_ss' or 'phi_ss' are used, then inclination and polarization 
+    averaging is used in hasasia (I think).
     """
 
-    # get pulsar properties
-    thetas = np.zeros(len(pulsars))
-    phis = np.zeros(len(pulsars))
-    sigmas = np.zeros(len(pulsars))
-    for ii in range(len(pulsars)):
-        thetas[ii] = pulsars[ii].theta
-        phis[ii] = pulsars[ii].phi
-        sigmas[ii] = np.mean(pulsars[ii].toaerrs)
-
-    # Assign random single source sky positions, if not provided.
-    if theta_ss is None:
-        theta_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
-    if phi_ss is None:
-        phi_ss = np.random.uniform(0, 2*np.pi, size = hc_ss.size).reshape(hc_ss.shape)
-    # if iota_ss is None:
-    #     iota_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
-    # if psi_ss is None:
-    #     psi_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
-    if Phi0_ss is None:
-        Phi0_ss = np.random.uniform(0,2*np.pi, size=hc_ss.size).reshape(hc_ss.shape)
-
     # rho_ss (corresponds to SNR)
-    rho_h_ss = np.zeros((hc_ss.shape[0],hc_ss.shape[0],
-                         hc_ss.shape[1], hc_ss.shape[2])) # (F,F,R,L)
+    hs = holo.utils.char_strain_to_strain_amp(hc_ss, fobs, dfobs)
+    rho_h_ss = np.zeros(hc_ss.shape) # (F,F,R,L)
+    # rho_h_ss = np.zeros((hc_ss.shape[0],hc_ss.shape[0],
+    #                      hc_ss.shape[1], hc_ss.shape[2])) # (F,F,R,L)
     for rr in range(len(hc_ss[0])):
         for ll in range(len(hc_ss[0,0])):
             if debug: print('hc_ss[:,rr,ll]', hc_ss[:,rr,ll].shape) #, hc_ss[:,rr,ll])
             if(iota_ss is not None): 
+                assert (psi_ss is None), "Only one of 'iota_ss' or 'psi_ss' should be provided."    
                 iota=iota_ss[:,rr,ll] 
             else: 
                 iota = None
@@ -1703,17 +1657,17 @@ def snr_skymap(pulsars, skymap, hc_ss, alpha_0=0.001,
                 psi = psi_ss[:,rr,ll] # otherwise 
             else: 
                 psi = None
-            rho = skymap.SNR(hc_ss[:,rr,ll], iota=iota, psi=psi) 
+            if debug: print('iota =', iota, 'psi =', psi)
+            rho = skymap.SNR(hs[:,rr,ll], iota=iota, psi=psi) # calcutes SNR for every phi theta combo
+            rho = np.diagonal(rho) # SNR only for the corresponding phis and thetas
             try:
-                rho_h_ss[:,:,rr,ll]  = rho
+                rho_h_ss[:,rr,ll]  = rho
                 if (rr==0) and (ll==0):
-                    print('rho', rho.shape) #, rho)
+                    if debug: print('rho', rho.shape) #, rho)
             except Exception:
                 if debug: print('rho', rho.shape) #, rho)
-                if debug: print("'rho_h_ss[:,:,rr,ll]  = rho' failed")
+                if debug: print("'rho_h_ss[:,rr,ll]  = rho' failed")
                 raise
                 # return rho_h_ss
-
+    
     return rho_h_ss
-
-'''
