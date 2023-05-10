@@ -427,17 +427,23 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret_all = F
     # Spectral Density
     Sh_bg = _power_spectral_density(hc_bg, fobs) # spectral density of bg, using 0th realization
     Sh0_bg = Sh_bg # appropsimation used in Rosado et al. 2015
+    print('Sh_bg:', Sh_bg.shape)
 
     # Noise 
     noise = _white_noise(cad, sigmas) 
+    print('noise:', noise.shape)
 
     sigma_0B = _sigma0_Bstatistic(noise, Gamma, Sh0_bg)
+    print('sigma_0B:', sigma_0B.shape)
 
     sigma_1B = _sigma1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
+    print('sigma_1B:', sigma_1B.shape)
 
     mu_1B = _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
+    print('mu_1B:', mu_1B.shape)
 
     dp_bg = _bg_detection_probability(sigma_0B, sigma_1B, mu_1B, alpha_0)
+    print('dp_bg', dp_bg.shape)
 
     if(ret_all):
         return dp_bg, Gamma, Sh_bg, noise, mu_1B, sigma_0B, sigma_1B
@@ -1101,7 +1107,7 @@ def _gamma_ssi(Fe_bar, rho):
     gamma_ssi = np.zeros((rho.shape))
     for ff in range(len(rho)):
         for rr in range(len(rho[0])):
-            for ss in range(len(rho[0,0]))
+            for ss in range(len(rho[0,0])):
                 for ll in range(len(rho[0,0,0])):
                     gamma_ssi[ff,rr,ss,ll] = integrate.quad(_integrand_gamma_ss_i, Fe_bar, np.inf, 
                                                             args=(rho[ff,rr,ss,ll]))[0]
@@ -1196,9 +1202,9 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
 
     # Assign random single source sky params, if not provided.
     if phi_ss is None:
-        phi_ss = np.random.uniform(0,2*np.pi, size=theta_ss).reshape(theta_ss.shape)
+        phi_ss = np.random.uniform(0,2*np.pi, size=theta_ss.size).reshape(theta_ss.shape)
     if Phi0_ss is None:
-        Phi0_ss = np.random.uniform(0,2*np.pi, size=theta_ss).reshape(theta_ss.shape)
+        Phi0_ss = np.random.uniform(0,2*np.pi, size=theta_ss.size).reshape(theta_ss.shape)
     if iota_ss is None:
         iota_ss = np.random.uniform(0, np.pi, size = theta_ss.size).reshape(theta_ss.shape)
     if psi_ss is None:
@@ -1291,17 +1297,15 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
         SNR of each single source.
 
     """
-    # Assign random single source sky positions, if not provided.
-    if theta_ss is None:
-        theta_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+    # Assign random single source sky params, if not provided.
     if phi_ss is None:
-        phi_ss = np.random.uniform(0, 2*np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+        phi_ss = np.random.uniform(0,2*np.pi, size=theta_ss.size).reshape(theta_ss.shape)
     if Phi0_ss is None:
-        Phi0_ss = np.random.uniform(0,2*np.pi, size=hc_ss.size).reshape(hc_ss.shape)
+        Phi0_ss = np.random.uniform(0,2*np.pi, size=theta_ss.size).reshape(theta_ss.shape)
     if iota_ss is None:
-        iota_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+        iota_ss = np.random.uniform(0, np.pi, size = theta_ss.size).reshape(theta_ss.shape)
     if psi_ss is None:
-        psi_ss = np.random.uniform(0, np.pi, size = hc_ss.size).reshape(hc_ss.shape)
+        psi_ss = np.random.uniform(0, np.pi, size = theta_ss.size).reshape(theta_ss.shape)
 
     # unitary vectors
     m_hat = _m_unitary_vector(theta_ss, phi_ss, psi_ss) # (3,F,S,L)
