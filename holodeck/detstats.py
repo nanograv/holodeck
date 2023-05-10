@@ -1091,7 +1091,7 @@ def _integrand_gamma_ss_i(Fe, rho):
     rv = (2*Fe)**(1/2) /rho * I_1 * np.exp(-Fe - rho**2 /2)
     return rv
 
-def _gamma_ssi(Fe_bar, rho):
+def _gamma_ssi(Fe_bar, rho, print_nans=False):
     """ Calculate the detection probability for each single source in each realization.
     
     Parameters
@@ -1116,7 +1116,8 @@ def _gamma_ssi(Fe_bar, rho):
                     gamma_ssi[ff,rr,ss,ll] = integrate.quad(_integrand_gamma_ss_i, Fe_bar, np.inf, 
                                                             args=(rho[ff,rr,ss,ll]))[0]
                     if(np.isnan(gamma_ssi[ff,rr,ss,ll])):
-                        print(f'gamma_ssi[{ff},{rr},{ss},{ll}] is nan, setting to 0.')
+                        if print_nans:
+                            print(f'gamma_ssi[{ff},{rr},{ss},{ll}] is nan, setting to 0.')
                         gamma_ssi[ff,rr,ss,ll] = 0
 
     return gamma_ssi
@@ -1247,7 +1248,7 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
 
 def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
               theta_ss=None, phi_ss=None, iota_ss=None, psi_ss=None, Phi0_ss=None,
-              Amp_red=None, gamma_red=None, alpha_0=0.001, ret_SNR=False,):
+              Amp_red=None, gamma_red=None, alpha_0=0.001, ret_SNR=False, print_nans=False):
     """ Calculate the single source detection probability, and all intermediary steps for
     R strain realizations and S sky realizations.
     
@@ -1345,7 +1346,7 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     Num = hc_ss[:,0,:].size # number of single sources in a single strain realization (F*L)
     Fe_bar = _Fe_thresh(Num, alpha_0=alpha_0) # scalar
 
-    gamma_ssi = _gamma_ssi(Fe_bar, rho=snr_ss) # (F,R,S,L)
+    gamma_ssi = _gamma_ssi(Fe_bar, rho=snr_ss, print_nans=print_nans) # (F,R,S,L)
     gamma_ss = _ss_detection_probability(gamma_ssi) # (R,S)
 
     if ret_SNR:
