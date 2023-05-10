@@ -298,7 +298,7 @@ cdef void _dynamic_binary_number_at_fobs(
     for kk in range(nz):
         # iterate in reverse order to match with `redz_interp_grid` which is decreasing
         rev = nz - 1 - kk
-        while (redz_interp_grid[ii] > redz[rev]) and (ii < ninterp - 1):
+        while (redz_interp_grid[ii+1] > redz[rev]) and (ii < ninterp - 1):
             ii += 1
         redz_age[rev] = interp_at_index(ii, redz[rev], redz_interp_grid, tage_interp_grid)
 
@@ -374,9 +374,22 @@ cdef void _dynamic_binary_number_at_fobs(
                     fobs_orb_left = frst_orb_left / (1.0 + redz_left)
                     fobs_orb_right = frst_orb_right / (1.0 + redz_right)
 
+                    # if this `fobs_orb_left` is above the highest target frequency, then all subsequent `kk` values
+                    #    (lower starting redshifts), will have higher observed frequencies
+                    #    so all of them will also be above the highest target frequency,
+                    #    so we can break out of the `kk` loop
+                    if fobs_orb_left > target_fobs_orb[nf-1]:
+                        printf("break\n")
+                        break
+
                     # find the index for target frequencies bounding the left edge
                     #    note: `fidx=0` may mean all targets are still above `fobs_orb_left`; check for this below
                     fidx = while_while(fidx, nf, fobs_orb_left, target_fobs_orb)
+
+                    printf(
+                        "ss=%d kk=%d | fobs_orb_left=%4e [%.4e, %.4e] %d\n",
+                        ss, kk, fobs_orb_left, target_fobs_orb[fidx], target_fobs_orb[fidx+1], fidx,
+                    )
 
                     # iterate over all target frequencies between left and right step-edges; interpolate to redshift
                     ff = fidx
@@ -387,6 +400,11 @@ cdef void _dynamic_binary_number_at_fobs(
                         # ---- TARGET FOUND ----
 
                         newz = _interp_between_vals(ftemp, fobs_orb_left, fobs_orb_right, redz_left, redz_right)
+                        printf(
+                            "ff=%d, ftemp=%.4e [%.4e, %.4e] %d [%.4e, %.4e] ==> %.4e\n",
+                            ff, ftemp, fobs_orb_left, fobs_orb_right, ff, redz_left, redz_right, newz
+                        )
+
                         if newz > 0.0:
 
                             redz_final[ii, jj, kk, ff] = newz
