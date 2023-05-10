@@ -447,7 +447,7 @@ class PD_Piecewise_Uniform_Density(PD_Piecewise_Uniform_Mass):
         return
 
 
-def load_pspace_from_dir(path, space_class):
+def load_pspace_from_dir(path, space_class=None):
     """Load a _Param_Space instance from the saved file in the given directory.
 
     Arguments
@@ -477,6 +477,25 @@ def load_pspace_from_dir(path, space_class):
         raise FileNotFoundError(f"found {len(space_fname)} matches to {pattern} in output {path}!")
 
     space_fname = space_fname[0]
+    # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces`
+    if space_class is None:
+        # get the filename without path, this should contain the name of the PS class
+        space_name = space_fname.name
+        # get a list of all parameter-space classes (assuming they all start with 'PS')
+        space_list = [ss for ss in dir(holo.param_spaces) if ss.startswith('PS')]
+        # iterate over space classes to try to find a match
+        for space in space_list:
+            # exist for-loop if the names match
+            # NOTE: previously the save files converted class names to lower-case; that should no
+            #       longer be the case, but use `lower()` for backwards compatibility at the moment
+            #       LZK 2023-05-10
+            if space.lower() in space_name.lower():
+                break
+        else:
+            raise ValueError(f"Unable to find a PS class matching {space_name}!")
+
+        space_class = getattr(holo.param_spaces, space)
+
     space = space_class.from_save(space_fname, log)
     return space, space_fname
 
