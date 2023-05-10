@@ -870,7 +870,7 @@ def _check_ss_files_and_load_shapes(path_sims, nsamp):
             pta_cad = temp['pta_cad']
         if dfobs is None:
             fobs_edges = temp['fobs_edges']
-            dfobs = np.diff(fobs_edges / 2.0 )
+            dfobs = np.diff(fobs_edges)
 
         # find a file that has GWB data in it (not all of them do, if the file was a 'failure' file)
         if (nreals is None) and ('hc_bg' in data_keys):
