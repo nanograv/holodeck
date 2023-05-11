@@ -957,6 +957,8 @@ def _gw_phase(dur, freqs, Phi_0):
     -------
     Phi_T : (F,R,L) NDarray
         Detected GW phase of each single source.
+    
+    Follows Eq. (47) in Rosado et al. 2015
     """
 
     Phi_T = 2 * np.pi * freqs[:,np.newaxis,np.newaxis] * dur + Phi_0
