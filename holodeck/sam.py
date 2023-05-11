@@ -757,6 +757,11 @@ class Semi_Analytic_Model:
 
         """
 
+        # LZK 2023-05-11  ------------------------------------------------------
+        log.warning("This is not the most accurate redshift calculation!")
+        log.warning("Use the new cython implementation when possible!")
+        # ----------------------------------------------------------------------
+
         if (fobs_orb is None) == (sepa is None):
             err = "one (and only one) of `fobs_orb` or `sepa` must be provided!"
             log.exception(err)
@@ -988,7 +993,16 @@ class Semi_Analytic_Model:
 
         return edges, dnum
 
-    def dynamic_binary_number_at_fobs(self, hard, fobs_orb, steps=123):
+    def dynamic_binary_number_at_fobs(self, hard, fobs_orb, steps=200):
+        """Get correct redshifts for full binary-number calculation.
+
+        Slower but more correct than old `dynamic_binary_number`.
+        Same as new cython implementation `holo.sam_cython.dynamic_binary_number_at_fobs`, which is
+        more than 10x faster.
+        LZK 2023-05-11
+
+        """
+
         fobs_orb = np.asarray(fobs_orb)
         edges = self.edges + [fobs_orb, ]
 
@@ -1018,10 +1032,8 @@ class Semi_Analytic_Model:
         # Combine the binary-evolution time, with the galaxy-merger time
         # (S, M*Q*Z)
         times_tot = times_evo + self._gmt_time.reshape(-1)[np.newaxis, :]
-        print(f"{times_tot.shape=}")
         #
         redz_evo = utils.redz_after(times_tot, redz=rz[1:, :])
-        print(f"{redz_evo.shape=}")
 
         # (S, M*Q*Z)   convert from separations to rest-frame orbital frequencies
         frst_orb_evo = utils.kepler_freq_from_sepa(mt, rads)
@@ -1033,13 +1045,10 @@ class Semi_Analytic_Model:
         # `fobs_orb_evo` is shaped (S, M*Q*Z)    so slice and transpose to  (M*Q*Z, S-1)
         # `redz_evo`     is shaped (S-1, M*Q*Z)  so transpose to  (M*Q*Z, S-1)
         redz_final = utils.ndinterp(fobs_orb.T, fobs_orb_evo[1:, :].T, redz_evo.T, xlog=True, ylog=False)
-        print(f"{redz_final.shape=}")
 
         # (M*Q*Z, S) ===> (M, Q, Z, S)
         redz_final = redz_final.reshape(self.shape + (fobs_orb.size,))
-        print(f"{redz_final.shape=}")
         coal = (redz_final > 0.0)
-        print(f"{utils.frac_str(coal)=}")
         frst_orb = fobs_orb * (1.0 + redz_final)
         frst_orb[frst_orb < 0.0] = 0.0
 
@@ -1063,7 +1072,6 @@ class Semi_Analytic_Model:
         # Convert from observer-frame orbital freq, to rest-frame orbital freq
         sa = utils.kepler_sepa_from_freq(mt, frst_orb)
         # (X, M*Q*Z), hardening rate, negative values, units of [cm/sec]
-        print(f"{mt.shape=} {mr.shape=} {sa.shape=}")
         args = [mt, mr, sa]
         args = np.broadcast_arrays(*args)
         args = [xx.reshape(-1, fobs_orb.size).T for xx in args]
@@ -1079,6 +1087,54 @@ class Semi_Analytic_Model:
         dnum[~coal] = 0.0
 
         return edges, dnum, redz_final
+
+    def new_gwb(self, fobs_gw_edges, hard, realize=100):
+        """Calculate GWB using new cython implementation, 10x faster!
+        """
+
+        assert isinstance(hard, holo.hardening.Fixed_Time_2PL_SAM)
+
+        fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
+
+        # convert to orbital-frequency (from GW-frequency)
+        fobs_orb_edges = fobs_gw_edges / 2.0
+        fobs_orb_cents = fobs_gw_cents / 2.0
+
+        # ---- Calculate number of binaries in each bin
+
+        redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
+            fobs_orb_cents, self, hard, cosmo
+        )
+
+        edges = [self.mtot, self.mrat, self.redz, fobs_orb_edges]
+        number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
+
+        # ---- Get the GWB spectrum from number of binaries over grid
+
+        gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
+
+        return gwb
+
+    def test_gwb(self, fobs_gw_edges, hard, realize=100):
+        """Calculate GWB using new `dynamic_binary_number_at_fobs` method, better, but slower.
+        """
+        fobs_gw_edges = np.atleast_1d(fobs_gw_edges)
+        fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
+        # convert to orbital-frequency (from GW-frequency)
+        fobs_orb_edges = fobs_gw_edges / 2.0
+        fobs_orb_cents = fobs_gw_cents / 2.0
+
+        edges, dnum, redz_final = self.dynamic_binary_number_at_fobs(hard, fobs_orb_cents)
+        edges[-1] = fobs_orb_edges
+
+        number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
+        number = number * np.diff(np.log(fobs_gw_edges))
+
+        # ---- Get the GWB spectrum from number of binaries over grid
+
+        gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
+
+        return gwb
 
     def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=False,
             zero_coalesced=None, zero_stalled=None, use_redz_after_hard=None, return_details=False):
