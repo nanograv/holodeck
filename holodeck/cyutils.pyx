@@ -137,7 +137,7 @@ cdef void my_trapz_grid_weight(int index, int size, double[:] grid, double *rv):
     rv[0] = 1.0
     # this is the same as the average of dx values on each side of the grid-point, i.e.:
     #     0.5 * ((grid[index] - grid[index-1]) + (grid[index+1] - grid[index]))
-    rv[1] = 0.5 * <double>(grid[index+1] - grid[index-1])
+    rv[1] = 0.5 * (<double>(grid[index+1] - grid[index-1]))
 
     return
 
@@ -917,18 +917,18 @@ def ss_bg_hc(number, h2fdf, nreals, normal_threshold=1e10):
         Index of the loudest single source, -1 if there are none at the frequency/realization.
 
     """
-    
+
     cdef long[:] shape = np.array(number.shape)
     F = shape[3]
     R = nreals
     cdef np.ndarray[np.double_t, ndim=2] hc2ss = np.zeros((F,R))
     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
     cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
-    _ss_bg_hc(shape, h2fdf, number, nreals, normal_threshold, 
+    _ss_bg_hc(shape, h2fdf, number, nreals, normal_threshold,
                 hc2ss, hc2bg, ssidx)
     # print(hc2ss, hc2bg, ssidx)
     return hc2ss, hc2bg, ssidx
-    
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.nonecheck(False)
@@ -955,15 +955,15 @@ cdef void _ss_bg_hc(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number
         (memory address of) background characteristic strain squared array.
     ssidx : [:,:,:] long array
         (memory address of) array for indices of max strain bins.
-    bgpar : 
+    bgpar :
         (memory address of) array of effective average parameters
-    
+
     Returns
     -------
     void
     updated via memory address: hc2ss, hc2bg, ssidx
     """
-    
+
     cdef int M = shape[0]
     cdef int Q = shape[1]
     cdef int Z = shape[2]
@@ -995,7 +995,7 @@ cdef void _ss_bg_hc(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number
                         cur = h2fdf[mm,qq,zz,ff]
                         if (num>thresh):
                             std = sqrt(num)
-                            num = <double>random_normal(rng, num, std)  
+                            num = <double>random_normal(rng, num, std)
                         else:
                             num = <double>random_poisson(rng, num)
                         if(cur > max and num > 0):
@@ -1010,10 +1010,10 @@ cdef void _ss_bg_hc(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number
             ssidx[0,ff,rr] = m_max
             ssidx[1,ff,rr] = q_max
             ssidx[2,ff,rr] = z_max
-            if (max==0): 
+            if (max==0):
                 print('No sources found at %dth frequency' % ff) # could warn
     # still need to sqrt and sum! (or do this back in python)
-    
+
     return
 
 # I also need to pass the edges to calculate the avged ones
@@ -1043,7 +1043,7 @@ def ss_bg_hc_and_par(number, h2fdf, nreals, mt, mr, rz, normal_threshold=1e10):
     hc2bg : (F, R) Ndarray of scalars
         Char strain squared of the background.
     ssidx : (3, F, R) NDarray of ints
-        Indices of the loudest single sources. -1 if there are 
+        Indices of the loudest single sources. -1 if there are
         no single sources at that frequency/realization.
     bgpar : (3, F, R) NDarray of scalars
         Average effective M, q, z parameters of the background.
@@ -1059,12 +1059,12 @@ def ss_bg_hc_and_par(number, h2fdf, nreals, mt, mr, rz, normal_threshold=1e10):
     cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
     cdef np.ndarray[np.double_t, ndim=3] sspar = np.zeros((3,F,R))
-    _ss_bg_hc_and_par(shape, h2fdf, number, nreals, normal_threshold, 
+    _ss_bg_hc_and_par(shape, h2fdf, number, nreals, normal_threshold,
                  mt, mr, rz,
                 hc2ss, hc2bg, ssidx, bgpar, sspar)
     # print(hc2ss, hc2bg, ssidx)
     return hc2ss, hc2bg, ssidx, bgpar, sspar
-    
+
 @cython.boundscheck(True)
 @cython.wraparound(True)
 @cython.nonecheck(True)
@@ -1072,7 +1072,7 @@ def ss_bg_hc_and_par(number, h2fdf, nreals, mt, mr, rz, normal_threshold=1e10):
 cdef void _ss_bg_hc_and_par(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number,
             long nreals, long thresh,
             double[:] mt, double[:] mr, double[:] rz,
-            double[:,:] hc2ss, double[:,:] hc2bg, long[:,:,:] ssidx, 
+            double[:,:] hc2ss, double[:,:] hc2bg, long[:,:,:] ssidx,
             double[:,:,:] bgpar, double[:,:,:] sspar):
     """
     Calculates the characteristic strain from loud single sources and a background of all other sources.
@@ -1100,14 +1100,14 @@ cdef void _ss_bg_hc_and_par(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:
         (memory address of) background characteristic strain squared array.
     ssidx : [:,:,:] long array
         (memory address of) array for indices of max strain bins.
-    bgpar : 
+    bgpar :
         (memory address of) array of effective average parameters
     Returns
     _________
     void
     updated via memory address: hc2ss, hc2bg, ssidx, bg_par
     """
-    
+
     cdef int M = shape[0]
     cdef int Q = shape[1]
     cdef int Z = shape[2]
@@ -1141,7 +1141,7 @@ cdef void _ss_bg_hc_and_par(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:
                         cur = h2fdf[mm,qq,zz,ff]
                         if (num>thresh):
                             std = sqrt(num)
-                            num = <double>random_normal(rng, num, std)  
+                            num = <double>random_normal(rng, num, std)
                         else:
                             num = <double>random_poisson(rng, num)
                         if(cur > max and num > 0):
@@ -1159,7 +1159,7 @@ cdef void _ss_bg_hc_and_par(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:
 
             # single source indices
             if (m_max<0):
-                raise 
+                raise
             ssidx[0,ff,rr] = m_max # -1 if no single sources
             ssidx[1,ff,rr] = q_max # -1 if no single sources
             ssidx[2,ff,rr] = z_max # -1 if no single sources
@@ -1178,8 +1178,8 @@ cdef void _ss_bg_hc_and_par(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:
             if (max==0): # sanity check
                 print('No sources found at %dth frequency' % ff) # could warn
     # still need to sqrt and sum! (back in python)
-    
-    return 
+
+    return
 
 
 def test_sort():
@@ -1209,7 +1209,7 @@ def sort_h2fdf(h2fdf):
     """
     cdef long[:] shape = np.array(h2fdf.shape)
     cdef long size = shape[0] * shape[1] * shape[2]
-    
+
     cdef double[:]flat_h2fdf = h2fdf.flatten()
 
     print('flattened array elements')
@@ -1219,10 +1219,10 @@ def sort_h2fdf(h2fdf):
     indices = _sort_h2fdf(flat_h2fdf, size)
 
     print('\nsorted array elements')
-    for ii in range(size): 
+    for ii in range(size):
         print(flat_h2fdf[indices[ii]])
 
-    return 
+    return
 
 cdef (int *) _sort_h2fdf(double[:] flat_h2fdf, long size):
 
@@ -1233,7 +1233,7 @@ cdef (int *) _sort_h2fdf(double[:] flat_h2fdf, long size):
         array[ii] = flat_h2fdf[ii]
 
     argsort(array, size, &indices)
-    
+
     return indices
 
 
@@ -1274,11 +1274,11 @@ def loudest_hc_from_sorted(number, h2fdf, nreals, nloudest, msort, qsort, zsort,
     L = nloudest
     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
-    _loudest_hc_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold, 
+    _loudest_hc_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold,
                             msort, qsort, zsort,
                             hc2ss, hc2bg)
     return hc2ss, hc2bg
-    
+
 @cython.boundscheck(True)
 @cython.wraparound(True)
 @cython.nonecheck(True)
@@ -1312,13 +1312,13 @@ cdef void _loudest_hc_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, double[:
         (Memory address of) single source characteristic strain squared array.
     hc2bg : double[:,:] array
         (Memory address of) background characteristic strain squared array.
-    
+
     Returns
     -------
     void
     updated via memory address: hc2ss, hc2bg, ssidx, bg_par
     """
-    
+
     cdef int M = shape[0]
     cdef int Q = shape[1]
     cdef int Z = shape[2]
@@ -1329,7 +1329,7 @@ cdef void _loudest_hc_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, double[:
     cdef int mm, qq, zz, ff, rr, ll, loud
     cdef double num, sum
     cdef np.ndarray[np.double_t, ndim=3] maxes = np.zeros((F,R,L))
-    
+
     # Setup random number generator from numpy library
     cdef bitgen_t *rng
     cdef const char *capsule_name = "BitGenerator"
@@ -1348,7 +1348,7 @@ cdef void _loudest_hc_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, double[:
                 num = number[mm,qq,zz,ff]
                 if (num>thresh): # Gaussian sample
                     std = sqrt(num)
-                    num = <double>random_normal(rng, num, std)  
+                    num = <double>random_normal(rng, num, std)
                 else:            # Poisson sample
                     num = <double>random_poisson(rng, num)
                 if(num < 1):
@@ -1416,11 +1416,11 @@ def loudest_hc_and_par_from_sorted(number, h2fdf, nreals, nloudest, mt, mr, rz, 
     cdef np.ndarray[np.double_t, ndim=3] lspar = np.zeros((3,F,R))
     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
     cdef np.ndarray[np.long_t, ndim=4] ssidx = np.zeros((3,F,R,L), dtype=int)
-    _loudest_hc_and_par_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold, 
+    _loudest_hc_and_par_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold,
                             mt, mr, rz, msort, qsort, zsort,
                             hc2ss, hc2bg, lspar, bgpar, ssidx)
     return hc2ss, hc2bg, lspar, bgpar, ssidx
-    
+
 @cython.boundscheck(True)
 @cython.wraparound(True)
 @cython.nonecheck(True)
@@ -1467,13 +1467,13 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
         Average effective M, q, z parameters of the background.
     ssidx : (3, F, R, L) NDarray of ints
         Indices of the loudest sources.
-    
+
     Returns
     -------
     void
     updated via memory address: hc2ss, hc2bg, ssidx, bg_par
     """
-    
+
     cdef int M = shape[0]
     cdef int Q = shape[1]
     cdef int Z = shape[2]
@@ -1484,7 +1484,7 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
     cdef int mm, qq, zz, ff, rr, ll
     cdef double num, cur, sum_bg, sum_ls, m_bg, q_bg, z_bg, m_ls, q_ls, z_ls
     cdef np.ndarray[np.double_t, ndim=3] maxes = np.zeros((F,R,L))
-    
+
     # Setup random number generator from numpy library
     cdef bitgen_t *rng
     cdef const char *capsule_name = "BitGenerator"
@@ -1512,7 +1512,7 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
                 num = number[mm,qq,zz,ff]
                 if (num>thresh): # Gaussian sample
                     std = sqrt(num)
-                    num = <double>random_normal(rng, num, std)  
+                    num = <double>random_normal(rng, num, std)
                 else:            # Poisson sample
                     num = <double>random_poisson(rng, num)
                 if(num < 1):
@@ -1529,7 +1529,7 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
                     ssidx[1,ff,rr,ll] = qq
                     ssidx[2,ff,rr,ll] = zz
 
-                    
+
                     sum_ls += cur # tot ls h2fdf
                     # add to average parameters of loudest sources
                     m_ls += cur * mt[mm] # tot weighted ls mass
@@ -1539,13 +1539,13 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
                     # update number and ll index
                     num -= 1
                     ll += 1
-                
+
                 sum_bg += num * cur # tot bg h2fdf
                 # add to average parameters of background sources
                 m_bg += num * cur * mt[mm] # tot weight bg mass
                 q_bg += num * cur * mr[qq] # tot weighted bg ratio
                 z_bg += num * cur * rz[zz] # tot weighted bg redshift
-            
+
             hc2bg[ff,rr] = sum_bg # background strain
             # background average parameters
             bgpar[0,ff,rr] = m_bg/sum_bg # bg avg mass
