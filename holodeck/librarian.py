@@ -376,6 +376,99 @@ class PD_Log_Lin(_Param_Dist):
         return yy
 
 
+class PD_Piecewise_Uniform_Mass(_Param_Dist):
+
+    def __init__(self, edges, weights, **kwargs):
+        super().__init__(**kwargs)
+        edges = np.asarray(edges)
+        self._edges = edges
+        weights = np.asarray(weights)
+        self._weights = weights / weights.sum()
+        assert edges.size == weights.size + 1
+        assert np.ndim(edges) == 1
+        assert np.ndim(weights) == 1
+        assert np.all(np.diff(edges) > 0.0)
+        assert np.all(weights > 0.0)
+        return
+
+    def _dist_func(self, xx):
+        yy = np.zeros_like(xx)
+        xlo = 0.0
+        for ii, ww in enumerate(self._weights):
+            ylo = self._edges[ii]
+            yhi = self._edges[ii+1]
+
+            xhi = xlo + ww
+            sel = (xlo < xx) & (xx <= xhi)
+            yy[sel] = ylo + (xx[sel] - xlo) * (yhi - ylo) / (xhi - xlo)
+
+            xlo = xhi
+
+        return yy
+
+
+class PD_Piecewise_Uniform_Density(PD_Piecewise_Uniform_Mass):
+
+    def __init__(self, edges, densities, **kwargs):
+        dx = np.diff(edges)
+        weights = dx * np.asarray(densities)
+        super().__init__(edges, weights)
+        return
+
+
+def load_pspace_from_dir(path, space_class=None):
+    """Load a _Param_Space instance from the saved file in the given directory.
+
+    Arguments
+    ---------
+    path : str or pathlib.Path
+        Path to directory containing save file.
+        A single file matching "*.pspace.npz" is required in that directory.
+        NOTE: the specific glob pattern is specified by `holodeck.librarian.PSPACE_FILE_SUFFIX` e.g. '.pspace.npz'
+    space_class : _Param_Space subclass
+        Class with which to call the `from_save()` method to load a new _Param_Space instance.
+
+    Returns
+    -------
+    space : `_Param_Space` subclass instance
+        An instance of the `space_class` class.
+    space_fname : pathlib.Path
+        File that `space` was loaded from.
+
+    """
+    path = Path(path)
+    if not path.exists() or not path.is_dir():
+        raise RuntimeError(f"path {path} is not an existing directory!")
+
+    pattern = "*" + holo.librarian.PSPACE_FILE_SUFFIX
+    space_fname = list(path.glob(pattern))
+    if len(space_fname) != 1:
+        raise FileNotFoundError(f"found {len(space_fname)} matches to {pattern} in output {path}!")
+
+    space_fname = space_fname[0]
+    # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces`
+    if space_class is None:
+        # get the filename without path, this should contain the name of the PS class
+        space_name = space_fname.name
+        # get a list of all parameter-space classes (assuming they all start with 'PS')
+        space_list = [ss for ss in dir(holo.param_spaces) if ss.startswith('PS')]
+        # iterate over space classes to try to find a match
+        for space in space_list:
+            # exist for-loop if the names match
+            # NOTE: previously the save files converted class names to lower-case; that should no
+            #       longer be the case, but use `lower()` for backwards compatibility at the moment
+            #       LZK 2023-05-10
+            if space.lower() in space_name.lower():
+                break
+        else:
+            raise ValueError(f"Unable to find a PS class matching {space_name}!")
+
+        space_class = getattr(holo.param_spaces, space)
+
+    space = space_class.from_save(space_fname, log)
+    return space, space_fname
+
+
 def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
     """
 
@@ -840,7 +933,7 @@ def _load_ss_library_from_all_files(path_sims, hc_ss, hc_bg, fit_data, log, sspa
 
         if fits_bad:
             log.warning(f"Missing fit keys in file {pnum} = {fname.name}")
-        
+
         # store the pars from this file
         if(get_pars):
             if ('sspar' not in temp) or ('bgpar' not in temp):
@@ -851,7 +944,7 @@ def _load_ss_library_from_all_files(path_sims, hc_ss, hc_bg, fit_data, log, sspa
             else:
                 sspar[pnum, :, :, :, :] = temp['sspar'][...]
                 bgpar[pnum, :, :, :] = temp['bgpar'][...]
-        
+
 
     if num_fits_failed > 0:
         log.warning(f"Missing fit keys in {num_fits_failed}/{nsamp} = {num_fits_failed/nsamp:.2e} files!")
@@ -1145,7 +1238,7 @@ def run_sam_at_pspace_num(args, space, pnum):
     return rv
 
 def run_ss_at_pspace_num(args, space, pnum):
-    """Run single source and background strain calculations for the SAM simulation 
+    """Run single source and background strain calculations for the SAM simulation
     for sample-parameter `pnum` in the `space` parameter-space.
     Arguments
     ---------
@@ -1198,24 +1291,24 @@ def run_ss_at_pspace_num(args, space, pnum):
         _log_mem_usage(log)
 
         log.debug(f"Calculating 'edges' and 'number' for this SAM.")
-        fobs_orb_edges = fobs_edges / 2.0 
+        fobs_orb_edges = fobs_edges / 2.0
         fobs_orb_cents = fobs_cents/ 2.0
         # edges
         edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents) # should the zero stalled option be part of the parameter space?
         edges[-1] = fobs_orb_edges
         # integrate for number
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
-        number = number * np.diff(np.log(fobs_edges))  
+        number = number * np.diff(np.log(fobs_edges))
         _log_mem_usage(log)
-        
+
         if(get_pars):
             log.debug(f"Calculating 'hc_ss', 'hc_bg', 'sspar', and 'bgpar' for shape ({fobs_cents.size}, {args.nreals})")
-            hc_ss, hc_bg, sspar, bgpar = ss.ss_gws(edges, number, realize=args.nreals, 
+            hc_ss, hc_bg, sspar, bgpar = ss.ss_gws(edges, number, realize=args.nreals,
                                                loudest = args.nloudest, params = True)
         else:
             log.debug(f"Calculating 'hc_ss' and 'hc_bg' only for shape ({fobs_cents.size}, {args.nreals})")
-            hc_ss, hc_bg = ss.ss_gws(edges, number, realize=args.nreals, 
-                                               loudest = args.nloudest, params = False) 
+            hc_ss, hc_bg = ss.ss_gws(edges, number, realize=args.nreals,
+                                               loudest = args.nloudest, params = False)
         _log_mem_usage(log)
         log.debug(f"{holo.utils.stats(hc_ss)=}")
         log.debug(f"{holo.utils.stats(hc_bg)=}")
@@ -1225,10 +1318,10 @@ def run_ss_at_pspace_num(args, space, pnum):
 
         log.debug(f"Saving {pnum} to file")
         if(get_pars):
-            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
+            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges,
                     hc_ss = hc_ss, hc_bg = hc_bg, sspar = sspar, bgpar = bgpar)
         else:
-            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges, 
+            data = dict(fobs=fobs_cents, fobs_edges=fobs_edges,
                     hc_ss = hc_ss, hc_bg = hc_bg)
         rv = True
     except Exception as err:
