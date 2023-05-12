@@ -2194,6 +2194,32 @@ def rho_to_char_strain(freqs, rho, tspan):
     return hc
 
 
+def char_strain_to_strain_amp(hc, fc, df):
+    """ Calculate the strain amplitude of single sources given 
+    their characteristic strains.
+    
+    Parameters
+    ----------
+    hc : (F,R,L) NDarray
+        Characteristic strain of the single sources.
+    fc : (F,) 1Darray
+        Frequency bin centers.
+    df : (F,) 1Darray
+        Frequency bin widths.
+
+    Returns
+    -------
+    hs : (F,R,L)
+        Strain amplitude of the single sources.
+
+    """
+    hs = hc * np.sqrt(df[:,np.newaxis,np.newaxis] / fc[:,np.newaxis,np.newaxis])
+    return hs
+
+
+
+
+
 @numba.njit
 def _gw_ecc_func(eccen):
     """GW Hardening rate eccentricitiy dependence F(e).
