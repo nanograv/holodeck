@@ -605,7 +605,7 @@ class Fixed_Time_2PL(_Hardening):
     _INTERP_THRESH_PAD_FACTOR = 5.0      #: allowance for when to use chunking and when to process full array
     _NORM_CHUNK_SIZE = 1e3
 
-    def __init__(self, time, mtot, mrat, redz, sepa,
+    def __init__(self, time, mtot, mrat, redz, sepa_init,
                  rchar=100.0*PC, gamma_inner=-1.0, gamma_outer=+1.5,
                  progress=False, interpolate_norm=False):
         """Initialize `Fixed_Time` instance for the given binary properties and function parameters.
@@ -625,7 +625,7 @@ class Fixed_Time_2PL(_Hardening):
         redz : array_like
             Binary Redshift.
             NOTE: this is only used as an argument to callable `rchar` and `time` values.
-        sepa : array_like
+        sepa_init : array_like
             Binary semi-major axis (separation) [cm].
         rchar : scalar  or  callable
             Characteristic radius dividing two power-law regimes, in units of [cm]:
@@ -666,8 +666,8 @@ class Fixed_Time_2PL(_Hardening):
             raise ValueError(err)
 
         # ---- Calculate normalization parameter
-        self._sepa_init = sepa
-        mtot, mrat, time, sepa = np.broadcast_arrays(mtot, mrat, time, sepa)
+        self._sepa_init = sepa_init
+        mtot, mrat, time, sepa_init = np.broadcast_arrays(mtot, mrat, time, sepa_init)
         if mtot.ndim != 1:
             err = f"Error in input shapes (`mtot.shape={np.shape(mtot)})"
             log.exception(err)
@@ -687,7 +687,7 @@ class Fixed_Time_2PL(_Hardening):
             interp, backup = self._calculate_norm_interpolant(rchar, gamma_inner, gamma_outer)
 
             log.debug("calculating normalization from interpolants")
-            points = [np.log10(mtot/MSOL), np.log10(mrat), time/GYR, np.log10(sepa/PC)]
+            points = [np.log10(mtot/MSOL), np.log10(mrat), time/GYR, np.log10(sepa_init/PC)]
             points = np.array(points)
             norm = interp(points.T)
             bads = ~np.isfinite(norm)
@@ -709,7 +709,7 @@ class Fixed_Time_2PL(_Hardening):
         # For small numbers of points, calculate the normalization directly
         else:
             log.info("calculating normalization exactly")
-            norm = self._get_norm_chunk(time, mtot, mrat, rchar, gamma_inner, gamma_outer, sepa, progress=progress)
+            norm = self._get_norm_chunk(time, mtot, mrat, rchar, gamma_inner, gamma_outer, sepa_init, progress=progress)
 
         self._gamma_inner = gamma_inner
         self._gamma_outer = gamma_outer
@@ -1130,8 +1130,13 @@ class Fixed_Time_2PL(_Hardening):
 
         return norm
 
+    def time_total(self, mt, mr):
+        args = [self._norm, mt, mr, self._rchar, self._gamma_inner, self._gamma_outer, self._sepa_init]
+        args = np.broadcast_arrays(*args)
+        return self._time_total(*args)
+
     @classmethod
-    def _time_total(cls, norm, mt, mr, rchar, gamma_inner, gamma_outer, rmax, num=123):
+    def _time_total(cls, norm, mt, mr, rchar, gamma_inner, gamma_outer, sepa_init, num=123):
         """For the given parameters, integrate the binary evolution to find total lifetime.
 
         Parameters
@@ -1151,7 +1156,7 @@ class Fixed_Time_2PL(_Hardening):
         gamma_outer : float  or  array_like
             Power-law of hardening timescale in the dynamical-friction regime,
             (large separations: r > rchar).
-        rmax : float  or  array_like
+        sepa_init : float  or  array_like
             Initial binary separation.  Units of [cm].
         num : int
             Number of steps in separation overwhich to integrate the binary evolution
@@ -1167,12 +1172,12 @@ class Fixed_Time_2PL(_Hardening):
         norm = np.atleast_1d(norm)
         rmin = utils.rad_isco(mt)
 
-        args = [norm, mt, mr, rchar, gamma_inner, gamma_outer, rmax, rmin]
+        args = [norm, mt, mr, rchar, gamma_inner, gamma_outer, sepa_init, rmin]
         args = np.broadcast_arrays(*args)
-        norm, mt, mr, rchar, gamma_inner, gamma_outer, rmax, rmin = args
+        norm, mt, mr, rchar, gamma_inner, gamma_outer, sepa_init, rmin = args
 
         # define separations (radii) for each binary's evolution
-        rextr = np.log10([rmin, rmax]).T
+        rextr = np.log10([rmin, sepa_init]).T
         rads = np.linspace(0.0, 1.0, num)[np.newaxis, :]
         rads = rextr[:, 0, np.newaxis] + rads * np.diff(rextr, axis=1)
         # (N, R) for N-binaries and R-radii (`num`)
@@ -1189,6 +1194,14 @@ class Fixed_Time_2PL(_Hardening):
         # Integrate (inverse) hardening rates to calculate total lifetime
         tt = utils.trapz_loglog(- 1.0 / dadt, rads, axis=-1)
         tt = tt[:, -1]
+
+        # dadt_left = dadt[..., :-1]
+        # dadt_right = dadt[..., 1:]
+        # sepa_left = rads[..., :-1]
+        # sepa_right = rads[..., 1:]
+        # tt = 2.0 * (sepa_left - sepa_right) / (dadt_left + dadt_right)
+        # tt = np.sum(tt, axis=-1)
+
         return tt
 
 
@@ -1282,14 +1295,7 @@ class Fixed_Time_2PL_SAM(_Hardening):
         # (M*Q,) ==> (M, Q)
         norm_log10 = np.reshape(norm_log10, shape)
 
-        # for (ii, jj), mt in np.ndenumerate(mtot):
-        #     mr = mrat[ii, jj]
-        #     tt = holo.sam_cython.integrate_binary_evolution_2pl(
-        #         norm_log10[ii, jj], mt, mr, sepa_init, rchar, gamma_inner, gamma_outer, num_steps
-        #     )
-        #     print(ii, jj, tt/GYR)
-
-        self._time = time
+        self._target_time = time
         self._norm = 10.0 ** norm_log10
         self._num_steps = num_steps
         self._sepa_init = sepa_init
@@ -1303,7 +1309,11 @@ class Fixed_Time_2PL_SAM(_Hardening):
         raise NotImplementedError()
 
     def dadt(self, mtot, mrat, sepa):
-        raise NotImplementedError()
+        dadt_vals = holo.sam_cython.hard_func_2pwl_gw(
+            mtot.flatten(), mrat.flatten(), sepa.flatten(), self._norm.flatten(),
+            self._rchar, self._gamma_inner, self._gamma_outer
+        )
+        return dadt_vals
 
 
 # =================================================================================================
