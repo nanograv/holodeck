@@ -2200,12 +2200,12 @@ def char_strain_to_strain_amp(hc, fc, df):
     
     Parameters
     ----------
-    hc : (F,R,L) NDarray
+    hc : array_like
         Characteristic strain of the single sources.
-    fc : (F,) 1Darray
-        Frequency bin centers.
-    df : (F,) 1Darray
-        Frequency bin widths.
+    fc : array_like
+        Observed orbital frequency bin centers.
+    df : array_like
+        Observed orbital frequency bin widths.
 
     Returns
     -------
@@ -2213,7 +2213,7 @@ def char_strain_to_strain_amp(hc, fc, df):
         Strain amplitude of the single sources.
 
     """
-    hs = hc * np.sqrt(df[:,np.newaxis,np.newaxis] / fc[:,np.newaxis,np.newaxis])
+    hs = hc * np.sqrt(df/fc)
     return hs
 
 
