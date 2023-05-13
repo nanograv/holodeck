@@ -1239,14 +1239,14 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     gamma_ss = _ss_detection_probability(gamma_ssi) # (R,S)
 
     if ret_snr:
-        return gamma_ss, snr_ss
+        return gamma_ss, snr_ss, gamma_ssi
     else:
         return gamma_ss
 
 
 def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
               theta_ss=None, phi_ss=None, iota_ss=None, psi_ss=None, Phi0_ss=None,
-              Amp_red=None, gamma_red=None, alpha_0=0.001, ret_snr=False, print_nans=False):
+              Fe_bar = None, Amp_red=None, gamma_red=None, alpha_0=0.001, ret_snr=False, print_nans=False):
     """ Calculate the single source detection probability, and all intermediary steps for
     R strain realizations and S sky realizations.
     
@@ -1283,7 +1283,9 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     psi_ss : (F,S,L) NDarray or None
         Polarization of each single source.
         If None, random values between 0 and pi will be assigned.
-    A_red : scalar or None
+    Fe_bar : scalar or None
+        Threshold F-statistic
+    Amp_red : scalar or None
         Amplitude of pulsar red noise.
     gamma_red : scalar or None
         Power law index of pulsar red noise.
@@ -1297,7 +1299,9 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     gamma_ss : (R,S) NDarray
         Probability of detecting any single source, for each R and S realization.
     snr_ss : (F,R,S,L) NDarray
-        SNR of each single source.
+        SNR of each single source. Returned only if ret_snr is True.
+    gamma_ssi : (F,R,S,L) NDarray
+        DP of each single source. Returned only if ret_snr is True.
 
     """
     # Assign random single source sky params, if not provided.
@@ -1341,14 +1345,15 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     # SNR (includes a_pol, b_pol, and Phi_T calculations internally)
     snr_ss = _snr_ss(amp, F_iplus, F_icross, iota_ss, dur, Phi0_ss, S_i, fobs) # (F,R,S,L)
     
-    Num = hc_ss[:,0,:].size # number of single sources in a single strain realization (F*L)
-    Fe_bar = _Fe_thresh(Num, alpha_0=alpha_0) # scalar
+    if (Fe_bar is None):
+        Num = hc_ss[:,0,:].size # number of single sources in a single strain realization (F*L)
+        Fe_bar = _Fe_thresh(Num, alpha_0=alpha_0) # scalar
 
     gamma_ssi = _gamma_ssi(Fe_bar, rho=snr_ss, print_nans=print_nans) # (F,R,S,L)
     gamma_ss = _ss_detection_probability(gamma_ssi) # (R,S)
 
     if ret_snr:
-        return gamma_ss, snr_ss
+        return gamma_ss, snr_ss, gamma_ssi
     else:
         return gamma_ss
 
@@ -1445,14 +1450,20 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=0.5,
     snr_bg = np.zeros((nsamp, nfreqs, nreals))
     df_ss = np.zeros(nsamp)
     df_bg = np.zeros(nsamp)
+    gamma_ssi = np.zeros((nsamp, nfreqs, nreals, nskies, nloudest))
+
+    # one time calculations
+    Num = nfreqs * nloudest # number of single sources in a single strain realization (F*L)
+    Fe_bar = _Fe_thresh(Num) # scalar
 
     for nn in range(nsamp):
         if debug: print('on sample nn=%d out of N=%d' % (nn,nsamp))
         dp_bg[nn,:], snr_bg[nn,...] = detect_bg_pta(psrs, fobs, cad, hc_bg[nn], ret_snr=True)
-        dp_ss[nn,:,:], snr_ss[nn,...] = detect_ss_pta(psrs, cad, dur, fobs, dfobs,
-                                                hc_ss[nn], hc_bg[nn], ret_snr=True,
+        vals_ss = detect_ss_pta(psrs, cad, dur, fobs, dfobs,
+                                                hc_ss[nn], hc_bg[nn], ret_snr=True, Fe_bar=Fe_bar,
                                                 theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss,
                                                 iota_ss=iota_ss, psi_ss=psi_ss)
+        dp_ss[nn,:,:], snr_ss[nn,...], gamma_ssi[nn] = vals_ss[0], vals_ss[1], vals_ss[2]
         df_ss[nn] = np.sum(dp_ss[nn]>thresh)/(nreals*nskies)
         df_bg[nn] = np.sum(dp_bg[nn]>thresh)/(nreals)
 
@@ -1472,7 +1483,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=0.5,
     plt.close(fig1)
     plt.close(fig2)
     np.savez(output_dir+'/detstats.npz', dp_ss=dp_ss, dp_bg=dp_bg, 
-             df_ss=df_ss, df_bg=df_bg, snr_ss=snr_ss, snr_bg=snr_bg)
+             df_ss=df_ss, df_bg=df_bg, snr_ss=snr_ss, snr_bg=snr_bg, gamma_ssi=gamma_ssi)
 
     return dp_ss, dp_bg, df_ss, df_bg, snr_ss, snr_bg
         
