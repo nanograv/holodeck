@@ -964,17 +964,20 @@ def _gw_phase(dur, freqs, Phi_0):
     Phi_T = 2 * np.pi * freqs[:,np.newaxis,np.newaxis] * dur + Phi_0
     return Phi_T
 
-def _amplitude(hc_ss, f, df):
+
+def _amplitude(hc_ss, fobs, dfobs):
     """ Calculate the amplitude from the single source to use in DP calculations
     
     Parameters
     ----------
     hc_ss : (F,R,L) NDarray
         Characteristic strain of each single source at each realization.
-    f : (F,) 1Darray
-        Frequency
-    df : (F,) 1Darray
-        Frequency bin widths.
+    fobs : (F,) 1Darray
+        Observer frame frequency. This can be orbital or gw frequency, 
+        it just has to match dfobs.
+    dfobs_orb : (F,) 1Darray
+        Observer frame frequency bin widths. This can be orbital or gw frequency, 
+        it just has to match dfobs.
 
     Returns
     -------
@@ -983,7 +986,7 @@ def _amplitude(hc_ss, f, df):
     
     """
 
-    Amp = hc_ss * np.sqrt(5) / 4 / 2**(1/6) *np.sqrt(df[:,np.newaxis,np.newaxis]/f[:,np.newaxis,np.newaxis])
+    Amp = hc_ss * np.sqrt(10) / 4 *np.sqrt(dfobs[:,np.newaxis,np.newaxis]/fobs[:,np.newaxis,np.newaxis])
     return Amp
 
 
@@ -1165,9 +1168,9 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     dur : scalar
         Duration of observations in seconds. 
     fobs : (F,) 1Darray of scalars
-        Frequency bin centers in hertz.
+        Observer frame gw frequency bin centers in Hz.
     dfobs : (F-1,) 1Darray of scalars
-        Frequency bin widths in hertz.
+        Observer frame gw frequency bin widths in Hz.
     hc_ss : (F,R,L) NDarray of scalars
         Characteristic strain of the L loudest single sources at 
         each frequency, for R realizations.
@@ -1231,7 +1234,8 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, Amp_red, gamma_red)
 
     # amplitudw
-    amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
+    amp = _amplitude(hc_ss, fobs[:,np.newaxis,np.newaxis], 
+                     dfobs[:,np.newaxis,np.newaxis]) # (F,R,L)
 
     # SNR (includes a_pol, b_pol, and Phi_T calculations internally)
     snr_ss = _snr_ss(amp, F_iplus, F_icross, iota_ss, dur, Phi0_ss, S_i, fobs) # (F,R,S,L)
@@ -1263,9 +1267,9 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     dur : scalar
         Duration of observations in seconds. 
     fobs : (F,) 1Darray of scalars
-        Frequency bin centers in Hz.
+        Observer frame gw frequency bin centers in Hz.
     dfobs : (F-1,) 1Darray of scalars
-        Frequency bin widths in Hz.
+        Observer frame gw frequency bin widths in Hz.
     hc_ss : (F,R,L) NDarray of scalars
         Characteristic strain of the L loudest single sources at 
         each frequency, for R realizations.
