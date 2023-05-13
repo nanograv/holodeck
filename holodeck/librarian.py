@@ -822,7 +822,7 @@ def _check_ss_files_and_load_shapes(path_sims, nsamp):
     Returns
     -------
     fobs : (F,) ndarray
-        Observer-frame frequency bin centers at which GW signals are calculated.
+        Observer-frame GW Zfrequency bin centers at which GW signals are calculated.
     nreals : int
         Number of realizations in the output files.
     nloudest : int
@@ -836,7 +836,7 @@ def _check_ss_files_and_load_shapes(path_sims, nsamp):
     pta_cad : scalar
         Cadence of pta observations in seconds.
     dfobs : (F-1,) ndarray
-        Observer-frame frequency bin widths.
+        Observer-frame GW frequency bin widths.
     """
 
     fobs = None
