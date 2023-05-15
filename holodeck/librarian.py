@@ -569,14 +569,14 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
     # ---- make sure all files exist; get shape information from files
 
     log.info(f"checking that all {nsamp} files exist")
-    fobs, nreals, nloudest, fit_data = _check_files_and_load_shapes(path_sims, nsamp)
+    fobs, nreals, nloudest, fit_data, has_gwb = _check_files_and_load_shapes(path_sims, nsamp)
     nfreqs = fobs.size
     fit_keys = fit_data.keys() if fit_data is not None else None
     log.debug(f"{nfreqs=}, {nreals=}, {nloudest=}, {fit_keys=}")
 
     # ---- Store results from all files
 
-    gwb = np.zeros((nsamp, nfreqs, nreals))
+    gwb = np.zeros((nsamp, nfreqs, nreals)) if has_gwb else None
     hc_ss = np.zeros((nsamp, nfreqs, nreals, nloudest))
     hc_bg = np.zeros((nsamp, nfreqs, nreals))
     sspar = np.zeros((nsamp, 3, nfreqs, nreals, nloudest))
@@ -593,7 +593,8 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
     log.info(f"Writing collected data to file {out_filename}")
     with h5py.File(out_filename, 'w') as h5:
         h5.create_dataset('fobs', data=fobs)
-        h5.create_dataset('gwb', data=gwb)
+        if gwb is not None:
+            h5.create_dataset('gwb', data=gwb)
         h5.create_dataset('hc_ss', data=hc_ss)
         h5.create_dataset('hc_bg', data=hc_bg)
         h5.create_dataset('sspar', data=sspar)
@@ -636,6 +637,7 @@ def _check_files_and_load_shapes(path_sims, nsamp):
     nreals = None
     nloudest = None
     fit_data = None
+    has_gwb = False
     for ii in tqdm.trange(nsamp):
         temp = _get_sim_fname_gwb_ss(path_sims, ii)
         if not temp.exists():
@@ -653,10 +655,22 @@ def _check_files_and_load_shapes(path_sims, nsamp):
         if fobs is None:
             fobs = temp['fobs'][()]
 
+        if (not has_gwb) and ('gwb' in data_keys):
+            has_gwb = True
+
         # find a file that has GWB data in it (not all of them do, if the file was a 'failure' file)
-        if (nreals is None) and ('gwb' in data_keys):
-            nreals = temp['gwb'].shape[-1]
-            assert nreals == temp['hc_bg'].shape[-1]
+        if (nreals is None):
+            nreals_1 = None
+            nreals_2 = None
+            if ('gwb' in data_keys):
+                nreals_1 = temp['gwb'].shape[-1]
+                nreals = nreals_1
+            if ('hc_bg' in data_keys):
+                nreals_2 == temp['hc_bg'].shape[-1]
+                nreals = nreals_2
+            if (nreals_1 is not None) and (nreals_2 is not None):
+                assert nreals_1 == nreals_2
+
         if (nloudest is None) and ('hc_ss' in data_keys):
             nloudest = temp['hc_ss'].shape[-1]
 
@@ -680,7 +694,7 @@ def _check_files_and_load_shapes(path_sims, nsamp):
         log.warning("Unable to load `fit_data` from any files!")
         fit_data = {}
 
-    return fobs, nreals, nloudest, fit_data
+    return fobs, nreals, nloudest, fit_data, has_gwb
 
 
 def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, fit_data, sspar, bgpar, log):
@@ -700,7 +714,7 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, fit_data, sspar, 
 
     """
 
-    nsamp = gwb.shape[0]
+    nsamp = hc_bg.shape[0]
     log.info(f"Collecting data from {nsamp} files")
     bad_files = np.zeros(nsamp, dtype=bool)     #: track which files contain UN-useable data
     num_fits_failed = 0
@@ -713,7 +727,8 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, fit_data, sspar, 
             msg = f"file {pnum=:06d} is a failure file, setting values to NaN ({fname})"
             log.warning(msg)
             # set all parameters to NaN for failure files.  Note that this is distinct from gwb=0.0 which can be real.
-            gwb[pnum, :, :] = np.nan
+            if gwb is not None:
+                gwb[pnum, :, :] = np.nan
             hc_ss[pnum, :, :, :] = np.nan
             hc_bg[pnum, :, :] = np.nan
             for fk in fit_data.keys():
@@ -723,7 +738,8 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, fit_data, sspar, 
             continue
 
         # store the GWB from this file
-        gwb[pnum, :, :] = temp['gwb'][...]
+        if gwb is not None:
+            gwb[pnum, :, :] = temp['gwb'][...]
         hc_ss[pnum, :, :, :] = temp['hc_ss'][...]
         hc_bg[pnum, :, :] = temp['hc_bg'][...]
         sspar[pnum, :, :, :, :] = temp['sspar'][...]
@@ -989,27 +1005,35 @@ def run_sam_at_pspace_num(args, space, pnum):
         number = number * np.diff(np.log(fobs_edges))
         _log_mem_usage(log)
 
+        try:
+            use_redz = sam._redz_final
+            log.info("using `redz_final`")
+        except AttributeError:
+            use_redz = sam._redz_prime[:, :, :, np.newaxis]
+            log.warning("using `redz_prime`")
+
         log.debug(f"Calculating `ss_gws` for shape ({fobs_cents.size}, {args.nreals})")
-        hc_ss, hc_bg, sspar, bgpar = ss.ss_gws(edges, number, realize=args.nreals,
-                                               loudest=args.nloudest, params=True)
+        hc_ss, hc_bg, sspar, bgpar = ss.ss_gws_redz(
+            edges, use_redz, number, realize=args.nreals,
+            loudest=args.nloudest, params=True
+        )
+        log.debug(f"{holo.utils.stats(hc_ss)=}")
+        log.debug(f"{holo.utils.stats(hc_bg)=}")
 
         _log_mem_usage(log)
 
         log.debug(f"Calculating `gwb` for shape ({fobs_cents.size}, {args.nreals})")
-        try:
-            use_redz = sam._redz_final
-        except AttributeError:
-            use_redz = sam._redz_prime[:, :, :, np.newaxis]
-        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, args.nreals)
+        if ALSO_PRODUCE_LEGACY_GWB_CALCULATION:
+            gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, args.nreals)
+            log.debug(f"{holo.utils.stats(gwb)=}")
 
         _log_mem_usage(log)
-        log.debug(f"{holo.utils.stats(hc_ss)=}")
-        log.debug(f"{holo.utils.stats(hc_bg)=}")
-        log.debug(f"{holo.utils.stats(gwb)=}")
 
         log.debug(f"Saving {pnum} to file")
         data = dict(fobs=fobs_cents, fobs_edges=fobs_edges,
-                    gwb=gwb, hc_ss=hc_ss, hc_bg=hc_bg, sspar=sspar, bgpar=bgpar)
+                    hc_ss=hc_ss, hc_bg=hc_bg, sspar=sspar, bgpar=bgpar)
+        if ALSO_PRODUCE_LEGACY_GWB_CALCULATION:
+            data['gwb'] = gwb
 
         rv = True
     except Exception as err:
