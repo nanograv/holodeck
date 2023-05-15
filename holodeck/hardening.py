@@ -63,7 +63,7 @@ _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 class _Hardening(abc.ABC):
     """Base class for binary-hardening models, providing the `dadt_dedt(evo, step, ...)` method.
     """
-    
+
     CONSISTENT = None
 
     @abc.abstractmethod
@@ -199,7 +199,7 @@ class Hard_GW(_Hardening):
         # rv = rv / (12 * sepa * fe)
         rv = 1.0 / utils.gw_dade(sepa, eccen)
         return rv
-    
+
     @property
     def consistent(self):
         return False
@@ -612,8 +612,8 @@ class Fixed_Time_2PL(_Hardening):
     _NORM_CHUNK_SIZE = 1e3
     CONSISTENT = True
 
-    def __init__(self, time, mtot, mrat, redz, sepa,
-                 rchar=100.0*PC, gamma_inner=-1.0, gamma_outer=+2.5,
+    def __init__(self, time, mtot, mrat, redz, sepa_init,
+                 rchar=100.0*PC, gamma_inner=-1.0, gamma_outer=+1.5,
                  progress=False, interpolate_norm=False):
         """Initialize `Fixed_Time` instance for the given binary properties and function parameters.
 
@@ -632,7 +632,7 @@ class Fixed_Time_2PL(_Hardening):
         redz : array_like
             Binary Redshift.
             NOTE: this is only used as an argument to callable `rchar` and `time` values.
-        sepa : array_like
+        sepa_init : array_like
             Binary semi-major axis (separation) [cm].
         rchar : scalar  or  callable
             Characteristic radius dividing two power-law regimes, in units of [cm]:
@@ -673,8 +673,8 @@ class Fixed_Time_2PL(_Hardening):
             raise ValueError(err)
 
         # ---- Calculate normalization parameter
-        self._sepa_init = sepa
-        mtot, mrat, time, sepa = np.broadcast_arrays(mtot, mrat, time, sepa)
+        self._sepa_init = sepa_init
+        mtot, mrat, time, sepa_init = np.broadcast_arrays(mtot, mrat, time, sepa_init)
         if mtot.ndim != 1:
             err = f"Error in input shapes (`mtot.shape={np.shape(mtot)})"
             log.exception(err)
@@ -694,7 +694,7 @@ class Fixed_Time_2PL(_Hardening):
             interp, backup = self._calculate_norm_interpolant(rchar, gamma_inner, gamma_outer)
 
             log.debug("calculating normalization from interpolants")
-            points = [np.log10(mtot/MSOL), np.log10(mrat), time/GYR, np.log10(sepa/PC)]
+            points = [np.log10(mtot/MSOL), np.log10(mrat), time/GYR, np.log10(sepa_init/PC)]
             points = np.array(points)
             norm = interp(points.T)
             bads = ~np.isfinite(norm)
@@ -716,7 +716,7 @@ class Fixed_Time_2PL(_Hardening):
         # For small numbers of points, calculate the normalization directly
         else:
             log.info("calculating normalization exactly")
-            norm = self._get_norm_chunk(time, mtot, mrat, rchar, gamma_inner, gamma_outer, sepa, progress=progress)
+            norm = self._get_norm_chunk(time, mtot, mrat, rchar, gamma_inner, gamma_outer, sepa_init, progress=progress)
 
         self._gamma_inner = gamma_inner
         self._gamma_outer = gamma_outer
@@ -1137,8 +1137,13 @@ class Fixed_Time_2PL(_Hardening):
 
         return norm
 
+    def time_total(self, mt, mr):
+        args = [self._norm, mt, mr, self._rchar, self._gamma_inner, self._gamma_outer, self._sepa_init]
+        args = np.broadcast_arrays(*args)
+        return self._time_total(*args)
+
     @classmethod
-    def _time_total(cls, norm, mt, mr, rchar, gamma_inner, gamma_outer, rmax, num=123):
+    def _time_total(cls, norm, mt, mr, rchar, gamma_inner, gamma_outer, sepa_init, num=123):
         """For the given parameters, integrate the binary evolution to find total lifetime.
 
         Parameters
@@ -1158,7 +1163,7 @@ class Fixed_Time_2PL(_Hardening):
         gamma_outer : float  or  array_like
             Power-law of hardening timescale in the dynamical-friction regime,
             (large separations: r > rchar).
-        rmax : float  or  array_like
+        sepa_init : float  or  array_like
             Initial binary separation.  Units of [cm].
         num : int
             Number of steps in separation overwhich to integrate the binary evolution
@@ -1174,12 +1179,12 @@ class Fixed_Time_2PL(_Hardening):
         norm = np.atleast_1d(norm)
         rmin = utils.rad_isco(mt)
 
-        args = [norm, mt, mr, rchar, gamma_inner, gamma_outer, rmax, rmin]
+        args = [norm, mt, mr, rchar, gamma_inner, gamma_outer, sepa_init, rmin]
         args = np.broadcast_arrays(*args)
-        norm, mt, mr, rchar, gamma_inner, gamma_outer, rmax, rmin = args
+        norm, mt, mr, rchar, gamma_inner, gamma_outer, sepa_init, rmin = args
 
         # define separations (radii) for each binary's evolution
-        rextr = np.log10([rmin, rmax]).T
+        rextr = np.log10([rmin, sepa_init]).T
         rads = np.linspace(0.0, 1.0, num)[np.newaxis, :]
         rads = rextr[:, 0, np.newaxis] + rads * np.diff(rextr, axis=1)
         # (N, R) for N-binaries and R-radii (`num`)
@@ -1196,6 +1201,14 @@ class Fixed_Time_2PL(_Hardening):
         # Integrate (inverse) hardening rates to calculate total lifetime
         tt = utils.trapz_loglog(- 1.0 / dadt, rads, axis=-1)
         tt = tt[:, -1]
+
+        # dadt_left = dadt[..., :-1]
+        # dadt_right = dadt[..., 1:]
+        # sepa_left = rads[..., :-1]
+        # sepa_right = rads[..., 1:]
+        # tt = 2.0 * (sepa_left - sepa_right) / (dadt_left + dadt_right)
+        # tt = np.sum(tt, axis=-1)
+
         return tt
 
 
@@ -1252,6 +1265,63 @@ class Fixed_Time(Fixed_Time_2PL):
         """
         dadt = - norm * np.power(1.0 + xx, -g2-1) / np.power(xx, g1-1)
         return dadt
+
+
+class Fixed_Time_2PL_SAM(_Hardening):
+    """Provide a binary hardening rate such that the total lifetime matches a given value.
+    """
+
+    def __init__(self, sam, time, sepa_init=1.0e3*PC, rchar=10.0*PC, gamma_inner=-1.0, gamma_outer=+1.5, num_steps=300):
+        """Initialize a `Fixed_Time` instance using a provided `Semi_Analytic_Model` instance.
+
+        Parameters
+        ----------
+        sam : `holodeck.sam.Semi_Analytic_Model`
+            Input population, from which to use masses, redshifts and separations.
+        time : float,
+            Total merger time of binaries, units of [sec].
+        sepa_init : float,
+            Initial binary separation.  Units of [cm].
+        **kwargs : dict
+            Additional keyword-argument pairs passed to the `Fixed_Time` initialization method.
+
+        Returns
+        -------
+        `Fixed_Time`
+            Instance configured for the given binary population.
+
+        """
+        assert np.ndim(time) == 0
+        mtot, mrat = np.meshgrid(sam.mtot, sam.mrat, indexing='ij')
+        shape = mtot.shape
+        mt, mr = [mm.flatten() for mm in [mtot, mrat]]
+
+        norm_log10 = holo.sam_cython.find_2pl_hardening_norm(
+            time, mt, mr,
+            sepa_init, rchar, gamma_inner, gamma_outer, num_steps,
+        )
+        # (M*Q,) ==> (M, Q)
+        norm_log10 = np.reshape(norm_log10, shape)
+
+        self._target_time = time
+        self._norm = 10.0 ** norm_log10
+        self._num_steps = num_steps
+        self._sepa_init = sepa_init
+        self._rchar = rchar
+        self._gamma_inner = gamma_inner
+        self._gamma_outer = gamma_outer
+
+        return
+
+    def dadt_dedt(self, evo, step, *args, **kwargs):
+        raise NotImplementedError()
+
+    def dadt(self, mtot, mrat, sepa):
+        dadt_vals = holo.sam_cython.hard_func_2pwl_gw(
+            mtot.flatten(), mrat.flatten(), sepa.flatten(), self._norm.flatten(),
+            self._rchar, self._gamma_inner, self._gamma_outer
+        )
+        return dadt_vals
 
 
 # =================================================================================================

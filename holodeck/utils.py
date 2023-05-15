@@ -971,7 +971,7 @@ def rk4_step(func, x0, y0, dx, args=None, check_nan=0, check_nan_max=5):
     return x1, y1
 
 
-def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int = 2) -> str:
+def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int = 2, weights=None) -> str:
     """Return a string giving quantiles of the given input data.
 
     Parameters
@@ -1005,7 +1005,7 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
         percs = np.concatenate([1-percs[::-1], [0.5], percs])
 
     # stats = np.percentile(vals, percs*100)
-    stats = quantiles(vals, percs)
+    stats = quantiles(vals, percs, weights=weights)
     _rv = ["{val:.{prec}e}".format(prec=prec, val=ss) for ss in stats]
     rv = ", ".join(_rv)
     return rv
