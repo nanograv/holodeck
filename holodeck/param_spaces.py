@@ -395,7 +395,7 @@ class PS_Uniform_07A(PS_Generic_2):
         new_def_params = dict(
             hard_gamma_inner=-1.0,
             hard_rchar=100.0,               # [pc]
-            hard_gamma_outer=+2.5,
+            hard_gamma_outer=+1.5,
             hard_sepa_init=1e4,     # [pc]
         )
         return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
@@ -421,7 +421,7 @@ class PS_Uniform_07B(PS_Generic_2):
         new_def_params = dict(
             hard_gamma_inner=-1.0,
             hard_rchar=100.0,               # [pc]
-            hard_gamma_outer=+1.5,
+            hard_gamma_outer=+2.5,
             hard_sepa_init=1e4,     # [pc]
         )
         return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
