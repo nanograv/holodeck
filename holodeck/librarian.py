@@ -22,7 +22,7 @@ from scipy.stats import qmc
 
 import holodeck as holo
 import holodeck.single_sources as ss
-from holodeck import log, utils
+from holodeck import log, utils, cosmo
 from holodeck.constants import YR
 
 
@@ -999,20 +999,35 @@ def run_sam_at_pspace_num(args, space, pnum):
         # edges
         # should the zero stalled option be part of the parameter space?
 
-        edges, dnum, redz_final = sam.dynamic_binary_number_at_fobs(hard, fobs_orb=fobs_orb_cents)
+        # ==== OLD / MID ====
+        # # ---- OLD
+        # # edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents)
+        # # use_redz = None
+        # # ---- MID
+        # edges, dnum, redz_final = sam.dynamic_binary_number_at_fobs(hard, fobs_orb=fobs_orb_cents)
+        # use_redz = redz_final
+        # # --------
+        # edges[-1] = fobs_orb_edges
+        # # integrate for number
+        # number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
+        # number = number * np.diff(np.log(fobs_edges))
+        # ==== NEW ====
+        redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
+            fobs_orb_cents, sam, hard, cosmo
+        )
+        use_redz = redz_final
+        edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
+        number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
 
-        edges[-1] = fobs_orb_edges
-        # integrate for number
-        number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
-        number = number * np.diff(np.log(fobs_edges))
         _log_mem_usage(log)
 
-        try:
-            use_redz = sam._redz_final
-            log.info("using `redz_final`")
-        except AttributeError:
-            use_redz = sam._redz_prime[:, :, :, np.newaxis]
-            log.warning("using `redz_prime`")
+        if use_redz is None:
+            try:
+                use_redz = sam._redz_final
+                log.info("using `redz_final`")
+            except AttributeError:
+                use_redz = sam._redz_prime[:, :, :, np.newaxis]
+                log.warning("using `redz_prime`")
 
         log.debug(f"Calculating `ss_gws` for shape ({fobs_cents.size}, {args.nreals})")
         hc_ss, hc_bg, sspar, bgpar = ss.ss_gws_redz(
