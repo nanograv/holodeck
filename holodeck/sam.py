@@ -383,11 +383,6 @@ class Semi_Analytic_Model:
 
     """
 
-    # ZERO_GMT_STALLED_SYSTEMS = False
-    # ZERO_DYNAMIC_STALLED_SYSTEMS = True
-    # ZERO_DYNAMIC_COALESCED_SYSTEMS = True
-    # USE_REDZ_AFTER_HARD = True
-
     def __init__(
         self, mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91), mrat=(1e-3, 1.0, 71), redz=(1e-3, 10.0, 101),
         shape=None,
@@ -701,8 +696,7 @@ class Semi_Analytic_Model:
 
         return self._fisco
 
-    def dynamic_binary_number(self, hard, fobs_orb=None, sepa=None,
-                              zero_coalesced=None, zero_stalled=None, return_details=False):
+    def dynamic_binary_number(self, hard, fobs_orb=None, sepa=None, zero_stalled=None, return_details=False):
         """Calculate the differential number of binaries (per bin-volume, per log-freq interval).
 
         d^4 N / [dlog10(M) dq dz dln(X)    <===    d^3 n / dlog10(M) dq dz
@@ -721,9 +715,6 @@ class Semi_Analytic_Model:
         sepa : ArrayLike
             Rest-frame binary separation in [cm].
             NOTE: either `fobs_orb` or `sepa` must be provided (and not both).
-        zero_coalesced : bool
-            Whether binaries should be checked for coalescence.
-            If `True`, they will not contribute to frequency bins above their ISCO frequency.
         zero_stalled : bool
             Whether binaries should be checked for stalling before z=0.
             If `True`, they will not contribute to frequency bins that they reach after z=0.
@@ -770,16 +761,6 @@ class Semi_Analytic_Model:
             xsize = len(sepa)
             edges = self.edges + [sepa, ]
 
-        if zero_coalesced is None:
-            if hard.CONSISTENT is True:
-                zero_coalesced = False
-            elif hard.CONSISTENT is False:
-                zero_coalesced = True
-            else:
-                err = "`hard.CONSISTENT` or 'zero_coalesced' must be one of {{True, False}}!"
-                log.error(err)
-                raise ValueError(err)
-            
         if zero_stalled is None:
             if hard.CONSISTENT is True:
                 zero_stalled = True
@@ -790,7 +771,7 @@ class Semi_Analytic_Model:
                 log.error(err)
                 raise ValueError(err)
 
-        log.info(f"{zero_coalesced=}, {zero_stalled=}")
+        log.info(f"{zero_stalled=}")
 
         # shape: (M, Q, Z)
         dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
@@ -869,26 +850,22 @@ class Semi_Analytic_Model:
             del dadt, tau, dens, cosmo_fact
 
         # ---- Check when binaries reach their ISCO (and zero out density at higher frequencies)
-        if zero_coalesced:
-            # (M,) rest-frame orbital-frequency of ISCO in [1/sec]
-            fisco = self.fisco
-            # duplicate for all Q and Z  i.e. (M,) ==> (M,Q,Z)
-            fisco = fisco[:, np.newaxis, np.newaxis] * np.ones(self.shape)
-            # (M,Q,Z) ==> (M*Q*Z)
-            fisco = fisco.flatten()
-            # `frst_orb` is shaped (X, M*Q*Z)
-            coal = (frst_orb > fisco[np.newaxis, :])
-            # reshape to match `dnum`  (X, M*Q*Z) ==> (M*Q*Z, X) ==> (M, Q, Z, X)
-            coal = coal.T.reshape(dnum.shape)
-            log.info(f"fraction of coalesced binaries: {utils.frac_str(coal)}")
-            dnum[coal] = 0.0
-            # self._coal = coal
-            if return_details:
-                details['coal'] = coal
-                details['fisco'] = fisco
-
-        else:
-            log.warning("WARNING: _coalesced_ binaries are not being accounted for in `dynamic_binary_number`!")
+        # (M,) rest-frame orbital-frequency of ISCO in [1/sec]
+        fisco = self.fisco
+        # duplicate for all Q and Z  i.e. (M,) ==> (M,Q,Z)
+        fisco = fisco[:, np.newaxis, np.newaxis] * np.ones(self.shape)
+        # (M,Q,Z) ==> (M*Q*Z)
+        fisco = fisco.flatten()
+        # `frst_orb` is shaped (X, M*Q*Z)
+        coal = (frst_orb > fisco[np.newaxis, :])
+        # reshape to match `dnum`  (X, M*Q*Z) ==> (M*Q*Z, X) ==> (M, Q, Z, X)
+        coal = coal.T.reshape(dnum.shape)
+        log.info(f"fraction of coalesced binaries: {utils.frac_str(coal)}")
+        dnum[coal] = 0.0
+        # self._coal = coal
+        if return_details:
+            details['coal'] = coal
+            details['fisco'] = fisco
 
         # ---- Check that binaries reach each frequency bin before redshift zero
         if zero_stalled:
@@ -1003,7 +980,7 @@ class Semi_Analytic_Model:
         return edges, dnum
 
     def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=False,
-            zero_coalesced=None, zero_stalled=None, use_redz_after_hard=None, return_details=False):
+            zero_stalled=None, use_redz_after_hard=None, return_details=False):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
         Parameters
@@ -1062,7 +1039,7 @@ class Semi_Analytic_Model:
         # ! NOTE: using frequency-bin _centers_ produces more accurate results than frequency-bin _edges_ !#
         vals = self.dynamic_binary_number(
             hard, fobs_orb=fobs_orb_cents,
-            zero_coalesced=zero_coalesced, zero_stalled=zero_stalled, return_details=return_details,
+            zero_stalled=zero_stalled, return_details=return_details,
         )
 
         # print("GWB 2: ", flush=True)
@@ -1179,7 +1156,7 @@ class Semi_Analytic_Model:
         return gwb
 
     def ss_gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=1, loudest=1, params=False,
-            zero_coalesced=None, zero_stalled=None, use_redz_after_hard=None, return_details=False):
+            zero_stalled=None, use_redz_after_hard=None, return_details=False):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
         Parameters
@@ -1236,7 +1213,7 @@ class Semi_Analytic_Model:
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
         edges, dnum = self.dynamic_binary_number(
             hard, fobs_orb=fobs_orb_cents,
-            zero_coalesced=zero_coalesced, zero_stalled=zero_stalled, return_details=return_details,
+            zero_stalled=zero_stalled, return_details=return_details,
         )
 
         print("SS 2: ", flush=True)
@@ -1269,7 +1246,7 @@ class Semi_Analytic_Model:
             use_redz = self._redz_prime[:, :, :, np.newaxis] * np.ones_like(dnum)
 
 
-        ret_vals= single_sources.ss_gws_redz(edges, use_redz, number, 
+        ret_vals= single_sources.ss_gws_redz(edges, use_redz, number,
                                              realize=realize, loudest=loudest, params=params)
         hc_ss = ret_vals[0]
         hc_bg = ret_vals[1]
