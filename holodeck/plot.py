@@ -421,6 +421,7 @@ def draw_ss_and_gwb(ax, xx, hc_ss, gwb, nsamp=10,
 
     # return hh
 
+
 def plot_gwb(fobs, gwb, hc_ss=None, bglabel=None, sslabel=None, **kwargs):
     xx = fobs * YR
     fig, ax = figax(
@@ -434,6 +435,7 @@ def plot_gwb(fobs, gwb, hc_ss=None, bglabel=None, sslabel=None, **kwargs):
         draw_gwb(ax, xx, gwb, **kwargs)
     _twin_hz(ax)
     return fig
+
 
 def plot_bg_ss(fobs, bg, ss=None, bglabel=None, sslabel=None,
              xlabel=LABEL_GW_FREQUENCY_YR, ylabel=LABEL_CHARACTERISTIC_STRAIN, **kwargs):
@@ -451,6 +453,7 @@ def plot_bg_ss(fobs, bg, ss=None, bglabel=None, sslabel=None,
         draw_gwb(ax, xx, bg, **kwargs)
     _twin_hz(ax)
     return fig
+
 
 def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=cm.rainbow_r, color = None, label=None, **kwargs):
     # if color is None:
@@ -502,6 +505,7 @@ def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=c
             ci +=1
     # return mm_med, qq_med, dd_med, hh_med
 
+
 def plot_pars(fobs, hc_ss, hc_bg, sspar, bgpar, **kwargs):
     xx= fobs * YR
     fig, axs = figax(figsize = (11,6), ncols=2, nrows=2, sharex = True)
@@ -514,6 +518,7 @@ def plot_pars(fobs, hc_ss, hc_bg, sspar, bgpar, **kwargs):
     draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, color='pink')
     # fig.tight_layout()
     return fig
+
 
 def scientific_notation(val, man=1, exp=0, dollar=True):
     """Convert a scalar into a string with scientific notation (latex formatted).
@@ -685,6 +690,105 @@ def draw_smooth_med_conf(ax, xx, vals, smooth=(10, 4), interp=100, fracs=[0.50, 
         gg = ax.fill_between(xnew, lo, hi, color=hh.get_color(), **fill)
 
     return (hh, gg)
+
+
+def violins(ax, xx, yy, zz, width, **kwargs):
+    assert np.ndim(xx) == 1
+    if np.ndim(yy) == 1:
+        yy = [yy] * len(xx)
+
+    assert np.ndim(yy) == 2
+    assert np.shape(yy) == np.shape(zz)
+    if np.shape(yy)[0] != xx.size:
+        if np.shape(yy)[1] == xx.size:
+            yy = yy.T
+            zz = zz.T
+    assert np.shape(xx)[0] == xx.size
+    assert np.shape(zz)[0] == xx.size
+
+    for ii in range(xx.size):
+        usey = yy[ii]
+        usez = zz[ii]
+        handle = violin(ax, xx[ii], usey, usez, width, **kwargs)
+
+    return handle
+
+
+def violin(ax, xx, yy, zz, width, side='both', clip_pdf=None,
+           median={}, line={}, fill={}, **kwargs):
+    assert np.ndim(xx) == 0
+    assert np.shape(xx) == np.shape(width)
+    assert np.ndim(yy) == 1
+    assert yy.shape == zz.shape
+    valid_sides = ['l', 'r', 'b']
+    if side[0] not in valid_sides:
+        raise ValueError(f"{side=} must begin with one of {valid_sides}!")
+
+    if line is not None:
+        line_def = dict(alpha=0.5, lw=0.5, color='k')
+        line_def.update(kwargs)
+        line_def.update(line)
+        line = line_def
+
+    if fill is not None:
+        fill_def = dict(alpha=0.25, lw=0.0)
+        fill_def.update(kwargs)
+        fill_def.update(fill)
+        fill = fill_def
+
+    if clip_pdf is not None:
+        assert np.ndim(clip_pdf) == 0
+        assert clip_pdf < 1.0
+
+    dy = np.diff(yy)
+    cdf = 0.5 * (zz[1:] + zz[:-1]) * dy
+    cdf = np.concatenate([[0.0, ], cdf])
+    cdf = np.cumsum(cdf)
+
+    zz = zz / zz.max()
+
+    if median is not None:
+        med = np.interp([0.5], cdf, yy)
+
+    if clip_pdf is not None:
+        idx = zz > clip_pdf
+        yy = yy[idx]
+        zz = zz[idx]
+
+    xl = xx * np.ones_like(yy)
+    xr = xx * np.ones_like(yy)
+    left_flag = side.startswith('l') or side.startswith('b')
+    right_flag = side.startswith('r') or side.startswith('b')
+    if left_flag:
+        xl = xl - zz * width
+    if right_flag:
+        xr = xr + zz * width
+
+    handle = []
+    if line is not None:
+        h1, = ax.plot(xl, yy, **line)
+        ax.plot(xr, yy, **line)
+        handle.append(h1)
+
+    if fill is not None:
+        h2 = ax.fill_betweenx(yy, xl, xr, **fill)
+        handle.append(h2)
+
+    if median is not None:
+        kwargs = dict(line)
+        kwargs['lw'] = 1.0
+        kwargs.update(median)
+        mwid = kwargs.pop('width', 0.5)
+        ll = xx
+        rr = xx
+        if left_flag:
+            ll = ll - width * mwid
+        if right_flag:
+            rr = rr + width * mwid
+        ax.plot([ll, rr], [med, med], **kwargs)
+
+    handle = handle[0] if len(handle) == 1 else tuple(handle)
+    return handle
 
 
 # =================================================================================================
