@@ -998,7 +998,9 @@ def run_sam_at_pspace_num(args, space, pnum):
         fobs_orb_cents = fobs_cents / 2.0
         # edges
         # should the zero stalled option be part of the parameter space?
-        edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents)
+
+        edges, dnum, redz_final = sam.dynamic_binary_number_at_fobs(hard, fobs_orb=fobs_orb_cents)
+
         edges[-1] = fobs_orb_edges
         # integrate for number
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
@@ -1136,6 +1138,7 @@ def setup_basics(comm, copy_files=None):
         # instantiate the parameter space class
         if args.resume:
             # Load pspace object from previous save
+            log.info(f"{args.resume=} attempting to load pspace {space_class=} from {args.output=}")
             space, space_fname = holo.librarian.load_pspace_from_dir(args.output, space_class)
             log.warning(f"resume={args.resume} :: Loaded param-space save from {space_fname}")
         else:
@@ -1200,8 +1203,8 @@ def _setup_argparse(comm, *args, **kwargs):
     if args.resume:
         if not output.exists() or not output.is_dir():
             raise FileNotFoundError(f"`--resume` is active but output path does not exist! '{output}'")
-    elif output.exists():
-        raise RuntimeError(f"Output {output} already exists!  Overwritting not currently supported!")
+    #elif output.exists():
+    #    raise RuntimeError(f"Output {output} already exists!  Overwritting not currently supported!")
 
     # ---- Create output directories as needed
 
