@@ -25,7 +25,7 @@ To-Do
 
 """
 
-__version__ = '0.2.2'
+__version__ = '0.2.3'
 
 import argparse
 import os
@@ -193,9 +193,13 @@ def _setup_argparse(*args, **kwargs):
                         help='Number of frequency bins', default=DEF_NUM_FBINS)
     parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
                         help='Shape of SAM grid', default=None)
+    parser.add_argument('-l', '--loudest', action='store', dest='nloudest', type=int,
+                        help='Number of loudest single sources', default=5)
 
     parser.add_argument('--resume', action='store_true', default=False,
                         help='resume production of a library by loading previous parameter-space from output directory')
+    parser.add_argument('--recreate', action='store_true', default=False,
+                        help='recreating existing simulation files')
     parser.add_argument('--plot', action='store_true', default=False,
                         help='produce plots for each simulation configuration')
     parser.add_argument('--seed', action='store', type=int, default=None,
