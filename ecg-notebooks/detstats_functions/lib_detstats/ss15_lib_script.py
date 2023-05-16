@@ -8,16 +8,16 @@ hdf_name = LIB_PATH+'/ss_lib.hdf5'
 print('Hdf file:', hdf_name)
 
 # settings to change
-DS_NUM = 4
-NPSRS = 60
-SIGMA = 1e-7
+DS_NUM = '2B'
+NPSRS = 40
+SIGMA = 5e-7
 
 NSKIES = 25
 THRESH = 0.5
 PLOT = True
 DEBUG = True
 
-output_dir = (LIB_PATH+'/detstats/ds%01d_psrs%d_sigma%.0e'
+output_dir = (LIB_PATH+'/detstats/ds%s_psrs%d_sigma%.0e'
               % (DS_NUM, NPSRS, SIGMA))
 print('Output dir:', output_dir)
 
