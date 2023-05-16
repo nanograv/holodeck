@@ -1013,6 +1013,7 @@ class Semi_Analytic_Model:
         coal = (redz_final > 0.0)
         frst_orb = fobs_orb * (1.0 + redz_final)
         frst_orb[frst_orb < 0.0] = 0.0
+        redz_final[~coal] = -1.0
 
         # shape: (M, Q, Z)
         dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
@@ -1125,6 +1126,7 @@ class Semi_Analytic_Model:
     def test_gwb(self, fobs_gw_edges, hard, realize=100):
         """Calculate GWB using new `dynamic_binary_number_at_fobs` method, better, but slower.
         """
+
         fobs_gw_edges = np.atleast_1d(fobs_gw_edges)
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
         # convert to orbital-frequency (from GW-frequency)

@@ -1012,15 +1012,14 @@ def run_sam_at_pspace_num(args, space, pnum):
         #     err = f"`holo.hardening.Fixed_Time_2PL` must be used here!  Not {hard}!"
         #     log.exception(err)
         #     raise RuntimeError(err)
-        # # ---- OLD
-        # # edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents)
-        # # use_redz = None
-        # # ---- MID
+        # ---- OLD
+        # edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents)
+        # use_redz = None
+        # ---- MID
         # edges, dnum, redz_final = sam.dynamic_binary_number_at_fobs(hard, fobs_orb=fobs_orb_cents)
         # use_redz = redz_final
-        # # --------
+        # --------
         # edges[-1] = fobs_orb_edges
-        # # integrate for number
         # number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
         # number = number * np.diff(np.log(fobs_edges))
         # ==== NEW ====
@@ -1035,6 +1034,8 @@ def run_sam_at_pspace_num(args, space, pnum):
         edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
         number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
 
+        log.debug(f"{utils.stats(number)=}")
+
         _log_mem_usage(log)
 
         if use_redz is None:
@@ -1042,7 +1043,7 @@ def run_sam_at_pspace_num(args, space, pnum):
                 use_redz = sam._redz_final
                 log.info("using `redz_final`")
             except AttributeError:
-                use_redz = sam._redz_prime[:, :, :, np.newaxis]
+                use_redz = sam._redz_prime[:, :, :, np.newaxis] * np.ones_like(number)
                 log.warning("using `redz_prime`")
 
         log.debug(f"Calculating `ss_gws` for shape ({fobs_cents.size}, {args.nreals})")
@@ -1234,8 +1235,8 @@ def _setup_argparse(comm, *args, **kwargs):
     if args.resume:
         if not output.exists() or not output.is_dir():
             raise FileNotFoundError(f"`--resume` is active but output path does not exist! '{output}'")
-    #elif output.exists():
-    #    raise RuntimeError(f"Output {output} already exists!  Overwritting not currently supported!")
+    # elif output.exists():
+    #     raise RuntimeError(f"Output {output} already exists!  Overwritting not currently supported!")
 
     # ---- Create output directories as needed
 
@@ -1267,7 +1268,8 @@ def _setup_log(comm, args):
 
     output = args.output_logs
     fname = f"{output.joinpath(log_name)}.log"
-    log_lvl = holo.logger.INFO if args.verbose else holo.logger.WARNING
+    # log_lvl = holo.logger.INFO if args.verbose else holo.logger.WARNING
+    log_lvl = holo.logger.DEBUG
     tostr = sys.stdout if comm.rank == 0 else False
     log = holo.logger.get_logger(name=log_name, level_stream=log_lvl, tofile=fname, tostr=tostr)
     log.info(f"Output path: {output}")

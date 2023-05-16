@@ -371,7 +371,7 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
 
     shape = sam.shape + (fobs_orb.size,)
     cdef np.ndarray[np.double_t, ndim=4] diff_num = np.zeros(shape)
-    cdef np.ndarray[np.double_t, ndim=4] redz_final = NAN * np.ones(shape)
+    cdef np.ndarray[np.double_t, ndim=4] redz_final = -1.0 * np.ones(shape)
 
     # ---- Fixed_Time_2pwl_SAM
 
@@ -672,11 +672,11 @@ cdef int _dynamic_binary_number_at_fobs_gw(
 
                 # redz_prime is -1 for systems past age of Universe
                 rzp = <double>redz_prime[ii, jj, kk]
+                if rzp <= 0.0:
+                    continue
 
                 for ff in range(n_freq):
                     redz_final[ii, jj, kk, ff] = rzp
-                    if rzp <= 0.0:
-                        continue
 
                     ftarget = target_fobs_orb[ff]
                     # find rest-frame orbital frequency and binary separation

@@ -1364,6 +1364,7 @@ cdef void _loudest_hc_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, double[:
 
             hc2bg[ff,rr] = sum
 
+
 def loudest_hc_and_par_from_sorted(number, h2fdf, nreals, nloudest, mt, mr, rz, msort, qsort, zsort, normal_threshold=1e10):
     """
     Calculates the characteristic strain from loud single sources and a background of all other sources.
@@ -1421,9 +1422,10 @@ def loudest_hc_and_par_from_sorted(number, h2fdf, nreals, nloudest, mt, mr, rz, 
                             hc2ss, hc2bg, lspar, bgpar, ssidx)
     return hc2ss, hc2bg, lspar, bgpar, ssidx
 
-@cython.boundscheck(True)
-@cython.wraparound(True)
-@cython.nonecheck(True)
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
 @cython.cdivision(True)
 cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number,
             long nreals, long nloudest, long thresh,
