@@ -946,7 +946,16 @@ class Semi_Analytic_Model:
 
         return edges, dnum
 
-    def dynamic_binary_number_at_fobs(self, hard, fobs_orb, steps=200):
+    def dynamic_binary_number_at_fobs(self, hard, fobs_orb, **kwargs):
+
+        if hard.CONSISTENT:
+            edges, dnum, redz_final = self._dynamic_binary_number_at_fobs_consistent(hard, fobs_orb, **kwargs)
+        else:
+            edges, dnum, redz_final = self._dynamic_binary_number_at_fobs_inconsistent(hard, fobs_orb, **kwargs)
+
+        return edges, dnum, redz_final
+
+    def _dynamic_binary_number_at_fobs_consistent(self, hard, fobs_orb, steps=200):
         """Get correct redshifts for full binary-number calculation.
 
         Slower but more correct than old `dynamic_binary_number`.
@@ -1009,6 +1018,52 @@ class Semi_Analytic_Model:
         dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
 
         # (Z,) comoving-distance in [Mpc]
+        dc = np.zeros_like(redz_final)
+        dc[coal] = cosmo.comoving_distance(redz_final[coal]).to('Mpc').value
+
+        # (Z,) this is `(dVc/dz) * (dz/dt)` in units of [Mpc^3/s]
+        cosmo_fact = np.zeros_like(redz_final)
+        cosmo_fact[coal] = 4 * np.pi * (SPLC/MPC) * np.square(dc[coal]) * (1.0 + redz_final[coal])
+
+        # (M, Q) calculate chirp-mass
+        mt = self.mtot[:, np.newaxis, np.newaxis, np.newaxis]
+        mr = self.mrat[np.newaxis, :, np.newaxis, np.newaxis]
+        mchirp = utils.m1m2_from_mtmr(mt, mr)
+        mchirp = utils.chirp_mass(*mchirp)
+
+        # Convert from observer-frame orbital freq, to rest-frame orbital freq
+        sa = utils.kepler_sepa_from_freq(mt, frst_orb)
+        # (X, M*Q*Z), hardening rate, negative values, units of [cm/sec]
+        args = [mt, mr, sa]
+        args = np.broadcast_arrays(*args)
+        args = [xx.reshape(-1, fobs_orb.size).T for xx in args]
+        dadt = hard.dadt(*args)
+        dadt = dadt.T.reshape(sa.shape)
+        # Calculate `tau = dt/dlnf_r = f_r / (df_r/dt)`
+        # dfdt is positive (increasing frequency)
+        dfdt, frst_orb = utils.dfdt_from_dadt(dadt, sa, frst_orb=frst_orb)
+        tau = frst_orb / dfdt
+
+        # (M, Q, Z) units: [1/s] i.e. number per second
+        dnum = dens[..., np.newaxis] * cosmo_fact * tau
+        dnum[~coal] = 0.0
+
+        self._redz_final = redz_final
+
+        return edges, dnum, redz_final
+
+    def _dynamic_binary_number_at_fobs_inconsistent(self, hard, fobs_orb):
+        fobs_orb = np.asarray(fobs_orb)
+        edges = self.edges + [fobs_orb, ]
+
+        # shape: (M, Q, Z)
+        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
+        shape = dens.shape
+        new_shape = shape + (fobs_orb.size, )
+
+        redz_final = self._redz_prime[:, :, :, np.newaxis] * np.ones(new_shape)
+        coal = (redz_final > 0.0)
+
         dc = np.zeros_like(redz_final)
         dc[coal] = cosmo.comoving_distance(redz_final[coal]).to('Mpc').value
 
@@ -1344,8 +1399,8 @@ class Semi_Analytic_Model:
             log.warning(f"Using `redz_prime` for redshift (includes galaxy merger time, but not evolution time)")
             use_redz = self._redz_prime[:, :, :, np.newaxis] * np.ones_like(dnum)
 
-        ret_vals= single_sources.ss_gws_redz(edges, use_redz, number,
-                                             realize=realize, loudest=loudest, params=params)
+        ret_vals = single_sources.ss_gws_redz(edges, use_redz, number,
+                                              realize=realize, loudest=loudest, params=params)
         hc_ss = ret_vals[0]
         hc_bg = ret_vals[1]
         if params:

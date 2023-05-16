@@ -78,9 +78,11 @@ class _Hardening(abc.ABC):
         _dadt, rv_dedt = self.dadt_dedt(*args, **kwargs)
         return rv_dedt
 
+
 class Hard_GW(_Hardening):
     """Gravitational-wave driven binary hardening.
     """
+
     CONSISTENT = False
 
     @staticmethod
@@ -1270,6 +1272,8 @@ class Fixed_Time(Fixed_Time_2PL):
 class Fixed_Time_2PL_SAM(_Hardening):
     """Provide a binary hardening rate such that the total lifetime matches a given value.
     """
+
+    CONSISTENT = True
 
     def __init__(self, sam, time, sepa_init=1.0e3*PC, rchar=10.0*PC, gamma_inner=-1.0, gamma_outer=+1.5, num_steps=300):
         """Initialize a `Fixed_Time` instance using a provided `Semi_Analytic_Model` instance.
