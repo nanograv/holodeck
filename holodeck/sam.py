@@ -380,7 +380,8 @@ class Semi_Analytic_Model:
     def __init__(
         self, mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
         shape=None, log=None,
-        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013
+        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013,
+        **kwargs
     ):
         """
 
@@ -400,6 +401,15 @@ class Semi_Analytic_Model:
         if log is None:
             log = holo.log
         self._log = log
+
+        deprecated_keys = ['ZERO_DYNAMIC_STALLED_SYSTEMS', 'ZERO_GMT_STALLED_SYSTEMS']
+        for key, val in kwargs.items():
+            if key in deprecated_keys:
+                log.error("Using deprecated kwarg: {key}: {val}!  In the future this will raise an error.")
+            else:
+                err = f"Unexpected kwarg {key=}: {val=}!"
+                log.exception(err)
+                raise ValueError(err)
 
         # ---- Process SAM components
 
