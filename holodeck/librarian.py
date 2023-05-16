@@ -21,7 +21,8 @@ import tqdm
 from scipy.stats import qmc
 
 import holodeck as holo
-import holodeck.single_sources as ss
+import holodeck.single_sources
+import holodeck.sam_cython
 from holodeck import log, utils, cosmo
 from holodeck.constants import YR
 
@@ -491,7 +492,7 @@ def load_pspace_from_dir(path, space_class=None):
         # get the filename without path, this should contain the name of the PS class
         space_name = space_fname.name
         # get a list of all parameter-space classes (assuming they all start with 'PS')
-        space_list = [ss for ss in dir(holo.param_spaces) if ss.startswith('PS')]
+        space_list = [sl for sl in dir(holo.param_spaces) if sl.startswith('PS')]
         # iterate over space classes to try to find a match
         for space in space_list:
             # exist for-loop if the names match
@@ -1030,7 +1031,7 @@ def run_sam_at_pspace_num(args, space, pnum):
                 log.warning("using `redz_prime`")
 
         log.debug(f"Calculating `ss_gws` for shape ({fobs_cents.size}, {args.nreals})")
-        hc_ss, hc_bg, sspar, bgpar = ss.ss_gws_redz(
+        hc_ss, hc_bg, sspar, bgpar = holo.single_sources.ss_gws_redz(
             edges, use_redz, number, realize=args.nreals,
             loudest=args.nloudest, params=True
         )
