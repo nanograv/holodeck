@@ -1229,8 +1229,8 @@ class Semi_Analytic_Model:
         fobs_orb_edges = fobs_gw_edges / 2.0
         fobs_orb_cents = fobs_gw_cents / 2.0
 
-        print("SS 1: ", flush=True)
-        holo.librarian._log_mem_usage(None)
+        # print("SS 1: ", flush=True)
+        # holo.librarian._log_mem_usage(None)
 
         # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
@@ -1240,8 +1240,8 @@ class Semi_Analytic_Model:
         )
         log.debug(f"dnum: {utils.stats(dnum)}")
         
-        print("SS 2: ", flush=True)
-        holo.librarian._log_mem_usage(None)
+        # print("SS 2: ", flush=True)
+        # holo.librarian._log_mem_usage(None)
 
 
        
@@ -1258,8 +1258,8 @@ class Semi_Analytic_Model:
         log.debug(f"number: {utils.stats(number)}")
         log.debug(f"number.sum(): {number.sum():.4e}")
 
-        print("SS 3: ", flush=True)
-        holo.librarian._log_mem_usage(None)
+        # print("SS 3: ", flush=True)
+        # holo.librarian._log_mem_usage(None)
 
 
         # ---- Get the Single Source and GWB spectrum from number of binaries over grid
@@ -1283,8 +1283,8 @@ class Semi_Analytic_Model:
             bgpar = ret_vals[3]
 
 
-        print("SS 4: ", flush=True)
-        holo.librarian._log_mem_usage(None)
+        # print("SS 4: ", flush=True)
+        # holo.librarian._log_mem_usage(None)
 
 
         if _DEBUG:
