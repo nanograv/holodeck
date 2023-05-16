@@ -171,8 +171,8 @@ class PS_Generic_2(PS_Generic_1):
 
     @classmethod
     def _init_hard(cls, sam, settings):
-        # hard = holo.hardening.Fixed_Time_2PL.from_sam(
-        hard = holo.hardening.Fixed_Time_2PL_SAM(
+        # hard = holo.hardening.Fixed_Time_2PL.from_sam(   # OLD
+        hard = holo.hardening.Fixed_Time_2PL_SAM(     # NEW 
             sam,
             settings['hard_time']*GYR,
             sepa_init=settings['hard_sepa_init']*PC,

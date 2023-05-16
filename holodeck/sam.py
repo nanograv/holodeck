@@ -434,9 +434,7 @@ class Semi_Analytic_Model:
                 if shape[ii] is not None:
                     par[2] = shape[ii]
             params[ii] = np.logspace(*np.log10(par[:2]), par[2])
-
-            log.debug(f"{name}: [{params[0]}, {params[-1]}] {params.size}")
-            params[ii] = par
+            log.debug(f"{name}: [{params[ii][0]}, {params[ii][-1]}] {params[ii].size}")
 
         mtot, mrat, redz = params
         self.mtot = mtot
