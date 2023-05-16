@@ -23,7 +23,7 @@ from scipy.stats import qmc
 import holodeck as holo
 import holodeck.single_sources
 import holodeck.sam_cython
-from holodeck import log, utils, cosmo
+from holodeck import utils, cosmo
 from holodeck.constants import YR
 
 
@@ -457,7 +457,7 @@ class PD_Piecewise_Uniform_Density(PD_Piecewise_Uniform_Mass):
         return
 
 
-def load_pspace_from_dir(path, space_class=None):
+def load_pspace_from_dir(log, path, space_class=None):
     """Load a _Param_Space instance from the saved file in the given directory.
 
     Arguments
@@ -570,10 +570,15 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
     # ---- make sure all files exist; get shape information from files
 
     log.info(f"checking that all {nsamp} files exist")
-    fobs, nreals, nloudest, fit_data, has_gwb = _check_files_and_load_shapes(path_sims, nsamp)
+    fobs, nreals, nloudest, fit_data, has_gwb = _check_files_and_load_shapes(log, path_sims, nsamp)
     nfreqs = fobs.size
     fit_keys = fit_data.keys() if fit_data is not None else None
     log.debug(f"{nfreqs=}, {nreals=}, {nloudest=}, {fit_keys=}")
+
+    if (fobs is None) or (nreals is None):
+        err = f"After checking files, {fobs=} and {nreals=}!"
+        log.exception(err)
+        raise ValueError(err)
 
     # ---- Store results from all files
 
@@ -610,7 +615,7 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
     return out_filename
 
 
-def _check_files_and_load_shapes(path_sims, nsamp):
+def _check_files_and_load_shapes(log, path_sims, nsamp):
     """Check that all `nsamp` files exist in the given path, and load info about array shapes.
 
     Arguments
@@ -639,10 +644,11 @@ def _check_files_and_load_shapes(path_sims, nsamp):
     nloudest = None
     fit_data = None
     has_gwb = False
+    log.info(f"Checking {nsamp} files in {path_sims}")
     for ii in tqdm.trange(nsamp):
-        temp = _get_sim_fname_gwb_ss(path_sims, ii)
-        if not temp.exists():
-            err = f"Missing at least file number {ii} out of {nsamp} files!  {temp}"
+        temp_fname = _get_sim_fname_gwb_ss(path_sims, ii)
+        if not temp_fname.exists():
+            err = f"Missing at least file number {ii} out of {nsamp} files!  {temp_fname}"
             log.exception(err)
             raise ValueError(err)
 
@@ -650,8 +656,9 @@ def _check_files_and_load_shapes(path_sims, nsamp):
         if (fobs is not None) and (nreals is not None) and (fit_data is not None) and (nloudest is not None):
             continue
 
-        temp = np.load(temp)
-        data_keys = temp.keys()
+        temp = np.load(temp_fname)
+        data_keys = list(temp.keys())
+        log.debug(f"{ii=} {temp_fname.name=} {data_keys=}")
 
         if fobs is None:
             fobs = temp['fobs'][()]
@@ -667,7 +674,7 @@ def _check_files_and_load_shapes(path_sims, nsamp):
                 nreals_1 = temp['gwb'].shape[-1]
                 nreals = nreals_1
             if ('hc_bg' in data_keys):
-                nreals_2 == temp['hc_bg'].shape[-1]
+                nreals_2 = temp['hc_bg'].shape[-1]
                 nreals = nreals_2
             if (nreals_1 is not None) and (nreals_2 is not None):
                 assert nreals_1 == nreals_2
@@ -1001,6 +1008,10 @@ def run_sam_at_pspace_num(args, space, pnum):
         # should the zero stalled option be part of the parameter space?
 
         # ==== OLD / MID ====
+        # if not isinstance(hard, holo.hardening.Fixed_Time_2PL):
+        #     err = f"`holo.hardening.Fixed_Time_2PL` must be used here!  Not {hard}!"
+        #     log.exception(err)
+        #     raise RuntimeError(err)
         # # ---- OLD
         # # edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents)
         # # use_redz = None
@@ -1013,6 +1024,10 @@ def run_sam_at_pspace_num(args, space, pnum):
         # number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
         # number = number * np.diff(np.log(fobs_edges))
         # ==== NEW ====
+        if not isinstance(hard, holo.hardening.Fixed_Time_2PL_SAM):
+            err = f"`holo.hardening.Fixed_Time_2PL_SAM` must be used here!  Not {hard}!"
+            log.exception(err)
+            raise RuntimeError(err)
         redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
             fobs_orb_cents, sam, hard, cosmo
         )
@@ -1155,7 +1170,7 @@ def setup_basics(comm, copy_files=None):
         if args.resume:
             # Load pspace object from previous save
             log.info(f"{args.resume=} attempting to load pspace {space_class=} from {args.output=}")
-            space, space_fname = holo.librarian.load_pspace_from_dir(args.output, space_class)
+            space, space_fname = holo.librarian.load_pspace_from_dir(log, args.output, space_class)
             log.warning(f"resume={args.resume} :: Loaded param-space save from {space_fname}")
         else:
             space = space_class(log, args.nsamples, args.sam_shape, args.seed)
@@ -1264,6 +1279,7 @@ def _setup_log(comm, args):
 def main():
 
     from argparse import ArgumentParser
+    log = holo.log
 
     parser = ArgumentParser()
     subparsers = parser.add_subparsers(dest="subcommand")
