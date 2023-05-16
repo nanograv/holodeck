@@ -1085,6 +1085,7 @@ def _Fe_thresh(Num, alpha_0=0.001):
 def _integrand_gamma_ss_i(Fe, rho):
 
     I_1 = special.i1(rho*np.sqrt(2*Fe))
+    if np.isinf(I_1): return 0
     rv = (2*Fe)**(1/2) /rho * I_1 * np.exp(-Fe - rho**2 /2)
     return rv
 
