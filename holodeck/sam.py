@@ -1061,42 +1061,39 @@ class Semi_Analytic_Model:
         shape = dens.shape
         new_shape = shape + (fobs_orb.size, )
 
-        redz_final = self._redz_prime[:, :, :, np.newaxis] * np.ones(new_shape)
-        coal = (redz_final > 0.0)
+        rz = self._redz_prime[..., np.newaxis] * np.ones(new_shape)
+        coal = (rz > 0.0)
 
-        dc = np.zeros_like(redz_final)
-        dc[coal] = cosmo.comoving_distance(redz_final[coal]).to('Mpc').value
+        dc = cosmo.comoving_distance(rz[coal]).to('Mpc').value
+        frst_orb = utils.frst_from_fobs(
+            fobs_orb[np.newaxis, np.newaxis, np.newaxis, :], rz
+        )
 
         # (Z,) this is `(dVc/dz) * (dz/dt)` in units of [Mpc^3/s]
-        cosmo_fact = np.zeros_like(redz_final)
-        cosmo_fact[coal] = 4 * np.pi * (SPLC/MPC) * np.square(dc[coal]) * (1.0 + redz_final[coal])
+        cosmo_fact = 4 * np.pi * (SPLC/MPC) * np.square(dc) * (1.0 + rz[coal])
 
-        # (M, Q) calculate chirp-mass
+        # # (M, Q) calculate chirp-mass
         mt = self.mtot[:, np.newaxis, np.newaxis, np.newaxis]
         mr = self.mrat[np.newaxis, :, np.newaxis, np.newaxis]
-        mchirp = utils.m1m2_from_mtmr(mt, mr)
-        mchirp = utils.chirp_mass(*mchirp)
+        mt, mr = [(mm * np.ones(new_shape))[coal] for mm in [mt, mr]]
 
         # Convert from observer-frame orbital freq, to rest-frame orbital freq
-        sa = utils.kepler_sepa_from_freq(mt, frst_orb)
+        sa = utils.kepler_sepa_from_freq(mt, frst_orb[coal])
         # (X, M*Q*Z), hardening rate, negative values, units of [cm/sec]
         args = [mt, mr, sa]
-        args = np.broadcast_arrays(*args)
-        args = [xx.reshape(-1, fobs_orb.size).T for xx in args]
         dadt = hard.dadt(*args)
-        dadt = dadt.T.reshape(sa.shape)
         # Calculate `tau = dt/dlnf_r = f_r / (df_r/dt)`
         # dfdt is positive (increasing frequency)
-        dfdt, frst_orb = utils.dfdt_from_dadt(dadt, sa, frst_orb=frst_orb)
-        tau = frst_orb / dfdt
+        dfdt, _ = utils.dfdt_from_dadt(dadt, sa, frst_orb=frst_orb[coal])
+        tau = frst_orb[coal] / dfdt
 
         # (M, Q, Z) units: [1/s] i.e. number per second
-        dnum = dens[..., np.newaxis] * cosmo_fact * tau
-        dnum[~coal] = 0.0
+        dnum = np.zeros(new_shape)
+        dnum[coal] = (dens[..., np.newaxis] * np.ones(new_shape))[coal] * cosmo_fact * tau
 
-        self._redz_final = redz_final
+        self._redz_final = rz
 
-        return edges, dnum, redz_final
+        return edges, dnum, rz
 
     def new_gwb(self, fobs_gw_edges, hard, realize=100):
         """Calculate GWB using new cython implementation, 10x faster!
