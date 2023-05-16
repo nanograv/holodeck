@@ -782,7 +782,8 @@ class Fixed_Time_2PL(_Hardening):
             Instance configured for the given binary population.
 
         """
-        mtot, mrat, redz = [gg.ravel() for gg in sam.grid]
+        grid = np.meshgrid(*sam.edges, indexing='ij')
+        mtot, mrat, redz = [gg.ravel() for gg in grid]
         return cls(time, mtot, mrat, redz, sepa_init, **kwargs)
 
     # ====     Hardening Rate Methods    ====
