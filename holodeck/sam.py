@@ -51,15 +51,9 @@ import scipy.interpolate  # noqa
 import kalepy as kale
 
 import holodeck as holo
-from holodeck import cosmo, utils, log
+from holodeck import cosmo, utils   # , log
 from holodeck.constants import GYR, SPLC, MSOL, MPC, YR, PC
 from holodeck import relations, gravwaves, single_sources
-
-_DEBUG = False
-_DEBUG_LVL = log.DEBUG
-# _DEBUG_LVL = log.WARNING
-
-# _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
 
 REDZ_SAMPLE_VOLUME = True    #: get redshifts by sampling uniformly in 3D spatial volume, and converting
 
@@ -237,7 +231,7 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
 
         if (max_frac < 0.0) or (1.0 < max_frac):
             err = f"Given `max_frac`={max_frac:.4f} must be between [0.0, 1.0]!"
-            log.exception(err)
+            holo.log.exception(err)
             raise ValueError(err)
         self._max_frac = max_frac
 
@@ -385,7 +379,7 @@ class Semi_Analytic_Model:
 
     def __init__(
         self, mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
-        shape=None,
+        shape=None, log=None,
         gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013,
         **kwargs
     ):
@@ -403,6 +397,10 @@ class Semi_Analytic_Model:
         mmbulge : _type_, optional
 
         """
+
+        if log is None:
+            log = holo.log
+        self._log = log
 
         for key, val in kwargs.items():
             if not hasattr(self, key):
@@ -556,6 +554,7 @@ class Semi_Analytic_Model:
 
         """
         if self._density is None:
+            log = self._log
 
             # ---- convert from MBH ===> mstar
 
@@ -583,13 +582,6 @@ class Semi_Analytic_Model:
             # find valid entries (M, Q, Z)
             idx_stalled = (zprime < 0.0)
             log.info(f"Stalled SAM bins based on GMT: {utils.frac_str(idx_stalled)}")
-            if _DEBUG:
-                if np.all(idx_stalled):
-                    utils.print_stats(stack=False, print_func=log.error,
-                                      mstar_tot=mstar_tot, mstar_rat=mstar_rat, redz=redz)
-                    err = "No `zprime` values are greater than zero!"
-                    log.warning(err)
-                    # raise RuntimeError(err)
 
             # ---- Get Galaxy Merger Rate  [Chen2019] Eq.5
             log.debug(f"GSMF_USES_MTOT={GSMF_USES_MTOT}")
@@ -601,22 +593,6 @@ class Semi_Analytic_Model:
             # `gmt` returns [sec]
             dens /= gmt_time
             # now `dens` is  ``dn_gal / [dlog10(Mstar) dq_gal dz]``  with units of [Mpc^-3]
-
-            if _DEBUG:
-                dens_check = self._ndens_gal(mass_gsmf, mstar_rat, redz)
-                log.log(_DEBUG_LVL, "checking galaxy merger densities...")
-                log.log(_DEBUG_LVL, f"dens_check = {utils.stats(dens_check)}")
-                log.log(_DEBUG_LVL, f"dens       = {utils.stats(dens)}")
-                err = (dens - dens_check) / dens_check
-                log.log(_DEBUG_LVL, f"       err = {utils.stats(err)}")
-                bads = ~np.isclose(dens, dens_check, rtol=1e-6, atol=1e-100)
-                if np.any(bads):
-                    err_msg = "Galaxy ndens check failed!"
-                    log.exception(err_msg)
-                    bads = np.where(bads)
-                    log.error(f"check bads = {utils.stats(dens_check[bads])}")
-                    log.error(f"      bads = {utils.stats(dens[bads])}")
-                    raise ValueError(err_msg)
 
             # ---- Convert to MBH Binary density
 
@@ -636,22 +612,6 @@ class Semi_Analytic_Model:
 
             dens *= (self.mtot[:, np.newaxis, np.newaxis] / mstar_tot) * (dmstar_dmbh / dqbh_dqgal)
 
-            if _DEBUG:
-                dens_check = self._ndens_mbh(mass_gsmf, mstar_rat, redz)
-                log.log(_DEBUG_LVL, "checking MBH merger densities...")
-                log.log(_DEBUG_LVL, f"dens_check = {utils.stats(dens_check)}")
-                log.log(_DEBUG_LVL, f"dens       = {utils.stats(dens)}")
-                err = (dens - dens_check) / dens_check
-                log.log(_DEBUG_LVL, f"       err = {utils.stats(err)}")
-                bads = ~np.isclose(dens, dens_check, rtol=1e-6, atol=1e-100)
-                if np.any(bads):
-                    err_msg = "MBH ndens check failed!"
-                    log.exception(err_msg)
-                    bads = np.where(bads)
-                    log.error(f"check bads = {utils.stats(dens_check[bads])}")
-                    log.error(f"      bads = {utils.stats(dens[bads])}")
-                    raise ValueError(err_msg)
-
             # Add scatter from the M-Mbulge relation
             scatter = self._mmbulge._scatter_dex
             log.debug(f"mmbulge scatter = {scatter}")
@@ -661,7 +621,7 @@ class Semi_Analytic_Model:
                 dur = datetime.now()
                 mass_bef = self._integrated_binary_density(dens, sum=True)
                 self._dens_bef = np.copy(dens)
-                dens = add_scatter_to_masses(self.mtot, self.mrat, dens, scatter)
+                dens = add_scatter_to_masses(self.mtot, self.mrat, dens, scatter, log=log)
                 self._dens_aft = np.copy(dens)
 
                 mass_aft = self._integrated_binary_density(dens, sum=True)
@@ -747,6 +707,8 @@ class Semi_Analytic_Model:
             as arguments and outputs.
 
         """
+
+        log = self._log
 
         # LZK 2023-05-11  ------------------------------------------------------
         log.warning("This is not the most accurate redshift calculation!")
@@ -1078,7 +1040,7 @@ class Semi_Analytic_Model:
         dnum[~coal] = 0.0
 
         self._redz_final = redz_final
-        
+
         return edges, dnum, redz_final
 
     def new_gwb(self, fobs_gw_edges, hard, realize=100):
@@ -1158,6 +1120,8 @@ class Semi_Analytic_Model:
 
         """
 
+        log = self._log
+
         if use_redz_after_hard is None:
             if hard.CONSISTENT is True:
                 use_redz_after_hard = True
@@ -1203,9 +1167,6 @@ class Semi_Analytic_Model:
         edges[-1] = fobs_orb_edges
         log.debug(f"dnum: {utils.stats(dnum)}")
 
-        if _DEBUG:
-            _check_bads(edges, dnum, "dnum")
-
         # "integrate" within each bin (i.e. multiply by bin volume)
         # NOTE: `freq` should also be integrated to get proper poisson sampling!
         #       after poisson calculation, need to convert back to dN/dlogf
@@ -1218,9 +1179,6 @@ class Semi_Analytic_Model:
 
         # print("GWB 3: ", flush=True)
         # holo.librarian._log_mem_usage(None)
-
-        if _DEBUG:
-            _check_bads(edges, number, "number")
 
         # ---- Get the GWB spectrum from number of binaries over grid
 
@@ -1247,14 +1205,6 @@ class Semi_Analytic_Model:
 
         # print("GWB 4: ", flush=True)
         # holo.librarian._log_mem_usage(None)
-
-        if _DEBUG:
-            _rr = np.arange(realize)
-            if len(_rr) > 1:
-                check_edges = [edges[-1], np.arange(realize)]
-            else:
-                check_edges = [edges[-1]]
-            _check_bads(check_edges, gwb, "gwb")
 
         if squeeze:
             gwb = gwb.squeeze()
@@ -1306,7 +1256,7 @@ class Semi_Analytic_Model:
         return gwb
 
     def ss_gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=1, loudest=1, params=False,
-            zero_stalled=None, use_redz_after_hard=None, return_details=False):
+               zero_stalled=None, use_redz_after_hard=None, return_details=False):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
         Parameters
@@ -1333,6 +1283,8 @@ class Semi_Analytic_Model:
 
 
         """
+
+        log = self._log
 
         if use_redz_after_hard is None:
             if hard.CONSISTENT is True:
@@ -1369,10 +1321,8 @@ class Semi_Analytic_Model:
         print("SS 2: ", flush=True)
         holo.librarian._log_mem_usage(None)
 
-
         edges[-1] = fobs_orb_edges
         log.debug(f"dnum: {utils.stats(dnum)}")
-
 
         # "integrate" within each bin (i.e. multiply by bin volume)
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
@@ -1382,7 +1332,6 @@ class Semi_Analytic_Model:
 
         print("SS 3: ", flush=True)
         holo.librarian._log_mem_usage(None)
-
 
         # ---- Get the Single Source and GWB spectrum from number of binaries over grid
 
@@ -1395,7 +1344,6 @@ class Semi_Analytic_Model:
             log.warning(f"Using `redz_prime` for redshift (includes galaxy merger time, but not evolution time)")
             use_redz = self._redz_prime[:, :, :, np.newaxis] * np.ones_like(dnum)
 
-
         ret_vals= single_sources.ss_gws_redz(edges, use_redz, number,
                                              realize=realize, loudest=loudest, params=params)
         hc_ss = ret_vals[0]
@@ -1404,18 +1352,8 @@ class Semi_Analytic_Model:
             sspar = ret_vals[2]
             bgpar = ret_vals[3]
 
-
         print("SS 4: ", flush=True)
         holo.librarian._log_mem_usage(None)
-
-
-        if _DEBUG:
-            _rr = np.arange(realize)
-            if len(_rr) > 1:
-                check_edges = [edges[-1], np.arange(realize)]
-            else:
-                check_edges = [edges[-1]]
-            _check_bads(check_edges, hc_bg, "hc_bg")
 
         self._gwb = hc_bg
         if params:
@@ -1425,7 +1363,7 @@ class Semi_Analytic_Model:
 
     def _ndens_gal(self, mass_gal, mrat_gal, redz):
         if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
-            log.warning("{self.__class__}._ndens_gal assumes that primary mass is used for GSMF, GPF and GMT!")
+            self._log.warning("{self.__class__}._ndens_gal assumes that primary mass is used for GSMF, GPF and GMT!")
 
         # NOTE: dlog10(M_1) / dlog10(M) = (M/M_1) * (dM_1/dM) = 1
         nd = self._gsmf(mass_gal, redz) * self._gpf(mass_gal, mrat_gal, redz)
@@ -1434,7 +1372,7 @@ class Semi_Analytic_Model:
 
     def _ndens_mbh(self, mass_gal, mrat_gal, redz):
         if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
-            log.warning("{self.__class__}._ndens_mbh assumes that primary mass is used for GSMF, GPF and GMT!")
+            self._log.warning("{self.__class__}._ndens_mbh assumes that primary mass is used for GSMF, GPF and GMT!")
 
         # this is  d^3 n / [dlog10(M_gal-pri) dq_gal dz]
         nd_gal = self._ndens_gal(mass_gal, mrat_gal, redz)
@@ -1731,7 +1669,7 @@ def _add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, linear_interp_ba
     return m1m2_dens
 
 
-def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4):
+def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
     """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
 
     The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
@@ -1767,6 +1705,9 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4):
         Binary density with scatter introduced.
 
     """
+    if log is None:
+        log = holo.log
+
     assert np.ndim(dens) == 3
     assert np.shape(dens)[:2] == (mtot.size, mrat.size)
     dist = sp.stats.norm(loc=0.0, scale=scatter)
@@ -1831,6 +1772,7 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4):
     return output
 
 
+'''
 def _check_bads(edges, vals, name):
     bads = ~np.isfinite(vals) | (vals < 0.0)
     if not np.any(bads):
@@ -1849,3 +1791,4 @@ def _check_bads(edges, vals, name):
 
     log.exception(err)
     raise ValueError(err)
+'''
