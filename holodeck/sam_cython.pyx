@@ -44,6 +44,7 @@ cdef double FOUR_PI_SPLC_OVER_MPC = 4 * M_PI * MY_SPLC / MY_MPC
 
 @cython.cdivision(True)
 cpdef double hard_gw(double mtot, double mrat, double sepa):
+# cdef double hard_gw(double mtot, double mrat, double sepa):
     cdef double dadt = GW_DADT_SEP_CONST * pow(mtot, 3) * mrat / pow(sepa, 3) / pow(1 + mrat, 2)
     return dadt
 
@@ -158,6 +159,10 @@ def integrate_differential_number_3dx1d(edges, dnum):
     return numb
 
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
 cdef void _integrate_differential_number_3dx1d(
     double[:] log10_mtot,
     double[:] mrat,
@@ -389,10 +394,8 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
             dens, sam.mtot, sam.mrat, sam.redz, sam._redz_prime,
             cosmo._grid_z, cosmo._grid_dcom,
             # output:
-            diff_num
+            redz_final, diff_num
         )
-
-        redz_final[...] = sam._redz_prime[:, :, :, np.newaxis]
 
     # ---- OTHER
 
@@ -637,6 +640,7 @@ cdef int _dynamic_binary_number_at_fobs_gw(
     double[:] dcom_interp_grid,
 
     # output
+    double[:, :, :, :] redz_final,
     double[:, :, :, :] diff_num,
 ) except -1:
     """Convert from binary volume-density (all separations) to binary number at particular frequencies.
@@ -648,8 +652,8 @@ cdef int _dynamic_binary_number_at_fobs_gw(
     cdef int n_freq = target_fobs_orb.size
     cdef int n_interp = redz_interp_grid.size
 
-    cdef int ii, jj, kk, ff, interp_idx
-    cdef double mt, mr, ftarget, target_frst_orb, sepa, rad_isco, frst_orb_isco
+    cdef int ii, jj, kk, ff, interp_idx, _kk
+    cdef double mt, mr, ftarget, target_frst_orb, sepa, rad_isco, frst_orb_isco, rzp
 
 
     # ---- calculate dynamic binary numbers for all SAM grid bins
@@ -663,14 +667,17 @@ cdef int _dynamic_binary_number_at_fobs_gw(
             mr = mrat[jj]
 
             interp_idx = 0
-            for kk in range(n_redz):
+            for _kk in range(n_redz):
+                kk = n_redz - 1 - _kk
 
                 # redz_prime is -1 for systems past age of Universe
-                rzp = redz_prime[ii, jj, kk]
-                if rzp <= 0.0:
-                    continue
+                rzp = <double>redz_prime[ii, jj, kk]
 
                 for ff in range(n_freq):
+                    redz_final[ii, jj, kk, ff] = rzp
+                    if rzp <= 0.0:
+                        continue
+
                     ftarget = target_fobs_orb[ff]
                     # find rest-frame orbital frequency and binary separation
                     target_frst_orb = ftarget * (1.0 + rzp)
@@ -679,7 +686,7 @@ cdef int _dynamic_binary_number_at_fobs_gw(
                         break
 
                     # get comoving distance
-                    interp_idx = while_while_increasing(interp_idx, n_interp, rzp, redz_interp_grid)
+                    interp_idx = while_while_decreasing(interp_idx, n_interp, rzp, redz_interp_grid)
                     dcom = interp_at_index(interp_idx, rzp, redz_interp_grid, dcom_interp_grid)
 
                     # calculate total hardening rate at this exact separation

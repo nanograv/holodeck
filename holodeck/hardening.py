@@ -1300,7 +1300,7 @@ class Fixed_Time_2PL_SAM(_Hardening):
         shape = mtot.shape
         mt, mr = [mm.flatten() for mm in [mtot, mrat]]
 
-        norm_log10 = holo.sam_cython.find_2pl_hardening_norm(
+        norm_log10 = holo.sam_cython.find_2pwl_hardening_norm(
             time, mt, mr,
             sepa_init, rchar, gamma_inner, gamma_outer, num_steps,
         )
