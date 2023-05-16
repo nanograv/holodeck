@@ -18,6 +18,7 @@ from libc.stdlib cimport malloc, free
 # make sure to use c-native math functions instead of python/numpy
 from libc.math cimport pow, sqrt, M_PI, NAN, log10
 
+import holodeck as holo
 from holodeck.cyutils cimport interp_at_index, _interp_between_vals
 
 
@@ -207,7 +208,7 @@ cdef void _integrate_differential_number_3dx1d(
 
 
 # ==================================================================================================
-# ====    Fixed_Time_2PL_SAM - Hardening Model    ====
+# ====    Fixed_Time_2pwl_SAM - Hardening Model    ====
 # ==================================================================================================
 
 
@@ -227,14 +228,14 @@ cpdef double hard_func_2pwl_gw(
     return dadt
 
 
-def find_2pl_hardening_norm(time, mtot, mrat, sepa_init, rchar, gamma_inner, gamma_outer, nsteps):
+def find_2pwl_hardening_norm(time, mtot, mrat, sepa_init, rchar, gamma_inner, gamma_outer, nsteps):
     assert np.ndim(time) == 0
     assert np.ndim(mtot) == 1
     assert np.shape(mtot) == np.shape(mrat)
 
     cdef np.ndarray[np.double_t, ndim=1] norm_log10 = np.zeros(mtot.size)
 
-    cdef integrate_2pl_params args
+    cdef lifetime_2pwl_params args
     args.target_time = time
     args.sepa_init = sepa_init
     args.rchar = rchar
@@ -242,12 +243,12 @@ def find_2pl_hardening_norm(time, mtot, mrat, sepa_init, rchar, gamma_inner, gam
     args.gamma_outer = gamma_outer
     args.nsteps = nsteps
 
-    _find_2pl_hardening_norm(mtot, mrat, args, norm_log10)
+    _get_hardening_norm_2pwl(mtot, mrat, args, norm_log10)
 
     return norm_log10
 
 
-ctypedef struct integrate_2pl_params:
+ctypedef struct lifetime_2pwl_params:
     double target_time
     double mt
     double mr
@@ -262,10 +263,10 @@ ctypedef struct integrate_2pl_params:
 @cython.wraparound(False)
 @cython.nonecheck(False)
 @cython.cdivision(True)
-cdef void _find_2pl_hardening_norm(
+cdef void _get_hardening_norm_2pwl(
     double[:] mtot,
     double[:] mrat,
-    integrate_2pl_params args,
+    lifetime_2pwl_params args,
     # output
     double[:] norm_log10,
 ):
@@ -285,10 +286,10 @@ cdef void _find_2pl_hardening_norm(
         args.mt = mtot[ii]
         args.mr = mrat[ii]
         norm_log10[ii] = brentq(
-            _integrate_binary_evolution_2pl, NORM_LOG10_LO, NORM_LOG10_HI,
-            <integrate_2pl_params *> &args, XTOL, RTOL, MITR, NULL
+            get_binary_lifetime_2pwl, NORM_LOG10_LO, NORM_LOG10_HI,
+            <lifetime_2pwl_params *> &args, XTOL, RTOL, MITR, NULL
         )
-        # time = _integrate_binary_evolution_2pl(norm_log10[ii], <integrate_2pl_params *> &args)
+        # time = get_binary_lifetime_2pwl(norm_log10[ii], <lifetime_2pwl_params *> &args)
         # total_time[ii] = time + args.target_time
 
     return
@@ -298,8 +299,8 @@ cdef void _find_2pl_hardening_norm(
 @cython.wraparound(False)
 @cython.nonecheck(False)
 @cython.cdivision(True)
-cdef double _integrate_binary_evolution_2pl(double norm_log10, void *args):
-    cdef integrate_2pl_params *pars = <integrate_2pl_params *> args
+cdef double get_binary_lifetime_2pwl(double norm_log10, void *args):
+    cdef lifetime_2pwl_params *pars = <lifetime_2pwl_params *> args
 
     cdef double risco_log10 = log10(3.0 * MY_SCHW * pars.mt)
     cdef double sepa_log10 = log10(pars.sepa_init)
@@ -339,8 +340,8 @@ cdef double _integrate_binary_evolution_2pl(double norm_log10, void *args):
     return time
 
 
-def integrate_binary_evolution_2pl(norm_log10, mtot, mrat, sepa_init, rchar, gamma_inner, gamma_outer, nsteps):
-    cdef integrate_2pl_params args
+def integrate_binary_evolution_2pwl(norm_log10, mtot, mrat, sepa_init, rchar, gamma_inner, gamma_outer, nsteps):
+    cdef lifetime_2pwl_params args
     args.mt = mtot
     args.mr = mrat
     args.target_time = 0.0
@@ -350,7 +351,7 @@ def integrate_binary_evolution_2pl(norm_log10, mtot, mrat, sepa_init, rchar, gam
     args.gamma_outer = gamma_outer
     args.nsteps = nsteps
 
-    time = _integrate_binary_evolution_2pl(norm_log10, <integrate_2pl_params *> &args)
+    time = get_binary_lifetime_2pwl(norm_log10, <lifetime_2pwl_params *> &args)
     return time
 
 
@@ -360,30 +361,51 @@ def integrate_binary_evolution_2pl(norm_log10, mtot, mrat, sepa_init, rchar, gam
 
 
 def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
+
     dens = sam.static_binary_density
 
     shape = sam.shape + (fobs_orb.size,)
-    cdef np.ndarray[np.double_t, ndim=4] redz_final = NAN * np.ones(shape)
     cdef np.ndarray[np.double_t, ndim=4] diff_num = np.zeros(shape)
+    cdef np.ndarray[np.double_t, ndim=4] redz_final = NAN * np.ones(shape)
 
-    # _dynamic_binary_number_at_fobs_1(
-    _dynamic_binary_number_at_fobs_2(
-        fobs_orb, hard._sepa_init, hard._num_steps,
-        hard._norm, hard._rchar, hard._gamma_inner, hard._gamma_outer,
-        dens, sam.mtot, sam.mrat, sam.redz, sam._gmt_time,
-        cosmo._grid_z, cosmo._grid_dcom, cosmo._grid_age,
-        # output:
-        redz_final, diff_num
-    )
+    # ---- Fixed_Time_2pwl_SAM
+
+    if isinstance(hard, holo.hardening.Fixed_Time_2PL_SAM):
+
+        _dynamic_binary_number_at_fobs_2pwl(
+            fobs_orb, hard._sepa_init, hard._num_steps,
+            hard._norm, hard._rchar, hard._gamma_inner, hard._gamma_outer,
+            dens, sam.mtot, sam.mrat, sam.redz, sam._gmt_time,
+            cosmo._grid_z, cosmo._grid_dcom, cosmo._grid_age,
+            # output:
+            redz_final, diff_num
+        )
+
+    # ---- Hard_GW
+
+    elif isinstance(hard, holo.hardening.Hard_GW) or issubclass(hard, holo.hardening.Hard_GW):
+        _dynamic_binary_number_at_fobs_gw(
+            fobs_orb,
+            dens, sam.mtot, sam.mrat, sam.redz, sam._redz_prime,
+            cosmo._grid_z, cosmo._grid_dcom,
+            # output:
+            diff_num
+        )
+
+        redz_final[...] = sam._redz_prime[:, :, :, np.newaxis]
+
+    # ---- OTHER
+
+    else:
+        raise ValueError(f"Unexpected `hard` value {hard}!")
 
     return redz_final, diff_num
-
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.nonecheck(False)
 @cython.cdivision(True)
-cdef int _dynamic_binary_number_at_fobs_2(
+cdef int _dynamic_binary_number_at_fobs_2pwl(
     double[:] target_fobs_orb,
     double sepa_init,
     int num_steps,
@@ -598,207 +620,78 @@ cdef int _dynamic_binary_number_at_fobs_2(
     return 0
 
 
-# @cython.boundscheck(False)
-# @cython.wraparound(False)
-# @cython.nonecheck(False)
-# @cython.cdivision(True)
-# cdef void _dynamic_binary_number_at_fobs_1(
-#     # input
-#     double[:] target_fobs_orb,
-#     double sepa_init,
-#     int num_steps,
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef int _dynamic_binary_number_at_fobs_gw(
+    double[:] target_fobs_orb,
 
-#     double[:, :] hard_norm,
-#     double hard_rchar,
-#     double hard_gamma_inner,
-#     double hard_gamma_outer,
+    double[:, :, :] dens,
+    double[:] mtot,
+    double[:] mrat,
+    double[:] redz,
+    double[:, :, :] redz_prime,
 
-#     double[:, :, :] dens,
-#     double[:] mtot,
-#     double[:] mrat,
-#     double[:] redz,
-#     double[:, :, :] gmt_time,
+    double[:] redz_interp_grid,
+    double[:] dcom_interp_grid,
 
-#     double[:] redz_interp_grid,
-#     double[:] dcom_interp_grid,
-#     double[:] tage_interp_grid,
+    # output
+    double[:, :, :, :] diff_num,
+) except -1:
+    """Convert from binary volume-density (all separations) to binary number at particular frequencies.
+    """
 
-#     # output
-#     double[:, :, :, :] redz_final,
-#     double[:, :, :, :] diff_num,
-# ):
-    # """THIS IMPLEMENTATION DOESN'T WORK.  SOME FREQUENCY BINS ARE BEING SKIPPED.
-    #    IDEALLY THIS SHOULD BE FASTER, ONCE IT WORKS CORRECTLY.  IMPROVEMENT MAY BE MINOR.
-    # """
+    cdef int n_mtot = mtot.size
+    cdef int n_mrat = mrat.size
+    cdef int n_redz = redz.size
+    cdef int n_freq = target_fobs_orb.size
+    cdef int n_interp = redz_interp_grid.size
 
-#     cdef int n_freq = target_fobs_orb.size
-#     cdef int n_mtot = mtot.size
-#     cdef int n_mrat = mrat.size
-#     cdef int n_redz = redz.size
-#     cdef int n_interp = redz_interp_grid.size
-#     cdef double age_universe = tage_interp_grid[n_interp - 1]
-#     cdef double sepa_init_log10 = log10(sepa_init)
+    cdef int ii, jj, kk, ff, interp_idx
+    cdef double mt, mr, ftarget, target_frst_orb, sepa, rad_isco, frst_orb_isco
 
-#     cdef int ii, jj, kk, step, fidx, interp_left_idx, interp_right_idx, ff
-#     cdef double mt, mr, rz, norm
-#     cdef double risco, risco_log10, dx, new_redz
-#     cdef double sepa_log10, sepa, sepa_left, sepa_right, dadt_left, dadt_right
-#     cdef double time_evo, redz_left, redz_right, time_left, time_right
-#     cdef double frst_orb_left, fobs_orb_left, frst_orb_right, fobs_orb_right, gmt, ftarget
-#     cdef double target_frst_orb
 
-#     # ---- Calculate ages corresponding to `redz`
+    # ---- calculate dynamic binary numbers for all SAM grid bins
 
-#     cdef double *redz_age = <double *>malloc(n_redz * sizeof(double))     # (Z,) age of the universe in [sec]
-#     ii = 0
-#     cdef int rev
-#     for kk in range(n_redz):
-#         # iterate in reverse order to match with `redz_interp_grid` which is decreasing
-#         rev = n_redz - 1 - kk
-#         while (redz_interp_grid[ii+1] > redz[rev]) and (ii < n_interp - 1):
-#             ii += 1
-#         redz_age[rev] = interp_at_index(ii, redz[rev], redz_interp_grid, tage_interp_grid)
+    for ii in range(n_mtot):
+        mt = mtot[ii]
+        rad_isco = 3.0 * MY_SCHW * mt
+        frst_orb_isco = kepler_freq_from_sepa(mt, rad_isco)
 
-#     # ---- Integrate
+        for jj in range(n_mrat):
+            mr = mrat[jj]
 
-#     for ii in range(n_mtot):
-#         mt = mtot[ii]
-#         risco = 3.0 * MY_SCHW * mt     # ISCO is 3x combined schwarzschild radius
-#         risco_log10 = log10(risco)
-#         # step-size, in log10-space, to go from sepa_init to ISCO
-#         dx = (sepa_init_log10 - risco_log10) / num_steps
-#         for jj in range(n_mrat):
-#             mr = mrat[jj]
-#             sepa_log10 = sepa_init_log10
-#             norm = hard_norm[ii, jj]
+            interp_idx = 0
+            for kk in range(n_redz):
 
-#             # Get total hardening rate at 0th edge
-#             sepa_left = pow(10.0, sepa_log10)
-#             dadt_left = hard_func_2pwl_gw(
-#                 mt, mr, sepa_left,
-#                 norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
-#             )
+                # redz_prime is -1 for systems past age of Universe
+                rzp = redz_prime[ii, jj, kk]
+                if rzp <= 0.0:
+                    continue
 
-#             # get rest-frame orbital frequency of binary at left edge
-#             frst_orb_left = kepler_freq_from_sepa(mt, sepa_left)
+                for ff in range(n_freq):
+                    ftarget = target_fobs_orb[ff]
+                    # find rest-frame orbital frequency and binary separation
+                    target_frst_orb = ftarget * (1.0 + rzp)
+                    # if target frequency is above ISCO freq, then all future ones will be also, so: break
+                    if target_frst_orb > frst_orb_isco:
+                        break
 
-#             time_evo = 0.0
-#             interp_left_idx = 0
-#             fidx = 0
-#             for step in range(num_steps):
-#                 # Increment the current separation
-#                 sepa_log10 -= dx
-#                 sepa_right = pow(10.0, sepa_log10)
-#                 frst_orb_right = kepler_freq_from_sepa(mt, sepa_right)
+                    # get comoving distance
+                    interp_idx = while_while_increasing(interp_idx, n_interp, rzp, redz_interp_grid)
+                    dcom = interp_at_index(interp_idx, rzp, redz_interp_grid, dcom_interp_grid)
 
-#                 # Get total hardening rate at k+1 edge
-#                 dadt_right = hard_func_2pwl_gw(
-#                     mt, mr, sepa_right,
-#                     norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
-#                 )
+                    # calculate total hardening rate at this exact separation
+                    sepa = kepler_sepa_from_freq(mt, target_frst_orb)
+                    dadt = hard_gw(mt, mr, sepa)
 
-#                 # Find time to move from left to right
-#                 dt = 2.0 * (sepa_right - sepa_left) / (dadt_left + dadt_right)
-#                 time_evo += dt
+                    # calculate residence/hardening time = f/[df/dt] = -(2/3) a/[da/dt]
+                    tres = - (2.0/3.0) * sepa / dadt
 
-#                 # ---- Iterate over starting redshift bins
-#                 for kk in range(n_redz-1, -1, -1):
+                    # calculate number of binaries
+                    cosmo_fact = FOUR_PI_SPLC_OVER_MPC * (1.0 + rzp) * pow(dcom / MY_MPC, 2)
+                    diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
 
-#                     # get the total time from each starting redshift, plus GMT time, plus evolution time to this step
-#                     gmt = gmt_time[ii, jj, kk]
-#                     time_left = (time_evo - dt) + gmt + redz_age[kk]
-#                     time_right = time_evo + gmt + redz_age[kk]
+    return 0
 
-#                     # if we pass the age of the universe, this binary has stalled, no further redshifts will work
-#                     # NOTE: if `gmt_time` decreases too fast, then system won't necessary always stall,
-#                     #       so we cant use a `break` statement here
-#                     if time_left > age_universe:
-#                         continue
-
-#                     # ---- find the redshift bins corresponding to left- and right- side of step
-#                     # left edge
-#                     interp_left_idx = while_while_increasing(interp_left_idx, n_interp, time_left, tage_interp_grid)
-#                     # find right-edge starting from left edge, i.e. `interp_left_idx` (i.e. `interp_left_idx` is not a typo!)
-#                     interp_right_idx = while_while_increasing(interp_left_idx, n_interp, time_left, tage_interp_grid)
-#                     # get redshifts
-#                     redz_left = interp_at_index(interp_left_idx, time_left, tage_interp_grid, redz_interp_grid)
-#                     redz_right = interp_at_index(interp_right_idx, time_right, tage_interp_grid, redz_interp_grid)
-
-#                     # redz_left = redz[kk]
-#                     # redz_right = redz[kk]
-
-#                     # convert to frequencies
-#                     fobs_orb_left = frst_orb_left / (1.0 + redz_left)
-#                     fobs_orb_right = frst_orb_right / (1.0 + redz_right)
-
-#                     # if this `fobs_orb_left` is above the highest target frequency, then all subsequent `kk` values
-#                     #    (lower starting redshifts), will have higher observed frequencies
-#                     #    so all of them will also be above the highest target frequency,
-#                     #    so we can break out of the `kk` loop
-#                     if fobs_orb_left > target_fobs_orb[n_freq-1]:
-#                         printf("break\n")
-#                         break
-
-#                     # find the index for target frequencies bounding the left edge
-#                     #    note: `fidx=0` may mean all targets are still above `fobs_orb_left`; check for this below
-#                     fidx = while_while_increasing(fidx, n_freq, fobs_orb_left, target_fobs_orb)
-
-#                     printf(
-#                         "step=%d kk=%d | fobs_orb_left=%4e [%.4e, %.4e] %d\n",
-#                         step, kk, fobs_orb_left, target_fobs_orb[fidx], target_fobs_orb[fidx+1], fidx,
-#                     )
-
-#                     # iterate over all target frequencies between left and right step-edges; interpolate to redshift
-#                     ff = fidx
-#                     ftarget = target_fobs_orb[ff]
-#                     while (fobs_orb_left < ftarget) and (ftarget < fobs_orb_right) and (ff < n_freq):
-
-#                         # ----------------------
-#                         # ---- TARGET FOUND ----
-
-#                         new_redz = _interp_between_vals(ftarget, fobs_orb_left, fobs_orb_right, redz_left, redz_right)
-#                         printf(
-#                             "ff=%d, ftarget=%.4e [%.4e, %.4e] %d [%.4e, %.4e] ==> %.4e\n",
-#                             ff, ftarget, fobs_orb_left, fobs_orb_right, ff, redz_left, redz_right, new_redz
-#                         )
-
-#                         if new_redz > 0.0:
-
-#                             redz_final[ii, jj, kk, ff] = new_redz
-
-#                             target_frst_orb = ftarget * (1.0 + new_redz)
-#                             sepa = kepler_sepa_from_freq(mt, target_frst_orb)
-
-#                             # dadt : interpolate left-right
-#                             # dadt = _interp_between_vals(ftarget, fobs_orb_left, fobs_orb_right, dadt_left, dadt_right)
-#                             dadt = hard_func_2pwl_gw(
-#                                 mt, mr, sepa,
-#                                 norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
-#                             )
-
-#                             # calculate residence/hardening time = f/[df/dt] = -(2/3) a/[da/dt]
-#                             tres = - (2.0/3.0) * sepa / dadt
-#                             # get comoving distance values at left and right step-edges
-#                             dcom_left = interp_at_index(interp_left_idx, time_left, tage_interp_grid, dcom_interp_grid)
-#                             dcom_right = interp_at_index(interp_right_idx, time_right, tage_interp_grid, dcom_interp_grid)
-#                             # dcom : interpolate left-right
-#                             dcom = _interp_between_vals(ftarget, fobs_orb_left, fobs_orb_right, dcom_left, dcom_right)
-
-#                             cosmo_fact = FOUR_PI_SPLC_OVER_MPC * (1.0 + new_redz) * pow(dcom / MY_MPC, 2)
-#                             diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
-
-#                         # ----------------------
-
-#                         ff += 1
-#                         if ff < n_freq:
-#                             ftarget = target_fobs_orb[ff]
-
-#                 # update new left edge
-#                 dadt_left = dadt_right
-#                 sepa_left = sepa_right
-#                 frst_orb_left = frst_orb_right
-#                 # note that we _cannot_ do this for redz or freqs because the redshift bin is changing
-
-#     free(redz_age)
-
-#     return
