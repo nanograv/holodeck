@@ -13,4 +13,3 @@ cython
 schwimmbad
 emcee
 george
-mpi4py
