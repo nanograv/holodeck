@@ -8,9 +8,9 @@ hdf_name = LIB_PATH+'/ss_lib.hdf5'
 print('Hdf file:', hdf_name)
 
 # settings to change
-DS_NUM = '2B'
+DS_NUM = '5'
 NPSRS = 40
-SIGMA = 5e-7
+SIGMA = 6.5e-6
 
 NSKIES = 25
 THRESH = 0.5

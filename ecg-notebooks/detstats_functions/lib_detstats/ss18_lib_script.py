@@ -3,8 +3,8 @@
 import holodeck.detstats as ds
 import h5py
 
-LIB_PATH = '/Users/emigardiner/GWs/holodeck/output/2023-05-16-mbp-ss18_n100_r40_d15_f30_l1000_p0/'
-hdf_name = LIB_PATH+'ss_lib.hdf5'
+LIB_PATH = '/Users/emigardiner/GWs/holodeck/output/2023-05-16-mbp-ss18_n100_r40_d15_f30_l1000_p0'
+hdf_name = LIB_PATH+'/ss_lib.hdf5'
 print('Hdf file:', hdf_name)
 
 # settings to change, manually calibrated
