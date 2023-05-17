@@ -1008,7 +1008,7 @@ def run_sam_at_pspace_num(args, space, pnum):
         # should the zero stalled option be part of the parameter space?
 
         # ==== OLD / MID ====
-        # if not isinstance(hard, holo.hardening.Fixed_Time_2PL):
+        # if not isinstance(hard, (holo.hardening.Fixed_Time_2PL, holo.hardening.Hard_GW)):
         #     err = f"`holo.hardening.Fixed_Time_2PL` must be used here!  Not {hard}!"
         #     log.exception(err)
         #     raise RuntimeError(err)
@@ -1023,7 +1023,7 @@ def run_sam_at_pspace_num(args, space, pnum):
         # number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
         # number = number * np.diff(np.log(fobs_edges))
         # ==== NEW ====
-        if not isinstance(hard, holo.hardening.Fixed_Time_2PL_SAM):
+        if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
             err = f"`holo.hardening.Fixed_Time_2PL_SAM` must be used here!  Not {hard}!"
             log.exception(err)
             raise RuntimeError(err)
