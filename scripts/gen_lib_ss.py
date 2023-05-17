@@ -193,7 +193,7 @@ def _setup_argparse(*args, **kwargs):
                         help='Number of frequency bins', default=DEF_NUM_FBINS)
     parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
                         help='Shape of SAM grid', default=DEF_SAM_SHAPE)
-    parser.add_argument('-l', '--loudest', action='store', dest='nloudest', type=int,
+    parser.add_argument('-l', '--nloudest', action='store', dest='nloudest', type=int,
                         help='Number of loudest single sources', default=1)
     parser.add_argument('-p', '--pars', action='store', dest='get_pars', type=int,
                         help='Whether or not to get pars', default=0)
