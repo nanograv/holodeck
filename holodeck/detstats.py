@@ -1062,7 +1062,7 @@ def _snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
 
 ######################### Detection Probability #########################
 
-def _Fe_thresh(Num, alpha_0=0.001):
+def _Fe_thresh(Num, alpha_0=0.001, guess=15):
     """ Calculate the threshold F_e statistic using sympy.nsolve
     
     Parameters
@@ -1079,13 +1079,22 @@ def _Fe_thresh(Num, alpha_0=0.001):
     """
     Fe_bar = Symbol('Fe_bar')
     func = 1 - (1 - (1 + Fe_bar)*np.e**(-Fe_bar))**Num - alpha_0
-    Fe_bar = nsolve(func, Fe_bar, 10)
+    Fe_bar = nsolve(func, Fe_bar, guess) # mod from 
     return(Fe_bar)
 
-def _integrand_gamma_ss_i(Fe, rho):
+def _I1_approx(xx):
+    """ Modified Bessel Function of the first kind, first order, expansion for large values.
+    """
+    term1 = np.exp(xx)/np.sqrt(2*np.pi*xx)
+    term2 = 1-3/8/xx * (1+5/2/8/xx * (1 + 21/3/8/xx))
+    I_1 = term1*term2
+    return I_1
+
+def _integrand_gamma_ss_i(Fe, rho, cutoff=10.0):
 
     I_1 = special.i1(rho*np.sqrt(2*Fe))
-    if np.isinf(I_1): return 0
+    if np.isinf(I_1): I_1 = _I1_approx(rho*np.sqrt((2*Fe)))
+    # if np.isinf(I_1): I_1 = 0
     rv = (2*Fe)**(1/2) /rho * I_1 * np.exp(-Fe - rho**2 /2)
     return rv
 
@@ -1247,7 +1256,8 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
 
 def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
               theta_ss=None, phi_ss=None, iota_ss=None, psi_ss=None, Phi0_ss=None,
-              Fe_bar = None, Amp_red=None, gamma_red=None, alpha_0=0.001, ret_snr=False, print_nans=False):
+              Fe_bar = None, Amp_red=None, gamma_red=None, alpha_0=0.001, Fe_bar_guess=15,
+              ret_snr=False, print_nans=False):
     """ Calculate the single source detection probability, and all intermediary steps for
     R strain realizations and S sky realizations.
     
@@ -1348,7 +1358,7 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     
     if (Fe_bar is None):
         Num = hc_ss[:,0,:].size # number of single sources in a single strain realization (F*L)
-        Fe_bar = _Fe_thresh(Num, alpha_0=alpha_0) # scalar
+        Fe_bar = _Fe_thresh(Num, alpha_0=alpha_0, guess=Fe_bar_guess) # scalar
 
     gamma_ssi = _gamma_ssi(Fe_bar, rho=snr_ss, print_nans=print_nans) # (F,R,S,L)
     gamma_ss = _ss_detection_probability(gamma_ssi) # (R,S)
