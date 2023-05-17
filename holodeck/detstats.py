@@ -25,7 +25,7 @@ testconst = 100
 ###################### Overlap Reduction Function ######################
 
 def _gammaij_from_thetaij(theta_ij):
-    """ Calcualte gamma_ij for two pulsars of relative angle theta_ij.
+    """ Calculate gamma_ij for two pulsars of relative angle theta_ij.
     
     Parameters
     ----------
@@ -1427,9 +1427,11 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=0.5,
 
     # Assign output folder
     import os
-    assert (os.path.isdir(output_dir) is False), \
-        'Output directory already exists. Delete existing directory to replace it or assign a new directory.'
-    os.makedirs(output_dir)
+    if (os.path.exists(output_dir) is False):
+        print('Making output directory.')
+        os.makedirs(output_dir)
+    else:
+        print('Writing to an existing directory.')
 
     # build PTA
     if debug: print('Building pulsar timing array.')
@@ -1572,3 +1574,59 @@ def plot_detfrac(df_ss, df_bg, nsamp, thresh):
     fig.tight_layout()
     return fig
 
+
+############################# Rank Samples ############################# 
+
+
+def amp_to_hc(amp_ref, fobs, dfobs):
+    """ Calculate characteristic strain from strain amplitude.
+    
+    """
+    hc = amp_ref*np.sqrt(fobs/dfobs)
+    return hc
+
+def rank_samples(hc_ss, hc_bg, fobs, dfobs=None, amp_ref=None, hc_ref=None, ret_all = False):
+    """ Sort samples by those with f=1/yr char strains closest to some reference value.
+    
+    Parameters
+    ----------
+    hc_ss : (N,F,R,L) NDarray
+        Characteristic strain of the loudest single sources.
+    hc_bg : (N,F,R) NDarray
+        Characteristic strain of the background.
+    fobs : (F,) 
+        Observed GW frequency
+    dfobs : (F,) or None
+        Observed GW frequency bin widths.
+        only needed if using amp_ref
+    amp_ref : scalar or None
+        Reference strain amplitude at f=1/yr
+    hc_ref : scalar or None
+        Reference characteristic strain at f=1/yr
+        Only one of hc_ref and amp_ref should be provided.
+
+
+    Returns
+    -------
+    nsort : (N,) 1Darray
+        Indices of the param space samples sorted by proximity to the reference 1yr amplitude.
+    """
+    # find bin with 1/yr
+    fidx = (np.abs(fobs - 1/YR)).argmin()
+
+    if (hc_ref is None):
+        # find reference (e.g. 12.5 yr) char strain
+        hc_ref = amp_to_hc(amp_ref, fobs[fidx], dfobs[fidx])
+        
+    # select 1/yr median strains of samples
+    hc_1yr = np.sqrt(hc_bg[:,fidx,:]**2 + np.sum(hc_ss[:,fidx,:,:]**2, axis=-1)) # (N,R)
+    hc_1yr = np.median(hc_1yr, axis=1) 
+
+    # sort by closest
+    nsort = np.argsort(np.abs(hc_1yr-hc_ref))
+
+    if ret_all:
+        return nsort, fidx, hc_1yr
+    return nsort
+
+############################ Calibrate PTA ############################# 
