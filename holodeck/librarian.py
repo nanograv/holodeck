@@ -156,7 +156,7 @@ class _Param_Space(abc.ABC):
 
         """
         log.debug(f"loading parameter space from {fname}")
-        data = np.load(fname)
+        data = np.load(fname, allow_pickle=True)
 
         # get the name of the parameter-space class from the file, and try to find this class in the
         # `holodeck.param_spaces` module
