@@ -32,6 +32,7 @@ __version__ = "0.3.0"
 # Default argparse parameters
 DEF_NUM_REALS = 100
 DEF_NUM_FBINS = 40
+DEF_NUM_LOUDEST = 10
 DEF_PTA_DUR = 16.03     # [yrs]
 
 FITS_NBINS_PLAW = [2, 3, 4, 5, 8, 9, 14]
@@ -1210,7 +1211,7 @@ def _setup_argparse(comm, *args, **kwargs):
     parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
                         help='Shape of SAM grid', default=None)
     parser.add_argument('-l', '--loudest', action='store', dest='nloudest', type=int,
-                        help='Number of loudest single sources', default=5)
+                        help='Number of loudest single sources', default=DEF_NUM_LOUDEST)
 
     parser.add_argument('--resume', action='store_true', default=False,
                         help='resume production of a library by loading previous parameter-space from output directory')
