@@ -17,9 +17,13 @@ THRESH = 0.5
 PLOT = True
 DEBUG = True
 
-output_dir = (LIB_PATH+'/detstats/ds%s_psrs%d_sigma%.0e'
-              % (DS_NUM, NPSRS, SIGMA))
-print('Output dir:', output_dir)
+def main():
+    output_dir = (LIB_PATH+'/detstats/ds%s_psrs%d_sigma%.0e'
+                % (DS_NUM, NPSRS, SIGMA))
+    print('Output dir:', output_dir)
 
-vals = ds.detect_lib(hdf_name, output_dir, NPSRS, SIGMA, 
-                     nskies=NSKIES, thresh=THRESH, plot=PLOT, debug=DEBUG)
+    vals = ds.detect_lib(hdf_name, output_dir, NPSRS, SIGMA, 
+                        nskies=NSKIES, thresh=THRESH, plot=PLOT, debug=DEBUG)
+    
+if __name__ == "__main__":
+    main()
