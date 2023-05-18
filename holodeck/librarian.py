@@ -32,6 +32,7 @@ __version__ = "0.3.0"
 # Default argparse parameters
 DEF_NUM_REALS = 100
 DEF_NUM_FBINS = 40
+DEF_NUM_LOUDEST = 10
 DEF_PTA_DUR = 16.03     # [yrs]
 
 FITS_NBINS_PLAW = [2, 3, 4, 5, 8, 9, 14]
@@ -156,7 +157,7 @@ class _Param_Space(abc.ABC):
 
         """
         log.debug(f"loading parameter space from {fname}")
-        data = np.load(fname)
+        data = np.load(fname, allow_pickle=True)
 
         # get the name of the parameter-space class from the file, and try to find this class in the
         # `holodeck.param_spaces` module
@@ -1008,7 +1009,7 @@ def run_sam_at_pspace_num(args, space, pnum):
         # should the zero stalled option be part of the parameter space?
 
         # ==== OLD / MID ====
-        # if not isinstance(hard, holo.hardening.Fixed_Time_2PL):
+        # if not isinstance(hard, (holo.hardening.Fixed_Time_2PL, holo.hardening.Hard_GW)):
         #     err = f"`holo.hardening.Fixed_Time_2PL` must be used here!  Not {hard}!"
         #     log.exception(err)
         #     raise RuntimeError(err)
@@ -1023,7 +1024,7 @@ def run_sam_at_pspace_num(args, space, pnum):
         # number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
         # number = number * np.diff(np.log(fobs_edges))
         # ==== NEW ====
-        if not isinstance(hard, holo.hardening.Fixed_Time_2PL_SAM):
+        if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
             err = f"`holo.hardening.Fixed_Time_2PL_SAM` must be used here!  Not {hard}!"
             log.exception(err)
             raise RuntimeError(err)
@@ -1210,7 +1211,7 @@ def _setup_argparse(comm, *args, **kwargs):
     parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
                         help='Shape of SAM grid', default=None)
     parser.add_argument('-l', '--loudest', action='store', dest='nloudest', type=int,
-                        help='Number of loudest single sources', default=5)
+                        help='Number of loudest single sources', default=DEF_NUM_LOUDEST)
 
     parser.add_argument('--resume', action='store_true', default=False,
                         help='resume production of a library by loading previous parameter-space from output directory')

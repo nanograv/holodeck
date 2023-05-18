@@ -1,21 +1,18 @@
 name: generate coverage and upload to Codecov
 on:
   push:
-    # !! TEMPORARILY DISABLE THIS WORKFLOW / ACTION !!
-    branches-ignore:
-      - '**'
-    # branches:
-    #   - "main"
-    #   # - "dev"
-    #   # - "docs"
+    # branches-ignore:
+    #   - '**'
+    branches:
+      - "main"
+      - "dev"
+
   pull_request:
-    # !! TEMPORARILY DISABLE THIS WORKFLOW / ACTION !!
-    branches-ignore:
-      - '**'
-    # branches:
-    #   - "main"
-    #   # - "dev"
-    #   # - "docs"
+    # branches-ignore:
+    #   - '**'
+    branches:
+      - "main"
+      - "dev"
 
 jobs:
   run:
@@ -23,7 +20,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ['3.9']
+        python-version: ['3.10']
 
     steps:
     - name: Set up Python ${{ matrix.python-version }}
@@ -46,10 +43,12 @@ jobs:
 
     - name: Install package
       run: |
-        which python
-        python --version
         python setup.py build_ext -i
         python setup.py develop
+
+    - name: Report environment information
+      run: |
+        which python
         python --version
         python -c "import sys; print(f'Python {sys.version}')"
         python -c "import pip; print(f'pip {pip.__version__}')"
