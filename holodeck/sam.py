@@ -380,7 +380,8 @@ class Semi_Analytic_Model:
     def __init__(
         self, mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
         shape=None, log=None,
-        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013
+        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013,
+        **kwargs
     ):
         """
 
@@ -400,6 +401,15 @@ class Semi_Analytic_Model:
         if log is None:
             log = holo.log
         self._log = log
+
+        deprecated_keys = ['ZERO_DYNAMIC_STALLED_SYSTEMS', 'ZERO_GMT_STALLED_SYSTEMS']
+        for key, val in kwargs.items():
+            if key in deprecated_keys:
+                log.error("Using deprecated kwarg: {key}: {val}!  In the future this will raise an error.")
+            else:
+                err = f"Unexpected kwarg {key=}: {val=}!"
+                log.exception(err)
+                raise ValueError(err)
 
         # ---- Process SAM components
 
@@ -775,7 +785,7 @@ class Semi_Analytic_Model:
 
         return gwb
 
-    def test_gwb(self, fobs_gw_edges, hard, realize=100):
+    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=100):
         """Calculate GWB using new `dynamic_binary_number_at_fobs` method, better, but slower.
         """
 
@@ -796,10 +806,6 @@ class Semi_Analytic_Model:
         gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
 
         return gwb
-
-    @utils.deprecated_fail("`new_gwb` or `test_gwb`")
-    def gwb(self, *args, **kwargs):
-        pass
 
     def gwb_ideal(self, fobs_gw, sum=True, redz_prime=True):
         """Calculate the idealized, continuous GWB amplitude.
@@ -826,7 +832,7 @@ class Semi_Analytic_Model:
             mstar_pri, mstar_rat, mstar_tot, rz = np.broadcast_arrays(*args)
 
             gmt_mass = mstar_tot if GMT_USES_MTOT else mstar_pri
-            rz = self._gmt.zprime(gmt_mass, mstar_rat, rz)
+            rz, _ = self._gmt.zprime(gmt_mass, mstar_rat, rz)
             print(f"{self} :: {utils.stats(rz)=}")
 
         # d^3 n / [dlog10(M) dq dz] in units of [Mpc^-3], convert to [cm^-3]
