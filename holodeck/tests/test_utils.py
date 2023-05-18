@@ -79,7 +79,7 @@ class Test_GW_Methods:
         check_hs = utils.gw_strain_source(mc, dc, freq)
         check_gwlum = utils.gw_lum_circ(mc, freq)
         check_dedt = utils.gw_dedt(m1, m2, aa, ee)
-        check_dade = utils.gw_dade(m1, m2, aa, ee)
+        check_dade = utils.gw_dade(aa, ee)
         check_dadt = utils.gw_hardening_rate_dadt(m1, m2, aa, ee)
         check_dfdt, _ = utils.gw_hardening_rate_dfdt(m1, m2, freq, ee)
         check_tau = utils.gw_hardening_timescale_freq(mc, freq)

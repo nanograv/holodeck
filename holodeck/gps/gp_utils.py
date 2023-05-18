@@ -228,15 +228,19 @@ def train_gp(spectra_file,
         gp_george, num_kpars = create_gp_kernels(gp_freqs,
                                                  pars,
                                                  xobs,
-                                                 np.zeros_like(yerr),
-                                                 yobs=np.log10(yerr),
+                                                 yerr=(yerr/np.sqrt(2*spectra['gwb'].shape[-1] - 2)),
+                                                 yobs=yerr,
                                                  y_is_variance=y_is_variance,
                                                  kernel=kernel)
 
     else:
-        gp_george, num_kpars = create_gp_kernels(gp_freqs, pars, xobs,
-                                                 np.zeros_like(yobs), yobs,
-                                                 y_is_variance, kernel)
+        gp_george, num_kpars = create_gp_kernels(gp_freqs,
+                                                 pars,
+                                                 xobs,
+                                                 yerr=(yerr/np.sqrt(spectra['gwb'].shape[-1])),
+                                                 yobs=yobs,
+                                                 y_is_variance=y_is_variance,
+                                                 kernel=kernel)
 
     # Sample the posterior distribution of the kernel parameters
     # to find MAP value for each frequency.

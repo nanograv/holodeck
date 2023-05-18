@@ -47,8 +47,26 @@ ext_cyutils = Extension(
     extra_compile_args=['-Wno-unreachable-code-fallthrough', '-Wno-unused-function'],
 )
 
+ext_sam_cython = Extension(
+    "holodeck.sam_cython",    # specify the resulting name/location of compiled extension
+    sources=[join('.', 'holodeck', 'sam_cython.pyx')],   # location of source code
+    # define parameters external libraries
+    include_dirs=[
+        np.get_include()
+    ],
+    library_dirs=[
+        abspath(join(np.get_include(), '..', '..', 'random', 'lib')),
+        abspath(join(np.get_include(), '..', 'lib'))
+    ],
+    libraries=['npyrandom', 'npymath'],
+
+    # Silence some undesired warnings
+    define_macros=[('NPY_NO_DEPRECATED_API', 0)],
+    extra_compile_args=['-Wno-unreachable-code-fallthrough', '-Wno-unused-function'],
+)
+
 cython_modules = cythonize(
-    [ext_cyutils],
+    [ext_cyutils, ext_sam_cython],
     compiler_directives={"language_level": "3"},
     annotate=True,   # create html output about cython files
 )

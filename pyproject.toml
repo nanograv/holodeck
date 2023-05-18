@@ -1,5 +1,6 @@
 [build-system]
-requires = ["setuptools >= 40.6.0", "wheel", "Cython"]
+# cython/numpy/scipy are required to build cython extensions.  The build steps are specified in `setup.py`
+requires = ["setuptools >= 40.6.0", "wheel", "Cython", "numpy", "scipy"]
 build-backend = "setuptools.build_meta"
 
 [mypy]
