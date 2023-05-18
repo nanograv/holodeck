@@ -1620,23 +1620,28 @@ def rank_samples(hc_ss, hc_bg, fobs, dfobs=None, amp_ref=None, hc_ref=None, ret_
     -------
     nsort : (N,) 1Darray
         Indices of the param space samples sorted by proximity to the reference 1yr amplitude.
+    
     """
-    # find bin with 1/yr
-    fidx = (np.abs(fobs - 1/YR)).argmin()
+    
+    # find frequency bin nearest to 1/10yr
+    fidx = (np.abs(fobs - 1/(10*YR))).argmin()
 
     if (hc_ref is None):
         # find reference (e.g. 12.5 yr) char strain
         hc_ref = amp_to_hc(amp_ref, fobs[fidx], dfobs[fidx])
         
     # select 1/yr median strains of samples
-    hc_1yr = np.sqrt(hc_bg[:,fidx,:]**2 + np.sum(hc_ss[:,fidx,:,:]**2, axis=-1)) # (N,R)
-    hc_1yr = np.median(hc_1yr, axis=1) 
+    hc_tt = np.sqrt(hc_bg[:,fidx,:]**2 + np.sum(hc_ss[:,fidx,:,:]**2, axis=-1)) # (N,R)
+    hc_tt = np.median(hc_tt, axis=1) 
+
+    # extrapolate hc_ref at freq closest to 1/10yr from 1/10yr ref
+    hc_ref = hc_ref * (fobs[fidx]*YR/.1)**(-2/3)
 
     # sort by closest
-    nsort = np.argsort(np.abs(hc_1yr-hc_ref))
+    nsort = np.argsort(np.abs(hc_tt-hc_ref))
 
     if ret_all:
-        return nsort, fidx, hc_1yr
+        return nsort, fidx, hc_tt, hc_ref
     return nsort
 
 ############################ Calibrate PTA ############################# 
