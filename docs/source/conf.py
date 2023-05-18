@@ -8,18 +8,18 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('../..'))
 
-import holodeck   # noqa
+# import holodeck   # noqa
 
 
 # -- Project information -----------------------------------------------------
 
 project = 'holodeck'
-copyright = holodeck.__copyright__
-author = holodeck.__author__
-# The short X.Y version
-version = holodeck.__version__
-# The full version, including alpha/beta/rc tags
-release = holodeck.__version__
+# copyright = holodeck.__copyright__
+# author = holodeck.__author__
+# # The short X.Y version
+# version = holodeck.__version__
+# # The full version, including alpha/beta/rc tags
+# release = holodeck.__version__
 
 
 # -- General configuration ---------------------------------------------------
