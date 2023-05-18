@@ -1,23 +1,18 @@
 name: generate coverage and upload to Codecov
 on:
   push:
-    # # !! TEMPORARILY DISABLE THIS WORKFLOW / ACTION !!
     # branches-ignore:
     #   - '**'
     branches:
-      # - "main"
-      # - "dev"
-      # - "docs"
-        - "continuous-integration"
+      - "main"
+      - "dev"
 
   pull_request:
-    # !! TEMPORARILY DISABLE THIS WORKFLOW / ACTION !!
-    branches-ignore:
-      - '**'
-    # branches:
-    #   - "main"
-    #   # - "dev"
-    #   # - "docs"
+    # branches-ignore:
+    #   - '**'
+    branches:
+      - "main"
+      - "dev"
 
 jobs:
   run:
