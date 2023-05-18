@@ -1,4 +1,4 @@
-"""Semi Analytic Modeling (SAM) submodule.
+r"""Semi Analytic Modeling (SAM) submodule.
 
 The core element of the SAM module is the :class:`Semi_Analytic_Model` class.  This class requires four
 components as arguments:
@@ -74,6 +74,8 @@ GMT_USES_MTOT = False        #: the mass used in the GMT  is interpretted as M=m
 
 class _Galaxy_Stellar_Mass_Function(abc.ABC):
     """Galaxy Stellar-Mass Function base-class.  Used to calculate number-density of galaxies.
+
+
     """
 
     @abc.abstractmethod
@@ -103,7 +105,7 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
 
 
 class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
-    """Single Schechter Function - Galaxy Stellar Mass Function.
+    r"""Single Schechter Function - Galaxy Stellar Mass Function.
 
     This is density per unit log10-interval of stellar mass, i.e. $Phi = dn / d\\log_{10}(M)$
 
@@ -125,7 +127,7 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
         return
 
     def __call__(self, mstar, redz):
-        """Return the number-density of galaxies at a given stellar mass.
+        r"""Return the number-density of galaxies at a given stellar mass.
 
         See: [Chen2019] Eq.8
 
@@ -369,7 +371,6 @@ class Semi_Analytic_Model:
     """Semi-Analytic Model of MBH Binary populations.
 
     Based on four components:
-
     * Galaxy Stellar-Mass Function (GSMF): the distribution of galaxy masses
     * Galaxy Pair Fraction (GPF): the probability of galaxies having a companion
     * Galaxy Merger Time (GMT): the expected galaxy-merger timescale for a pair of galaxies
@@ -383,7 +384,7 @@ class Semi_Analytic_Model:
         gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013,
         **kwargs
     ):
-        """
+        """Construct a new Semi_Analytic_Model instance.
 
         Parameters
         ----------
@@ -397,7 +398,6 @@ class Semi_Analytic_Model:
         mmbulge : _type_, optional
 
         """
-
         if log is None:
             log = holo.log
         self._log = log
@@ -626,7 +626,6 @@ class Semi_Analytic_Model:
         LZK 2023-05-11
 
         """
-
         fobs_orb = np.asarray(fobs_orb)
         edges = self.edges + [fobs_orb, ]
 
@@ -817,7 +816,6 @@ class Semi_Analytic_Model:
         * There is no coalescence of binaries cutting them off at high-frequencies.
 
         """
-
         mstar_pri, mstar_tot = self.mass_stellar()
         # q = m2 / m1
         mstar_rat = mstar_tot / mstar_pri
@@ -871,7 +869,6 @@ class Semi_Analytic_Model:
 
 
         """
-
         log = self._log
 
         if use_redz_after_hard is None:
