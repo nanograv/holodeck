@@ -2,22 +2,13 @@ name: build
 
 on:
   push:
-    # !! TEMPORARILY DISABLE THIS WORKFLOW / ACTION !!
-    # branches-ignore:
-    #   - '**'
     branches:
-      # - "main"
-      # - "dev"
-      # - "docs"
-      - "continuous-integration"
+      - "main"
+      - "dev"
   pull_request:
-    # !! TEMPORARILY DISABLE THIS WORKFLOW / ACTION !!
-    branches-ignore:
-      - '**'
-    # branches:
-    #   - "main"
-    #   # - "dev"
-    #   # - "docs"
+    branches:
+      - "main"
+      - "dev"
 
 jobs:
   test:
