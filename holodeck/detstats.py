@@ -1376,7 +1376,7 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
 ########################################################################
 
 def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=0.5,
-                   plot=True, debug=False):
+                   dur=None, cad=None, dfobs=None, plot=True, debug=False):
     """ Calculate detection statistics for an ss library output.
 
     Parameters
@@ -1427,9 +1427,9 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=0.5,
     # Read in hdf file
     ssfile = h5py.File(hdf_name, 'r')
     fobs = ssfile['fobs'][:]
-    dfobs = ssfile['dfobs'][:]
-    dur = ssfile['pta_dur'][0]
-    cad = ssfile['pta_cad'][0]
+    if dfobs is None: dfobs = ssfile['dfobs'][:]
+    if dur is None: dur = ssfile['pta_dur'][0]
+    if cad is None: cad = ssfile['pta_cad'][0]
     hc_ss = ssfile['hc_ss'][...]
     hc_bg = ssfile['hc_bg'][...]
     shape = hc_ss.shape
