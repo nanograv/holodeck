@@ -846,11 +846,11 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
     return gwb, hc_ss, hc_bg, sspar, bgpar, bad_files
 
 
-def fit_library(library_path, log):
+def fit_library_spectra(library_path, log):
     """
     """
 
-    log.info("Fitting library from path {library_path}")
+    log.info(f"Fitting library from path {library_path}")
 
     # ---- setup path
 
@@ -868,31 +868,31 @@ def fit_library(library_path, log):
 
     with h5py.File(library_path, 'r') as library:
         fobs = library['fobs'][()]
-        psd = utils.char_strain_to_psd(fobs, library['gwb'])
+        psd = utils.char_strain_to_psd(fobs[np.newaxis, :, np.newaxis], library['gwb'][()])
 
     nsamps, nfreqs, nreals = psd.shape
     log.debug(f"{nsamps=}, {nfreqs=}, {nreals=}")
 
     # ---- Run fits
 
-    nbins_plaw = FITS_NBINS_PLAW
-    len_nbins_plaw = len(nbins_plaw)
-    npars_plaw = 2
-    shape_plaw_fits = [nsamps, nreals, len_nbins_plaw, npars_plaw]
-    fits_plaw = np.zeros(shape_plaw_fits)
-    for ss, rr in np.ndindex((nsamps, nreals)):
-        yy = psd[ss, :, rr]
-        for nn, nbin in enumerate(nbins_plaw):
-            fits, _ = utils.fit_powerlaw(fobs[:nbin], yy[:nbin])
-            fits_plaw[ss, rr, nn, :] = fits
+    nbins_plaw, fits_plaw = holo.librarian.fit_spectra_plaw(fobs, psd[:10], nbins_list=FITS_NBINS_PLAW)
+    fails = np.any(~np.isfinite(fits_plaw), axis=-1)
+    lvl = log.DEBUG if np.any(fails) else log.INFO
+    log.log(lvl, f"Failed to fit {utils.frac_str(fails)} spectra with powerlaw model")
 
-    nbins_turn = FITS_NBINS_TURN
-    len_nbins_plaw = len(nbins_plaw)
+    nbins_turn, fits_turn = holo.librarian.fit_spectra_turn(fobs, psd[:10], nbins_list=FITS_NBINS_TURN)
+    fails = np.any(~np.isfinite(fits_turn), axis=-1)
+    lvl = log.DEBUG if np.any(fails) else log.INFO
+    log.log(lvl, f"Failed to fit {utils.frac_str(fails)} spectra with turnover model")
 
+    # ---- Save to output
 
+    fits_path = library_path.with_stem(library_path.stem + "_fits")
+    fits_path = fits_path.with_suffix('.npz')
+    np.savez(fits_path, fobs=fobs, psd=psd, nbins_plaw=nbins_plaw, fits_plaw=fits_plaw, nbins_turn=nbins_turn)
+    log.warning(f"Saved fits to {fits_path} size: {utils.get_file_size(fits_path)}")
 
-    return
-
+    return fits_path
 
 
 # ==============================================================================
@@ -906,21 +906,29 @@ def _fit_spectra(freqs, psd, nbins_list, fit_npars, fit_func):
     assert len(freqs) == nfreqs
     assert np.ndim(nbins_list) == 1
 
+    bad_pars = [np.nan] * fit_npars
+
     def fit_if_all_finite(xx, yy):
         if np.any(~np.isfinite(yy)):
-            pars = [np.nan] * fit_npars
-        else:
-            sel = (yy > 0.0)
-            if np.count_nonzero(sel) < fit_npars:
-                pars = [np.nan] * fit_npars
-            else:
-                pars = fit_func(xx[sel], yy[sel])
+            return bad_pars
+
+        sel = (yy > 0.0)
+        if np.count_nonzero(sel) < fit_npars:
+            return bad_pars
+
+        try:
+            pars = fit_func(xx[sel], yy[sel])
+        except RuntimeError:
+            return bad_pars
+
         return pars
 
     len_nbins = len(nbins_list)
     shape_fits = [nsamps, nreals, len_nbins, fit_npars]
     fits = np.zeros(shape_fits)
-    for ss, rr in tqdm.tqdm(np.ndindex((nsamps, nreals)), total=nsamps*nreals):
+    failures = 0
+    ntot = nsamps * nreals
+    for ss, rr in tqdm.tqdm(np.ndindex((nsamps, nreals)), total=ntot):
         yy = psd[ss, :, rr]
         for nn, nbin in enumerate(nbins_list):
             if nbin > nfreqs:
@@ -928,6 +936,8 @@ def _fit_spectra(freqs, psd, nbins_list, fit_npars, fit_func):
 
             pars = fit_if_all_finite(freqs[:nbin], yy[:nbin])
             fits[ss, rr, nn, :] = pars
+            if not np.isfinite(pars[0]):
+                failures += 1
 
     return fits
 
@@ -1292,13 +1302,12 @@ def _setup_log(comm, args):
 
 if __name__ == "__main__":
 
-    from argparse import ArgumentParser
     log = holo.log
 
-    parser = ArgumentParser()
+    parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="subcommand")
 
-    # ---- Combine ----
+    # ---- combine
 
     combine = subparsers.add_parser('combine', help='combine output files')
     combine.add_argument(
@@ -1307,14 +1316,15 @@ if __name__ == "__main__":
     )
     combine.add_argument('--debug', '-d', action='store_true', default=False)
 
-    # ---- fits ----
+    # ---- fit
 
     fit = subparsers.add_parser('fit', help='fit spectra in combined output file')
     fit.add_argument(
         'path', default=None,
         help='library directory to run fits on; must contain the `sam_lib.hdf5` file'
     )
-    # fit.add_argument('--debug', '-d', action='store_true', default=False)
+
+    # ---- Run sub-command
 
     args = parser.parse_args()
     log.debug(f"{args=}")
@@ -1322,7 +1332,9 @@ if __name__ == "__main__":
     if args.subcommand == 'combine':
         sam_lib_combine(args.path, log, path_sims=Path(args.path).joinpath('sims'))
     if args.subcommand == 'fit':
-        fit_library(args.path, log, path_library=Path(args.path))
+        fit_library_spectra(args.path, log)
     else:
         parser.print_help()
         sys.exit()
+
+    log.debug("done")
