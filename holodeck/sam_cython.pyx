@@ -702,3 +702,57 @@ cdef int _dynamic_binary_number_at_fobs_gw(
 
     return 0
 
+
+
+# ==================================================================================================
+# ====    DetStats Functions    ====
+# ==================================================================================================
+
+
+def gamma_of_rho_interp(rho, rsort, rho_interp_grid, gamma_interp_grid):
+    """
+    rho : 1Darray of scalars
+    rr_sort : 1Darray
+        order of rho values smallest to largest
+    rho_interp_grid : 1Darray
+        rho values corresponding to each gamma
+    gamma_interp_grid : 1Darray
+        gamma values corresponding to each rho
+
+    """
+    # pass in the interp grid
+    cdef np.ndarray[np.double_t, ndim=1] gamma = np.zeros(rho.shape)
+
+    _gamma_of_rho_interp(rho, rsort, rho_interp_grid, gamma_interp_grid, gamma)
+
+    return gamma
+
+
+cdef int _gamma_of_rho_interp(
+    double[:] rho, long[:] rsort, 
+    double[:] rho_interp_grid, double[:] gamma_interp_grid,
+    # output
+    double[:] gamma
+    ):
+    """ Interpolate over gamma grids in sorted rho order to get gamma of each rho.
+    """
+
+    cdef int n_rho = rho.size
+    cdef int n_interp = rho_interp_grid.size
+    print('n_rho=', n_rho)
+    cdef int ii, kk, rr
+    ii = 0 # get rho in order using rho[rsort[ii]]
+
+    for kk in range(n_rho): 
+        rr = rsort[kk] # index of next largest rho, equiv to rev in redz calculation
+        print('kk =',kk,' rr =', rr, 'rho[rr] =', rho[rr])
+        # get to the right index of the interpolation-grid
+        while (rho_interp_grid[ii+1] < rho[rr]) and (ii < n_interp -1):
+            ii += 1
+        print('ii =',ii, ' rho_interp[ii] =', rho_interp_grid[ii], ' rho_interp[ii+1] =', rho_interp_grid[ii+1])
+        # interpolate
+        gamma[rr] = interp_at_index(ii, rho[rr], rho_interp_grid, gamma_interp_grid)
+        print('rho =', rho[rr], ' gamma =', gamma[rr])
+        print()
+
+    return 0
