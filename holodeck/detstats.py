@@ -10,9 +10,10 @@ from scipy import special, integrate
 from sympy import nsolve, Symbol
 import h5py
 import matplotlib.pyplot as plt
+import os
 
 import holodeck as holo
-from holodeck import utils, cosmo, log, plot
+from holodeck import utils, cosmo, log, plot, sam_cython
 from holodeck.constants import MPC, YR
 
 import hasasia.sensitivity as hsen
@@ -1164,8 +1165,38 @@ def _gamma_ssi(Fe_bar, rho, print_nans=False, max_peak = False):
 
     return gamma_ssi
 
+def _gamma_above_peak(gamma):
+    """ Set all gamma(rho>rho_peak) equal to gamma(rho_peak).
+    
+    """
+    arg_peak = np.nanargmax(gamma)
+    gamma[arg_peak:] = gamma[arg_peak]
+    return gamma
 
-def _gamma_ssi_cython(Fe_bar, rho, print_nans=False, max_peak = False):
+def _gamma_above_one(gamma):
+    """ Set all gamma values greater than one equal to one.
+    
+    """
+    gamma[gamma>1.0] = 1.0
+    return gamma
+
+def _build_gamma_interp_grid(Num, grid_name):
+    """ Build and save interpolation grid for rho to gamma, for the given Num.
+    """
+    rho_interp = np.geomspace(10**-3, 10**3, 10**3)
+    Fe_bar = _Fe_thresh(Num)
+    Fe_bar = np.float64(Fe_bar)
+    gamma_interp = np.zeros_like(rho_interp)
+
+    for rr in range(len(rho_interp)):
+        gamma_interp[rr] = _gamma_of_rho(Fe_bar, rho_interp[rr])
+    
+    gamma_interp = _gamma_above_peak(gamma_interp)
+    gamma_interp = _gamma_above_one(gamma_interp)
+    
+    np.savez(grid_name, rho_interp_grid=rho_interp, gamma_interp_grid=gamma_interp, Fe_bar=Fe_bar, Num=Num)
+
+def _gamma_ssi_cython(rho, grid_path = '/Users/emigardiner/GWs/holodeck/output/rho_gamma_grids'):
     """ Calculate the detection probability for each single source in each realization.
     
     Parameters
@@ -1180,19 +1211,33 @@ def _gamma_ssi_cython(Fe_bar, rho, print_nans=False, max_peak = False):
     gamma_ssi : (F,R,S,L) NDarray
         The detection probability for each single source, i, at each frequency and realization.
 
-    TODO: this
+    TODO: change grid save location to belong to some class or something?
     """
-    gamma_ssi = np.zeros((rho.shape))
+    Num = np.size(rho[:,0,0,:]) 
 
-    # sort rho's
+    grid_name = grid_path+'/rho_gamma_interp_grid_Num%d.npz' % (Num)
 
-    # if interpolation grid for Num = nfreqs*nlouds does not exist, built it
+    # check if interpolation grid already exists, if not, build it
+    if os.path.exists(grid_name) is False:
+        _build_gamma_interp_grid(Num, grid_name)
 
-    # pass sorted rhos and interp grid to cython, returns sorted DPs
-    
-    # unsort DPs 
+    # read in data from saved grid
+    grid_file = np.load(grid_name)
+    rho_interp_grid = grid_file['rho_interp_grid']
+    gamma_interp_grid = grid_file['gamma_interp_grid']
+    grid_file.close()
+
+    gamma_ssi = np.zeros_like(rho)
+    for ff in range(len(rho)):
+        for rr in range(len(rho[0])):
+            # interpolate for gamma in cython
+            rho_flat = rho[ff,rr].flatten()
+            rsort = np.argsort(rho_flat)
+            gamma_flat = sam_cython.gamma_of_rho_interp(rho_flat, rsort, rho_interp_grid, gamma_interp_grid)
+            gamma_ssi[ff,rr] = gamma_flat.reshape(rho[ff,rr].shape)
 
     return gamma_ssi
+
 
 
 def _ss_detection_probability(gamma_ss_i):
