@@ -1024,7 +1024,7 @@ def fit_all_libraries_in_path(path, log, pattern=None, recreate=False):
     """Recursively find all `sam_lib.hdf5` files in the given path, and construct spectra fits for them.
     """
     path = Path(path)
-    msg = "" if pattern is None else " that match pattern {pattern}"
+    msg = "" if pattern is None else f" that match pattern {pattern}"
     log.info(f"fitting all libraries in path {path}" + msg)
     sub_paths = _find_sam_lib_in_path_tree(path, pattern=pattern)
     log.info(f"found {len(sub_paths)} sam_lib files")
@@ -1494,6 +1494,7 @@ if __name__ == "__main__":
     sys.excepthook = mpiabort_excepthook
 
     log = holo.log
+    # log.setLevel(log.DEBUG)
 
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="subcommand")
