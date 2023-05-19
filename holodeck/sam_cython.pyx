@@ -747,7 +747,7 @@ cdef int _gamma_of_rho_interp(
         rr = rsort[kk] # index of next largest rho, equiv to rev in redz calculation
         print('kk =',kk,' rr =', rr, 'rho[rr] =', rho[rr])
         # get to the right index of the interpolation-grid
-        while (rho_interp_grid[ii+1] < rho[rr]) and (ii < n_interp -1):
+        while (rho_interp_grid[ii+1] < rho[rr]) and (ii < n_interp -2):
             ii += 1
         print('ii =',ii, ' rho_interp[ii] =', rho_interp_grid[ii], ' rho_interp[ii+1] =', rho_interp_grid[ii+1])
         # interpolate
