@@ -844,7 +844,7 @@ class Semi_Analytic_Model:
         return gwb
 
     def ss_gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=1, loudest=1, params=False,
-               zero_stalled=None, use_redz_after_hard=None, return_details=False):
+               use_redz_after_hard=None):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
         Parameters
@@ -901,10 +901,13 @@ class Semi_Analytic_Model:
 
         # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
         # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
-        edges, dnum = self.dynamic_binary_number(
-            hard, fobs_orb=fobs_orb_cents,
-            zero_stalled=zero_stalled, return_details=return_details,
-        )
+        # edges, dnum = self.dynamic_binary_number(
+        #     hard, fobs_orb=fobs_orb_cents,
+        #     zero_stalled=zero_stalled, return_details=return_details,
+        # )
+        edges, dnum, redz_final = self.dynamic_binary_number_at_fobs(hard, fobs_orb_cents)
+        edges[-1] = fobs_orb_edges
+
         log.debug(f"dnum: {utils.stats(dnum)}")
         
         # print("SS 2: ", flush=True)
