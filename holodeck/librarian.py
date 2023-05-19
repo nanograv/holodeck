@@ -27,7 +27,7 @@ from holodeck import utils, cosmo
 from holodeck.constants import YR
 
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 
 # Default argparse parameters
 DEF_NUM_REALS = 100
@@ -876,8 +876,7 @@ def fit_library_spectra(library_path, log, recreate=False):
 
     # ---- check for existing fits file
 
-    fits_path = library_path.with_stem(library_path.stem + "_fits")
-    fits_path = fits_path.with_suffix('.npz')
+    fits_path = get_fits_path(library_path)
     if fits_path.exists():
         lvl = log.INFO if recreate else log.WARNING
         log.log(lvl, f"library fits already exists: {fits_path}")
@@ -909,10 +908,50 @@ def fit_library_spectra(library_path, log, recreate=False):
 
     # ---- Save to output
 
-    np.savez(fits_path, fobs=fobs, psd=psd, nbins_plaw=nbins_plaw, fits_plaw=fits_plaw, nbins_turn=nbins_turn)
+    np.savez(fits_path, fobs=fobs, psd=psd, nbins_plaw=nbins_plaw, fits_plaw=fits_plaw, nbins_turn=nbins_turn, version=__version__)
     log.warning(f"Saved fits to {fits_path} size: {utils.get_file_size(fits_path)}")
 
     return fits_path
+
+
+def fit_all_libraries_in_path(path, log, pattern=None, recreate=False):
+    """Recursively find all `sam_lib.hdf5` files in the given path, and construct spectra fits for them.
+    """
+    path = Path(path)
+    msg = "" if pattern is None else " that match pattern {pattern}"
+    log.info(f"fitting all libraries in path {path}" + msg)
+    sub_paths = _find_sam_lib_in_path_tree(path, pattern=pattern)
+    log.info(f"found {len(sub_paths)} sam_lib files")
+    for pp in tqdm.tqdm(sub_paths):
+        log.info(f"path: {pp}")
+        fit_library_spectra(pp, log, recreate=recreate)
+
+    return
+
+
+def _find_sam_lib_in_path_tree(path, pattern=None):
+    """Recursive method to find `sam_lib.hdf5` files anywhere in the given path.
+    """
+
+    if path.is_file():
+        # if a pattern is given, and it's not in this path, return nothing
+        if (pattern is not None) and (pattern not in str(path)):
+            return []
+        # if we find the library file, return it
+        if path.name == "sam_lib.hdf5":
+            return [path]
+        return []
+
+    # don't recursively follow into these subdirectories
+    if path.name in ['sims', 'logs']:
+        return []
+
+    # accumulate paths from all subdirectories
+    path_list = []
+    for pp in path.iterdir():
+        path_list += _find_sam_lib_in_path_tree(pp, pattern=pattern)
+
+    return path_list
 
 
 # ==============================================================================
@@ -1153,6 +1192,14 @@ def _get_sim_fname_gwb_ss(path, pnum):
     return temp
 
 
+def get_fits_path(library_path):
+    """Get the name of the spectral fits file, given a library file path.
+    """
+    fits_path = library_path.with_stem(library_path.stem + "_fits")
+    fits_path = fits_path.with_suffix('.npz')
+    return fits_path
+
+
 def _log_mem_usage(log):
     # results.ru_maxrss is KB on Linux, B on macos
     mem_max = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
@@ -1350,16 +1397,28 @@ if __name__ == "__main__":
         '--recreate', '-r', action='store_true', default=False,
         help='recreate/replace existing fits file with a new one.'
     )
+    fit.add_argument(
+        '--all', '-a', nargs='?', const=True, default=False,
+        help=(
+            "recursively find all libraries within the given path, and fit them.  "
+            "Optional argument is a pattern that all found paths must match, e.g. 'uniform-07'."
+        )
+    )
 
     # ---- Run sub-command
 
     args = parser.parse_args()
     log.debug(f"{args=}")
+    path = Path(args.path)
 
     if args.subcommand == 'combine':
-        sam_lib_combine(args.path, log, path_sims=Path(args.path).joinpath('sims'), recreate=args.recreate)
+        sam_lib_combine(path, log, path_sims=path.joinpath('sims'), recreate=args.recreate)
     if args.subcommand == 'fit':
-        fit_library_spectra(args.path, log, recreate=args.recreate)
+        if args.all is not False:
+            pattern = None if args.all is True else args.all
+            fit_all_libraries_in_path(path, log, pattern, recreate=args.recreate)
+        else:
+            fit_library_spectra(path, log, recreate=args.recreate)
     else:
         parser.print_help()
         sys.exit()
