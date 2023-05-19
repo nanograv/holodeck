@@ -1090,15 +1090,51 @@ def _I1_approx(xx):
     I_1 = term1*term2
     return I_1
 
-def _integrand_gamma_ss_i(Fe, rho, cutoff=10.0):
+def _integrand_approx(Fe, rho):
+    """ Calculate an approximate integrand for the gamma_ssi integral
+    using the large I_1 expansion approximation.
+    
+    """
+    xx = rho*np.sqrt(2*Fe)
+    termA = np.sqrt( Fe / np.pi / xx )/rho 
+    termB = np.exp(xx-Fe-rho**2/2)
+    termC = 1-(3/8/xx*(1 + 5/2/8/xx * (1 + 21/3/8/xx)))
+    return termA * termB * termC
+
+def _integrand_gamma_ss_i(Fe, rho):
+    """ Calculate the integrand of the gamma_ssi integral over Fe.
+    
+    """
 
     I_1 = special.i1(rho*np.sqrt(2*Fe))
-    if np.isinf(I_1): I_1 = _I1_approx(rho*np.sqrt((2*Fe)))
-    # if np.isinf(I_1): I_1 = 0
-    rv = (2*Fe)**(1/2) /rho * I_1 * np.exp(-Fe - rho**2 /2)
+    if np.isinf(I_1): # check if inf
+        rv = _integrand_approx(Fe,rho)
+    else:
+        rv = (2*Fe)**(1/2) /rho * I_1 * np.exp(-Fe - rho**2 /2)
     return rv
 
-def _gamma_ssi(Fe_bar, rho, print_nans=False):
+def _gamma_of_rho(Fe_bar, rho, print_nans=False, max_peak = False):
+    """ Calculate the detection probability for each single source in each realization.
+    
+    Parameters
+    ----------
+    rho : scalar
+        SNR value for integral
+    Fe_bar : scalar
+        The threshold F_e statistic
+
+    Returns
+    -------
+    gamma_ssi : (F,R,S,L) NDarray
+        The detection probability for each single source, i, at each frequency and realization.
+
+    TODO: Find a way to do this without the four embedded for-loops.
+    """
+    gamma_ssi = integrate.quad(_integrand_gamma_ss_i, Fe_bar, np.inf, 
+                               args=(rho))[0]
+    return gamma_ssi
+
+def _gamma_ssi(Fe_bar, rho, print_nans=False, max_peak = False):
     """ Calculate the detection probability for each single source in each realization.
     
     Parameters
@@ -1120,8 +1156,7 @@ def _gamma_ssi(Fe_bar, rho, print_nans=False):
         for rr in range(len(rho[0])):
             for ss in range(len(rho[0,0])):
                 for ll in range(len(rho[0,0,0])):
-                    gamma_ssi[ff,rr,ss,ll] = integrate.quad(_integrand_gamma_ss_i, Fe_bar, np.inf, 
-                                                            args=(rho[ff,rr,ss,ll]))[0]
+                    gamma_ssi[ff,rr,ss,ll] = _gamma_of_rho(Fe_bar, rho[ff,rr,ss,ll])
                     if(np.isnan(gamma_ssi[ff,rr,ss,ll])):
                         if print_nans:
                             print(f'gamma_ssi[{ff},{rr},{ss},{ll}] is nan, setting to 0.')
