@@ -325,7 +325,7 @@ def _get_cmap(cmap):
 
 
 def _get_hist_steps(xx, yy, yfilter=None):
-    """Convert from
+    """Convert from bin-edges and histogram heights, to specifications for step lines.
 
     Parameters
     ----------
@@ -333,6 +333,7 @@ def _get_hist_steps(xx, yy, yfilter=None):
         Independence variable representing bin-edges.  Size (N,)
     yy : array_like
         Dependence variable representing histogram amplitudes.  Size (N-1,)
+    yfilter : None, bool, callable
 
     Returns
     -------
@@ -353,11 +354,13 @@ def _get_hist_steps(xx, yy, yfilter=None):
     xnew = np.array(xnew).flatten()
     ynew = np.array(ynew).flatten()
 
-    if yfilter is not None:
+    if yfilter not in [None, False]:
         if yfilter is True:
             idx = (ynew > 0.0)
-        else:
+        elif callable(yfilter):
             idx = yfilter(ynew)
+        else:
+            raise ValueError()
 
         xnew = xnew[idx]
         ynew = ynew[idx]

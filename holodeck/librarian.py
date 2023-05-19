@@ -27,7 +27,7 @@ from holodeck import utils, cosmo
 from holodeck.constants import YR
 
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 # Default argparse parameters
 DEF_NUM_REALS = 100
@@ -35,14 +35,21 @@ DEF_NUM_FBINS = 40
 DEF_NUM_LOUDEST = 10
 DEF_PTA_DUR = 16.03     # [yrs]
 
-FITS_NBINS_PLAW = [2, 3, 4, 5, 8, 9, 14]
-FITS_NBINS_TURN = [4, 9, 14, 30]
+# FITS_NBINS_PLAW = [2, 3, 4, 5, 8, 9, 14]
+# FITS_NBINS_TURN = [4, 9, 14, 30]
+FITS_NBINS_PLAW = [3, 4, 5, 10, 15]
+FITS_NBINS_TURN = [5, 10, 15]
 
 FNAME_SIM_FILE_GWB_SS = "lib-sams_gwb-ss__p{pnum:06d}.npz"
 # FNAME_SS_FILE = "lib_ss__p{pnum:06d}.npz"
 PSPACE_FILE_SUFFIX = ".pspace.npz"
 
 ALSO_PRODUCE_LEGACY_GWB_CALCULATION = True
+
+
+# ==============================================================================
+# ====    Class Definitions    ====
+# ==============================================================================
 
 
 class _Param_Space(abc.ABC):
@@ -458,57 +465,172 @@ class PD_Piecewise_Uniform_Density(PD_Piecewise_Uniform_Mass):
         return
 
 
-def load_pspace_from_dir(log, path, space_class=None):
-    """Load a _Param_Space instance from the saved file in the given directory.
+# ==============================================================================
+# ====    Library Generation    ====
+# ==============================================================================
+
+
+def run_sam_at_pspace_num(args, space, pnum):
+    """Run strain calculations for sample-parameter `pnum` in the `space` parameter-space.
 
     Arguments
     ---------
-    path : str or pathlib.Path
-        Path to directory containing save file.
-        A single file matching "*.pspace.npz" is required in that directory.
-        NOTE: the specific glob pattern is specified by `holodeck.librarian.PSPACE_FILE_SUFFIX` e.g. '.pspace.npz'
-    space_class : _Param_Space subclass
-        Class with which to call the `from_save()` method to load a new _Param_Space instance.
+    args : `argparse.ArgumentParser` instance
+        Arguments from the `gen_lib_sams.py` script.
+        NOTE: this should be improved.
+    space : _Param_Space instance
+        Parameter space from which to load `sam` and `hard` instances.
+    pnum : int
+        Which parameter-sample from `space` should be run.
 
     Returns
     -------
-    space : `_Param_Space` subclass instance
-        An instance of the `space_class` class.
-    space_fname : pathlib.Path
-        File that `space` was loaded from.
+    rv : bool
+        True if this simulation was successfully run.
 
     """
-    path = Path(path)
-    if not path.exists() or not path.is_dir():
-        raise RuntimeError(f"path {path} is not an existing directory!")
+    log = args.log
 
-    pattern = "*" + holo.librarian.PSPACE_FILE_SUFFIX
-    space_fname = list(path.glob(pattern))
-    if len(space_fname) != 1:
-        raise FileNotFoundError(f"found {len(space_fname)} matches to {pattern} in output {path}!")
+    # ---- get output filename for this simulation, check if already exists
 
-    space_fname = space_fname[0]
-    # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces`
-    if space_class is None:
-        # get the filename without path, this should contain the name of the PS class
-        space_name = space_fname.name
-        # get a list of all parameter-space classes (assuming they all start with 'PS')
-        space_list = [sl for sl in dir(holo.param_spaces) if sl.startswith('PS')]
-        # iterate over space classes to try to find a match
-        for space in space_list:
-            # exist for-loop if the names match
-            # NOTE: previously the save files converted class names to lower-case; that should no
-            #       longer be the case, but use `lower()` for backwards compatibility at the moment
-            #       LZK 2023-05-10
-            if space.lower() in space_name.lower():
-                break
-        else:
-            raise ValueError(f"Unable to find a PS class matching {space_name}!")
+    sim_fname = _get_sim_fname_gwb_ss(args.output_sims, pnum)
 
-        space_class = getattr(holo.param_spaces, space)
+    beg = datetime.now()
+    log.info(f"{pnum=} :: {sim_fname=} beginning at {beg}")
 
-    space = space_class.from_save(space_fname, log)
-    return space, space_fname
+    if sim_fname.exists():
+        log.info(f"File {sim_fname} already exists.  {args.recreate=}")
+        # skip existing files unless we specifically want to recreate them
+        if not args.recreate:
+            return True
+
+    # ---- Setup PTA frequencies
+
+    pta_dur = args.pta_dur * YR
+    nfreqs = args.nfreqs
+    hifr = nfreqs/pta_dur
+    pta_cad = 1.0 / (2 * hifr)
+    fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
+    fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
+    log.info(f"Created {fobs_cents.size} frequency bins")
+    log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
+    log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
+    _log_mem_usage(log)
+    assert nfreqs == fobs_cents.size
+
+    # ---- Calculate hc_ss, hc_bg, sspar, and bgpar from SAM
+
+    try:
+        log.debug("Selecting `sam` and `hard` instances")
+        sam, hard = space(pnum)
+        _log_mem_usage(log)
+
+        log.debug("Calculating 'edges' and 'number' for this SAM.")
+        fobs_orb_edges = fobs_edges / 2.0
+        fobs_orb_cents = fobs_cents / 2.0
+        # edges
+        # should the zero stalled option be part of the parameter space?
+
+        # ==== OLD / MID ====
+        # if not isinstance(hard, (holo.hardening.Fixed_Time_2PL, holo.hardening.Hard_GW)):
+        #     err = f"`holo.hardening.Fixed_Time_2PL` must be used here!  Not {hard}!"
+        #     log.exception(err)
+        #     raise RuntimeError(err)
+        # ---- OLD
+        # edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents)
+        # use_redz = None
+        # ---- MID
+        # edges, dnum, redz_final = sam.dynamic_binary_number_at_fobs(hard, fobs_orb=fobs_orb_cents)
+        # use_redz = redz_final
+        # --------
+        # edges[-1] = fobs_orb_edges
+        # number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
+        # number = number * np.diff(np.log(fobs_edges))
+        # ==== NEW ====
+        if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
+            err = f"`holo.hardening.Fixed_Time_2PL_SAM` must be used here!  Not {hard}!"
+            log.exception(err)
+            raise RuntimeError(err)
+        redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
+            fobs_orb_cents, sam, hard, cosmo
+        )
+        use_redz = redz_final
+        edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
+        number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
+
+        log.debug(f"{utils.stats(number)=}")
+
+        _log_mem_usage(log)
+
+        if use_redz is None:
+            try:
+                use_redz = sam._redz_final
+                log.info("using `redz_final`")
+            except AttributeError:
+                use_redz = sam._redz_prime[:, :, :, np.newaxis] * np.ones_like(number)
+                log.warning("using `redz_prime`")
+
+        log.debug(f"Calculating `ss_gws` for shape ({fobs_cents.size}, {args.nreals})")
+        hc_ss, hc_bg, sspar, bgpar = holo.single_sources.ss_gws_redz(
+            edges, use_redz, number, realize=args.nreals,
+            loudest=args.nloudest, params=True
+        )
+        log.debug(f"{holo.utils.stats(hc_ss)=}")
+        log.debug(f"{holo.utils.stats(hc_bg)=}")
+
+        _log_mem_usage(log)
+
+        log.debug(f"Calculating `gwb` for shape ({fobs_cents.size}, {args.nreals})")
+        if ALSO_PRODUCE_LEGACY_GWB_CALCULATION:
+            gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, args.nreals)
+            log.debug(f"{holo.utils.stats(gwb)=}")
+
+        _log_mem_usage(log)
+
+        log.debug(f"Saving {pnum} to file")
+        data = dict(fobs=fobs_cents, fobs_edges=fobs_edges,
+                    hc_ss=hc_ss, hc_bg=hc_bg, sspar=sspar, bgpar=bgpar)
+        if ALSO_PRODUCE_LEGACY_GWB_CALCULATION:
+            data['gwb'] = gwb
+
+        rv = True
+    except Exception as err:
+        log.exception(f"`run_ss` FAILED on {pnum=}\n")
+        log.exception(err)
+        rv = False
+        data = dict(fail=str(err))
+
+    # ---- Save data to file
+
+    np.savez(sim_fname, **data)
+    log.info(f"Saved to {sim_fname}, size {holo.utils.get_file_size(sim_fname)} after {(datetime.now()-beg)}")
+
+    # ---- Plot hc and pars
+
+    if rv and args.plot:
+        log.info("generating characteristic strain/psd plots")
+        try:
+            log.info("generating strain plots")
+            plot_fname = args.output_plots.joinpath(sim_fname.name)
+            hc_fname = str(plot_fname.with_suffix(''))+"_strain.png"
+            fig = holo.plot.plot_bg_ss(fobs_cents, bg=hc_bg, ss=hc_ss)
+            fig.savefig(hc_fname, dpi=100)
+            # log.info("generating PSD plots")
+            # psd_fname = str(plot_fname.with_suffix('')) + "_psd.png"
+            # fig = make_ss_plot(fobs_cents, hc_ss, hc_bg, fit_data)
+            # fig.savefig(psd_fname, dpi=100)
+            # log.info(f"Saved to {psd_fname}, size {holo.utils.get_file_size(psd_fname)}")
+            log.info("generating pars plots")
+            pars_fname = str(plot_fname.with_suffix('')) + "_pars.png"
+            fig = make_pars_plot(fobs_cents, hc_ss, hc_bg, sspar, bgpar)
+            fig.savefig(pars_fname, dpi=100)
+            log.info(f"Saved to {pars_fname}, size {holo.utils.get_file_size(pars_fname)}")
+            plt.close('all')
+        except Exception as err:
+            log.exception("Failed to make strain plot!")
+            log.exception(err)
+
+    return rv
 
 
 def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None, recreate=False):
@@ -581,10 +703,9 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None, recreate
     # ---- make sure all files exist; get shape information from files
 
     log.info(f"checking that all {nsamp} files exist")
-    fobs, nreals, nloudest, fit_data, has_gwb = _check_files_and_load_shapes(log, path_sims, nsamp)
+    fobs, nreals, nloudest, has_gwb = _check_files_and_load_shapes(log, path_sims, nsamp)
     nfreqs = fobs.size
-    fit_keys = fit_data.keys() if fit_data is not None else None
-    log.debug(f"{nfreqs=}, {nreals=}, {nloudest=}, {fit_keys=}")
+    log.debug(f"{nfreqs=}, {nreals=}, {nloudest=}")
 
     if (fobs is None) or (nreals is None):
         err = f"After checking files, {fobs=} and {nreals=}!"
@@ -598,8 +719,8 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None, recreate
     hc_bg = np.zeros((nsamp, nfreqs, nreals))
     sspar = np.zeros((nsamp, 3, nfreqs, nreals, nloudest))
     bgpar = np.zeros((nsamp, 3, nfreqs, nreals))
-    gwb, hc_ss, hc_bg, fit_data, sspar, bgpar, bad_files = _load_library_from_all_files(
-        path_sims, gwb, hc_ss, hc_bg, fit_data, sspar, bgpar, log
+    gwb, hc_ss, hc_bg, sspar, bgpar, bad_files = _load_library_from_all_files(
+        path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
     )
     log.info(f"Loaded data from all library files | {utils.stats(gwb)=}")
     param_samples[bad_files] = np.nan
@@ -616,8 +737,6 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None, recreate
         h5.create_dataset('sspar', data=sspar)
         h5.create_dataset('bgpar', data=bgpar)
         h5.create_dataset('sample_params', data=param_samples)
-        for kk, vv in fit_data.items():
-            h5.create_dataset(kk, data=vv)
         h5.attrs['param_names'] = np.array(param_names).astype('S')
 
     log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
@@ -642,17 +761,11 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
         Observer-frame frequency bin centers at which GW signals are calculated.
     nreals : int
         Number of realizations in the output files.
-    fit_data : dict
-        Dictionary where each key is a fit-parameter in all of the output files.  The values are
-        'ndarray's of the appropriate shapes to store fit-parameters from all files.
-        The 0th dimension is always for the number-of-files.
 
     """
-
     fobs = None
     nreals = None
     nloudest = None
-    fit_data = None
     has_gwb = False
     log.info(f"Checking {nsamp} files in {path_sims}")
     for ii in tqdm.trange(nsamp):
@@ -663,7 +776,7 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
             raise ValueError(err)
 
         # if we've already loaded all of the necessary info, then move on to the next file
-        if (fobs is not None) and (nreals is not None) and (fit_data is not None) and (nloudest is not None):
+        if (fobs is not None) and (nreals is not None) and (nloudest is not None):
             continue
 
         temp = np.load(temp_fname)
@@ -692,30 +805,10 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
         if (nloudest is None) and ('hc_ss' in data_keys):
             nloudest = temp['hc_ss'].shape[-1]
 
-        # find a file that has fits data in it (it's possible for the fits portion to fail by itself)
-        # initialize arrays to store output data for all files
-        if (fit_data is None) and np.any([kk.startswith('fit_') for kk in data_keys]):
-            fit_data = {}
-            for kk in data_keys:
-                if not kk.startswith('fit_'):
-                    continue
-
-                vv = temp[kk]
-                # arrays need to store values for 'nsamp' files
-                shape = (nsamp,) + vv.shape
-                fit_data[kk] = np.zeros(shape)
-
-    if fit_data is not None:
-        for kk, vv in fit_data.items():
-            log.debug(f"\t{kk:>20s}: {vv.shape}")
-    else:
-        log.warning("Unable to load `fit_data` from any files!")
-        fit_data = {}
-
-    return fobs, nreals, nloudest, fit_data, has_gwb
+    return fobs, nreals, nloudest, has_gwb
 
 
-def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, fit_data, sspar, bgpar, log):
+def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log):
     """Load data from all individual simulation files.
 
     Arguments
@@ -725,17 +818,13 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, fit_data, sspar, 
     gwb : (S, F, R) ndarray
         Array in which to store GWB data from all of 'S' files.
         S: num-samples/simulations,  F: num-frequencies,  R: num-realizations.
-    fit_data : dict
-        Dictionary of ndarrays in which to store fit-parameters.
     log : `logging.Logger`
         Logging instance.
 
     """
-
     nsamp = hc_bg.shape[0]
     log.info(f"Collecting data from {nsamp} files")
     bad_files = np.zeros(nsamp, dtype=bool)     #: track which files contain UN-useable data
-    num_fits_failed = 0
     msg = None
     for pnum in tqdm.trange(nsamp):
         fname = _get_sim_fname_gwb_ss(path_sims, pnum)
@@ -749,8 +838,6 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, fit_data, sspar, 
                 gwb[pnum, :, :] = np.nan
             hc_ss[pnum, :, :, :] = np.nan
             hc_bg[pnum, :, :] = np.nan
-            for fk in fit_data.keys():
-                fit_data[fk][pnum, ...] = np.nan
 
             bad_files[pnum] = True
             continue
@@ -763,91 +850,124 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, fit_data, sspar, 
         sspar[pnum, :, :, :, :] = temp['sspar'][...]
         bgpar[pnum, :, :, :] = temp['bgpar'][...]
 
-        # store all of the fit data
-        fits_bad = False
-        for fk in fit_data.keys():
-            try:
-                fit_data[fk][pnum, ...] = temp[fk][...]
-            except Exception as err:
-                # only count the first time it fails
-                if not fits_bad:
-                    num_fits_failed += 1
-                fits_bad = True
-                fit_data[fk][pnum, ...] = np.nan
-                msg = str(err)
-
-        if fits_bad:
-            log.warning(f"Missing fit keys in file {pnum} = {fname.name}")
-
-    if num_fits_failed > 0:
-        log.warning(f"Missing fit keys in {num_fits_failed}/{nsamp} = {num_fits_failed/nsamp:.2e} files!")
-        log.warning(msg)
-
     log.info(f"{utils.frac_str(bad_files)} files are failures")
 
-    return gwb, hc_ss, hc_bg, fit_data, sspar, bgpar, bad_files
+    return gwb, hc_ss, hc_bg, sspar, bgpar, bad_files
 
 
-def _fit_spectra(freqs, psd, nbins, nfit_pars, fit_func, min_nfreq_valid):
-    nfreq, nreals = np.shape(psd)
-    assert len(freqs) == nfreq
+def fit_library_spectra(library_path, log):
+    """
+    """
+
+    log.info(f"Fitting library from path {library_path}")
+
+    # ---- setup path
+
+    library_path = Path(library_path)
+    if library_path.is_dir():
+        library_path = library_path.joinpath("sam_lib.hdf5")
+    if not library_path.exists() or not library_path.is_file():
+        err = f"{library_path=} must point to an existing library file!"
+        log.exception(err)
+        raise FileNotFoundError(err)
+
+    log.debug(f"library path = {library_path}")
+
+    # ---- load library GWB and convert to PSD
+
+    with h5py.File(library_path, 'r') as library:
+        fobs = library['fobs'][()]
+        psd = utils.char_strain_to_psd(fobs[np.newaxis, :, np.newaxis], library['gwb'][()])
+
+    nsamps, nfreqs, nreals = psd.shape
+    log.debug(f"{nsamps=}, {nfreqs=}, {nreals=}")
+
+    # ---- Run fits
+
+    nbins_plaw, fits_plaw = holo.librarian.fit_spectra_plaw(fobs, psd[:10], nbins_list=FITS_NBINS_PLAW)
+    fails = np.any(~np.isfinite(fits_plaw), axis=-1)
+    lvl = log.DEBUG if np.any(fails) else log.INFO
+    log.log(lvl, f"Failed to fit {utils.frac_str(fails)} spectra with powerlaw model")
+
+    nbins_turn, fits_turn = holo.librarian.fit_spectra_turn(fobs, psd[:10], nbins_list=FITS_NBINS_TURN)
+    fails = np.any(~np.isfinite(fits_turn), axis=-1)
+    lvl = log.DEBUG if np.any(fails) else log.INFO
+    log.log(lvl, f"Failed to fit {utils.frac_str(fails)} spectra with turnover model")
+
+    # ---- Save to output
+
+    fits_path = library_path.with_stem(library_path.stem + "_fits")
+    fits_path = fits_path.with_suffix('.npz')
+    np.savez(fits_path, fobs=fobs, psd=psd, nbins_plaw=nbins_plaw, fits_plaw=fits_plaw, nbins_turn=nbins_turn)
+    log.warning(f"Saved fits to {fits_path} size: {utils.get_file_size(fits_path)}")
+
+    return fits_path
+
+
+# ==============================================================================
+# ====    Fitting Functions    ====
+# ==============================================================================
+
+
+def _fit_spectra(freqs, psd, nbins_list, fit_npars, fit_func):
+    assert np.ndim(psd) == 3
+    nsamps, nfreqs, nreals = np.shape(psd)
+    assert len(freqs) == nfreqs
+    assert np.ndim(nbins_list) == 1
+
+    bad_pars = [np.nan] * fit_npars
 
     def fit_if_all_finite(xx, yy):
         if np.any(~np.isfinite(yy)):
-            pars = [np.nan] * nfit_pars
-        else:
-            sel = (yy > 0.0)
-            if np.count_nonzero(sel) < min_nfreq_valid:
-                pars = [np.nan] * nfit_pars
-            else:
-                pars = fit_func(xx[sel], yy[sel])
+            return bad_pars
+
+        sel = (yy > 0.0)
+        if np.count_nonzero(sel) < fit_npars:
+            return bad_pars
+
+        try:
+            pars = fit_func(xx[sel], yy[sel])
+        except RuntimeError:
+            return bad_pars
+
         return pars
 
-    nfreq_bins = len(nbins)
-    fit_pars = np.zeros((nfreq_bins, nreals, nfit_pars))
-    fit_med_pars = np.zeros((nfreq_bins, nfit_pars))
-    for ii, num in enumerate(nbins):
-        if num > nfreq:
-            raise ValueError(f"Cannot fit for {num=} bins, data has {nfreq=} frequencies!")
+    len_nbins = len(nbins_list)
+    shape_fits = [nsamps, nreals, len_nbins, fit_npars]
+    fits = np.zeros(shape_fits)
+    failures = 0
+    ntot = nsamps * nreals
+    for ss, rr in tqdm.tqdm(np.ndindex((nsamps, nreals)), total=ntot):
+        yy = psd[ss, :, rr]
+        for nn, nbin in enumerate(nbins_list):
+            if nbin > nfreqs:
+                raise ValueError(f"Cannot fit for {nbin=} bins, data has {nfreqs=} frequencies!")
 
-        num = None if (num == 0) else num
-        cut = slice(None, num)
-        xx = freqs[cut]
+            pars = fit_if_all_finite(freqs[:nbin], yy[:nbin])
+            fits[ss, rr, nn, :] = pars
+            if not np.isfinite(pars[0]):
+                failures += 1
 
-        # fit the median spectra
-        yy = np.median(psd, axis=-1)[cut]
-        fit_med_pars[ii] = fit_if_all_finite(xx, yy)
-
-        # fit each realization of the spectra
-        for rr in range(nreals):
-            yy = psd[cut, rr]
-            fit_pars[ii, rr, :] = fit_if_all_finite(xx, yy)
-
-    return nbins, fit_pars, fit_med_pars
+    return fits
 
 
-def fit_spectra_plaw(freqs, psd, nbins):
-    fit_func = lambda xx, yy: utils.fit_powerlaw_psd(xx, yy, 1/YR)
-    nfit_pars = 2
-    # min_nfreq_valid = 2
-    min_nfreq_valid = nfit_pars
-    return _fit_spectra(freqs, psd, nbins, nfit_pars, fit_func, min_nfreq_valid)
+def fit_spectra_plaw(freqs, psd, nbins_list=FITS_NBINS_PLAW):
+    fit_func = lambda xx, yy: utils.fit_powerlaw_psd(xx, yy, 1/YR)[0]
+    fit_npars = 2
+    fits = _fit_spectra(freqs, psd, nbins_list, fit_npars, fit_func)
+    return nbins_list, fits
 
 
-def fit_spectra_turn(freqs, psd, nbins):
-    fit_func = lambda xx, yy: utils.fit_turnover_psd(xx, yy, 1/YR)
-    nfit_pars = 4
-    # min_nfreq_valid = 3
-    min_nfreq_valid = nfit_pars
-    return _fit_spectra(freqs, psd, nbins, nfit_pars, fit_func, min_nfreq_valid)
+def fit_spectra_turn(freqs, psd, nbins_list=FITS_NBINS_TURN):
+    fit_func = lambda xx, yy: utils.fit_turnover_psd(xx, yy, 1/YR)[0]
+    fit_npars = 4
+    fits = _fit_spectra(freqs, psd, nbins_list, fit_npars, fit_func)
+    return nbins_list, fits
 
 
-def fit_spectra_plaw_hc(freqs, gwb, nbins):
-    fit_func = lambda xx, yy: utils.fit_powerlaw(xx, yy)
-    nfit_pars = 2
-    # min_nfreq_valid = 2
-    min_nfreq_valid = nfit_pars
-    return _fit_spectra(freqs, gwb, nbins, nfit_pars, fit_func, min_nfreq_valid)
+# ==============================================================================
+# ====    Plotting Functions    ====
+# ==============================================================================
 
 
 def make_gwb_plot(fobs, gwb, fit_data):
@@ -957,166 +1077,63 @@ def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar):
     return fig
 
 
-def run_sam_at_pspace_num(args, space, pnum):
-    """Run single source and background strain calculations for the SAM simulation
-    for sample-parameter `pnum` in the `space` parameter-space.
-    Arguments
-    ---------
-    args : `argparse.ArgumentParser` instance
-        Arguments from the `gen_lib_sams.py` script.
-        NOTE: this should be improved.
-    space : _Param_Space instance
-        Parameter space from which to load `sam` and `hard` instances.
-    pnum : int
-        Which parameter-sample from `space` should be run.
+# ==============================================================================
+# ====    Utility Functions    ====
+# ==============================================================================
+
+
+def load_pspace_from_dir(log, path, space_class=None):
+    """Load a _Param_Space instance from the saved file in the given directory.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        Path to directory containing save file.
+        A single file matching "*.pspace.npz" is required in that directory.
+        NOTE: the specific glob pattern is specified by `holodeck.librarian.PSPACE_FILE_SUFFIX` e.g. '.pspace.npz'
+    space_class : _Param_Space subclass
+        Class with which to call the `from_save()` method to load a new _Param_Space instance.
+
     Returns
     -------
-    rv : bool
-        True if this simulation was successfully run.
+    log : `logging.Logger`
+    space : `_Param_Space` subclass instance
+        An instance of the `space_class` class.
+    space_fname : pathlib.Path
+        File that `space` was loaded from.
+
     """
+    path = Path(path)
+    if not path.exists() or not path.is_dir():
+        raise RuntimeError(f"path {path} is not an existing directory!")
 
-    log = args.log
+    pattern = "*" + holo.librarian.PSPACE_FILE_SUFFIX
+    space_fname = list(path.glob(pattern))
+    if len(space_fname) != 1:
+        raise FileNotFoundError(f"found {len(space_fname)} matches to {pattern} in output {path}!")
 
-    # ---- get output filename for this simulation, check if already exists
+    space_fname = space_fname[0]
+    # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces`
+    if space_class is None:
+        # get the filename without path, this should contain the name of the PS class
+        space_name = space_fname.name
+        # get a list of all parameter-space classes (assuming they all start with 'PS')
+        space_list = [sl for sl in dir(holo.param_spaces) if sl.startswith('PS')]
+        # iterate over space classes to try to find a match
+        for space in space_list:
+            # exist for-loop if the names match
+            # NOTE: previously the save files converted class names to lower-case; that should no
+            #       longer be the case, but use `lower()` for backwards compatibility at the moment
+            #       LZK 2023-05-10
+            if space.lower() in space_name.lower():
+                break
+        else:
+            raise ValueError(f"Unable to find a PS class matching {space_name}!")
 
-    sim_fname = _get_sim_fname_gwb_ss(args.output_sims, pnum)
+        space_class = getattr(holo.param_spaces, space)
 
-    beg = datetime.now()
-    log.info(f"{pnum=} :: {sim_fname=} beginning at {beg}")
-
-    if sim_fname.exists():
-        log.info(f"File {sim_fname} already exists.  {args.recreate=}")
-        # skip existing files unless we specifically want to recreate them
-        if not args.recreate:
-            return True
-
-    # ---- Setup PTA frequencies
-
-    pta_dur = args.pta_dur * YR
-    nfreqs = args.nfreqs
-    hifr = nfreqs/pta_dur
-    pta_cad = 1.0 / (2 * hifr)
-    fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
-    fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
-    log.info(f"Created {fobs_cents.size} frequency bins")
-    log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
-    log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
-    _log_mem_usage(log)
-    assert nfreqs == fobs_cents.size
-
-    # ---- Calculate hc_ss, hc_bg, sspar, and bgpar from SAM
-
-    try:
-        log.debug("Selecting `sam` and `hard` instances")
-        sam, hard = space(pnum)
-        _log_mem_usage(log)
-
-        log.debug(f"Calculating 'edges' and 'number' for this SAM.")
-        fobs_orb_edges = fobs_edges / 2.0
-        fobs_orb_cents = fobs_cents / 2.0
-        # edges
-        # should the zero stalled option be part of the parameter space?
-
-        # ==== OLD / MID ====
-        # if not isinstance(hard, (holo.hardening.Fixed_Time_2PL, holo.hardening.Hard_GW)):
-        #     err = f"`holo.hardening.Fixed_Time_2PL` must be used here!  Not {hard}!"
-        #     log.exception(err)
-        #     raise RuntimeError(err)
-        # ---- OLD
-        # edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents)
-        # use_redz = None
-        # ---- MID
-        # edges, dnum, redz_final = sam.dynamic_binary_number_at_fobs(hard, fobs_orb=fobs_orb_cents)
-        # use_redz = redz_final
-        # --------
-        # edges[-1] = fobs_orb_edges
-        # number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
-        # number = number * np.diff(np.log(fobs_edges))
-        # ==== NEW ====
-        if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
-            err = f"`holo.hardening.Fixed_Time_2PL_SAM` must be used here!  Not {hard}!"
-            log.exception(err)
-            raise RuntimeError(err)
-        redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
-            fobs_orb_cents, sam, hard, cosmo
-        )
-        use_redz = redz_final
-        edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
-        number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
-
-        log.debug(f"{utils.stats(number)=}")
-
-        _log_mem_usage(log)
-
-        if use_redz is None:
-            try:
-                use_redz = sam._redz_final
-                log.info("using `redz_final`")
-            except AttributeError:
-                use_redz = sam._redz_prime[:, :, :, np.newaxis] * np.ones_like(number)
-                log.warning("using `redz_prime`")
-
-        log.debug(f"Calculating `ss_gws` for shape ({fobs_cents.size}, {args.nreals})")
-        hc_ss, hc_bg, sspar, bgpar = holo.single_sources.ss_gws_redz(
-            edges, use_redz, number, realize=args.nreals,
-            loudest=args.nloudest, params=True
-        )
-        log.debug(f"{holo.utils.stats(hc_ss)=}")
-        log.debug(f"{holo.utils.stats(hc_bg)=}")
-
-        _log_mem_usage(log)
-
-        log.debug(f"Calculating `gwb` for shape ({fobs_cents.size}, {args.nreals})")
-        if ALSO_PRODUCE_LEGACY_GWB_CALCULATION:
-            gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, args.nreals)
-            log.debug(f"{holo.utils.stats(gwb)=}")
-
-        _log_mem_usage(log)
-
-        log.debug(f"Saving {pnum} to file")
-        data = dict(fobs=fobs_cents, fobs_edges=fobs_edges,
-                    hc_ss=hc_ss, hc_bg=hc_bg, sspar=sspar, bgpar=bgpar)
-        if ALSO_PRODUCE_LEGACY_GWB_CALCULATION:
-            data['gwb'] = gwb
-
-        rv = True
-    except Exception as err:
-        log.exception(f"`run_ss` FAILED on {pnum=}\n")
-        log.exception(err)
-        rv = False
-        data = dict(fail=str(err))
-
-    # ---- Save data to file
-
-    np.savez(sim_fname, **data)
-    log.info(f"Saved to {sim_fname}, size {holo.utils.get_file_size(sim_fname)} after {(datetime.now()-beg)}")
-
-    # ---- Plot hc and pars
-
-    if rv and args.plot:
-        log.info("generating characteristic strain/psd plots")
-        try:
-            log.info("generating strain plots")
-            plot_fname = args.output_plots.joinpath(sim_fname.name)
-            hc_fname = str(plot_fname.with_suffix(''))+"_strain.png"
-            fig = holo.plot.plot_bg_ss(fobs_cents, bg=hc_bg, ss=hc_ss)
-            fig.savefig(hc_fname, dpi=100)
-            # log.info("generating PSD plots")
-            # psd_fname = str(plot_fname.with_suffix('')) + "_psd.png"
-            # fig = make_ss_plot(fobs_cents, hc_ss, hc_bg, fit_data)
-            # fig.savefig(psd_fname, dpi=100)
-            # log.info(f"Saved to {psd_fname}, size {holo.utils.get_file_size(psd_fname)}")
-            log.info("generating pars plots")
-            pars_fname = str(plot_fname.with_suffix('')) + "_pars.png"
-            fig = make_pars_plot(fobs_cents, hc_ss, hc_bg, sspar, bgpar)
-            fig.savefig(pars_fname, dpi=100)
-            log.info(f"Saved to {pars_fname}, size {holo.utils.get_file_size(pars_fname)}")
-            plt.close('all')
-        except Exception as err:
-            log.exception("Failed to make strain plot!")
-            log.exception(err)
-
-    return rv
+    space = space_class.from_save(space_fname, log)
+    return space, space_fname
 
 
 def _get_sim_fname_gwb_ss(path, pnum):
@@ -1230,8 +1247,7 @@ def _setup_argparse(comm, *args, **kwargs):
                         help='produce plots for each simulation configuration')
     parser.add_argument('--seed', action='store', type=int, default=None,
                         help='Random seed to use')
-    # parser.add_argument('-t', '--test', action='store_true', default=False, dest='test',
-    #                     help='Do not actually run, just output what parameters would have been done.')
+
     parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
                         help='verbose output [INFO]')
 
@@ -1288,13 +1304,19 @@ def _setup_log(comm, args):
     return log
 
 
-def main():
+# ==============================================================================
+# ====    `main` - Script Entry-Point    ====
+# ==============================================================================
 
-    from argparse import ArgumentParser
+
+if __name__ == "__main__":
+
     log = holo.log
 
-    parser = ArgumentParser()
+    parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="subcommand")
+
+    # ---- combine
 
     combine = subparsers.add_parser('combine', help='combine output files')
     combine.add_argument(
@@ -1306,17 +1328,25 @@ def main():
         help='recreate/replace existing combined library file with a new merge.'
     )
 
+    # ---- fit
+
+    fit = subparsers.add_parser('fit', help='fit spectra in combined output file')
+    fit.add_argument(
+        'path', default=None,
+        help='library directory to run fits on; must contain the `sam_lib.hdf5` file'
+    )
+
+    # ---- Run sub-command
+
     args = parser.parse_args()
     log.debug(f"{args=}")
 
     if args.subcommand == 'combine':
         sam_lib_combine(args.path, log, path_sims=Path(args.path).joinpath('sims'), recreate=args.recreate)
+    if args.subcommand == 'fit':
+        fit_library_spectra(args.path, log)
     else:
         parser.print_help()
         sys.exit()
 
-    return
-
-
-if __name__ == "__main__":
-    main()
+    log.debug("done")
