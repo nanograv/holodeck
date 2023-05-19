@@ -667,6 +667,7 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None, recreate
     log.info(f"Path sims = {path_sims}")
 
     # ---- see if a combined library already exists
+
     out_filename = path_output.joinpath('sam_lib.hdf5')
     if out_filename.exists():
         lvl = log.INFO if recreate else log.WARNING
@@ -675,7 +676,7 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None, recreate
             return
 
         log.log(lvl, "re-combining data into new file")
-    
+
     # ---- load parameter space from save file
 
     if path_pspace is None:
@@ -855,7 +856,7 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
     return gwb, hc_ss, hc_bg, sspar, bgpar, bad_files
 
 
-def fit_library_spectra(library_path, log):
+def fit_library_spectra(library_path, log, recreate=False):
     """
     """
 
@@ -872,6 +873,18 @@ def fit_library_spectra(library_path, log):
         raise FileNotFoundError(err)
 
     log.debug(f"library path = {library_path}")
+
+    # ---- check for existing fits file
+
+    fits_path = library_path.with_stem(library_path.stem + "_fits")
+    fits_path = fits_path.with_suffix('.npz')
+    if fits_path.exists():
+        lvl = log.INFO if recreate else log.WARNING
+        log.log(lvl, f"library fits already exists: {fits_path}")
+        if not recreate:
+            return
+
+        log.log(lvl, "re-fitting data into new file")
 
     # ---- load library GWB and convert to PSD
 
@@ -896,8 +909,6 @@ def fit_library_spectra(library_path, log):
 
     # ---- Save to output
 
-    fits_path = library_path.with_stem(library_path.stem + "_fits")
-    fits_path = fits_path.with_suffix('.npz')
     np.savez(fits_path, fobs=fobs, psd=psd, nbins_plaw=nbins_plaw, fits_plaw=fits_plaw, nbins_turn=nbins_turn)
     log.warning(f"Saved fits to {fits_path} size: {utils.get_file_size(fits_path)}")
 
@@ -1335,6 +1346,10 @@ if __name__ == "__main__":
         'path', default=None,
         help='library directory to run fits on; must contain the `sam_lib.hdf5` file'
     )
+    fit.add_argument(
+        '--recreate', '-r', action='store_true', default=False,
+        help='recreate/replace existing fits file with a new one.'
+    )
 
     # ---- Run sub-command
 
@@ -1344,7 +1359,7 @@ if __name__ == "__main__":
     if args.subcommand == 'combine':
         sam_lib_combine(args.path, log, path_sims=Path(args.path).joinpath('sims'), recreate=args.recreate)
     if args.subcommand == 'fit':
-        fit_library_spectra(args.path, log)
+        fit_library_spectra(args.path, log, recreate=args.recreate)
     else:
         parser.print_help()
         sys.exit()
