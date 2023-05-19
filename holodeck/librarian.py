@@ -511,7 +511,7 @@ def load_pspace_from_dir(log, path, space_class=None):
     return space, space_fname
 
 
-def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
+def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None, recreate=False):
     """
 
     Arguments
@@ -544,6 +544,16 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
     path_sims = Path(path_sims)
     log.info(f"Path sims = {path_sims}")
 
+    # ---- see if a combined library already exists
+    out_filename = path_output.joinpath('sam_lib.hdf5')
+    if out_filename.exists():
+        lvl = log.INFO if recreate else log.WARNING
+        log.log(lvl, f"combined library already exists: {out_filename}")
+        if not recreate:
+            return
+
+        log.log(lvl, "re-combining data into new file")
+    
     # ---- load parameter space from save file
 
     if path_pspace is None:
@@ -596,7 +606,6 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None):
 
     # ---- Save to concatenated output file ----
 
-    out_filename = path_output.joinpath('sam_lib.hdf5')
     log.info(f"Writing collected data to file {out_filename}")
     with h5py.File(out_filename, 'w') as h5:
         h5.create_dataset('fobs', data=fobs)
@@ -1292,13 +1301,16 @@ def main():
         'path', default=None,
         help='library directory to run combination on; must contain the `sims` subdirectory'
     )
-    combine.add_argument('--debug', '-d', action='store_true', default=False)
+    combine.add_argument(
+        '--recreate', '-r', action='store_true', default=False,
+        help='recreate/replace existing combined library file with a new merge.'
+    )
 
     args = parser.parse_args()
     log.debug(f"{args=}")
 
     if args.subcommand == 'combine':
-        sam_lib_combine(args.path, log, path_sims=Path(args.path).joinpath('sims'))
+        sam_lib_combine(args.path, log, path_sims=Path(args.path).joinpath('sims'), recreate=args.recreate)
     else:
         parser.print_help()
         sys.exit()
