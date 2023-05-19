@@ -54,6 +54,7 @@ import holodeck as holo
 from holodeck import cosmo, utils   # , log
 from holodeck.constants import GYR, SPLC, MSOL, MPC, YR, PC
 from holodeck import relations, gravwaves, single_sources
+import holodeck.sam_cython
 
 REDZ_SAMPLE_VOLUME = True    #: get redshifts by sampling uniformly in 3D spatial volume, and converting
 
