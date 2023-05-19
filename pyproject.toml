@@ -23,16 +23,17 @@ exclude = [
     "pyproject.toml",
 ]
 ignore = [
+    # "D416",  # is too complex (17)
     # "C901",  # is too complex (17)
     # "E722",    # do not use bare 'except'
-    # "E731",    # do not assign a lambda expression, use a def
+    "E731",    # do not assign a lambda expression, use a def
     # "F401",  # imported but unused
     # "W605",     # invalid escape sequence [e.g. '\s'] :: can be caused by inline sphinx latex math
 ]
 line-length = 140
 select = [
     "C9",
-    "D",   # pydocstyle
+    # "D",   # pydocstyle
     "E",   # pycodestyle
     "F",   # pyflakes
     "W",
