@@ -9,8 +9,8 @@ print('Hdf file:', hdf_name)
 
 # settings to change, manually calibrated
 DS_NUM = '01'
-NPSRS = 60
-SIGMA = 1.24e-8 
+NPSRS = 67
+SIGMA = 2.85e-6 
 
 NSKIES = 25
 THRESH = 0.5
@@ -24,6 +24,8 @@ def main():
 
     vals = ds.detect_lib(hdf_name, output_dir, NPSRS, SIGMA, 
                         nskies=NSKIES, thresh=THRESH, plot=PLOT, debug=DEBUG)
+    
+    print('Detstats complete!')
     
 if __name__ == "__main__":
     main()
