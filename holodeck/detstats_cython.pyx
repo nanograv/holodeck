@@ -82,6 +82,6 @@ cdef int _gamma_of_rho_interp(
             ii += 1
         
         # interpolate
-        gamma[rsort[ii]] = interp_at_index(ii, rho[rsort[ii], rho_interp_grid, gamma_interp_grid])
+        gamma[rsort[ii]] = interp_at_index(ii, rho[rr], rho_interp_grid, gamma_interp_grid)
 
     return 0

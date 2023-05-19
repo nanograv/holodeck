@@ -1165,6 +1165,36 @@ def _gamma_ssi(Fe_bar, rho, print_nans=False, max_peak = False):
     return gamma_ssi
 
 
+def _gamma_ssi_cython(Fe_bar, rho, print_nans=False, max_peak = False):
+    """ Calculate the detection probability for each single source in each realization.
+    
+    Parameters
+    ----------
+    rho : (F,R,S,L) NDarray
+        Given by the total PTA signal to noise ratio, S/N_S, for each single source
+    Fe_bar : scalar
+        The threshold F_e statistic
+
+    Returns
+    -------
+    gamma_ssi : (F,R,S,L) NDarray
+        The detection probability for each single source, i, at each frequency and realization.
+
+    TODO: this
+    """
+    gamma_ssi = np.zeros((rho.shape))
+
+    # sort rho's
+
+    # if interpolation grid for Num = nfreqs*nlouds does not exist, built it
+
+    # pass sorted rhos and interp grid to cython, returns sorted DPs
+    
+    # unsort DPs 
+
+    return gamma_ssi
+
+
 def _ss_detection_probability(gamma_ss_i):
     """ Calculate the probability of detecting any single source, given individual single 
     source detection probabilities.
