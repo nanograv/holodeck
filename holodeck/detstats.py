@@ -1228,13 +1228,21 @@ def _gamma_ssi_cython(rho, grid_path = '/Users/emigardiner/GWs/holodeck/output/r
     grid_file.close()
 
     gamma_ssi = np.zeros_like(rho)
-    for ff in range(len(rho)):
-        for rr in range(len(rho[0])):
-            # interpolate for gamma in cython
-            rho_flat = rho[ff,rr].flatten()
-            rsort = np.argsort(rho_flat)
-            gamma_flat = sam_cython.gamma_of_rho_interp(rho_flat, rsort, rho_interp_grid, gamma_interp_grid)
-            gamma_ssi[ff,rr] = gamma_flat.reshape(rho[ff,rr].shape)
+    # for ff in range(len(rho)):
+    #     for rr in range(len(rho[0])):
+    #         # interpolate for gamma in cython
+    #         rho_flat = rho[ff,rr].flatten()
+    #         rsort = np.argsort(rho_flat)
+    #         gamma_flat = sam_cython.gamma_of_rho_interp(rho_flat, rsort, rho_interp_grid, gamma_interp_grid)
+    #         gamma_ssi[ff,rr] = gamma_flat.reshape(rho[ff,rr].shape)
+
+    for rr in range(len(rho[0])):
+        # interpolate for gamma in cython
+        rho_flat = rho[:,rr].flatten()
+        rsort = np.argsort(rho_flat)
+        gamma_flat = sam_cython.gamma_of_rho_interp(rho_flat, rsort, rho_interp_grid, gamma_interp_grid)
+        gamma_ssi[:,rr] = gamma_flat.reshape(rho[:,rr].shape)
+
 
     return gamma_ssi
 
