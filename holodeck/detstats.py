@@ -1510,144 +1510,6 @@ def _build_skies(nfreqs, nskies, nloudest):
     return theta_ss, phi_ss, Phi0_ss, iota_ss, psi_ss
 
 
-def plot_sample_nn(fobs, hc_ss, hc_bg, dp_ss, dp_bg, df_ss, df_bg, nn):
-    """ Plot strain and detection probability for a single sample.
-    """
-    shape = hc_ss.shape
-    F, R, L = shape[0], shape[1], shape[2]
-    S = dp_ss.shape[-1]
-    fig, axs = plt.subplots(1, 2,figsize=(12,4))
-
-    # Strains
-    plot.draw_ss_and_gwb(axs[0], fobs*YR, hc_ss, hc_bg)
-    axs[0].set_xlabel(plot.LABEL_GW_FREQUENCY_YR)
-    axs[0].set_ylabel(plot.LABEL_CHARACTERISTIC_STRAIN)
-    axs[0].set_title('Sample nn=%d (F=%d, R=%d, L=%d)' % (nn, F, R, L))
-    axs[0].set_xscale('log')
-    axs[0].set_yscale('log')
-
-    for ss in range(S):
-        axs[1].scatter(np.arange(R), dp_ss[:,ss], alpha=0.25)
-    axs[1].scatter(np.arange(R), dp_bg, color='k', 
-                   label='BG, DF = %.2e' % df_bg,
-                   marker='d')
-    axs[1].errorbar(np.arange(R), np.mean(dp_ss[:,:], axis=1),
-                     yerr = np.std(dp_ss[:,:], axis=1), color='orangered',
-                      label = 'SS, sky-avg, DF = %.2e' % df_ss, linestyle='', capsize=3,
-                       marker='o' )
-    axs[1].set_xlabel('Realization (R)')
-    axs[1].set_ylabel('SS DetProb')
-    # axs[1].set_title('BG DF = ' %nn)
-    fig.legend()
-    fig.tight_layout()
-    
-    return fig
-
-def plot_detprob(dp_ss_all, dp_bg_all, nsamp):
-    """ Plot detection probability for many samples.
-
-    Paramaters
-    ----------
-    dp_ss_all : (N,R) NDarray
-    dp_bg_all : (N,R,S) NDarray
-    """
-    fig, ax = plt.subplots(figsize=(6.5,4))
-    ax.set_xlabel('Param Space Sample')
-    ax.set_ylabel('Detection Probability, $\gamma$')
-    ax.errorbar(np.arange(nsamp), np.mean(dp_bg_all, axis=1), 
-                yerr = np.std(dp_bg_all, axis=1), linestyle='', 
-                marker='d', capsize=5, color='cornflowerblue', alpha=0.75,
-                label = r'$\langle \gamma_\mathrm{BG} \rangle$')
-    ax.errorbar(np.arange(nsamp), np.mean(dp_ss_all, axis=(1,2)),
-                yerr = np.std(dp_ss_all, axis=(1,2)), linestyle='', 
-                marker='o', capsize=5, color='orangered', alpha=0.75,
-                label = r'$\langle \gamma_\mathrm{SS} \rangle$')
-    ax.set_yscale('log')
-    ax.set_title('Average DP across Realizations')
-
-    ax.legend()
-    fig.tight_layout()
-
-    return fig
-
-
-def plot_detfrac(df_ss, df_bg, nsamp, thresh):
-    fig, ax = plt.subplots(figsize=(6.5,4))
-    ax.plot(np.arange(nsamp), df_bg, color='cornflowerblue', label='BG',
-            marker='d')
-    ax.plot(np.arange(nsamp), df_ss, color='orangered', label='SS',
-            marker='o')
-    ax.set_xlabel('Param Space Sample')
-    ax.set_ylabel('Detection Fraction')
-    ax.set_title('Fraction of Realizations with DP > %0.2f' % thresh)
-    ax.legend()
-    fig.tight_layout()
-    return fig
-
-
-############################# Rank Samples ############################# 
-
-
-def amp_to_hc(amp_ref, fobs, dfobs):
-    """ Calculate characteristic strain from strain amplitude.
-    
-    """
-    hc = amp_ref*np.sqrt(fobs/dfobs)
-    return hc
-
-def rank_samples(hc_ss, hc_bg, fobs, dfobs=None, amp_ref=None, hc_ref=None, ret_all = False):
-    """ Sort samples by those with f=1/yr char strains closest to some reference value.
-    
-    Parameters
-    ----------
-    hc_ss : (N,F,R,L) NDarray
-        Characteristic strain of the loudest single sources.
-    hc_bg : (N,F,R) NDarray
-        Characteristic strain of the background.
-    fobs : (F,) 
-        Observed GW frequency
-    dfobs : (F,) or None
-        Observed GW frequency bin widths.
-        only needed if using amp_ref
-    amp_ref : scalar or None
-        Reference strain amplitude at f=1/yr
-    hc_ref : scalar or None
-        Reference characteristic strain at f=1/yr
-        Only one of hc_ref and amp_ref should be provided.
-
-
-    Returns
-    -------
-    nsort : (N,) 1Darray
-        Indices of the param space samples sorted by proximity to the reference 1yr amplitude.
-    
-    """
-    
-    # find frequency bin nearest to 1/10yr
-    fidx = (np.abs(fobs - 1/(10*YR))).argmin()
-
-    if (hc_ref is None):
-        # find reference (e.g. 12.5 yr) char strain
-        hc_ref = amp_to_hc(amp_ref, fobs[fidx], dfobs[fidx])
-        
-    # select 1/yr median strains of samples
-    hc_tt = np.sqrt(hc_bg[:,fidx,:]**2 + np.sum(hc_ss[:,fidx,:,:]**2, axis=-1)) # (N,R)
-    hc_tt = np.median(hc_tt, axis=1) 
-
-    # extrapolate hc_ref at freq closest to 1/10yr from 1/10yr ref
-    hc_ref = hc_ref * (fobs[fidx]*YR/.1)**(-2/3)
-
-    # sort by closest
-    nsort = np.argsort(np.abs(hc_tt-hc_ref))
-
-    if ret_all:
-        return nsort, fidx, hc_tt, hc_ref
-    return nsort
-
-############################ Calibrate PTA ############################# 
-
-
-
 ############################# Plot Library ############################# 
 
 def plot_sample_nn(fobs, hc_ss, hc_bg, dp_ss, dp_bg, df_ss, df_bg, nn):
@@ -1705,21 +1567,19 @@ def plot_sample_nn(fobs, hc_ss, hc_bg, dp_ss, dp_bg, df_ss, df_bg, nn):
     
     return fig
 
-def plot_detprob(dp_ss_all, dp_bg_all):
+def plot_detprob(dp_ss_all, dp_bg_all, nsamp):
     """ Plot detection probability for many samples.
 
     Paramaters
     ----------
     dp_ss_all : (N,R, S) NDarray
         Single source detection probably of each strain and sky realization of each sample.
-    dp_bg_all : (N,R,S) NDarray
+    dp_bg_all : (N,R) NDarray
         Background detection probability of each strain realization of each sample.
-
 
     Returns
     -------
     fig : figure object
-
 
     """
     fig, ax = plt.subplots(figsize=(6.5,4))
@@ -1740,3 +1600,95 @@ def plot_detprob(dp_ss_all, dp_bg_all):
     fig.tight_layout()
 
     return fig
+
+
+def plot_detfrac(df_ss, df_bg, nsamp, thresh):
+    """ Plot detection fraction for many samples.
+
+    Paramaters
+    ----------
+    df_all : (N,) NDarray
+        Fraction of strain and sky realization with a 'dp_ss'>'thresh'.
+    df_bg : (N,) NDarray
+        Fraction of strain realization with a 'dp_bg'>'thresh'.
+
+
+    Returns
+    -------
+    fig : figure object
+    """
+    fig, ax = plt.subplots(figsize=(6.5,4))
+    ax.plot(np.arange(nsamp), df_bg, color='cornflowerblue', label='BG',
+            marker='d')
+    ax.plot(np.arange(nsamp), df_ss, color='orangered', label='SS',
+            marker='o')
+    ax.set_xlabel('Param Space Sample')
+    ax.set_ylabel('Detection Fraction')
+    ax.set_title('Fraction of Realizations with DP > %0.2f' % thresh)
+    ax.legend()
+    fig.tight_layout()
+    return fig
+
+
+############################# Rank Samples ############################# 
+
+
+def amp_to_hc(amp_ref, fobs, dfobs):
+    """ Calculate characteristic strain from strain amplitude.
+    
+    """
+    hc = amp_ref*np.sqrt(fobs/dfobs)
+    return hc
+
+def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref=None, ret_all = False):
+    """ Sort samples by those with f=1/yr char strains closest to some reference value.
+    
+    Parameters
+    ----------
+    hc_ss : (N,F,R,L) NDarray
+        Characteristic strain of the loudest single sources.
+    hc_bg : (N,F,R) NDarray
+        Characteristic strain of the background.
+    fobs : (F,) 
+        Observed GW frequency
+    dfobs : (F,) or None
+        Observed GW frequency bin widths.
+        only needed if using amp_ref
+    amp_ref : scalar or None
+        Reference strain amplitude at f=0.1/yr
+    hc_ref : scalar or None
+        Reference characteristic strain at f=0.1/yr
+        Only one of hc_ref and amp_ref should be provided.
+
+
+    Returns
+    -------
+    nsort : (N,) 1Darray
+        Indices of the param space samples sorted by proximity to the reference 1yr amplitude.
+    
+    """
+    
+    # find frequency bin nearest to 1/10yr
+    if fidx is None:
+        fidx = (np.abs(fobs - 1/(10*YR))).argmin()
+
+    if (hc_ref is None):
+        # find reference (e.g. 12.5 yr) char strain
+        hc_ref = amp_to_hc(amp_ref, fobs[fidx], dfobs[fidx])
+        
+    # select 1/yr median strains of samples
+    hc_tt = np.sqrt(hc_bg[:,fidx,:]**2 + np.sum(hc_ss[:,fidx,:,:]**2, axis=-1)) # (N,R)
+    hc_tt = np.median(hc_tt, axis=1) 
+
+    # extrapolate hc_ref at freq closest to 1/10yr from 1/10yr ref
+    hc_ref = hc_ref * (fobs[fidx]*YR/.1)**(-2/3)
+
+    # sort by closest
+    nsort = np.argsort(np.abs(hc_tt-hc_ref))
+
+    if ret_all:
+        return nsort, fidx, hc_tt, hc_ref
+    return nsort
+
+############################ Calibrate PTA ############################# 
+
