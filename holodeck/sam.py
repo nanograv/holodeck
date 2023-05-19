@@ -762,7 +762,7 @@ class Semi_Analytic_Model:
         """Calculate GWB using new cython implementation, 10x faster!
         """
 
-        assert isinstance(hard, holo.hardening.Fixed_Time_2PL_SAM)
+        assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
 
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
 
