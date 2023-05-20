@@ -44,8 +44,8 @@ import holodeck.logger
 from holodeck import log as _log     #: import the default holodeck log just so that we can silence it
 from holodeck import utils
 # silence default holodeck log
-# _log.setLevel(_log.WARNING)
-_log.setLevel(_log.DEBUG)
+_log.setLevel(_log.WARNING)
+# _log.setLevel(_log.DEBUG)
 
 
 MAX_FAILURES = 5

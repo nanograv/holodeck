@@ -1309,7 +1309,7 @@ def _func_line(xx, amp, slope):
 
 
 def fit_powerlaw(xx, yy, init=[-15.0, -2.0/3.0]):
-    """
+    """Fit the given data with a power-law.
 
     Returns
     -------
@@ -1319,9 +1319,15 @@ def fit_powerlaw(xx, yy, init=[-15.0, -2.0/3.0]):
     """
 
     popt, pcov = sp.optimize.curve_fit(_func_line, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
-    log10_amp = popt[0]
-    gamma = popt[1]
-    return log10_amp, gamma
+    # log10_amp = popt[0]
+    # gamma = popt[1]
+
+    def fit_func(xx, log10_amp, gamma):
+        yy = _func_line(np.log10(xx), log10_amp, gamma)
+        yy = 10.0 ** yy
+        return yy
+
+    return popt, fit_func
 
 
 def _func_powerlaw_psd(freqs, fref, amp, index):
@@ -1340,7 +1346,13 @@ def fit_powerlaw_psd(xx, yy, fref, init=[-15.0, -13.0/3.0]):
         fit_func, xx, np.log10(yy),
         p0=init, maxfev=10000, full_output=False
     )
-    return popt
+
+    def fit_func(xx, log10_amp, index):
+        amp = 10.0 ** log10_amp
+        yy = _func_powerlaw_psd(xx, fref, amp, index)
+        return yy
+
+    return popt, fit_func
 
 
 def fit_powerlaw_fixed_index(xx, yy, index=-2.0/3.0, init=[-15.0]):
@@ -1358,6 +1370,7 @@ def fit_powerlaw_fixed_index(xx, yy, index=-2.0/3.0, init=[-15.0]):
     return log10_amp
 
 
+'''
 def _func_turnover_hc(freqs, fref, amp, gamma, fbreak, kappa):
     alpha = (3.0 + gamma) / 2.0
     bend = np.power(fbreak/freqs, kappa)
@@ -1381,6 +1394,7 @@ def fit_turnover_hc(xx, yy, init=[-16.0, -13/3, 0.3, 2.5]):
         p0=init, maxfev=10000, full_output=False
     )
     return popt
+'''
 
 
 def _func_turnover_psd(freqs, fref, amp, gamma, fbreak, kappa):
@@ -1412,7 +1426,13 @@ def fit_turnover_psd(xx, yy, fref, init=[-16, -13/3, 0.3/YR, 2.5]):
         fit_func, xx, np.log10(yy),
         p0=init, maxfev=10000, full_output=False
     )
-    return popt
+
+    def fit_func(xx, log10_amp, *args):
+        amp = 10.0 ** log10_amp
+        yy = _func_turnover_psd(xx, fref, amp, *args)
+        return yy
+
+    return popt, fit_func
 
 
 # =================================================================================================
@@ -2195,9 +2215,9 @@ def rho_to_char_strain(freqs, rho, tspan):
 
 
 def char_strain_to_strain_amp(hc, fc, df):
-    """ Calculate the strain amplitude of single sources given 
+    """ Calculate the strain amplitude of single sources given
     their characteristic strains.
-    
+
     Parameters
     ----------
     hc : (F,R,L) NDarray
