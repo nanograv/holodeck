@@ -729,7 +729,7 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
     sspar = np.zeros((nsamp, 3, nfreqs, nreals, nloudest))
     bgpar = np.zeros((nsamp, 3, nfreqs, nreals))
     gwb, hc_ss, hc_bg, sspar, bgpar, bad_files = _load_library_from_all_files(
-        path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
+        path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log, gwb_only,
     )
     log.info(f"Loaded data from all library files | {utils.stats(gwb)=}")
     param_samples[bad_files] = np.nan
@@ -818,7 +818,7 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
     return fobs, nreals, nloudest, has_gwb
 
 
-def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log):
+def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log, gwb_only):
     """Load data from all individual simulation files.
 
     Arguments
@@ -846,8 +846,9 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
             # set all parameters to NaN for failure files.  Note that this is distinct from gwb=0.0 which can be real.
             if gwb is not None:
                 gwb[pnum, :, :] = np.nan
-            hc_ss[pnum, :, :, :] = np.nan
-            hc_bg[pnum, :, :] = np.nan
+            if not gwb_only:
+                hc_ss[pnum, :, :, :] = np.nan
+                hc_bg[pnum, :, :] = np.nan
 
             bad_files[pnum] = True
             continue
@@ -855,10 +856,11 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
         # store the GWB from this file
         if gwb is not None:
             gwb[pnum, :, :] = temp['gwb'][...]
-        hc_ss[pnum, :, :, :] = temp['hc_ss'][...]
-        hc_bg[pnum, :, :] = temp['hc_bg'][...]
-        sspar[pnum, :, :, :, :] = temp['sspar'][...]
-        bgpar[pnum, :, :, :] = temp['bgpar'][...]
+        if not gwb_only:
+            hc_ss[pnum, :, :, :] = temp['hc_ss'][...]
+            hc_bg[pnum, :, :] = temp['hc_bg'][...]
+            sspar[pnum, :, :, :, :] = temp['sspar'][...]
+            bgpar[pnum, :, :, :] = temp['bgpar'][...]
 
     log.info(f"{utils.frac_str(bad_files)} files are failures")
 
