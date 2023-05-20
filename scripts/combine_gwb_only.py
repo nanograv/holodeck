@@ -19,10 +19,16 @@ if not path.is_dir():
 for lib in lib_names:
     lib_path = path.joinpath(lib)
     if not lib_path.is_dir():
-        raise FileNotFoundError(f"library path {lib_path} is not a directory!")
+        err = f"library path {lib_path} is not a directory!"
+        print(err)
+        # raise FileNotFoundError(err)
+        continue
     test = lib_path.joinpath("sims")
     if not test.is_dir():
-        raise FileNotFoundError(f"library path does not contain a `sims` director {test}!")
+        err = f"library path does not contain a `sims` director {test}!"
+        print(err)
+        # raise FileNotFoundError(err)
+        continue
 
     lib_path = holo.librarian.sam_lib_combine(lib_path, holo.log, gwb_only=True)
 
