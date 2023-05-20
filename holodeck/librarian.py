@@ -640,7 +640,7 @@ def run_sam_at_pspace_num(args, space, pnum):
     return rv
 
 
-def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None, recreate=False):
+def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None, recreate=False, gwb_only=False):
     """
 
     Arguments
@@ -658,7 +658,7 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None, recreate
 
     Returns
     -------
-    out_filename : Path,
+    lib_path : Path,
         Path to library output filename (typically ending with 'sam_lib.hdf5').
 
     """
@@ -675,10 +675,10 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None, recreate
 
     # ---- see if a combined library already exists
 
-    out_filename = path_output.joinpath('sam_lib.hdf5')
-    if out_filename.exists():
+    lib_path = get_sam_lib_fname(path_output, gwb_only)
+    if lib_path.exists():
         lvl = log.INFO if recreate else log.WARNING
-        log.log(lvl, f"combined library already exists: {out_filename}")
+        log.log(lvl, f"combined library already exists: {lib_path}")
         if not recreate:
             return
 
@@ -715,6 +715,11 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None, recreate
     nfreqs = fobs.size
     log.debug(f"{nfreqs=}, {nreals=}, {nloudest=}")
 
+    if not has_gwb and gwb_only:
+        err = f"Combining with {gwb_only=}, but received {has_gwb=} from `_check_files_and_load_shapes`!"
+        log.exception(err)
+        raise RuntimeError(err)
+
     if (fobs is None) or (nreals is None):
         err = f"After checking files, {fobs=} and {nreals=}!"
         log.exception(err)
@@ -735,21 +740,22 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None, recreate
 
     # ---- Save to concatenated output file ----
 
-    log.info(f"Writing collected data to file {out_filename}")
-    with h5py.File(out_filename, 'w') as h5:
+    log.info(f"Writing collected data to file {lib_path}")
+    with h5py.File(lib_path, 'w') as h5:
         h5.create_dataset('fobs', data=fobs)
+        h5.create_dataset('sample_params', data=param_samples)
         if gwb is not None:
             h5.create_dataset('gwb', data=gwb)
-        h5.create_dataset('hc_ss', data=hc_ss)
-        h5.create_dataset('hc_bg', data=hc_bg)
-        h5.create_dataset('sspar', data=sspar)
-        h5.create_dataset('bgpar', data=bgpar)
-        h5.create_dataset('sample_params', data=param_samples)
+        if not gwb_only:
+            h5.create_dataset('hc_ss', data=hc_ss)
+            h5.create_dataset('hc_bg', data=hc_bg)
+            h5.create_dataset('sspar', data=sspar)
+            h5.create_dataset('bgpar', data=bgpar)
         h5.attrs['param_names'] = np.array(param_names).astype('S')
 
-    log.warning(f"Saved to {out_filename}, size: {holo.utils.get_file_size(out_filename)}")
+    log.warning(f"Saved to {lib_path}, size: {holo.utils.get_file_size(lib_path)}")
 
-    return out_filename
+    return lib_path
 
 
 def _check_files_and_load_shapes(log, path_sims, nsamp):
@@ -869,7 +875,6 @@ def fit_library_spectra(library_path, log, recreate=False):
 
     # make sure MPI is working
     _check_mpi_comm(name="fit_library_spectra()")
-
 
     # ---- setup path
 
@@ -1298,6 +1303,14 @@ def _get_sim_fname_gwb_ss(path, pnum):
     return temp
 
 
+def get_sam_lib_fname(path, gwb_only):
+    fname = 'sam_lib'
+    if gwb_only:
+        fname += "_gwb-only"
+    lib_path = path.joinpath(fname).with_suffix(".hdf5")
+    return lib_path
+
+
 def get_fits_path(library_path):
     """Get the name of the spectral fits file, given a library file path.
     """
@@ -1510,6 +1523,10 @@ if __name__ == "__main__":
         '--recreate', '-r', action='store_true', default=False,
         help='recreate/replace existing combined library file with a new merge.'
     )
+    combine.add_argument(
+        '--gwb', action='store_true', default=False,
+        help='only merge the key GWB data (no single source, or binary parameter data).'
+    )
 
     # ---- fit
 
@@ -1537,13 +1554,15 @@ if __name__ == "__main__":
     path = Path(args.path)
 
     if args.subcommand == 'combine':
-        sam_lib_combine(path, log, path_sims=path.joinpath('sims'), recreate=args.recreate)
-    if args.subcommand == 'fit':
+        sam_lib_combine(path, log, path_sims=path.joinpath('sims'), recreate=args.recreate, gwb_only=args.gwb)
+
+    elif args.subcommand == 'fit':
         if args.all is not False:
             pattern = None if args.all is True else args.all
             fit_all_libraries_in_path(path, log, pattern, recreate=args.recreate)
         else:
             fit_library_spectra(path, log, recreate=args.recreate)
+
     else:
         parser.print_help()
         sys.exit()
