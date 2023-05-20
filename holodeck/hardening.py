@@ -49,6 +49,7 @@ import scipy.interpolate   # noqa
 import holodeck as holo
 from holodeck import utils, cosmo, log, _PATH_DATA
 from holodeck.constants import GYR, NWTG, PC, MSOL
+import holodeck.sam_cython
 
 #: number of influence radii to set minimum radius for dens calculation
 _MIN_DENS_RAD__INFL_RAD_MULT = 10.0
