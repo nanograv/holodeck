@@ -640,7 +640,7 @@ def run_sam_at_pspace_num(args, space, pnum):
     return rv
 
 
-def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None, recreate=False, gwb_only=False):
+def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only=False):
     """
 
     Arguments
@@ -667,11 +667,7 @@ def sam_lib_combine(path_output, log, path_sims=None, path_pspace=None, recreate
 
     path_output = Path(path_output)
     log.info(f"Path output = {path_output}")
-    # if dedicated simulation path is not given, assume same as general output path
-    if path_sims is None:
-        path_sims = path_output
-    path_sims = Path(path_sims)
-    log.info(f"Path sims = {path_sims}")
+    path_sims = path_output.joinpath('sims')
 
     # ---- see if a combined library already exists
 
@@ -884,7 +880,7 @@ def fit_library_spectra(library_path, log, recreate=False):
 
         library_path = Path(library_path)
         if library_path.is_dir():
-            library_path = library_path.joinpath("sam_lib.hdf5")
+            library_path = get_sam_lib_fname(library_path, gwb_only=False)
         if not library_path.exists() or not library_path.is_file():
             err = f"{library_path=} must point to an existing library file!"
             log.exception(err)
@@ -1554,7 +1550,7 @@ if __name__ == "__main__":
     path = Path(args.path)
 
     if args.subcommand == 'combine':
-        sam_lib_combine(path, log, path_sims=path.joinpath('sims'), recreate=args.recreate, gwb_only=args.gwb)
+        sam_lib_combine(path, log, recreate=args.recreate, gwb_only=args.gwb)
 
     elif args.subcommand == 'fit':
         if args.all is not False:
