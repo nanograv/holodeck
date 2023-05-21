@@ -383,7 +383,6 @@ class PS_Uniform_07A(PS_Generic_2):
         super().__init__(
             log, nsamples, sam_shape, seed,
             hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
-            hard_gamma_rot=PD_Uniform(-0.5, 0.5),
             gsmf_phi0=PD_Uniform(-3.5, -1.5),
             gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
             mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
