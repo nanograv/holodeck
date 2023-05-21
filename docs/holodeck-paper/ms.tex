@@ -9,27 +9,27 @@
 % =================================================================================================
 % ====   Header & Setup
 % =================================================================================================
+\documentclass[useAMS, usenatbib]{src/mnras}
 
-% general package imports and setup
+% % general package imports and setup
 \input{src/packages}
-% definitions of custom commands
+% % definitions of custom commands
 \input{src/commands}
-% journal abbreviations for bibliography
+% % journal abbreviations for bibliography
 \input{src/abbrevs}
 
 % =================================================================================================
 % ====    Front Matter
 % =================================================================================================
 
-\newtotcounter{citnum} % From the package documentation
-\def\oldbibitem{} \let\oldbibitem=\bibitem
-\def\bibitem{\stepcounter{citnum}\oldbibitem}
+% \newtotcounter{citnum} % From the package documentation
+% \def\oldbibitem{} \let\oldbibitem=\bibitem
+% \def\bibitem{\stepcounter{citnum}\oldbibitem}
 
-\newcommand{\orcidauthorA}{0000-0002-6625-6450} % For author A
+% \newcommand{\orcidauthorA}{0000-0002-6625-6450} % For author A
 
-\title[holodeck: MBH binary populations]{Enter the \texttt{holodeck}: massive black hole binary population synthesis for gravitational wave calculations}
+\title[holodeck: MBHB populations]{Enter the \texttt{holodeck}: massive black hole binary population synthesis}
 \author[NANOGrav]{the NANOGrav collaboration}
-
 
 
 \begin{document}
@@ -58,29 +58,36 @@
 \section{Introduction}
     \label{sec:intro}
 
-    Massive black holes (MBHs) are known to occupy the centers of most if not all massive galaxies \needcite{}.
-    Binaries of MBHs are believed to form following the merger of massive galaxies \needcite{}.  Such MBH Binaries (MBHBs) could then produce low-frequency gravitational waves (GWs) \needcite{LF-GWs}, in the nano-Hertz regime, that would soon be detectable by experiments called pulsar timing arrays (PTAs) \needcite{PTAs}.  In this paper, we introduce the MBHB population synthesis code called \holodeck{}.  The goal of this package is to provide a cohesive and comprehensive framework for:
+    % Massive black holes (MBHs) are known to occupy the centers of most if not all massive galaxies \needcite{}.
+    Binaries of MBHs form following the merger of massive galaxies \needcite{}.  These MBH Binaries (MBHBs) can then produce the loudest gravitational waves (GWs) in the Universe.  MBHBs with total masses $M \gtrsim 10^8 \,\msol$ are detectable by experiments called pulsar timing arrays (PTAs) \needcite{PTAs} in the nanohertz regime \needcite{}, while more modest systems with $M \lesssim 10^7 \, \msol$ will be detectable by LISA \needcite{LISA} at millihertz \needcite{}.  While accreting, MBHs are visible across the electromagnetic (EM) spectrum as active galactic nuclei (AGN) \needcite{}, suggesting that MBHBs could be promising multimessenger sources \needcite{}.  A large number of studies have modeled cosmological populations of MBHBs, and made predictions for their GW signatures and EM counterparts, however no comprehensive framework has been released.  In this paper, we introduce the MBHB population synthesis code \holodeck{}, developed within the astrophysics working group of the NANOGrav\footnote{North American nanohertz observatory for gravitational waves \citep{}: \url{https://www.nanograv.org}.}.  The goal of this package is to provide a cohesive and comprehensive framework for:
     \begin{enumerate}
         \item
-        modeling the physics of MBHB formation and evolution while accurately capturing the true uncertainties in this modeling;
+        modeling the physics of MBHB formation and evolution, with parameterizations for uncertain physical processes;
         \item
-        rapidly generating large simulated populations of MBHBs;
+        rapidly generating large simulated populations of MBHBs; and,
         \item
-        calculating the resulting GW signals from these populations.
+        calculating the resulting GW signals and EM signatures from these populations.
     \end{enumerate}
-    % (1) modeling the physics of MBHB formation and evolution while accurately capturing the true uncertainties in this modeling, (2) rapidly generating large simulated populations of MBHBs, and (3) calculating the resulting GW signals from these populations.
-
-    As in the case of high-frequency GWs detected by LIGO-Virgo \needcite{}, tremendous uncertainties exist in the physics of the formation and evolution of the binary sources.  For individual MBHs, there are numerous, well-known scaling relationships between their properties and those of their host galaxies \needcite{MBH-Host relations}, but numerous questions remain such as where or not the observed sample of MBHs (i.e.~quasars and active galactic nuclei, AGN) accurately reflect the full population \needcite{MBH bias}, and how reliably these relationships extend to different host galaxies and redshift ranges.
-
-    For binary MBHs in particular, a variety of physical processes are required for the two MBHs to find the center of the post-merger host galaxy and eventually become gravitationally bound \needcite{BBR1980}.  In particular, the two MBHs must interact with their host galaxy environments through dynamical friction, stellar scattering, accretion disk torques, and possibly three-body interactions with a third MBH component \needcite{}, before reaching small enough binary separations for GW emission to eventually dominate the final coalescence of the binary.  Besides GW emission, none of these processes can be modeled exactly, necessitating the usage of simplified prescriptions which each containing numerous parametric uncertainties.  The resolution of cosmological hydrodynamic simulations is far too coarse to resolve the MBH binary phase, with some simulations instantaneously merging nearby MBHs \needcite{illustris}, and others using sub-grid models to `resolve' down to the scale of $\sim kpc$ \needcite{Romulus/Tremmel, Ma+Hopkins}.
-
-    In addition to the theoretical uncertainties, there exists a substantial dearth of observational constraints.  A growing number of \textit{candidate} MBHB systems have been identified through varying electromagnetic (EM) indicators in AGN \needcite{}, but a substantial fraction may be false positives \needcite{}.  To date, no gravitationally bound MBH binary has yet to be confirmed, although examples exist of dual AGN at close projected separation \needcite{Rodriguez et al. 2007}, and single AGN showing time-variability highly suggestive of a binary companion \needcite{OJ~287}.
 
     GWs from MBHBs, particularly in the form of a stochastic gravitational wave background (GWB), have been forecast for decades.  Only recently have the sensitivities of PTA experiments begin to encroach on astrophysically plausible GWB amplitudes \needcite{PTA limits} \needcite{c.f.~Shannon et al.}.  Indeed, PTA upper-limits have already been used to place constraints on limited sub-spaces of MBHB parameters \needcite{11yr analysis, etc}.  In the 12.5yr dataset of the North-American nano-Hertz Observatory for Gravitational waves \needcite{NANOGrav}, a `common process' signal was identified that is consistent with a GWB but not yet statistically definitive.  Followup modelling suggests that the GW nature of the signal can be determined within the next few years \needcite{Pol}.  While the interpretation is currently entirely conjectural, the two currently measurable parameters of the common process, the GW-strain amplitude and strain spectral index, each challenge the standard expectations of theoretical models.  The \todo{possible} amplitude is larger than many models have predicted, and the spectral index significantly flatter than the canonical `-2/3' power-law \needcite{phinney} \needcite{c.f.~Sesana, Kocsis}.  Still, both of these parameters can easily be fit with current models, and indeed, studies have already performed MBHB model inference using the amplitude and spectral index of the candidate \todo{(what's the word besides `candidate'?)} signal \needcite{middleton}.
 
     Studies which have used PTA observations to constrain MBHB models have been focused on demonstrating the feasibility of performing such inference, and thus have relied on single classes of models (semi-analytic models, SAMs) that make significant simplifications of the physical processes, and only explore small sub-spaces of astrophysical parameters.  The \holodeck{} framework, presented here, is structured to more fully capture the astrophysical uncertainties underlying our understanding of MBHB formation and evolution.  \holodeck{} uses comprehensive and self-consistent models for binary evolution, in addition to allowing SAMs to be interchanged with populations derived from cosmological hydrodynamic simulations.  In this way, \holodeck{} is designed to capture both statistical and systematic uncertainties by allowing the marginalization over not only specific astrophysical parameters, but also entire modeling methodologies.
 
-    In this paper, we present the simulation methodologies and their implementations in \holodeck{}.  We also use the framework to explore in more detail the range of plausible GW-strain spectral indices that would be detectable by PTAs. \todo{expand this paragraph}.
+    Tremendous uncertainties exist across every stage of the formation and evolution MBHBs.  Even the formation process(es) of individual MBHs is almost entirely unconstrained \needcite{}.  The three leading seeding mechanisms---light seeds: the rapid growth of stellar mass black holes, heavy seeds: from the `direct collapse' of pristine gas clouds, or in between: the runaway mergers of stars or stellar remnants in dense clusters---all struggle to explain the high masses and high occurrence rates of quasars in the very early Universe \needcite{}.  LISA, scheduled to be launched in the mid 2030s, can directly detect MBHBs at their seeding mass and redshift \needcite{}.  Accurate models for LISA sources are required to translate GW detections (or the lack of detections) into meaningful astrophysical constraints.
+
+    PTA sources, the most massive MBHBs in the relatively local Universe, are not particularly sensitive to seeding model, as the early history of their formation is washed out \needcite{}.  For a given seeding model to be viable, it must be able to reproduce the properties of well characterized MBHs and AGN in the local Universe \needcite{}.  For nearby systems, numerous, well-known scaling relations connect the properties of MBHs to their host galaxies \needcite{MBH-Host relations}.  Even then, questions remain such as whether or not the observed sample of MBHs, i.e.~luminous ones, accurately reflect the full population \needcite{MBH bias}, and how reliably these relationships extend to different mass and redshift ranges, and differences in host galaxy type.
+
+    The properties and occurrence rates of MBH binaries are almost entirely unconstrained, as no confirmed examples of gravitationally bound MBHBs exist.  A large number of \textit{dual} systems, not dynamically interacting, have been identified---typically at kiloparsec separations \needcite{dual AGN}, but one example which may be within the sphere of influence \needcite{Rogriguez et al.}.  Additionally, many \textit{candidate} binaries have been suggested in the literature \needcite{Graham, Charisi}, however, numerous lines of reasoning suggest that many or most are likely false positives \needcite{Eracleous, Sesana, Kelley}.  Still, handful of compelling examples persist \needcite{OJ287, etc?  BoBCat?}.
+
+    Despite the lack of observational constraints, the evolution of MBHBs has been explored for decades.  Following galaxy merger, a variety of physical processes are required for the two MBHs to find the center of the post-merger host galaxy and eventually become gravitationally bound \needcite{BBR1980}.  In particular, the two MBHs must interact with their host galaxy environments through dynamical friction ($\sim\Kpc$) and stellar scattering ($\sim \pc$), and possibly a circumbinary accretion disk ($\lesssim \pc$), possibly triply interactions with a third MBH component ($\sim \pc$) \needcite{Loeb, Ryu, Bonetti}.  Only after these interactions can binaries reach the separations where GW emission will become important, and drive their final coalescence.  A lower-limit to binary lifetimes can be estimates by assuming that environmental processes are highly efficient at extracting energy and angular momentum from the two MBHs, in which case their separation could e-fold roughly every dynamical time, leading to total binary lifetimes of $\sim 100 \Myr$.
+
+    On the other extreme, there is no physical necessity for environmental interactions to be effective, and all binaries could stall.  The existence of stable satellite galaxies demonstrates that, at least for small mass-ratio galaxy mergers ($q \equiv m_2/m_1 \leq 1$), dynamical friction is not always effective.  The stellar scattering regime is typically believed to be the most challenging for inspiral.  In general, roughly a mass of stars equivalent to that of the secondary MBH must be scattered for each e-folding of binary separation.  Analytic estimates, using symmetric phase-space distributions of stars that are able to interact with the binary (the `loss cone'), typically find that inspiral would take longer than the Hubble time---the `final-parsec' problem \needcite{Merritt, Milosaljevic}.  More detailed calculations that account for the tumultuous nuclear environments of realistic galaxies, typically find that the loss-cone can be continually refilled and inspiral can be efficient \needcite{}.  Even with a full loss-cone, inspiral can take multiple billions of years, and large fractions of systems can still stall \needcite{Kelley2017}.
+
+    Torques from circumbinary accretion disks have been suggested to aid in the inspiral process at sub-parsec scales \needcite{Cuadra, Haiman, etc}.  Galaxy mergers are known to drive substantial volumes of gas to galactic nuclei \needcite{Hernquist, etc}, but whether this persists long enough for binaries to reach the parsec regime is unclear.  Nuclear bursts of star formation following galaxy mergers may even preferentially drive out the gas in galactic nuclei roughly coincident with when binaries form \needcite{may not be any}.  Even if high mass circumbinary disks form, recent results from idealized hydrodynamic simulations have shown that circumbinary disk toques can actually drive binaries towards out-spiral \needcite{Munoz}.  This is likely not a problem for PTA sources, higher mass MBHBs, both because of the regimes in which out-spiral is expected to dominate \needcite{outspiral population study}, and because high-mass elliptical galaxy mergers tend to be much drier.
+
+    The long inspiral times of MBHBs, particularly in systems which tend towards stalling, can easily become longer than the typical time between galaxy mergers.  This suggests that systems with three MBHs could become important \needcite{Loeb}.  Cosmological simulations have shown that such occurrences can indeed to be somewhat common \needcite{Kelley, Sayeb, Romulus, Astrid}, but they lack the resolution to explore triple interactions in detail.  Semi-analytic modeling has suggested that such triples could drive a substantial fraction of `stalled' systems to merger \needcite{Bonetti, Ryu}.  However, accurately modeling the triple dynamics at the same time as dissipative environmental interactions is very challenging.
+
+    Besides GW emission, none of these processes can be modeled exactly, necessitating the usage of simplified prescriptions which each containing numerous parametric uncertainties.  The resolution of cosmological hydrodynamic simulations is far too coarse to resolve the MBH binary phase, with some simulations instantaneously merging nearby MBHs \needcite{illustris}, and others using sub-grid models to `resolve' down to the scale of $\sim kpc$ \needcite{Romulus/Tremmel, Ma+Hopkins}.
 
 
 % =================================================================================================
