@@ -252,6 +252,7 @@ class _Param_Space(abc.ABC):
             ss = self._dists[ii](vv)    # convert to actual parameter values
             params[pname] = ss           # store to dictionary
 
+        kwargs.setdefault('sam_shape', self.sam_shape)
         return self.model_for_params(params, **kwargs)
 
     @classmethod
