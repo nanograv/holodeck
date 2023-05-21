@@ -25,6 +25,13 @@ def setup_argparse():
         help="The path to the ini configuration file.",
     )
 
+    parser.add_argument(
+        "-f",
+        "--freq-ind",
+        type=int,
+        help="The frequency index from the library to use for training."
+    )
+
     args = parser.parse_args()
 
     return args
@@ -94,5 +101,6 @@ if __name__ == "__main__":
     args = setup_argparse()
     config = configparser.ConfigParser()
     config.read(args.config_path)
+    config['Training Options']['nfreqs'] = str(args.freq_ind)
 
     main(config)
