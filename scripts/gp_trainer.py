@@ -81,8 +81,14 @@ def main(config):
     datestr = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     # Save the trained GP as a pickle to be used with PTA data!
-    gp_file = Path("trained_gp_" + spectra_file.parent.name + "_" + datestr +
-                   ".pkl")
+    # Add some extra info for specific frequency and what the GP was trained on
+    y_is_variance = train_opts.getboolean('train_on_variance', False)
+    if y_is_variance:
+        type_str = "std"
+    else:
+        type_str = "med"
+    gp_file = Path(f"trained_gp_{spectra_file.parent.name}_{type_str}_freq"\
+                   f"{train_opts.getint('nfreqs', None)}_{datestr}.pkl")
     loc_gp_file = spectra_file.parent / gp_file
 
     with open(loc_gp_file, "wb") as gpf:
