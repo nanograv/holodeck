@@ -307,7 +307,9 @@ def get_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     if VERBOSE:
         utils.my_print(f"setting aside {test_frac} of samples ({test_ind}) for testing, and choosing {nfreqs} frequencies")
 
-    gwb_spectra = gwb_spectra[test_ind:, :nfreqs, :]**2
+    # Changed the next line to only select one frequency. I'm reusing the `nfreqs`
+    # variable, but really it should be renamed something like `freq_ind`
+    gwb_spectra = gwb_spectra[test_ind:, nfreqs:nfreqs+1, :]**2
     xobs = xobs[test_ind:, :]
 
     # Find all the zeros and set them to be h_c = 1e-20
@@ -338,7 +340,7 @@ def get_gwb(spectra, nfreqs, test_frac=0.0, center_measure="median"):
     # The "y" data are the medians or means and errors for the spectra at each point in parameter space
     yobs = center.copy()  # mean.copy()
     yerr = err.copy()
-    gp_freqs = spectra["fobs"][:nfreqs].copy()
+    gp_freqs = spectra["fobs"][nfreqs:nfreqs+1].copy()
     gp_freqs *= YR
 
     # Find mean in each frequency bin (remove it before analyzing with the GP)
