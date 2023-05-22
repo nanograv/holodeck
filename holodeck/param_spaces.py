@@ -392,13 +392,14 @@ class PS_Uniform_07A(PS_Generic_2):
     @classmethod
     def model_for_params(cls, params, sam_shape=None, new_def_params={}):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
-        new_def_params = dict(
+        defs = dict(
             hard_gamma_inner=-1.0,
             hard_rchar=100.0,               # [pc]
             hard_gamma_outer=+1.5,
             hard_sepa_init=1e4,     # [pc]
         )
-        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
 
 
 class PS_Uniform_07A_Rot(PS_Generic_2):
@@ -438,13 +439,61 @@ class PS_Uniform_07A_Rot(PS_Generic_2):
     @classmethod
     def model_for_params(cls, params, sam_shape=None, new_def_params={}):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
-        new_def_params = dict(
+        defs = dict(
             hard_gamma_inner=-1.0,
             hard_rchar=100.0,               # [pc]
             hard_gamma_outer=+1.5,
             hard_sepa_init=1e4,     # [pc]
         )
-        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+class PS_Uniform_07A_Rot_2(PS_Generic_2):
+    """Change `hard_gamma_rot` relative to PS_Uniform_07A_Rot
+    """
+
+    # `DEFAULTS` must have a copy of all settings that are used, so make a copy and expand it
+    DEFAULTS = PS_Generic_2.DEFAULTS.copy()
+    DEFAULTS['hard_gamma_rot'] = 0.0
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+            hard_gamma_rot=PD_Uniform(0.0, 1.0),
+        )
+
+    @classmethod
+    def _init_hard(cls, sam, settings):
+        rotation = settings['hard_gamma_rot']
+        gamma_inner = settings['hard_gamma_inner'] + rotation
+        gamma_outer = settings['hard_gamma_outer'] + rotation
+        hard = holo.hardening.Fixed_Time_2PL_SAM(
+            sam,
+            settings['hard_time']*GYR,
+            sepa_init=settings['hard_sepa_init']*PC,
+            rchar=settings['hard_rchar']*PC,
+            gamma_inner=gamma_inner,
+            gamma_outer=gamma_outer,
+        )
+        return hard
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_inner=-1.0,
+            hard_rchar=100.0,               # [pc]
+            hard_gamma_outer=+1.5,
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
 
 
 class PS_Uniform_07A_Rot_Test(PS_Generic_2):
@@ -480,13 +529,57 @@ class PS_Uniform_07A_Rot_Test(PS_Generic_2):
     @classmethod
     def model_for_params(cls, params, sam_shape=None, new_def_params={}):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
-        new_def_params = dict(
+        defs = dict(
             hard_gamma_inner=-1.0,
             hard_rchar=100.0,               # [pc]
             hard_gamma_outer=+1.5,
             hard_sepa_init=1e4,     # [pc]
         )
-        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+class PS_Uniform_07A_Rot_Test_2(PS_Generic_2):
+    """Change `hard_gamma_rot` relative to PS_Uniform_07A_Rot_Test
+    """
+
+    # `DEFAULTS` must have a copy of all settings that are used, so make a copy and expand it
+    DEFAULTS = PS_Generic_2.DEFAULTS.copy()
+    DEFAULTS['hard_gamma_rot'] = 0.0
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            hard_gamma_rot=PD_Uniform(0.0, 1.0),
+        )
+
+    @classmethod
+    def _init_hard(cls, sam, settings):
+        rotation = settings['hard_gamma_rot']
+        gamma_inner = settings['hard_gamma_inner'] + rotation
+        gamma_outer = settings['hard_gamma_outer'] + rotation
+        hard = holo.hardening.Fixed_Time_2PL_SAM(
+            sam,
+            settings['hard_time']*GYR,
+            sepa_init=settings['hard_sepa_init']*PC,
+            rchar=settings['hard_rchar']*PC,
+            gamma_inner=gamma_inner,
+            gamma_outer=gamma_outer,
+        )
+        return hard
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_inner=-1.0,
+            hard_rchar=100.0,               # [pc]
+            hard_gamma_outer=+1.5,
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
 
 
 class PS_Uniform_07B(PS_Generic_2):
@@ -506,13 +599,14 @@ class PS_Uniform_07B(PS_Generic_2):
     @classmethod
     def model_for_params(cls, params, sam_shape=None, new_def_params={}):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
-        new_def_params = dict(
+        defs = dict(
             hard_gamma_inner=-1.0,
             hard_rchar=100.0,               # [pc]
             hard_gamma_outer=+2.5,
             hard_sepa_init=1e4,     # [pc]
         )
-        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
 
 
 class PS_Uniform_07C(PS_Generic_2):
@@ -532,13 +626,14 @@ class PS_Uniform_07C(PS_Generic_2):
     @classmethod
     def model_for_params(cls, params, sam_shape=None, new_def_params={}):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
-        new_def_params = dict(
+        defs = dict(
             hard_gamma_inner=-1.0,
             hard_rchar=30.0,               # [pc]
             hard_gamma_outer=+1.5,
             hard_sepa_init=3e3,     # [pc]
         )
-        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
 
 
 class PS_Uniform_07D(PS_Generic_2):
@@ -558,13 +653,14 @@ class PS_Uniform_07D(PS_Generic_2):
     @classmethod
     def model_for_params(cls, params, sam_shape=None, new_def_params={}):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
-        new_def_params = dict(
+        defs = dict(
             hard_gamma_inner=-1.0 - 0.5,
             hard_rchar=100.0,               # [pc]
             hard_gamma_outer=+1.5 - 0.5,
             hard_sepa_init=1e4,     # [pc]
         )
-        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
 
 
 
@@ -585,13 +681,14 @@ class PS_Uniform_07E(PS_Generic_2):
     @classmethod
     def model_for_params(cls, params, sam_shape=None, new_def_params={}):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
-        new_def_params = dict(
+        defs = dict(
             hard_gamma_inner=-1.0 + 0.5,
             hard_rchar=100.0,               # [pc]
             hard_gamma_outer=+1.5 + 0.5,
             hard_sepa_init=1e4,     # [pc]
         )
-        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
 
 
 
