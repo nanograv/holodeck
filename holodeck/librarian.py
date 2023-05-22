@@ -745,7 +745,7 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
     gwb, hc_ss, hc_bg, sspar, bgpar, bad_files = _load_library_from_all_files(
         path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log,
     )
-    log.info(f"Loaded data from all library files | {utils.stats(gwb)=}")
+    if has_gwb: log.info(f"Loaded data from all library files | {utils.stats(gwb)=}")
     param_samples[bad_files] = np.nan
 
     # ---- Save to concatenated output file ----
