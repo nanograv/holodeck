@@ -47,8 +47,8 @@ DEF_PTA_DUR = 16.03     # [yrs]
 FITS_NBINS_PLAW = [3, 4, 5, 10, 15]
 FITS_NBINS_TURN = [5, 10, 15]
 
+# FNAME_SIM_FILE = "lib-sams_gwb-ss__p{pnum:06d}.npz"
 FNAME_SIM_FILE = "sam-lib__p{pnum:06d}.npz"
-# FNAME_SS_FILE = "lib_ss__p{pnum:06d}.npz"
 PSPACE_FILE_SUFFIX = ".pspace.npz"
 
 
@@ -540,7 +540,6 @@ def run_sam_at_pspace_num(args, space, pnum):
     try:
         log.debug("Selecting `sam` and `hard` instances")
         sam, hard = space(pnum)
-        log.info(f"{hard._gamma_inner=} {hard._gamma_outer=}")
         _log_mem_usage(log)
 
         log.debug("Calculating 'edges' and 'number' for this SAM.")
@@ -860,7 +859,15 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
         Logging instance.
 
     """
-    nsamp = hc_bg.shape[0]
+    if hc_bg is not None:
+        nsamp = hc_bg.shape[0]
+    elif gwb is not None:
+        nsamp = gwb.shape[0]
+    else:
+        err = f"Unable to get shape from either `hc_bg` or `gwb`!"
+        log.exception(err)
+        raise RuntimeError(err)
+    
     log.info(f"Collecting data from {nsamp} files")
     bad_files = np.zeros(nsamp, dtype=bool)     #: track which files contain UN-useable data
     msg = None
@@ -885,15 +892,14 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
         # store the GWB from this file
         if gwb is not None:
             gwb[pnum, :, :] = temp['gwb'][...]
-        if (not gwb_only):
-            # `hc_ss` will be set to None if `gwb_only==True`
-            if (hc_ss is not None):
-                hc_ss[pnum, :, :, :] = temp['hc_ss'][...]
-                hc_bg[pnum, :, :] = temp['hc_bg'][...]
-            # `hc_ss` will be set to None if `gwb_only==True`
-            if bgpar is not None:
-                sspar[pnum, :, :, :, :] = temp['sspar'][...]
-                bgpar[pnum, :, :, :] = temp['bgpar'][...]
+        # `hc_ss` will be set to None if `gwb_only==True`
+        if (hc_ss is not None):
+            hc_ss[pnum, :, :, :] = temp['hc_ss'][...]
+            hc_bg[pnum, :, :] = temp['hc_bg'][...]
+        # `hc_ss` will be set to None if `gwb_only==True`
+        if bgpar is not None:
+            sspar[pnum, :, :, :, :] = temp['sspar'][...]
+            bgpar[pnum, :, :, :] = temp['bgpar'][...]
 
     log.info(f"{utils.frac_str(bad_files)} files are failures")
 
@@ -1458,8 +1464,8 @@ def _setup_argparse(comm, *args, **kwargs):
                         help='resume production of a library by loading previous parameter-space from output directory')
     parser.add_argument('--recreate', action='store_true', default=False,
                         help='recreating existing simulation files')
-    # parser.add_argument('--plot', action='store_true', default=False,
-    #                     help='produce plots for each simulation configuration')
+    parser.add_argument('--plot', action='store_true', default=False,
+                        help='produce plots for each simulation configuration')
     parser.add_argument('--seed', action='store', type=int, default=None,
                         help='Random seed to use')
 
@@ -1473,11 +1479,11 @@ def _setup_argparse(comm, *args, **kwargs):
         output = Path('.').resolve() / output
         output = output.resolve()
 
-    if not args.gwb and not args.ss:
+    if not args.gwb_flag and not args.ss_flag:
         raise RuntimeError("Either `--gwb` or `--ss` is required!")
 
-    if args.pars and not args.ss:
-        raise RuntimeError("`--pars` requires the `--ss` option!")
+    if args.params_flag and not args.ss_flag:
+        raise RuntimeError("`--params` requires the `--ss` option!")
 
     if args.resume:
         if not output.exists() or not output.is_dir():
