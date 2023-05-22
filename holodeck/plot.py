@@ -974,7 +974,6 @@ class Corner:
         limits = [None] * size      # variable to store the data extrema
         for jj, ax in enumerate(axes.diagonal()):
             rot = (rotate and (jj == last))
-            print(f"{jj}, {list(dist1d.keys())=}")
             self.dist1d(
                 ax, edges[jj], data[jj], weights=weights, quantiles=quantiles, rotate=rot,
                 color=color, **dist1d
@@ -1144,8 +1143,6 @@ class Corner:
             _ee, _hh, handle = kale.plot.draw_hist2d(
                 ax, edges, hh, mask_below=mask_below, cmap=cmap, zorder=10, shading='auto',
             )
-
-        print(f"{levels=}")
 
         # ---- Draw Contours
         if contour:
