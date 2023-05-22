@@ -16,9 +16,25 @@ import holodeck as holo
 from holodeck import cosmo, utils, observations, log
 from holodeck.constants import MSOL, PC, YR
 
-LABEL_GW_FREQUENCY_YR = "GW Frequency $[\mathrm{yr}^{-1}]$"
-LABEL_GW_FREQUENCY_HZ = "GW Frequency $[\mathrm{Hz}]$"
-LABEL_GW_FREQUENCY_NHZ = "GW Frequency $[\mathrm{nHz}]$"
+FIGSIZE = 6
+FONTSIZE = 13
+GOLDEN_RATIO = (np.sqrt(5) - 1) / 2
+
+mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
+plt.rcParams['axes.grid'] = True
+plt.rcParams['grid.alpha'] = 0.25
+plt.rcParams["mathtext.fontset"] = "cm"
+plt.rcParams["font.family"] = "serif"
+plt.rcParams["font.size"] = FONTSIZE
+plt.rcParams["legend.fontsize"] = FONTSIZE*0.8
+plt.rcParams["legend.handlelength"] = 1.5
+plt.rcParams["lines.solid_capstyle"] = 'round'
+mpl.rcParams['xtick.labelsize'] = FONTSIZE*0.8
+mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
+
+LABEL_GW_FREQUENCY_YR = r"GW Frequency $[\mathrm{yr}^{-1}]$"
+LABEL_GW_FREQUENCY_HZ = r"GW Frequency $[\mathrm{Hz}]$"
+LABEL_GW_FREQUENCY_NHZ = r"GW Frequency $[\mathrm{nHz}]$"
 LABEL_CHARACTERISTIC_STRAIN = "GW Characteristic Strain"
 
 
@@ -62,6 +78,28 @@ class MidpointLogNormalize(mpl.colors.LogNorm):
         vals = utils.interp(value, x, y, xlog=False, ylog=True)
         # return np.ma.masked_array(vals, np.isnan(value))
         return vals
+
+
+def figax_single(**kwargs):
+    figsize_single = [FIGSIZE, FIGSIZE * GOLDEN_RATIO]
+    adjust_single = dict(left=0.12, bottom=0.15, right=0.95, top=0.95)
+
+    kwargs.setdefault('figsize', figsize_single)
+    for kk, vv in adjust_single.items():
+        kwargs.setdefault(kk, vv)
+
+    return figax(**kwargs)
+
+
+def figax_double(**kwargs):
+    figsize_double = [2*FIGSIZE, 2*FIGSIZE*GOLDEN_RATIO]
+    adjust_double = dict(left=0.08, bottom=0.10, right=0.98, top=0.95)
+
+    kwargs.setdefault('figsize', figsize_double)
+    for kk, vv in adjust_double.items():
+        kwargs.setdefault(kk, vv)
+
+    return figax(**kwargs)
 
 
 def figax(figsize=[7, 5], ncols=1, nrows=1, sharex=False, sharey=False, squeeze=True,
@@ -750,8 +788,13 @@ def violin(ax, xx, yy, zz, width, side='both', clip_pdf=None,
 
     zz = zz / zz.max()
 
+    if median is True:
+        median = {}
+    if median is False:
+        median = None
+
     if median is not None:
-        med = np.interp([0.5], cdf, yy)
+        med = np.interp([0.5], cdf/cdf.max(), yy)
 
     if clip_pdf is not None:
         idx = zz > clip_pdf
@@ -895,7 +938,7 @@ class Corner:
 
         return
 
-    def plot(self, data, edges=None, weights=None, quantiles=None,
+    def plot(self, data, edges=None, weights=None, quantiles=None, sigmas=None,
              color=None, cmap=None, limit=None, dist1d={}, dist2d={}):
 
         if limit is None:
@@ -921,7 +964,7 @@ class Corner:
         color, cmap = kale.plot._parse_color_cmap(ax=axes[0][0], color=color, cmap=cmap)
 
         edges = kale.utils.parse_edges(data, edges=edges)
-        quantiles, _ = kale.plot._default_quantiles(quantiles=quantiles)
+        quantiles, _ = kale.plot._default_quantiles(quantiles=quantiles, sigmas=sigmas)
 
         #
         # Draw / Plot Data
@@ -941,7 +984,7 @@ class Corner:
         for (ii, jj), ax in np.ndenumerate(axes):
             if jj >= ii:
                 continue
-            self.dist2d(
+            handle = self.dist2d(
                 ax, [edges[jj], edges[ii]], [data[jj], data[ii]], weights=weights,
                 color=color, cmap=cmap, quantiles=quantiles, **dist2d
             )
@@ -955,7 +998,7 @@ class Corner:
             # Set axes to limits
             kale.plot._set_corner_axes_extrema(self.axes, self._limits, self._rotate)
 
-        return
+        return handle
 
     def dist1d(self, ax, edge, data, color=None, **kwargs):
         """Wrapper for `kalepy.plot.dist1d` that sets default parameters appropriate for 1D data.
@@ -1024,6 +1067,8 @@ class Corner:
                 ax, edges, hh, mask_below=mask_below, cmap=cmap, zorder=10, shading='auto',
             )
 
+        print(f"{levels=}")
+
         # ---- Draw Contours
         if contour:
             contour_cmap = cmap.reversed()
@@ -1038,13 +1083,13 @@ class Corner:
                 ax, cents, hh_prep, levels=levels, cmap=contour_cmap, zorder=20, outline=outline,
             )
 
-            if handle is None:
-                hi = 1 if len(_handle.collections) > 0 else 0
-                handle = _handle.collections[hi]
-                # for some reason the above handle is not showing up on legends... create a dummy line
-                # to get a better handle
-                col = handle.get_edgecolor()
-                handle, = ax.plot([], [], color=col)
+            # hi = 1 if len(_handle.collections) > 0 else 0
+            hi = -1
+            handle = _handle.collections[hi]
+            # for some reason the above handle is not showing up on legends... create a dummy line
+            # to get a better handle
+            col = handle.get_edgecolor()
+            handle, = ax.plot([], [], color=col)
 
         # Mask dense scatter-points
         if mask_dense:
