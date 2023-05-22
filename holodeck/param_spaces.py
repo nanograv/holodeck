@@ -52,7 +52,7 @@ class PS_Generic_1(_Param_Space):
     #         hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
     #         gsmf_phi0=PD_Uniform(-3.5, -1.5),
     #         gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
-    #         mmb_amp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
+    #         mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
     #         mmb_scatter=PD_Uniform(+0.0, +1.2),
     #     )
 
@@ -881,9 +881,9 @@ class PS_New_Astro_02A(PS_Generic_2):
             gmt_norm=PD_Uniform(0.2, 5.0),    # [Gyr]
             gmt_zbeta=PD_Uniform(-2.0, +0.0),
 
-            mmb_amp_log10=PD_Normal(+8.6, 0.2),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Normal(+8.6, 0.2),   # [log10(Msol)]
             mmb_plaw=PD_Normal(+1.2, 0.2),
-            mmb_scatter=PD_Normal(+0.32, 0.15),
+            mmb_scatter_dex=PD_Normal(+0.32, 0.15),
 
             # hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
             # gsmf_phi0=PD_Uniform(-3.5, -1.5),
@@ -926,9 +926,9 @@ class PS_New_Astro_02B(PS_Generic_2):
             gmt_norm=PD_Uniform(0.2, 5.0),    # [Gyr]
             gmt_zbeta=PD_Uniform(-2.0, +0.0),
 
-            mmb_amp_log10=PD_Normal(+8.6, 0.2),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Normal(+8.6, 0.2),   # [log10(Msol)]
             mmb_plaw=PD_Normal(+1.2, 0.2),
-            mmb_scatter=PD_Normal(+0.32, 0.15),
+            mmb_scatter_dex=PD_Normal(+0.32, 0.15),
 
             # hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
             # gsmf_phi0=PD_Uniform(-3.5, -1.5),
@@ -968,9 +968,9 @@ class PS_New_Astro_02_GW(PS_Generic_2):
             gmt_norm=PD_Uniform(0.2, 5.0),    # [Gyr]
             gmt_zbeta=PD_Uniform(-2.0, +0.0),
 
-            mmb_amp_log10=PD_Normal(+8.6, 0.2),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Normal(+8.6, 0.2),   # [log10(Msol)]
             mmb_plaw=PD_Normal(+1.2, 0.2),
-            mmb_scatter=PD_Normal(+0.32, 0.15),
+            mmb_scatter_dex=PD_Normal(+0.32, 0.15),
 
             # hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
             # gsmf_phi0=PD_Uniform(-3.5, -1.5),
