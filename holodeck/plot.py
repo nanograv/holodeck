@@ -974,6 +974,7 @@ class Corner:
         limits = [None] * size      # variable to store the data extrema
         for jj, ax in enumerate(axes.diagonal()):
             rot = (rotate and (jj == last))
+            print(f"{jj}, {list(dist1d.keys())=}")
             self.dist1d(
                 ax, edges[jj], data[jj], weights=weights, quantiles=quantiles, rotate=rot,
                 color=color, **dist1d
@@ -1000,17 +1001,94 @@ class Corner:
 
         return handle
 
-    def dist1d(self, ax, edge, data, color=None, **kwargs):
-        """Wrapper for `kalepy.plot.dist1d` that sets default parameters appropriate for 1D data.
-        """
-        # Set default parameters
-        kwargs.setdefault('density', False)
-        kwargs.setdefault('confidence', False)
-        kwargs.setdefault('carpet', True)
-        kwargs.setdefault('hist', True)
-        # This is identical to `kalepy.plot.dist1d` (just used for naming convenience)
-        rv = kale.plot.dist1d(data, ax=ax, edges=edge, color=color, **kwargs)
-        return rv
+    def dist1d(self, ax, edges, data, color=None, weights=None, probability=True, param=0, rotate=False,
+               density=None, confidence=False, hist=None, carpet=True, quantiles=None,
+               ls=None, alpha=None, **kwargs):
+
+        kde = None
+
+        if np.ndim(data) > 1:
+            err = "Input `data` ({}) is not 1D, please flatten array!".format(np.shape(data))
+            raise ValueError(err)
+
+        if ax is None:
+            ax = plt.gca()
+
+        # Use `scatter` as the limiting-number of scatter-points
+        #    To disable scatter, `scatter` will be set to `None`
+        carpet = kale.plot._scatter_limit(carpet, "carpet")
+
+        # set default color to next from axes' color-cycle
+        if color is None:
+            color = kale.plot._get_next_color(ax)
+
+        # set default: plot KDE-density curve if KDE is given (data not given explicitly)
+        if density is None:
+            density = (kde is not None)
+
+        # Default: plot histogram if data is given (KDE is *not* given)
+        if hist is None:
+            hist = (kde is None)
+
+        # ---- Draw Components
+
+        # Draw PDF from KDE
+        handle = None     # variable to store a plotting 'handle' from one of the plotted objects
+        if density is not False:
+            if kde is None:
+                try:
+                    kde = kale.KDE(data, weights=weights)
+                except:
+                    raise
+
+            # If histogram is also being plotted (as a solid line) use a dashed line
+            if ls is None:
+                _ls = '--' if hist else '-'
+                _alpha = 0.8 if hist else 0.8
+            else:
+                _ls = ls
+                _alpha = alpha
+
+            # Calculate KDE density distribution for the given parameter
+            xx, yy = kde.density(probability=probability, params=param)
+            # rescale by value of density
+            yy = yy * density
+            # Plot
+            if rotate:
+                temp = xx
+                xx = yy
+                yy = temp
+
+            handle, = ax.plot(xx, yy, color=color, ls=_ls, alpha=_alpha, **kwargs)
+
+        # Draw Histogram
+        if hist:
+            if alpha is None:
+                _alpha = 0.5 if density else 0.8
+            else:
+                _alpha = alpha
+
+            _, _, hh = kale.plot.hist1d(
+                data, ax=ax, edges=edges, weights=weights, color=color,
+                density=True, probability=probability, joints=True, rotate=rotate,
+                ls=ls, alpha=_alpha, **kwargs
+            )
+            if handle is None:
+                handle = hh
+
+        # Draw Contours and Median Line
+        if confidence:
+            hh = kale.plot._confidence(data, ax=ax, color=color, quantiles=quantiles, rotate=rotate)
+            if handle is None:
+                handle = hh
+
+        # Draw Carpet Plot
+        if carpet is not None:
+            hh = kale.plot._carpet(data, weights=weights, ax=ax, color=color, rotate=rotate, limit=carpet)
+            if handle is None:
+                handle = hh
+
+        return handle
 
     def dist2d(
         self, ax, edges, data, weights=None, quantiles=None, sigmas=None,
