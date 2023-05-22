@@ -49,6 +49,7 @@ import scipy.interpolate   # noqa
 import holodeck as holo
 from holodeck import utils, cosmo, log, _PATH_DATA
 from holodeck.constants import GYR, NWTG, PC, MSOL
+import holodeck.sam_cython
 
 #: number of influence radii to set minimum radius for dens calculation
 _MIN_DENS_RAD__INFL_RAD_MULT = 10.0
@@ -1317,6 +1318,15 @@ class Fixed_Time_2PL_SAM(_Hardening):
         self._gamma_outer = gamma_outer
 
         return
+
+    def __str__(self):
+        msg = (
+            f"{super().__str__()} :: "
+            f"target_time/Gyr={self._target_time/GYR:.2e} num_steps={self._num_steps} "
+            f"sepa_init/pc={self._sepa_init/PC:.2e} rchar/pc={self._rchar/PC:.2e} "
+            f"gamma_inner={self._gamma_inner:.2e} gamma_outer={self._gamma_outer:.2e} "
+        )
+        return msg
 
     def dadt_dedt(self, evo, step, *args, **kwargs):
         raise NotImplementedError()

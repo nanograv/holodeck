@@ -554,12 +554,13 @@ def set_up_predictions(spectra, gp_george):
     --------
     FIXME: Add docs.
 
-
     """
     gp_list = []
-    gp_freqs = spectra["fobs"][:len(gp_george)].copy()
+    # gp_freqs = spectra["fobs"][:len(gp_george)].copy()
+    # for ii in range(len(gp_freqs)):
 
-    for ii in range(len(gp_freqs)):
+    num_freqs = len(gp_george)
+    for ii in range(num_freqs):
         gp = gp_george[ii]
 
         # Try to use the kernel attribute. If it doesn't exist, default to ExpSquaredKernel
@@ -676,7 +677,7 @@ def hc_from_gp(gp_george, gp_list, gp_george_variance, gp_list_variance,
             total_pred_unc = np.sqrt(std_pred**2 + std_pred_unc**2 + mean_pred_unc**2)
         else:
             total_pred_unc = std_pred
-        
+
         rho_pred[ii, 0], rho_pred[ii, 1] = mean_pred, total_pred_unc
 
         # transforming from zero-mean unit-variance variable to rho
