@@ -1319,6 +1319,15 @@ class Fixed_Time_2PL_SAM(_Hardening):
 
         return
 
+    def __str__(self):
+        msg = (
+            f"{super().__str__()} :: "
+            f"target_time/Gyr={self._target_time/GYR:.2e} num_steps={self._num_steps} "
+            f"sepa_init/pc={self._sepa_init/PC:.2e} rchar/pc={self._rchar/PC:.2e} "
+            f"gamma_inner={self._gamma_inner:.2e} gamma_outer={self._gamma_outer:.2e} "
+        )
+        return msg
+
     def dadt_dedt(self, evo, step, *args, **kwargs):
         raise NotImplementedError()
 
