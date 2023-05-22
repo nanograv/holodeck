@@ -34,7 +34,7 @@ except Exception as err:
     holo.log.warning(f"failed to load `mpi4py` in {__file__}: {err}")
 
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 
 # Default argparse parameters
 DEF_NUM_REALS = 100
@@ -47,11 +47,9 @@ DEF_PTA_DUR = 16.03     # [yrs]
 FITS_NBINS_PLAW = [3, 4, 5, 10, 15]
 FITS_NBINS_TURN = [5, 10, 15]
 
-FNAME_SIM_FILE_GWB_SS = "lib-sams_gwb-ss__p{pnum:06d}.npz"
+FNAME_SIM_FILE = "sam-lib__p{pnum:06d}.npz"
 # FNAME_SS_FILE = "lib_ss__p{pnum:06d}.npz"
 PSPACE_FILE_SUFFIX = ".pspace.npz"
-
-ALSO_PRODUCE_LEGACY_GWB_CALCULATION = True
 
 
 # ==============================================================================
@@ -518,7 +516,7 @@ def run_sam_at_pspace_num(args, space, pnum):
 
     # ---- get output filename for this simulation, check if already exists
 
-    sim_fname = _get_sim_fname_gwb_ss(args.output_sims, pnum)
+    sim_fname = _get_sim_fname(args.output_sims, pnum)
 
     beg = datetime.now()
     log.info(f"{pnum=} :: {sim_fname=} beginning at {beg}")
@@ -548,29 +546,13 @@ def run_sam_at_pspace_num(args, space, pnum):
         log.debug("Calculating 'edges' and 'number' for this SAM.")
         fobs_orb_edges = fobs_edges / 2.0
         fobs_orb_cents = fobs_cents / 2.0
-        # edges
-        # should the zero stalled option be part of the parameter space?
+        data = dict(fobs=fobs_cents, fobs_edges=fobs_edges)
 
-        # ==== OLD / MID ====
-        # if not isinstance(hard, (holo.hardening.Fixed_Time_2PL, holo.hardening.Hard_GW)):
-        #     err = f"`holo.hardening.Fixed_Time_2PL` must be used here!  Not {hard}!"
-        #     log.exception(err)
-        #     raise RuntimeError(err)
-        # ---- OLD
-        # edges, dnum = sam.dynamic_binary_number(hard, fobs_orb=fobs_orb_cents)
-        # use_redz = None
-        # ---- MID
-        # edges, dnum, redz_final = sam.dynamic_binary_number_at_fobs(hard, fobs_orb=fobs_orb_cents)
-        # use_redz = redz_final
-        # --------
-        # edges[-1] = fobs_orb_edges
-        # number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
-        # number = number * np.diff(np.log(fobs_edges))
-        # ==== NEW ====
         if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
             err = f"`holo.hardening.Fixed_Time_2PL_SAM` must be used here!  Not {hard}!"
             log.exception(err)
             raise RuntimeError(err)
+
         redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
             fobs_orb_cents, sam, hard, cosmo
         )
@@ -590,27 +572,34 @@ def run_sam_at_pspace_num(args, space, pnum):
                 use_redz = sam._redz_prime[:, :, :, np.newaxis] * np.ones_like(number)
                 log.warning("using `redz_prime`")
 
-        log.debug(f"Calculating `ss_gws` for shape ({fobs_cents.size}, {args.nreals})")
-        hc_ss, hc_bg, sspar, bgpar = holo.single_sources.ss_gws_redz(
-            edges, use_redz, number, realize=args.nreals,
-            loudest=args.nloudest, params=True
-        )
-        log.debug(f"{holo.utils.stats(hc_ss)=}")
-        log.debug(f"{holo.utils.stats(hc_bg)=}")
+        # ---- Calculate SS/CW Sources & binary parameters
 
-        _log_mem_usage(log)
+        if args.ss_flag:
+            log.debug(f"Calculating `ss_gws` for shape ({fobs_cents.size}, {args.nreals}) | {args.params_flag=}")
+            vals = holo.single_sources.ss_gws_redz(
+                edges, use_redz, number, realize=args.nreals,
+                loudest=args.nloudest, params=args.params_flag,
+            )
+            if args.params_flag:
+                hc_ss, hc_bg, sspar, bgpar = vals
+                data['sspar'] = sspar
+                data['bgpar'] = bgpar
+            else:
+                hc_ss, hc_bg = vals
 
-        log.debug(f"Calculating `gwb` for shape ({fobs_cents.size}, {args.nreals})")
-        if ALSO_PRODUCE_LEGACY_GWB_CALCULATION:
+            data['hc_ss'] = hc_ss
+            data['hc_bg'] = hc_bg
+            log.debug(f"{holo.utils.stats(hc_ss)=}")
+            log.debug(f"{holo.utils.stats(hc_bg)=}")
+            _log_mem_usage(log)
+
+        # ---- Calculate GWB
+
+        if args.gwb_flag:
+            log.debug(f"Calculating `gwb` for shape ({fobs_cents.size}, {args.nreals})")
             gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, args.nreals)
             log.debug(f"{holo.utils.stats(gwb)=}")
-
-        _log_mem_usage(log)
-
-        log.debug(f"Saving {pnum} to file")
-        data = dict(fobs=fobs_cents, fobs_edges=fobs_edges,
-                    hc_ss=hc_ss, hc_bg=hc_bg, sspar=sspar, bgpar=bgpar)
-        if ALSO_PRODUCE_LEGACY_GWB_CALCULATION:
+            _log_mem_usage(log)
             data['gwb'] = gwb
 
         rv = True
@@ -622,6 +611,8 @@ def run_sam_at_pspace_num(args, space, pnum):
 
     # ---- Save data to file
 
+    log.debug(f"Saving {pnum} to file | {args.gwb_flag=} {args.ss_flag=} {args.params_flag=}")
+    log.debug(f"data has keys: {list(data.keys())}")
     np.savez(sim_fname, **data)
     log.info(f"Saved to {sim_fname}, size {holo.utils.get_file_size(sim_fname)} after {(datetime.now()-beg)}")
 
@@ -792,7 +783,7 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
     has_gwb = False
     log.info(f"Checking {nsamp} files in {path_sims}")
     for ii in tqdm.trange(nsamp):
-        temp_fname = _get_sim_fname_gwb_ss(path_sims, ii)
+        temp_fname = _get_sim_fname(path_sims, ii)
         if not temp_fname.exists():
             err = f"Missing at least file number {ii} out of {nsamp} files!  {temp_fname}"
             log.exception(err)
@@ -850,7 +841,7 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
     bad_files = np.zeros(nsamp, dtype=bool)     #: track which files contain UN-useable data
     msg = None
     for pnum in tqdm.trange(nsamp):
-        fname = _get_sim_fname_gwb_ss(path_sims, pnum)
+        fname = _get_sim_fname(path_sims, pnum)
         temp = np.load(fname, allow_pickle=True)
         # When a processor fails for a given parameter, the output file is still created with the 'fail' key added
         if ('fail' in temp):
@@ -1308,8 +1299,8 @@ def load_pspace_from_dir(log, path, space_class=None):
     return space, space_fname
 
 
-def _get_sim_fname_gwb_ss(path, pnum):
-    temp = FNAME_SIM_FILE_GWB_SS.format(pnum=pnum)
+def _get_sim_fname(path, pnum):
+    temp = FNAME_SIM_FILE.format(pnum=pnum)
     temp = path.joinpath(temp)
     return temp
 
@@ -1424,20 +1415,27 @@ def _setup_argparse(comm, *args, **kwargs):
                         help='Number of frequency bins', default=DEF_NUM_FBINS)
     parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
                         help='Shape of SAM grid', default=None)
+
     parser.add_argument('-l', '--loudest', action='store', dest='nloudest', type=int,
                         help='Number of loudest single sources', default=DEF_NUM_LOUDEST)
+    parser.add_argument('--gwb', action='store_true', dest="gwb_flag", default=False,
+                        help="calculate and store the 'gwb' per se")
+    parser.add_argument('--ss', action='store_true', dest="ss_flag", default=False,
+                        help="calculate and store SS/CW sources and the BG separately")
+    parser.add_argument('--params', action='store_true', dest="params_flag", default=False,
+                        help="calculate and store SS/BG binary parameters [NOTE: requires `--ss`]")
 
     parser.add_argument('--resume', action='store_true', default=False,
                         help='resume production of a library by loading previous parameter-space from output directory')
     parser.add_argument('--recreate', action='store_true', default=False,
                         help='recreating existing simulation files')
-    parser.add_argument('--plot', action='store_true', default=False,
-                        help='produce plots for each simulation configuration')
+    # parser.add_argument('--plot', action='store_true', default=False,
+    #                     help='produce plots for each simulation configuration')
     parser.add_argument('--seed', action='store', type=int, default=None,
                         help='Random seed to use')
 
-    parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
-                        help='verbose output [INFO]')
+    # parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
+    #                     help='verbose output [INFO]')
 
     args = parser.parse_args(*args, **kwargs)
 
@@ -1445,6 +1443,12 @@ def _setup_argparse(comm, *args, **kwargs):
     if not output.is_absolute:
         output = Path('.').resolve() / output
         output = output.resolve()
+
+    if not args.gwb and not args.ss:
+        raise RuntimeError("Either `--gwb` or `--ss` is required!")
+
+    if args.pars and not args.ss:
+        raise RuntimeError("`--pars` requires the `--ss` option!")
 
     if args.resume:
         if not output.exists() or not output.is_dir():
