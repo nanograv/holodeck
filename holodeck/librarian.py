@@ -203,8 +203,8 @@ class _Param_Space(abc.ABC):
         rv = {nn: pp for nn, pp in zip(self.param_names, self.params(samp_num))}
         return rv
 
-    def __call__(self, samp_num):
-        return self.model_for_number(samp_num)
+    def __call__(self, samp_num, **kwargs):
+        return self.model_for_number(samp_num, **kwargs)
 
     @property
     def shape(self):
@@ -218,10 +218,12 @@ class _Param_Space(abc.ABC):
     def npars(self):
         return self.shape[1]
 
-    def model_for_number(self, samp_num):
+    def model_for_number(self, samp_num, sam_shape=None):
+        if sam_shape is None:
+            sam_shape = self.sam_shape
         params = self.param_dict(samp_num)
         self._log.debug(f"params {samp_num} :: {params}")
-        return self.model_for_params(params, self.sam_shape)
+        return self.model_for_params(params, sam_shape)
 
     def model_for_normalized_params(self, vals, **kwargs):
         """Construct a model from this space by specifying fractional parameter values [0.0, 1.0].
@@ -478,6 +480,21 @@ class PD_Piecewise_Uniform_Density(PD_Piecewise_Uniform_Mass):
 # ==============================================================================
 
 
+def get_freqs(args):
+    if args is not None:
+        pta_dur = args.pta_dur * YR
+        nfreqs = args.nfreqs
+    else:
+        pta_dur = DEF_PTA_DUR * YR
+        nfreqs = DEF_NUM_FBINS
+
+    hifr = nfreqs/pta_dur
+    pta_cad = 1.0 / (2 * hifr)
+    fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
+    fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
+    return fobs_cents, fobs_edges
+
+
 def run_sam_at_pspace_num(args, space, pnum):
     """Run strain calculations for sample-parameter `pnum` in the `space` parameter-space.
 
@@ -513,24 +530,19 @@ def run_sam_at_pspace_num(args, space, pnum):
             return True
 
     # ---- Setup PTA frequencies
-
-    pta_dur = args.pta_dur * YR
-    nfreqs = args.nfreqs
-    hifr = nfreqs/pta_dur
-    pta_cad = 1.0 / (2 * hifr)
-    fobs_cents = holo.utils.nyquist_freqs(pta_dur, pta_cad)
-    fobs_edges = holo.utils.nyquist_freqs_edges(pta_dur, pta_cad)
+    fobs_cents, fobs_edges = get_freqs(args)
     log.info(f"Created {fobs_cents.size} frequency bins")
     log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
     log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
     _log_mem_usage(log)
-    assert nfreqs == fobs_cents.size
+    assert args.nfreqs == fobs_cents.size
 
     # ---- Calculate hc_ss, hc_bg, sspar, and bgpar from SAM
 
     try:
         log.debug("Selecting `sam` and `hard` instances")
         sam, hard = space(pnum)
+        log.info(f"{hard._gamma_inner=} {hard._gamma_outer=}")
         _log_mem_usage(log)
 
         log.debug("Calculating 'edges' and 'number' for this SAM.")
