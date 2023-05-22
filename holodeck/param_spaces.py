@@ -5,7 +5,7 @@ import holodeck as holo
 from holodeck.constants import PC, GYR, MSOL
 from holodeck.librarian import (
     _Param_Space, PD_Uniform, PD_Piecewise_Uniform_Density,
-    # PD_Normal,
+    PD_Normal,
     # PD_Uniform_Log,
 )
 
@@ -845,6 +845,138 @@ class PS_Uniform_07_GW(PS_Generic_2):
             gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
             mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
             mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+        )
+
+    @classmethod
+    def _init_hard(cls, sam, settings):
+        hard = holo.hardening.Hard_GW()
+        return hard
+
+
+
+# ==============================================================================
+# ====    New-Astro-02 / PS_Generic_2    ====
+# ==============================================================================
+
+
+class PS_New_Astro_02A(PS_Generic_2):
+    """New version of 'PS_Astro_02' using PS_Generic_2 base.
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            hard_gamma_inner=PD_Uniform(-1.5, +0.5),
+
+            # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
+            gsmf_phi0=PD_Normal(-2.56, 0.4),
+            gsmf_mchar0_log10=PD_Normal(10.9, 0.4),   # [log10(Msol)]
+            gsmf_alpha0=PD_Normal(-1.2, 0.2),
+
+            gpf_zbeta=PD_Normal(+0.8, 0.4),
+            gpf_qgamma=PD_Normal(+0.5, 0.3),
+
+            gmt_norm=PD_Uniform(0.2, 5.0),    # [Gyr]
+            gmt_zbeta=PD_Uniform(-2.0, +0.0),
+
+            mmb_amp_log10=PD_Normal(+8.6, 0.2),   # [log10(Msol)]
+            mmb_plaw=PD_Normal(+1.2, 0.2),
+            mmb_scatter=PD_Normal(+0.32, 0.15),
+
+            # hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            # gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            # gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            # mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            # mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_rchar=100.0,               # [pc]
+            hard_gamma_outer=+1.5,
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+class PS_New_Astro_02B(PS_Generic_2):
+    """New version of 'PS_Astro_02' using PS_Generic_2 base.
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            hard_gamma_inner=PD_Uniform(-1.5, +0.5),
+
+            # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
+            gsmf_phi0=PD_Normal(-2.56, 0.4),
+            gsmf_mchar0_log10=PD_Normal(10.9, 0.4),   # [log10(Msol)]
+            gsmf_alpha0=PD_Normal(-1.2, 0.2),
+
+            gpf_zbeta=PD_Normal(+0.8, 0.4),
+            gpf_qgamma=PD_Normal(+0.5, 0.3),
+
+            gmt_norm=PD_Uniform(0.2, 5.0),    # [Gyr]
+            gmt_zbeta=PD_Uniform(-2.0, +0.0),
+
+            mmb_amp_log10=PD_Normal(+8.6, 0.2),   # [log10(Msol)]
+            mmb_plaw=PD_Normal(+1.2, 0.2),
+            mmb_scatter=PD_Normal(+0.32, 0.15),
+
+            # hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            # gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            # gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            # mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            # mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_rchar=100.0,               # [pc]
+            hard_gamma_outer=+2.5,
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+class PS_New_Astro_02_GW(PS_Generic_2):
+    """New version of 'PS_Astro_02' using PS_Generic_2 base.
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+
+            # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
+            gsmf_phi0=PD_Normal(-2.56, 0.4),
+            gsmf_mchar0_log10=PD_Normal(10.9, 0.4),   # [log10(Msol)]
+            gsmf_alpha0=PD_Normal(-1.2, 0.2),
+
+            gpf_zbeta=PD_Normal(+0.8, 0.4),
+            gpf_qgamma=PD_Normal(+0.5, 0.3),
+
+            gmt_norm=PD_Uniform(0.2, 5.0),    # [Gyr]
+            gmt_zbeta=PD_Uniform(-2.0, +0.0),
+
+            mmb_amp_log10=PD_Normal(+8.6, 0.2),   # [log10(Msol)]
+            mmb_plaw=PD_Normal(+1.2, 0.2),
+            mmb_scatter=PD_Normal(+0.32, 0.15),
+
+            # hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            # gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            # gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            # mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            # mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
         )
 
     @classmethod
