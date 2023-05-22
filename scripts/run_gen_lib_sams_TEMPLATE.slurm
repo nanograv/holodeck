@@ -92,7 +92,7 @@ echo ""
 
 
 # ---- Production Run ----
-mpiexec -np $NTASKS  python $SCRIPT $SPACE $OUTPUT -n $NSAMPS -r $NREALS -f $NFREQS  1> $LOG_OUT 2> $LOG_ERR
+mpiexec -np $NTASKS  python $SCRIPT $SPACE $OUTPUT --gwb -n $NSAMPS -r $NREALS -f $NFREQS  1> $LOG_OUT 2> $LOG_ERR
 
 # ---- DEBUG Run ----
 # set the SAM shape very small, e.g. `-s 10` to run really fast

@@ -694,7 +694,6 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
         msg = f"found {num_files} pspace.npz files in {path_output}"
         log.info(msg)
         if num_files != 1:
-            log.exception(f"")
             log.exception(msg)
             log.exception(f"{files=}")
             log.exception(f"{regex=}")
@@ -711,9 +710,10 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
     # ---- make sure all files exist; get shape information from files
 
     log.info(f"checking that all {nsamp} files exist")
-    fobs, nreals, nloudest, has_gwb = _check_files_and_load_shapes(log, path_sims, nsamp)
+    fobs, nreals, nloudest, has_gwb, has_ss, has_params = _check_files_and_load_shapes(log, path_sims, nsamp)
     nfreqs = fobs.size
     log.debug(f"{nfreqs=}, {nreals=}, {nloudest=}")
+    log.debug(f"{has_gwb=}, {has_ss=}, {has_params=}")
 
     if not has_gwb and gwb_only:
         err = f"Combining with {gwb_only=}, but received {has_gwb=} from `_check_files_and_load_shapes`!"
@@ -725,15 +725,26 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
         log.exception(err)
         raise ValueError(err)
 
-    # ---- Store results from all files
+    # ---- load results from all files
 
     gwb = np.zeros((nsamp, nfreqs, nreals)) if has_gwb else None
-    hc_ss = np.zeros((nsamp, nfreqs, nreals, nloudest))
-    hc_bg = np.zeros((nsamp, nfreqs, nreals))
-    sspar = np.zeros((nsamp, 3, nfreqs, nreals, nloudest))
-    bgpar = np.zeros((nsamp, 3, nfreqs, nreals))
+
+    if (not gwb_only) and has_ss:
+        hc_ss = np.zeros((nsamp, nfreqs, nreals, nloudest))
+        hc_bg = np.zeros((nsamp, nfreqs, nreals))
+    else:
+        hc_ss = None
+        hc_bg = None
+
+    if (not gwb_only) and has_params:
+        sspar = np.zeros((nsamp, 3, nfreqs, nreals, nloudest))
+        bgpar = np.zeros((nsamp, 3, nfreqs, nreals))
+    else:
+        sspar = None
+        bgpar = None
+
     gwb, hc_ss, hc_bg, sspar, bgpar, bad_files = _load_library_from_all_files(
-        path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log, gwb_only,
+        path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log,
     )
     log.info(f"Loaded data from all library files | {utils.stats(gwb)=}")
     param_samples[bad_files] = np.nan
@@ -747,10 +758,12 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
         if gwb is not None:
             h5.create_dataset('gwb', data=gwb)
         if not gwb_only:
-            h5.create_dataset('hc_ss', data=hc_ss)
-            h5.create_dataset('hc_bg', data=hc_bg)
-            h5.create_dataset('sspar', data=sspar)
-            h5.create_dataset('bgpar', data=bgpar)
+            if has_ss:
+                h5.create_dataset('hc_ss', data=hc_ss)
+                h5.create_dataset('hc_bg', data=hc_bg)
+            if has_params:
+                h5.create_dataset('sspar', data=sspar)
+                h5.create_dataset('bgpar', data=bgpar)
         h5.attrs['param_names'] = np.array(param_names).astype('S')
 
     log.warning(f"Saved to {lib_path}, size: {holo.utils.get_file_size(lib_path)}")
@@ -781,6 +794,9 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
     nreals = None
     nloudest = None
     has_gwb = False
+    has_ss = False
+    has_params = False
+
     log.info(f"Checking {nsamp} files in {path_sims}")
     for ii in tqdm.trange(nsamp):
         temp_fname = _get_sim_fname(path_sims, ii)
@@ -803,6 +819,14 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
         if (not has_gwb) and ('gwb' in data_keys):
             has_gwb = True
 
+        if (not has_ss) and ('hc_ss' in data_keys):
+            assert 'hc_bg' in data_keys
+            has_ss = True
+
+        if (not has_params) and ('sspar' in data_keys):
+            assert 'bgpar' in data_keys
+            has_params = True
+
         # find a file that has GWB data in it (not all of them do, if the file was a 'failure' file)
         if (nreals is None):
             nreals_1 = None
@@ -819,10 +843,10 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
         if (nloudest is None) and ('hc_ss' in data_keys):
             nloudest = temp['hc_ss'].shape[-1]
 
-    return fobs, nreals, nloudest, has_gwb
+    return fobs, nreals, nloudest, has_gwb, has_ss, has_params
 
 
-def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log, gwb_only):
+def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log):
     """Load data from all individual simulation files.
 
     Arguments
@@ -850,7 +874,8 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
             # set all parameters to NaN for failure files.  Note that this is distinct from gwb=0.0 which can be real.
             if gwb is not None:
                 gwb[pnum, :, :] = np.nan
-            if not gwb_only:
+            # `hc_ss` will be set to None if `gwb_only==True`
+            if hc_ss is not None:
                 hc_ss[pnum, :, :, :] = np.nan
                 hc_bg[pnum, :, :] = np.nan
 
@@ -860,11 +885,15 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
         # store the GWB from this file
         if gwb is not None:
             gwb[pnum, :, :] = temp['gwb'][...]
-        if not gwb_only:
-            hc_ss[pnum, :, :, :] = temp['hc_ss'][...]
-            hc_bg[pnum, :, :] = temp['hc_bg'][...]
-            sspar[pnum, :, :, :, :] = temp['sspar'][...]
-            bgpar[pnum, :, :, :] = temp['bgpar'][...]
+        if (not gwb_only):
+            # `hc_ss` will be set to None if `gwb_only==True`
+            if (hc_ss is not None):
+                hc_ss[pnum, :, :, :] = temp['hc_ss'][...]
+                hc_bg[pnum, :, :] = temp['hc_bg'][...]
+            # `hc_ss` will be set to None if `gwb_only==True`
+            if bgpar is not None:
+                sspar[pnum, :, :, :, :] = temp['sspar'][...]
+                bgpar[pnum, :, :, :] = temp['bgpar'][...]
 
     log.info(f"{utils.frac_str(bad_files)} files are failures")
 
