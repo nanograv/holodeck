@@ -626,6 +626,8 @@ class Semi_Analytic_Model:
         more than 10x faster.
         LZK 2023-05-11
 
+        # BUG doesn't work for Fixed_Time_2PL
+
         """
         fobs_orb = np.asarray(fobs_orb)
         edges = self.edges + [fobs_orb, ]
@@ -786,7 +788,7 @@ class Semi_Analytic_Model:
 
         return gwb
 
-    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=100):
+    def gwb_old(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=100):
         """Calculate GWB using new `dynamic_binary_number_at_fobs` method, better, but slower.
         """
 
@@ -844,7 +846,7 @@ class Semi_Analytic_Model:
         return gwb
 
 
-    def new_ss_gwb(self, fobs_gw_edges, hard, realize=100, loudest=1, params=False):
+    def gwb(self, fobs_gw_edges, hard, realize=100, loudest=1, params=False):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
         Parameters
@@ -909,7 +911,7 @@ class Semi_Analytic_Model:
 
         return hc_ss, hc_bg
 
-    def ss_gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=1, loudest=1, params=False,
+    def old_ss_gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=1, loudest=1, params=False,
                use_redz_after_hard=None):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
 
@@ -941,6 +943,7 @@ class Semi_Analytic_Model:
             Returned only if params = True.
 
 
+        BUG _dynamic_binary_number_at_fobs_consistent() doesn't work for Fixed_Time_2PL
         """
         log = self._log
 
@@ -966,22 +969,13 @@ class Semi_Analytic_Model:
         fobs_orb_edges = fobs_gw_edges / 2.0
         fobs_orb_cents = fobs_gw_cents / 2.0
 
-        # print("SS 1: ", flush=True)
-        # holo.librarian._log_mem_usage(None)
 
-        # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
-        # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
-        # edges, dnum = self.dynamic_binary_number(
-        #     hard, fobs_orb=fobs_orb_cents,
-        #     zero_stalled=zero_stalled, return_details=return_details,
-        # )
+        # TODO: fix this for Fixed_Time_2PL
         edges, dnum, redz_final = self.dynamic_binary_number_at_fobs(hard, fobs_orb_cents)
         edges[-1] = fobs_orb_edges
 
         log.debug(f"dnum: {utils.stats(dnum)}")
         
-        # print("SS 2: ", flush=True)
-        # holo.librarian._log_mem_usage(None)
 
         # "integrate" within each bin (i.e. multiply by bin volume)
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
@@ -989,31 +983,10 @@ class Semi_Analytic_Model:
         log.debug(f"number: {utils.stats(number)}")
         log.debug(f"number.sum(): {number.sum():.4e}")
 
-        # print("SS 3: ", flush=True)
-        # holo.librarian._log_mem_usage(None)
 
         # ---- Get the Single Source and GWB spectrum from number of binaries over grid
 
         # Use the redshift based on initial redshift + galaxy-merger-time + evolution-time
-       
-
-        """
-        # TODO: update this to just use redz_final, because inconsistent/consistent is accounted for
-        #       in dynamic_binary_number_at_fobs
-
-        log.debug(f"{use_redz_after_hard=}")
-        if use_redz_after_hard:
-            use_redz = self._redz_final
-        # Use the redshift based on initial redshift + galaxy-merger-time (without evo time)
-        else:
-            log.warning(f"Using `redz_prime` for redshift (includes galaxy merger time, but not evolution time)")
-            use_redz = self._redz_prime[:, :, :, np.newaxis] * np.ones_like(dnum)
-
-        ret_vals = single_sources.ss_gws_redz(edges, use_redz, number,
-                                              realize=realize, loudest=loudest, params=params)
-
-        """
-
         ret_vals = single_sources.ss_gws_redz(edges, redz_final, number,
                                               realize=realize, loudest=loudest, params=params)
 
@@ -1023,10 +996,6 @@ class Semi_Analytic_Model:
         if params:
             sspar = ret_vals[2]
             bgpar = ret_vals[3]
-
-
-        # print("SS 4: ", flush=True)
-        # holo.librarian._log_mem_usage(None)
 
         self._gwb = hc_bg
         if params:
