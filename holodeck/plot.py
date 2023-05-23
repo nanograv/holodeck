@@ -438,10 +438,11 @@ def draw_gwb(ax, xx, gwb, nsamp=10, color=None, label=None, **kwargs):
     if color is None:
         color = ax._get_lines.get_next_color()
 
+
     kw_plot = kwargs.pop('plot', {})
     kw_plot.setdefault('color', color)
+    kw_plot.setdefault('label', label)
     hh = draw_med_conf(ax, xx, gwb, plot=kw_plot, **kwargs)
-
     if (nsamp is not None) and (nsamp > 0):
         nsamp_max = gwb.shape[1]
         idx = np.random.choice(nsamp_max, np.min([nsamp, nsamp_max]), replace=False)
@@ -688,7 +689,6 @@ def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill=
     rv = kale.utils.quantiles(vals, percs=inter_percs, weights=weights, axis=-1)
 
     med, *conf = rv.T
-
     # plot median
     hh, = ax.plot(xx, med, **plot)
 
