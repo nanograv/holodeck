@@ -680,6 +680,7 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
     xvals : (N, M) ndarray
         Evaluation points (x-values) of the functions to be interpolated.
         Interpolation is performed over the 1th (last) axis.
+        NOTE: values *must* be monotonically increasing along axis=1 !
     yvals : (N, M) ndarray
         Function values (y-values) of the function to be interpolated.
         Interpolation is performed over the 1th (last) axis.
@@ -695,6 +696,8 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
     assert np.shape(xvals) == np.shape(yvals)
 
     xx = np.asarray(xx)
+    xvals = np.asarray(xvals)
+    yvals = np.asarray(yvals)
 
     if xlog:
         xx = np.log10(xx)
