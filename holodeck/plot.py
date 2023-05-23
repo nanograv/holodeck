@@ -25,12 +25,12 @@ plt.rcParams['axes.grid'] = True
 plt.rcParams['grid.alpha'] = 0.25
 plt.rcParams["mathtext.fontset"] = "cm"
 plt.rcParams["font.family"] = "serif"
-plt.rcParams["font.size"] = FONTSIZE
-plt.rcParams["legend.fontsize"] = FONTSIZE*0.8
 plt.rcParams["legend.handlelength"] = 1.5
 plt.rcParams["lines.solid_capstyle"] = 'round'
-mpl.rcParams['xtick.labelsize'] = FONTSIZE*0.8
-mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
+# plt.rcParams["font.size"] = FONTSIZE
+# plt.rcParams["legend.fontsize"] = FONTSIZE*0.8
+# mpl.rcParams['xtick.labelsize'] = FONTSIZE*0.8
+# mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
 
 LABEL_GW_FREQUENCY_YR = r"GW Frequency $[\mathrm{yr}^{-1}]$"
 LABEL_GW_FREQUENCY_HZ = r"GW Frequency $[\mathrm{Hz}]$"
@@ -81,6 +81,18 @@ class MidpointLogNormalize(mpl.colors.LogNorm):
 
 
 def figax_single(**kwargs):
+    mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
+    plt.rcParams['axes.grid'] = True
+    plt.rcParams['grid.alpha'] = 0.25
+    plt.rcParams["mathtext.fontset"] = "cm"
+    plt.rcParams["font.family"] = "serif"
+    plt.rcParams["legend.handlelength"] = 1.5
+    plt.rcParams["lines.solid_capstyle"] = 'round'
+    plt.rcParams["font.size"] = FONTSIZE
+    plt.rcParams["legend.fontsize"] = FONTSIZE*0.8
+    mpl.rcParams['xtick.labelsize'] = FONTSIZE*0.8
+    mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
+
     figsize_single = [FIGSIZE, FIGSIZE * GOLDEN_RATIO]
     adjust_single = dict(left=0.12, bottom=0.15, right=0.95, top=0.95)
 
@@ -92,6 +104,18 @@ def figax_single(**kwargs):
 
 
 def figax_double(**kwargs):
+    mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
+    plt.rcParams['axes.grid'] = True
+    plt.rcParams['grid.alpha'] = 0.25
+    plt.rcParams["mathtext.fontset"] = "cm"
+    plt.rcParams["font.family"] = "serif"
+    plt.rcParams["legend.handlelength"] = 1.5
+    plt.rcParams["lines.solid_capstyle"] = 'round'
+    plt.rcParams["font.size"] = FONTSIZE
+    plt.rcParams["legend.fontsize"] = FONTSIZE*0.8
+    mpl.rcParams['xtick.labelsize'] = FONTSIZE*0.8
+    mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
+
     figsize_double = [2*FIGSIZE, 2*FIGSIZE*GOLDEN_RATIO]
     adjust_double = dict(left=0.08, bottom=0.10, right=0.98, top=0.95)
 
