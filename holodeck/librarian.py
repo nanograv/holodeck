@@ -223,6 +223,20 @@ class _Param_Space(abc.ABC):
         self._log.debug(f"params {samp_num} :: {params}")
         return self.model_for_params(params, sam_shape)
 
+    def normalized_params(self, vals):
+        if np.ndim(vals) == 0:
+            vals = self.npars * [vals]
+        assert len(vals) == self.npars
+
+        params = {}
+        for ii, pname in enumerate(self.param_names):
+            vv = vals[ii]    # desired fractional parameter value [0.0, 1.0]
+            ss = self._dists[ii](vv)    # convert to actual parameter values
+            params[pname] = ss           # store to dictionary
+
+        return params
+
+    @utils.deprecated_pass("Use `space.normalized_params` + `space.model_for_params` instead!")
     def model_for_normalized_params(self, vals, **kwargs):
         """Construct a model from this space by specifying fractional parameter values [0.0, 1.0].
 
@@ -242,16 +256,7 @@ class _Param_Space(abc.ABC):
         hard : `holodeck.hardening._Hardening` instance
 
         """
-        if np.ndim(vals) == 0:
-            vals = self.npars * [vals]
-        assert len(vals) == self.npars
-
-        params = {}
-        for ii, pname in enumerate(self.param_names):
-            vv = vals[ii]    # desired fractional parameter value [0.0, 1.0]
-            ss = self._dists[ii](vv)    # convert to actual parameter values
-            params[pname] = ss           # store to dictionary
-
+        params = self.normalized_params(vals)
         kwargs.setdefault('sam_shape', self.sam_shape)
         return self.model_for_params(params, **kwargs)
 
