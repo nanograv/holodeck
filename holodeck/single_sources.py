@@ -75,7 +75,7 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
     # All other bin midpoints
     mt = kale.utils.midpoints(edges[0]) #: total mass
     mr = kale.utils.midpoints(edges[1]) #: mass ratio
-    rz = kale.utils.midpoints(edges[2]) #: redshift
+    rz = kale.utils.midpoints(edges[2]) #: initial redshift
 
 
     # hsfdf = hsamp^2 * f/df # this is same as hc^2

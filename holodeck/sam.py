@@ -910,10 +910,7 @@ class Semi_Analytic_Model:
         
         # print("SS 2: ", flush=True)
         # holo.librarian._log_mem_usage(None)
-
-        edges[-1] = fobs_orb_edges
-        log.debug(f"dnum: {utils.stats(dnum)}")
-
+        
         # "integrate" within each bin (i.e. multiply by bin volume)
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
         number = number * np.diff(np.log(fobs_gw_edges))
