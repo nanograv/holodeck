@@ -1559,7 +1559,6 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
             lspar[2,ff,rr] = z_ls/sum_ls # ls avg redshift
 
 
-
 def loudest_hc_and_par_from_sorted_redz(number, h2fdf, nreals, nloudest, mt, mr, redz, msort, qsort, zsort, normal_threshold=1e10):
     """
     Calculates the characteristic strain and binary parameters from loud single sources and a 
