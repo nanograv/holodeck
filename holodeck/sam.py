@@ -630,6 +630,10 @@ class Semi_Analytic_Model:
         fobs_orb = np.asarray(fobs_orb)
         edges = self.edges + [fobs_orb, ]
 
+        # shape: (M, Q, Z)
+        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
+
+
         # start from the hardening model's initial separation
         rmax = hard._sepa_init
         # (M,) end at the ISCO
@@ -676,9 +680,6 @@ class Semi_Analytic_Model:
         frst_orb = fobs_orb * (1.0 + redz_final)
         frst_orb[frst_orb < 0.0] = 0.0
         redz_final[~coal] = -1.0
-
-        # shape: (M, Q, Z)
-        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
 
         # (Z,) comoving-distance in [Mpc]
         dc = np.zeros_like(redz_final)
@@ -928,7 +929,7 @@ class Semi_Analytic_Model:
         """
         # TODO: update this to just use redz_final, because inconsistent/consistent is accounted for
         #       in dynamic_binary_number_at_fobs
-        
+
         log.debug(f"{use_redz_after_hard=}")
         if use_redz_after_hard:
             use_redz = self._redz_final
