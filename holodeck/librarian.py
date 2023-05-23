@@ -479,6 +479,20 @@ class PD_Piecewise_Uniform_Density(PD_Piecewise_Uniform_Mass):
 
 
 def get_freqs(args):
+    """Get PTA frequencies.
+
+    Arguments
+    ---------
+    args : `argparse` or other namespace,  or None
+
+    Returns
+    -------
+    fobs_cents : (F,) ndarray
+        Observer-frame GW-frequencies at frequency-bin centers.
+    fobs_edges : (F+1,) ndarray
+        Observer-frame GW-frequencies at frequency-bin edges.
+
+    """
     if args is not None:
         pta_dur = args.pta_dur * YR
         nfreqs = args.nfreqs
@@ -867,7 +881,7 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
         err = f"Unable to get shape from either `hc_bg` or `gwb`!"
         log.exception(err)
         raise RuntimeError(err)
-    
+
     log.info(f"Collecting data from {nsamp} files")
     bad_files = np.zeros(nsamp, dtype=bool)     #: track which files contain UN-useable data
     msg = None
