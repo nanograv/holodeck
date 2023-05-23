@@ -847,7 +847,7 @@ class Semi_Analytic_Model:
 
 
     def gwb(self, fobs_gw_edges, hard, realize=100, loudest=1, params=False):
-        """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
+        """Calculate the (smooth/semi-analytic) GWB and CWs at the given observed GW-frequencies.
 
         Parameters
         ----------
@@ -860,6 +860,11 @@ class Semi_Analytic_Model:
         realize : int
             Specification of how many discrete realizations to construct.
             Realizations approximate the finite-source effects of a realistic population.
+        loudest : int
+            Number of loudest single sources to distinguish from the background.
+        params : Boolean
+            Whether or not to return astrophysical parameters of the binaries.
+
 
         Returns
         -------
@@ -868,12 +873,11 @@ class Semi_Analytic_Model:
         hc_bg : (F, R) NDarray of scalars
             Characteristic strain of the GWB.
         sspar : (3, F, R, L) NDarray of scalars
-            Astrophysical parametes of each loud single sources, 
-            for each frequency and realization. 
+            Astrophysical parametes of each loud single sources, for each frequency and realization. 
             Returned only if params == True.
         bgpar : (3, F, R) NDarray of scalars
-            Average effective binary astrophysical parameters for background
-            sources at each frequency and realization, 
+            Average effective binary astrophysical parameters for background sources at each frequency 
+            and realization, 
             Returned only if params == True.
         """
 
@@ -913,7 +917,8 @@ class Semi_Analytic_Model:
 
     def old_ss_gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=1, loudest=1, params=False,
                use_redz_after_hard=None):
-        """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
+        """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies,  
+        using new `dynamic_binary_number_at_fobs` method, better, but slower than cython version.
 
         Parameters
         ----------
