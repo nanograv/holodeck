@@ -910,7 +910,7 @@ class Semi_Analytic_Model:
         
         # print("SS 2: ", flush=True)
         # holo.librarian._log_mem_usage(None)
-        
+
         # "integrate" within each bin (i.e. multiply by bin volume)
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
         number = number * np.diff(np.log(fobs_gw_edges))
@@ -923,6 +923,12 @@ class Semi_Analytic_Model:
         # ---- Get the Single Source and GWB spectrum from number of binaries over grid
 
         # Use the redshift based on initial redshift + galaxy-merger-time + evolution-time
+       
+
+        """
+        # TODO: update this to just use redz_final, because inconsistent/consistent is accounted for
+        #       in dynamic_binary_number_at_fobs
+        
         log.debug(f"{use_redz_after_hard=}")
         if use_redz_after_hard:
             use_redz = self._redz_final
@@ -933,6 +939,13 @@ class Semi_Analytic_Model:
 
         ret_vals = single_sources.ss_gws_redz(edges, use_redz, number,
                                               realize=realize, loudest=loudest, params=params)
+
+        """
+
+        ret_vals = single_sources.ss_gws_redz(edges, redz_final, number,
+                                              realize=realize, loudest=loudest, params=params)
+
+
         hc_ss = ret_vals[0]
         hc_bg = ret_vals[1]
         if params:
