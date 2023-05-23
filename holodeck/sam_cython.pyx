@@ -217,19 +217,68 @@ cdef void _integrate_differential_number_3dx1d(
 # ==================================================================================================
 
 
+# @cython.cdivision(True)
+# cpdef double _hard_func_2pwl(double norm, double xx, double gamma_inner, double gamma_outer):
+#     cdef double dadt = - norm * pow(1.0 + xx, -gamma_outer+gamma_inner) / pow(xx, gamma_inner-1)
+#     return dadt
+
+
+# @cython.cdivision(True)
+# cpdef double hard_func_2pwl_gw(
+#     double mtot, double mrat, double sepa,
+#     double norm, double rchar, double gamma_inner, double gamma_outer
+# ):
+#     cdef double dadt = _hard_func_2pwl(norm, sepa/rchar, gamma_inner, gamma_outer)
+#     dadt += hard_gw(mtot, mrat, sepa)
+#     return dadt
+
+
 @cython.cdivision(True)
-cpdef double _hard_func_2pwl(double norm, double xx, double gamma_inner, double gamma_outer):
+cdef double _hard_func_2pwl(double norm, double xx, double gamma_inner, double gamma_outer):
     cdef double dadt = - norm * pow(1.0 + xx, -gamma_outer+gamma_inner) / pow(xx, gamma_inner-1)
     return dadt
 
 
 @cython.cdivision(True)
-cpdef double hard_func_2pwl_gw(
+cdef double _hard_func_2pwl_gw(
     double mtot, double mrat, double sepa,
     double norm, double rchar, double gamma_inner, double gamma_outer
 ):
     cdef double dadt = _hard_func_2pwl(norm, sepa/rchar, gamma_inner, gamma_outer)
     dadt += hard_gw(mtot, mrat, sepa)
+    return dadt
+
+
+@cython.cdivision(True)
+cdef double[:] _hard_func_2pwl_gw_1darray(
+    double[:] mtot, double[:] mrat, double[:] sepa,
+    double[:] norm, double[:] rchar, double[:] gamma_inner, double[:] gamma_outer
+):
+    cdef int ii
+    cdef int size = mtot.size
+    cdef np.ndarray[np.double_t, ndim=1] dadt = np.zeros(size)
+    for ii in range(size):
+        dadt[ii] = _hard_func_2pwl(norm[ii], sepa[ii]/rchar[ii], gamma_inner[ii], gamma_outer[ii])
+        dadt[ii] += hard_gw(mtot[ii], mrat[ii], sepa[ii])
+
+    return dadt
+
+
+def hard_func_2pwl_gw(
+    mtot, mrat, sepa,
+    norm, rchar, gamma_inner, gamma_outer
+):
+    """
+
+    NOTE: this function will be somewhat slow, because of the explicit broadcasting!
+
+    """
+    args = mtot, mrat, sepa, norm, rchar, gamma_inner, gamma_outer
+    args = np.broadcast_arrays(*args)
+    shape = args[0].shape
+    mtot, mrat, sepa, norm, rchar, gamma_inner, gamma_outer = [aa.flatten() for aa in args]
+    dadt = _hard_func_2pwl_gw_1darray(mtot, mrat, sepa, norm, rchar, gamma_inner, gamma_outer)
+    dadt = np.array(dadt).reshape(shape)
     return dadt
 
 
@@ -319,7 +368,7 @@ cdef double get_binary_lifetime_2pwl(double norm_log10, void *args):
     cdef double sepa_right, dadt_right, dt
 
     cdef double sepa_left = pow(10.0, sepa_log10)
-    cdef double dadt_left = hard_func_2pwl_gw(
+    cdef double dadt_left = _hard_func_2pwl_gw(
         pars.mt, pars.mr, sepa_left,
         norm, pars.rchar, pars.gamma_inner, pars.gamma_outer
     )
@@ -329,7 +378,7 @@ cdef double get_binary_lifetime_2pwl(double norm_log10, void *args):
         sepa_right = pow(10.0, sepa_log10)
 
         # Get total hardening rate at k+1 edge
-        dadt_right = hard_func_2pwl_gw(
+        dadt_right = _hard_func_2pwl_gw(
             pars.mt, pars.mr, sepa_right,
             norm, pars.rchar, pars.gamma_inner, pars.gamma_outer
         )
@@ -483,7 +532,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
 
             # Get total hardening rate at left-most edge
             sepa_left = pow(10.0, sepa_log10)
-            dadt_left = hard_func_2pwl_gw(
+            dadt_left = _hard_func_2pwl_gw(
                 mt, mr, sepa_left,
                 norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
             )
@@ -502,7 +551,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
                 frst_orb_right = kepler_freq_from_sepa(mt, sepa_right)
 
                 # Get total hardening rate at the right-edge of this step (left-edge already obtained)
-                dadt_right = hard_func_2pwl_gw(
+                dadt_right = _hard_func_2pwl_gw(
                     mt, mr, sepa_right,
                     norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
                 )
@@ -597,7 +646,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
                         sepa = kepler_sepa_from_freq(mt, target_frst_orb)
 
                         # calculate total hardening rate at this exact separation
-                        dadt = hard_func_2pwl_gw(
+                        dadt = _hard_func_2pwl_gw(
                             mt, mr, sepa,
                             norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
                         )
