@@ -843,6 +843,72 @@ class Semi_Analytic_Model:
         gwb = gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
         return gwb
 
+
+    def new_ss_gwb(self, fobs_gw_edges, hard, realize=100, loudest=1, params=False):
+        """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
+
+        Parameters
+        ----------
+        fobs_gw_edges : (F,) array_like of scalar,
+            Observer-frame GW-frequencies. [1/sec]
+            These are the frequency bin edges, which are integrated across to get the number of binaries in each
+            frequency bin.
+        hard : holodeck.evolution._Hardening class or instance
+            Hardening mechanism to apply over the range of `fobs_gw`.
+        realize : int
+            Specification of how many discrete realizations to construct.
+            Realizations approximate the finite-source effects of a realistic population.
+
+        Returns
+        -------
+        hc_ss : (F, R, L) NDarray of scalars
+            The characteristic strain of the L loudest single sources at each frequency.
+        hc_bg : (F, R) NDarray of scalars
+            Characteristic strain of the GWB.
+        sspar : (3, F, R, L) NDarray of scalars
+            Astrophysical parametes of each loud single sources, 
+            for each frequency and realization. 
+            Returned only if params == True.
+        bgpar : (3, F, R) NDarray of scalars
+            Average effective binary astrophysical parameters for background
+            sources at each frequency and realization, 
+            Returned only if params == True.
+        """
+
+        assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
+
+        fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
+        
+        # convert to orbital-frequency (from GW-frequency)
+        fobs_orb_edges = fobs_gw_edges / 2.0
+        fobs_orb_cents = fobs_gw_cents / 2.0
+
+        # ---- Calculate number of binaries in each bin
+
+        redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
+            fobs_orb_cents, self, hard, cosmo
+        )
+
+        edges = [self.mtot, self.mrat, self.redz, fobs_orb_edges]
+        number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
+
+        # ---- Get the Single Source and GWB spectrum from number of binaries over grid
+
+        ret_vals = single_sources.ss_gws_redz(edges, redz_final, number,
+                                              realize=realize, loudest=loudest, params=params)
+
+        hc_ss = ret_vals[0]
+        hc_bg = ret_vals[1]
+        if params:
+            sspar = ret_vals[2]
+            bgpar = ret_vals[3]
+
+        self._gwb = hc_bg
+        if params:
+            return hc_ss, hc_bg, sspar, bgpar
+
+        return hc_ss, hc_bg
+
     def ss_gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=1, loudest=1, params=False,
                use_redz_after_hard=None):
         """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
@@ -855,19 +921,24 @@ class Semi_Analytic_Model:
             frequency bin.
         hard : holodeck.evolution._Hardening class or instance
             Hardening mechanism to apply over the range of `fobs_gw`.
-        realize : bool or int,
-            Whether to construct a Poisson 'realization' (discretization) of the SAM distribution.
+        realize : int
+            Specification of how many discrete realizations to construct.
             Realizations approximate the finite-source effects of a realistic population.
-        **kw_dynamic_binary_number : keyword-value pairs,
-            Additional arguments passed along to `Semi_Analytic_Model.dynamic_binary_number()`.
 
         Returns
         -------
-        gwb : (F,[R,]) ndarray of scalar
-            Dimensionless, characteristic strain at each frequency.
-            If `realize` is an integer with value R, then R realizations of the GWB are returned,
-            such that `hc` has shape (F,R,).
-        [details]
+        hc_ss : (F, R, L) NDarray of scalars
+            The characteristic strain of the L loudest single sources at each frequency.
+        hc_bg : (F, R) NDarray of scalars
+            Characteristic strain of the GWB.
+        sspar : (3, F, R, L) NDarray of scalars
+            Astrophysical parametes of each loud single sources, 
+            for each frequency and realization. 
+            Returned only if params = True.
+        bgpar : (3, F, R) NDarray of scalars
+            Average effective binary astrophysical parameters for background
+            sources at each frequency and realization, 
+            Returned only if params = True.
 
 
         """
