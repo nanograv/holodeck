@@ -43,18 +43,25 @@ To-do items and changes to the API should be included in the [CHANGELOG.md](./CH
 
 Contributions are not only welcome but encouraged, anywhere from new modules/customizations to bug-fixes to improved documentation and usage examples.  The git workflow is based around a `main` branch which is intended to be (relatively) stable and operational, and an actively developed `dev` branch.  New development should be performed in "feature" branches (made off of the `dev` branch), and then incorporated via pull-request (back into the `dev` branch).
 
+### Testing:
+
 (Unit)tests should be developed in two ways: for basic functions/behaviors, standard unit-tests can be placed in the `holodeck/tests/` directory.  More complex functionality should be tested in notebooks (in `notebooks/`) where they can also be used as demonstrations/tutorials for that behavior.  The python script `scripts/convert_notebook_tests.py` converts target notebooks into python scripts in the `holodeck/tests/` directory, which can then be run by `pytest`.  The script `scripts/tester.sh` will run the conversion script and then run `pytest`.
 
-**Before submitting a pull request, run `scripts/tester.sh -bv` to run the builtin tests.**
-For more comprehensive testing (e.g. against numerous python versions, and building from the sdist package), you can use the python `tox` package: simply run `tox` in the root directory and it will use the configuration specified in `tox.ini`.  The scripy `scripts/run_tox.sh` is also provided to setup and execute tox tests and required environments.
 
-**Formatting**:
-New code should generally abide by PEP8 formatting, with `numpy style docstrings <https://numpydoc.readthedocs.io/en/latest/format.html>`_.  Exceptions are:
+### Formatting:
+
+New code should generally abide by PEP8 formatting, with [`numpy` style docstrings](https://numpydoc.readthedocs.io/en/latest/format.html).  Exceptions are:
 
    * lines may be broken at either 100 or 120 columns
 
-**Notebooks**:
-Please strip all notebook outputs before commiting notebook changes.  The `[nbstripout](https://github.com/kynan/nbstripout)` package is an excellent option to automatically strip all notebook output only in git commits (i.e. it doesn't change your notebooks in-place).  You can also use `nbconvert` to strip output in place: `jupyter nbconvert --clear-output --inplace <NOTEBOOK-NAME>.ipynb`.
+### Notebooks:
+
+Please strip all notebook outputs before commiting notebook changes.  The [`nbstripout`](https://github.com/kynan/nbstripout) package is an excellent option to automatically strip all notebook output only in git commits (i.e. it doesn't change your notebooks in-place).  You can also use `nbconvert` to strip output in place: `jupyter nbconvert --clear-output --inplace <NOTEBOOK-NAME>.ipynb`.
+
+To install this package for just this repository:
+
+   * (1) install:  `pip install --upgrade nbstripout`  or  `conda install -c conda-forge nbstripout`
+   * (2) enable: `nbstripout --install --attributes .gitattributes`   (run this in the top-level `holodeck/` directory)
 
 ## Copyright
 
