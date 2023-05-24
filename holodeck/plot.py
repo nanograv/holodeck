@@ -662,14 +662,15 @@ def _twin_hz(ax, nano=True, fs=8, **kw):
     return
 
 
-def _twin_yr(ax, nano=True, fs=8, **kw):
+def _twin_yr(ax, nano=True, fs=8, label=True, **kw):
     tw = ax.twiny()
     xlim = np.array(ax.get_xlim()) * YR
     if nano:
         xlim /= 1e9
 
     tw.set(xlim=xlim, xscale=ax.get_xscale())
-    tw.set_xlabel(LABEL_GW_FREQUENCY_YR, fontsize=fs, **kw)
+    if label:
+        tw.set_xlabel(LABEL_GW_FREQUENCY_YR, fontsize=fs, **kw)
     return
 
 
