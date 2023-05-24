@@ -236,7 +236,6 @@ class _Param_Space(abc.ABC):
 
         return params
 
-    @utils.deprecated_pass("Use `space.normalized_params` + `space.model_for_params` instead!")
     def model_for_normalized_params(self, vals, **kwargs):
         """Construct a model from this space by specifying fractional parameter values [0.0, 1.0].
 
@@ -256,6 +255,10 @@ class _Param_Space(abc.ABC):
         hard : `holodeck.hardening._Hardening` instance
 
         """
+        self._log.warning(
+            "`model_for_normalized_params() is deprecated, use "
+            "space.model_for_params(space.normalized_params(vals)) instead."
+        )
         params = self.normalized_params(vals)
         kwargs.setdefault('sam_shape', self.sam_shape)
         return self.model_for_params(params, **kwargs)
