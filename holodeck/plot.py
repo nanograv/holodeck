@@ -35,7 +35,9 @@ plt.rcParams["lines.solid_capstyle"] = 'round'
 LABEL_GW_FREQUENCY_YR = r"GW Frequency $[\mathrm{yr}^{-1}]$"
 LABEL_GW_FREQUENCY_HZ = r"GW Frequency $[\mathrm{Hz}]$"
 LABEL_GW_FREQUENCY_NHZ = r"GW Frequency $[\mathrm{nHz}]$"
-LABEL_CHARACTERISTIC_STRAIN = "GW Characteristic Strain"
+LABEL_SEPARATION_PC = r"Binary Separation $[\mathrm{pc}]$"
+LABEL_CHARACTERISTIC_STRAIN = r"GW Characteristic Strain"
+LABEL_HARDENING_TIME = r"Hardening Time $[\mathrm{Gyr}]$"
 
 
 class MidpointNormalize(mpl.colors.Normalize):
@@ -94,7 +96,7 @@ def figax_single(**kwargs):
     mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
 
     figsize_single = [FIGSIZE, FIGSIZE * GOLDEN_RATIO]
-    adjust_single = dict(left=0.12, bottom=0.15, right=0.95, top=0.95)
+    adjust_single = dict(left=0.15, bottom=0.15, right=0.95, top=0.95)
 
     kwargs.setdefault('figsize', figsize_single)
     for kk, vv in adjust_single.items():
@@ -117,7 +119,7 @@ def figax_double(**kwargs):
     mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
 
     figsize_double = [2*FIGSIZE, 2*FIGSIZE*GOLDEN_RATIO]
-    adjust_double = dict(left=0.08, bottom=0.10, right=0.98, top=0.95)
+    adjust_double = dict(left=0.10, bottom=0.10, right=0.98, top=0.95)
 
     kwargs.setdefault('figsize', figsize_double)
     for kk, vv in adjust_double.items():
@@ -661,7 +663,7 @@ def _twin_hz(ax, nano=True, fs=8, **kw):
 
     tw.set(xlim=xlim, xscale=ax.get_xscale())
     tw.set_xlabel(label, fontsize=fs, **kw)
-    return
+    return tw
 
 
 def _twin_yr(ax, nano=True, fs=8, label=True, **kw):
@@ -673,7 +675,7 @@ def _twin_yr(ax, nano=True, fs=8, label=True, **kw):
     tw.set(xlim=xlim, xscale=ax.get_xscale())
     if label:
         tw.set_xlabel(LABEL_GW_FREQUENCY_YR, fontsize=fs, **kw)
-    return
+    return tw
 
 
 def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={}, filter=False):
