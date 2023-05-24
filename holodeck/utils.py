@@ -15,8 +15,9 @@ import functools
 import inspect
 import numbers
 import os
-from typing import Optional, Tuple, Union, List  # , Sequence,
+import subprocess
 import warnings
+from typing import Optional, Tuple, Union, List  # , Sequence,
 
 import h5py
 import numba
@@ -305,6 +306,13 @@ def _get_subclass_instance(value, default, superclass):
         raise ValueError(err)
 
     return value
+
+
+def get_git_hash(short=True) -> str:
+    args = ['git', 'rev-parse', 'HEAD']
+    if short:
+        args.insert(2, "--short")
+    return subprocess.check_output(args).decode('ascii').strip()
 
 
 # =================================================================================================
