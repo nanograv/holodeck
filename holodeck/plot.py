@@ -22,7 +22,7 @@ GOLDEN_RATIO = (np.sqrt(5) - 1) / 2
 
 mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
 plt.rcParams['axes.grid'] = True
-plt.rcParams['grid.alpha'] = 0.25
+plt.rcParams['grid.alpha'] = 0.15
 plt.rcParams["mathtext.fontset"] = "cm"
 plt.rcParams["font.family"] = "serif"
 plt.rcParams["legend.handlelength"] = 1.5
@@ -83,7 +83,7 @@ class MidpointLogNormalize(mpl.colors.LogNorm):
 def figax_single(**kwargs):
     mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
     plt.rcParams['axes.grid'] = True
-    plt.rcParams['grid.alpha'] = 0.25
+    plt.rcParams['grid.alpha'] = 0.15
     plt.rcParams["mathtext.fontset"] = "cm"
     plt.rcParams["font.family"] = "serif"
     plt.rcParams["legend.handlelength"] = 1.5
@@ -106,7 +106,7 @@ def figax_single(**kwargs):
 def figax_double(**kwargs):
     mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
     plt.rcParams['axes.grid'] = True
-    plt.rcParams['grid.alpha'] = 0.25
+    plt.rcParams['grid.alpha'] = 0.15
     plt.rcParams["mathtext.fontset"] = "cm"
     plt.rcParams["font.family"] = "serif"
     plt.rcParams["legend.handlelength"] = 1.5
@@ -243,8 +243,10 @@ def figax(figsize=[7, 5], ncols=1, nrows=1, sharex=False, sharey=False, squeeze=
 
         if grid is True:
             ax.set_axisbelow(True)
-            ax.grid(True, which='major', axis='both', c='0.6', zorder=2, alpha=0.4)
-            ax.grid(True, which='minor', axis='both', c='0.8', zorder=2, alpha=0.4)
+            # ax.grid(True, which='major', axis='both', c='0.6', zorder=2, alpha=0.4)
+            # ax.grid(True, which='minor', axis='both', c='0.8', zorder=2, alpha=0.4)
+            # ax.grid(True, which='major', axis='both', c='0.6', zorder=2, alpha=0.4)
+            # ax.grid(True, which='minor', axis='both', c='0.8', zorder=2, alpha=0.4)
 
     if squeeze:
         axes = np.squeeze(axes)
@@ -674,8 +676,8 @@ def _twin_yr(ax, nano=True, fs=8, label=True, **kw):
     return
 
 
-def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={}):
-    plot.setdefault('alpha', 0.5)
+def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={}, filter=False):
+    plot.setdefault('alpha', 0.75)
     fill.setdefault('alpha', 0.2)
     percs = np.atleast_1d(fracs)
     assert np.all((0.0 <= percs) & (percs <= 1.0))
@@ -685,7 +687,14 @@ def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill=
     # Add the median value (50%)
     inter_percs = [0.5, ] + np.concatenate(inter_percs).tolist()
     # Get percentiles; they go along the last axis
-    rv = kale.utils.quantiles(vals, percs=inter_percs, weights=weights, axis=-1)
+    if filter:
+        rv = [
+            kale.utils.quantiles(vv[vv > 0.0], percs=inter_percs, weights=weights)
+            for vv in vals
+        ]
+        rv = np.asarray(rv)
+    else:
+        rv = kale.utils.quantiles(vals, percs=inter_percs, weights=weights, axis=-1)
 
     med, *conf = rv.T
     # plot median
