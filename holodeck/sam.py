@@ -589,10 +589,9 @@ class Semi_Analytic_Model:
                 log.info(f"\tdens aft: ({utils.stats(dens)})")
                 msg = f"mass: {mass_bef:.2e} ==> {mass_aft:.2e} || change = {dm:.4e}"
                 log.info(f"\t{msg}")
-                if np.fabs(dm) > 0.05:
+                if np.fabs(dm) > 0.2:
                     err = f"Warning, significant change in number-mass!  {msg}"
                     log.error(err)
-                    print(err, flush=True)
 
             # set values after redshift zero to have zero density
             # if self.ZERO_GMT_STALLED_SYSTEMS:
@@ -862,7 +861,7 @@ class Semi_Analytic_Model:
             # (M, Q, X)  ==>  (M, Q, Z, X)
             tau = tau[:, :, np.newaxis, :] * np.ones_like(redz_final)
             dadt = dadt[:, :, np.newaxis, :] * np.ones_like(redz_final)
-            dets = dict(tau=tau, cosmo_fact=cosmo_fact, dadt=dadt)
+            dets = dict(tau=tau, cosmo_fact=cosmo_fact, dadt=dadt, sepa=target_sepa)
             return edges, dnum, redz_final, dets
 
         # self._redz_final = redz_final
