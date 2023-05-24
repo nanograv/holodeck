@@ -438,10 +438,8 @@ def draw_gwb(ax, xx, gwb, nsamp=10, color=None, label=None, **kwargs):
     if color is None:
         color = ax._get_lines.get_next_color()
 
-
     kw_plot = kwargs.pop('plot', {})
     kw_plot.setdefault('color', color)
-    kw_plot.setdefault('label', label)
     hh = draw_med_conf(ax, xx, gwb, plot=kw_plot, **kwargs)
     if (nsamp is not None) and (nsamp > 0):
         nsamp_max = gwb.shape[1]
