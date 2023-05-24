@@ -625,9 +625,15 @@ class Semi_Analytic_Model:
         more than 10x faster.
         LZK 2023-05-11
 
+        # BUG doesn't work for Fixed_Time_2PL
+
         """
         fobs_orb = np.asarray(fobs_orb)
         edges = self.edges + [fobs_orb, ]
+
+        # shape: (M, Q, Z)
+        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
+
 
         # start from the hardening model's initial separation
         rmax = hard._sepa_init
@@ -675,9 +681,6 @@ class Semi_Analytic_Model:
         frst_orb = fobs_orb * (1.0 + redz_final)
         frst_orb[frst_orb < 0.0] = 0.0
         redz_final[~coal] = -1.0
-
-        # shape: (M, Q, Z)
-        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
 
         # (M, Q, Z, X) comoving-distance in [Mpc]
         dc = np.zeros_like(redz_final)
@@ -895,7 +898,7 @@ class Semi_Analytic_Model:
 
         return gwb
 
-    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=100):
+    def gwb_old(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=100):
         """Calculate GWB using new `dynamic_binary_number_at_fobs` method, better, but slower.
         """
 
@@ -952,9 +955,80 @@ class Semi_Analytic_Model:
         gwb = gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
         return gwb
 
-    def ss_gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=1, loudest=1, params=False,
-               zero_stalled=None, use_redz_after_hard=None, return_details=False):
-        """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
+
+    def gwb(self, fobs_gw_edges, hard, realize=100, loudest=1, params=False):
+        """Calculate the (smooth/semi-analytic) GWB and CWs at the given observed GW-frequencies.
+
+        Parameters
+        ----------
+        fobs_gw_edges : (F,) array_like of scalar,
+            Observer-frame GW-frequencies. [1/sec]
+            These are the frequency bin edges, which are integrated across to get the number of binaries in each
+            frequency bin.
+        hard : holodeck.evolution._Hardening class or instance
+            Hardening mechanism to apply over the range of `fobs_gw`.
+        realize : int
+            Specification of how many discrete realizations to construct.
+            Realizations approximate the finite-source effects of a realistic population.
+        loudest : int
+            Number of loudest single sources to distinguish from the background.
+        params : Boolean
+            Whether or not to return astrophysical parameters of the binaries.
+
+
+        Returns
+        -------
+        hc_ss : (F, R, L) NDarray of scalars
+            The characteristic strain of the L loudest single sources at each frequency.
+        hc_bg : (F, R) NDarray of scalars
+            Characteristic strain of the GWB.
+        sspar : (3, F, R, L) NDarray of scalars
+            Astrophysical parametes of each loud single sources, for each frequency and realization. 
+            Returned only if params == True.
+        bgpar : (3, F, R) NDarray of scalars
+            Average effective binary astrophysical parameters for background sources at each frequency 
+            and realization, 
+            Returned only if params == True.
+        """
+
+        assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
+
+        fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
+        
+        # convert to orbital-frequency (from GW-frequency)
+        fobs_orb_edges = fobs_gw_edges / 2.0
+        fobs_orb_cents = fobs_gw_cents / 2.0
+
+        # ---- Calculate number of binaries in each bin
+
+        redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
+            fobs_orb_cents, self, hard, cosmo
+        )
+
+        edges = [self.mtot, self.mrat, self.redz, fobs_orb_edges]
+        number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
+
+        # ---- Get the Single Source and GWB spectrum from number of binaries over grid
+
+        ret_vals = single_sources.ss_gws_redz(edges, redz_final, number,
+                                              realize=realize, loudest=loudest, params=params)
+
+        hc_ss = ret_vals[0]
+        hc_bg = ret_vals[1]
+        if params:
+            sspar = ret_vals[2]
+            bgpar = ret_vals[3]
+
+        self._gwb = hc_bg
+        if params:
+            return hc_ss, hc_bg, sspar, bgpar
+
+        return hc_ss, hc_bg
+
+    def old_ss_gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=1, loudest=1, params=False,
+               use_redz_after_hard=None):
+        """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies,  
+        using new `dynamic_binary_number_at_fobs` method, better, but slower than cython version.
 
         Parameters
         ----------
@@ -964,21 +1038,27 @@ class Semi_Analytic_Model:
             frequency bin.
         hard : holodeck.evolution._Hardening class or instance
             Hardening mechanism to apply over the range of `fobs_gw`.
-        realize : bool or int,
-            Whether to construct a Poisson 'realization' (discretization) of the SAM distribution.
+        realize : int
+            Specification of how many discrete realizations to construct.
             Realizations approximate the finite-source effects of a realistic population.
-        **kw_dynamic_binary_number : keyword-value pairs,
-            Additional arguments passed along to `Semi_Analytic_Model.dynamic_binary_number()`.
 
         Returns
         -------
-        gwb : (F,[R,]) ndarray of scalar
-            Dimensionless, characteristic strain at each frequency.
-            If `realize` is an integer with value R, then R realizations of the GWB are returned,
-            such that `hc` has shape (F,R,).
-        [details]
+        hc_ss : (F, R, L) NDarray of scalars
+            The characteristic strain of the L loudest single sources at each frequency.
+        hc_bg : (F, R) NDarray of scalars
+            Characteristic strain of the GWB.
+        sspar : (3, F, R, L) NDarray of scalars
+            Astrophysical parametes of each loud single sources, 
+            for each frequency and realization. 
+            Returned only if params = True.
+        bgpar : (3, F, R) NDarray of scalars
+            Average effective binary astrophysical parameters for background
+            sources at each frequency and realization, 
+            Returned only if params = True.
 
 
+        BUG _dynamic_binary_number_at_fobs_consistent() doesn't work for Fixed_Time_2PL
         """
         log = self._log
 
@@ -1004,21 +1084,13 @@ class Semi_Analytic_Model:
         fobs_orb_edges = fobs_gw_edges / 2.0
         fobs_orb_cents = fobs_gw_cents / 2.0
 
-        print("SS 1: ", flush=True)
-        holo.librarian._log_mem_usage(None)
 
-        # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
-        # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
-        edges, dnum = self.dynamic_binary_number(
-            hard, fobs_orb=fobs_orb_cents,
-            zero_stalled=zero_stalled, return_details=return_details,
-        )
-
-        print("SS 2: ", flush=True)
-        holo.librarian._log_mem_usage(None)
-
+        # TODO: fix this for Fixed_Time_2PL
+        edges, dnum, redz_final = self.dynamic_binary_number_at_fobs(hard, fobs_orb_cents)
         edges[-1] = fobs_orb_edges
+
         log.debug(f"dnum: {utils.stats(dnum)}")
+        
 
         # "integrate" within each bin (i.e. multiply by bin volume)
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
@@ -1026,30 +1098,19 @@ class Semi_Analytic_Model:
         log.debug(f"number: {utils.stats(number)}")
         log.debug(f"number.sum(): {number.sum():.4e}")
 
-        print("SS 3: ", flush=True)
-        holo.librarian._log_mem_usage(None)
 
         # ---- Get the Single Source and GWB spectrum from number of binaries over grid
 
         # Use the redshift based on initial redshift + galaxy-merger-time + evolution-time
-        log.debug(f"{use_redz_after_hard=}")
-        if use_redz_after_hard:
-            use_redz = self._redz_final
-        # Use the redshift based on initial redshift + galaxy-merger-time (without evo time)
-        else:
-            log.warning(f"Using `redz_prime` for redshift (includes galaxy merger time, but not evolution time)")
-            use_redz = self._redz_prime[:, :, :, np.newaxis] * np.ones_like(dnum)
-
-        ret_vals = single_sources.ss_gws_redz(edges, use_redz, number,
+        ret_vals = single_sources.ss_gws_redz(edges, redz_final, number,
                                               realize=realize, loudest=loudest, params=params)
+
+
         hc_ss = ret_vals[0]
         hc_bg = ret_vals[1]
         if params:
             sspar = ret_vals[2]
             bgpar = ret_vals[3]
-
-        print("SS 4: ", flush=True)
-        holo.librarian._log_mem_usage(None)
 
         self._gwb = hc_bg
         if params:
