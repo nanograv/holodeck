@@ -132,3 +132,4 @@ run_gen_lib_sams__*
 *.ini
 *.c
 *.html
+.gitattributes
