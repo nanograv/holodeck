@@ -109,4 +109,3 @@ def sph_harm_from_hc(hc_ss, hc_bg, nside = NSIDE, lmax = LMAX):
     return moll_hc, Cl
 
 
-
