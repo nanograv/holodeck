@@ -40,6 +40,25 @@ LABEL_CHARACTERISTIC_STRAIN = r"GW Characteristic Strain"
 LABEL_HARDENING_TIME = r"Hardening Time $[\mathrm{Gyr}]$"
 
 
+PARAM_KEYS = {
+    'hard_time': r"phenom $\tau_f$",
+    'hard_gamma_inner': r"phenom $\gamma_\mathrm{inner}$",
+    'hard_gamma_outer': r"phenom $\gamma_\mathrm{outer}$",
+    'gsmf_phi0': r"GSMF $\Phi_0$",
+    'gsmf_mchar0_log10': r"GSMF $\log_{10}(M_0/M_\odot)$",
+    'gsmf_alpha0': r"GSMF $\alpha_0$",
+    'gpf_zbeta': r"GPF $\beta_z$",
+    'gpf_qgamma': r"GPF $\gamma_q$",
+    'gmt_norm': r"GMT $\tau_\mathrm{GMT}$",
+    'gmt_zbeta': r"GMT $\beta_z$",
+    'mmb_mamp_log10': r"MMB $\log_{10}(M_0/M_\odot)$",
+    'mmb_plaw': r"MMB $\alpha$",
+    'mmb_scatter_dex': r"MMB $\epsilon$",
+}
+
+COLORS_MPL = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+
 class MidpointNormalize(mpl.colors.Normalize):
     """
     Normalise the colorbar so that diverging bars work there way either side from a prescribed midpoint value)
@@ -1281,7 +1300,6 @@ class Corner:
                     loc = 'lower left'
                     index = (size-index-1, index)
 
-            print(f"{index=}")
             bbox = self.axes[index].get_position()
             bbox = (bbox.x0, bbox.y0)
             kwargs['bbox_to_anchor'] = bbox
