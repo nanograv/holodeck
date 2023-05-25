@@ -75,7 +75,7 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
     # All other bin midpoints
     mt = kale.utils.midpoints(edges[0]) #: total mass
     mr = kale.utils.midpoints(edges[1]) #: mass ratio
-    rz = kale.utils.midpoints(edges[2]) #: redshift
+    rz = kale.utils.midpoints(edges[2]) #: initial redshift
 
 
     # hsfdf = hsamp^2 * f/df # this is same as hc^2
@@ -96,13 +96,11 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
             # lspar = avg parameters of loudest sources
             # bgpar = avg parameters of background
             # ssidx = indices of loud single sources
-            hc2ss, hc2bg, lspar, bgpar, ssidx = \
-                holo.cyutils.loudest_hc_and_par_from_sorted(number, h2fdf, realize, loudest,
-                                                            mt, mr, rz, msort, qsort, zsort)
+            hc2ss, hc2bg, sspar, bgpar = \
+                holo.cyutils.loudest_hc_and_par_from_sorted_redz(number, h2fdf, realize, loudest,
+                                                            mt, mr, redz, msort, qsort, zsort)
             hc_ss = np.sqrt(hc2ss) # calculate single source strain
             hc_bg = np.sqrt(hc2bg) # calculate background strain
-            # calulate parameters of single sources
-            sspar = np.array([mt[ssidx[0,...]], mr[ssidx[1,...]], rz[ssidx[2,...]]])
             return hc_ss, hc_bg, sspar, bgpar
             
         else:
