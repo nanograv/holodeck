@@ -23,8 +23,8 @@ def main():
 
     ss_file = h5py.File(hdf_name, 'r')
     print('Loaded file, with keys:', list(ss_file.keys()))
-    hc_ss = ss_file['hc_ss'][...]
-    hc_bg = ss_file['hc_bg'][...]
+    hc_ss = ss_file['hc_ss'][:,:,:50,:]
+    hc_bg = ss_file['hc_bg'][:,:,:50]
     fobs = ss_file['fobs'][:]
     # dfobs = ss_file['dfobs'][:]
     ss_file.close()
@@ -59,7 +59,7 @@ def main():
     else:
         print('Writing to an existing directory.')
 
-    output_name = output_dir+'/sph_harm_lmax%d_nside%d_nbest%d.npz' % (LMAX, NSIDE, NBEST))
+    output_name = output_dir+'/sph_harm_lmax%d_nside%d_nbest%d.npz' % (LMAX, NSIDE, NBEST)
     print('Saving npz file: ', output_name)
     np.savez(output_name,
              nsort=nsort, fidx=fidx, hc_tt=hc_tt, hc_ref15=hc_ref15, ss_shape=shape,
