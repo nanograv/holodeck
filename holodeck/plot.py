@@ -972,13 +972,14 @@ class Corner:
 
         return
 
-    def plot(self, data, edges=None, weights=None, quantiles=None, sigmas=None,
+    def plot(self, data, edges=None, weights=None, ratio=None, quantiles=None, sigmas=None, reflect=None,
              color=None, cmap=None, limit=None, dist1d={}, dist2d={}):
 
         if limit is None:
             limit = self._limit_flag
 
         # ---- Sanitize
+
         if np.ndim(data) != 2:
             err = "`data` (shape: {}) must be 2D with shape (parameters, data-points)!".format(
                 np.shape(data))
@@ -990,7 +991,13 @@ class Corner:
         if (np.ndim(axes) != 2) or (shp[0] != shp[1]) or (shp[0] != size):
             raise ValueError("`axes` (shape: {}) does not match data dimension {}!".format(shp, size))
 
+        if ratio is not None:
+            if np.ndim(ratio) != 2 or np.shape(ratio)[0] != size:
+                err = f"`ratio` (shape: {np.shape(ratio)}) must be 2D with shape (parameters, data-points)!"
+                raise ValueError(err)
+
         # ---- Set parameters
+
         last = size - 1
         rotate = self._rotate
 
@@ -1000,30 +1007,32 @@ class Corner:
         edges = kale.utils.parse_edges(data, edges=edges)
         quantiles, _ = kale.plot._default_quantiles(quantiles=quantiles, sigmas=sigmas)
 
-        #
-        # Draw / Plot Data
-        # ----------------------------------
-
         # ---- Draw 1D Histograms & Carpets
+
         limits = [None] * size      # variable to store the data extrema
         for jj, ax in enumerate(axes.diagonal()):
             rot = (rotate and (jj == last))
+            refl = reflect[jj] if reflect is not None else None
+            rat = ratio[jj] if ratio is not None else None
             self.dist1d(
-                ax, edges[jj], data[jj], weights=weights, quantiles=quantiles, rotate=rot,
-                color=color, **dist1d
+                ax, edges[jj], data[jj], weights=weights, ratio=rat, quantiles=quantiles, rotate=rot,
+                color=color, reflect=refl, **dist1d
             )
             limits[jj] = kale.utils.minmax(data[jj], stretch=self._LIMITS_STRETCH)
 
         # ---- Draw 2D Histograms and Contours
+
         for (ii, jj), ax in np.ndenumerate(axes):
             if jj >= ii:
                 continue
+            rat = [ratio[jj], ratio[ii]] if ratio is not None else None
             handle = self.dist2d(
-                ax, [edges[jj], edges[ii]], [data[jj], data[ii]], weights=weights,
+                ax, [edges[jj], edges[ii]], [data[jj], data[ii]], weights=weights, ratio=rat,
                 color=color, cmap=cmap, quantiles=quantiles, **dist2d
             )
 
-        # If we are setting the axes limits dynamically
+        # ---- calculate and set axes limits
+
         if limit:
             # Update any stored values
             for ii in range(self.ndim):
@@ -1034,18 +1043,17 @@ class Corner:
 
         return handle
 
-    def dist1d(self, ax, edges, data, color=None, weights=None, probability=True, param=0, rotate=False,
+    def dist1d(self, ax, edges, data, color=None, weights=None, ratio=None, probability=True, rotate=False,
                density=None, confidence=False, hist=None, carpet=True, quantiles=None,
-               ls=None, alpha=None, **kwargs):
+               ls=None, alpha=None, reflect=None, **kwargs):
 
-        kde = None
-
-        if np.ndim(data) > 1:
-            err = "Input `data` ({}) is not 1D, please flatten array!".format(np.shape(data))
+        if np.ndim(data) != 1:
+            err = "Input `data` (shape: {}) is not 1D!".format(np.shape(data))
             raise ValueError(err)
 
-        if ax is None:
-            ax = plt.gca()
+        if ratio is not None and np.ndim(ratio) != 1:
+            err = "`ratio` (shape: {}) is not 1D!".format(np.shape(ratio))
+            raise ValueError(err)
 
         # Use `scatter` as the limiting-number of scatter-points
         #    To disable scatter, `scatter` will be set to `None`
@@ -1055,24 +1063,12 @@ class Corner:
         if color is None:
             color = kale.plot._get_next_color(ax)
 
-        # set default: plot KDE-density curve if KDE is given (data not given explicitly)
-        if density is None:
-            density = (kde is not None)
-
-        # Default: plot histogram if data is given (KDE is *not* given)
-        if hist is None:
-            hist = (kde is None)
-
         # ---- Draw Components
 
         # Draw PDF from KDE
         handle = None     # variable to store a plotting 'handle' from one of the plotted objects
         if density is not False:
-            if kde is None:
-                try:
-                    kde = kale.KDE(data, weights=weights)
-                except:
-                    raise
+            kde = kale.KDE(data, weights=weights)
 
             # If histogram is also being plotted (as a solid line) use a dashed line
             if ls is None:
@@ -1083,7 +1079,14 @@ class Corner:
                 _alpha = alpha
 
             # Calculate KDE density distribution for the given parameter
-            xx, yy = kde.density(probability=probability, params=param)
+            kde_kwargs = dict(probability=probability, params=0, reflect=reflect)
+            xx, yy = kde.density(**kde_kwargs)
+
+            if ratio is not None:
+                kde_ratio = kale.KDE(ratio, weights=weights)
+                _, kde_ratio = kde_ratio.density(points=xx, **kde_kwargs)
+                yy /= kde_ratio
+
             # rescale by value of density
             yy = yy * density
             # Plot
@@ -1101,8 +1104,8 @@ class Corner:
             else:
                 _alpha = alpha
 
-            _, _, hh = kale.plot.hist1d(
-                data, ax=ax, edges=edges, weights=weights, color=color,
+            _, _, hh = self.hist1d(
+                ax, data, edges=edges, weights=weights, ratio=ratio, color=color,
                 density=True, probability=probability, joints=True, rotate=rotate,
                 ls=ls, alpha=_alpha, **kwargs
             )
@@ -1111,23 +1114,55 @@ class Corner:
 
         # Draw Contours and Median Line
         if confidence:
+            if ratio is not None:
+                raise NotImplementedError("`confidence` with `ratio` is not implemented!")
             hh = kale.plot._confidence(data, ax=ax, color=color, quantiles=quantiles, rotate=rotate)
             if handle is None:
                 handle = hh
 
         # Draw Carpet Plot
         if carpet is not None:
+            if ratio is not None:
+                raise NotImplementedError("`confidence` with `carpet` is not implemented!")
             hh = kale.plot._carpet(data, weights=weights, ax=ax, color=color, rotate=rotate, limit=carpet)
             if handle is None:
                 handle = hh
 
         return handle
 
+    def hist1d(self, ax, data, edges=None, weights=None, ratio=None, density=False, probability=False,
+            renormalize=False, joints=True, positive=True, rotate=False, **kwargs):
+
+        hist_kwargs = dict(density=density, probability=probability)
+        # Calculate histogram
+        hist, edges = kale.utils.histogram(data, bins=edges, weights=weights, **hist_kwargs)
+
+        if ratio is not None:
+            hist_ratio, _ = kale.utils.histogram(data, bins=edges, **hist_kwargs)
+            hist /= hist_ratio
+
+        # Draw
+        rv = kale.plot.draw_hist1d(
+            ax, edges, hist,
+            renormalize=renormalize, joints=joints, positive=positive, rotate=rotate,
+            **kwargs
+        )
+        return hist, edges, rv
+
     def dist2d(
-        self, ax, edges, data, weights=None, quantiles=None, sigmas=None,
+        self, ax, edges, data, weights=None, ratio=None, quantiles=None, sigmas=None,
         color=None, cmap=None, smooth=None, upsample=None, pad=True, outline=True,
         median=False, scatter=True, contour=True, hist=True, mask_dense=None, mask_below=True, mask_alpha=0.9
     ):
+
+        if np.ndim(data) != 2 or np.shape(data)[0] != 2:
+            err = f"`data` (shape: {np.shape(data)}) must be 2D with shape (parameters, data-points)!"
+            raise ValueError(err)
+
+        if ratio is not None:
+            if np.ndim(ratio) != 2 or np.shape(ratio)[0] != 2:
+                err = f"`ratio` (shape: {np.shape(ratio)}) must be 2D with shape (parameters, data-points)!"
+                raise ValueError(err)
 
         # Set default color or cmap as needed
         color, cmap = kale.plot._parse_color_cmap(ax=ax, color=color, cmap=cmap)
@@ -1142,14 +1177,18 @@ class Corner:
 
         # Calculate histogram
         edges = kale.utils.parse_edges(data, edges=edges)
-        hh, *_ = np.histogram2d(*data, bins=edges, weights=weights, density=True)
+        hist_kwargs = dict(bins=edges, density=True)
+        hh, *_ = np.histogram2d(*data, weights=weights, **hist_kwargs)
+
+        if ratio is not None:
+            hh_ratio, *_ = np.histogram2d(*ratio, **hist_kwargs)
+            hh /= hh_ratio
+            hh = np.nan_to_num(hh)
 
         _, levels, quantiles = kale.plot._dfm_levels(hh, quantiles=quantiles, sigmas=sigmas)
         if mask_below is True:
             mask_below = levels.min()
 
-        # ---- Draw components
-        # ------------------------------------
         handle = None
 
         # ---- Draw Scatter Points
@@ -1158,6 +1197,9 @@ class Corner:
 
         # ---- Draw Median Lines (cross-hairs style)
         if median:
+            if ratio:
+                raise NotImplementedError("`median` is not impemented with `ratio`!")
+
             for dd, func in zip(data, [ax.axvline, ax.axhline]):
                 # Calculate value
                 if weights is None:
@@ -1232,13 +1274,14 @@ class Corner:
                     loc = 'upper right'
                 elif size % 2 == 0:
                     index = size // 2
-                    index = (1, index)
+                    index = (size - index - 2, index + 1)
                     loc = 'lower left'
                 else:
                     index = (size // 2) + 1
                     loc = 'lower left'
                     index = (size-index-1, index)
 
+            print(f"{index=}")
             bbox = self.axes[index].get_position()
             bbox = (bbox.x0, bbox.y0)
             kwargs['bbox_to_anchor'] = bbox
