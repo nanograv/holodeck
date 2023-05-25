@@ -767,7 +767,7 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
     gwb, hc_ss, hc_bg, sspar, bgpar, bad_files = _load_library_from_all_files(
         path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log,
     )
-    log.info(f"Loaded data from all library files | {utils.stats(gwb)=}")
+    if has_gwb: log.info(f"Loaded data from all library files | {utils.stats(gwb)=}")
     param_samples[bad_files] = np.nan
 
     # ---- Save to concatenated output file ----
@@ -1472,8 +1472,7 @@ def _setup_argparse(comm, *args, **kwargs):
                         help='Number of frequency bins', default=DEF_NUM_FBINS)
     parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
                         help='Shape of SAM grid', default=None)
-
-    parser.add_argument('-l', '--loudest', action='store', dest='nloudest', type=int,
+    parser.add_argument('-l', '--nloudest', action='store', dest='nloudest', type=int,
                         help='Number of loudest single sources', default=DEF_NUM_LOUDEST)
     parser.add_argument('--gwb', action='store_true', dest="gwb_flag", default=False,
                         help="calculate and store the 'gwb' per se")
