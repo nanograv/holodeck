@@ -109,3 +109,50 @@ def sph_harm_from_hc(hc_ss, hc_bg, nside = NSIDE, lmax = LMAX):
     return moll_hc, Cl
 
 
+def Cl_analytic_from_num(fobs_orb_edges, number, hs, realize = False):
+    """ Calculate Cl using Eq. (17) of Sato-Polito & Kamionkowski
+    Parameters
+    ----------
+    fobs_orb_edges : (F,) 1Darray
+        Observed orbital frequency bin edges
+    hs : (M,Q,Z,F) NDarray
+        Strain amplitude of each M,q,z bin
+    number : (M,Q,Z,F) NDarray
+        Number of sources in each M,q,z, bin
+    realize : boolean or integer
+        How many realizations to Poisson sample.
+    
+    Returns
+    -------
+    C0 : (F,R) or (F,) NDarray
+        C_0 
+    Cl : (F,R) or (F,) NDarray
+        C_l>0 for arbitrary l using shot noise approximation
+    """
+
+    df = np.diff(fobs_orb_edges)                 #: frequency bin widths
+    fc = kale.utils.midpoints(fobs_orb_edges)    #: frequency-bin centers 
+
+    # df = fobs_orb_widths[np.newaxis, np.newaxis, np.newaxis, :] # (M,Q,Z,F) NDarray
+    # fc = fobs_orb_cents[np.newaxis, np.newaxis, np.newaxis, :]  # (M,Q,Z,F) NDarray
+
+
+    # Poisson sample number in each bin
+    if utils.isinteger(realize):
+        number = np.random.poisson(number[...,np.newaxis], 
+                                size = (number.shape + (realize,)))
+        df = df[...,np.newaxis]
+        fc = fc[...,np.newaxis]
+        hs = hs[...,np.newaxis]
+    elif realize is True:
+        number = holo.gravwaves.poisson_as_needed(number)
+
+
+
+    delta_term = (fc/(4*np.pi*df) * np.sum(number*hs**2, axis=(0,1,2)))**2
+
+    Cl = (fc/(4*np.pi*df))**2 * np.sum(number*hs**4, axis=(0,1,2))
+
+    C0 = Cl + delta_term
+
+    return C0, Cl
