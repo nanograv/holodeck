@@ -1007,6 +1007,42 @@ def _snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
     S_i : (P,F,R,L) NDarray
         Total noise of each pulsar wrt detection of each single source, in s^3
     freqs : (F,) 1Darray 
+        Observed frequency bin centers.
+
+    Returns
+    -------
+    snr_ss : (F,R,S,L) NDarray
+        SNR from the whole PTA for each single source with each realized sky position (S) 
+        and realized strain (R).
+
+    """
+    
+    
+    snr_ss = sam_cython.snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs)
+    return snr_ss
+
+def _snr_ss_5dim(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
+    """ Calculate the SNR for each pulsar wrt each single source detection,
+    for S sky realizations and R strain realizations.
+
+    Paramters
+    ---------
+    amp : (F,R,L) NDarray 
+        Dimensionless strain amplitude for loudest source at each frequency.
+    F_iplus : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    F_icross : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    iotas : (F,S,L) NDarray
+        Is this inclination? or what?
+        Gives the wave polarizations a and b.
+    dur : scalar
+        Duration of observations.
+    Phi_0 : (F,S,L) NDarray
+        Initial GW Phase.
+    S_i : (P,F,R,L) NDarray
+        Total noise of each pulsar wrt detection of each single source, in s^3
+    freqs : (F,) 1Darray 
 
     Returns
     -------
@@ -1059,7 +1095,6 @@ def _snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
 
     snr_ss = np.sqrt(np.sum(snr2_pulsar_ss, axis=0)) # (F,R,S,L), sum over the pulsars
     return snr_ss
-
 
 ######################### Detection Probability #########################
 

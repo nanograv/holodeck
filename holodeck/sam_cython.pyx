@@ -16,7 +16,7 @@ from scipy.optimize.cython_optimize cimport brentq
 from libc.stdio cimport printf, fflush, stdout
 from libc.stdlib cimport malloc, free
 # make sure to use c-native math functions instead of python/numpy
-from libc.math cimport pow, sqrt, M_PI, NAN, log10
+from libc.math cimport pow, sqrt, M_PI, NAN, log10, sin, cos
 
 import holodeck as holo
 from holodeck.cyutils cimport interp_at_index, _interp_between_vals
@@ -755,3 +755,129 @@ cdef int _gamma_of_rho_interp(
         # print('rho =', rho[rr], ' gamma =', gamma[rr], '\n')\
 
     return 0
+
+
+def snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
+    """ Calculate single source SNR
+
+
+    Parameters
+    ----------
+    amp : (F,R,L) NDarray
+        Dimensionless strain amplitude of loudest single sources
+    F_iplus : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    F_icross : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    iotas : (F,S,L) NDarray
+        Inclination, used to calculate:
+        a_pol = 1 + np.cos(iotas) **2
+        b_pol = -2 * np.cos(iotas)
+    dur : scalar
+        Duration of observations.
+    Phi_0 : (F,S,L) NDarray
+        Initial GW phase
+    S_i : (P,F,R,L) NDarray
+        Total noise of each pulsar wrt detection of each single source, in s^3
+    freqs : (F,) 1Darray
+        Observed frequency bin centers.
+
+    Returns
+    -------
+    snr_ss : (F,R,S,L) NDarray
+        SNR from the whole PTA for each single source with
+        each realized sky position (S) and realized strain (R)
+
+    """
+    nfreqs, nreals, nloudest = amp.shape[0], amp.shape[1], amp.shape[2]
+    npsrs, nskies = F_iplus.shape[0], F_iplus.shape[2]
+    cdef np.ndarray[np.double_t, ndim=4] snr_ss = np.zeros((nfreqs, nreals, nskies, nloudest))
+    _snr_ss(
+        amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs, 
+        npsrs, nfreqs, nreals, nskies, nloudest,
+        snr_ss)
+    return snr_ss
+
+
+cdef int _snr_ss(
+    double[:,:,:] amp, 
+    double[:,:,:,:] F_iplus,
+    double[:,:,:,:] F_icross,
+    double[:,:,:] iotas,
+    double dur,
+    double[:,:,:] Phi_0,
+    double[:,:,:,:] S_i,
+    double[:] freqs,
+    long npsrs, long nfreqs, long nreals, long nskies, long nloudest,
+    # output
+    double[:,:,:,:] snr_ss
+    ):
+    """ 
+
+    Parameters
+    ----------
+    amp : (F,R,L) NDarray
+        Dimensionless strain amplitude of loudest single sources
+    F_iplus : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    F_icross : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    iotas : (F,S,L) NDarray
+        Inclination, used to calculate:
+        a_pol = 1 + np.cos(iotas) **2
+        b_pol = -2 * np.cos(iotas)
+    dur : scalar
+        Duration of observations.
+    Phi_0 : (F,S,L) NDarray
+        Initial GW phase
+    S_i : (P,F,R,L) NDarray
+        Total noise of each pulsar wrt detection of each single source, in s^3
+    freqs : (F,) 1Darray
+        Observed frequency bin centers.
+    snr_ss : (F,R,S,L) NDarray
+        Pointer to single source SNR array, to be calculated.
+
+    NOTE: This may be improved by moving some of the math outside the function.
+    I.e., passing in sin/cos of NDarrays to be used.
+    """
+
+    cdef int pp, ff, rr, ss, ll
+    cdef float a_pol, b_pol, Phi_T, pta_snr_sq
+
+    
+    for ff in range(nfreqs):
+        for ss in range(nskies):
+            for ll in range(nloudest):
+                a_pol = 1 + pow(cos(iotas[ff,ss,ll]), 2.0)
+                b_pol = -2 * cos(iotas[ff,ss,ll])
+                Phi_T = 2 * M_PI * freqs[ff] * dur + Phi_0[ff,ss,ll]
+                for rr in range(nreals):
+                    pta_snr_sq = 0
+                    for pp in range(npsrs): 
+                        coef = pow(amp[ff,rr,ll], 2.0) / (S_i[pp,ff,rr,ll] * 8 * M_PI * pow(freqs[ff], 3.0))
+                        term1 = (
+                            pow(a_pol * F_iplus[pp,ff,ss,ll], 2.0) 
+                            * (Phi_T * (1.0 + 2.0 * pow(sin(Phi_0[ff,ss,ll]), 2.0))
+                                + cos(Phi_T) * (-1.0 * sin(Phi_T) + 4.0 * cos(Phi_0[ff,ss,ll]))
+                                - 4.0 * sin(Phi_0[ff,ss,ll])
+                                )
+                        )
+                        term2 = (
+                            pow(b_pol * F_icross[pp,ff,ss,ll], 2.0)
+                            * (Phi_T * (1.0 + 2.0 * pow(cos(Phi_0[ff,ss,ll]), 2.0))
+                                + sin(Phi_T) * cos(Phi_T) - 4.0 * cos(Phi_0[ff,ss,ll])
+                                )
+                        )
+                        term3 = (
+                            -2.0 * a_pol * b_pol * F_iplus[pp,ff,ss,ll] * F_icross[pp,ff,ss,ll]
+                            * (2.0 * Phi_T * sin(Phi_T) *cos(Phi_0[ff,ss,ll])
+                                + sin(Phi_T) * (sin(Phi_T) - 2.0 * sin(Phi_0[ff,ss,ll])
+                                                + 2.0 * cos(Phi_T) * cos(Phi_0[ff,ss,ll])
+                                                - 2.0 * cos(Phi_0[ff,ss,ll])
+                                                )
+                            )
+                        )
+                        pta_snr_sq += coef*(term1 + term2 + term3)
+                    snr_ss[ff,rr,ss,ll] = sqrt(pta_snr_sq)
+
+
