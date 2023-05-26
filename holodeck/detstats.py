@@ -21,7 +21,6 @@ import hasasia.sim as hsim
 import hasasia as has
 
 
-testconst = 100
 
 ###################### Overlap Reduction Function ######################
 
