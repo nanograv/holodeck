@@ -556,8 +556,8 @@ def plot_pars(fobs, sspar, bgpar, **kwargs):
     fig, axs = figax(figsize = (11,6), ncols=2, nrows=2, sharex = True)
     axs[0,0].set_ylabel('Total Mass $M/M_\odot$')
     axs[0,1].set_ylabel('Mass Ratio $q$')
-    axs[1,0].set_ylabel('Initial Comoving Distance $d_c$')
-    axs[1,1].set_ylabel('Final Comoving Distance $d_c$')
+    axs[1,0].set_ylabel('Initial Comoving Distance $d_c$ (Mpc)')
+    axs[1,1].set_ylabel('Final Comoving Distance $d_c$ (Mpc)')
 
     axs[1,0].set_xlabel(LABEL_GW_FREQUENCY_YR)
     axs[1,1].set_xlabel(LABEL_GW_FREQUENCY_YR)
