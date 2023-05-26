@@ -34,7 +34,7 @@ except Exception as err:
     holo.log.warning(f"failed to load `mpi4py` in {__file__}: {err}")
 
 
-__version__ = "0.3.3"
+__version__ = "0.4"
 
 # Default argparse parameters
 DEF_NUM_REALS = 100
@@ -681,6 +681,7 @@ def run_model(sam, hard, nreals, gwb_flag=True, details_flag=False):
     edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
     number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
     if details_flag:
+        data['static_binary_density'] = sam.static_binary_density
         data['number'] = number
         data['redz_final'] = redz_final
 
@@ -689,7 +690,7 @@ def run_model(sam, hard, nreals, gwb_flag=True, details_flag=False):
         gwb_pars = []
         bin_pars = []
         for ii in range(3):
-            margins = np.arange(4).tolist()
+            margins = np.arange(3).tolist()
             del margins[ii]
             margins = tuple(margins)
             numer = np.sum(hc2*number, axis=margins)
@@ -705,16 +706,26 @@ def run_model(sam, hard, nreals, gwb_flag=True, details_flag=False):
         for ii in range(3):
             rz = utils.midpoints(rz, axis=ii)
 
-        rz = rz.flatten()
-        numer, *_ = sp.stats.binned_statistic(
-            rz, (hc2*number).flatten(), bins=sam.redz, statistic='sum'
-        )
-        tpar = numer / denom
-        gwb_pars.append(tpar)
-        tpar, *_ = sp.stats.binned_statistic(
-            rz, number.flatten(), bins=sam.redz, statistic='sum'
-        )
-        bin_pars.append(tpar)
+        nzbins = len(sam.redz) - 1
+        nfreqs = len(fobs_orb_cents)
+        gwb_rz = np.zeros((nzbins, nfreqs))
+        bin_rz = np.zeros((nzbins, nfreqs))
+        hc2_num = hc2 * number
+        for ii in range(nfreqs):
+            rz_flat = rz[:, :, :, ii].flatten()
+            numer, *_ = sp.stats.binned_statistic(
+                rz_flat, hc2_num[:, :, :, ii].flatten(), bins=sam.redz, statistic='sum'
+            )
+            tpar = numer / denom
+            gwb_rz[:, ii] = tpar
+
+            tpar, *_ = sp.stats.binned_statistic(
+                rz_flat, number[:, :, :, ii].flatten(), bins=sam.redz, statistic='sum'
+            )
+            bin_rz[:, ii] = tpar
+
+        gwb_pars.append(gwb_rz)
+        bin_pars.append(bin_rz)
 
         data['gwb_params'] = gwb_pars
         data['bin_params'] = bin_pars
