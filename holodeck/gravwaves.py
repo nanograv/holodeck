@@ -639,6 +639,38 @@ def char_strain_sq_from_bin_edges_redz(edges, redz):
     hc2 = (hs ** 2) * (fc / df)
     return hc2
 
+def strain_amp_from_bin_edges_redz(edges, redz):
+    assert len(edges) == 4
+    assert np.all([np.ndim(ee) == 1 for ee in edges])
+
+    foo = edges[-1]                   #: should be observer-frame orbital-frequencies
+    df = np.diff(foo)                 #: frequency bin widths
+    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+
+    # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)
+    #    where M, Q, Z are edges and Fc is frequency centers
+    # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
+    for dd in range(3):
+        redz = np.moveaxis(redz, dd, 0)
+        redz = kale.utils.midpoints(redz, axis=0)
+        redz = np.moveaxis(redz, 0, dd)
+
+    # ---- calculate GW strain ----
+    mt = kale.utils.midpoints(edges[0])
+    mr = kale.utils.midpoints(edges[1])
+    # rz = kale.utils.midpoints(edges[2])
+    mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
+    mc = mc[:, :, np.newaxis, np.newaxis]
+    dc = +np.inf * np.ones_like(redz)
+    sel = (redz > 0.0)
+    dc[sel] = cosmo.comoving_distance(redz[sel]).cgs.value
+
+    # convert from observer-frame to rest-frame; still using frequency-bin centers
+    fr = utils.frst_from_fobs(fc[np.newaxis, np.newaxis, np.newaxis, :], redz)
+
+    hs = utils.gw_strain_source(mc, dc, fr)
+    return hs
+
 
 def char_strain_sq_from_bin_edges(edges):
     assert len(edges) == 4

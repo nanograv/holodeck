@@ -62,13 +62,13 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
         The characteristic strain of the L loudest single sources at each frequency.
     hc_bg : (F, R) NDarray of scalars
         Characteristic strain of the GWB.
-    sspar : (3, F, R, L) NDarray of scalars
-        Astrophysical parametes of each loud single sources, 
-        for each frequency and realization. 
+    sspar : (4, F, R, L) NDarray of scalars
+        Astrophysical parametes (total mass, mass ratio, initial redshift, final redshift) of each 
+        loud single sources, for each frequency and realization. 
         Returned only if params = True.
-    bgpar : (3, F, R) NDarray of scalars
-        Average effective binary astrophysical parameters for background
-        sources at each frequency and realization, 
+    bgpar : (4, F, R) NDarray of scalars
+        Average effective binary astrophysical parameters (total mass, mass ratio, initial redshift, 
+        final redshift) for background sources at each frequency and realization, 
         Returned only if params = True.
     """
  
@@ -98,7 +98,7 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
             # ssidx = indices of loud single sources
             hc2ss, hc2bg, sspar, bgpar = \
                 holo.cyutils.loudest_hc_and_par_from_sorted_redz(number, h2fdf, realize, loudest,
-                                                            mt, mr, redz, msort, qsort, zsort)
+                                                            mt, mr, rz, redz, msort, qsort, zsort)
             hc_ss = np.sqrt(hc2ss) # calculate single source strain
             hc_bg = np.sqrt(hc2bg) # calculate background strain
             return hc_ss, hc_bg, sspar, bgpar
@@ -577,7 +577,7 @@ def ss_by_ndars(edges, number, realize, round = True):
         R=1
         bgnum = np.random.poisson(number[...,np.newaxis], 
                                 size = (number.shape + (R,)))
-        assert (np.all(bgnum%1 ==0)), 'nonzero numbers found with realize=True'
+        assert (np.all(bgnum%1 ==0)), 'non integer numbers found with realize=True'
     elif(utils.isinteger(realize)):
         R=realize
         bgnum = np.random.poisson(number[...,np.newaxis], 
