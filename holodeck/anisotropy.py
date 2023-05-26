@@ -8,10 +8,11 @@ import matplotlib.cm as cm
 
 import kalepy as kale
 import healpy as hp
+import h5py
 
 import holodeck as holo
-from holodeck import utils, cosmo, log
-from holodeck.constants import SPLC, NWTG, MPC
+from holodeck import utils, cosmo, log, detstats
+from holodeck.constants import YR
 
 NSIDE = 32
 NPIX = hp.nside2npix(NSIDE)
@@ -109,6 +110,109 @@ def sph_harm_from_hc(hc_ss, hc_bg, nside = NSIDE, lmax = LMAX):
     return moll_hc, Cl
 
 
+######################################################################
+############# Plots
+######################################################################
+
+def plot_ClC0_medians(fobs, Cl_best, lmax, nshow):
+    xx = fobs*YR
+    fig, ax = holo.plot.figax(figsize=(8,5), xlabel=holo.plot.LABEL_GW_FREQUENCY_YR, ylabel='$C_{\ell>0}/C_0$')
+
+    yy = Cl_best[:,:,:,1:]/Cl_best[:,:,:,0,np.newaxis] # (B,F,R,l)
+    yy = np.median(yy, axis=-1) # (B,F,l) median over realizations
+
+    colors = cm.gist_rainbow(np.linspace(0, 1, lmax))
+    for ll in range(lmax):
+        ax.plot(xx, np.median(yy[:,:,ll], axis=0), color=colors[ll], label='$l=%d$' % (ll+1))
+        for pp in [50, 98]:
+            percs = pp/2
+            percs = [50-percs, 50+percs]
+            ax.fill_between(xx, *np.percentile(yy[:,:,ll], percs, axis=0), alpha=0.1, color=colors[ll])
+        
+        for bb in range(0,nshow):
+            ax.plot(xx, yy[bb,:,ll], color=colors[ll], linestyle=':', alpha=0.1,
+                                 linewidth=1)         
+        ax.legend(ncols=2)
+    holo.plot._twin_hz(ax, nano=False)
+    
+    # ax.set_title('50%% and 98%% confidence intervals of the %d best samples \nusing realizations medians, lmax=%d'
+    #             % (nbest, lmax))
+    return fig
+
+
+######################################################################
+############# Libraries
+######################################################################
+
+
+def lib_anisotropy(lib_path, hc_ref_10yr, nbest=100, nreals=50, lmax=LMAX, nside=NSIDE):
+
+    # ---- read in file
+    hdf_name = lib_path+'/sam_lib.hdf5'
+    print('Hdf file:', hdf_name)
+
+    ss_file = h5py.File(hdf_name, 'r')
+    print('Loaded file, with keys:', list(ss_file.keys()))
+    hc_ss = ss_file['hc_ss'][:,:,:nreals,:]
+    hc_bg = ss_file['hc_bg'][:,:,:nreals]
+    fobs = ss_file['fobs'][:]
+    ss_file.close()
+
+    shape = hc_ss.shape
+    nsamps, nfreqs, nreals, nloudest = shape[0], shape[1], shape[2], shape[3]
+    print('N,F,R,L =', nsamps, nfreqs, nreals, nloudest)
+
+
+     # ---- rank samples
+    nsort, fidx, hc_tt, hc_ref = detstats.rank_samples(hc_ss, hc_bg, fobs, fidx=1, hc_ref=hc_ref_10yr, ret_all=True)
+    
+    print('Ranked samples by hc_ref = %.2e at fobs = %.2f/yr' % (hc_ref, fobs[fidx]*YR))
+
+
+    # ---- calculate spherical harmonics
+
+    npix = hp.nside2npix(nside)
+    Cl_best = np.zeros((nbest, nfreqs, nreals, lmax+1 ))
+    moll_hc_best = np.zeros((nbest, nfreqs, nreals, npix))
+    for nn in range(nbest):
+        print('on nn=%d out of nbest=%d' % (nn,nbest))
+        moll_hc_best[nn,...], Cl_best[nn,...] = sph_harm_from_hc(
+            hc_ss[nsort[nn]], hc_bg[nsort[nn]], nside=nside, lmax=lmax, )
+        
+
+    # ---- save to npz file
+
+    output_dir = lib_path+'/anisotropy'
+    # Assign output folder
+    import os
+    if (os.path.exists(output_dir) is False):
+        print('Making output directory.')
+        os.makedirs(output_dir)
+    else:
+        print('Writing to an existing directory.')
+
+    output_name = output_dir+'/sph_harm_lmax%d_nside%d_nbest%d.npz' % (lmax, nside, nbest)
+    print('Saving npz file: ', output_name)
+    np.savez(output_name,
+             nsort=nsort, fidx=fidx, hc_tt=hc_tt, hc_ref=hc_ref, ss_shape=shape,
+         moll_hc_best=moll_hc_best, Cl_best=Cl_best, nside=nside, lmax=lmax, fobs=fobs)
+    
+
+    # ---- plot median Cl/C0
+    
+    print('Plotting Cl/C0 for median realizations')
+    fig = plot_ClC0_medians(fobs, Cl_best, lmax, nshow=nreals)
+    fig_name = output_dir+'/sph_harm_lmax%d_nside%d_nbest%d.png' % (lmax, nside, nbest)
+    fig.savefig(fig_name, dpi=300)
+
+
+
+
+
+######################################################################
+############# Analytic/Sato-Polito
+######################################################################
+
 def Cl_analytic_from_num(fobs_orb_edges, number, hs, realize = False):
     """ Calculate Cl using Eq. (17) of Sato-Polito & Kamionkowski
     Parameters
@@ -156,3 +260,7 @@ def Cl_analytic_from_num(fobs_orb_edges, number, hs, realize = False):
     C0 = Cl + delta_term
 
     return C0, Cl
+
+
+
+
