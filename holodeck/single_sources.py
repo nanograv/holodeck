@@ -98,7 +98,7 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
             # ssidx = indices of loud single sources
             hc2ss, hc2bg, sspar, bgpar = \
                 holo.cyutils.loudest_hc_and_par_from_sorted_redz(number, h2fdf, realize, loudest,
-                                                            mt, mr, redz, msort, qsort, zsort)
+                                                            mt, mr, rz, redz, msort, qsort, zsort)
             hc_ss = np.sqrt(hc2ss) # calculate single source strain
             hc_bg = np.sqrt(hc2bg) # calculate background strain
             return hc_ss, hc_bg, sspar, bgpar
