@@ -17,6 +17,7 @@ from holodeck.constants import YR
 NSIDE = 32
 NPIX = hp.nside2npix(NSIDE)
 LMAX = 8
+HC_REF15_10YR = 11.2*10**-15 
 
 def healpix_map(hc_ss, hc_bg, nside=NSIDE):
     """ Build mollview array of strains for a healpix map
@@ -123,7 +124,7 @@ def plot_ClC0_medians(fobs, Cl_best, lmax, nshow):
 
     colors = cm.gist_rainbow(np.linspace(0, 1, lmax))
     for ll in range(lmax):
-        ax.plot(xx, np.median(yy[:,:,ll], axis=0), color=colors[ll], label='$l=%d$' % (ll+1))
+        ax.plot(xx, np.median(yy[:,:,ll], axis=0), color=colors[ll], alpha=0.75, label='$l=%d$' % (ll+1))
         for pp in [50, 98]:
             percs = pp/2
             percs = [50-percs, 50+percs]
@@ -145,7 +146,7 @@ def plot_ClC0_medians(fobs, Cl_best, lmax, nshow):
 ######################################################################
 
 
-def lib_anisotropy(lib_path, hc_ref_10yr, nbest=100, nreals=50, lmax=LMAX, nside=NSIDE):
+def lib_anisotropy(lib_path, hc_ref_10yr=HC_REF15_10YR, nbest=100, nreals=50, lmax=LMAX, nside=NSIDE):
 
     # ---- read in file
     hdf_name = lib_path+'/sam_lib.hdf5'
@@ -201,7 +202,7 @@ def lib_anisotropy(lib_path, hc_ref_10yr, nbest=100, nreals=50, lmax=LMAX, nside
     # ---- plot median Cl/C0
     
     print('Plotting Cl/C0 for median realizations')
-    fig = plot_ClC0_medians(fobs, Cl_best, lmax, nshow=nreals)
+    fig = plot_ClC0_medians(fobs, Cl_best, lmax, nshow=nbest)
     fig_name = output_dir+'/sph_harm_lmax%d_nside%d_nbest%d.png' % (lmax, nside, nbest)
     fig.savefig(fig_name, dpi=300)
 
