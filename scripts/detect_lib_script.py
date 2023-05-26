@@ -14,10 +14,14 @@ DEF_SIGMA = 1e-6
 DEF_NSKIES = 25
 DEF_THRESH = 0.5
 
+GAMMA_RHO_GRID_PATH = '/Users/emigardiner/GWs/holodeck/output/rho_gamma_grids' # modify for system
+
 def _setup_argparse():
     parser = argparse.ArgumentParser()
     parser.add_argument('lib_path', action='store', type=str,
                         help="library path")
+    parser.add_argument('--grid_path', action='store', dest ='grid_path', type=str, default=GAMMA_RHO_GRID_PATH,
+                        help="gamma-rho interpolation grid path")
     
     parser.add_argument('-f', '--nfreqs', action='store', dest='nfreqs', type=int, default=DEF_NFREQS,
                         help='number of frequency bins')
@@ -73,7 +77,7 @@ def main():
 
     ds.detect_lib(hdf_name, output_dir, args.npsrs, args.sigma, 
                         nskies=args.nskies, thresh=args.thresh, plot=args.plot, debug=args.debug,
-                        dur=dur, cad=cad, dfobs=dfobs)
+                        dur=dur, cad=cad, dfobs=dfobs, grid_path=args.grid_path)
   
 
 if __name__ == "__main__":

@@ -20,6 +20,7 @@ import hasasia.sensitivity as hsen
 import hasasia.sim as hsim
 import hasasia as has
 
+GAMMA_RHO_GRID_PATH = '/Users/emigardiner/GWs/holodeck/output/rho_gamma_grids'
 
 
 ###################### Overlap Reduction Function ######################
@@ -1195,7 +1196,7 @@ def _build_gamma_interp_grid(Num, grid_name):
     
     np.savez(grid_name, rho_interp_grid=rho_interp, gamma_interp_grid=gamma_interp, Fe_bar=Fe_bar, Num=Num)
 
-def _gamma_ssi_cython(rho, grid_path = '/Users/emigardiner/GWs/holodeck/output/rho_gamma_grids'):
+def _gamma_ssi_cython(rho, grid_path):
     """ Calculate the detection probability for each single source in each realization.
     
     Parameters
@@ -1374,7 +1375,7 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
 def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
               theta_ss=None, phi_ss=None, iota_ss=None, psi_ss=None, Phi0_ss=None,
               Fe_bar = None, Amp_red=None, gamma_red=None, alpha_0=0.001, Fe_bar_guess=15,
-              ret_snr=False, print_nans=False, use_cython=True):
+              ret_snr=False, print_nans=False, use_cython=True, grid_path=GAMMA_RHO_GRID_PATH):
     """ Calculate the single source detection probability, and all intermediary steps for
     R strain realizations and S sky realizations.
     
@@ -1474,7 +1475,7 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     snr_ss = _snr_ss(amp, F_iplus, F_icross, iota_ss, dur, Phi0_ss, S_i, fobs) # (F,R,S,L)
     
     if use_cython:
-        gamma_ssi = _gamma_ssi_cython(snr_ss) # (F,R,S,L)
+        gamma_ssi = _gamma_ssi_cython(snr_ss, grid_path=grid_path) # (F,R,S,L)
     else:
         if (Fe_bar is None):
             Num = hc_ss[:,0,:].size # number of single sources in a single strain realization (F*L)
@@ -1496,7 +1497,8 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
 ########################################################################
 
 def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=0.5,
-                   dur=None, cad=None, dfobs=None, plot=True, debug=False):
+                   dur=None, cad=None, dfobs=None, plot=True, debug=False,
+                   grid_path=GAMMA_RHO_GRID_PATH):
     """ Calculate detection statistics for an ss library output.
 
     Parameters
@@ -1595,7 +1597,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=0.5,
         vals_ss = detect_ss_pta(psrs, cad, dur, fobs, dfobs,
                                                 hc_ss[nn], hc_bg[nn], ret_snr=True, use_cython=True,
                                                 theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss,
-                                                iota_ss=iota_ss, psi_ss=psi_ss)
+                                                iota_ss=iota_ss, psi_ss=psi_ss, grid_path=grid_path)
         dp_ss[nn,:,:], snr_ss[nn,...], gamma_ssi[nn] = vals_ss[0], vals_ss[1], vals_ss[2]
         df_ss[nn] = np.sum(dp_ss[nn]>thresh)/(nreals*nskies)
         df_bg[nn] = np.sum(dp_bg[nn]>thresh)/(nreals)
