@@ -1326,9 +1326,8 @@ cdef void _loudest_hc_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, double[:
     cdef int L = nloudest
     cdef int R = nreals
 
-    cdef int mm, qq, zz, ff, rr, ll, loud
+    cdef int mm, qq, zz, ff, rr, ll
     cdef double num, sum
-    cdef np.ndarray[np.double_t, ndim=3] maxes = np.zeros((F,R,L))
 
     # Setup random number generator from numpy library
     cdef bitgen_t *rng
@@ -1683,7 +1682,6 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
 
     cdef int mm, qq, zz, ff, rr, ll
     cdef double num, cur, sum_bg, m_bg, q_bg, z_bg, zfinal_bg
-    cdef np.ndarray[np.double_t, ndim=3] maxes = np.zeros((F,R,L))
 
     # Setup random number generator from numpy library
     cdef bitgen_t *rng
