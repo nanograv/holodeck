@@ -872,13 +872,14 @@ class Semi_Analytic_Model:
             The characteristic strain of the L loudest single sources at each frequency.
         hc_bg : (F, R) NDarray of scalars
             Characteristic strain of the GWB.
-        sspar : (3, F, R, L) NDarray of scalars
-            Astrophysical parametes of each loud single sources, for each frequency and realization. 
-            Returned only if params == True.
-        bgpar : (3, F, R) NDarray of scalars
-            Average effective binary astrophysical parameters for background sources at each frequency 
-            and realization, 
-            Returned only if params == True.
+        sspar : (4, F, R, L) NDarray of scalars
+            Astrophysical parametes (total mass, mass ratio, initial redshift, final redshift) of each 
+            loud single sources, for each frequency and realization. 
+            Returned only if params = True.
+        bgpar : (4, F, R) NDarray of scalars
+            Average effective binary astrophysical parameters (total mass, mass ratio, initial redshift, 
+            final redshift) for background sources at each frequency and realization, 
+            Returned only if params = True.
         """
 
         assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
