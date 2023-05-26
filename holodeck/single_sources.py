@@ -577,7 +577,7 @@ def ss_by_ndars(edges, number, realize, round = True):
         R=1
         bgnum = np.random.poisson(number[...,np.newaxis], 
                                 size = (number.shape + (R,)))
-        assert (np.all(bgnum%1 ==0)), 'nonzero numbers found with realize=True'
+        assert (np.all(bgnum%1 ==0)), 'non integer numbers found with realize=True'
     elif(utils.isinteger(realize)):
         R=realize
         bgnum = np.random.poisson(number[...,np.newaxis], 
