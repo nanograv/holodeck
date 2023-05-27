@@ -852,32 +852,38 @@ cdef int _snr_ss(
                 b_pol = -2 * cos(iotas[ff,ss,ll])
                 Phi_T = 2 * M_PI * freqs[ff] * dur + Phi_0[ff,ss,ll]
                 for rr in range(nreals):
+                    # calculate terms that depend on p, f, s, and l 
+                    # functions of F_iplus, F_icross, a_pol, b_pol, Phi_0, and Phi_T
+                    term1 = (
+                        pow(a_pol * F_iplus[pp,ff,ss,ll], 2.0) 
+                        * (Phi_T * (1.0 + 2.0 * pow(sin(Phi_0[ff,ss,ll]), 2.0))
+                            + cos(Phi_T) * (-1.0 * sin(Phi_T) + 4.0 * cos(Phi_0[ff,ss,ll]))
+                            - 4.0 * sin(Phi_0[ff,ss,ll])
+                            )
+                    )
+                    term2 = (
+                        pow(b_pol * F_icross[pp,ff,ss,ll], 2.0)
+                        * (Phi_T * (1.0 + 2.0 * pow(cos(Phi_0[ff,ss,ll]), 2.0))
+                            + sin(Phi_T) * cos(Phi_T) - 4.0 * cos(Phi_0[ff,ss,ll])
+                            )
+                    )
+                    term3 = (
+                        -2.0 * a_pol * b_pol * F_iplus[pp,ff,ss,ll] * F_icross[pp,ff,ss,ll]
+                        * (2.0 * Phi_T * sin(Phi_T) *cos(Phi_0[ff,ss,ll])
+                            + sin(Phi_T) * (sin(Phi_T) - 2.0 * sin(Phi_0[ff,ss,ll])
+                                            + 2.0 * cos(Phi_T) * cos(Phi_0[ff,ss,ll])
+                                            - 2.0 * cos(Phi_0[ff,ss,ll])
+                                            )
+                        )
+                    )
                     pta_snr_sq = 0
                     for pp in range(npsrs): 
+                        # calculate coefficient depending on 
+                        # function of amp, S_i, and freqs
                         coef = pow(amp[ff,rr,ll], 2.0) / (S_i[pp,ff,rr,ll] * 8 * M_PI * pow(freqs[ff], 3.0))
-                        term1 = (
-                            pow(a_pol * F_iplus[pp,ff,ss,ll], 2.0) 
-                            * (Phi_T * (1.0 + 2.0 * pow(sin(Phi_0[ff,ss,ll]), 2.0))
-                                + cos(Phi_T) * (-1.0 * sin(Phi_T) + 4.0 * cos(Phi_0[ff,ss,ll]))
-                                - 4.0 * sin(Phi_0[ff,ss,ll])
-                                )
-                        )
-                        term2 = (
-                            pow(b_pol * F_icross[pp,ff,ss,ll], 2.0)
-                            * (Phi_T * (1.0 + 2.0 * pow(cos(Phi_0[ff,ss,ll]), 2.0))
-                                + sin(Phi_T) * cos(Phi_T) - 4.0 * cos(Phi_0[ff,ss,ll])
-                                )
-                        )
-                        term3 = (
-                            -2.0 * a_pol * b_pol * F_iplus[pp,ff,ss,ll] * F_icross[pp,ff,ss,ll]
-                            * (2.0 * Phi_T * sin(Phi_T) *cos(Phi_0[ff,ss,ll])
-                                + sin(Phi_T) * (sin(Phi_T) - 2.0 * sin(Phi_0[ff,ss,ll])
-                                                + 2.0 * cos(Phi_T) * cos(Phi_0[ff,ss,ll])
-                                                - 2.0 * cos(Phi_0[ff,ss,ll])
-                                                )
-                            )
-                        )
-                        pta_snr_sq += coef*(term1 + term2 + term3)
+                        pta_snr_sq += coef*(term1 + term2 + term3) # sum snr^2 of all pulsars for a single source
+
+                    # set snr for a single source, using sum from all pulsars
                     snr_ss[ff,rr,ss,ll] = sqrt(pta_snr_sq)
 
 
