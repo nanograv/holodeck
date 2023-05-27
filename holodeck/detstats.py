@@ -1826,7 +1826,12 @@ def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref
     -------
     nsort : (N,) 1Darray
         Indices of the param space samples sorted by proximity to the reference 1yr amplitude.
-    
+    fidx : integer
+        Index of reference frequency.
+    hc_tt : (N,) 1Darray
+        Median total char strain at ref frequency, for each sample.
+    hc_ref : float
+        Reference char strain extrapolated to fidx frequency.
     """
     
     # find frequency bin nearest to 1/10yr
