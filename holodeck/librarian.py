@@ -665,14 +665,16 @@ def run_sam_at_pspace_num(args, space, pnum):
     return rv
 
 
-def run_model(sam, hard, nreals, gwb_flag=True, details_flag=False):
+def run_model(sam, hard, nreals, nfreqs, gwb_flag=True, details_flag=False):
     """Run the given modeling, storing requested data
     """
     fobs_cents, fobs_edges = holo.librarian.get_freqs(None)
+    fobs_edges = fobs_edges[:nfreqs+1]
+    fobs_cents = fobs_cents[:nfreqs]
     fobs_orb_cents = fobs_cents / 2.0     # convert from GW to orbital frequencies
     fobs_orb_edges = fobs_edges / 2.0     # convert from GW to orbital frequencies
 
-    data = dict(fobs=fobs_cents)
+    data = dict(fobs_cents=fobs_cents, fobs_edges=fobs_edges)
 
     redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
         fobs_orb_cents, sam, hard, cosmo
@@ -682,50 +684,10 @@ def run_model(sam, hard, nreals, gwb_flag=True, details_flag=False):
     number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
     if details_flag:
         data['static_binary_density'] = sam.static_binary_density
-        data['number'] = number
-        data['redz_final'] = redz_final
+        # data['number'] = number
+        data['coal'] = (redz_final > 0.0)
 
-        hc2 = holo.gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz_final)
-        denom = np.sum(hc2*number)
-        gwb_pars = []
-        bin_pars = []
-        for ii in range(3):
-            margins = np.arange(3).tolist()
-            del margins[ii]
-            margins = tuple(margins)
-            numer = np.sum(hc2*number, axis=margins)
-            tpar = numer / denom
-            gwb_pars.append(tpar)
-            tpar = np.sum(number, axis=margins)
-            bin_pars.append(tpar)
-
-        # calculate redz_final based distributions
-        # `redz_final` is edges: (M, Q, Z, F)
-        # `number` is cents: (M-1, Q-1, Z-1, F)
-        rz = redz_final.copy()
-        for ii in range(3):
-            rz = utils.midpoints(rz, axis=ii)
-
-        nzbins = len(sam.redz) - 1
-        nfreqs = len(fobs_orb_cents)
-        gwb_rz = np.zeros((nzbins, nfreqs))
-        bin_rz = np.zeros((nzbins, nfreqs))
-        hc2_num = hc2 * number
-        for ii in range(nfreqs):
-            rz_flat = rz[:, :, :, ii].flatten()
-            numer, *_ = sp.stats.binned_statistic(
-                rz_flat, hc2_num[:, :, :, ii].flatten(), bins=sam.redz, statistic='sum'
-            )
-            tpar = numer / denom
-            gwb_rz[:, ii] = tpar
-
-            tpar, *_ = sp.stats.binned_statistic(
-                rz_flat, number[:, :, :, ii].flatten(), bins=sam.redz, statistic='sum'
-            )
-            bin_rz[:, ii] = tpar
-
-        gwb_pars.append(gwb_rz)
-        bin_pars.append(bin_rz)
+        gwb_pars, bin_pars = _calc_model_details(edges, redz_final, number)
 
         data['gwb_params'] = gwb_pars
         data['bin_params'] = bin_pars
@@ -754,6 +716,55 @@ def run_model(sam, hard, nreals, gwb_flag=True, details_flag=False):
         data['gwb'] = gwb
 
     return data
+
+
+def _calc_model_details(edges, redz_final, number):
+    redz = edges[2]
+    nzbins = len(redz) - 1
+    nfreqs = len(edges[3]) - 1
+    hc2 = holo.gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz_final)
+    denom = np.sum(hc2*number)
+    gwb_pars = []
+    bin_pars = []
+    for ii in range(3):
+        margins = np.arange(2).tolist()
+        if ii in margins:
+            del margins[ii]
+        margins = tuple(margins)
+
+        numer = np.sum(hc2*number, axis=margins)
+        tpar = numer / denom
+        gwb_pars.append(tpar)
+
+        tpar = np.sum(number, axis=margins)
+        bin_pars.append(tpar)
+
+    # calculate redz_final based distributions
+    # `redz_final` is edges: (M, Q, Z, F)
+    # `number` is cents: (M-1, Q-1, Z-1, F)
+    rz = redz_final.copy()
+    for ii in range(3):
+        rz = utils.midpoints(rz, axis=ii)
+
+    gwb_rz = np.zeros((nzbins, nfreqs))
+    bin_rz = np.zeros((nzbins, nfreqs))
+    hc2_num = hc2 * number
+    for ii in range(nfreqs):
+        rz_flat = rz[:, :, :, ii].flatten()
+        numer, *_ = sp.stats.binned_statistic(
+            rz_flat, hc2_num[:, :, :, ii].flatten(), bins=redz, statistic='sum'
+        )
+        tpar = numer / denom
+        gwb_rz[:, ii] = tpar
+
+        tpar, *_ = sp.stats.binned_statistic(
+            rz_flat, number[:, :, :, ii].flatten(), bins=redz, statistic='sum'
+        )
+        bin_rz[:, ii] = tpar
+
+    gwb_pars.append(gwb_rz)
+    bin_pars.append(bin_rz)
+    return gwb_pars, bin_pars
 
 
 def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only=False):
