@@ -1747,11 +1747,11 @@ def plot_detprob(dp_ss_all, dp_bg_all, nsamp):
     ax.set_ylabel('Detection Probability, $\gamma$')
     ax.errorbar(np.arange(nsamp), np.mean(dp_bg_all, axis=1), 
                 yerr = np.std(dp_bg_all, axis=1), linestyle='', 
-                marker='d', capsize=5, color='cornflowerblue', alpha=0.75,
+                marker='d', capsize=5, color='cornflowerblue', alpha=0.5,
                 label = r'$\langle \gamma_\mathrm{BG} \rangle$')
     ax.errorbar(np.arange(nsamp), np.mean(dp_ss_all, axis=(1,2)),
                 yerr = np.std(dp_ss_all, axis=(1,2)), linestyle='', 
-                marker='o', capsize=5, color='orangered', alpha=0.75,
+                marker='o', capsize=5, color='orangered', alpha=0.5,
                 label = r'$\langle \gamma_\mathrm{SS} \rangle$')
     ax.set_yscale('log')
     ax.set_title('Average DP across Realizations')
@@ -1779,9 +1779,9 @@ def plot_detfrac(df_ss, df_bg, nsamp, thresh):
     """
     fig, ax = plt.subplots(figsize=(6.5,4))
     ax.plot(np.arange(nsamp), df_bg, color='cornflowerblue', label='BG',
-            marker='d')
+            marker='d', alpha=0.5)
     ax.plot(np.arange(nsamp), df_ss, color='orangered', label='SS',
-            marker='o')
+            marker='o', alpha=0.5)
     ax.set_xlabel('Param Space Sample')
     ax.set_ylabel('Detection Fraction')
     ax.set_title('Fraction of Realizations with DP > %0.2f' % thresh)
