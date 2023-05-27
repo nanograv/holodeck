@@ -1049,6 +1049,32 @@ class PS_Uniform_09B(PS_Generic_2):
 
 
 
+class PS_Uniform_08E(PS_Generic_2):
+    """`PS_Uniform_07A` with varying gamma_outer
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+            hard_gamma_outer=PD_Uniform(+1.5, +3.0),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_inner=-1.5,
+            hard_rchar=100.0,               # [pc]
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
 
 # ==============================================================================
 # ====    New-Astro-02 / PS_Generic_2    ====
