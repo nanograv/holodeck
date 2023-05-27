@@ -1178,6 +1178,7 @@ def fit_library_spectra(library_path, log, recreate=False):
 def fit_all_libraries_in_path(path, log, pattern=None, recreate=False):
     """Recursively find all `sam_lib.hdf5` files in the given path, and construct spectra fits for them.
     """
+
     path = Path(path)
     msg = "" if pattern is None else f" that match pattern {pattern}"
     log.info(f"fitting all libraries in path {path}" + msg)
