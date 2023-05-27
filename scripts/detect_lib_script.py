@@ -42,6 +42,8 @@ def _setup_argparse():
                         help='produce plots for each simulation configuration')
     parser.add_argument('--debug', action='store_true', default=False,
                         help='print steps along the way')
+    parser.add_argument('--snr_cython', action='store_true', default=False,
+                        help='Use cython for ss snr clculations')
     
     args = parser.parse_args()
     return args
@@ -77,7 +79,8 @@ def main():
 
     ds.detect_lib(hdf_name, output_dir, args.npsrs, args.sigma, 
                         nskies=args.nskies, thresh=args.thresh, plot=args.plot, debug=args.debug,
-                        dur=dur, cad=cad, dfobs=dfobs, grid_path=args.grid_path)
+                        dur=dur, cad=cad, dfobs=dfobs, grid_path=args.grid_path, 
+                        snr_cython=args.snr_cython)
   
 
 if __name__ == "__main__":

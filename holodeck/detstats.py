@@ -1409,7 +1409,7 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
 def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
               theta_ss=None, phi_ss=None, iota_ss=None, psi_ss=None, Phi0_ss=None,
               Fe_bar = None, Amp_red=None, gamma_red=None, alpha_0=0.001, Fe_bar_guess=15,
-              ret_snr=False, print_nans=False, use_cython=True, grid_path=GAMMA_RHO_GRID_PATH):
+              ret_snr=False, print_nans=False, snr_cython=True, gamma_cython=True, grid_path=GAMMA_RHO_GRID_PATH):
     """ Calculate the single source detection probability, and all intermediary steps for
     R strain realizations and S sky realizations.
     
@@ -1506,9 +1506,12 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
 
     # SNR (includes a_pol, b_pol, and Phi_T calculations internally)
-    snr_ss = _snr_ss(amp, F_iplus, F_icross, iota_ss, dur, Phi0_ss, S_i, fobs) # (F,R,S,L)
+    if snr_cython:
+        snr_ss = _snr_ss(amp, F_iplus, F_icross, iota_ss, dur, Phi0_ss, S_i, fobs) # (F,R,S,L)
+    else:
+        snr_ss = _snr_ss_5dim(amp, F_iplus, F_icross, iota_ss, dur, Phi0_ss, S_i, fobs) # (F,R,S,L)
     
-    if use_cython:
+    if gamma_cython:
         gamma_ssi = _gamma_ssi_cython(snr_ss, grid_path=grid_path) # (F,R,S,L)
     else:
         if (Fe_bar is None):
@@ -1532,7 +1535,7 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
 
 def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=0.5,
                    dur=None, cad=None, dfobs=None, plot=True, debug=False,
-                   grid_path=GAMMA_RHO_GRID_PATH):
+                   grid_path=GAMMA_RHO_GRID_PATH, snr_cython = True):
     """ Calculate detection statistics for an ss library output.
 
     Parameters
@@ -1629,7 +1632,8 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=0.5,
         if debug: print('on sample nn=%d out of N=%d' % (nn,nsamp))
         dp_bg[nn,:], snr_bg[nn,...] = detect_bg_pta(psrs, fobs, cad, hc_bg[nn], ret_snr=True)
         vals_ss = detect_ss_pta(psrs, cad, dur, fobs, dfobs,
-                                                hc_ss[nn], hc_bg[nn], ret_snr=True, use_cython=True,
+                                                hc_ss[nn], hc_bg[nn], ret_snr=True, 
+                                                gamma_cython=True, snr_cython=snr_cython,
                                                 theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss,
                                                 iota_ss=iota_ss, psi_ss=psi_ss, grid_path=grid_path)
         dp_ss[nn,:,:], snr_ss[nn,...], gamma_ssi[nn] = vals_ss[0], vals_ss[1], vals_ss[2]
