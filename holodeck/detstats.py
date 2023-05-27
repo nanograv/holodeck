@@ -1389,8 +1389,7 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, Amp_red, gamma_red)
 
     # amplitudw
-    amp = _amplitude(hc_ss, fobs[:,np.newaxis,np.newaxis], 
-                     dfobs[:,np.newaxis,np.newaxis]) # (F,R,L)
+    amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
 
     # SNR (includes a_pol, b_pol, and Phi_T calculations internally)
     snr_ss = _snr_ss(amp, F_iplus, F_icross, iota_ss, dur, Phi0_ss, S_i, fobs) # (F,R,S,L)
