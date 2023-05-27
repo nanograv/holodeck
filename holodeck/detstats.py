@@ -21,6 +21,7 @@ import hasasia.sim as hsim
 import hasasia as has
 
 GAMMA_RHO_GRID_PATH = '/Users/emigardiner/GWs/holodeck/output/rho_gamma_grids'
+HC_REF15_10YR = 11.2*10**-15 
 
 
 ###################### Overlap Reduction Function ######################
