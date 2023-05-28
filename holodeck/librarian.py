@@ -669,8 +669,9 @@ def run_model(sam, hard, nreals, nfreqs, gwb_flag=True, details_flag=False):
     """Run the given modeling, storing requested data
     """
     fobs_cents, fobs_edges = holo.librarian.get_freqs(None)
-    fobs_edges = fobs_edges[:nfreqs+1]
-    fobs_cents = fobs_cents[:nfreqs]
+    if nfreqs is not None:
+        fobs_edges = fobs_edges[:nfreqs+1]
+        fobs_cents = fobs_cents[:nfreqs]
     fobs_orb_cents = fobs_cents / 2.0     # convert from GW to orbital frequencies
     fobs_orb_edges = fobs_edges / 2.0     # convert from GW to orbital frequencies
 
