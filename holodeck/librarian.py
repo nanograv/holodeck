@@ -725,7 +725,8 @@ def _calc_model_details(edges, redz_final, number):
     hc2 = holo.gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz_final)
     denom = np.sum(hc2*number)
     gwb_pars = []
-    bin_pars = []
+    num_pars = []
+
     for ii in range(3):
         margins = np.arange(2).tolist()
         if ii in margins:
@@ -737,7 +738,7 @@ def _calc_model_details(edges, redz_final, number):
         gwb_pars.append(tpar)
 
         tpar = np.sum(number, axis=margins)
-        bin_pars.append(tpar)
+        num_pars.append(tpar)
 
     # calculate redz_final based distributions
     # `redz_final` is edges: (M, Q, Z, F)
@@ -763,8 +764,14 @@ def _calc_model_details(edges, redz_final, number):
         bin_rz[:, ii] = tpar
 
     gwb_pars.append(gwb_rz)
-    bin_pars.append(bin_rz)
-    return gwb_pars, bin_pars
+    num_pars.append(bin_rz)
+
+    for ii in range(4):
+        if np.ndim(gwb_pars[ii]) == 2:
+            gwb_pars[ii] = gwb_pars[ii][np.newaxis, :, :]
+            num_pars[ii] = num_pars[ii][np.newaxis, :, :]
+
+    return gwb_pars, num_pars
 
 
 def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only=False):
