@@ -685,8 +685,9 @@ def run_model(sam, hard, nreals, nfreqs, gwb_flag=True, details_flag=False):
     number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
     if details_flag:
         data['static_binary_density'] = sam.static_binary_density
-        # data['number'] = number
-        data['coal'] = (redz_final > 0.0)
+        data['number'] = number
+        data['redz_final'] = redz_final
+        data['coalescing'] = (redz_final > 0.0)
 
         gwb_pars, bin_pars = _calc_model_details(edges, redz_final, number)
 
@@ -766,11 +767,6 @@ def _calc_model_details(edges, redz_final, number):
 
     gwb_pars.append(gwb_rz)
     num_pars.append(bin_rz)
-
-    for ii in range(4):
-        if np.ndim(gwb_pars[ii]) == 2:
-            gwb_pars[ii] = gwb_pars[ii][np.newaxis, :, :]
-            num_pars[ii] = num_pars[ii][np.newaxis, :, :]
 
     return gwb_pars, num_pars
 
