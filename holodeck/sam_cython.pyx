@@ -626,7 +626,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.nonecheck(False)
-@cython.cdivision(True)
+@cython.cdivision(False)
 cdef int _dynamic_binary_number_at_fobs_gw(
     double[:] target_fobs_orb,
 
@@ -728,7 +728,10 @@ def gamma_of_rho_interp(rho, rsort, rho_interp_grid, gamma_interp_grid):
 
     return gamma
 
-
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
 cdef int _gamma_of_rho_interp(
     double[:] rho, long[:] rsort, 
     double[:] rho_interp_grid, double[:] gamma_interp_grid,
@@ -798,7 +801,10 @@ def snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
         snr_ss)
     return snr_ss
 
-
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
 cdef int _snr_ss(
     double[:,:,:] amp, 
     double[:,:,:,:] F_iplus,
@@ -842,7 +848,7 @@ cdef int _snr_ss(
     """
 
     cdef int pp, ff, rr, ss, ll
-    cdef float a_pol, b_pol, Phi_T, pta_snr_sq
+    cdef float a_pol, b_pol, Phi_T, pta_snr_sq, coef, term1, term2, term3
     # print('npsrs %d, nfreqs %d, nreals %d, nskies %d, nloudest %d' % (npsrs, nfreqs, nreals, nskies, nloudest))
     
     for ff in range(nfreqs):
