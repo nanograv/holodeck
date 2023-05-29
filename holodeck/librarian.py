@@ -34,7 +34,7 @@ except Exception as err:
     holo.log.warning(f"failed to load `mpi4py` in {__file__}: {err}")
 
 
-__version__ = "0.4"
+__version__ = "0.5"
 
 # Default argparse parameters
 DEF_NUM_REALS = 100
@@ -725,7 +725,7 @@ def _calc_model_details(edges, redz_final, number):
     nzbins = len(redz) - 1
     nfreqs = len(edges[3]) - 1
     hc2 = holo.gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz_final)
-    denom = np.sum(hc2*number)
+    denom = np.sum(hc2*number, axis=(0, 1, 2))
     gwb_pars = []
     num_pars = []
 
@@ -736,7 +736,7 @@ def _calc_model_details(edges, redz_final, number):
         margins = tuple(margins)
 
         numer = np.sum(hc2*number, axis=margins)
-        tpar = numer / denom
+        tpar = numer / denom[np.newaxis, np.newaxis, np.newaxis, :]
         gwb_pars.append(tpar)
 
         tpar = np.sum(number, axis=margins)
@@ -757,7 +757,7 @@ def _calc_model_details(edges, redz_final, number):
         numer, *_ = sp.stats.binned_statistic(
             rz_flat, hc2_num[:, :, :, ii].flatten(), bins=redz, statistic='sum'
         )
-        tpar = numer / denom
+        tpar = numer / denom[np.newaxis, :]
         gwb_rz[:, ii] = tpar
 
         tpar, *_ = sp.stats.binned_statistic(
