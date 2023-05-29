@@ -1050,7 +1050,7 @@ class PS_Uniform_09A(PS_Generic_2):
 
 
 class PS_Uniform_09B(PS_Generic_2):
-    """`PS_Uniform_07B` with varying gamma_inner (gamma_outer=+2.5, same as 07A)
+    """`PS_Uniform_07B` with varying gamma_inner (gamma_outer=+2.5, same as 07B)
     """
 
     def __init__(self, log, nsamples, sam_shape, seed):
