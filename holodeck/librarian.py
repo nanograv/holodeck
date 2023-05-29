@@ -757,7 +757,7 @@ def _calc_model_details(edges, redz_final, number):
         numer, *_ = sp.stats.binned_statistic(
             rz_flat, hc2_num[:, :, :, ii].flatten(), bins=redz, statistic='sum'
         )
-        tpar = numer / denom[np.newaxis, :]
+        tpar = numer / denom[ii]
         gwb_rz[:, ii] = tpar
 
         tpar, *_ = sp.stats.binned_statistic(
