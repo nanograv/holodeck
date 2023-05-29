@@ -45,7 +45,7 @@ PARAM_KEYS = {
     'hard_gamma_inner': r"phenom $\gamma_\mathrm{inner}$",
     'hard_gamma_outer': r"phenom $\gamma_\mathrm{outer}$",
     'hard_gamma_rot' : r"phenom $\gamma_{\mathrm{rot}}$",
-    'gsmf_phi0': r"GSMF $\Phi_0$",
+    'gsmf_phi0': r"GSMF $\Psi_0$",
     'gsmf_mchar0_log10': r"GSMF $\log_{10}(M_0/M_\odot)$",
     'gsmf_alpha0': r"GSMF $\alpha_0$",
     'gpf_zbeta': r"GPF $\beta_z$",
