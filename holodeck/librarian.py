@@ -34,7 +34,7 @@ except Exception as err:
     holo.log.warning(f"failed to load `mpi4py` in {__file__}: {err}")
 
 
-__version__ = "0.5"
+__version__ = "0.6"
 
 # Default argparse parameters
 DEF_NUM_REALS = 100
@@ -665,7 +665,8 @@ def run_sam_at_pspace_num(args, space, pnum):
     return rv
 
 
-def run_model(sam, hard, nreals, nfreqs, gwb_flag=True, details_flag=False):
+def run_model(sam, hard, nreals, nfreqs, nloudest=5,
+              gwb_flag=True, details_flag=False, singles_flag=False, params_flag=False):
     """Run the given modeling, storing requested data
     """
     fobs_cents, fobs_edges = holo.librarian.get_freqs(None)
@@ -694,24 +695,24 @@ def run_model(sam, hard, nreals, nfreqs, gwb_flag=True, details_flag=False):
         data['gwb_params'] = gwb_pars
         data['bin_params'] = bin_pars
 
-    # # calculate single sources and/or binary parameters
-    # if singles_flag or params_flag:
-    #     nloudest = NLOUDEST if singles_flag else 1
+    # calculate single sources and/or binary parameters
+    if singles_flag or params_flag:
+        nloudest = nloudest if singles_flag else 1
 
-    #     vals = holo.single_sources.ss_gws_redz(
-    #         edges, use_redz, number, realize=NREALS,
-    #         loudest=nloudest, params=params_flag,
-    #     )
-    #     if params_flag:
-    #         hc_ss, hc_bg, sspar, bgpar = vals
-    #         data['sspar'] = sspar
-    #         data['bgpar'] = bgpar
-    #     else:
-    #         hc_ss, hc_bg = vals
+        vals = holo.single_sources.ss_gws_redz(
+            edges, use_redz, number, realize=nreals,
+            loudest=nloudest, params=params_flag,
+        )
+        if params_flag:
+            hc_ss, hc_bg, sspar, bgpar = vals
+            data['sspar'] = sspar
+            data['bgpar'] = bgpar
+        else:
+            hc_ss, hc_bg = vals
 
-    #     if singles_flag:
-    #         data['hc_ss'] = hc_ss
-    #         data['hc_bg'] = hc_bg
+        if singles_flag:
+            data['hc_ss'] = hc_ss
+            data['hc_bg'] = hc_bg
 
     if gwb_flag:
         gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, nreals)
