@@ -1701,6 +1701,7 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
             m_bg = 0
             q_bg = 0
             z_bg = 0
+            zfinal_bg = 0
             for bb in range(M*Q*Z): #iterate through bins, loudest to quietest
                 mm = msort[bb]
                 qq = qsort[bb]
