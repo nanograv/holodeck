@@ -66,9 +66,9 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
         Astrophysical parametes (total mass, mass ratio, initial redshift, final redshift) of each 
         loud single sources, for each frequency and realization. 
         Returned only if params = True.
-    bgpar : (4, F, R) NDarray of scalars
+    bgpar : (7, F, R) NDarray of scalars
         Average effective binary astrophysical parameters (total mass, mass ratio, initial redshift, 
-        final redshift) for background sources at each frequency and realization, 
+        final redshift, final comoving distances, final separation, final angular separation) for background sources at each frequency and realization, 
         Returned only if params = True.
     """
  
@@ -96,9 +96,30 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
             # lspar = avg parameters of loudest sources
             # bgpar = avg parameters of background
             # ssidx = indices of loud single sources
+
+            # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)
+            #    where M, Q, Z are edges and Fc is frequency centers
+            # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
+            for dd in range(3):
+                redz = np.moveaxis(redz, dd, 0)
+                redz = kale.utils.midpoints(redz, axis=0)
+                redz = np.moveaxis(redz, 0, dd)
+
+            dcom_final = cosmo.comoving_distance(redz).to('Mpc').value # (M,Q,Z,F)
+
+            fobs_orb_edges = edges[-1]
+            fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges)
+            frst_orb_cents = utils.frst_from_fobs(fobs_orb_cents[np.newaxis,np.newaxis,np.newaxis,:], redz) # (M,Q,Z,F,), final
+
+
+            sepa = utils.kepler_sepa_from_freq(mt[:,np.newaxis,np.newaxis,np.newaxis], frst_orb_cents) # (M,Q,Z,F)
+            asep = utils.asep_from_sepa(sepa, dcom_final, redz) # (M,Q,Z,F)
+
             hc2ss, hc2bg, sspar, bgpar = \
-                holo.cyutils.loudest_hc_and_par_from_sorted_redz(number, h2fdf, realize, loudest,
-                                                            mt, mr, rz, redz, msort, qsort, zsort)
+                holo.cyutils.loudest_hc_and_par_from_sorted_redz(
+                    number, h2fdf, realize, loudest,
+                    mt, mr, rz, redz, dcom_final, sepa, asep,
+                    msort, qsort, zsort)
             hc_ss = np.sqrt(hc2ss) # calculate single source strain
             hc_bg = np.sqrt(hc2bg) # calculate background strain
             return hc_ss, hc_bg, sspar, bgpar
