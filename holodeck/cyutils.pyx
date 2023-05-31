@@ -1698,7 +1698,7 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
     cdef int R = nreals
 
     cdef int mm, qq, zz, ff, rr, ll
-    cdef double num, cur, sum_bg, m_bg, q_bg, z_bg, zfinal_bg, dcom_bg, dcfinal_bg, sepa_bg, asep_bg
+    cdef double num, cur, sum_bg, m_bg, q_bg, z_bg, zfinal_bg, dcom_bg, sepa_bg, asep_bg
 
     # Setup random number generator from numpy library
     cdef bitgen_t *rng
@@ -1717,8 +1717,7 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
             q_bg = 0
             z_bg = 0
             zfinal_bg = 0
-            dcinit_bg = 0
-            dcfinal_bg = 0
+            dcom_bg = 0
             sepa_bg = 0
             asep_bg = 0
             for bb in range(M*Q*Z): #iterate through bins, loudest to quietest
