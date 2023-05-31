@@ -1769,9 +1769,9 @@ def asep_from_sepa(sepa, dcom, redz):
     Parameters
     ----------
     sepa : ArrayLike
-        Binary separation, in pc
+        Binary separation, in cm
     dcom : ArrayLike
-        Binary comoving distance, in Mpc
+        Binary comoving distance, in cm
     redz : ArrayLike
         Binary redshift
 
@@ -1781,8 +1781,8 @@ def asep_from_sepa(sepa, dcom, redz):
         Angular separation
 
     """
-    dang = dcom * MPC / (1.0 + redz)   # angular-diameter distance [cm]
-    asep = sepa * PC / dang           # angular-separation [radians]
+    dang = dcom / (1.0 + redz)   # angular-diameter distance [cm]
+    asep = sepa / dang           # angular-separation [radians]
     return asep
 
 
