@@ -786,7 +786,7 @@ def all_sspars(fobs_gw_cents, sspar):
         Includes mtot, mrat, redz_init, redz_final, dcom_final, sepa_final (cm), and asep_final.
     """
     mtot = sspar[0,:,:] # (F,R,L) in g
-    mrat = sspar[0,:,:] # (F,R,L) dimensionless
+    mrat = sspar[1,:,:] # (F,R,L) dimensionless
     redz_init = sspar[2,:,:]  # (F,R,L) dimensionless
     redz_final = sspar[3,:,:]  # (F,R,L) dimensionless
     dcom_final = holo.cosmo.comoving_distance(redz_final).to('cm').value # (F,R,L) in cm
