@@ -1828,8 +1828,6 @@ def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref
         Indices of the param space samples sorted by proximity to the reference 1yr amplitude.
     fidx : integer
         Index of reference frequency.
-    hc_tt : (N,) 1Darray
-        Median total char strain at ref frequency, for each sample.
     hc_ref : float
         Reference char strain extrapolated to fidx frequency.
     """
@@ -1842,18 +1840,22 @@ def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref
         # find reference (e.g. 12.5 yr) char strain
         hc_ref = amp_to_hc(amp_ref, fobs[fidx], dfobs[fidx])
         
-    # select 1/yr median strains of samples
-    hc_tt = np.sqrt(hc_bg[:,fidx,:]**2 + np.sum(hc_ss[:,fidx,:,:]**2, axis=-1)) # (N,R)
-    hc_tt = np.median(hc_tt, axis=1) 
 
     # extrapolate hc_ref at freq closest to 1/10yr from 1/10yr ref
     hc_ref = hc_ref * (fobs[fidx]*YR/.1)**(-2/3)
 
+    # select 1/yr median strains of samples
+    hc_tt = np.sqrt(hc_bg[:,fidx,:]**2 + np.sum(hc_ss[:,fidx,:,:]**2, axis=-1)) # (N,R)
+    hc_diff = np.abs(hc_tt - hc_ref) # (N,R)
+    print('hc_diff', hc_diff.shape)
+    hc_diff = np.median(hc_diff, axis=-1) # median of differences (N,)
+    print('hc_diff', hc_diff.shape)
+
     # sort by closest
-    nsort = np.argsort(np.abs(hc_tt-hc_ref))
+    nsort = np.argsort(hc_diff)
 
     if ret_all:
-        return nsort, fidx, hc_tt, hc_ref
+        return nsort, fidx, hc_ref
     return nsort
 
 ############################ Calibrate PTA ############################# 
