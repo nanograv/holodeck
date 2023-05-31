@@ -28,7 +28,7 @@ import scipy.stats    # noqa
 import scipy.special  # noqa
 
 from holodeck import log, cosmo
-from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR
+from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC
 
 # [Sesana2004]_ Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
@@ -1772,6 +1772,30 @@ def lambda_factor_dlnf(frst, dfdt, redz, dcom=None):
     # Calculate weighting
     lambda_fact = vfac * tfac
     return lambda_fact
+
+
+def asep_from_sepa(sepa, dcom, redz):
+    """ Calculate angular separation
+    
+    Parameters
+    ----------
+    sepa : ArrayLike
+        Binary separation, in cm
+    dcom : ArrayLike
+        Binary comoving distance, in cm
+    redz : ArrayLike
+        Binary redshift
+
+    Returns
+    -------
+    asep : ArrayLike
+        Angular separation
+
+    """
+    dang = dcom / (1.0 + redz)   # angular-diameter distance [cm]
+    asep = sepa / dang           # angular-separation [radians]
+    return asep
+
 
 
 # =================================================================================================
