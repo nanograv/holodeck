@@ -133,3 +133,4 @@ run_gen_lib_sams__*
 *.c
 *.html
 .gitattributes
+*.slurm
