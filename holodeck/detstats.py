@@ -1408,7 +1408,7 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
 
 
 def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
-              theta_ss=None, phi_ss=None, iota_ss=None, psi_ss=None, Phi0_ss=None,
+              theta_ss=None, phi_ss=None, Phi0_ss=None, iota_ss=None, psi_ss=None, 
               Fe_bar = None, Amp_red=None, gamma_red=None, alpha_0=0.001, Fe_bar_guess=15,
               ret_snr=False, print_nans=False, snr_cython=True, gamma_cython=True, grid_path=GAMMA_RHO_GRID_PATH):
     """ Calculate the single source detection probability, and all intermediary steps for
