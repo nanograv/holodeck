@@ -1020,7 +1020,7 @@ def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = T
         Input to be integrated.
     xx : ArrayLike of scalar,
         The sample points corresponding to the `yy` values.
-        This must be either be shaped as
+        This must either be shaped as
         * the same number of dimensions as `yy`, with the same length along the `axis` dimension, or
         * 1D with length matching `yy[axis]`
     axis : int,
