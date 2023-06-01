@@ -675,7 +675,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.nonecheck(False)
-@cython.cdivision(False)
+@cython.cdivision(True)
 cdef int _dynamic_binary_number_at_fobs_gw(
     double[:] target_fobs_orb,
 
