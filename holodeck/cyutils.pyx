@@ -1326,9 +1326,8 @@ cdef void _loudest_hc_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, double[:
     cdef int L = nloudest
     cdef int R = nreals
 
-    cdef int mm, qq, zz, ff, rr, ll, loud
+    cdef int mm, qq, zz, ff, rr, ll
     cdef double num, sum
-    cdef np.ndarray[np.double_t, ndim=3] maxes = np.zeros((F,R,L))
 
     # Setup random number generator from numpy library
     cdef bitgen_t *rng
@@ -1559,7 +1558,10 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
             lspar[2,ff,rr] = z_ls/sum_ls # ls avg redshift
 
 
-def loudest_hc_and_par_from_sorted_redz(number, h2fdf, nreals, nloudest, mt, mr, redz, msort, qsort, zsort, normal_threshold=1e10):
+def loudest_hc_and_par_from_sorted_redz(
+    number, h2fdf, nreals, nloudest, 
+    mt, mr, rz, redz_final, dcom_final, sepa, angs,
+    msort, qsort, zsort, normal_threshold=1e10):
     """
     Calculates the characteristic strain and binary parameters from loud single sources and a 
     background of all other sources.
@@ -1578,8 +1580,16 @@ def loudest_hc_and_par_from_sorted_redz(number, h2fdf, nreals, nloudest, mt, mr,
         Total masses, M, of each bin center.
     mr : (Q,) 1Darray of scalars
         Mass ratios, q, of each bin center.
-    redz : (M,Q,Z,F) NDarray of scalars
-        Final redshifts, z, of each bin.
+    rz : (Z,) 1Darray of scalars
+        Redshifts, z, of each bin center.
+    redz_final : (M,Q,Z,F) NDarray of scalars
+        Final redshifts of each bin.
+    dcom_final : (M,Q,Z,F) NDarray of scalars
+        Final comoving distances of each bin.
+    sepa : (M,Q,Z,F) NDarray of scalars
+        Final separations of each mass and frequency combination.
+    angs : (M,Q,Z,F)
+        Final angular separations of each bin.
     msort : (M*Q*Z,) 1Darray
         M indices of each bin, sorted from largest to smallest h2fdf.
     qsort : (M*Q*Z,) 1Darray
@@ -1595,10 +1605,12 @@ def loudest_hc_and_par_from_sorted_redz(number, h2fdf, nreals, nloudest, mt, mr,
         Char strain squared of the loudest single sources.
     hc2bg : (F, R) Ndarray of scalars
         Char strain squared of the background.
-    sspar : (3, F, R) NDarray of scalars
+    sspar : (4, F, R) NDarray of scalars
         Effective M, q, z parameters of the loudest L sources.
-    bgpar : (3, F, R) NDarray of scalars
+        mass, ratio, redshift, redshift_final
+    bgpar : (4, F, R) NDarray of scalars
         Average effective M, q, z parameters of the background.
+        mass, ratio, redshift, redshift_final
     """
 
     cdef long[:] shape = np.array(number.shape)
@@ -1607,10 +1619,11 @@ def loudest_hc_and_par_from_sorted_redz(number, h2fdf, nreals, nloudest, mt, mr,
     L = nloudest
     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
-    cdef np.ndarray[np.double_t, ndim=4] sspar = np.zeros((3,F,R,L))
-    cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
+    cdef np.ndarray[np.double_t, ndim=4] sspar = np.zeros((4,F,R,L))
+    cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((7,F,R))
     _loudest_hc_and_par_from_sorted_redz(shape, h2fdf, number, nreals, nloudest, normal_threshold,
-                            mt, mr, redz, msort, qsort, zsort,
+                            mt, mr, rz, redz_final, dcom_final, sepa, angs,
+                            msort, qsort, zsort,
                             hc2ss, hc2bg, sspar, bgpar)
     return hc2ss, hc2bg, sspar, bgpar
 
@@ -1621,7 +1634,8 @@ def loudest_hc_and_par_from_sorted_redz(number, h2fdf, nreals, nloudest, mt, mr,
 @cython.cdivision(True)
 cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number,
             long nreals, long nloudest, long thresh,
-            double[:] mt, double[:] mr, double[:,:,:,:] redz,
+            double[:] mt, double[:] mr, double[:] rz, 
+            double[:,:,:,:] redz_final, double[:,:,:,:] dcom_final, double[:,:,:,:] sepa, double[:,:,:,:] angs,
             long[:] msort, long[:] qsort, long[:] zsort,
             double[:,:,:] hc2ss, double[:,:] hc2bg, double[:,:,:,:] sspar, double[:,:,:] bgpar):
     """
@@ -1643,8 +1657,16 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
         Total masses of each bin center.
     mr : (Q,) 1Darray of scalars
         Mass ratios of each bin center.
-    redz : (M,Q,Z,F) 1Darray of scalars
-        Final redshifts of each bin center.
+    rz : (Z,) 1Darray of scalars
+        Redshifts, z, of each bin center.
+    redz_final : (M,Q,Z,F) NDarray of scalars
+        Final redshifts of each bin.
+    dcom_final : (M,Q,Z,F) NDarray of scalars
+        Final comoving distances of each bin.
+    sepa : (M,Q,Z,F) NDarray of scalars
+        Final separations of each bin.
+    angs : (M,Q,Z,F)
+        Final angular separations of each bin.
     msort : (M*Q*Z,) 1Darray
         M indices of each bin, sorted from largest to smallest h2fdf.
     qsort : (M*Q*Z,) 1Darray
@@ -1655,10 +1677,12 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
         (Memory address of) single source characteristic strain squared array.
     hc2bg : double[:,:] array
         (Memory address of) background characteristic strain squared array.
-    sspar : (3, F, R) NDarray of scalars
+    sspar : (4, F, R) NDarray of scalars
         Effective M, q, z parameters of the loudest L sources.
-    bgpar : (3, F, R) NDarray of scalars
+        mass, ratio, redshift, redshift_final
+    bgpar : (4, F, R) NDarray of scalars
         Average effective M, q, z parameters of the background.
+        mass, ratio, redshift, redshift_final
 
     Returns
     -------
@@ -1674,8 +1698,7 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
     cdef int R = nreals
 
     cdef int mm, qq, zz, ff, rr, ll
-    cdef double num, cur, sum_bg, m_bg, q_bg, z_bg
-    cdef np.ndarray[np.double_t, ndim=3] maxes = np.zeros((F,R,L))
+    cdef double num, cur, sum_bg, m_bg, q_bg, z_bg, zfinal_bg, dcom_bg, sepa_bg, angs_bg
 
     # Setup random number generator from numpy library
     cdef bitgen_t *rng
@@ -1693,6 +1716,10 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
             m_bg = 0
             q_bg = 0
             z_bg = 0
+            zfinal_bg = 0
+            dcom_bg = 0
+            sepa_bg = 0
+            angs_bg = 0
             for bb in range(M*Q*Z): #iterate through bins, loudest to quietest
                 mm = msort[bb]
                 qq = qsort[bb]
@@ -1715,7 +1742,8 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
                     # store indices of ll loudest source
                     sspar[0,ff,rr,ll] = mt[mm]
                     sspar[1,ff,rr,ll] = mr[qq]
-                    sspar[2,ff,rr,ll] = redz[mm,qq,zz,ff]
+                    sspar[2,ff,rr,ll] = rz[zz]
+                    sspar[3,ff,rr,ll] = redz_final[mm,qq,zz,ff]
 
                     # update number and ll index
                     num -= 1
@@ -1725,13 +1753,21 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
                 # add to average parameters of background sources
                 m_bg += num * cur * mt[mm] # tot weight bg mass
                 q_bg += num * cur * mr[qq] # tot weighted bg ratio
-                z_bg += num * cur * redz[mm,qq,zz,ff] # tot weighted bg redshift
+                z_bg += num * cur * rz[zz] # tot weighted bg redshift
+                zfinal_bg += num * cur * redz_final[mm,qq,zz,ff] # tot weighted bg redshift after hardening
+                dcom_bg += num * cur * dcom_final[mm,qq,zz,ff] # tot weighted bg com. dist. after hardening
+                sepa_bg += num * cur * sepa[mm,qq,zz,ff] # tot weighted bg separation after hardening
+                angs_bg += num * cur * angs[mm,qq,zz,ff] # tot weighted bg angular separation after hardening
 
             hc2bg[ff,rr] = sum_bg # background strain
             # background average parameters
             bgpar[0,ff,rr] = m_bg/sum_bg # bg avg mass
             bgpar[1,ff,rr] = q_bg/sum_bg # bg avg ratio
             bgpar[2,ff,rr] = z_bg/sum_bg # bg avg redshift
+            bgpar[3,ff,rr] = zfinal_bg/sum_bg # bg avg redshift after hardening
+            bgpar[4,ff,rr] = dcom_bg/sum_bg # bg avg comoving distance after hardening
+            bgpar[5,ff,rr] = sepa_bg/sum_bg # bg avg binary separation after hardening
+            bgpar[6,ff,rr] = angs_bg/sum_bg # bg avg binary angular separation after hardening
 
 
 
