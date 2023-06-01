@@ -866,7 +866,7 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
 
     if (not gwb_only) and has_params:
         sspar = np.zeros((nsamp, 4, nfreqs, nreals, nloudest))
-        bgpar = np.zeros((nsamp, 4, nfreqs, nreals))
+        bgpar = np.zeros((nsamp, 7, nfreqs, nreals))
     else:
         sspar = None
         bgpar = None
