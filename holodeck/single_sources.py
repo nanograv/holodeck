@@ -28,7 +28,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 log = holo.log
 log.setLevel(logging.INFO)
 
-par_names = np.array(['mtot', 'mrat', 'redz_init', 'redz_final', 'dcom_final', 'sepa_final', 'asep_final'])
+par_names = np.array(['mtot', 'mrat', 'redz_init', 'redz_final', 'dcom_final', 'sepa_final', 'angs_final'])
 par_labels = np.array(['Total Mass $M$ (g)', 'Mass Ratio $q$', 'Initial Redshift $z_i$', 'Final Redshift $z_f$', 
                    'Final Comoving Distance $d_c$ (Mpc)', 'Final Separation (pc)', 'Final Angular Separation (rad)'])
 par_units = np.array([1/MSOL, 1, 1, 1, 1/MPC,  1/PC, 1])
@@ -117,12 +117,12 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
 
 
             sepa = utils.kepler_sepa_from_freq(mt[:,np.newaxis,np.newaxis,np.newaxis], frst_orb_cents) # (M,Q,Z,F) in cm
-            asep = utils.asep_from_sepa(sepa, dcom_final, redz) # (M,Q,Z,F) use sepa and dcom in cm
+            angs = utils.angs_from_sepa(sepa, dcom_final, redz) # (M,Q,Z,F) use sepa and dcom in cm
 
             hc2ss, hc2bg, sspar, bgpar = \
                 holo.cyutils.loudest_hc_and_par_from_sorted_redz(
                     number, h2fdf, realize, loudest,
-                    mt, mr, rz, redz, dcom_final, sepa, asep,
+                    mt, mr, rz, redz, dcom_final, sepa, angs,
                     msort, qsort, zsort)
             hc_ss = np.sqrt(hc2ss) # calculate single source strain
             hc_bg = np.sqrt(hc2bg) # calculate background strain
@@ -772,7 +772,7 @@ def h2fdf(edges):
 
 def all_sspars(fobs_gw_cents, sspar):
     """ Calculate all single source parameters incl.
-    ['mtot' 'mrat' 'redz_init' 'redz_final' 'dcom_final' 'sepa_final' 'asep_final']
+    ['mtot' 'mrat' 'redz_init' 'redz_final' 'dcom_final' 'sepa_final' 'angs_final']
 
     Parameters
     ----------
@@ -786,7 +786,7 @@ def all_sspars(fobs_gw_cents, sspar):
     -------
     sspar_all : (7,F,R,L) NDarray
         All single source parameters, corresponding to those in bgpar as calculated by ss_gws_redz().
-        Includes mtot, mrat, redz_init, redz_final, dcom_final, sepa_final (cm), and asep_final.
+        Includes mtot, mrat, redz_init, redz_final, dcom_final, sepa_final (cm), and angs_final.
     """
     mtot = sspar[0,:,:] # (F,R,L) in g
     mrat = sspar[1,:,:] # (F,R,L) dimensionless
@@ -796,8 +796,8 @@ def all_sspars(fobs_gw_cents, sspar):
     fobs_orb_cents = fobs_gw_cents/2.0  # (F,)
     frst_orb_cents = utils.frst_from_fobs(fobs_orb_cents[:,np.newaxis,np.newaxis], redz_final) #  (F,R,L) in Hz
     sepa = utils.kepler_sepa_from_freq(mtot, frst_orb_cents) #  (F,R,L) in cm
-    asep = utils.asep_from_sepa(sepa, dcom_final, redz_final)  # (F,R,L) in cm
-    sspar_all = np.array([mtot, mrat, redz_init, redz_final, dcom_final, sepa, asep])
+    angs = utils.angs_from_sepa(sepa, dcom_final, redz_final)  # (F,R,L) in cm
+    sspar_all = np.array([mtot, mrat, redz_init, redz_final, dcom_final, sepa, angs])
     return sspar_all
 
 
