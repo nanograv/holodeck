@@ -1763,7 +1763,7 @@ def lambda_factor_dlnf(frst, dfdt, redz, dcom=None):
     return lambda_fact
 
 
-def asep_from_sepa(sepa, dcom, redz):
+def angs_from_sepa(sepa, dcom, redz):
     """ Calculate angular separation
     
     Parameters
@@ -1777,13 +1777,13 @@ def asep_from_sepa(sepa, dcom, redz):
 
     Returns
     -------
-    asep : ArrayLike
+    angs : ArrayLike
         Angular separation
 
     """
     dang = dcom / (1.0 + redz)   # angular-diameter distance [cm]
-    asep = sepa / dang           # angular-separation [radians]
-    return asep
+    angs = sepa / dang           # angular-separation [radians]
+    return angs
 
 
 

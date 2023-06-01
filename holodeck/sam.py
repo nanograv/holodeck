@@ -876,9 +876,10 @@ class Semi_Analytic_Model:
             Astrophysical parametes (total mass, mass ratio, initial redshift, final redshift) of each 
             loud single sources, for each frequency and realization. 
             Returned only if params = True.
-        bgpar : (4, F, R) NDarray of scalars
+        bgpar : (7, F, R) NDarray of scalars
             Average effective binary astrophysical parameters (total mass, mass ratio, initial redshift, 
-            final redshift) for background sources at each frequency and realization, 
+            final redshift, final comoving distance, final separation, final angular separation) 
+            for background sources at each frequency and realization, 
             Returned only if params = True.
         """
 
