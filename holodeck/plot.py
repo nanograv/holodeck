@@ -42,19 +42,19 @@ LABEL_HARDENING_TIME = r"Hardening Time $[\mathrm{Gyr}]$"
 
 PARAM_KEYS = {
     'hard_time': r"phenom $\tau_f$",
-    'hard_gamma_inner': r"phenom $\gamma_\mathrm{inner}$",
-    'hard_gamma_outer': r"phenom $\gamma_\mathrm{outer}$",
-    'hard_gamma_rot' : r"phenom $\gamma_{\mathrm{rot}}$",
-    'gsmf_phi0': r"GSMF $\Psi_0$",
-    'gsmf_mchar0_log10': r"GSMF $\log_{10}(M_0/M_\odot)$",
-    'gsmf_alpha0': r"GSMF $\alpha_0$",
-    'gpf_zbeta': r"GPF $\beta_z$",
-    'gpf_qgamma': r"GPF $\gamma_q$",
-    'gmt_norm': r"GMT $\tau_\mathrm{GMT}$",
-    'gmt_zbeta': r"GMT $\beta_z$",
-    'mmb_mamp_log10': r"MMB $\log_{10}(M_0/M_\odot)$",
-    'mmb_plaw': r"MMB $\alpha$",
-    'mmb_scatter_dex': r"MMB $\epsilon$",
+    'hard_gamma_inner': r"phenom $\nu_\mathrm{inner}$",
+    'hard_gamma_outer': r"phenom $\nu_\mathrm{outer}$",
+    'hard_gamma_rot' : r"phenom $\nu_{\mathrm{rot}}$",
+    'gsmf_phi0': r"GSMF $\psi_0$",
+    'gsmf_mchar0_log10': r"GSMF $m_{\psi,0}$",
+    'gsmf_alpha0': r"GSMF $\alpha_{\psi,0}$",
+    'gpf_zbeta': r"GPF $\beta_{p,z}$",
+    'gpf_qgamma': r"GPF $\gamma_{p,0}$",
+    'gmt_norm': r"GMT $T_0$",
+    'gmt_zbeta': r"GMT $\beta_{t,z}$",
+    'mmb_mamp_log10': r"MMB $\mu$",
+    'mmb_plaw': r"MMB $\alpha_{\mu}$",
+    'mmb_scatter_dex': r"MMB $\epsilon_{\mu}$",
 }
 
 COLORS_MPL = plt.rcParams['axes.prop_cycle'].by_key()['color']
@@ -102,7 +102,7 @@ class MidpointLogNormalize(mpl.colors.LogNorm):
         return vals
 
 
-def figax_single(**kwargs):
+def figax_single(height=None, **kwargs):
     mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
     plt.rcParams['axes.grid'] = True
     plt.rcParams['grid.alpha'] = 0.15
@@ -115,7 +115,9 @@ def figax_single(**kwargs):
     mpl.rcParams['xtick.labelsize'] = FONTSIZE*0.8
     mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
 
-    figsize_single = [FIGSIZE, FIGSIZE * GOLDEN_RATIO]
+    if height is None:
+        height = FIGSIZE * GOLDEN_RATIO
+    figsize_single = [FIGSIZE, height]
     adjust_single = dict(left=0.15, bottom=0.15, right=0.95, top=0.95)
 
     kwargs.setdefault('figsize', figsize_single)
@@ -125,7 +127,7 @@ def figax_single(**kwargs):
     return figax(**kwargs)
 
 
-def figax_double(**kwargs):
+def figax_double(height=None, **kwargs):
     mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
     plt.rcParams['axes.grid'] = True
     plt.rcParams['grid.alpha'] = 0.15
@@ -138,7 +140,10 @@ def figax_double(**kwargs):
     mpl.rcParams['xtick.labelsize'] = FONTSIZE*0.8
     mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
 
-    figsize_double = [2*FIGSIZE, 2*FIGSIZE*GOLDEN_RATIO]
+    if height is None:
+        height = 2 * FIGSIZE * GOLDEN_RATIO
+
+    figsize_double = [2*FIGSIZE, height]
     adjust_double = dict(left=0.10, bottom=0.10, right=0.98, top=0.95)
 
     kwargs.setdefault('figsize', figsize_double)
@@ -677,8 +682,9 @@ def _draw_plaw(ax, freqs, amp=1e-15, f0=1/YR, **kwargs):
     return ax.plot(freqs, plaw, **kwargs)
 
 
-def _twin_hz(ax, nano=True, fs=8, **kw):
+def _twin_hz(ax, nano=True, fs=10, **kw):
     tw = ax.twiny()
+    tw.grid(False)
     xlim = np.array(ax.get_xlim()) / YR
     if nano:
         label = LABEL_GW_FREQUENCY_NHZ
@@ -691,8 +697,9 @@ def _twin_hz(ax, nano=True, fs=8, **kw):
     return tw
 
 
-def _twin_yr(ax, nano=True, fs=8, label=True, **kw):
+def _twin_yr(ax, nano=True, fs=10, label=True, **kw):
     tw = ax.twiny()
+    tw.grid(False)
     xlim = np.array(ax.get_xlim()) * YR
     if nano:
         xlim /= 1e9
@@ -814,7 +821,7 @@ def violins(ax, xx, yy, zz, width, **kwargs):
     return handle
 
 
-def violin(ax, xx, yy, zz, width, side='both', clip_pdf=None,
+def violin(ax, xx, yy, zz, width, median_log10=False, side='both', clip_pdf=None,
            median={}, line={}, fill={}, **kwargs):
     assert np.ndim(xx) == 0
     assert np.shape(xx) == np.shape(width)
@@ -840,11 +847,6 @@ def violin(ax, xx, yy, zz, width, side='both', clip_pdf=None,
         assert np.ndim(clip_pdf) == 0
         assert clip_pdf < 1.0
 
-    dy = np.diff(yy)
-    cdf = 0.5 * (zz[1:] + zz[:-1]) * dy
-    cdf = np.concatenate([[0.0, ], cdf])
-    cdf = np.cumsum(cdf)
-
     zz = zz / zz.max()
 
     if median is True:
@@ -853,6 +855,13 @@ def violin(ax, xx, yy, zz, width, side='both', clip_pdf=None,
         median = None
 
     if median is not None:
+        if median_log10:
+            dy = np.diff(np.log10(yy))
+        else:
+            dy = np.diff(yy)
+        cdf = 0.5 * (zz[1:] + zz[:-1]) * dy
+        cdf = np.concatenate([[0.0, ], cdf])
+        cdf = np.cumsum(cdf)
         med = np.interp([0.5], cdf/cdf.max(), yy)
 
     if clip_pdf is not None:
