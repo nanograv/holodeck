@@ -17,6 +17,7 @@ import numbers
 import os
 import subprocess
 import warnings
+from pathlib import Path
 from typing import Optional, Tuple, Union, List  # , Sequence,
 
 import h5py
@@ -260,6 +261,13 @@ def get_file_size(fnames, precision=1):
     size = byte_size / factor
     byte_str = f"{size:.{precision:}f} {suffix}"
     return byte_str
+
+
+def path_name_ending(path, ending):
+    fname = Path(path)
+    name_bare = fname.with_suffix("")
+    fname = fname.parent.joinpath(str(name_bare) + ending).with_suffix(fname.suffix)
+    return fname
 
 
 def _get_subclass_instance(value, default, superclass):
