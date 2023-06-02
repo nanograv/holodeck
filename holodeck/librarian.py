@@ -865,8 +865,8 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
         hc_bg = None
 
     if (not gwb_only) and has_params:
-        sspar = np.zeros((nsamp, 3, nfreqs, nreals, nloudest))
-        bgpar = np.zeros((nsamp, 3, nfreqs, nreals))
+        sspar = np.zeros((nsamp, 4, nfreqs, nreals, nloudest))
+        bgpar = np.zeros((nsamp, 7, nfreqs, nreals))
     else:
         sspar = None
         bgpar = None
@@ -1392,15 +1392,11 @@ def make_ss_plot(fobs, hc_ss, hc_bg, fit_data):
 
 
 def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar):
+    """ Plot total mass, mass ratio, initial d_c, final d_c
+    
+    """
     # fig = holo.plot.plot_gwb(fobs, gwb)
-    fig = holo.plot.plot_pars(fobs, hc_ss, hc_bg, sspar, bgpar)
-    ax = fig.axes[3]
-
-    xx = fobs * YR
-    yy = 1e-15 * np.power(xx, -2.0/3.0)
-    ax.plot(xx, yy, 'k--', alpha=0.5, lw=1.0, label=r"$10^{-15} \cdot f_\mathrm{yr}^{-2/3}$")
-
-    ax.legend(fontsize=6, loc='upper right')
+    fig = holo.plot.plot_pars(fobs, sspar, bgpar)
 
     return fig
 

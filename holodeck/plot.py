@@ -548,7 +548,7 @@ def plot_bg_ss(fobs, bg, ss=None, bglabel=None, sslabel=None,
     return fig
 
 
-def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=cm.rainbow_r, color = None, label=None, **kwargs):
+def draw_sspars_and_bgpars(axs, xx, sspar, bgpar, nsamp=10, cmap=cm.rainbow_r, color = None, label=None, **kwargs):
     # if color is None:
     #     color = axs[0,0]._get_lines.get_next_color()
 
@@ -564,14 +564,18 @@ def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=c
     q_ss = sspar[1,:,:,:] # ss ratios
     # qq_med = draw_med_conf(axs[0,1], xx, q_bg, plot=kw_plot, **kwargs)
 
-    d_bg = holo.cosmo.comoving_distance(bgpar[2,:,:]).value # bg avg distances in Mpc
-    d_ss = holo.cosmo.comoving_distance(sspar[2,:,:,:]).value # ss distances in Mpc
+    di_bg = holo.cosmo.comoving_distance(bgpar[2,:,:]).value # bg avg distances in Mpc
+    di_ss = holo.cosmo.comoving_distance(sspar[2,:,:,:]).value # ss distances in Mpc
+
+
+    df_bg = holo.cosmo.comoving_distance(bgpar[3,:,:]).value # bg avg distances in Mpc
+    df_ss = holo.cosmo.comoving_distance(sspar[3,:,:,:]).value # ss distances in Mpc
     # dd_med = draw_med_conf(axs[1,0], xx, d_bg, plot=kw_plot, **kwargs)
 
     # hh_med = draw_med_conf(axs[1,1], xx, hc_bg, plot=kw_plot, **kwargs)
 
     if (nsamp is not None) and (nsamp > 0):
-        nsamp_max = hc_bg.shape[1]
+        nsamp_max = bgpar.shape[2]
         nsize = np.min([nsamp, nsamp_max])
         colors = cmap(np.linspace(0,1,nsize))
         ci = 0
@@ -580,36 +584,37 @@ def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=c
             # background
             axs[0,0].plot(xx, m_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # masses (upper left)
             axs[0,1].plot(xx, q_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # ratios (upper right)
-            axs[1,0].plot(xx, d_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # distances (lower left)
-            axs[1,1].plot(xx, hc_bg[:, ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # strains (lower right)
+            axs[1,0].plot(xx, di_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # initial distances (lower left)
+            axs[1,1].plot(xx, df_bg[:, ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # final distances (lower right)
 
             # single sources
-            for ll in range(len(hc_ss[0,0])):
+            for ll in range(sspar.shape[-1]):
                 if(ll==0): edgecolor='k'
                 else: edgecolor=None
                 axs[0,0].scatter(xx, m_ss[:, ii, ll], color=colors[ci], alpha=0.25,
                            edgecolor=edgecolor) # ss masses (upper left)
                 axs[0,1].scatter(xx, q_ss[:, ii, ll], color=colors[ci], alpha=0.25,
                            edgecolor=edgecolor) # ss ratios (upper right)
-                axs[1,0].scatter(xx, d_ss[:, ii, ll], color=colors[ci], alpha=0.25,
-                           edgecolor=edgecolor) # ss distances (lower left)
-                axs[1,1].scatter(xx, hc_ss[:, ii, ll], color=colors[ci], alpha=0.25,
-                           edgecolor=edgecolor) # ss strains (lower right)
+                axs[1,0].scatter(xx, di_ss[:, ii, ll], color=colors[ci], alpha=0.25,
+                           edgecolor=edgecolor) # ss intial distances (lower left)
+                axs[1,1].scatter(xx, df_ss[:, ii, ll], color=colors[ci], alpha=0.25,
+                           edgecolor=edgecolor) # ss final distances (lower left)
             ci +=1
     # return mm_med, qq_med, dd_med, hh_med
 
 
-def plot_pars(fobs, hc_ss, hc_bg, sspar, bgpar, **kwargs):
+def plot_pars(fobs, sspar, bgpar, **kwargs):
     xx= fobs * YR
     fig, axs = figax(figsize = (11,6), ncols=2, nrows=2, sharex = True)
     axs[0,0].set_ylabel('Total Mass $M/M_\odot$')
     axs[0,1].set_ylabel('Mass Ratio $q$')
-    axs[1,0].set_ylabel('Comoving Distance $d_c$')
+    axs[1,0].set_ylabel('Initial Comoving Distance $d_c$ (Mpc)')
+    axs[1,1].set_ylabel('Final Comoving Distance $d_c$ (Mpc)')
+
     axs[1,0].set_xlabel(LABEL_GW_FREQUENCY_YR)
-    axs[1,1].set_ylabel(LABEL_CHARACTERISTIC_STRAIN)
     axs[1,1].set_xlabel(LABEL_GW_FREQUENCY_YR)
-    draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, color='pink')
-    # fig.tight_layout()
+    draw_sspars_and_bgpars(axs, xx, sspar, bgpar, color='pink')
+    fig.tight_layout()
     return fig
 
 
