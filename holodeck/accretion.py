@@ -1,14 +1,10 @@
-"""
-Massive Black Hole Binary (MBHB) accretion models to evolve individual Massive
-Black Hole (MBH) masses using the Illustris [1] accretion rates.
+""" Massive Black Hole Binary (MBHB) accretion models to evolve individual Massive Black Hole (MBH)
+masses using the illustris accretion rates.
 
 Authors
 -------
 Magdalena Siwek
 
-References
-----------
- .. [1] Illustris Simulation. https://illustris-project.org
 """
 
 import os
@@ -30,10 +26,10 @@ class Accretion:
 
     Methods
     -------
-    mdot_eddington(mass)
+    :meth:`mdot_eddington(mass)`
         Calculate the total accretion rate based on masses and a fraction of
         the Eddington limit.
-    pref_acc(mdot, evol, step)
+    :meth:`pref_acc(mdot, evol, step)`
         Contains a variety of accretion models to choose from to calculate
         primary vs secondary accretion rates.
     """
@@ -65,13 +61,18 @@ class Accretion:
         self.eccen = eccen
         self.subpc = subpc
 
-    def mdot_eddington(self, mass):
-        """ Calculate the total accretion rate based on masses and a fraction
-        of the Eddington limit.
+    def mdot_eddington(self, mass, eps=0.1):
+        """ Calculate the total accretion rate based on masses and a fraction of the Eddington limit.
 
         Parameters
         ----------
-        mass :
+        mass : float
+        eps : float, optional
+            Radiative efficiency epsilon. Defaults to 0.1.
+
+        Returns
+        -------
+        medd : float
 
         See Also
         --------
@@ -89,24 +90,30 @@ class Accretion:
         >>> print(acc.mdot_eddington(mass))
         """
         from holodeck.constants import SIGMA_T, MPRT, NWTG, MSOL, SPLC, EDDT
-        # choose radiative efficiency epsilon = 0.1
-        # eps = 0.1
+
         # medd = (4.*np.pi*NWTG*MPRT)/(eps*SPLC*SIGMA_T) * self.mtot
-        eps = 0.1
         medd = self.f_edd * (EDDT/(eps * SPLC**2)) * mass
         return(medd)
 
     def pref_acc(self, mdot, evol, step):
         """
-        Contains a variety of accretion models to choose from to calculate
-        primary vs secondary accretion rates.
+        Contains a variety of accretion models to choose from to calculate primary vs secondary
+        accretion rates.
+
+        The accretion models are as follows:
+        * Basic
+        * Primary
+        * Secondary
+        * Proportional
+        * Siwek22
+        * Duffell
 
         Parameters
         ----------
         mdot :
+            Gas inflow rate in solar masses. Units of [M/year]
         evol :
-            evolution class instance which contains the eccentricities of the
-            current evolution.
+            evolution class instance which contains the eccentricities of the current evolution
         step : int
             current timestep
 
@@ -117,12 +124,12 @@ class Accretion:
 
         See Also
         --------
-        evolution._take_next_step() : Relationship
+        :meth: `Evolution._take_next_step()` : Relationship
 
         Notes
         -----
-        The instance of the evolution class must also be suppled in case
-        eccentricities need to be accessed.
+        The instance of the evolution class must also be suppled in case eccentricities need to be
+        accessed.
 
         """
         m1 = evol.mass[:, step - 1, 0]
