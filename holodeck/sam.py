@@ -968,7 +968,7 @@ class Semi_Analytic_Model:
         return gwb
 
 
-    def gwb(self, fobs_gw_edges, hard, realize=100, loudest=1, params=False):
+    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100, loudest=1, params=False):
         """Calculate the (smooth/semi-analytic) GWB and CWs at the given observed GW-frequencies.
 
         Parameters
@@ -995,18 +995,18 @@ class Semi_Analytic_Model:
         hc_bg : (F, R) NDarray of scalars
             Characteristic strain of the GWB.
         sspar : (3, F, R, L) NDarray of scalars
-            Astrophysical parametes of each loud single sources, for each frequency and realization. 
+            Astrophysical parametes of each loud single sources, for each frequency and realization.
             Returned only if params == True.
         bgpar : (3, F, R) NDarray of scalars
-            Average effective binary astrophysical parameters for background sources at each frequency 
-            and realization, 
+            Average effective binary astrophysical parameters for background sources at each frequency
+            and realization,
             Returned only if params == True.
         """
 
         assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
 
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
-        
+
         # convert to orbital-frequency (from GW-frequency)
         fobs_orb_edges = fobs_gw_edges / 2.0
         fobs_orb_cents = fobs_gw_cents / 2.0
@@ -1039,7 +1039,7 @@ class Semi_Analytic_Model:
 
     def old_ss_gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=1, loudest=1, params=False,
                use_redz_after_hard=None):
-        """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies,  
+        """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies,
         using new `dynamic_binary_number_at_fobs` method, better, but slower than cython version.
 
         Parameters
@@ -1061,12 +1061,12 @@ class Semi_Analytic_Model:
         hc_bg : (F, R) NDarray of scalars
             Characteristic strain of the GWB.
         sspar : (3, F, R, L) NDarray of scalars
-            Astrophysical parametes of each loud single sources, 
-            for each frequency and realization. 
+            Astrophysical parametes of each loud single sources,
+            for each frequency and realization.
             Returned only if params = True.
         bgpar : (3, F, R) NDarray of scalars
             Average effective binary astrophysical parameters for background
-            sources at each frequency and realization, 
+            sources at each frequency and realization,
             Returned only if params = True.
 
 
@@ -1102,7 +1102,7 @@ class Semi_Analytic_Model:
         edges[-1] = fobs_orb_edges
 
         log.debug(f"dnum: {utils.stats(dnum)}")
-        
+
 
         # "integrate" within each bin (i.e. multiply by bin volume)
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
