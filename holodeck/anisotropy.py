@@ -214,7 +214,7 @@ def lib_anisotropy(lib_path, hc_ref_10yr=HC_REF15_10YR, nbest=100, nreals=50, lm
 ############# Analytic/Sato-Polito
 ######################################################################
 
-def Cl_analytic_from_num(fobs_orb_edges, number, hs, realize = False):
+def Cl_analytic_from_num(fobs_orb_edges, number, hs, realize = False, floor = False):
     """ Calculate Cl using Eq. (17) of Sato-Polito & Kamionkowski
     Parameters
     ----------
@@ -226,6 +226,8 @@ def Cl_analytic_from_num(fobs_orb_edges, number, hs, realize = False):
         Number of sources in each M,q,z, bin
     realize : boolean or integer
         How many realizations to Poisson sample.
+    floor : boolean
+        Whether or not to round numbers down to nearest integers, if not realizing
     
     Returns
     -------
@@ -251,7 +253,8 @@ def Cl_analytic_from_num(fobs_orb_edges, number, hs, realize = False):
         hs = hs[...,np.newaxis]
     elif realize is True:
         number = holo.gravwaves.poisson_as_needed(number)
-
+    elif floor is True:
+        number = np.floor(number)
 
 
     delta_term = (fc/(4*np.pi*df) * np.sum(number*hs**2, axis=(0,1,2)))**2
@@ -406,6 +409,8 @@ def Cl_analytic_from_dnum(edges, dnum, redz=None, realize=False):
     C0 = Cl + delta_term
 
     return C0, Cl
+
+
 
 ######################################################################
 ############# Plotting Functions
