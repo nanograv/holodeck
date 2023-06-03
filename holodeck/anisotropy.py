@@ -375,37 +375,25 @@ def Cl_analytic_from_dnum(edges, dnum, redz=None, realize=False):
         # integrate over redshift
         numh4 = utils.trapz(numh4, edges[2], axis=2)
         # times dln(f)
-        print('numh4:', numh4.shape, 'np.diff(np.log(fobs_gw_edges))', np.diff(np.log(fobs_gw_edges)).shape)
         numh4 = numh4 * np.diff(np.log(fobs_gw_edges))  # how is this not a shape issue??
 
     elif utils.isinteger(realize):
         # add reals axis
         hs_cents = strain_amp_at_bin_centers_redz(edges, redz)[...,np.newaxis]
-        print('hs_cents:', hs_cents.shape)
         df = df[:,np.newaxis] 
         fc = fc[:,np.newaxis] 
 
     
         number = holo.sam_cython.integrate_differential_number_3dx1d(edges, dnum)
         shape = number.shape + (realize,)
-        print('number:', number.shape)
         number = holo.gravwaves.poisson_as_needed(number[...,np.newaxis] * np.ones(shape))
-        print('number:', number.shape)
 
         numh2 = number * hs_cents**2 * np.diff(np.log(fobs_gw_edges))[:,np.newaxis] 
         numh4 = number * hs_cents**4 * np.diff(np.log(fobs_gw_edges))[:,np.newaxis] 
-
-
-
     else:
         err = "`realize` ({}) must be one of {{False, integer}}!".format(realize)
         raise ValueError(err)
 
-    print('numh2:', numh2.shape, 'numh4:', numh4.shape)
-
-
-    # df = fobs_orb_widths[np.newaxis, np.newaxis, np.newaxis, :] # (M,Q,Z,F) NDarray
-    # fc = fobs_orb_cents[np.newaxis, np.newaxis, np.newaxis, :]  # (M,Q,Z,F) NDarray
 
     delta_term = (
         fc / (4*np.pi * df) * np.sum(numh2, axis=(0,1,2))
@@ -425,13 +413,14 @@ def Cl_analytic_from_dnum(edges, dnum, redz=None, realize=False):
 
 
 
-def draw_analytic(ax, Cl, C0, fobs_gw_cents, color='tab:orange', label='Eq. 17 analytic', lw=2):
+def draw_analytic(ax, Cl, C0, fobs_gw_cents, color='tab:orange', label='Eq. 17 analytic', 
+                  alpha=1, lw=2):
     xx = fobs_gw_cents
     yy = Cl/C0 # (F,)
-    ax.plot(xx, yy, color=color, lw=lw, label=label, linestyle='dashdot')
+    ax.plot(xx, yy, color=color, lw=lw, label=label, linestyle='dashdot', alpha=alpha)
 
 def draw_reals(ax, Cl_many, C0_many, fobs_gw_cents,  color='tab:orange', label= 'Poisson number/bin realization',
-                show_ci=False, show_reals=True, show_median=False):
+                show_ci=False, show_reals=True, show_median=False, nshow=10):
     xx = fobs_gw_cents
     yy = Cl_many/C0_many # (F,R)
     if show_median:
@@ -490,29 +479,24 @@ def draw_sim(ax, xx, Cl_best, lmax, nshow, show_ci=True, show_reals=True):
                                  linewidth=1, label=label)
 
 
-# def plot_ClC0(fobs_gw_cents, spk=True, bayes=True, 
-#               sim=True, Cl_best_sim=None, lmax_sim=None,
-#               analytic=False, Cl_analytic, C0_analytic, label_analytic,
-#               anreals=False, Cl_anreals=None):
-#     fig, ax = plot.figax(xlabel=plot.LABEL_GW_FREQUENCY_HZ, ylabel='$C_{\ell>0}/C_0$')
-#     draw_analytic(ax, Cl, C0, fobs_gw_cents, label='analytic from integrated num')
-#     draw_reals(ax, Cl_many, C0_many, fobs_gw_cents, label=None, color='tab:orange')
-    
-#     draw_analytic(ax, Cl_dnum, C0_dnum, fobs_gw_cents, label='analytic from dnum, hs from z_init', color='deeppink')
-#     draw_reals(ax, Cl_dnum_reals, C0_dnum_reals, fobs_gw_cents, label=None, color='deeppink')
-    
-#     draw_analytic(ax, Cl_redz, C0_redz, fobs_gw_cents, label='analytic from dnum, hs from z_final', color='indigo')
-#     draw_reals(ax, Cl_redz_reals, C0_redz_reals, fobs_gw_cents, label=None, color='indigo')
-    
-#     if spk: draw_spk(ax, label='S-P & K')
-#     if bayes: draw_bayes(ax, lmax=6)
-#     if sim and (Cl_best_sim is not None) and (lmax_sim is not None): 
-#         draw_sim(ax, fobs_gw_cents, Cl_best_sim, lmax_sim, show_ci=True, show_reals=True, nshow=10)
-#     # ax.set_ylim(10**-6, 10**0)
-#     plot._twin_yr(ax, nano=False)
-#     ax.set_xlim(fobs_gw_cents[0]- 10**(-10), 1/YR)
+def plot_ClC0_versions(fobs_gw_cents, spk=True, bayes=True, 
+              sim=True, Cl_best_sim=None, lmax_sim=None,
+              analytic=False, Cl_analytic=None, C0_analytic=None, label_analytic='analytic',
+              anreals=False, Cl_anreals=None, C0_anreals=None, label_anreals=None, 
+              xmax = 1/YR, leg_anchor=(0,-0.15), leg_cols=3, legend=False):
+    fig, ax = plot.figax(xlabel=plot.LABEL_GW_FREQUENCY_HZ, ylabel='$C_{\ell>0}/C_0$')
 
-#     fig.legend(bbox_to_anchor=(0,-0.15), loc='upper left', bbox_transform = ax.transAxes, ncols=3)
-#     return fig
+    if analytic: draw_analytic(ax, Cl_analytic, C0_analytic, fobs_gw_cents, label=label_analytic)
+    if anreals: draw_reals(ax, Cl_anreals, C0_anreals, fobs_gw_cents, label=label_anreals)
+      
+    if bayes: draw_bayes(ax, lmax=6)
+    if spk: draw_spk(ax, label='S-P & K')
+    if sim and (Cl_best_sim is not None) and (lmax_sim is not None): 
+        draw_sim(ax, fobs_gw_cents, Cl_best_sim, lmax_sim, show_ci=True, show_reals=True, nshow=10)
+    # ax.set_ylim(10**-6, 10**0)
+    plot._twin_yr(ax, nano=False)
+    ax.set_xlim(fobs_gw_cents[0]- 10**(-10), xmax)
 
-# fig = plot_ClC0()  
+    if legend:
+        fig.legend(bbox_to_anchor=leg_anchor, loc='upper left', bbox_transform = ax.transAxes, ncols=leg_cols)
+    return fig
