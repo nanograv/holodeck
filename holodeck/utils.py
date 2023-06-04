@@ -640,6 +640,10 @@ def midpoints(vals, axis=-1, log=False):
     mm = np.moveaxis(mm, 0, axis)
     return mm
 
+def midpoints_multiax(vals, axis, log=False):
+    for aa in axis:
+        vals = midpoints(vals, aa, log=log)
+    return vals
 
 def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
     """Find the minimum and maximum values in the given array.
