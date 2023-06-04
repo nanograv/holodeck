@@ -266,7 +266,7 @@ def Cl_analytic_from_num(fobs_orb_edges, number, hs, realize = False, floor = Fa
     return C0, Cl
 
 
-def strain_amp_at_bin_edges(edges, redz=None):
+def strain_amp_at_bin_edges_redz(edges, redz=None):
     """ Calculate strain amplitude at bin edges, with final or initial redz.
     
     """
@@ -359,7 +359,7 @@ def Cl_analytic_from_dnum(edges, dnum, redz=None, realize=False):
 
 
     if realize is False:
-        hs_edges = strain_amp_at_bin_edges(edges, redz)
+        hs_edges = strain_amp_at_bin_edges_redz(edges, redz)
 
         # ---- integrate from differential-number to number per bin
         # integrate over dlog10(M)
