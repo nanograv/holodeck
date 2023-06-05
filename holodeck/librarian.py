@@ -34,7 +34,7 @@ except Exception as err:
     holo.log.warning(f"failed to load `mpi4py` in {__file__}: {err}")
 
 
-__version__ = "0.3.3"
+__version__ = "0.6"
 
 # Default argparse parameters
 DEF_NUM_REALS = 100
@@ -223,6 +223,19 @@ class _Param_Space(abc.ABC):
         self._log.debug(f"params {samp_num} :: {params}")
         return self.model_for_params(params, sam_shape)
 
+    def normalized_params(self, vals):
+        if np.ndim(vals) == 0:
+            vals = self.npars * [vals]
+        assert len(vals) == self.npars
+
+        params = {}
+        for ii, pname in enumerate(self.param_names):
+            vv = vals[ii]    # desired fractional parameter value [0.0, 1.0]
+            ss = self._dists[ii](vv)    # convert to actual parameter values
+            params[pname] = ss           # store to dictionary
+
+        return params
+
     def model_for_normalized_params(self, vals, **kwargs):
         """Construct a model from this space by specifying fractional parameter values [0.0, 1.0].
 
@@ -242,16 +255,11 @@ class _Param_Space(abc.ABC):
         hard : `holodeck.hardening._Hardening` instance
 
         """
-        if np.ndim(vals) == 0:
-            vals = self.npars * [vals]
-        assert len(vals) == self.npars
-
-        params = {}
-        for ii, pname in enumerate(self.param_names):
-            vv = vals[ii]    # desired fractional parameter value [0.0, 1.0]
-            ss = self._dists[ii](vv)    # convert to actual parameter values
-            params[pname] = ss           # store to dictionary
-
+        self._log.warning(
+            "`model_for_normalized_params() is deprecated, use "
+            "space.model_for_params(space.normalized_params(vals)) instead."
+        )
+        params = self.normalized_params(vals)
         kwargs.setdefault('sam_shape', self.sam_shape)
         return self.model_for_params(params, **kwargs)
 
@@ -479,6 +487,20 @@ class PD_Piecewise_Uniform_Density(PD_Piecewise_Uniform_Mass):
 
 
 def get_freqs(args):
+    """Get PTA frequencies.
+
+    Arguments
+    ---------
+    args : `argparse` or other namespace,  or None
+
+    Returns
+    -------
+    fobs_cents : (F,) ndarray
+        Observer-frame GW-frequencies at frequency-bin centers.
+    fobs_edges : (F+1,) ndarray
+        Observer-frame GW-frequencies at frequency-bin edges.
+
+    """
     if args is not None:
         pta_dur = args.pta_dur * YR
         nfreqs = args.nfreqs
@@ -641,6 +663,113 @@ def run_sam_at_pspace_num(args, space, pnum):
             log.exception(err)
 
     return rv
+
+
+def run_model(sam, hard, nreals, nfreqs, nloudest=5,
+              gwb_flag=True, details_flag=False, singles_flag=False, params_flag=False):
+    """Run the given modeling, storing requested data
+    """
+    fobs_cents, fobs_edges = holo.librarian.get_freqs(None)
+    if nfreqs is not None:
+        fobs_edges = fobs_edges[:nfreqs+1]
+        fobs_cents = fobs_cents[:nfreqs]
+    fobs_orb_cents = fobs_cents / 2.0     # convert from GW to orbital frequencies
+    fobs_orb_edges = fobs_edges / 2.0     # convert from GW to orbital frequencies
+
+    data = dict(fobs_cents=fobs_cents, fobs_edges=fobs_edges)
+
+    redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
+        fobs_orb_cents, sam, hard, cosmo
+    )
+    use_redz = redz_final
+    edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
+    number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
+    if details_flag:
+        data['static_binary_density'] = sam.static_binary_density
+        data['number'] = number
+        data['redz_final'] = redz_final
+        data['coalescing'] = (redz_final > 0.0)
+
+        gwb_pars, bin_pars = _calc_model_details(edges, redz_final, number)
+
+        data['gwb_params'] = gwb_pars
+        data['bin_params'] = bin_pars
+
+    # calculate single sources and/or binary parameters
+    if singles_flag or params_flag:
+        nloudest = nloudest if singles_flag else 1
+
+        vals = holo.single_sources.ss_gws_redz(
+            edges, use_redz, number, realize=nreals,
+            loudest=nloudest, params=params_flag,
+        )
+        if params_flag:
+            hc_ss, hc_bg, sspar, bgpar = vals
+            data['sspar'] = sspar
+            data['bgpar'] = bgpar
+        else:
+            hc_ss, hc_bg = vals
+
+        if singles_flag:
+            data['hc_ss'] = hc_ss
+            data['hc_bg'] = hc_bg
+
+    if gwb_flag:
+        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, nreals)
+        data['gwb'] = gwb
+
+    return data
+
+
+def _calc_model_details(edges, redz_final, number):
+    redz = edges[2]
+    nzbins = len(redz) - 1
+    nfreqs = len(edges[3]) - 1
+    hc2 = holo.gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz_final)
+    denom = np.sum(hc2*number, axis=(0, 1, 2))
+    gwb_pars = []
+    num_pars = []
+
+    for ii in range(3):
+        margins = np.arange(2).tolist()
+        if ii in margins:
+            del margins[ii]
+        margins = tuple(margins)
+
+        numer = np.sum(hc2*number, axis=margins)
+        tpar = numer / denom[np.newaxis, np.newaxis, np.newaxis, :]
+        gwb_pars.append(tpar)
+
+        tpar = np.sum(number, axis=margins)
+        num_pars.append(tpar)
+
+    # calculate redz_final based distributions
+    # `redz_final` is edges: (M, Q, Z, F)
+    # `number` is cents: (M-1, Q-1, Z-1, F)
+    rz = redz_final.copy()
+    for ii in range(3):
+        rz = utils.midpoints(rz, axis=ii)
+
+    gwb_rz = np.zeros((nzbins, nfreqs))
+    bin_rz = np.zeros((nzbins, nfreqs))
+    hc2_num = hc2 * number
+    for ii in range(nfreqs):
+        rz_flat = rz[:, :, :, ii].flatten()
+        numer, *_ = sp.stats.binned_statistic(
+            rz_flat, hc2_num[:, :, :, ii].flatten(), bins=redz, statistic='sum'
+        )
+        tpar = numer / denom[ii]
+        gwb_rz[:, ii] = tpar
+
+        tpar, *_ = sp.stats.binned_statistic(
+            rz_flat, number[:, :, :, ii].flatten(), bins=redz, statistic='sum'
+        )
+        bin_rz[:, ii] = tpar
+
+    gwb_pars.append(gwb_rz)
+    num_pars.append(bin_rz)
+
+    return gwb_pars, num_pars
 
 
 def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only=False):
@@ -867,7 +996,7 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
         err = f"Unable to get shape from either `hc_bg` or `gwb`!"
         log.exception(err)
         raise RuntimeError(err)
-    
+
     log.info(f"Collecting data from {nsamp} files")
     bad_files = np.zeros(nsamp, dtype=bool)     #: track which files contain UN-useable data
     msg = None
@@ -1065,6 +1194,7 @@ def fit_library_spectra(library_path, log, recreate=False):
 def fit_all_libraries_in_path(path, log, pattern=None, recreate=False):
     """Recursively find all `sam_lib.hdf5` files in the given path, and construct spectra fits for them.
     """
+
     path = Path(path)
     msg = "" if pattern is None else f" that match pattern {pattern}"
     log.info(f"fitting all libraries in path {path}" + msg)
@@ -1276,7 +1406,7 @@ def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar):
 # ==============================================================================
 
 
-def load_pspace_from_dir(log, path, space_class=None):
+def load_pspace_from_path(log, path, space_class=None):
     """Load a _Param_Space instance from the saved file in the given directory.
 
     Parameters
@@ -1298,36 +1428,53 @@ def load_pspace_from_dir(log, path, space_class=None):
 
     """
     path = Path(path)
-    if not path.exists() or not path.is_dir():
-        raise RuntimeError(f"path {path} is not an existing directory!")
+    if not path.exists():
+        raise RuntimeError(f"path {path} does not exist!")
 
-    pattern = "*" + holo.librarian.PSPACE_FILE_SUFFIX
-    space_fname = list(path.glob(pattern))
-    if len(space_fname) != 1:
-        raise FileNotFoundError(f"found {len(space_fname)} matches to {pattern} in output {path}!")
+    # If this is a directory, look for a pspace save file
+    if path.is_dir():
+        pattern = "*" + holo.librarian.PSPACE_FILE_SUFFIX
+        space_fname = list(path.glob(pattern))
+        if len(space_fname) != 1:
+            raise FileNotFoundError(f"found {len(space_fname)} matches to {pattern} in output {path}!")
 
-    space_fname = space_fname[0]
+        space_fname = space_fname[0]
+
+    # if this is a file, assume that it's already the pspace save file
+    elif path.is_file():
+        space_fname = path
+
+    else:
+        raise
+
     # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces`
     if space_class is None:
-        # get the filename without path, this should contain the name of the PS class
-        space_name = space_fname.name
-        # get a list of all parameter-space classes (assuming they all start with 'PS')
-        space_list = [sl for sl in dir(holo.param_spaces) if sl.startswith('PS')]
-        # iterate over space classes to try to find a match
-        for space in space_list:
-            # exist for-loop if the names match
-            # NOTE: previously the save files converted class names to lower-case; that should no
-            #       longer be the case, but use `lower()` for backwards compatibility at the moment
-            #       LZK 2023-05-10
-            if space.lower() in space_name.lower():
-                break
-        else:
-            raise ValueError(f"Unable to find a PS class matching {space_name}!")
-
-        space_class = getattr(holo.param_spaces, space)
+        space_class = _get_space_class_from_space_fname(space_fname)
 
     space = space_class.from_save(space_fname, log)
     return space, space_fname
+
+
+def _get_space_class_from_space_fname(space_fname):
+    # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces`
+
+    # get the filename without path, this should contain the name of the PS class
+    space_name = space_fname.name
+    # get a list of all parameter-space classes (assuming they all start with 'PS')
+    space_list = [sl for sl in dir(holo.param_spaces) if sl.startswith('PS')]
+    # iterate over space classes to try to find a match
+    for space in space_list:
+        # exist for-loop if the names match
+        # NOTE: previously the save files converted class names to lower-case; that should no
+        #       longer be the case, but use `lower()` for backwards compatibility at the moment
+        #       LZK 2023-05-10
+        if space.lower() in space_name.lower():
+            break
+    else:
+        raise ValueError(f"Unable to find a PS class matching {space_name}!")
+
+    space_class = getattr(holo.param_spaces, space)
+    return space_class
 
 
 def _get_sim_fname(path, pnum):
@@ -1534,6 +1681,12 @@ def _check_mpi_comm(name=None):
         holo.log.exception(err)
         raise RuntimeError(err)
     return
+
+
+@utils.deprecated_pass(load_pspace_from_path)
+def load_pspace_from_dir(log, path, space_class=None):
+    pass
+
 
 # ==============================================================================
 # ====    `main` - Script Entry-Point    ====

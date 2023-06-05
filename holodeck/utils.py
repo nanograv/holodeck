@@ -15,8 +15,10 @@ import functools
 import inspect
 import numbers
 import os
-from typing import Optional, Tuple, Union, List  # , Sequence,
+import subprocess
 import warnings
+from pathlib import Path
+from typing import Optional, Tuple, Union, List  # , Sequence,
 
 import h5py
 import numba
@@ -261,6 +263,13 @@ def get_file_size(fnames, precision=1):
     return byte_str
 
 
+def path_name_ending(path, ending):
+    fname = Path(path)
+    name_bare = fname.with_suffix("")
+    fname = fname.parent.joinpath(str(name_bare) + ending).with_suffix(fname.suffix)
+    return fname
+
+
 def _get_subclass_instance(value, default, superclass):
     """Convert the given `value` into a subclass instance.
 
@@ -305,6 +314,13 @@ def _get_subclass_instance(value, default, superclass):
         raise ValueError(err)
 
     return value
+
+
+def get_git_hash(short=True) -> str:
+    args = ['git', 'rev-parse', 'HEAD']
+    if short:
+        args.insert(2, "--short")
+    return subprocess.check_output(args).decode('ascii').strip()
 
 
 # =================================================================================================
@@ -684,6 +700,7 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
     xvals : (N, M) ndarray
         Evaluation points (x-values) of the functions to be interpolated.
         Interpolation is performed over the 1th (last) axis.
+        NOTE: values *must* be monotonically increasing along axis=1 !
     yvals : (N, M) ndarray
         Function values (y-values) of the function to be interpolated.
         Interpolation is performed over the 1th (last) axis.
@@ -699,6 +716,8 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
     assert np.shape(xvals) == np.shape(yvals)
 
     xx = np.asarray(xx)
+    xvals = np.asarray(xvals)
+    yvals = np.asarray(yvals)
 
     if xlog:
         xx = np.log10(xx)

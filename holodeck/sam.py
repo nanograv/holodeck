@@ -406,7 +406,7 @@ class Semi_Analytic_Model:
         deprecated_keys = ['ZERO_DYNAMIC_STALLED_SYSTEMS', 'ZERO_GMT_STALLED_SYSTEMS']
         for key, val in kwargs.items():
             if key in deprecated_keys:
-                log.error("Using deprecated kwarg: {key}: {val}!  In the future this will raise an error.")
+                log.error(f"Using deprecated kwarg: {key}: {val}!  In the future this will raise an error.")
             else:
                 err = f"Unexpected kwarg {key=}: {val=}!"
                 log.exception(err)
@@ -589,10 +589,9 @@ class Semi_Analytic_Model:
                 log.info(f"\tdens aft: ({utils.stats(dens)})")
                 msg = f"mass: {mass_bef:.2e} ==> {mass_aft:.2e} || change = {dm:.4e}"
                 log.info(f"\t{msg}")
-                if np.fabs(dm) > 0.05:
+                if np.fabs(dm) > 0.2:
                     err = f"Warning, significant change in number-mass!  {msg}"
                     log.error(err)
-                    print(err, flush=True)
 
             # set values after redshift zero to have zero density
             # if self.ZERO_GMT_STALLED_SYSTEMS:
@@ -618,7 +617,7 @@ class Semi_Analytic_Model:
 
         return edges, dnum, redz_final
 
-    def _dynamic_binary_number_at_fobs_consistent(self, hard, fobs_orb, steps=200):
+    def _dynamic_binary_number_at_fobs_consistent(self, hard, fobs_orb, steps=200, details=False):
         """Get correct redshifts for full binary-number calculation.
 
         Slower but more correct than old `dynamic_binary_number`.
@@ -646,73 +645,85 @@ class Semi_Analytic_Model:
         # (M, S)  =  (M,1) * (1,S)
         rads = extr[0][:, np.newaxis] + (extr[1] - extr[0])[:, np.newaxis] * rads
         rads = 10.0 ** rads
-        # (M, Q, Z, S)
-        mt, mr, rz, rads = np.broadcast_arrays(
-            self.mtot[:, np.newaxis, np.newaxis, np.newaxis],
-            self.mrat[np.newaxis, :, np.newaxis, np.newaxis],
-            self.redz[np.newaxis, np.newaxis, :, np.newaxis],
-            rads[:, np.newaxis, np.newaxis, :]
+
+        # (M, Q, S)
+        mt, mr, rads, norm = np.broadcast_arrays(
+            self.mtot[:, np.newaxis, np.newaxis],
+            self.mrat[np.newaxis, :, np.newaxis],
+            rads[:, np.newaxis, :],
+            hard._norm[:, :, np.newaxis],
         )
-        # (S, M*Q*Z)
-        mt, mr, rz, rads = [mm.reshape(-1, steps).T for mm in [mt, mr, rz, rads]]
-        # (S, M*Q*Z) --- `Fixed_Time.dadt` will only accept this shape
-        dadt_evo = hard.dadt(mt, mr, rads)
+        dadt_evo = hard.dadt(mt, mr, rads, norm=norm)
+        print(f"{utils.stats(dadt_evo*YR/PC)=}")
+
+        # (M, Q, S-1)
         # Integrate (inverse) hardening rates to calculate total lifetime to each separation
-        times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=0, cumsum=True)
+        times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=-1, cumsum=True)
+        print(f"{utils.stats(times_evo/GYR)=}")
         # Combine the binary-evolution time, with the galaxy-merger time
-        # (S, M*Q*Z)
-        times_tot = times_evo + self._gmt_time.reshape(-1)[np.newaxis, :]
-        #
-        redz_evo = utils.redz_after(times_tot, redz=rz[1:, :])
+        # (M, Q, Z, S-1)
+        rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis]
+        times_tot = times_evo[:, :, np.newaxis, :] + self._gmt_time[:, :, :, np.newaxis]
+        redz_evo = utils.redz_after(times_tot, redz=rz)
 
-        # (S, M*Q*Z)   convert from separations to rest-frame orbital frequencies
+        # convert from separations to rest-frame orbital frequencies
+        # (M, Q, S)
         frst_orb_evo = utils.kepler_freq_from_sepa(mt, rads)
-        fobs_orb_evo = frst_orb_evo / (1.0 + rz)
+        # (M, Q, Z, S)
+        fobs_orb_evo = frst_orb_evo[:, :, np.newaxis, :] / (1.0 + rz)
 
-        # interpolate to target frequencies
+        # ---- interpolate to target frequencies
         # `ndinterp` interpolates over 1th dimension
-        # `fobs_orb`     is shaped (X, M*Q*Z)    so transpose to  (M*Q*Z, X)
-        # `fobs_orb_evo` is shaped (S, M*Q*Z)    so slice and transpose to  (M*Q*Z, S-1)
-        # `redz_evo`     is shaped (S-1, M*Q*Z)  so transpose to  (M*Q*Z, S-1)
-        redz_final = utils.ndinterp(fobs_orb.T, fobs_orb_evo[1:, :].T, redz_evo.T, xlog=True, ylog=False)
 
-        # (M*Q*Z, S) ===> (M, Q, Z, S)
+        # (M, Q, Z, S-1)  ==>  (M*Q*Z, S-1)
+        fobs_orb_evo, redz_evo = [mm.reshape(-1, steps-1) for mm in [fobs_orb_evo[:, :, :, 1:], redz_evo]]
+        # (M*Q*Z, X)
+        redz_final = utils.ndinterp(fobs_orb, fobs_orb_evo, redz_evo, xlog=True, ylog=False)
+        print(f"{utils.stats(redz_final)=}")
+
+        # (M*Q*Z, X) ===> (M, Q, Z, X)
         redz_final = redz_final.reshape(self.shape + (fobs_orb.size,))
         coal = (redz_final > 0.0)
         frst_orb = fobs_orb * (1.0 + redz_final)
         frst_orb[frst_orb < 0.0] = 0.0
         redz_final[~coal] = -1.0
 
-        # (Z,) comoving-distance in [Mpc]
+        # (M, Q, Z, X) comoving-distance in [Mpc]
         dc = np.zeros_like(redz_final)
         dc[coal] = cosmo.comoving_distance(redz_final[coal]).to('Mpc').value
 
-        # (Z,) this is `(dVc/dz) * (dz/dt)` in units of [Mpc^3/s]
+        # (M, Q, Z, X) this is `(dVc/dz) * (dz/dt)` in units of [Mpc^3/s]
         cosmo_fact = np.zeros_like(redz_final)
         cosmo_fact[coal] = 4 * np.pi * (SPLC/MPC) * np.square(dc[coal]) * (1.0 + redz_final[coal])
 
         # (M, Q) calculate chirp-mass
         mt = self.mtot[:, np.newaxis, np.newaxis, np.newaxis]
         mr = self.mrat[np.newaxis, :, np.newaxis, np.newaxis]
-        mchirp = utils.m1m2_from_mtmr(mt, mr)
-        mchirp = utils.chirp_mass(*mchirp)
 
         # Convert from observer-frame orbital freq, to rest-frame orbital freq
         sa = utils.kepler_sepa_from_freq(mt, frst_orb)
-        # (X, M*Q*Z), hardening rate, negative values, units of [cm/sec]
-        args = [mt, mr, sa]
-        args = np.broadcast_arrays(*args)
-        args = [xx.reshape(-1, fobs_orb.size).T for xx in args]
-        dadt = hard.dadt(*args)
-        dadt = dadt.T.reshape(sa.shape)
+        print(f"{utils.stats(sa/PC)=}")
+        mt, mr, sa, norm = np.broadcast_arrays(mt, mr, sa, hard._norm[:, :, np.newaxis, np.newaxis])
+        # hardening rate, negative values, units of [cm/sec]
+        dadt = hard.dadt(mt, mr, sa, norm=norm)
+        print(f"{utils.stats(dadt*YR/PC)=}")
         # Calculate `tau = dt/dlnf_r = f_r / (df_r/dt)`
         # dfdt is positive (increasing frequency)
         dfdt, frst_orb = utils.dfdt_from_dadt(dadt, sa, frst_orb=frst_orb)
         tau = frst_orb / dfdt
 
-        # (M, Q, Z) units: [1/s] i.e. number per second
+        # (M, Q, Z, X) units: [1/s] i.e. number per second
         dnum = dens[..., np.newaxis] * cosmo_fact * tau
         dnum[~coal] = 0.0
+
+        if details:
+            tau[~coal] = 0.0
+            dadt[~coal] = 0.0
+            sa[~coal] = 0.0
+            cosmo_fact[~coal] = 0.0
+            # (M, Q, X)  ==>  (M, Q, Z, X)
+            dets = dict(tau=tau, cosmo_fact=cosmo_fact, dadt=dadt, fobs=fobs_orb, sepa=sa)
+            return edges, dnum, redz_final, dets
 
         self._redz_final = redz_final
 
@@ -760,6 +771,117 @@ class Semi_Analytic_Model:
         self._redz_final = rz
 
         return edges, dnum, rz
+
+    def _dynamic_binary_number_at_sepa_consistent(self, hard, target_sepa, steps=200, details=False):
+        """Get correct redshifts for full binary-number calculation.
+
+        Slower but more correct than old `dynamic_binary_number`.
+        Same as new cython implementation `holo.sam_cython.dynamic_binary_number_at_fobs`, which is
+        more than 10x faster.
+        LZK 2023-05-11
+
+        """
+        target_sepa = np.asarray(target_sepa)
+        ntarget = target_sepa.size    # this will be refered to as 'X' in shapes
+        edges = self.edges + [target_sepa, ]
+        nmtot, nmrat, nredz = self.shape
+
+        # start from the hardening model's initial separation
+        rmax = hard._sepa_init
+        # (M,) end at the ISCO
+        rmin = utils.rad_isco(self.mtot)
+        # Choose steps for each binary, log-spaced between rmin and rmax
+        extr = np.log10([rmax * np.ones_like(rmin), rmin])     # (2,M,)
+        rads = np.linspace(0.0, 1.0, steps)[np.newaxis, :]     # (1,X)
+        # (M, S)  =  (M,1) * (1,S)
+        rads = extr[0][:, np.newaxis] + (extr[1] - extr[0])[:, np.newaxis] * rads
+        rads = 10.0 ** rads
+
+        # (M, Q, Z, S)
+        norm = hard._norm
+        mt, mr, rz, rads, norm = np.broadcast_arrays(
+            self.mtot[:, np.newaxis, np.newaxis, np.newaxis],
+            self.mrat[np.newaxis, :, np.newaxis, np.newaxis],
+            self.redz[np.newaxis, np.newaxis, :, np.newaxis],
+            rads[:, np.newaxis, np.newaxis, :],
+            norm[:, :, np.newaxis, np.newaxis]
+        )
+
+        # (M, Q, Z, S)  ==>  (M, Q, Z*S)
+        mt, mr, rz, rads, norm = [mm.reshape(nmtot, nmrat, -1) for mm in [mt, mr, rz, rads, norm]]
+        dadt_evo = hard.dadt(mt, mr, rads, norm=norm)
+
+        # (M, Q, Z*S)  ==>  (M, Q, Z, S)
+        dadt_evo, rz, rads = [mm.reshape(nmtot, nmrat, nredz, steps) for mm in [dadt_evo, rz, rads]]
+        # dadt_evo = dadt_evo.reshape(nmtot, nmrat, nredz, steps)
+
+        # Integrate (inverse) hardening rates to calculate total lifetime to each separation
+        times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=-1, cumsum=True)
+        # Combine the binary-evolution time, with the galaxy-merger time
+        times_tot = times_evo + self._gmt_time[:, :, :, np.newaxis]
+        redz_evo = utils.redz_after(times_tot, redz=rz[:, :, :, 1:])
+
+        # ---- interpolate to target frequencies
+
+        # `ndinterp` interpolates over axis=1,  so get steps (S,) and target radii (X,) to axis=1
+
+        # get our target separations in the appropriate shape to match evolution arrays
+        # (X,)  ==>  (M, Q, Z, X)
+        sepa = target_sepa[np.newaxis, np.newaxis, np.newaxis, :] * np.ones(self.shape)[..., np.newaxis]
+        # (M, Q, Z, X)  ==>  (M*Q*Z, X)
+        sepa = sepa.reshape(-1, target_sepa.size)
+        # (M, Q, Z, S-1) ==>  (M*Q*Z, S-1)
+        rads, redz_evo = [mm.reshape(-1, steps-1) for mm in [rads[:, :, :, 1:], redz_evo]]
+
+        # `rads` MUST BE INCREASING for interpolation, so reverse the steps
+        rads = rads[:, ::-1]
+        redz_evo = rads[:, ::-1]
+        redz_final = utils.ndinterp(sepa, rads, redz_evo, xlog=True, ylog=False)
+
+        # (M*Q*Z, X) ===> (M, Q, Z, X)
+        redz_final = redz_final.reshape(self.shape + (ntarget,))
+        coal = (redz_final > 0.0)
+        redz_final[~coal] = -1.0
+
+        # shape: (M, Q, Z)
+        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
+
+        # (M, Q, Z, X) comoving-distance in [Mpc]
+        dc = np.zeros_like(redz_final)
+        dc[coal] = cosmo.comoving_distance(redz_final[coal]).to('Mpc').value
+
+        # (M, Q, Z, X) this is `(dVc/dz) * (dz/dt)` in units of [Mpc^3/s]
+        cosmo_fact = np.zeros_like(redz_final)
+        cosmo_fact[coal] = 4 * np.pi * (SPLC/MPC) * np.square(dc[coal]) * (1.0 + redz_final[coal])
+
+        # ---- Calculate timescale `tau = dt/dlnf_r = f_r / (df_r/dt)`
+
+        mt, mr, sepa, norm = np.broadcast_arrays(
+            self.mtot[:, np.newaxis, np.newaxis],
+            self.mrat[np.newaxis, :, np.newaxis],
+            target_sepa[np.newaxis, np.newaxis, :],
+            hard._norm[:, :, np.newaxis],
+        )
+        # hardening rate, negative values, units of [cm/sec]
+        dadt = hard.dadt(mt, mr, sepa, norm=norm)
+        # dfdt is positive (increasing frequency)
+        dfdt, frst_orb = utils.dfdt_from_dadt(dadt, sepa, mtot=mt)
+        tau = frst_orb / dfdt
+
+        # (M, Q, Z) units: [1/s] i.e. number per second
+        dnum = dens[..., np.newaxis] * cosmo_fact * tau[:, :, np.newaxis, :]
+        dnum[~coal] = 0.0
+
+        if details:
+            # (M, Q, X)  ==>  (M, Q, Z, X)
+            tau = tau[:, :, np.newaxis, :] * np.ones_like(redz_final)
+            dadt = dadt[:, :, np.newaxis, :] * np.ones_like(redz_final)
+            dets = dict(tau=tau, cosmo_fact=cosmo_fact, dadt=dadt, sepa=target_sepa)
+            return edges, dnum, redz_final, dets
+
+        # self._redz_final = redz_final
+
+        return edges, dnum, redz_final
 
     def new_gwb(self, fobs_gw_edges, hard, realize=100):
         """Calculate GWB using new cython implementation, 10x faster!
@@ -846,7 +968,7 @@ class Semi_Analytic_Model:
         return gwb
 
 
-    def gwb(self, fobs_gw_edges, hard, realize=100, loudest=1, params=False):
+    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100, loudest=1, params=False):
         """Calculate the (smooth/semi-analytic) GWB and CWs at the given observed GW-frequencies.
 
         Parameters
@@ -873,20 +995,20 @@ class Semi_Analytic_Model:
         hc_bg : (F, R) NDarray of scalars
             Characteristic strain of the GWB.
         sspar : (4, F, R, L) NDarray of scalars
-            Astrophysical parametes (total mass, mass ratio, initial redshift, final redshift) of each 
-            loud single sources, for each frequency and realization. 
+            Astrophysical parametes (total mass, mass ratio, initial redshift, final redshift) of each
+            loud single sources, for each frequency and realization.
             Returned only if params = True.
         bgpar : (7, F, R) NDarray of scalars
-            Average effective binary astrophysical parameters (total mass, mass ratio, initial redshift, 
-            final redshift, final comoving distance, final separation, final angular separation) 
-            for background sources at each frequency and realization, 
+            Average effective binary astrophysical parameters (total mass, mass ratio, initial redshift,
+            final redshift, final comoving distance, final separation, final angular separation)
+            for background sources at each frequency and realization,
             Returned only if params = True.
         """
 
         assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
 
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
-        
+
         # convert to orbital-frequency (from GW-frequency)
         fobs_orb_edges = fobs_gw_edges / 2.0
         fobs_orb_cents = fobs_gw_cents / 2.0
@@ -919,7 +1041,7 @@ class Semi_Analytic_Model:
 
     def old_ss_gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=1, loudest=1, params=False,
                use_redz_after_hard=None):
-        """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies,  
+        """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies,
         using new `dynamic_binary_number_at_fobs` method, better, but slower than cython version.
 
         Parameters
@@ -941,12 +1063,12 @@ class Semi_Analytic_Model:
         hc_bg : (F, R) NDarray of scalars
             Characteristic strain of the GWB.
         sspar : (3, F, R, L) NDarray of scalars
-            Astrophysical parametes of each loud single sources, 
-            for each frequency and realization. 
+            Astrophysical parametes of each loud single sources,
+            for each frequency and realization.
             Returned only if params = True.
         bgpar : (3, F, R) NDarray of scalars
             Average effective binary astrophysical parameters for background
-            sources at each frequency and realization, 
+            sources at each frequency and realization,
             Returned only if params = True.
 
 
@@ -982,7 +1104,7 @@ class Semi_Analytic_Model:
         edges[-1] = fobs_orb_edges
 
         log.debug(f"dnum: {utils.stats(dnum)}")
-        
+
 
         # "integrate" within each bin (i.e. multiply by bin volume)
         number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
