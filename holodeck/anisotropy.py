@@ -253,7 +253,7 @@ def Cl_analytic_from_num(fobs_orb_edges, number, hs, realize = False, floor = Fa
         hs = hs[...,np.newaxis]
     elif realize is True:
         number = holo.gravwaves.poisson_as_needed(number)
-    elif floor is True:
+    elif floor is True: # assumes realize is False
         number = np.floor(number)
 
 
@@ -391,8 +391,10 @@ def Cl_analytic_from_dnum(edges, dnum, redz=None, realize=False):
         shape = number.shape + (realize,)
         number = holo.gravwaves.poisson_as_needed(number[...,np.newaxis] * np.ones(shape))
 
-        numh2 = number * hs_cents**2 * np.diff(np.log(fobs_gw_edges))[:,np.newaxis] 
-        numh4 = number * hs_cents**4 * np.diff(np.log(fobs_gw_edges))[:,np.newaxis] 
+        # numh2 = number * hs_cents**2 * np.diff(np.log(fobs_gw_edges))[:,np.newaxis] 
+        # numh4 = number * hs_cents**4 * np.diff(np.log(fobs_gw_edges))[:,np.newaxis] 
+        numh2 = number * hs_cents**2 
+        numh4 = number * hs_cents**4 
     else:
         err = "`realize` ({}) must be one of {{False, integer}}!".format(realize)
         raise ValueError(err)
