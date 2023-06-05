@@ -1298,6 +1298,9 @@ class Fixed_Time_2PL_SAM(_Hardening):
 
         """
         assert np.ndim(time) == 0
+        assert np.ndim(rchar) == 0
+        assert np.ndim(gamma_inner) == 0
+        assert np.ndim(gamma_outer) == 0
         mtot, mrat = np.meshgrid(sam.mtot, sam.mrat, indexing='ij')
         shape = mtot.shape
         mt, mr = [mm.flatten() for mm in [mtot, mrat]]
@@ -1331,11 +1334,19 @@ class Fixed_Time_2PL_SAM(_Hardening):
     def dadt_dedt(self, evo, step, *args, **kwargs):
         raise NotImplementedError()
 
-    def dadt(self, mtot, mrat, sepa):
+    def dadt(self, mtot, mrat, sepa, norm=None):
+        if norm is None:
+            norm = self._norm
+
+        args = np.broadcast_arrays(mtot, mrat, sepa, norm)
+        shape = args[0].shape
+        args = [aa.flatten() for aa in args]
+        mtot, mrat, sepa, norm = args
         dadt_vals = holo.sam_cython.hard_func_2pwl_gw(
-            mtot.flatten(), mrat.flatten(), sepa.flatten(), self._norm.flatten(),
-            self._rchar, self._gamma_inner, self._gamma_outer
+            mtot, mrat, sepa, norm,                             # must all be 1darrays of matching size (X,)
+            self._rchar, self._gamma_inner, self._gamma_outer   # must all be scalars
         )
+        dadt_vals = dadt_vals.reshape(shape)
         return dadt_vals
 
 

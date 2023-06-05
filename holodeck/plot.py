@@ -22,20 +22,42 @@ GOLDEN_RATIO = (np.sqrt(5) - 1) / 2
 
 mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
 plt.rcParams['axes.grid'] = True
-plt.rcParams['grid.alpha'] = 0.25
+plt.rcParams['grid.alpha'] = 0.15
 plt.rcParams["mathtext.fontset"] = "cm"
 plt.rcParams["font.family"] = "serif"
-plt.rcParams["font.size"] = FONTSIZE
-plt.rcParams["legend.fontsize"] = FONTSIZE*0.8
 plt.rcParams["legend.handlelength"] = 1.5
 plt.rcParams["lines.solid_capstyle"] = 'round'
-mpl.rcParams['xtick.labelsize'] = FONTSIZE*0.8
-mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
+# plt.rcParams["font.size"] = FONTSIZE
+# plt.rcParams["legend.fontsize"] = FONTSIZE*0.8
+# mpl.rcParams['xtick.labelsize'] = FONTSIZE*0.8
+# mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
 
 LABEL_GW_FREQUENCY_YR = r"GW Frequency $[\mathrm{yr}^{-1}]$"
 LABEL_GW_FREQUENCY_HZ = r"GW Frequency $[\mathrm{Hz}]$"
 LABEL_GW_FREQUENCY_NHZ = r"GW Frequency $[\mathrm{nHz}]$"
-LABEL_CHARACTERISTIC_STRAIN = "GW Characteristic Strain"
+LABEL_SEPARATION_PC = r"Binary Separation $[\mathrm{pc}]$"
+LABEL_CHARACTERISTIC_STRAIN = r"GW Characteristic Strain"
+LABEL_HARDENING_TIME = r"Hardening Time $[\mathrm{Gyr}]$"
+
+
+PARAM_KEYS = {
+    'hard_time': r"phenom $\tau_f$",
+    'hard_gamma_inner': r"phenom $\nu_\mathrm{inner}$",
+    'hard_gamma_outer': r"phenom $\nu_\mathrm{outer}$",
+    'hard_gamma_rot' : r"phenom $\nu_{\mathrm{rot}}$",
+    'gsmf_phi0': r"GSMF $\psi_0$",
+    'gsmf_mchar0_log10': r"GSMF $m_{\psi,0}$",
+    'gsmf_alpha0': r"GSMF $\alpha_{\psi,0}$",
+    'gpf_zbeta': r"GPF $\beta_{p,z}$",
+    'gpf_qgamma': r"GPF $\gamma_{p,0}$",
+    'gmt_norm': r"GMT $T_0$",
+    'gmt_zbeta': r"GMT $\beta_{t,z}$",
+    'mmb_mamp_log10': r"MMB $\mu$",
+    'mmb_plaw': r"MMB $\alpha_{\mu}$",
+    'mmb_scatter_dex': r"MMB $\epsilon_{\mu}$",
+}
+
+COLORS_MPL = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
 
 class MidpointNormalize(mpl.colors.Normalize):
@@ -80,9 +102,23 @@ class MidpointLogNormalize(mpl.colors.LogNorm):
         return vals
 
 
-def figax_single(**kwargs):
-    figsize_single = [FIGSIZE, FIGSIZE * GOLDEN_RATIO]
-    adjust_single = dict(left=0.12, bottom=0.15, right=0.95, top=0.95)
+def figax_single(height=None, **kwargs):
+    mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
+    plt.rcParams['axes.grid'] = True
+    plt.rcParams['grid.alpha'] = 0.15
+    plt.rcParams["mathtext.fontset"] = "cm"
+    plt.rcParams["font.family"] = "serif"
+    plt.rcParams["legend.handlelength"] = 1.5
+    plt.rcParams["lines.solid_capstyle"] = 'round'
+    plt.rcParams["font.size"] = FONTSIZE
+    plt.rcParams["legend.fontsize"] = FONTSIZE*0.8
+    mpl.rcParams['xtick.labelsize'] = FONTSIZE*0.8
+    mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
+
+    if height is None:
+        height = FIGSIZE * GOLDEN_RATIO
+    figsize_single = [FIGSIZE, height]
+    adjust_single = dict(left=0.15, bottom=0.15, right=0.95, top=0.95)
 
     kwargs.setdefault('figsize', figsize_single)
     for kk, vv in adjust_single.items():
@@ -91,9 +127,24 @@ def figax_single(**kwargs):
     return figax(**kwargs)
 
 
-def figax_double(**kwargs):
-    figsize_double = [2*FIGSIZE, 2*FIGSIZE*GOLDEN_RATIO]
-    adjust_double = dict(left=0.08, bottom=0.10, right=0.98, top=0.95)
+def figax_double(height=None, **kwargs):
+    mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
+    plt.rcParams['axes.grid'] = True
+    plt.rcParams['grid.alpha'] = 0.15
+    plt.rcParams["mathtext.fontset"] = "cm"
+    plt.rcParams["font.family"] = "serif"
+    plt.rcParams["legend.handlelength"] = 1.5
+    plt.rcParams["lines.solid_capstyle"] = 'round'
+    plt.rcParams["font.size"] = FONTSIZE
+    plt.rcParams["legend.fontsize"] = FONTSIZE*0.8
+    mpl.rcParams['xtick.labelsize'] = FONTSIZE*0.8
+    mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
+
+    if height is None:
+        height = 2 * FIGSIZE * GOLDEN_RATIO
+
+    figsize_double = [2*FIGSIZE, height]
+    adjust_double = dict(left=0.10, bottom=0.10, right=0.98, top=0.95)
 
     kwargs.setdefault('figsize', figsize_double)
     for kk, vv in adjust_double.items():
@@ -219,8 +270,10 @@ def figax(figsize=[7, 5], ncols=1, nrows=1, sharex=False, sharey=False, squeeze=
 
         if grid is True:
             ax.set_axisbelow(True)
-            ax.grid(True, which='major', axis='both', c='0.6', zorder=2, alpha=0.4)
-            ax.grid(True, which='minor', axis='both', c='0.8', zorder=2, alpha=0.4)
+            # ax.grid(True, which='major', axis='both', c='0.6', zorder=2, alpha=0.4)
+            # ax.grid(True, which='minor', axis='both', c='0.8', zorder=2, alpha=0.4)
+            # ax.grid(True, which='major', axis='both', c='0.6', zorder=2, alpha=0.4)
+            # ax.grid(True, which='minor', axis='both', c='0.8', zorder=2, alpha=0.4)
 
     if squeeze:
         axes = np.squeeze(axes)
@@ -417,7 +470,6 @@ def draw_gwb(ax, xx, gwb, nsamp=10, color=None, label=None, **kwargs):
     kw_plot = kwargs.pop('plot', {})
     kw_plot.setdefault('color', color)
     hh = draw_med_conf(ax, xx, gwb, plot=kw_plot, **kwargs)
-
     if (nsamp is not None) and (nsamp > 0):
         nsamp_max = gwb.shape[1]
         idx = np.random.choice(nsamp_max, np.min([nsamp, nsamp_max]), replace=False)
@@ -630,8 +682,9 @@ def _draw_plaw(ax, freqs, amp=1e-15, f0=1/YR, **kwargs):
     return ax.plot(freqs, plaw, **kwargs)
 
 
-def _twin_hz(ax, nano=True, fs=8, **kw):
+def _twin_hz(ax, nano=True, fs=10, **kw):
     tw = ax.twiny()
+    tw.grid(False)
     xlim = np.array(ax.get_xlim()) / YR
     if nano:
         label = LABEL_GW_FREQUENCY_NHZ
@@ -641,22 +694,24 @@ def _twin_hz(ax, nano=True, fs=8, **kw):
 
     tw.set(xlim=xlim, xscale=ax.get_xscale())
     tw.set_xlabel(label, fontsize=fs, **kw)
-    return
+    return tw
 
 
-def _twin_yr(ax, nano=True, fs=8, **kw):
+def _twin_yr(ax, nano=True, fs=10, label=True, **kw):
     tw = ax.twiny()
+    tw.grid(False)
     xlim = np.array(ax.get_xlim()) * YR
     if nano:
         xlim /= 1e9
 
     tw.set(xlim=xlim, xscale=ax.get_xscale())
-    tw.set_xlabel(LABEL_GW_FREQUENCY_YR, fontsize=fs, **kw)
-    return
+    if label:
+        tw.set_xlabel(LABEL_GW_FREQUENCY_YR, fontsize=fs, **kw)
+    return tw
 
 
-def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={}):
-    plot.setdefault('alpha', 0.5)
+def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={}, filter=False):
+    plot.setdefault('alpha', 0.75)
     fill.setdefault('alpha', 0.2)
     percs = np.atleast_1d(fracs)
     assert np.all((0.0 <= percs) & (percs <= 1.0))
@@ -666,10 +721,16 @@ def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill=
     # Add the median value (50%)
     inter_percs = [0.5, ] + np.concatenate(inter_percs).tolist()
     # Get percentiles; they go along the last axis
-    rv = kale.utils.quantiles(vals, percs=inter_percs, weights=weights, axis=-1)
+    if filter:
+        rv = [
+            kale.utils.quantiles(vv[vv > 0.0], percs=inter_percs, weights=weights)
+            for vv in vals
+        ]
+        rv = np.asarray(rv)
+    else:
+        rv = kale.utils.quantiles(vals, percs=inter_percs, weights=weights, axis=-1)
 
     med, *conf = rv.T
-
     # plot median
     hh, = ax.plot(xx, med, **plot)
 
@@ -760,7 +821,7 @@ def violins(ax, xx, yy, zz, width, **kwargs):
     return handle
 
 
-def violin(ax, xx, yy, zz, width, side='both', clip_pdf=None,
+def violin(ax, xx, yy, zz, width, median_log10=False, side='both', clip_pdf=None,
            median={}, line={}, fill={}, **kwargs):
     assert np.ndim(xx) == 0
     assert np.shape(xx) == np.shape(width)
@@ -786,11 +847,6 @@ def violin(ax, xx, yy, zz, width, side='both', clip_pdf=None,
         assert np.ndim(clip_pdf) == 0
         assert clip_pdf < 1.0
 
-    dy = np.diff(yy)
-    cdf = 0.5 * (zz[1:] + zz[:-1]) * dy
-    cdf = np.concatenate([[0.0, ], cdf])
-    cdf = np.cumsum(cdf)
-
     zz = zz / zz.max()
 
     if median is True:
@@ -799,6 +855,13 @@ def violin(ax, xx, yy, zz, width, side='both', clip_pdf=None,
         median = None
 
     if median is not None:
+        if median_log10:
+            dy = np.diff(np.log10(yy))
+        else:
+            dy = np.diff(yy)
+        cdf = 0.5 * (zz[1:] + zz[:-1]) * dy
+        cdf = np.concatenate([[0.0, ], cdf])
+        cdf = np.cumsum(cdf)
         med = np.interp([0.5], cdf/cdf.max(), yy)
 
     if clip_pdf is not None:
@@ -943,13 +1006,14 @@ class Corner:
 
         return
 
-    def plot(self, data, edges=None, weights=None, quantiles=None, sigmas=None,
+    def plot(self, data, edges=None, weights=None, ratio=None, quantiles=None, sigmas=None, reflect=None,
              color=None, cmap=None, limit=None, dist1d={}, dist2d={}):
 
         if limit is None:
             limit = self._limit_flag
 
         # ---- Sanitize
+
         if np.ndim(data) != 2:
             err = "`data` (shape: {}) must be 2D with shape (parameters, data-points)!".format(
                 np.shape(data))
@@ -961,7 +1025,13 @@ class Corner:
         if (np.ndim(axes) != 2) or (shp[0] != shp[1]) or (shp[0] != size):
             raise ValueError("`axes` (shape: {}) does not match data dimension {}!".format(shp, size))
 
+        if ratio is not None:
+            if np.ndim(ratio) != 2 or np.shape(ratio)[0] != size:
+                err = f"`ratio` (shape: {np.shape(ratio)}) must be 2D with shape (parameters, data-points)!"
+                raise ValueError(err)
+
         # ---- Set parameters
+
         last = size - 1
         rotate = self._rotate
 
@@ -971,30 +1041,32 @@ class Corner:
         edges = kale.utils.parse_edges(data, edges=edges)
         quantiles, _ = kale.plot._default_quantiles(quantiles=quantiles, sigmas=sigmas)
 
-        #
-        # Draw / Plot Data
-        # ----------------------------------
-
         # ---- Draw 1D Histograms & Carpets
+
         limits = [None] * size      # variable to store the data extrema
         for jj, ax in enumerate(axes.diagonal()):
             rot = (rotate and (jj == last))
+            refl = reflect[jj] if reflect is not None else None
+            rat = ratio[jj] if ratio is not None else None
             self.dist1d(
-                ax, edges[jj], data[jj], weights=weights, quantiles=quantiles, rotate=rot,
-                color=color, **dist1d
+                ax, edges[jj], data[jj], weights=weights, ratio=rat, quantiles=quantiles, rotate=rot,
+                color=color, reflect=refl, **dist1d
             )
             limits[jj] = kale.utils.minmax(data[jj], stretch=self._LIMITS_STRETCH)
 
         # ---- Draw 2D Histograms and Contours
+
         for (ii, jj), ax in np.ndenumerate(axes):
             if jj >= ii:
                 continue
+            rat = [ratio[jj], ratio[ii]] if ratio is not None else None
             handle = self.dist2d(
-                ax, [edges[jj], edges[ii]], [data[jj], data[ii]], weights=weights,
+                ax, [edges[jj], edges[ii]], [data[jj], data[ii]], weights=weights, ratio=rat,
                 color=color, cmap=cmap, quantiles=quantiles, **dist2d
             )
 
-        # If we are setting the axes limits dynamically
+        # ---- calculate and set axes limits
+
         if limit:
             # Update any stored values
             for ii in range(self.ndim):
@@ -1005,23 +1077,126 @@ class Corner:
 
         return handle
 
-    def dist1d(self, ax, edge, data, color=None, **kwargs):
-        """Wrapper for `kalepy.plot.dist1d` that sets default parameters appropriate for 1D data.
-        """
-        # Set default parameters
-        kwargs.setdefault('density', False)
-        kwargs.setdefault('confidence', False)
-        kwargs.setdefault('carpet', True)
-        kwargs.setdefault('hist', True)
-        # This is identical to `kalepy.plot.dist1d` (just used for naming convenience)
-        rv = kale.plot.dist1d(data, ax=ax, edges=edge, color=color, **kwargs)
-        return rv
+    def dist1d(self, ax, edges, data, color=None, weights=None, ratio=None, probability=True, rotate=False,
+               density=None, confidence=False, hist=None, carpet=True, quantiles=None,
+               ls=None, alpha=None, reflect=None, **kwargs):
+
+        if np.ndim(data) != 1:
+            err = "Input `data` (shape: {}) is not 1D!".format(np.shape(data))
+            raise ValueError(err)
+
+        if ratio is not None and np.ndim(ratio) != 1:
+            err = "`ratio` (shape: {}) is not 1D!".format(np.shape(ratio))
+            raise ValueError(err)
+
+        # Use `scatter` as the limiting-number of scatter-points
+        #    To disable scatter, `scatter` will be set to `None`
+        carpet = kale.plot._scatter_limit(carpet, "carpet")
+
+        # set default color to next from axes' color-cycle
+        if color is None:
+            color = kale.plot._get_next_color(ax)
+
+        # ---- Draw Components
+
+        # Draw PDF from KDE
+        handle = None     # variable to store a plotting 'handle' from one of the plotted objects
+        if density is not False:
+            kde = kale.KDE(data, weights=weights)
+
+            # If histogram is also being plotted (as a solid line) use a dashed line
+            if ls is None:
+                _ls = '--' if hist else '-'
+                _alpha = 0.8 if hist else 0.8
+            else:
+                _ls = ls
+                _alpha = alpha
+
+            # Calculate KDE density distribution for the given parameter
+            kde_kwargs = dict(probability=probability, params=0, reflect=reflect)
+            xx, yy = kde.density(**kde_kwargs)
+
+            if ratio is not None:
+                kde_ratio = kale.KDE(ratio, weights=weights)
+                _, kde_ratio = kde_ratio.density(points=xx, **kde_kwargs)
+                yy /= kde_ratio
+
+            # rescale by value of density
+            yy = yy * density
+            # Plot
+            if rotate:
+                temp = xx
+                xx = yy
+                yy = temp
+
+            handle, = ax.plot(xx, yy, color=color, ls=_ls, alpha=_alpha, **kwargs)
+
+        # Draw Histogram
+        if hist:
+            if alpha is None:
+                _alpha = 0.5 if density else 0.8
+            else:
+                _alpha = alpha
+
+            _, _, hh = self.hist1d(
+                ax, data, edges=edges, weights=weights, ratio=ratio, color=color,
+                density=True, probability=probability, joints=True, rotate=rotate,
+                ls=ls, alpha=_alpha, **kwargs
+            )
+            if handle is None:
+                handle = hh
+
+        # Draw Contours and Median Line
+        if confidence:
+            if ratio is not None:
+                raise NotImplementedError("`confidence` with `ratio` is not implemented!")
+            hh = kale.plot._confidence(data, ax=ax, color=color, quantiles=quantiles, rotate=rotate)
+            if handle is None:
+                handle = hh
+
+        # Draw Carpet Plot
+        if carpet is not None:
+            if ratio is not None:
+                raise NotImplementedError("`confidence` with `carpet` is not implemented!")
+            hh = kale.plot._carpet(data, weights=weights, ax=ax, color=color, rotate=rotate, limit=carpet)
+            if handle is None:
+                handle = hh
+
+        return handle
+
+    def hist1d(self, ax, data, edges=None, weights=None, ratio=None, density=False, probability=False,
+            renormalize=False, joints=True, positive=True, rotate=False, **kwargs):
+
+        hist_kwargs = dict(density=density, probability=probability)
+        # Calculate histogram
+        hist, edges = kale.utils.histogram(data, bins=edges, weights=weights, **hist_kwargs)
+
+        if ratio is not None:
+            hist_ratio, _ = kale.utils.histogram(data, bins=edges, **hist_kwargs)
+            hist /= hist_ratio
+
+        # Draw
+        rv = kale.plot.draw_hist1d(
+            ax, edges, hist,
+            renormalize=renormalize, joints=joints, positive=positive, rotate=rotate,
+            **kwargs
+        )
+        return hist, edges, rv
 
     def dist2d(
-        self, ax, edges, data, weights=None, quantiles=None, sigmas=None,
+        self, ax, edges, data, weights=None, ratio=None, quantiles=None, sigmas=None,
         color=None, cmap=None, smooth=None, upsample=None, pad=True, outline=True,
         median=False, scatter=True, contour=True, hist=True, mask_dense=None, mask_below=True, mask_alpha=0.9
     ):
+
+        if np.ndim(data) != 2 or np.shape(data)[0] != 2:
+            err = f"`data` (shape: {np.shape(data)}) must be 2D with shape (parameters, data-points)!"
+            raise ValueError(err)
+
+        if ratio is not None:
+            if np.ndim(ratio) != 2 or np.shape(ratio)[0] != 2:
+                err = f"`ratio` (shape: {np.shape(ratio)}) must be 2D with shape (parameters, data-points)!"
+                raise ValueError(err)
 
         # Set default color or cmap as needed
         color, cmap = kale.plot._parse_color_cmap(ax=ax, color=color, cmap=cmap)
@@ -1036,14 +1211,18 @@ class Corner:
 
         # Calculate histogram
         edges = kale.utils.parse_edges(data, edges=edges)
-        hh, *_ = np.histogram2d(*data, bins=edges, weights=weights, density=True)
+        hist_kwargs = dict(bins=edges, density=True)
+        hh, *_ = np.histogram2d(*data, weights=weights, **hist_kwargs)
+
+        if ratio is not None:
+            hh_ratio, *_ = np.histogram2d(*ratio, **hist_kwargs)
+            hh /= hh_ratio
+            hh = np.nan_to_num(hh)
 
         _, levels, quantiles = kale.plot._dfm_levels(hh, quantiles=quantiles, sigmas=sigmas)
         if mask_below is True:
             mask_below = levels.min()
 
-        # ---- Draw components
-        # ------------------------------------
         handle = None
 
         # ---- Draw Scatter Points
@@ -1052,6 +1231,9 @@ class Corner:
 
         # ---- Draw Median Lines (cross-hairs style)
         if median:
+            if ratio:
+                raise NotImplementedError("`median` is not impemented with `ratio`!")
+
             for dd, func in zip(data, [ax.axvline, ax.axhline]):
                 # Calculate value
                 if weights is None:
@@ -1071,8 +1253,6 @@ class Corner:
             _ee, _hh, handle = kale.plot.draw_hist2d(
                 ax, edges, hh, mask_below=mask_below, cmap=cmap, zorder=10, shading='auto',
             )
-
-        print(f"{levels=}")
 
         # ---- Draw Contours
         if contour:
@@ -1128,7 +1308,7 @@ class Corner:
                     loc = 'upper right'
                 elif size % 2 == 0:
                     index = size // 2
-                    index = (1, index)
+                    index = (size - index - 2, index + 1)
                     loc = 'lower left'
                 else:
                     index = (size // 2) + 1
