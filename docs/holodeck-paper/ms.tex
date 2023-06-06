@@ -46,6 +46,8 @@
 \end{keywords}
 
 
+
+
 % =================================================================================================
 % ====    Section 1 - Introduction
 % =================================================================================================
@@ -84,6 +86,7 @@
     In this paper, we present the simulation methodologies and their implementations in \holodeck{}.  We also use the framework to explore in more detail the range of plausible GW-strain spectral indices that would be detectable by PTAs. \todo{expand this paragraph}.
 
 
+
 % =================================================================================================
 % ====    Section 2 - Methods
 % =================================================================================================
@@ -95,12 +98,12 @@
 
     \subsection{Source Distributions and Gravitational Wave Calculations}
 
-        It was shown by \citet[][Eq.~5]{Phinney-2001} that the GWB spectrum, can be expressed in terms of the GW characteristic strain ($\hc$),
+        It was shown by \citet[][]{Phinney-2001} that the GWB spectrum can be calculated by relating the current energy-density of GWs to the integrated GW energy produced by sources over all of cosmic time,
         \begin{equation}
-            % \label{eq:}
-            \hc^2(f) = \frac{4G}{\pi c^2 f} \int dz \; \frac{d\ndens}{dz} \, \scale{d\egw}{d f_p} \bigg|_{f_p=f\lr{1+z}}.
+            \label{eq:soltan_analog}
+            \hc^2(f) = \frac{4G}{\pi c^2 f} \int dz \; \diffp{\ndens}{{z}} \, \diffp{\egw}{{f_r}} \bigg|_{f_r=f\lr{1+z}}.
         \end{equation}
-        We can convert from the GW energy-spectrum ($\frac{d\egw}{d f_p}$) to GW spectral strain using Eq.~\ref{eq:gw_energy_spectrum}~\&~\ref{eq:strain_lum}, and rewrite this as,
+        Converting from the rest-frame frequency $f_r$ to observer-frame $f$ in the term in front of the integral cancels out the redshifting of gravitons between their emission and detection.  Here the comoving, volumetric number density of sources is \mbox{$\ndens \equiv \diffp{N}{{V_c}}$}, and the GWB spectrum is described in terms of the characteristic strain $\hc$.  We can convert from the GW energy-spectrum integrated over each sources lifetime, $\diffp{\egw}{{f_p}}$, to GW spectral strain using Eq.~\ref{eq:gw_energy_spectrum}~\&~\ref{eq:strain_lum}, and rewrite the GWB spectrum as,
         \begin{equation}
             \label{eq:gwb_sa}
             \hc^2(f) = \int_0^\infty \!\! dz \, \sum_n^\infty \; \frac{d\ndens}{dz} \, \hsn^2\lr{f_p} \cdot 4\pi c \, d_c^2 \cdot \lr{1+z} \cdot \thard(f_p) \, \bigg|_{f_p = f(1+z)/n}.
@@ -352,7 +355,7 @@
 
     \subsection{Binaries and Gravitational Waves}
 
-        A binary is described by its total mass $M$, mass ratio $q \equiv m_2 / m_1$ (s.t.~$q\leq1$), (proper) semi-major axis $a$, and rest-frame orbital frequency $f_r$.  The characteristic gravitational wave mass is the chirp mass, $\mchirp \equiv M \, q^{3/5} \, \lr[-6/5]{1+q}$.
+        A binary is described by its total mass $M$, mass ratio $q \equiv m_2 / m_1$ (s.t.~$q\leq1$), (proper) semi-major axis $a$, and rest-frame orbital frequency $f_p$.  The characteristic gravitational wave mass is the chirp mass, $\mchirp \equiv M \, q^{3/5} \, \lr[-6/5]{1+q}$.
 
         The time evolution of a binary's orbit due to the loss of energy and angular momentum through gravitational waves was calculated by \citep[][Eq.~5.6--5.8]{Peters1964}:
         \begin{subequations}
