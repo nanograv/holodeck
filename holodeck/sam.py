@@ -866,7 +866,7 @@ class Semi_Analytic_Model:
     def new_gwb(self, *args, **kwargs):
         pass
 
-    def gwb_new(self, fobs_gw_edges, hard, realize=100):
+    def gwb_new(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100):
         """Calculate GWB using new cython implementation, 10x faster!
         """
 
