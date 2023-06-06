@@ -577,7 +577,6 @@ def run_sam_at_pspace_num(args, space, pnum):
         redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
             fobs_orb_cents, sam, hard, cosmo
         )
-        use_redz = redz_final
         edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
         number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
 
@@ -585,20 +584,20 @@ def run_sam_at_pspace_num(args, space, pnum):
 
         _log_mem_usage(log)
 
-        if use_redz is None:
-            try:
-                use_redz = sam._redz_final
-                log.info("using `redz_final`")
-            except AttributeError:
-                use_redz = sam._redz_prime[:, :, :, np.newaxis] * np.ones_like(number)
-                log.warning("using `redz_prime`")
+        # if use_redz is None:
+        #     try:
+        #         use_redz = sam._redz_final
+        #         log.info("using `redz_final`")
+        #     except AttributeError:
+        #         use_redz = sam._redz_prime[:, :, :, np.newaxis] * np.ones_like(number)
+        #         log.warning("using `redz_prime`")
 
         # ---- Calculate SS/CW Sources & binary parameters
 
         if args.ss_flag:
             log.debug(f"Calculating `ss_gws` for shape ({fobs_cents.size}, {args.nreals}) | {args.params_flag=}")
             vals = holo.single_sources.ss_gws_redz(
-                edges, use_redz, number, realize=args.nreals,
+                edges, redz_final, number, realize=args.nreals,
                 loudest=args.nloudest, params=args.params_flag,
             )
             if args.params_flag:
@@ -618,7 +617,7 @@ def run_sam_at_pspace_num(args, space, pnum):
 
         if args.gwb_flag:
             log.debug(f"Calculating `gwb` for shape ({fobs_cents.size}, {args.nreals})")
-            gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, args.nreals)
+            gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, args.nreals)
             log.debug(f"{holo.utils.stats(gwb)=}")
             _log_mem_usage(log)
             data['gwb'] = gwb
@@ -1393,7 +1392,7 @@ def make_ss_plot(fobs, hc_ss, hc_bg, fit_data):
 
 def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar):
     """ Plot total mass, mass ratio, initial d_c, final d_c
-    
+
     """
     # fig = holo.plot.plot_gwb(fobs, gwb)
     fig = holo.plot.plot_pars(fobs, sspar, bgpar)
