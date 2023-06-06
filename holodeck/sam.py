@@ -27,12 +27,7 @@ in $a$ or $f$ is subtle, as it requires modeling the binary evolution (i.e. hard
 
 To-Do
 -----
-* Change mass-ratios and redshifts (1+z) to log-space; expand q parameter range.
-* Incorporate arbitrary hardening mechanisms into SAM construction, sample self-consistently.
-* Should there be an additional dimension of parameter space for galaxy properties?  This way
-  variance in scaling relations is incorporated directly before calculating realizations.
 * Allow SAM class to take M-sigma in addition to M-Mbulge.
-* Should GW calculations be moved to the `gravwaves.py` module?
 
 References
 ----------
@@ -51,8 +46,8 @@ import scipy.interpolate  # noqa
 import kalepy as kale
 
 import holodeck as holo
-from holodeck import cosmo, utils   # , log
-from holodeck.constants import GYR, SPLC, MSOL, MPC, YR, PC
+from holodeck import cosmo, utils
+from holodeck.constants import GYR, SPLC, MSOL, MPC
 from holodeck import relations, gravwaves, single_sources
 import holodeck.sam_cython
 
@@ -62,7 +57,6 @@ GSMF_USES_MTOT = False       #: the mass used in the GSMF is interpretted as M=m
 GPF_USES_MTOT = False        #: the mass used in the GPF  is interpretted as M=m1+m2, otherwise use primary m1
 GMT_USES_MTOT = False        #: the mass used in the GMT  is interpretted as M=m1+m2, otherwise use primary m1
 
-# ZERO_GMT_STALLED_SYSTEMS = False
 
 
 # ==============================
@@ -460,9 +454,6 @@ class Semi_Analytic_Model:
         self._gmt_time = None         #: GMT timescale of galaxy mergers [sec]
         self._redz_prime = None       #: redshift following galaxy merger process
 
-        # These values change each time a certain function is called, but are cached after each call
-        self._gwb = None
-
         return
 
     @property
@@ -594,7 +585,6 @@ class Semi_Analytic_Model:
                     log.error(err)
 
             # set values after redshift zero to have zero density
-            # if self.ZERO_GMT_STALLED_SYSTEMS:
             log.info(f"zeroing out {utils.frac_str(idx_stalled)} systems stalled from GMT")
             dens[idx_stalled] = 0.0
             # else:
@@ -654,12 +644,10 @@ class Semi_Analytic_Model:
             hard._norm[:, :, np.newaxis],
         )
         dadt_evo = hard.dadt(mt, mr, rads, norm=norm)
-        print(f"{utils.stats(dadt_evo*YR/PC)=}")
 
         # (M, Q, S-1)
         # Integrate (inverse) hardening rates to calculate total lifetime to each separation
         times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=-1, cumsum=True)
-        print(f"{utils.stats(times_evo/GYR)=}")
         # Combine the binary-evolution time, with the galaxy-merger time
         # (M, Q, Z, S-1)
         rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis]
@@ -679,7 +667,6 @@ class Semi_Analytic_Model:
         fobs_orb_evo, redz_evo = [mm.reshape(-1, steps-1) for mm in [fobs_orb_evo[:, :, :, 1:], redz_evo]]
         # (M*Q*Z, X)
         redz_final = utils.ndinterp(fobs_orb, fobs_orb_evo, redz_evo, xlog=True, ylog=False)
-        print(f"{utils.stats(redz_final)=}")
 
         # (M*Q*Z, X) ===> (M, Q, Z, X)
         redz_final = redz_final.reshape(self.shape + (fobs_orb.size,))
@@ -702,11 +689,9 @@ class Semi_Analytic_Model:
 
         # Convert from observer-frame orbital freq, to rest-frame orbital freq
         sa = utils.kepler_sepa_from_freq(mt, frst_orb)
-        print(f"{utils.stats(sa/PC)=}")
         mt, mr, sa, norm = np.broadcast_arrays(mt, mr, sa, hard._norm[:, :, np.newaxis, np.newaxis])
         # hardening rate, negative values, units of [cm/sec]
         dadt = hard.dadt(mt, mr, sa, norm=norm)
-        print(f"{utils.stats(dadt*YR/PC)=}")
         # Calculate `tau = dt/dlnf_r = f_r / (df_r/dt)`
         # dfdt is positive (increasing frequency)
         dfdt, frst_orb = utils.dfdt_from_dadt(dadt, sa, frst_orb=frst_orb)
@@ -724,8 +709,6 @@ class Semi_Analytic_Model:
             # (M, Q, X)  ==>  (M, Q, Z, X)
             dets = dict(tau=tau, cosmo_fact=cosmo_fact, dadt=dadt, fobs=fobs_orb, sepa=sa)
             return edges, dnum, redz_final, dets
-
-        self._redz_final = redz_final
 
         return edges, dnum, redz_final
 
@@ -767,8 +750,6 @@ class Semi_Analytic_Model:
         # (M, Q, Z) units: [1/s] i.e. number per second
         dnum = np.zeros(new_shape)
         dnum[coal] = (dens[..., np.newaxis] * np.ones(new_shape))[coal] * cosmo_fact * tau
-
-        self._redz_final = rz
 
         return edges, dnum, rz
 
@@ -879,11 +860,13 @@ class Semi_Analytic_Model:
             dets = dict(tau=tau, cosmo_fact=cosmo_fact, dadt=dadt, sepa=target_sepa)
             return edges, dnum, redz_final, dets
 
-        # self._redz_final = redz_final
-
         return edges, dnum, redz_final
 
-    def new_gwb(self, fobs_gw_edges, hard, realize=100):
+    @utils.deprecated_fail("`gwb_new`")
+    def new_gwb(self, *args, **kwargs):
+        pass
+
+    def gwb_new(self, fobs_gw_edges, hard, realize=100):
         """Calculate GWB using new cython implementation, 10x faster!
         """
 
@@ -967,7 +950,6 @@ class Semi_Analytic_Model:
         gwb = gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
         return gwb
 
-
     def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100, loudest=1, params=False):
         """Calculate the (smooth/semi-analytic) GWB and CWs at the given observed GW-frequencies.
 
@@ -1005,7 +987,13 @@ class Semi_Analytic_Model:
             Returned only if params = True.
         """
 
-        assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
+        if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
+            err = (
+                "`sam_cython` methods only work with `Fixed_Time_2PL_SAM` or `Hard_GW` hardening models!  "
+                "Use `gwb_only` for alternative classes!"
+            )
+            self._log.exception(err)
+            raise ValueError(err)
 
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
 
@@ -1033,100 +1021,6 @@ class Semi_Analytic_Model:
             sspar = ret_vals[2]
             bgpar = ret_vals[3]
 
-        self._gwb = hc_bg
-        if params:
-            return hc_ss, hc_bg, sspar, bgpar
-
-        return hc_ss, hc_bg
-
-    def old_ss_gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=1, loudest=1, params=False,
-               use_redz_after_hard=None):
-        """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies,
-        using new `dynamic_binary_number_at_fobs` method, better, but slower than cython version.
-
-        Parameters
-        ----------
-        fobs_gw : (F,) array_like of scalar,
-            Observer-frame GW-frequencies. [1/sec]
-            These are the frequency bin edges, which are integrated across to get the number of binaries in each
-            frequency bin.
-        hard : holodeck.evolution._Hardening class or instance
-            Hardening mechanism to apply over the range of `fobs_gw`.
-        realize : int
-            Specification of how many discrete realizations to construct.
-            Realizations approximate the finite-source effects of a realistic population.
-
-        Returns
-        -------
-        hc_ss : (F, R, L) NDarray of scalars
-            The characteristic strain of the L loudest single sources at each frequency.
-        hc_bg : (F, R) NDarray of scalars
-            Characteristic strain of the GWB.
-        sspar : (3, F, R, L) NDarray of scalars
-            Astrophysical parametes of each loud single sources,
-            for each frequency and realization.
-            Returned only if params = True.
-        bgpar : (3, F, R) NDarray of scalars
-            Average effective binary astrophysical parameters for background
-            sources at each frequency and realization,
-            Returned only if params = True.
-
-
-        BUG _dynamic_binary_number_at_fobs_consistent() doesn't work for Fixed_Time_2PL
-        """
-        log = self._log
-
-        if use_redz_after_hard is None:
-            if hard.CONSISTENT is True:
-                use_redz_after_hard = True
-            elif hard.CONSISTENT is False:
-                use_redz_after_hard = False
-            else:
-                err = "`hard.CONSISTENT` or 'use_redz_after_hard' must be one of {{True, False}}!"
-                log.error(err)
-                raise ValueError(err)
-
-        fobs_gw_edges = np.atleast_1d(fobs_gw_edges)
-        if np.isscalar(fobs_gw_edges) or np.size(fobs_gw_edges) == 1:
-            err = "GWB can only be calculated across bins of frequency, `fobs_gw_edges` must provide bin edges!"
-            log.exception(err)
-            raise ValueError(err)
-
-        fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
-        # ---- Get the differential-number of binaries for each bin
-        # convert to orbital-frequency (from GW-frequency)
-        fobs_orb_edges = fobs_gw_edges / 2.0
-        fobs_orb_cents = fobs_gw_cents / 2.0
-
-
-        # TODO: fix this for Fixed_Time_2PL
-        edges, dnum, redz_final = self.dynamic_binary_number_at_fobs(hard, fobs_orb_cents)
-        edges[-1] = fobs_orb_edges
-
-        log.debug(f"dnum: {utils.stats(dnum)}")
-
-
-        # "integrate" within each bin (i.e. multiply by bin volume)
-        number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
-        number = number * np.diff(np.log(fobs_gw_edges))
-        log.debug(f"number: {utils.stats(number)}")
-        log.debug(f"number.sum(): {number.sum():.4e}")
-
-
-        # ---- Get the Single Source and GWB spectrum from number of binaries over grid
-
-        # Use the redshift based on initial redshift + galaxy-merger-time + evolution-time
-        ret_vals = single_sources.ss_gws_redz(edges, redz_final, number,
-                                              realize=realize, loudest=loudest, params=params)
-
-
-        hc_ss = ret_vals[0]
-        hc_bg = ret_vals[1]
-        if params:
-            sspar = ret_vals[2]
-            bgpar = ret_vals[3]
-
-        self._gwb = hc_bg
         if params:
             return hc_ss, hc_bg, sspar, bgpar
 
@@ -1541,25 +1435,3 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
         output[:, :, ii] = m1m2_dens[...]
 
     return output
-
-
-'''
-def _check_bads(edges, vals, name):
-    bads = ~np.isfinite(vals) | (vals < 0.0)
-    if not np.any(bads):
-        return
-
-    err = f"Found {utils.frac_str(bads)} bad '{name}' values!"
-
-    if not np.all(bads):
-        bads = np.where(bads)
-        assert len(bads) == len(edges), f"`bads` ({len(bads)=}) does not match `edges` ({len(edges)=}) !"
-        for ii, (edge, bad) in enumerate(zip(edges, bads)):
-            idx = np.unique(bad)
-            log.error(ii)
-            log.error(idx)
-            log.error(edge[idx])
-
-    log.exception(err)
-    raise ValueError(err)
-'''
