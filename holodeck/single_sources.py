@@ -29,7 +29,7 @@ log = holo.log
 log.setLevel(logging.INFO)
 
 par_names = np.array(['mtot', 'mrat', 'redz_init', 'redz_final', 'dcom_final', 'sepa_final', 'angs_final'])
-par_labels = np.array(['Total Mass $M$ (g)', 'Mass Ratio $q$', 'Initial Redshift $z_i$', 'Final Redshift $z_f$', 
+par_labels = np.array(['Total Mass $M$ ($M_\odot$)', 'Mass Ratio $q$', 'Initial Redshift $z_i$', 'Final Redshift $z_f$', 
                    'Final Comoving Distance $d_c$ (Mpc)', 'Final Separation (pc)', 'Final Angular Separation (rad)'])
 par_units = np.array([1/MSOL, 1, 1, 1, 1/MPC,  1/PC, 1])
 
