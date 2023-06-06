@@ -22,6 +22,7 @@ import hasasia as has
 
 GAMMA_RHO_GRID_PATH = '/Users/emigardiner/GWs/holodeck/output/rho_gamma_grids'
 HC_REF15_10YR = 11.2*10**-15 
+DEF_THRESH=0.5
 
 
 ###################### Overlap Reduction Function ######################
@@ -1534,7 +1535,7 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
 ######################### Running on Libraries #########################
 ########################################################################
 
-def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=0.5,
+def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
                    dur=None, cad=None, dfobs=None, plot=True, debug=False,
                    grid_path=GAMMA_RHO_GRID_PATH, snr_cython = True):
     """ Calculate detection statistics for an ss library output.
@@ -1858,5 +1859,52 @@ def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref
         return nsort, fidx, hc_ref
     return nsort
 
-############################ Calibrate PTA ############################# 
+######################### Param Space Models ########################### 
 
+def detect_pspace_model(fobs_cents, hc_ss, hc_bg, dur,
+                        npsrs, sigma, nskies, thresh=DEF_THRESH, debug=False):
+    shape = hc_ss.shape
+    nfreqs, nreals, nloudest = shape[0], shape[1], shape[2]
+
+
+    # calculate dur, cad, dfobs
+    dur = dur * YR
+    hifr = nfreqs/dur
+    cad = 1.0 / (2 * hifr)
+    fobs_edges = holo.utils.nyquist_freqs_edges(dur, cad)
+    dfobs = np.diff(fobs_edges)
+
+    # build PTA
+    if debug: print('Building pulsar timing array.')
+    phis = np.random.uniform(0, 2*np.pi, size = npsrs)
+    thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    # sigmas = np.ones_like(phis)*sigma
+    psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
+                    phi=phis, theta=thetas)
+
+    # Build ss skies
+    if debug: print('Building ss skies.')
+    theta_ss, phi_ss, Phi0_ss, iota_ss, psi_ss = _build_skies(nfreqs, nskies, nloudest)
+
+
+    # Calculate DPs, SNRs, and DFs
+    if debug: print('Calculating SS and BG detection statistics.')
+    dp_bg, snr_bg = detect_bg_pta(psrs, fobs_cents, cad, hc_bg, ret_snr=True)
+    vals_ss = detect_ss_pta(
+        psrs, cad, dur, fobs_cents, dfobs, hc_ss, hc_bg, 
+        gamma_cython=True, snr_cython=True, ret_snr=True, 
+        theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss, iota_ss=iota_ss, psi_ss=psi_ss,
+        )
+    dp_ss, snr_ss, gamma_ssi = vals_ss[0], vals_ss[1], vals_ss[2]
+    df_ss = np.sum(dp_ss>thresh)/(nreals*nskies)
+    df_bg = np.sum(dp_bg>thresh)/(nreals)
+
+    dsdata = {
+        'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi, 
+        'dp_bg':dp_bg, 'snr_bg':snr_bg,
+        'df_ss':df_ss, 'df_bg':df_bg
+    }
+
+    return dsdata
+
+############################ Calibrate PTA ############################# 
