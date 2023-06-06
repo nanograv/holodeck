@@ -134,3 +134,6 @@ run_gen_lib_sams__*
 *.html
 .gitattributes
 *.slurm
+
+# Mac Desktop Services
+.DS_Store
