@@ -48,8 +48,8 @@ class Accretion:
             """ Indices where separation is less than or equal to a parsec """
             ind_sepa = evol.sepa[:, step] <= PC
         else:
-            """ Indices where separation is less than or equal to 10 kilo-parsec """
-            ind_sepa = evol.sepa[:, step] <= 10**4 * PC
+            """ Indices where separation is less than or equal to 100 kilo-parsec """
+            ind_sepa = evol.sepa[:, step] <= 10**5 * PC
 
         """ Set total accretion rates to 0 when separation is larger than 1pc or 10kpc,
             depending on subpc switch applied to accretion instance """
