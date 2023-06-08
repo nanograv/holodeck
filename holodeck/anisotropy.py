@@ -400,13 +400,9 @@ def Cl_analytic_from_dnum(edges, dnum, redz=None, realize=False):
         raise ValueError(err)
 
 
-    delta_term = (
-        fc / (4*np.pi * df) * np.sum(numh2, axis=(0,1,2))
-    )**2
+    delta_term = (fc / (4*np.pi * df) * np.sum(numh2, axis=(0,1,2)))**2
 
-    Cl = (
-        (fc / (4*np.pi*df))**2 * np.sum(numh4, axis=(0,1,2))
-    )
+    Cl = ((fc / (4*np.pi*df))**2 * np.sum(numh4, axis=(0,1,2)))
 
     C0 = Cl + delta_term
 
