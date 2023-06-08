@@ -1,5 +1,8 @@
 """Module for binary evolution from the time of formation/galaxy-merger until BH coalescence.
 
+#!NOTE: much of this documentation needs to be updated to reflect that much of the material in this
+#!      file was moved to `holodeck.hardening`.
+
 In `holodeck`, initial binary populations are typically defined near the time of galaxy-galaxy
 merger, when two MBHs come together at roughly kiloparsec scales.  Environmental 'hardening'
 mechanisms are required to dissipate orbital energy and angular momentum, allowing the binary
@@ -46,36 +49,9 @@ To-Do
     *   re-implement "magic" hardening models that coalesce in zero change-of-redshift or fixed
         amounts of time.
 
-*   Dynamical_Friction_NFW
-
-    *   Allow stellar-density profiles to also be specified (instead of using a hard-coded
-        Dehnen profile)
-    *   Generalize calculation of stellar characteristic radius.  Make self-consistent with
-        stellar-profile, and user-specifiable.
-
 *   Evolution
 
     *   `_sample_universe()` : sample in comoving-volume instead of redshift
-
-*   Sesana_Scattering
-
-    *   Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
-        and flexible.  Currently hard-coded to Dehnen profile estimate.
-
-*   _SHM06
-
-    *   Interpolants of hardening parameters return 1D arrays.
-
-*   Fixed_Time
-
-    *   Handle `rchar` better with respect to interpolation.  Currently not an interpolation
-        variable, which restricts it's usage.
-    *   This class should be separated into a generic `_Fixed_Time` class that can use any
-        functional form, and then a 2-power-law functional form that requires a specified
-        normalization.  When they're combined, it will produce the same effect.  Another good
-        functional form to implement would be GW + log-uniform hardening time, the same as the
-        current phenomenological model but with both power-laws set to 0.
-
 
 References
 ----------
@@ -108,26 +84,16 @@ import scipy as sp
 import scipy.interpolate   # noqa
 from scipy.interpolate import RectBivariateSpline
 
+
 import kalepy as kale
 
 import holodeck as holo
-from holodeck import utils, cosmo, log, _PATH_DATA
-from holodeck.constants import GYR, NWTG, PC, MSOL, YR
-from holodeck import accretion
+from holodeck import utils, cosmo, log
+from holodeck.constants import PC
+from holodeck.hardening import _Hardening
+# from holodeck import accretion
 
 _MAX_ECCEN_ONE_MINUS = 1.0e-6
-#: number of influence radii to set minimum radius for dens calculation
-_MIN_DENS_RAD__INFL_RAD_MULT = 10.0
-_DEF_TIME_DELAY = (5.0*GYR, 0.2)   #: default delay-time parameters, (mean, stdev)
-_SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
-
-# Pop = TypeVar('Pop', bound=holo.population._Population_Discrete)  # Must be exactly str or bytes
-# A = TypeVar('A', str, bytes)  # Must be exactly str or bytes
-# S = TypeVar('S', bound=str)  # Can be any subtype of str
-# Hard = TypeVar('Hard', bound=holo.evolution._Hardening)  # Can be any subtype of str
-# Hard = TypeVar('Hard', holo.evolution._Hardening, list[holo.evolution._Hardening])  # Can be any subtype of str
-# AliasType = Union[list[dict[tuple[int, str], set[int]]], tuple[str, list[str]]]
-# Hard_list = Union[list[Hard], Hard]
 
 
 # =================================================================================================
@@ -637,10 +603,6 @@ class Evolution:
 
         return ynew
 
-    @utils.deprecated_fail('Evolution.sample_universe')
-    def sample_full_population(self, fobs, DOWN=None):
-        return
-
     def sample_universe(self, fobs_orb_edges, down_sample=None):
         """Construct a full universe of binaries based on resampling this population.
 
@@ -769,9 +731,9 @@ class Evolution:
         tlook = cosmo.z_to_tlbk(redz)
         self.tlook[:, 0] = tlook
         # `pop.mass` has shape (N, 2), broadcast to (N, S, 2) for `S` steps
-        #self.mass[:, :, :] = pop.mass[:, np.newaxis, :]
+        # self.mass[:, :, :] = pop.mass[:, np.newaxis, :]
         self.mass[:, 0, :] = pop.mass
-        #HERE INITIAL MASSES ARE COPIED FOR EVERY STEP
+        # HERE INITIAL MASSES ARE COPIED FOR EVERY STEP
         self.mass[:, :, :] = self.mass[:, 0, np.newaxis, :]
 
         if self._debug:    # nocov
@@ -898,13 +860,29 @@ class Evolution:
             """ An instance of the accretion class has been supplied,
                 and binary masses are evolved through accretion
                 First, get total accretion rates """
-            mdot_t = self._acc.mdot_total(self, step)
-            """ A preferential accretion model is called to divide up
-                total accretion rates into primary and secondary accretion rates """
-            self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_t, self, step)
-            """ Accreted mass is calculated and added to primary and secondary masses """
-            self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:,step-1,0]
-            self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:,step-1,1]
+            if self._acc.mdot_ext is not None:
+                """ accretion rates have been supplied externally """
+                mdot_total = self._acc.mdot_ext[:, step-1]
+            else:
+                """ Get accretion rates as a fraction (f_edd in self._acc) of the
+                    Eddington limit from current BH masses """
+                total_bh_masses = np.sum(self.mass[:, step-1, :], axis=1)
+                mdot_total = self._acc.mdot_eddington(total_bh_masses)
+
+            """ Calculate individual accretion rates """
+            if self._acc.subpc:
+                """ Indices where separation is less than or equal to a parsec """
+                ind_sepa = self.sepa[:, step] <= PC
+            else:
+                """ Indices where separation is less than or equal to 10 kilo-parsec """
+                ind_sepa = self.sepa[:, step] <= 10**4 * PC
+
+            """ Set total accretion rates to 0 when separation is larger than 1pc or 10kpc,
+                depending on subpc switch applied to accretion instance """
+            mdot_total[~ind_sepa] = 0
+            self.mdot[:, step-1, :] = self._acc.pref_acc(mdot_total, self, step)
+            self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:, step-1, 0]
+            self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:, step-1, 1]
 
         return
 
@@ -1061,7 +1039,7 @@ class Evolution:
         mt : np.ndarray
             Total mass ($M = m_1 + m_2$) in [gram].
         mr : np.ndarray
-            Mass ratio ($q = m_2/m_1 \leq 1.0$).
+            Mass ratio ($q = m_2/m_1 \\leq 1.0$).
 
         """
         mass = np.moveaxis(self.mass, -1, 0)   # (N, M, 2) ==> (2, N, M)
@@ -1092,7 +1070,6 @@ class Evolution:
         if self._evolved is not True:
             raise RuntimeError("This instance has not been evolved yet!")
         return
-
 
 # =================================================================================================
 # ====    Hardening Classes    ====

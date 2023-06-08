@@ -1,5 +1,43 @@
 [build-system]
-requires = ["setuptools >= 40.6.0", "wheel"]
+# cython/numpy/scipy are required to build cython extensions.  The build steps are specified in `setup.py`
+requires = ["setuptools >= 40.6.0", "wheel", "Cython", "numpy", "scipy"]
 build-backend = "setuptools.build_meta"
+
 [mypy]
 allow_redefinition = true
+
+[tool.ruff]
+exclude = [
+    ".git",
+    ".tox",
+    "__pycache__",
+    "build",
+    "converted_notebooks",
+    "dist",
+    "data",
+    "docs",
+    "notebooks",
+    "notebooks/dev",
+    "scripts",
+    "venv",
+    "pyproject.toml",
+]
+ignore = [
+    # "D416",  # is too complex (17)
+    # "C901",  # is too complex (17)
+    # "E722",    # do not use bare 'except'
+    "E731",    # do not assign a lambda expression, use a def
+    # "F401",  # imported but unused
+    # "W605",     # invalid escape sequence [e.g. '\s'] :: can be caused by inline sphinx latex math
+]
+line-length = 140
+select = [
+    "C9",
+    # "D",   # pydocstyle
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "W",
+]
+
+[tool.ruff.mccabe]
+max-complexity = 10
