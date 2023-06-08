@@ -84,17 +84,19 @@ import scipy as sp
 import scipy.interpolate   # noqa
 from scipy.interpolate import RectBivariateSpline
 
-
 import kalepy as kale
 
 import holodeck as holo
-from holodeck import utils, cosmo, log
-from holodeck.constants import PC
+from holodeck import utils, cosmo, log, _PATH_DATA
+from holodeck.constants import PC, GYR, NWTG, PC, MSOL, YR
 from holodeck.hardening import _Hardening
 # from holodeck import accretion
 
 _MAX_ECCEN_ONE_MINUS = 1.0e-6
-
+#: number of influence radii to set minimum radius for dens calculation
+_MIN_DENS_RAD__INFL_RAD_MULT = 10.0
+_DEF_TIME_DELAY = (5.0*GYR, 0.2)   #: default delay-time parameters, (mean, stdev)
+_SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 
 # =================================================================================================
 # ====    Evolution Class    ====
