@@ -938,7 +938,6 @@ class Evolution:
         dedt = None if self.eccen is None else np.zeros_like(dadt)
 
         for ii, hard in enumerate(self._hard):
-            print("hard = ", hard)
             _hard_dadt, _ecc = hard.dadt_dedt(self, step)
             dadt[:] += _hard_dadt
             if self._debug:    # nocov
@@ -1256,9 +1255,9 @@ class CBD_Torques(_Hardening):
 
         if evo._acc is None:
             """ If no accretion modules is supplied, use an Eddington fraction for now """
-            total_mass = mass[:,step,0] + mass[:,step,1]
+            total_mass = mass[:,0] + mass[:,1]
             accretion_instance = holo.accretion.Accretion(f_edd = self.f_edd, subpc=self.subpc)
-            mdot = accretion_instance.mdot_eddington(total_mass)
+            mdot = accretion_instance.mdot_total(evo, step)
         if evo._acc is not None:
             """ An instance of the accretion class has been supplied,
                 and binary masses are evolved through accretion
@@ -1267,8 +1266,11 @@ class CBD_Torques(_Hardening):
 
         dadt, dedt = self._dadt_dedt(mass, sepa, eccen, mdot)
 
+        """ CURRENTLY WE CANNOT USE +ve dadt VALUES, SO WE SET THEM TO 0 """
         inds_dadt_pos = dadt > 0
         dadt[inds_dadt_pos] = 0.0
+        inds_dadt_nan = np.isnan(dadt)
+        dadt[inds_dadt_nan] = 0.0
 
         return dadt, dedt
 
@@ -1294,9 +1296,18 @@ class CBD_Torques(_Hardening):
 
         """
         mass = np.atleast_2d(mass)
+        mtot = mass[:,0] + mass[:,1]
+        """ MASS RATIO """
+        m1 = mass[:, 0]
+        m2 = mass[:, 1]
+        mrat = m2/m1
+        """ secondary and primary can swap indices. need to account for that and reverse the mass ratio """
+        inds_rev = mrat > 1
+        mrat[inds_rev] = 1./mrat[inds_rev]
+        """ SEPARATION """
         sepa = np.atleast_1d(sepa)
+        """ ECCENTRICITY """
         eccen = np.atleast_1d(eccen) if eccen is not None else None
-        mtot, mrat = utils.mtmr_from_m1m2(mass)
 
         semimajor_axis = sepa #for now? we don't resolve the orbit in time (ever?) so this approximation should do?
 
@@ -1311,6 +1322,7 @@ class CBD_Torques(_Hardening):
         dadt = _Siwek2023.dadt(mrat, eccen) * semimajor_axis * (mdot/mtot)
         if eccen is not None:
             dedt =  _Siwek2023.dedt(mrat, eccen) * (mdot/mtot)
+
         else:
             dedt = np.zeros_like(sepa)
 
@@ -1395,13 +1407,23 @@ class Sesana_Scattering(_Hardening):
         """
         mass = np.atleast_2d(mass)
         sepa = np.atleast_1d(sepa)
-        eccen = np.atleast_1d(eccen) if eccen is not None else None
+        eccen = np.atleast_1d(eccen) #if eccen is not None else None
         mtot, mrat = utils.mtmr_from_m1m2(mass)
+        if np.any(mrat>1):
+            inds = mrat>1
+            print("mass ratios greater than 1: mrat[inds] = ", mrat[inds])
         mbulge = self._mmbulge.mbulge_from_mbh(mtot, scatter=False)
         vdisp = self._msigma.vdisp_from_mbh(mtot, scatter=False)
         dens = _density_at_influence_radius_dehnen(mtot, mbulge, self._gamma_dehnen)
 
-        rhard = _Quinlan1996.radius_hardening(mass[:, 1], vdisp)
+        mass_ratio_test = mass[:, 1]/mass[:, 0] 
+        inds_mrat_1 = mass_ratio_test>1
+
+        secondary_mass = np.zeros(np.shape(mass[:, 1]))
+        secondary_mass[inds_mrat_1] = mass[:, 0][inds_mrat_1]
+        secondary_mass[~inds_mrat_1]  = mass[:, 1][~inds_mrat_1]
+
+        rhard = _Quinlan1996.radius_hardening(secondary_mass, vdisp)
         hh = self._shm06.H(mrat, sepa/rhard)
         dadt = _Quinlan1996.dadt(sepa, dens, vdisp, hh)
 
@@ -2350,7 +2372,6 @@ class _Siwek2023:
         all_es = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8]
         all_qs = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
         torque_contribution = 'sum_grav_acc'
-        print("eccen = ", eccen)
 
         mean_ebdot_arr = np.zeros((len(all_qs),len(all_es)))
         for i,q in enumerate(all_qs):
@@ -2362,8 +2383,6 @@ class _Siwek2023:
         dedt = dedt_qe_interp.ev(mrat, eccen)
         import random
         n = random.randint(0,100)
-        if mrat[n] > 0.1:
-            print("mrat[n] = %.2f, eccen[n] = %.2f, dedt[n] = %.2f" %(mrat[n], eccen[n], dedt[n]))
         return dedt
 
 
@@ -2504,6 +2523,7 @@ class _SHM06:
 
         """
         use_a = (sepa_rhard / self._K_a0(mrat, ecc))
+
         A = self._K_A(mrat, ecc)
         g = self._K_g(mrat, ecc)
         B = self._K_B(mrat, ecc)
@@ -2556,6 +2576,7 @@ class _SHM06:
             allowing q_b and e_b in future calls of the function
             to be in non-ascending order
         """
+
         self._K_A = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_A).T, kx=1, ky=1).ev
         self._K_a0 = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_a0).T, kx=1, ky=1).ev
         self._K_g = RectBivariateSpline(k_mass_ratios, k_eccen, np.array(k_g).T, kx=1, ky=1).ev
