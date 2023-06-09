@@ -98,6 +98,49 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
         """
         return
 
+    def mbh_mass_func(self, mbh, redz, mmbulge, scatter=None):
+        """Convert from the GSMF to a MBH mass function (number density), using a given Mbh-Mbulge relation.
+
+        Parameters
+        ----------
+        mbh : array_like
+            Blackhole masses at which to evaluate the mass function.
+        redz : array_like
+            Redshift(s) at which to evaluate the mass function.
+        mmbulge : `relations._MMBulge_Relation` subclass instance
+            Scaling relation between galaxy and MBH masses.
+        scatter : None, bool, or float
+            Introduce scatter in masses.
+            * `None` or `True` : use the value from `mmbulge._scatter_dex`
+            * `False` : do not introduce scatter
+            * float : introduce scatter with this amplitude (in dex)
+
+        Returns
+        -------
+        ndens : array_like
+            Number density of MBHs, in units of [Mpc^-3]
+
+        """
+        if scatter in [None, True]:
+            scatter = mmbulge._scatter_dex
+
+        mstar = mmbulge.mstar_from_mbh(mbh, scatter=False)
+        # This is `dn_star / dlog10(M_star)`
+        ndens = self(mstar, redz)    # units of  [1/Mpc^3]
+
+        # dM_star / dM_bh
+        dmstar_dmbh = mmbulge.dmstar_dmbh(mstar)   # [unitless]
+        # convert to dlog10(M_star) / dlog10(M_bh) = (M_bh / M_star) * (dM_star / dM_bh)
+        jac = (mbh/mstar) * dmstar_dmbh
+        # convert galaxy number density to  to dn_bh / dlog10(M_bh)
+        ndens *= jac
+
+        if scatter is not False:
+            ndens = holo.utils.scatter_redistribute_densities(mbh, ndens, scatter=scatter)
+
+        return ndens
+
+
 
 class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
     r"""Single Schechter Function - Galaxy Stellar Mass Function.
@@ -1244,96 +1287,6 @@ def evolve_eccen_uniform_single(sam, eccen_init, sepa_init, nsteps):
     return sepa, eccen
 
 
-def _add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, linear_interp_backup=True, logspace_interp=True):
-    """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
-
-    The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
-    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.
-          A 2nd-order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
-          In-between, a 1st-order interpolant is used if `linear_interp_backup` is True.
-    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2) to
-          account for scatter.
-    * (3) The new density distribution is interpolated back to the original (mtot, mrat) grid.
-
-    Parameters
-    ----------
-    mtot : (M,) ndarray
-        Total masses in grams.
-    mrat : (Q,) ndarray
-        Mass ratios.
-    dens : (M, Q) ndarray
-        Density of binaries over the given mtot and mrat domain.
-    scatter : float
-        Amount of scatter in the M-MBulge relationship, in dex (i.e. over log10 of masses).
-    refine : int,
-        The increased density of grid-points used in the intermediate (m1, m2) domain, in step (1).
-    linear_interp_backup : bool,
-        Whether a linear interpolant is used to fill-in bad values after the 2nd order interpolant.
-        This generally doesn't seem to fix any values.
-    logspace_interp : bool,
-        Whether interpolation should be performed in the log-space of masses.
-        NOTE: strongly recommended.
-
-    Returns
-    -------
-    m1m2_dens : (M, Q) ndarray,
-        Binary density with scatter introduced.
-
-    """
-    assert np.shape(dens) == (mtot.size, mrat.size)
-
-    dist = sp.stats.norm(loc=0.0, scale=scatter)
-
-    # Get the primary and secondary masses corresponding to these total-mass and mass-ratios
-    m1, m2 = utils.m1m2_from_mtmr(mtot[:, np.newaxis], mrat[np.newaxis, :])
-    m1m2_on_mtmr_grid = (m1.flatten(), m2.flatten())
-
-    # Construct a symmetric rectilinear grid in (m1, m2) space
-    grid_size = m1.shape[0] * refine
-    # make sure the extrema will fully span the required domain
-    mextr = utils.minmax([0.9*mtot[0]*mrat[0]/(1.0 + mrat[0]), mtot[-1]*(1.0 + mrat[0])/mrat[0]])
-    mgrid = np.logspace(*np.log10(mextr), grid_size)
-
-    # Interpolate in log-space [recommended]
-    scatter_mgrid = mgrid.copy()
-    if logspace_interp:
-        mgrid = np.log10(mgrid)
-        m1m2_on_mtmr_grid = tuple([np.log10(mm) for mm in m1m2_on_mtmr_grid])
-
-    m1m2_grid = np.meshgrid(mgrid, mgrid, indexing='ij')
-    # Interpolate from irregular m1m2 space (based on mtmr space), into regular m1m2 grid
-    m1m2_dens = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='cubic')
-    # Fill in problematic values with first-order interpolant
-    if linear_interp_backup:
-        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
-        temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='linear')
-        log.debug(f"After 2nd order interpolation, {utils.frac_str(bads)} bad values")
-        m1m2_dens[bads] = temp[bads]
-
-    # Fill in problematic values with zeroth-order interpolant
-    bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
-    log.debug(f"After interpolation, {utils.frac_str(bads)} bad values exist")
-    if np.any(bads):
-        temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='nearest')
-        m1m2_dens[bads] = temp[bads]
-        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
-        log.debug(f"After 0th order interpolation, {utils.frac_str(bads)} bad values exist")
-        if np.any(bads):
-            err = f"After 0th order interpolation, {utils.frac_str(bads)} remain!"
-            log.exception(err)
-            log.error(f"{utils.stats(dens.flatten())}")
-            raise ValueError(err)
-
-    # Introduce scatter along both the 0th (primary) and 1th (secondary) axes
-    m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=0)
-    m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=1)
-
-    # Interpolate result back to mtmr grid
-    interp = sp.interpolate.RegularGridInterpolator((mgrid, mgrid), m1m2_dens)
-    m1m2_dens = interp(m1m2_on_mtmr_grid, method='linear').reshape(m1.shape)
-    return m1m2_dens
-
-
 def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
     """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
 
@@ -1435,3 +1388,96 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
         output[:, :, ii] = m1m2_dens[...]
 
     return output
+
+
+
+'''
+def _add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, linear_interp_backup=True, logspace_interp=True):
+    """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
+
+    The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
+    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.
+          A 2nd-order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
+          In-between, a 1st-order interpolant is used if `linear_interp_backup` is True.
+    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2) to
+          account for scatter.
+    * (3) The new density distribution is interpolated back to the original (mtot, mrat) grid.
+
+    Parameters
+    ----------
+    mtot : (M,) ndarray
+        Total masses in grams.
+    mrat : (Q,) ndarray
+        Mass ratios.
+    dens : (M, Q) ndarray
+        Density of binaries over the given mtot and mrat domain.
+    scatter : float
+        Amount of scatter in the M-MBulge relationship, in dex (i.e. over log10 of masses).
+    refine : int,
+        The increased density of grid-points used in the intermediate (m1, m2) domain, in step (1).
+    linear_interp_backup : bool,
+        Whether a linear interpolant is used to fill-in bad values after the 2nd order interpolant.
+        This generally doesn't seem to fix any values.
+    logspace_interp : bool,
+        Whether interpolation should be performed in the log-space of masses.
+        NOTE: strongly recommended.
+
+    Returns
+    -------
+    m1m2_dens : (M, Q) ndarray,
+        Binary density with scatter introduced.
+
+    """
+    assert np.shape(dens) == (mtot.size, mrat.size)
+
+    dist = sp.stats.norm(loc=0.0, scale=scatter)
+
+    # Get the primary and secondary masses corresponding to these total-mass and mass-ratios
+    m1, m2 = utils.m1m2_from_mtmr(mtot[:, np.newaxis], mrat[np.newaxis, :])
+    m1m2_on_mtmr_grid = (m1.flatten(), m2.flatten())
+
+    # Construct a symmetric rectilinear grid in (m1, m2) space
+    grid_size = m1.shape[0] * refine
+    # make sure the extrema will fully span the required domain
+    mextr = utils.minmax([0.9*mtot[0]*mrat[0]/(1.0 + mrat[0]), mtot[-1]*(1.0 + mrat[0])/mrat[0]])
+    mgrid = np.logspace(*np.log10(mextr), grid_size)
+
+    # Interpolate in log-space [recommended]
+    scatter_mgrid = mgrid.copy()
+    if logspace_interp:
+        mgrid = np.log10(mgrid)
+        m1m2_on_mtmr_grid = tuple([np.log10(mm) for mm in m1m2_on_mtmr_grid])
+
+    m1m2_grid = np.meshgrid(mgrid, mgrid, indexing='ij')
+    # Interpolate from irregular m1m2 space (based on mtmr space), into regular m1m2 grid
+    m1m2_dens = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='cubic')
+    # Fill in problematic values with first-order interpolant
+    if linear_interp_backup:
+        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+        temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='linear')
+        log.debug(f"After 2nd order interpolation, {utils.frac_str(bads)} bad values")
+        m1m2_dens[bads] = temp[bads]
+
+    # Fill in problematic values with zeroth-order interpolant
+    bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+    log.debug(f"After interpolation, {utils.frac_str(bads)} bad values exist")
+    if np.any(bads):
+        temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='nearest')
+        m1m2_dens[bads] = temp[bads]
+        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+        log.debug(f"After 0th order interpolation, {utils.frac_str(bads)} bad values exist")
+        if np.any(bads):
+            err = f"After 0th order interpolation, {utils.frac_str(bads)} remain!"
+            log.exception(err)
+            log.error(f"{utils.stats(dens.flatten())}")
+            raise ValueError(err)
+
+    # Introduce scatter along both the 0th (primary) and 1th (secondary) axes
+    m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=0)
+    m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=1)
+
+    # Interpolate result back to mtmr grid
+    interp = sp.interpolate.RegularGridInterpolator((mgrid, mgrid), m1m2_dens)
+    m1m2_dens = interp(m1m2_on_mtmr_grid, method='linear').reshape(m1.shape)
+    return m1m2_dens
+'''

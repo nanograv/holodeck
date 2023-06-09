@@ -387,7 +387,7 @@ def get_scatter_weights(uniform_cents, dist):
     if not np.allclose(dx, dx[0]):
         log.error(f"{dx[0]=} {dx=}")
         log.error(f"{uniform_cents=}")
-        err = f"`get_scatter_weights` only works if `uniform_cents` are uniformly spaced!"
+        err = "`get_scatter_weights` only works if `uniform_cents` are uniformly spaced!"
         log.exception(err)
         raise ValueError(err)
 
@@ -437,7 +437,7 @@ def _get_rolled_weights(log_cents, dist):
     return weights
 
 
-def scatter_redistribute(cents, dist, dens, axis=0):
+def scatter_redistribute_densities(cents, dens, dist=None, scatter=None, axis=0):
     """Redistribute `dens` across the target axis to account for scatter/variance.
 
     Parameters
@@ -456,6 +456,12 @@ def scatter_redistribute(cents, dist, dens, axis=0):
         Array with resitributed values.  Same shape as input `dens`.
 
     """
+    if (dist is None) == (scatter is None):
+        raise ValueError(f"One and only one of `dist` ({dist}) and `scatter` ({scatter}) must be provided!")
+
+    if dist is None:
+        dist = sp.stats.norm(loc=0.0, scale=scatter)
+
     log_cents = np.log10(cents)
     num = log_cents.size
     if np.shape(dens)[axis] != num:
@@ -466,6 +472,8 @@ def scatter_redistribute(cents, dist, dens, axis=0):
     weights = _get_rolled_weights(log_cents, dist)
     dens_new = _scatter_with_weights(dens, weights, axis=0)
     return dens_new
+
+
 
 
 def eccen_func(cent: float, width: float, size: int) -> np.ndarray:
@@ -1784,7 +1792,7 @@ def lambda_factor_dlnf(frst, dfdt, redz, dcom=None):
 
 def angs_from_sepa(sepa, dcom, redz):
     """ Calculate angular separation
-    
+
     Parameters
     ----------
     sepa : ArrayLike
@@ -2280,9 +2288,6 @@ def char_strain_to_strain_amp(hc, fc, df):
     return hs
 
 
-
-
-
 @numba.njit
 def _gw_ecc_func(eccen):
     """GW Hardening rate eccentricitiy dependence F(e).
@@ -2312,3 +2317,10 @@ def _array_args(*args):
     args = [np.asarray(aa) if aa is not None else None
             for aa in args]
     return args
+
+
+@deprecated_fail(scatter_redistribute_densities)
+def scatter_redistribute(cents, dist, dens, axis=0):
+    pass
+
+
