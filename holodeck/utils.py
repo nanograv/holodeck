@@ -2313,7 +2313,6 @@ def _gw_ecc_func(eccen):
 
 
 def _array_args(*args):
-    # args = [np.atleast_1d(aa) for aa in args]
     args = [np.asarray(aa) if aa is not None else None
             for aa in args]
     return args
