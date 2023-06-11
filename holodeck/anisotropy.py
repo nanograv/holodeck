@@ -192,7 +192,7 @@ def lib_anisotropy(lib_path, hc_ref_10yr=HC_REF15_10YR, nbest=100, nreals=50, lm
     else:
         print('Writing to an existing directory.')
 
-    output_name = output_dir+'/sph_harm_lmax%d_nside%d_nbest%d.npz' % (lmax, nside, nbest)
+    output_name = output_dir+'/sph_harm_lmax%d_nside%d_nbest%d_nreals%d.npz' % (lmax, nside, nbest, nreals)
     print('Saving npz file: ', output_name)
     np.savez(output_name,
              nsort=nsort, fidx=fidx, hc_ref=hc_ref, ss_shape=shape,
