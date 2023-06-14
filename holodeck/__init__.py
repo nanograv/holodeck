@@ -34,7 +34,7 @@ In general, `holodeck` calculations proceed in three stages:
 """
 
 __author__ = "NANOGrav"
-__copyright__ = "Copyright (c) 2022 NANOGrav"
+__copyright__ = "Copyright (c) 2023 NANOGrav"
 __license__ = "MIT"
 
 import os
@@ -76,24 +76,25 @@ log = logger.get_logger(__name__, logging.INFO)       #: global root logger from
 
 # ---- Load cosmology instance
 
+# NOTE: Must load and initialize cosmology before importing other submodules!
 import cosmopy   # noqa
 cosmo = cosmopy.Cosmology(h=Parameters.HubbleParam, Om0=Parameters.Omega0, Ob0=Parameters.OmegaBaryon)
 del cosmopy
 
 # ---- Import submodules
 
-# NOTE: Must load and initialize cosmology before importing other submodules!
-# from . import cosmology   # noqa
-# cosmo = cosmology.Cosmology()              #: global cosmology instance for cosmolical calculations
-
-
-from . import constants   # noqa
-from . import evolution   # noqa
-from . import librarian   # noqa
-from . import relations   # noqa
-from . import population  # noqa
-from . import utils       # noqa
-from . import sam         # noqa
+from . import constants       # noqa
+from . import evolution       # noqa
+from . import gps             # noqa
+from . import gravwaves       # noqa
+from . import hardening       # noqa
+from . import librarian       # noqa
+from . import param_spaces    # noqa
+from . import plot            # noqa
+from . import population      # noqa
+from . import relations       # noqa
+from . import sam             # noqa
+from . import utils           # noqa
 
 # ---- Handle version
 

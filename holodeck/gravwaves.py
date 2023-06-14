@@ -13,7 +13,7 @@ import kalepy as kale
 
 import holodeck as holo
 from holodeck import utils, cosmo, log
-from holodeck.constants import SPLC, NWTG
+from holodeck.constants import SPLC, NWTG, MPC
 
 
 _CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen']
@@ -179,7 +179,8 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     num_binaries = _lambda_fact * dlnf
 
     shape = (num_binaries.size, nreals)
-    num_pois = np.random.poisson(num_binaries[:, np.newaxis], shape)
+    # num_pois = np.random.poisson(num_binaries[:, np.newaxis], shape)
+    num_pois = poisson_as_needed(num_binaries[:, np.newaxis] * np.ones(shape))
 
     # --- Calculate GW Signals
     temp = hs2 * gne * (2.0 / harms)**2
@@ -347,7 +348,7 @@ def gws_from_sampled_strains(fobs_gw_edges, fo, hs, weights):
     return gwf_freqs, gwfore, gwback
 
 
-def sampled_gws_from_sam(sam, fobs_gw, hard=holo.evolution.Hard_GW, **kwargs):
+def sampled_gws_from_sam(sam, fobs_gw, hard=holo.hardening.Hard_GW, **kwargs):
     """Sample the given binary population between the target frequencies, and calculate GW signals.
 
     NOTE: the input `fobs` are interpretted as bin edges, and GW signals are calculate within the
@@ -379,6 +380,494 @@ def sampled_gws_from_sam(sam, fobs_gw, hard=holo.evolution.Hard_GW, **kwargs):
     vals, weights, edges, dens, mass = holo.sam.sample_sam_with_hardening(sam, hard, fobs=fobs_orb, **kwargs)
     gff, gwf, gwb = _gws_from_samples(vals, weights, fobs_gw)
     return gff, gwf, gwb
+
+
+def _gws_from_number_grid_integrated_redz(edges, redz, number, realize, sum=True):
+    """
+
+    Parameters
+    ----------
+    edges : (4,) list of 1darrays
+        A list containing the edges along each dimension.  The four dimensions correspond to
+        total mass, mass ratio, redshift, and observer-frame orbital frequency.
+        The length of each of the four arrays is M, Q, Z, F.
+    redz :
+    number : (M-1, Q-1, Z-1, F-1) ndarray
+        The number of binaries in each bin of parameter space.  This is calculated by integrating
+        `dnum` over each bin.
+    realize : bool or int,
+        Specification of how to construct one or more discrete realizations.
+        If a `bool` value, then whether or not to construct a realization.
+        If an `int` value, then how many discrete realizations to construct.
+    sum : bool,
+        Whether or not to sum over axes {0, 1, 2}.
+
+    Returns
+    -------
+    hc : ndarray
+        Characteristic strain of the GWB.
+        The shape depends on whether `sum` is true or false.
+        sum = True:  shape is (F-1,)
+        sum = False: shape is (M-1, Q-1, Z-1, F-1)
+
+    """
+
+    hc2 = char_strain_sq_from_bin_edges_redz(edges, redz)
+
+    # Create a single realization
+    if realize is True:
+        hc2 = hc2 * poisson_as_needed(number)
+        # Sum over M, Q, Z bins  ::  (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])
+        if sum:
+            hc2 = np.sum(hc2, axis=(0, 1, 2))
+
+    # Do not create a discrete realization, use the expectation values directly
+    elif realize in [None, False]:
+        hc2 = hc2 * number
+        # Sum over M, Q, Z bins  ::  (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])
+        if sum:
+            hc2 = np.sum(hc2, axis=(0, 1, 2))
+
+    # Create multiple discrete realizations
+    elif utils.isinteger(realize):
+        if sum:
+            import holodeck.cyutils   # noqa
+            # This function reate
+            hc2 = holo.cyutils.sam_poisson_gwb(number, hc2, realize)
+
+        else:
+            log.warning(f"`sum`={sum} :: this requires a large amount of memory!")
+            shape = number.shape + (realize,)
+            hc2 = hc2[..., np.newaxis] * poisson_as_needed(number[..., np.newaxis] * np.ones(shape))
+            if holo.sam._DEBUG:
+                log.info(f"number = {utils.stats(number)}")
+                log.info(f"hc2 = {utils.stats(hc2)}")
+                holo.sam._check_bads(edges + [np.arange(realize),], hc2, "hc2")
+
+    else:
+        err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
+        log.error(err)
+        raise ValueError(err)
+
+    # convert from hc^2 to hc
+    hc2 = np.sqrt(hc2)
+    # this is for clarity, note that it does not duplicate the memory
+    hc = hc2
+
+    return hc
+
+
+def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
+    """
+
+    Parameters
+    ----------
+    edges : (4,) list of 1darrays
+        A list containing the edges along each dimension.  The four dimensions correspond to
+        total mass, mass ratio, redshift, and observer-frame orbital frequency.
+        The length of each of the four arrays is M, Q, Z, F.
+    number : (M-1, Q-1, Z-1, F-1) ndarray
+        The number of binaries in each bin of parameter space.  This is calculated by integrating
+        `dnum` over each bin.
+    realize : bool or int,
+        Specification of how to construct one or more discrete realizations.
+        If a `bool` value, then whether or not to construct a realization.
+        If an `int` value, then how many discrete realizations to construct.
+    sum : bool,
+        Whether or not to sum over axes {0, 1, 2}.
+
+    Returns
+    -------
+    hc : ndarray
+        Characteristic strain of the GWB.
+        The shape depends on whether `sum` is true or false.
+        sum = True:  shape is (F-1,)
+        sum = False: shape is (M-1, Q-1, Z-1, F-1)
+
+    """
+
+    hc2 = char_strain_sq_from_bin_edges(edges)
+
+    # Create a single realization
+    if realize is True:
+        hc2 = hc2 * poisson_as_needed(number)
+        # Sum over M, Q, Z bins  ::  (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])
+        if sum:
+            hc2 = np.sum(hc2, axis=(0, 1, 2))
+
+    # Do not create a discrete realization, use the expectation values directly
+    elif realize in [None, False]:
+        hc2 = hc2 * number
+        # Sum over M, Q, Z bins  ::  (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])
+        if sum:
+            hc2 = np.sum(hc2, axis=(0, 1, 2))
+
+    # Create multiple discrete realizations
+    elif utils.isinteger(realize):
+        if sum:
+            import holodeck.cyutils   # noqa
+            # This function reate
+            hc2 = holo.cyutils.sam_poisson_gwb(number, hc2, realize)
+
+        else:
+            log.warning(f"`sum`={sum} :: this requires a large amount of memory!")
+            shape = number.shape + (realize,)
+            hc2 = hc2[..., np.newaxis] * poisson_as_needed(number[..., np.newaxis] * np.ones(shape))
+            if holo.sam._DEBUG:
+                log.info(f"number = {utils.stats(number)}")
+                log.info(f"hc2 = {utils.stats(hc2)}")
+                holo.sam._check_bads(edges + [np.arange(realize),], hc2, "hc2")
+
+    else:
+        err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
+        log.error(err)
+        raise ValueError(err)
+
+    # convert from hc^2 to hc
+    hc2 = np.sqrt(hc2)
+    # this is for clarity, note that it does not duplicate the memory
+    hc = hc2
+
+    return hc
+
+
+def gwb_ideal(fobs_gw, ndens, mtot, mrat, redz, dlog10, sum=True):
+
+    const = ((4.0 * np.pi) / (3 * SPLC**2))
+    mc = utils.chirp_mass_mtmr(mtot, mrat)
+    mc = np.power(NWTG * mc, 5.0/3.0)
+    rz = np.power(1 + redz, -1.0/3.0)
+    fogw = np.power(np.pi * fobs_gw, -4.0/3.0)
+
+    integ = ndens * mc * rz
+    redz = redz * np.ones_like(integ)
+    integ[redz <= 0.0] = 0.0
+
+    arguments = [mtot, mrat, redz]
+    if dlog10:
+        arguments[0] = np.log10(arguments[0])
+
+    for ax, xx in enumerate(arguments):
+        integ = np.moveaxis(integ, ax, 0)
+        xx = np.moveaxis(xx, ax, 0)
+
+        # if integ is (X, A, B) and xx is (X, 1, 1), then this is fine
+        try:
+            integ = 0.5 * (integ[:-1] + integ[1:]) * np.diff(xx, axis=0)
+        # BUT if integ is (X, A, B) and xx is (X, A+1, B+1), then need to average xx values down
+        except ValueError:
+            # average other dimensions as needed
+            for jj in range(1, len(arguments)):
+                sh = np.shape(xx)[jj]
+                if (sh == 1) or (sh == np.shape(integ)[jj]):
+                    continue
+
+                xx = np.moveaxis(xx, jj, 0)
+                xx = 0.5 * (xx[:-1] + xx[1:])
+                xx = np.moveaxis(xx, 0, jj)
+
+            # try integration step again
+            integ = 0.5 * (integ[:-1] + integ[1:]) * np.diff(xx, axis=0)
+
+        # return integ to the correct shape (axis order)
+        integ = np.moveaxis(integ, 0, ax)
+
+    gwb = const * fogw
+    gwb = gwb * np.sum(integ) if sum else gwb * integ
+    gwb = np.sqrt(gwb)
+    return gwb
+
+
+def poisson_as_needed(values, thresh=1e10):
+    """Calculate Poisson distribution when values are below threshold, otherwise approximate with normal distribution.
+
+    Parameters
+    ----------
+    values : ndarray
+        Expectation values for poisson distribution.
+    thresh : float
+        Expectation value above which to use Normal distribution approximation.
+
+    Returns
+    -------
+    output : ndarray
+        (Approximately) Poisson distributed values.
+        Same shape as input `values`.
+
+    """
+    # NOTE: do not use `int` type as it can cause overflow errors
+    # output = np.zeros_like(values, dtype=int)
+    output = np.zeros_like(values)
+    idx = (values <= thresh)
+    output[idx] = np.random.poisson(values[idx])
+    tt = values[~idx]
+    # output[~idx] = np.floor(np.random.normal(tt, np.sqrt(tt))).astype(int)
+    output[~idx] = np.floor(np.random.normal(tt, np.sqrt(tt)))
+    return output
+
+
+def char_strain_sq_from_bin_edges_redz(edges, redz):
+    assert len(edges) == 4
+    assert np.all([np.ndim(ee) == 1 for ee in edges])
+
+    foo = edges[-1]                   #: should be observer-frame orbital-frequencies
+    df = np.diff(foo)                 #: frequency bin widths
+    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+
+    # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)
+    #    where M, Q, Z are edges and Fc is frequency centers
+    # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
+    for dd in range(3):
+        redz = np.moveaxis(redz, dd, 0)
+        redz = kale.utils.midpoints(redz, axis=0)
+        redz = np.moveaxis(redz, 0, dd)
+
+    # ---- calculate GW strain ----
+    mt = kale.utils.midpoints(edges[0])
+    mr = kale.utils.midpoints(edges[1])
+    # rz = kale.utils.midpoints(edges[2])
+    mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
+    mc = mc[:, :, np.newaxis, np.newaxis]
+    dc = +np.inf * np.ones_like(redz)
+    sel = (redz > 0.0)
+    dc[sel] = cosmo.comoving_distance(redz[sel]).cgs.value
+
+    # convert from observer-frame to rest-frame; still using frequency-bin centers
+    fr = utils.frst_from_fobs(fc[np.newaxis, np.newaxis, np.newaxis, :], redz)
+
+    hs = utils.gw_strain_source(mc, dc, fr)
+    hc2 = (hs ** 2) * (fc / df)
+    return hc2
+
+def strain_amp_from_bin_edges_redz(edges, redz):
+    assert len(edges) == 4
+    assert np.all([np.ndim(ee) == 1 for ee in edges])
+
+    foo = edges[-1]                   #: should be observer-frame orbital-frequencies
+    # df = np.diff(foo)                 #: frequency bin widths
+    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+
+    # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)
+    #    where M, Q, Z are edges and Fc is frequency centers
+    # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
+    for dd in range(3):
+        redz = np.moveaxis(redz, dd, 0)
+        redz = kale.utils.midpoints(redz, axis=0)
+        redz = np.moveaxis(redz, 0, dd)
+
+    # ---- calculate GW strain ----
+    mt = kale.utils.midpoints(edges[0])
+    mr = kale.utils.midpoints(edges[1])
+    # rz = kale.utils.midpoints(edges[2])
+    mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
+    mc = mc[:, :, np.newaxis, np.newaxis]
+    dc = +np.inf * np.ones_like(redz)
+    sel = (redz > 0.0)
+    dc[sel] = cosmo.comoving_distance(redz[sel]).cgs.value
+
+    # convert from observer-frame to rest-frame; still using frequency-bin centers
+    fr = utils.frst_from_fobs(fc[np.newaxis, np.newaxis, np.newaxis, :], redz)
+
+    hs = utils.gw_strain_source(mc, dc, fr)
+    return hs
+
+
+def char_strain_sq_from_bin_edges(edges):
+    assert len(edges) == 4
+    assert np.all([np.ndim(ee) == 1 for ee in edges])
+
+    foo = edges[-1]                   #: should be observer-frame orbital-frequencies
+    df = np.diff(foo)                 #: frequency bin widths
+    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+
+    # ---- calculate GW strain ----
+    mt = kale.utils.midpoints(edges[0])
+    mr = kale.utils.midpoints(edges[1])
+    rz = kale.utils.midpoints(edges[2])
+    mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
+    mc = mc[:, :, np.newaxis, np.newaxis]
+    dc = cosmo.comoving_distance(rz).cgs.value
+    dc = dc[np.newaxis, np.newaxis, :, np.newaxis]
+
+    # convert from observer-frame to rest-frame; still using frequency-bin centers
+    fr = utils.frst_from_fobs(fc[np.newaxis, :], rz[:, np.newaxis])
+    fr = fr[np.newaxis, np.newaxis, :, :]
+
+    hs = utils.gw_strain_source(mc, dc, fr)
+    hc2 = (hs ** 2) * (fc / df)
+    return hc2
+
+
+# ==============================================================================
+# ====    SAM GW Functions    ====
+# ==============================================================================
+
+
+#! NOTE: THIS IS SLOW PYTHON IMPLEMENTATION FOR TESTING.  USE `holodeck.cytuls.sam_calc_gwb_single_eccen()` !#
+
+def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
+    """
+
+    Parameters
+    ----------
+    gwfobs : (F,) array_like
+        Observer-frame frequencies at which to calculate GWB.
+    sam : `Semi_Analytic_Model` instance
+    forb_rst_evo : (M, E) array_like
+        Rest-frame orbital frequencies of binaries, for each total-mass M and evolution step E.
+    eccen_evo : (E,) array_like
+        Eccentricities at each evolution step.  The same for all binaries, corresponding to fixed
+        binary separations for all binaries.
+    nharms : int
+        Number of harmonics to use in calculating GWB.
+
+    """
+
+    # NOTE: need to check for coalescences and set to zero
+    # NOTE: need to check for frequencies below starting separation and set to zero
+
+    frst_orb_evo = utils.kepler_freq_from_sepa(sam.mtot[:, np.newaxis], sepa_evo[np.newaxis, :])
+
+    assert np.ndim(gwfobs) == 1
+    assert np.ndim(frst_orb_evo) == 2
+    assert np.ndim(eccen_evo) == 1
+    assert np.shape(frst_orb_evo) == (sam.mtot.size, eccen_evo.size)
+
+    harm_nums = np.arange(1, nharms+1)
+    two_over_nh_sq = (2.0 / harm_nums) ** 2
+
+    # (M, Q, Z) units of [Mpc^-3]
+    ndens = sam.static_binary_density
+
+    # (F, H)
+    gwfobs_harms = gwfobs[:, np.newaxis] / harm_nums[np.newaxis, :]
+
+    # (Z,)
+    dcom = cosmo.comoving_distance(sam.redz).to('Mpc').value
+
+    # (Z, F, H)
+    # gw_frst ==> frst_orb_harms
+    # gw_frst = gwfobs_harms[np.newaxis, :, :] * (1.0 * sam.redz[:, np.newaxis, np.newaxis])
+
+    # shape will be a tuple of (M, Q, Z, F, H)
+    shape = sam.shape + np.shape(gwfobs_harms)
+    # setup output arrays with shape (M, Q, Z, F, H)
+    hc2 = np.zeros(shape)
+    hs2 = np.zeros(shape)
+    hsn2 = np.zeros(shape)
+    tau_out = np.zeros(shape)
+    ecc_out = np.zeros(shape)
+
+    gwfr_check = np.zeros(shape[2:])
+
+    # NOTE: should sort `gwfobs_harms` into an ascending 1D array to speed up processes
+
+    for (aa, bb), gwfo in np.ndenumerate(gwfobs_harms):
+        # iterate over mtot M
+        for ii, mt in enumerate(sam.mtot):
+            # (Q,) masses of each component for this total-mass, and all mass-ratios
+            m1, m2 = utils.m1m2_from_mtmr(mt, sam.mrat)
+            mchirp = utils.chirp_mass(m1, m2)
+
+            # (E,) rest-frame orbital frequencies for this total-mass bin
+            frst_evo = frst_orb_evo[ii]
+            # iterate over redshifts Z
+            for kk, zz in enumerate(sam.redz):
+                # () scalar
+                zterm = (1.0 + zz)
+                dc = dcom[kk]   # this is still in units of [Mpc]
+                dc_term = 4*np.pi*(SPLC/MPC) * (dc**2)
+                # rest-frame frequency corresponding to target observer-frame frequency of GW observations
+                gwfr = gwfo * zterm
+                if ii > 0:
+                    assert gwfr_check[kk, aa, bb] == gwfr
+                else:
+                    gwfr_check[kk, aa, bb] = gwfr
+                sa = utils.kepler_sepa_from_freq(mt, gwfr)
+
+                # interpolate to target (rest-frame) frequency
+                # this is the same for all mass-ratios
+                # () scalar
+                ecc = np.interp(gwfr, frst_evo, eccen_evo, left=np.nan, right=np.nan)
+                # ecc_2 = np.interp(sa, sepa[::-1], eccen_evo[::-1], left=np.nan, right=np.nan)
+
+                # da/dt values are negative, get a positive rate
+                tau = -utils.gw_hardening_rate_dadt(m1, m2, sa, ecc)
+                # convert to timescale
+                tau = sa / tau
+                # print(f"{m1.shape")
+                tau_out[ii, :, kk, aa, bb] = tau
+                ecc_out[ii, :, kk, aa, bb] = ecc
+
+                # Calculate the GW spectral strain at each harmonic
+                #    see: [Amaro-seoane+2010 Eq.9]
+                # ()
+                temp = two_over_nh_sq[bb] * utils.gw_freq_dist_func(harm_nums[bb], ee=ecc, recursive=False)
+                # (Q,)
+                hs2[ii, :, kk, aa, bb] = utils.gw_strain_source(mchirp, dc*MPC, gwfr) ** 2
+                hsn2[ii, :, kk, aa, bb] = temp * hs2[ii, :, kk, aa, bb]
+
+                # (Q,)
+                hc2[ii, :, kk, aa, bb] = ndens[ii, :, kk] * dc_term * zterm * tau * hsn2[ii, :, kk, aa, bb]
+
+    # integrate
+    gwb = hc2.copy()
+    args = [np.log10(sam.mtot), sam.mrat, sam.redz]
+    for ii, xx in enumerate(args):
+        gwb = np.moveaxis(gwb, ii, 0)
+        dx = np.diff(xx)
+        gwb = dx * 0.5 * np.moveaxis(gwb[1:] + gwb[:-1], 0, -1)
+        gwb = np.moveaxis(gwb, -1, ii)
+
+    gwb = np.sum(gwb, axis=(0, 1, 2))
+
+    # return gwfobs_harms, gwfr_check, gwb, hsn2, hs2, ecc_out, tau_out
+    # return gwfobs_harms, gwb, ecc_out, tau_out
+    return gwfobs_harms, gwb, ecc_out, tau_out
+
+
+def sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
+    import holodeck.cyutils  # noqa
+
+    ndens = sam.static_binary_density
+    mt_l10 = np.log10(sam.mtot)
+    mr = sam.mrat
+    rz = sam.redz
+    dc = cosmo.comoving_distance(sam.redz).to('Mpc').value
+    gwb = holo.cyutils.sam_calc_gwb_single_eccen(ndens, mt_l10, mr, rz, dc, gwfobs, sepa_evo, eccen_evo, nharms)
+    return np.asarray(gwb)
+
+
+def sam_calc_gwb_single_eccen_discrete(gwfobs, sam, sepa_evo, eccen_evo, nharms=100, nreals=None):
+    import holodeck.cyutils  # noqa
+
+    ndens = sam.static_binary_density
+    mt_l10 = np.log10(sam.mtot)
+    mr = sam.mrat
+    rz = sam.redz
+    dc = cosmo.comoving_distance(sam.redz).to('Mpc').value
+    if nreals is None:
+        nreals = 1
+        squeeze = True
+    else:
+        squeeze = False
+
+    gwb = holo.cyutils.sam_calc_gwb_single_eccen_discrete(ndens, mt_l10, mr, rz, dc, gwfobs, sepa_evo, eccen_evo, nharms, nreals)
+
+    if squeeze:
+        gwb = gwb.squeeze()
+
+    return np.asarray(gwb)
+
+
+# ==============================================================================
+# ====    Deprecated Functions    ====
+# ==============================================================================
+
+
+@utils.deprecated_fail(_gws_harmonics_at_evo_fobs)
+def _calc_mc_at_fobs(*args, **kwargs):
+    return
 
 
 def _gws_from_number_grid_centroids(edges, dnum, number, realize):
@@ -476,140 +965,3 @@ def _gws_from_number_grid_centroids(edges, dnum, number, realize):
     hc = np.sqrt(hc)
 
     return hc
-
-
-def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
-    """
-
-    Parameters
-    ----------
-    edges : (4,) list of 1darrays
-        A list containing the edges along each dimension.  The four dimensions correspond to
-        total mass, mass ratio, redshift, and observer-frame orbital frequency.
-        The length of each of the four arrays is M, Q, Z, F.
-    number : (M-1, Q-1, Z-1, F-1) ndarray
-        The number of binaries in each bin of parameter space.  This is calculated by integrating
-        `dnum` over each bin.
-    realize : bool or int,
-        Specification of how to construct one or more discrete realizations.
-        If a `bool` value, then whether or not to construct a realization.
-        If an `int` value, then how many discrete realizations to construct.
-    sum : bool,
-        Whether or not to sum over axes {0, 1, 2}.
-
-    Returns
-    -------
-    hc : ndarray
-        Characteristic strain of the GWB.
-        The shape depends on whether `sum` is true or false.
-        sum = True:  shape is (F-1,)
-        sum = False: shape is (M-1, Q-1, Z-1, F-1)
-
-    """
-
-    foo = edges[-1]                   #: should be observer-frame orbital-frequencies
-    df = np.diff(foo)                 #: frequency bin widths
-    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
-
-    # ---- calculate GW strain ----
-    mt = kale.utils.midpoints(edges[0])
-    mr = kale.utils.midpoints(edges[1])
-    rz = kale.utils.midpoints(edges[2])
-    mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
-    mc = mc[:, :, np.newaxis, np.newaxis]
-    dc = cosmo.comoving_distance(rz).cgs.value
-    dc = dc[np.newaxis, np.newaxis, :, np.newaxis]
-
-    # convert from observer-frame to rest-frame; still using frequency-bin centers
-    fr = utils.frst_from_fobs(fc[np.newaxis, :], rz[:, np.newaxis])
-    fr = fr[np.newaxis, np.newaxis, :, :]
-
-    hs = utils.gw_strain_source(mc, dc, fr)
-    hc = (hs ** 2) * (fc / df)
-
-    if realize is True:
-        hc = hc * np.random.poisson(number)
-    elif realize in [None, False]:
-        hc = hc * number
-    elif utils.isinteger(realize):
-        shape = number.shape + (realize,)
-        try:
-            hc = hc[..., np.newaxis] * np.random.poisson(number[..., np.newaxis], size=shape)
-        except ValueError as err:
-            log.error(str(err))
-            print(f"{utils.stats(number)=}")
-            print(f"{number.max()=:.8e}")
-            print(f"{number.dtype=}")
-            raise
-
-    else:
-        err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
-        log.error(err)
-        raise ValueError(err)
-
-    # Sum over M, Q, Z bins
-    # (M-1, Q-1, Z-1, F-1 [, R]) ==> (F-1, [, R])
-    if sum:
-        hc = np.sum(hc, axis=(0, 1, 2))
-
-    # convert from hc^2 to hc
-    hc = np.sqrt(hc)
-
-    return hc
-
-
-def gwb_ideal(fobs_gw, ndens, mtot, mrat, redz, dlog10, sum=True):
-
-    const = ((4.0 * np.pi) / (3 * SPLC**2))
-    mc = utils.chirp_mass_mtmr(mtot, mrat)
-    mc = np.power(NWTG * mc, 5.0/3.0)
-    rz = np.power(1 + redz, -1.0/3.0)
-    fogw = np.power(np.pi * fobs_gw, -4.0/3.0)
-
-    integ = ndens * mc * rz
-    redz = redz * np.ones_like(integ)
-    integ[redz <= 0.0] = 0.0
-
-    arguments = [mtot, mrat, redz]
-    if dlog10:
-        arguments[0] = np.log10(arguments[0])
-
-    for ax, xx in enumerate(arguments):
-        integ = np.moveaxis(integ, ax, 0)
-        xx = np.moveaxis(xx, ax, 0)
-
-        # if integ is (X, A, B) and xx is (X, 1, 1), then this is fine
-        try:
-            integ = 0.5 * (integ[:-1] + integ[1:]) * np.diff(xx, axis=0)
-        # BUT if integ is (X, A, B) and xx is (X, A+1, B+1), then need to average xx values down
-        except ValueError:
-            # average other dimensions as needed
-            for jj in range(1, len(arguments)):
-                sh = np.shape(xx)[jj]
-                if (sh == 1) or (sh == np.shape(integ)[jj]):
-                    continue
-
-                xx = np.moveaxis(xx, jj, 0)
-                xx = 0.5 * (xx[:-1] + xx[1:])
-                xx = np.moveaxis(xx, 0, jj)
-
-            # try integration step again
-            integ = 0.5 * (integ[:-1] + integ[1:]) * np.diff(xx, axis=0)
-
-        # return integ to the correct shape (axis order)
-        integ = np.moveaxis(integ, 0, ax)
-
-    gwb = const * fogw
-    gwb = gwb * np.sum(integ) if sum else gwb * integ
-    gwb = np.sqrt(gwb)
-    return gwb
-
-
-# ==============================================================================
-# ====    Deprecated Functions    ====
-# ==============================================================================
-
-
-@utils.deprecated_fail(_gws_harmonics_at_evo_fobs)
-def _calc_mc_at_fobs(*args, **kwargs):
-    return
