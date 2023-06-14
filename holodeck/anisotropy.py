@@ -20,6 +20,43 @@ LMAX = 8
 HC_REF15_10YR = 11.2*10**-15 
 
 def healpix_map(hc_ss, hc_bg, nside=NSIDE):
+    """ Build mollview array of hc^2/dOmega for a healpix map
+    
+    Parameters
+    ----------
+    hc_ss : (F,R,L) NDarray
+        Characteristic strain of single sources.
+    hc_bg : (F,R) NDarray
+        Characteristic strain of the background.
+    nside : integer
+        number of sides for healpix map.
+
+    Returns
+    -------
+    moll_hc : (NPIX,) 1Darray
+        Array of h_c^2/dOmega at every pixel for a mollview healpix map.
+    
+    NOTE: Could speed up the for-loops, but it's ok for now.
+    """
+
+    npix = hp.nside2npix(nside)
+    nfreqs = len(hc_ss)
+    nreals = len(hc_ss[0])
+    nloudest = len(hc_ss[0,0])
+
+    # spread background evenly across pixels in moll_hc
+    moll_hc = np.ones((nfreqs,nreals,npix)) * hc_bg[:,:,np.newaxis]**2/(npix) # (frequency, realization, pixel)
+
+    # choose random pixels to place the single sources
+    pix_ss = np.random.randint(0, npix-1, size=nfreqs*nreals*nloudest).reshape(nfreqs, nreals, nloudest)
+    for ff in range(nfreqs):
+        for rr in range(nreals):
+            for ll in range(nloudest):
+                moll_hc[ff,rr,pix_ss[ff,rr,ll]] = (moll_hc[ff,rr,pix_ss[ff,rr,ll]] + hc_ss[ff,rr,ll]**2)
+                
+    return moll_hc
+
+def healpix_map_oldhc(hc_ss, hc_bg, nside=NSIDE):
     """ Build mollview array of strains for a healpix map
     
     Parameters
@@ -56,6 +93,44 @@ def healpix_map(hc_ss, hc_bg, nside=NSIDE):
                                                           + hc_ss[ff,rr,ll]**2)
                 
     return moll_hc
+
+
+def healpix_hcsq_map(hc_ss, hc_bg, nside=NSIDE):
+    """ Build mollview array of strains for a healpix map
+    
+    Parameters
+    ----------
+    hc_ss : (F,R,L) NDarray
+        Characteristic strain of single sources.
+    hc_bg : (F,R) NDarray
+        Characteristic strain of the background.
+    nside : integer
+        number of sides for healpix map.
+
+    Returns
+    -------
+    moll_hc : (NPIX,) 1Darray
+        Array of strain at every pixel for a mollview healpix map.
+    
+    NOTE: Could speed up the for-loops, but it's ok for now.
+    """
+
+    npix = hp.nside2npix(nside)
+    nfreqs = len(hc_ss)
+    nreals = len(hc_ss[0])
+    nloudest = len(hc_ss[0,0])
+
+    # spread background evenly across pixels in moll_hc
+    moll_hc2 = np.ones((nfreqs,nreals,npix)) * hc_bg[:,:,np.newaxis]**2/(npix) # (frequency, realization, pixel)
+
+    # choose random pixels to place the single sources
+    pix_ss = np.random.randint(0, npix-1, size=nfreqs*nreals*nloudest).reshape(nfreqs, nreals, nloudest)
+    for ff in range(nfreqs):
+        for rr in range(nreals):
+            for ll in range(nloudest):
+                moll_hc2[ff,rr,pix_ss[ff,rr,ll]] = moll_hc2[ff,rr,pix_ss[ff,rr,ll]] + hc_ss[ff,rr,ll]**2
+                
+    return moll_hc2
 
 def sph_harm_from_map(moll_hc, lmax=LMAX):
     """ Calculate spherical harmonics from strains at every pixel of 
@@ -100,7 +175,7 @@ def sph_harm_from_hc(hc_ss, hc_bg, nside = NSIDE, lmax = LMAX):
     Returns
     -------
     moll_hc : (F,R,NPIX,) 2Darray
-        Array of strain at every pixel for a mollview healpix map.
+        Array of hc^2/dOmega at every pixel for a mollview healpix map.
     Cl : (F,R,lmax+1) NDarray
         Spherical harmonic coefficients 
     
@@ -192,7 +267,7 @@ def lib_anisotropy(lib_path, hc_ref_10yr=HC_REF15_10YR, nbest=100, nreals=50, lm
     else:
         print('Writing to an existing directory.')
 
-    output_name = output_dir+'/sph_harm_lmax%d_nside%d_nbest%d_nreals%d.npz' % (lmax, nside, nbest, nreals)
+    output_name = output_dir+'/sph_harm_hc2dOm_lmax%d_nside%d_nbest%d_nreals%d.npz' % (lmax, nside, nbest, nreals)
     print('Saving npz file: ', output_name)
     np.savez(output_name,
              nsort=nsort, fidx=fidx, hc_ref=hc_ref, ss_shape=shape,
@@ -207,6 +282,71 @@ def lib_anisotropy(lib_path, hc_ref_10yr=HC_REF15_10YR, nbest=100, nreals=50, lm
     fig.savefig(fig_name, dpi=300)
 
 
+def lib_anisotropy_split(lib_path, hc_ref_10yr=HC_REF15_10YR, nbest=100, nreals=50, lmax=LMAX, nside=NSIDE, split=2):
+
+    # ---- read in file
+    hdf_name = lib_path+'/sam_lib.hdf5'
+    print('Hdf file:', hdf_name)
+
+    ss_file = h5py.File(hdf_name, 'r')
+    print('Loaded file, with keys:', list(ss_file.keys()))
+    hc_ss = ss_file['hc_ss'][:,:,:nreals,:]
+    hc_bg = ss_file['hc_bg'][:,:,:nreals]
+    fobs = ss_file['fobs'][:]
+    ss_file.close()
+
+    shape = hc_ss.shape
+    nsamps, nfreqs, nreals, nloudest = shape[0], shape[1], shape[2], shape[3]
+    print('N,F,R,L =', nsamps, nfreqs, nreals, nloudest)
+
+
+     # ---- rank samples
+    nsort, fidx, hc_ref = detstats.rank_samples(hc_ss, hc_bg, fobs, fidx=1, hc_ref=hc_ref_10yr, ret_all=True)
+    
+    print('Ranked samples by hc_ref = %.2e at fobs = %.2f/yr' % (hc_ref, fobs[fidx]*YR))
+
+
+    for ss in range(split):
+        bestrange = (np.array([ss, (ss+1)])*(nbest)/split).astype(int)
+        bestrange[1] = np.min([bestrange[1], nbest])
+        print(f"{bestrange=}")
+        # ---- calculate spherical harmonics
+
+        npix = hp.nside2npix(nside)
+        Cl_best = np.zeros((nbest, nfreqs, nreals, lmax+1 ))
+        moll_hc_best = np.zeros((nbest, nfreqs, nreals, npix))
+        for nn in range(bestrange[0], bestrange[1]):
+            print('on nn=%d out of nbest=%d' % (nn,nbest))
+            moll_hc_best[nn,...], Cl_best[nn,...] = sph_harm_from_hc(
+                hc_ss[nsort[nn]], hc_bg[nsort[nn]], nside=nside, lmax=lmax, )
+            
+
+        # ---- save to npz file
+
+        output_dir = lib_path+'/anisotropy'
+        # Assign output folder
+        import os
+        if (os.path.exists(output_dir) is False):
+            print('Making output directory.')
+            os.makedirs(output_dir)
+        else:
+            print('Writing to an existing directory.')
+
+        output_name =(output_dir+'/sph_harm_hc2dOm_lmax%d_ns%02d_r%d_b%02d-%-02d.npz' 
+                      % (lmax, nside, nreals, bestrange[0], bestrange[1]-1))
+        print('Saving npz file: ', output_name)
+        np.savez(output_name,
+                nsort=nsort, fidx=fidx, hc_ref=hc_ref, ss_shape=shape,
+            moll_hc_best=moll_hc_best, Cl_best=Cl_best, nside=nside, lmax=lmax, fobs=fobs)
+    
+
+        # ---- plot median Cl/C0
+        
+        print('Plotting Cl/C0 for median realizations')
+        fig = plot_ClC0_medians(fobs, Cl_best, lmax, nshow=nbest)
+        fig_name = (output_dir+'/sph_harm_hc2dOm_lmax%d_ns%02d_r%d_b%02d-%-02d.png' 
+                      % (lmax, nside, nreals, bestrange[0], bestrange[1]-1))
+        fig.savefig(fig_name, dpi=300)
 
 
 
