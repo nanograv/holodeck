@@ -324,6 +324,8 @@ class Pop_Illustris(_Population_Discrete):
 
         self._fname = fname             #: Filename for binary data
         super().__init__(**kwargs)
+        if 'eccen' in kwargs:
+            self.eccen = kwargs['eccen']
         return
 
     def _init(self):
