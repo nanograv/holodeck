@@ -73,4 +73,7 @@ def get_logger(name='holodeck', level_stream=logging.WARNING, tostr=sys.stdout, 
     for lvl in ['DEBUG', 'INFO', 'WARNING', 'ERROR']:
         setattr(logger, lvl, getattr(logging, lvl))
 
+    # Make sure that the `setLevel` command reaches the stream logger
+    logger.setLevel = lambda xx: logger.handlers[0].setLevel(xx)
+
     return logger

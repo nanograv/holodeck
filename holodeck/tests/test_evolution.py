@@ -26,7 +26,7 @@ def test_init_generic_evolution():
             self.scafa = np.zeros(SIZE)
             return
 
-    class Good_Hard(holo.evolution._Hardening):
+    class Good_Hard(holo.hardening._Hardening):
 
         def dadt_dedt(self, *args, **kwargs):   # nocov
             return 0.0
@@ -54,7 +54,7 @@ def test_init_generic_evolution():
 @pytest.fixture(scope='session')
 def evolution_illustris_fixed_time_circ():
     pop = holo.population.Pop_Illustris()
-    fixed = holo.evolution.Fixed_Time.from_pop(pop, TIME)
+    fixed = holo.hardening.Fixed_Time.from_pop(pop, TIME)
     evo = holo.evolution.Evolution(pop, fixed, nsteps=30)
     evo.evolve()
     return evo
@@ -64,7 +64,7 @@ def evolution_illustris_fixed_time_circ():
 def evolution_illustris_fixed_time_eccen():
     ecc = holo.population.PM_Eccentricity()
     pop = holo.population.Pop_Illustris(mods=ecc)
-    fixed = holo.evolution.Fixed_Time.from_pop(pop, TIME)
+    fixed = holo.hardening.Fixed_Time.from_pop(pop, TIME)
     evo = holo.evolution.Evolution(pop, fixed, nsteps=30)
     evo.evolve()
     return evo
@@ -74,7 +74,7 @@ def evolution_illustris_fixed_time_eccen():
 def evo_def():
     ecc = holo.population.PM_Eccentricity()
     pop = holo.population.Pop_Illustris(mods=ecc)
-    fixed = holo.evolution.Fixed_Time.from_pop(pop, TIME)
+    fixed = holo.hardening.Fixed_Time.from_pop(pop, TIME)
     evo = holo.evolution.Evolution(pop, fixed, nsteps=30)
 
     assert evo._evolved is False
@@ -99,7 +99,7 @@ def simplest():
             self.eccen = np.random.uniform(0.4, 0.6, SIZE)
             return
 
-    class Hard(holo.evolution._Hardening):
+    class Hard(holo.hardening._Hardening):
         def dadt_dedt(self, evo, step, *args, **kwargs):
             dadt = -(PC/YR) * np.ones(evo.size)
             dedt = None
@@ -198,7 +198,7 @@ class Test_Evolution_Basic:
         with pytest.raises(TypeError):
             holo.evolution.Evolution(pop, 2.0, nsteps=30)
 
-        holo.evolution.Evolution(pop, holo.evolution.Hard_GW, nsteps=30)
+        holo.evolution.Evolution(pop, holo.hardening.Hard_GW, nsteps=30)
 
         return
 
@@ -436,7 +436,7 @@ def mockup_modified():
             self.scafa = np.random.uniform(0.25, 0.75, SIZE)
             return
 
-    class Hard(holo.evolution._Hardening):
+    class Hard(holo.hardening._Hardening):
 
         def dadt_dedt(self, evo, step, *args, **kwargs):
             dadt = -(PC/YR) * np.ones(evo.size)
@@ -490,22 +490,22 @@ class Test_Modified:
 
 
 class Test_Hardening_Generic:
-    """Make sure that the :class:`evolution._Hardening` base-class behaves correctly.
+    """Make sure that the :class:`hardening._Hardening` base-class behaves correctly.
     """
 
     def test_subclassing(self):
         with pytest.raises(TypeError, match="Can't instantiate abstract class"):
-            holo.evolution._Hardening()
+            holo.hardening._Hardening()
 
         # Without overriding `dadt_dedt` method, `TypeError` raises on instantiation
-        class Hard_Fail(holo.evolution._Hardening):
+        class Hard_Fail(holo.hardening._Hardening):
             pass
 
         with pytest.raises(TypeError, match="Can't instantiate abstract class"):
             Hard_Fail()
 
         # Overriding `dadt_dedt` method, instantiation allowed
-        class Hard_Succeed(holo.evolution._Hardening):
+        class Hard_Succeed(holo.hardening._Hardening):
             def dadt_dedt(self, evo, step):   # nocov
                 pass
 
@@ -528,7 +528,7 @@ class Test_Hardening_Generic:
 
 
 class Test_Hard_GW:
-    """Test the :class:`evolution.Hard_GW` class.
+    """Test the :class:`hardening.Hard_GW` class.
     """
 
     def test_static_methods(self, simplest):
@@ -537,7 +537,7 @@ class Test_Hard_GW:
 
         step = np.random.randint(evo.steps)
         print(f"step = {step}")
-        dadt, dedt = holo.evolution.Hard_GW.dadt_dedt(evo, step)
+        dadt, dedt = holo.hardening.Hard_GW.dadt_dedt(evo, step)
         assert np.shape(dadt) == (evo.size,)
         assert np.shape(dedt) == (evo.size,)
         assert np.all(dadt <= 0.0)
@@ -548,8 +548,8 @@ class Test_Hard_GW:
         ee = evo.eccen[:, step]
 
         # Make sure combined method matches individual methods
-        _dadt = holo.evolution.Hard_GW.dadt(mt, mr, aa, eccen=ee)
-        _dedt = holo.evolution.Hard_GW.dedt(mt, mr, aa, eccen=ee)
+        _dadt = holo.hardening.Hard_GW.dadt(mt, mr, aa, eccen=ee)
+        _dedt = holo.hardening.Hard_GW.dedt(mt, mr, aa, eccen=ee)
 
         assert np.shape(dadt) == np.shape(_dadt)
         assert np.shape(dedt) == np.shape(_dedt)
@@ -557,8 +557,8 @@ class Test_Hard_GW:
         assert np.allclose(dedt, _dedt, rtol=1e-10)
 
         # Make sure combined method matches `utils` GW methods
-        _dadt = holo.evolution.Hard_GW.dadt(mt, mr, aa, eccen=ee)
-        _dedt = holo.evolution.Hard_GW.dedt(mt, mr, aa, eccen=ee)
+        _dadt = holo.hardening.Hard_GW.dadt(mt, mr, aa, eccen=ee)
+        _dedt = holo.hardening.Hard_GW.dedt(mt, mr, aa, eccen=ee)
 
         assert np.shape(dadt) == np.shape(_dadt)
         assert np.shape(dedt) == np.shape(_dedt)
@@ -589,7 +589,7 @@ class Test_Sesana_Scattering:
             print(f"\neccen = {eccen}")
             for kw in kwargs_list:
                 print(f"kw = {kw}")
-                sc = holo.evolution.Sesana_Scattering(**kw)
+                sc = holo.hardening.Sesana_Scattering(**kw)
                 dadt, dedt = sc._dadt_dedt(mass, sepa, eccen)
                 print(f"dadt = {dadt}")
                 print(f"dedt = {dedt}")
@@ -634,7 +634,7 @@ class Test_Dynamical_Friction_NFW:
                 print(f"\neccen = {eccen}, atten = {atten}")
                 for kw in kwargs_list:
                     print(f"kw = {kw}")
-                    df = holo.evolution.Dynamical_Friction_NFW(**kw)
+                    df = holo.hardening.Dynamical_Friction_NFW(**kw)
                     dadt, dedt = df._dadt_dedt(mass, sepa, redz, dt, eccen, attenuate=atten)
                     print(f"dadt = {dadt}")
                     print(f"dedt = {dedt}")
@@ -666,9 +666,9 @@ def composite_circ():
     pop = holo.population.Pop_Illustris(mods=resamp)
 
     hards = [
-        holo.evolution.Hard_GW,
-        holo.evolution.Sesana_Scattering(),
-        holo.evolution.Dynamical_Friction_NFW(),
+        holo.hardening.Hard_GW,
+        holo.hardening.Sesana_Scattering(),
+        holo.hardening.Dynamical_Friction_NFW(),
     ]
 
     evo = holo.evolution.Evolution(pop, hards, debug=True)
@@ -683,9 +683,9 @@ def composite_eccen():
     pop = holo.population.Pop_Illustris(mods=[ecc, resamp])
 
     hards = [
-        holo.evolution.Hard_GW,
-        holo.evolution.Sesana_Scattering(),
-        holo.evolution.Dynamical_Friction_NFW(),
+        holo.hardening.Hard_GW,
+        holo.hardening.Sesana_Scattering(),
+        holo.hardening.Dynamical_Friction_NFW(),
     ]
 
     evo = holo.evolution.Evolution(pop, hards, debug=True)
@@ -754,16 +754,16 @@ class Test_Composite_Hardening:
 
     def test_attenuated(self, composite_circ):
         evo_atten = composite_circ
-        assert isinstance(evo_atten._hard[-1], holo.evolution.Dynamical_Friction_NFW), "BAD INSTANCE"
+        assert isinstance(evo_atten._hard[-1], holo.hardening.Dynamical_Friction_NFW), "BAD INSTANCE"
         assert evo_atten._hard[-1]._attenuate is True, "BAD SETTING"
 
         # resamp = holo.population.PM_Resample(0.2)
         # pop = holo.population.Pop_Illustris(mods=resamp)
 
         hards = [
-            holo.evolution.Hard_GW,
-            holo.evolution.Sesana_Scattering(),
-            holo.evolution.Dynamical_Friction_NFW(attenuate=False),
+            holo.hardening.Hard_GW,
+            holo.hardening.Sesana_Scattering(),
+            holo.hardening.Dynamical_Friction_NFW(attenuate=False),
         ]
 
         evo_noatt = holo.evolution.Evolution(evo_atten._pop, hards, debug=True)
@@ -805,7 +805,7 @@ class Test_Fixed_Time:
         pop = holo.population.Pop_Illustris(mods=resamp)
 
         TIME = 2 * GYR
-        fixed = holo.evolution.Fixed_Time.from_pop(pop, TIME)
+        fixed = holo.hardening.Fixed_Time.from_pop(pop, TIME)
         evo = holo.evolution.Evolution(pop, fixed, debug=False)
         evo.evolve()
 
@@ -828,7 +828,7 @@ class Test_Fixed_Time:
         pop = holo.population.Pop_Illustris(mods=[resamp, eccen])
 
         TIME = 2 * GYR
-        fixed = holo.evolution.Fixed_Time.from_pop(pop, TIME)
+        fixed = holo.hardening.Fixed_Time.from_pop(pop, TIME)
         evo = holo.evolution.Evolution(pop, fixed, debug=False)
         evo.evolve()
 
