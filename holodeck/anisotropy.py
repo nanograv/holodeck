@@ -337,7 +337,7 @@ def lib_anisotropy_split(lib_path, hc_ref_10yr=HC_REF15_10YR, nbest=100, nreals=
         print('Saving npz file: ', output_name)
         np.savez(output_name,
                 nsort=nsort, fidx=fidx, hc_ref=hc_ref, ss_shape=shape,
-            moll_hc_best=moll_hc_best, Cl_best=Cl_best, nside=nside, lmax=lmax, fobs=fobs)
+            moll_hc_best=moll_hc_best, Cl_best=Cl_best, nside=nside, lmax=lmax, fobs=fobs, split=split)
     
 
         # ---- plot median Cl/C0
