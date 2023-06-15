@@ -313,11 +313,11 @@ def lib_anisotropy_split(lib_path, hc_ref_10yr=HC_REF15_10YR, nbest=100, nreals=
         # ---- calculate spherical harmonics
 
         npix = hp.nside2npix(nside)
-        Cl_best = np.zeros((nbest, nfreqs, nreals, lmax+1 ))
-        moll_hc_best = np.zeros((nbest, nfreqs, nreals, npix))
-        for nn in range(bestrange[0], bestrange[1]):
+        Cl_best = np.zeros((bestrange[1]-bestrange[0], nfreqs, nreals, lmax+1 ))
+        moll_hc_best = np.zeros((bestrange[1]-bestrange[0], nfreqs, nreals, npix))
+        for ii, nn in enumerate(range(bestrange[0], bestrange[1])):
             print('on nn=%d out of nbest=%d' % (nn,nbest))
-            moll_hc_best[nn,...], Cl_best[nn,...] = sph_harm_from_hc(
+            moll_hc_best[ii,...], Cl_best[ii,...] = sph_harm_from_hc(
                 hc_ss[nsort[nn]], hc_bg[nsort[nn]], nside=nside, lmax=lmax, )
             
 
@@ -340,13 +340,13 @@ def lib_anisotropy_split(lib_path, hc_ref_10yr=HC_REF15_10YR, nbest=100, nreals=
             moll_hc_best=moll_hc_best, Cl_best=Cl_best, nside=nside, lmax=lmax, fobs=fobs, split=split)
     
 
-        # ---- plot median Cl/C0
+        # # ---- plot median Cl/C0
         
-        print('Plotting Cl/C0 for median realizations')
-        fig = plot_ClC0_medians(fobs, Cl_best, lmax, nshow=nbest)
-        fig_name = (output_dir+'/sph_harm_hc2dOm_lmax%d_ns%02d_r%d_b%02d-%-02d.png' 
-                      % (lmax, nside, nreals, bestrange[0], bestrange[1]-1))
-        fig.savefig(fig_name, dpi=300)
+        # print('Plotting Cl/C0 for median realizations')
+        # fig = plot_ClC0_medians(fobs, Cl_best, lmax, nshow=(bestrange[1]-bestrange[0]))
+        # fig_name = (output_dir+'/sph_harm_hc2dOm_lmax%d_ns%02d_r%d_b%02d-%-02d.png' 
+        #               % (lmax, nside, nreals, bestrange[0], bestrange[1]-1))
+        # fig.savefig(fig_name, dpi=300)
 
 
 
