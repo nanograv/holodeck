@@ -19,6 +19,7 @@ NPIX = hp.nside2npix(NSIDE)
 LMAX = 8
 HC_REF15_10YR = 11.2*10**-15 
 
+
 def healpix_map(hc_ss, hc_bg, nside=NSIDE):
     """ Build mollview array of hc^2/dOmega for a healpix map
     
@@ -40,6 +41,45 @@ def healpix_map(hc_ss, hc_bg, nside=NSIDE):
     """
 
     npix = hp.nside2npix(nside)
+    area = hp.nside2pixarea(nside)
+    nfreqs = len(hc_ss)
+    nreals = len(hc_ss[0])
+    nloudest = len(hc_ss[0,0])
+
+    # spread background evenly across pixels in moll_hc
+    moll_hc = np.ones((nfreqs,nreals,npix)) * hc_bg[:,:,np.newaxis]**2/(npix/area) # (frequency, realization, pixel)
+
+    # choose random pixels to place the single sources
+    pix_ss = np.random.randint(0, npix-1, size=nfreqs*nreals*nloudest).reshape(nfreqs, nreals, nloudest)
+    for ff in range(nfreqs):
+        for rr in range(nreals):
+            for ll in range(nloudest):
+                moll_hc[ff,rr,pix_ss[ff,rr,ll]] = (moll_hc[ff,rr,pix_ss[ff,rr,ll]] + hc_ss[ff,rr,ll]**2/area)
+                
+    return moll_hc
+
+def healpix_map_oldhc2(hc_ss, hc_bg, nside=NSIDE):
+    """ Build mollview array of hc^2/dOmega for a healpix map
+    
+    Parameters
+    ----------
+    hc_ss : (F,R,L) NDarray
+        Characteristic strain of single sources.
+    hc_bg : (F,R) NDarray
+        Characteristic strain of the background.
+    nside : integer
+        number of sides for healpix map.
+
+    Returns
+    -------
+    moll_hc : (NPIX,) 1Darray
+        Array of h_c^2 at every pixel for a mollview healpix map.
+    
+    NOTE: Could speed up the for-loops, but it's ok for now.
+    """
+
+    npix = hp.nside2npix(nside)
+    area = hp.nside2pixarea(nside)
     nfreqs = len(hc_ss)
     nreals = len(hc_ss[0])
     nloudest = len(hc_ss[0,0])
@@ -563,22 +603,22 @@ def draw_analytic(ax, Cl, C0, fobs_gw_cents, color='tab:orange', label='Eq. 17 a
     ax.plot(xx, yy, color=color, lw=lw, label=label, linestyle='dashdot', alpha=alpha)
 
 def draw_reals(ax, Cl_many, C0_many, fobs_gw_cents,  color='tab:orange', label= 'Poisson number/bin realization',
-                show_ci=False, show_reals=True, show_median=False, nshow=10):
+                show_ci=False, show_reals=True, show_median=False, nshow=10, lw_median=2, ls_reals = ':'):
     xx = fobs_gw_cents
     yy = Cl_many/C0_many # (F,R)
     if show_median:
-        ax.plot(xx, np.median(yy[:,:], axis=-1), color=color) #, label='median of samples, $l=%d$' % ll)     
+        ax.plot(xx, np.median(yy[:,:], axis=-1), color=color, lw=lw_median, alpha=0.75) #, label='median of samples, $l=%d$' % ll)     
     if show_ci:
         for pp in [50, 98]:
             percs = pp/2
             percs = [50-percs, 50+percs]
-            ax.fill_between(xx, *np.percentile(yy[:,:], percs, axis=-1), color=color, alpha=0.1)
+            ax.fill_between(xx, *np.percentile(yy[:,:], percs, axis=-1), color=color, alpha=0.15)
     if show_reals:
         rr = 0
-        ax.plot(xx, yy[:,rr], color=color, alpha=0.15, linestyle='-', 
+        ax.plot(xx, yy[:,rr], color=color, alpha=0.15, linestyle=ls_reals, 
                 label = label)
         for rr in range(1, np.min([nshow, len(Cl_many[0])])):
-            ax.plot(xx, yy[:,rr], color=color, alpha=0.25, linestyle='-')
+            ax.plot(xx, yy[:,rr], color=color, alpha=0.15, linestyle=ls_reals)
 
 def draw_spk(ax, label='SP & K Rough Estimate'):
     spk_xx= np.array([3.5*10**-9, 1.25*10**-8, 1*10**-7]) /YR
@@ -586,16 +626,16 @@ def draw_spk(ax, label='SP & K Rough Estimate'):
     ax.plot(spk_xx * YR, spk_yy, label=label, color='limegreen', ls='--')
 
 def draw_bayes(ax, lmax, colors = ['k', 'b', 'r', 'g', 'c', 'm']):
-    xx_Nihan = np.array([2.0, 4.0, 5.9, 7.9, 9.9]) *10**-9 # Hz
+    xx_nihan = np.array([2.0, 4.0, 5.9, 7.9, 9.9]) *10**-9 # Hz
     
-    Cl_nihan = np.array([
+    ClC0_nihan = np.array([
     [0.20216773, 0.14690035, 0.09676646, 0.07453352, 0.05500382, 0.03177427],
     [0.21201336, 0.14884939, 0.10545698, 0.07734305, 0.05257189, 0.03090662],
     [0.20840993, 0.14836757, 0.09854803, 0.07205384, 0.05409881, 0.03305785],
     [0.19788951, 0.15765126, 0.09615489, 0.07475364, 0.0527356 , 0.03113331],
     [0.20182648, 0.14745265, 0.09681202, 0.0746824 , 0.05503161, 0.0317012 ]])
     for ll in range(lmax):
-        ax.plot(xx_Nihan, Cl_nihan[:,ll]/Cl_nihan[:,0], 
+        ax.plot(xx_nihan, ClC0_nihan[:,ll], 
                     label = '$l=%d$' % (ll+1), 
                 color=colors[ll], marker='o', ms=8)
         
