@@ -56,10 +56,11 @@
 
 \newcommand{\bigt}{\ensuremath{\uptau}}
 
-\newcommand{\hc}{h_\trt{c}}
-\newcommand{\hs}{h_\trt{s}}
+\newcommand{\hc}{h_\tr{c}}
+\newcommand{\hs}{h_\tr{s}}
 \newcommand{\hsn}{h_\tr{s,n}}
-\newcommand{\hscirc}{h_\trt{s,circ}}
+\newcommand{\hscirc}{h_\tr{s,circ}}
+\newcommand{\psd}{\Phi_{\Delta t}}
 
 \newcommand{\mdot}{\dot{M}}
 \newcommand{\mdotedd}{\dot{M}_\trt{Edd}}
@@ -73,14 +74,18 @@
 \newcommand{\distlum}{d_\trt{L}}   % luminosity distance
 \newcommand{\distcom}{d_c}   % comoving distance
 
-\newcommand{\fobs}{f_\tr{obs}}   % observer-frame orbital-frequency
+% \newcommand{\fobs}{f_\tr{obs}}   % observer-frame orbital-frequency
+\newcommand{\fobs}{f}   % observer-frame orbital-frequency
+\newcommand{\fref}{f_\tr{ref}}   % observer-frame orbital-frequency
 \newcommand{\fobsgw}{f_\tr{GW,obs}}   % observer-frame GW-frequency
 \newcommand{\frst}{f_\tr{rst}}   % rest-frame orbital-frequency
 \newcommand{\frstgw}{f_\tr{GW,rst}}   % rest-frame GW-frequency
-\newcommand{\frstorb}{f_{\trt{orb},r}}
-\newcommand{\fobsorb}{f_{\trt{orb},o}}
-\newcommand{\frstn}{f_\trt{n,r}}
-\newcommand{\fobsn}{f_\trt{n,o}}
+\newcommand{\frstorb}{f_{\tr{orb},r}}
+\newcommand{\fobsorb}{f_{\tr{orb},o}}
+\newcommand{\frstn}{f_\tr{n,r}}
+\newcommand{\fobsn}{f_\tr{n,o}}
+% \newcommand{\deltalnf}{\Delta \ln\!\frstorb}
+\newcommand{\deltalnf}{\Delta \ln\!\fobs}
 
 \newcommand\erfc[1]{\mathrm{erfc}\left(#1\right)}
 \newcommand\erfcinv[1]{\mathrm{erfc}^{-1}\left(#1\right)}
