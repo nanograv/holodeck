@@ -846,31 +846,16 @@ class Evolution:
 
         if self._acc is not None:
             """ An instance of the accretion class has been supplied,
-                and we will evolve the binary masses through accretion
+                and binary masses are evolved through accretion
                 First, get total accretion rates """
-            if self._acc.mdot_ext is not None:
-                """ accretion rates have been supplied externally """
-                mdot_total = self._acc.mdot_ext[:, step-1]
-            else:
-                """ Get accretion rates as a fraction (f_edd in self._acc) of the
-                    Eddington limit from current BH masses """
-                total_bh_masses = np.sum(self.mass[:, step-1, :], axis=1)
-                mdot_total = self._acc.mdot_eddington(total_bh_masses)
 
-            """ Calculate individual accretion rates """
-            if self._acc.subpc:
-                """ Indices where separation is less than or equal to a parsec """
-                ind_sepa = self.sepa[:, step] <= PC
-            else:
-                """ Indices where separation is less than or equal to 10 kilo-parsec """
-                ind_sepa = self.sepa[:, step] <= 10**4 * PC
-
-            """ Set total accretion rates to 0 when separation is larger than 1pc or 10kpc,
-                depending on subpc switch applied to accretion instance """
-            mdot_total[~ind_sepa] = 0
-            self.mdot[:, step-1, :] = self._acc.pref_acc(mdot_total, self, step)
-            self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:, step-1, 0]
-            self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:, step-1, 1]
+            mdot_t = self._acc.mdot_total(self, step)
+            """ A preferential accretion model is called to divide up
+                total accretion rates into primary and secondary accretion rates """
+            self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_t, self, step)
+            """ Accreted mass is calculated and added to primary and secondary masses """
+            self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:,step-1,0]
+            self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:,step-1,1]
 
         return
 

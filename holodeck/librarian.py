@@ -689,10 +689,12 @@ def run_model(sam, hard, nreals, nfreqs, nloudest=5,
         data['redz_final'] = redz_final
         data['coalescing'] = (redz_final > 0.0)
 
-        gwb_pars, bin_pars = _calc_model_details(edges, redz_final, number)
+        gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final = _calc_model_details(edges, redz_final, number)
 
         data['gwb_params'] = gwb_pars
-        data['bin_params'] = bin_pars
+        data['num_params'] = num_pars
+        data['gwb_mtot_redz_final'] = gwb_mtot_redz_final
+        data['num_mtot_redz_final'] = num_mtot_redz_final
 
     # calculate single sources and/or binary parameters
     if singles_flag or params_flag:
@@ -721,37 +723,63 @@ def run_model(sam, hard, nreals, nfreqs, nloudest=5,
 
 
 def _calc_model_details(edges, redz_final, number):
+    """
+
+    Parameters
+    ----------
+    edges : (4,) list of 1darrays
+        [mtot, mrat, redz, fobs_orb_edges] with shapes (M, Q, Z, F+1)
+    redz_final : (M,Q,Z,F)
+        Redshift final (redshift at the given frequencies).
+    number : (M-1, Q-1, Z-1, F)
+        Absolute number of binaries in the given bin (dimensionless).
+
+    """
+
     redz = edges[2]
+    nmbins = len(edges[0]) - 1
     nzbins = len(redz) - 1
     nfreqs = len(edges[3]) - 1
+    # (M-1, Q-1, Z-1, F) characteristic-strain squared for each bin
     hc2 = holo.gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz_final)
-    denom = np.sum(hc2*number, axis=(0, 1, 2))
+    # strain-squared weighted number of binaries
+    hc2_num = hc2 * number
+    # (F,) total GWB in each frequency bin
+    denom = np.sum(hc2_num, axis=(0, 1, 2))
     gwb_pars = []
     num_pars = []
 
+    # Iterate over the parameters to calculate weighted averaged of [mtot, mrat, redz]
     for ii in range(3):
-        margins = np.arange(2).tolist()
+        # Get the indices of the dimensions that we will be marginalizing (summing) over
+        # we'll also keep things in terms of redshift and frequency bins, so at most we marginalize
+        # over 0-mtot and 1-mrat
+        margins = [0, 1]
+        # if we're targeting mtot or mrat, then don't marginalize over that parameter
         if ii in margins:
             del margins[ii]
         margins = tuple(margins)
 
-        numer = np.sum(hc2*number, axis=margins)
-        tpar = numer / denom[np.newaxis, np.newaxis, np.newaxis, :]
+        # Get straight-squared weighted values (numerator, of the average)
+        numer = np.sum(hc2_num, axis=margins)
+        # divide by denominator to get average
+        tpar = numer / denom
         gwb_pars.append(tpar)
 
+        # Get the total number of binaries
         tpar = np.sum(number, axis=margins)
         num_pars.append(tpar)
 
     # calculate redz_final based distributions
-    # `redz_final` is edges: (M, Q, Z, F)
-    # `number` is cents: (M-1, Q-1, Z-1, F)
+    # get final-redshift at bin centers
     rz = redz_final.copy()
     for ii in range(3):
         rz = utils.midpoints(rz, axis=ii)
 
+    gwb_mtot_redz_final = np.zeros((nmbins, nzbins, nfreqs))
+    num_mtot_redz_final = np.zeros((nmbins, nzbins, nfreqs))
     gwb_rz = np.zeros((nzbins, nfreqs))
-    bin_rz = np.zeros((nzbins, nfreqs))
-    hc2_num = hc2 * number
+    num_rz = np.zeros((nzbins, nfreqs))
     for ii in range(nfreqs):
         rz_flat = rz[:, :, :, ii].flatten()
         numer, *_ = sp.stats.binned_statistic(
@@ -763,12 +791,26 @@ def _calc_model_details(edges, redz_final, number):
         tpar, *_ = sp.stats.binned_statistic(
             rz_flat, number[:, :, :, ii].flatten(), bins=redz, statistic='sum'
         )
-        bin_rz[:, ii] = tpar
+        num_rz[:, ii] = tpar
+
+        # Get values vs. mtot for redz-final
+        for mm in range(nmbins):
+            rz_flat = rz[mm, :, :, ii].flatten()
+            numer, *_ = sp.stats.binned_statistic(
+                rz_flat, hc2_num[mm, :, :, ii].flatten(), bins=redz, statistic='sum'
+            )
+            tpar = numer / denom[ii]
+            gwb_mtot_redz_final[mm, :, ii] = tpar
+
+            tpar, *_ = sp.stats.binned_statistic(
+                rz_flat, number[mm, :, :, ii].flatten(), bins=redz, statistic='sum'
+            )
+            num_mtot_redz_final[mm, :, ii] = tpar
 
     gwb_pars.append(gwb_rz)
-    num_pars.append(bin_rz)
+    num_pars.append(num_rz)
 
-    return gwb_pars, num_pars
+    return gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final
 
 
 def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only=False):
