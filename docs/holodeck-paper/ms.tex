@@ -61,7 +61,7 @@
 \section{Introduction}
     \label{sec:intro}
 
-    Massive black holes (MBHs) are known to occupy the centers of most if not all massive galaxies \needcite{}.
+    Massive black holes (MBHs) occupy the centers of most if not all massive galaxies \needcite{}.
     Binaries of MBHs are believed to form following the merger of massive galaxies \needcite{}.  Such MBH Binaries (MBHBs) could then produce low-frequency gravitational waves (GWs) \needcite{LF-GWs}, in the nano-Hertz regime, that would soon be detectable by experiments called pulsar timing arrays (PTAs) \needcite{PTAs}.  In this paper, we introduce the MBHB population synthesis code called \holodeck{}.  The goal of this package is to provide a cohesive and comprehensive framework for:
     \begin{enumerate}
         \item
@@ -98,29 +98,36 @@
 
     \subsection{Source Distributions and Gravitational Wave Calculations}
 
-        It was shown by \citet[][]{Phinney-2001} that the GWB spectrum can be calculated by relating the current energy-density of GWs to the integrated GW energy produced by sources over all of cosmic time,
+        The GWB spectrum can be calculated by relating the energy-density of GWs in the local Universe to the integrated GW energy produced by sources over all of cosmic time \citet{Phinney-2001},
         \begin{equation}
             \label{eq:soltan_analog}
-            \hc^2(f) = \frac{4G}{\pi c^2 f} \int dz \; \diffp{\ndens}{{z}} \, \diffp{\egw}{{f_r}} \bigg|_{f_r=f\lr{1+z}}.
+            \hc^2(\fobs) = \frac{4G}{\pi c^2 \fobs} \int dz \; \diffp{\ndens}{{z}} \, \diffp{\egw}{{f_r}} \bigg|_{\frst=\fobs\lr{1+z}}.
         \end{equation}
-        Converting from the rest-frame frequency $f_r$ to observer-frame $f$ in the term in front of the integral cancels out the redshifting of gravitons between their emission and detection.  Here the comoving, volumetric number density of sources is \mbox{$\ndens \equiv \diffp{N}{{V_c}}$}, and the GWB spectrum is described in terms of the characteristic strain $\hc$.  We can convert from the GW energy-spectrum integrated over each sources lifetime, $\diffp{\egw}{{f_p}}$, to GW spectral strain using Eq.~\ref{eq:gw_energy_spectrum}~\&~\ref{eq:strain_lum}, and rewrite the GWB spectrum as,
+        Converting from the rest-frame frequency $\frst$ to observer-frame $\fobs$ in front of the integral cancels out the redshifting of gravitons between their emission and detection.  Here the comoving, volumetric number density of sources is \mbox{$\ndens \equiv \diffp{N}{{V_c}}$}, and the GWB spectrum is described in terms of the characteristic strain $\hc$.  We can convert from the GW energy-spectrum of each source, $\diffp{\egw}{{\frst}}$, to GW spectral strain using Eq.~\ref{eq:gw_energy_spectrum}~\&~\ref{eq:strain_lum}, and rewrite the GWB spectrum as,
         \begin{equation}
             \label{eq:gwb_sa}
-            \hc^2(f) = \int_0^\infty \!\! dz \, \sum_n^\infty \; \frac{d\ndens}{dz} \, \hsn^2\lr{f_p} \cdot 4\pi c \, d_c^2 \cdot \lr{1+z} \cdot \thard(f_p) \, \bigg|_{f_p = f(1+z)/n}.
+            \hc^2(f) = \int_0^\infty \!\! dz \, \sum_n^\infty \diffp{\ndens}{{z}} \, \hsn^2\lr{\frstorb} \cdot 4\pi c \, \distcom^2 \cdot \lr{1+z} \cdot \thardf(\frstorb) \, \bigg|_{\frstorb = \fobs(1+z)/n}.
         \end{equation}
-        In the case of purely GW-driven binary hardening, and circular binary orbits, this can be simplified to \citep[][Eq.~11]{Phinney-2001},
+        Here, $\distcom$ is the comoving distance to redshift $z$.  The characteristic strain (left-hand side) \needcite{} is more appropriate for calculating detectability, while the GW spectral strain $\hsn{}$, is directly related to a source's GW luminosity \needcite{} (\eqref{eq:strain_lum}).  The subscript $n$ denotes the frequency harmonic.  Binaries in eccentric orbits emit GWs at all integer harmonics of their orbital frequency ($\frstorb$).  For circular obits, binaries only emit at the $n=2$ harmonic.  Eq.~\ref{eq:gwb_sa} also includes the frequency residence time / hardening time, \mbox{$\thardf \equiv \frstorb / \lr{\partial \frstorb / \partial t}$}.
+
+        In the case of purely GW-driven binary hardening\footnote{i.e.~using Eq.~\ref{eq:gw_hard}~\&~\ref{eq:hard_time}.}, and circular binary orbits\footnote{i.e.~using Eq.~\ref{eq:gw_strain_amp_circ}}, this can be simplified to \citep[][Eq.~11]{Phinney-2001},
         \begin{equation}
             \label{eq:gwb_ideal}
             \hc^2(f) = \frac{4 \pi}{3 c^2} \, \lr[-4/3]{2\pi f} \int_0^\infty \!\! dz \; \frac{d\ndens}{dz}  \, \frac{\lr[5/3]{G \mchirp}}{\lr[1/3]{1+z}}.
         \end{equation}
-        This ideal, power-law GWB is often expressed as, \mbox{$\hc(f) = A_{\yr} \cdot \lr[-2/3]{f \cdot \yr}$}.
+        This expression motivates the common idealized approximation that,
+        \begin{equation}
+            \label{eq:char_strain_plaw}
+            \hc(\fobs) \approx A_\tr{ref} \cdot \scale[\alpha]{\fobs}{\fref},
+        \end{equation}
+        and $\alpha \approx -2/3$ for an idealized GWB characteristic strain spectrum\footnote{In terms of timing residual power spectral density, the idealized power-law index is $-13/3$, see Eq.~\ref{eq:psd_char_strain}.}.  The applicability of this approximation is discussed below.
 
-        The redshift evolution of the comoving number density of sources ($\ndens \equiv dN/dV_c$) can be related to the number of sources in a given frequency interval as \citep[][Eq.~6]{Sesana+2008},
+        Instead of assuming an idealized shape of the GWB spectrum, we would like an expression which calculates the instantaneous number of binaries emitting at any arbitrary frequency interval.  We can do this by first relating the comoving number density of sources ($\ndens \equiv dN/dV_c$) to the total number of binaries in the observer's past light cone \citep{Haehnelt-1994}, and then connecting redshift evolution to the time-evolution of binaries over orbital frequency \citep{Jaffe+Backer-2003}.  We can then write \citep{Sesana+2008},
         \begin{equation}
             \label{eq:number_density_to_number_frequency}
             \frac{d\ndens}{dz} = \frac{d^2N}{dz \, dV_c} = \frac{d^2N}{dz \, d\ln f_p} \frac{d \ln f_p}{dt_r} \frac{dt_r}{dz} \frac{dz}{dV_c}.
         \end{equation}
-        Plugging \eqref{eq:number_density_to_number_frequency} into \eqref{eq:gwb_sa}, and utilizing the expressions from Eqs.~\ref{eq:gw_hard},~\ref{eq:hard_time},~\ref{eq:comvol}~\&~\ref{eq:redshift_time}, to write:
+        This is the crucial expression for modeling a full population of evolving binaries.  Plugging \eqref{eq:number_density_to_number_frequency} into \eqref{eq:gwb_sa}\footnote{And utilizing the expressions from Eqs.~\ref{eq:gw_hard},~\ref{eq:hard_time},~\ref{eq:comvol}~\&~\ref{eq:redshift_time},}, we can confirm that the local characteristic strain is indeed the total spectral strain in a logarithmic frequency interval, emitting by all binaries in the observer's past light cone:
         \begin{equation}
             \label{eq:gwb_mc}
                 \hc^2(f) = \int dz \sum_n^\infty \frac{d^2 N}{dz \, d\ln f_p} \, \hsn^2(f_p).
@@ -136,62 +143,51 @@
             \frac{d^2 N}{dz \, d\ln\!f_p} =
                 \frac{d \ndens}{dz} \, 4\pi c \, d_c^2 \lr{1+z} \, \thardf(f_p).
         \end{equation}
+        In general, implementations of binary populations will utilize some fixed number of binaries in a finite simulation volume; or alternatively be described as a number density over a finite grid, e.g., total mass, mass ratio, redshift, and orbital frequency.  In the latter case the derivative over redshift in \eqref{eq:pop_discrete_from_continuous} should be replaced with one over all parameters of interest, i.e.~\mbox{$d\ndens / dz \rightarrow d^3\ndens / dM \, dq \, dz$}.  In either case, we will procedurally always be calculating the left-hand side of \eqref{eq:pop_discrete_from_continuous} from the right-hand side.
+            \todo{Introduce 'discrete' vs. 'continuous' terminology and SAMs??}
 
-        In general, implementations of binary populations will be described over some finite grid, often in a parameter space of total mass, mass ratio, redshift, and orbital frequency.  In this case the derivative over redshift in \eqref{eq:pop_discrete_from_continuous}, should be replaced with one over all parameters of interest, e.g.~\mbox{$d\ndens / dz \rightarrow d^3\ndens / dM \, dq \, dz$}.  All additional parameters are treated the same in this context, so for brevity we will only explicitly include redshift.
+        We will often be interested in quantities which depend on the number of binaries over ranges of parameter space.  For example, for the GWB in the PTA, we are interested in the number of binaries over finite width frequency bins, $\deltalnf = \Delta \ln\!\frstorb$.  These quantities will be calculated using some numerical integration procedure, for example, in the simplest case: \mbox{$\langle \Delta N \rangle \approx \lr{d^2 N / dz \, d\ln\!f_p} \, \cdot \Delta z \cdot \Delta \ln\!f_p$}.  For distributions calculated over grids with additional parameters, those will also need to be `integrated' over (e.g.~including $1/\partial M$, $1/\partial q$, etc. and also $\Delta M$, $\Delta q$, etc.).  We write this with angle-brackets to denote it as an expectation value for two reasons.  First, it does not yet account for the intrinsic discreteness of binaries.  Second, it does not account for random variance from how many binaries happen to exist in a given volume (either physical volume or parameter-space volume).  We address both issues by drawing specific `realizations' of populations.  Assuming they are uniformly distributed, they will be Poisson distributed such that, $\Delta N \in \poisson(\langle \Delta N \rangle)$.
 
-        Eventually the end goal of binary modeling is often to determine the number of binaries over some range of parameters.  When calculating gravitational wave signals, for example, the number of binaries across a target frequency interval is desired.  The discreteness of binary sources can be enforced by converting the differential value of \eqref{eq:pop_discrete_from_continuous} into a number of sources over a small bin, i.e., \mbox{$\Delta N \approx \lr{d^2 N / dz \, d\ln\!f_p} \, \cdot \Delta z \cdot \Delta \ln\!f_p$}.
-
-        In general, the properties of \textit{every} binary in the Universe are not known, and thus the MC calculation cannot be performed directly.  The typical solution is to use some version of \eqref{eq:number_density_to_number_frequency} to convert from a number-density (e.g.~$d\ndens/dz$) into a discrete distribution of individual sources (e.g.~$d^2 N / dz \, d\ln f_r$).  The number-density is often constructed from either (semi-)analytic models which specify $\ndens(M,q,z,\dots)$ explicitly, or from simulations/observations of sources in a finite volume.  In the latter case, the number-density will be calculated as $\ndens \equiv N_\trt{finite}/V_\trt{c,finite}$, often over bins in some parameter space (e.g.~$\{M, q, z, \dots\}$). \\
-
-        For a finite population of binaries, the GWB spectrum is only defined over finite bins of frequency.  The definition of characteristic strain is related to the GW energy across a logarithmic frequency bin, so \eqref{eq:gwb_mc} should really be written as,
+        For a discretized population of binaries, the GWB spectrum is then calculated as,
         \begin{equation}
             \label{eq:gwb_discrete}
-            \hc^2(\Delta \ln f) = \sum_\textrm{bins} \sum_n^\infty \frac{\Delta N(f_p,M_a,q_b,z_c,\dots)}{\Delta \ln f_p} \, \hsn^2(f_p,M_a,q_b,z_c,\dots).
+            \hc^2(\Delta \ln f) = \sum_\textrm{bins} \sum_n^\infty \frac{\Delta N(\frstorb,M_a,q_b,z_c,\dots)}{\Delta \ln \frstorb} \, \hsn^2(\frstorb,M_a,q_b,z_c,\dots).
         \end{equation}
-        Here we have written out explicitly that the number of binaries, $\Delta N(f_p,M_a,q_b,z_c,\dots)$, is the number sources with frequencies inside $\Delta \ln f_p$, typically over bins of mass, mass-ratio, redshift, etc.  Discretizing and plugging into Eq.~\ref{eq:number_density_to_number_frequency} (or by examining Eq.~\ref{eq:gwb_sa}), we can then write,
-        \begin{equation}
-            \label{eq:expectation_number_of_binaries}
-            \langle \Delta N \rangle = \Delta \ndens \cdot 4\pi c \, \distcom^2 \cdot (1+z) \cdot \thard \cdot \Delta \ln f_p.
-        \end{equation}
-        Note that we have again dropped the written dependence on bin values $(M_a, q_b, \dots)$, but they are still implicitly present.  This expression represents an \textit{expectation value} based on extrapolating the given number-density of binaries.  It also will not give an integer, discrete number of binaries.  To address this, we construct discrete realizations by drawing from a Poisson distribution: $\Delta N \in \poisson(\langle \Delta N \rangle)$. \\
-
-        The way \eqref{eq:expectation_number_of_binaries} is handled in practice will still vary somewhat depending on how $\ndens$ is specified.  If a semi-analytic model is being used, then often
-        $\Delta \ndens = \left[ d^3 \ndens(M,q,z) / dM \, dq \, dz \right] \cdot \Delta M \, \Delta q \, \Delta z$.  In the case of a finite volume population, the procedure can be simplified.  An analogous exercise would amount to a binning and un-binning of the sources, i.e.~$\Delta \ndens \big|_\textrm{finite} = \left[ \Delta N_\textrm{finite}(M,q,z) / \Delta M \, \Delta q \, \Delta z \, \Delta V_c \right] \cdot \Delta M \, \Delta q \, \Delta z$, which unnecessarily reduces accuracy.  Instead, we can imagine shrinking each of our parameter-space bins such that each one captures a single source, in which case we can write,
+        The sum over `bins' corresponds to the bins $a$ in total mass ($M_a$), bins $b$ in mass ratio ($q_b$), etc.
+        This is all that is needed for populations calculated from number-density distributions over grids of parameter space, as in the case of semi-analytic models (SAMs) which are described in the following section.  An additional simplification can be made, however, in the case of discrete binaries in finite volume simulations, such as cosmological hydrodynamic simulations.  The most analogous procedure would be to group such binaries into similar bins of parameter space, calculate a number density, and translate into the number of binaries in the observer's light cone using \eqref{eq:pop_discrete_from_continuous}.  Because a finite range of parameters would still need to be considered before Poisson sampling, this amount to dividing by and then multiplying by, finite widths of parameter space.  This procedure can be skipped, and instead calculate for each binary ($i$):
         \begin{equation}
             \label{eq:expectation_number_of_single_binary}
-            \langle \Delta N \rangle_\textrm{source} = \frac{4\pi c \, \distcom^2 \, \thard}{V_c} \cdot (1+z) \cdot \Delta \ln f_p.
+            \langle \Delta N \rangle_i = \frac{4\pi c \, \distcom^2 \, \thardf}{V_c} \cdot (1+z_i) \cdot \Delta \ln \frstorb.
         \end{equation}
-        In this case, $\thard$ and $\hsn$ in \eqref{eq:gwb_discrete}, are the hardening time and strain amplitude for each source, and $\langle \Delta N \rangle_\textrm{source}$ represents the expectation number of binaries in the Universe implied by each source in the finite volume.
+        In this case, $\thardf$ and $\hsn$ are the hardening time and strain amplitude for each source, and $\langle \Delta N \rangle_i$ represents the expectation number of binaries in the Universe implied by each source in the finite volume.
+        \todo{Is this a biased estimator?  Is there a way to correct for that?  Because we're estimating an expectation value, based on a single Poisson draw from that expectation value.}
 
-    % \subsection{??Other??}
+        % In the latter case the derivative over redshift in \eqref{eq:pop_discrete_from_continuous} should be replaced with one over all parameters of interest, i.e.~\mbox{$d\ndens / dz \rightarrow d^3\ndens / dM \, dq \, dz$}.  And each specific function will generally also be dependent on similar parameters, e.g., $\hc = \hc(M,q,z,f)$.
+        % All additional parameters are treated the same in this context, so for brevity we will only explicitly include redshift.
 
-    %     Let $N(M,q,z,\frst)$ denote the number of binaries up to a total mass $M$, mass ratio $q$, redshift $z$, and rest-frame orbital-frequency $\frst$.
-    %     We can calculate the characteristic strain from an ensemble of GW sources as \citep[][Eqs.~5/8]{Phinney-2001},
-    %         \begin{align}
-    %             h_c^2 = \int_0^\infty \!\! dz \; \frac{d^4 N}{dM \, dq \, dz \, d\ln\!\frst} \; \hs^2\lr{\frst}.
-    %         \end{align}
-    %     In practice, the total number of sources in the Universe is calculated from the number-density, $n \equiv dN / dV_c$, for some comoving volume $V_c$, extrapolated into an observer's entire past light-cone.  These can be related as \citep[][Eq.~6]{Sesana+2008},
-    %         \begin{align}
-    %             \label{eq:num_num_dens}
-    %             \frac{d^4 N}{dM \, dq \, dz \, d\ln\!\frst} = \frac{d^3 n_c}{dM \, dq \, dz} \frac{dz}{dt} \frac{dt}{d\ln\!\frst} \frac{d V_c}{dz}.
-    %         \end{align}
-    %     Note that the total number of binaries in a given frequency interval depends not only on the number density, but also their rate of frequency-evolution.  The faster binaries evolve through a given frequency interval, the fewer binaries will occupy that interval on average.  This is typically described by the binary `hardening' timescale (or `residence time'), given by the expression,
-    %     \begin{equation}
-    %         \label{eq:hardening}
-    %         \thardf \equiv - \diffp{t}{{\ln\!\frst}} = - \frac{\frst}{\partial \frst / \partial t}.
-    %     \end{equation}
+        % The end goal of binary modeling is typically to determine the number of binaries over certain ranges of parameters.  When calculating gravitational wave signals, for example, the number of binaries across a target frequency interval is desired.  The discreteness of binary sources can be enforced by converting the differential value of \eqref{eq:pop_discrete_from_continuous} into a number of sources over a small bin, i.e., \mbox{$\Delta N \approx \lr{d^2 N / dz \, d\ln\!f_p} \, \cdot \Delta z \cdot \Delta \ln\!f_p$}.
 
-    %     % Plugging in the relevant cosmographic relationships (see \secref{sec:app_eqs}) we have,
-    %     %     \begin{align}
-    %         %         h_c^2(f) & = \int_0^\infty \!\! dz \; \frac{dn_c}{dz} \, h^2\lr{f_r} \, 4\pi c \, d_c^2 \lr{1+z} \, \thardf.
-    %         %     \end{align}
-    %         % The challenge in modeling astrophysical sources of GWs is in calculating their number density.  Numerous approaches are possible, described in the following sections.
+        % The typical solution is to use some version of \eqref{eq:number_density_to_number_frequency} to convert from a number-density (e.g.~$d\ndens/dz$) into a discrete distribution of individual sources (e.g.~$d^2 N / dz \, d\ln f_r$).  The number-density is often constructed from either (semi-)analytic models which specify $\ndens(M,q,z,\dots)$ explicitly, or from simulations/observations of sources in a finite volume.  In the latter case, the number-density will be calculated as $\ndens \equiv N_\trt{finite}/V_\trt{c,finite}$, often over bins in some parameter space (e.g.~$\{M, q, z, \dots\}$). \\
 
-    %     Plugging in \eqref{eq:hardening} along with the relevant cosmographic relationships (see \secref{sec:app_eqs}) into \eqref{eq:num_num_dens} we have,
-    %     \begin{equation}
-    %         \frac{d^4 N}{dM \, dq \, dz \, d\ln\!\frst} =
-    %             \frac{d^3 n_c}{dM \, dq \, dz} \, 4\pi c \, d_c^2 \lr{1+z} \, \thardf.
-    %     \end{equation}
+        % For a finite population of binaries, the GWB spectrum is only defined over finite bins of frequency.  The definition of characteristic strain is related to the GW energy across a logarithmic frequency bin, so \eqref{eq:gwb_mc} should really be written as,
+        % \begin{equation}
+        %     \label{eq:gwb_discrete}
+        %     \hc^2(\Delta \ln f) = \sum_\textrm{bins} \sum_n^\infty \frac{\Delta N(f_p,M_a,q_b,z_c,\dots)}{\Delta \ln f_p} \, \hsn^2(f_p,M_a,q_b,z_c,\dots).
+        % \end{equation}
+        % Here we have written out explicitly that the number of binaries, $\Delta N(f_p,M_a,q_b,z_c,\dots)$, is the number sources with frequencies inside $\Delta \ln f_p$, typically over bins of mass, mass-ratio, redshift, etc.  Discretizing and plugging into Eq.~\ref{eq:number_density_to_number_frequency} (or by examining Eq.~\ref{eq:gwb_sa}), we can then write,
+        % \begin{equation}
+        %     \label{eq:expectation_number_of_binaries}
+        %     \langle \Delta N \rangle = \Delta \ndens \cdot 4\pi c \, \distcom^2 \cdot (1+z) \cdot \thard \cdot \Delta \ln f_p.
+        % \end{equation}
+        % Note that we have again dropped the written dependence on bin values $(M_a, q_b, \dots)$, but they are still implicitly present.  This expression represents an \textit{expectation value} based on extrapolating the given number-density of binaries.  It also will not give an integer, discrete number of binaries.  To address this, we construct discrete realizations by drawing from a Poisson distribution: $\Delta N \in \poisson(\langle \Delta N \rangle)$. \\
+
+        % The way \eqref{eq:expectation_number_of_binaries} is handled in practice will still vary somewhat depending on how $\ndens$ is specified.  If a semi-analytic model is being used, then often
+        % $\Delta \ndens = \left[ d^3 \ndens(M,q,z) / dM \, dq \, dz \right] \cdot \Delta M \, \Delta q \, \Delta z$.  In the case of a finite volume population, the procedure can be simplified.  An analogous exercise would amount to a binning and un-binning of the sources, i.e.~$\Delta \ndens \big|_\textrm{finite} = \left[ \Delta N_\textrm{finite}(M,q,z) / \Delta M \, \Delta q \, \Delta z \, \Delta V_c \right] \cdot \Delta M \, \Delta q \, \Delta z$, which unnecessarily reduces accuracy.  Instead, we can imagine shrinking each of our parameter-space bins such that each one captures a single source, in which case we can write,
+        % \begin{equation}
+        %     \label{eq:expectation_number_of_single_binary}
+        %     \langle \Delta N \rangle_\textrm{source} = \frac{4\pi c \, \distcom^2 \, \thard}{V_c} \cdot (1+z) \cdot \Delta \ln f_p.
+        % \end{equation}
+        % In this case, $\thard$ and $\hsn$ in \eqref{eq:gwb_discrete}, are the hardening time and strain amplitude for each source, and $\langle \Delta N \rangle_\textrm{source}$ represents the expectation number of binaries in the Universe implied by each source in the finite volume.
 
 
     \subsection{Semi-Analytic Modeling}
@@ -379,18 +375,20 @@
 
         GW power is emitted at integer harmonics of the orbital frequency, $\frstn = n \cdot \frstorb$, which is also redshifted to reach the observer-frame, $\fobsn = n \cdot \frstorb / (1+z)$.  The energy spectrum emitted in GWs is \citet[][Eq.~3.10]{enoki2007a},
         \begin{subequations}
+        \label{eq:gw_energy_spectrum}
         \begin{align}
-            \label{eq:gw_energy_spectrum}
             \frac{d \egw}{d \frst} & = \int \frac{dt_r}{df_p} \, \sum_{n=1}^\infty \, \lgwn(f_p) \; \delta(\frst - n f_p) \; d f_p \\
                 & = \sum_{n=1}^\infty \left[ \lgwn(f_p) \cdot \frac{\thard(f_p)}{n f_p} \right]_{f_p = \frst/n},
         \end{align}
         \end{subequations}
         where the power-radiated at each harmonic can be expressed as is \citep[][Eq.~2.2]{enoki2007a},
+        \begin{subequations}
         \begin{align}
             \label{eq:lum_gw}
             \lgw & = \sum_n \lgwn = \lgwc \sum_n g(n,e) = \lgwc \cdot F(e), \\
             \lgwc & = \frac{32}{5 G c^5} \left(G\mchirp\right)^{10/3} \left( 2\pi \frstorb \right)^{10/3}.
         \end{align}
+        \end{subequations}
         Here, the GW frequency distribution function is,
         \begin{equation}
         \begin{split}
@@ -400,11 +398,13 @@
         \end{split}
         \end{equation}
         The GW spectral strain amplitude at a given harmonic can be related to the (rest-frame) luminosity as \citep[][Eq.~2.1]{Finn+Thorne-2000},
+        \begin{subequations}
+        \label{eq:strain_lum}
         \begin{align}
-            \label{eq:strain_lum}
             \hsn^2 & = \frac{G}{c^3} \, \scale[2]{2}{n} \, \frac{\lgwn}{\lr[2]{2 \pi \, \frstorb} \, \distcom^2}, \\
                 & = \frac{32}{5 c^8} \, \scale[2]{2}{n} \, \frac{\left(G\mchirp\right)^{10/3}}{\distcom^2} \lr[4/3]{2\pi\frstorb} \cdot g(n,e).
         \end{align}
+        \end{subequations}
         We always take the chirp mass to be an intrinsic (rest-frame) property of the binary, however an `observer-frame' chirp-mass can also be used.  For example, in the case of a circular binary, the spectral strain is,
         \begin{equation}
             \label{eq:gw_strain_amp_circ}
@@ -412,6 +412,20 @@
                 = \frac{8}{10^{1/2}} \frac{\left(G\mchirp\right)^{5/3}}{c^4 \, \distcom} \left(2 \pi \frstorb \right)^{2/3}
                 = \frac{8}{10^{1/2}} \frac{\left(G\mchirp_o\right)^{5/3}}{c^4 \, \distlum} \left(2 \pi \fobsorb \right)^{2/3}.
         \end{equation}
+
+        \todo{The spectral strain can be related to characteristic strain as...}
+
+        Instead of characteristic strain, the GWB spectrum at low-frequencies is often characterized in terms of the power spectral density (PSD) of timing residuals\footnote{The PSD is often denoted by $S_h$ in the GW literature.  Unfortunately, the PSD of GW strain is also often used and referred to using the same symbols and terminology, while the physical quantity is quite distinct \needcite{}.} ($\psd$)
+        \begin{equation}
+            \label{eq:psd_char_strain}
+            \psd(f) = \frac{\hc^2(f)}{12 \pi^2 f^3}.
+        \end{equation}
+        Assuming a power-law form for the PSD gives an expression analogous to Eq.~\ref{eq:char_strain_plaw}
+        \begin{equation}
+            \label{eq:psd_char_strain}
+            \psd(f) \approx  A^2_\tr{ref} \cdot \scale[\gamma]{\fobs}{\fref} \scale[-3]{f}{\fref},
+        \end{equation}
+        such that the PSD spectral index is related to the characteristic strain spectral index as, $\gamma = 2 \alpha - 3$.  In terms of PSD, the idealized, circular, GW-only GWB power-law index is then $\gamma = -13/3$.  Note that the literature uses varying sign conventions for both $\alpha$ and $\gamma$ such that they may typically be positive or negative.
 
 
     \subsection{Cosmology}
