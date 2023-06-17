@@ -4,7 +4,7 @@ import os
 from holodeck import utils, cosmo, log, _PATH_DATA
 from scipy import interpolate
 from scipy.interpolate import RectBivariateSpline
-
+from holodeck.constants import GYR, NWTG, PC, MSOL, YR
 
 class Accretion:
     """
@@ -13,7 +13,7 @@ class Accretion:
     ----------------
 
     """
-    def __init__(self, accmod = 'Basic', f_edd = 0.01, mdot_ext=None, eccen=0.0, subpc=True, **kwargs):
+    def __init__(self, accmod = 'Basic', f_edd = 0.10, mdot_ext=None, eccen=0.0, subpc=True, **kwargs):
         """ First sum masses to get total mass of MBHB """
         self.accmod = accmod
         self.f_edd = f_edd
@@ -33,6 +33,29 @@ class Accretion:
         medd = self.f_edd * (EDDT/(eps*SPLC**2)) * mass
         return(medd)
 
+    def mdot_total(self, evol, step):
+        if self.mdot_ext is not None:
+            """ accretion rates have been supplied externally """
+            mdot = self.mdot_ext[:,step-1]
+        else:
+            """ Get accretion rates as a fraction (f_edd in self._acc) of the
+                Eddington limit from current BH masses """
+            total_bh_masses = np.sum(evol.mass[:, step-1, :], axis=1)
+            mdot = self.mdot_eddington(total_bh_masses)
+
+        """ Calculate individual accretion rates """
+        if self.subpc:
+            """ Indices where separation is less than or equal to a parsec """
+            ind_sepa = evol.sepa[:, step] <= PC
+        else:
+            """ Indices where separation is less than or equal to 100 kilo-parsec """
+            ind_sepa = evol.sepa[:, step] <= 10**5 * PC
+
+        """ Set total accretion rates to 0 when separation is larger than 1pc or 10kpc,
+            depending on subpc switch applied to accretion instance """
+        mdot[~ind_sepa] = 0
+        return(mdot)
+
     def pref_acc(self, mdot, evol, step):
         """ Choose one of the below models to calculate primary vs secondary accretion rates
             We also supply the instance of the evolution class here in case we need to access eccentricities """
@@ -45,9 +68,13 @@ class Accretion:
             """ secondary and primary can swap indices. need to account for that and reverse the mass ratio """
             inds_rev = q_b > 1
             q_b[inds_rev] = 1./q_b[inds_rev]
-            #if evol has eccen, then do below, if not, set e_b = 0.
-            #e_b = evol.eccen[:, step-1]
-            e_b = self.eccen
+            """if evol has an eccentricity distribution,
+               we use it, if not, we set each eccentricity to
+               the value specified in __init__ """
+            if evol.eccen is not None:
+                e_b = evol.eccen[:, step-1]
+            else:
+                e_b = self.eccen
             """ Now interpolate to get lambda at [q,e] """
             def lambda_qe_interp_2d(fp="data/preferential_accretion/siwek+22/", es=[0.0,0.2,0.4,0.6,0.8]):
                 all_lambdas = []
