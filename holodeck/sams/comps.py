@@ -16,8 +16,6 @@ from holodeck.constants import GYR, MSOL
 
 class _Galaxy_Stellar_Mass_Function(abc.ABC):
     """Galaxy Stellar-Mass Function base-class.  Used to calculate number-density of galaxies.
-
-
     """
 
     @abc.abstractmethod
@@ -186,17 +184,6 @@ class _Galaxy_Merger_Rate(abc.ABC):
 
         """
         return
-
-    '''
-    def zprime(self, mass, mrat, redz, **kwargs):
-        """Return the redshift after merger (i.e. input `redz` delayed by merger time).
-        """
-        # tau0 = self(mass, mrat, redz, **kwargs)  # sec
-        # # Find the redshift of  t(z) + tau
-        # redz_prime = utils.redz_after(tau0, redz=redz)
-        # return redz_prime, tau0
-        return np.copy(redz), np.zeros_like(redz)
-    '''
 
 
 class GMR_Power_Law(_Galaxy_Merger_Rate):
