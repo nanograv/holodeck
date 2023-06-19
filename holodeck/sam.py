@@ -27,12 +27,7 @@ in $a$ or $f$ is subtle, as it requires modeling the binary evolution (i.e. hard
 
 To-Do
 -----
-* Change mass-ratios and redshifts (1+z) to log-space; expand q parameter range.
-* Incorporate arbitrary hardening mechanisms into SAM construction, sample self-consistently.
-* Should there be an additional dimension of parameter space for galaxy properties?  This way
-  variance in scaling relations is incorporated directly before calculating realizations.
 * Allow SAM class to take M-sigma in addition to M-Mbulge.
-* Should GW calculations be moved to the `gravwaves.py` module?
 
 References
 ----------
@@ -51,8 +46,8 @@ import scipy.interpolate  # noqa
 import kalepy as kale
 
 import holodeck as holo
-from holodeck import cosmo, utils   # , log
-from holodeck.constants import GYR, SPLC, MSOL, MPC, YR, PC
+from holodeck import cosmo, utils
+from holodeck.constants import GYR, SPLC, MSOL, MPC
 from holodeck import relations, gravwaves, single_sources
 import holodeck.sam_cython
 
@@ -62,7 +57,6 @@ GSMF_USES_MTOT = False       #: the mass used in the GSMF is interpretted as M=m
 GPF_USES_MTOT = False        #: the mass used in the GPF  is interpretted as M=m1+m2, otherwise use primary m1
 GMT_USES_MTOT = False        #: the mass used in the GMT  is interpretted as M=m1+m2, otherwise use primary m1
 
-# ZERO_GMT_STALLED_SYSTEMS = False
 
 
 # ==============================
@@ -104,6 +98,49 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
         """
         return
 
+    def mbh_mass_func(self, mbh, redz, mmbulge, scatter=None):
+        """Convert from the GSMF to a MBH mass function (number density), using a given Mbh-Mbulge relation.
+
+        Parameters
+        ----------
+        mbh : array_like
+            Blackhole masses at which to evaluate the mass function.
+        redz : array_like
+            Redshift(s) at which to evaluate the mass function.
+        mmbulge : `relations._MMBulge_Relation` subclass instance
+            Scaling relation between galaxy and MBH masses.
+        scatter : None, bool, or float
+            Introduce scatter in masses.
+            * `None` or `True` : use the value from `mmbulge._scatter_dex`
+            * `False` : do not introduce scatter
+            * float : introduce scatter with this amplitude (in dex)
+
+        Returns
+        -------
+        ndens : array_like
+            Number density of MBHs, in units of [Mpc^-3]
+
+        """
+        if scatter in [None, True]:
+            scatter = mmbulge._scatter_dex
+
+        mstar = mmbulge.mstar_from_mbh(mbh, scatter=False)
+        # This is `dn_star / dlog10(M_star)`
+        ndens = self(mstar, redz)    # units of  [1/Mpc^3]
+
+        # dM_star / dM_bh
+        dmstar_dmbh = mmbulge.dmstar_dmbh(mstar)   # [unitless]
+        # convert to dlog10(M_star) / dlog10(M_bh) = (M_bh / M_star) * (dM_star / dM_bh)
+        jac = (mbh/mstar) * dmstar_dmbh
+        # convert galaxy number density to  to dn_bh / dlog10(M_bh)
+        ndens *= jac
+
+        if scatter is not False:
+            ndens = holo.utils.scatter_redistribute_densities(mbh, ndens, scatter=scatter)
+
+        return ndens
+
+
 
 class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
     r"""Single Schechter Function - Galaxy Stellar Mass Function.
@@ -121,7 +158,7 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
 
         self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]  [log10(1/Mpc^3)]
         self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]  [log10(1/Mpc^3)]
-        self._mchar0 = mchar0       # +11.24  +/- [-0.17, +0.20]  [log10(Msol)]
+        self._mchar0 = mchar0       # 10^ (+11.24  +/- [-0.17, +0.20]  [log10(Msol)])
         self._mcharz = mcharz       #  0.0                        [log10(Msol)]    # noqa
         self._alpha0 = alpha0     # -1.24   +/- [-0.16, +0.16]
         self._alphaz = alphaz     # -0.03   +/- [-0.14, +0.16]
@@ -406,7 +443,7 @@ class Semi_Analytic_Model:
         deprecated_keys = ['ZERO_DYNAMIC_STALLED_SYSTEMS', 'ZERO_GMT_STALLED_SYSTEMS']
         for key, val in kwargs.items():
             if key in deprecated_keys:
-                log.error("Using deprecated kwarg: {key}: {val}!  In the future this will raise an error.")
+                log.error(f"Using deprecated kwarg: {key}: {val}!  In the future this will raise an error.")
             else:
                 err = f"Unexpected kwarg {key=}: {val=}!"
                 log.exception(err)
@@ -459,9 +496,6 @@ class Semi_Analytic_Model:
         self._shape = None            #: Shape of the parameter-space domain (mtot, mrat, redz)
         self._gmt_time = None         #: GMT timescale of galaxy mergers [sec]
         self._redz_prime = None       #: redshift following galaxy merger process
-
-        # These values change each time a certain function is called, but are cached after each call
-        self._gwb = None
 
         return
 
@@ -589,13 +623,11 @@ class Semi_Analytic_Model:
                 log.info(f"\tdens aft: ({utils.stats(dens)})")
                 msg = f"mass: {mass_bef:.2e} ==> {mass_aft:.2e} || change = {dm:.4e}"
                 log.info(f"\t{msg}")
-                if np.fabs(dm) > 0.05:
+                if np.fabs(dm) > 0.2:
                     err = f"Warning, significant change in number-mass!  {msg}"
                     log.error(err)
-                    print(err, flush=True)
 
             # set values after redshift zero to have zero density
-            # if self.ZERO_GMT_STALLED_SYSTEMS:
             log.info(f"zeroing out {utils.frac_str(idx_stalled)} systems stalled from GMT")
             dens[idx_stalled] = 0.0
             # else:
@@ -618,7 +650,7 @@ class Semi_Analytic_Model:
 
         return edges, dnum, redz_final
 
-    def _dynamic_binary_number_at_fobs_consistent(self, hard, fobs_orb, steps=200):
+    def _dynamic_binary_number_at_fobs_consistent(self, hard, fobs_orb, steps=200, details=False):
         """Get correct redshifts for full binary-number calculation.
 
         Slower but more correct than old `dynamic_binary_number`.
@@ -626,9 +658,15 @@ class Semi_Analytic_Model:
         more than 10x faster.
         LZK 2023-05-11
 
+        # BUG doesn't work for Fixed_Time_2PL
+
         """
         fobs_orb = np.asarray(fobs_orb)
         edges = self.edges + [fobs_orb, ]
+
+        # shape: (M, Q, Z)
+        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
+
 
         # start from the hardening model's initial separation
         rmax = hard._sepa_init
@@ -640,78 +678,80 @@ class Semi_Analytic_Model:
         # (M, S)  =  (M,1) * (1,S)
         rads = extr[0][:, np.newaxis] + (extr[1] - extr[0])[:, np.newaxis] * rads
         rads = 10.0 ** rads
-        # (M, Q, Z, S)
-        mt, mr, rz, rads = np.broadcast_arrays(
-            self.mtot[:, np.newaxis, np.newaxis, np.newaxis],
-            self.mrat[np.newaxis, :, np.newaxis, np.newaxis],
-            self.redz[np.newaxis, np.newaxis, :, np.newaxis],
-            rads[:, np.newaxis, np.newaxis, :]
+
+        # (M, Q, S)
+        mt, mr, rads, norm = np.broadcast_arrays(
+            self.mtot[:, np.newaxis, np.newaxis],
+            self.mrat[np.newaxis, :, np.newaxis],
+            rads[:, np.newaxis, :],
+            hard._norm[:, :, np.newaxis],
         )
-        # (S, M*Q*Z)
-        mt, mr, rz, rads = [mm.reshape(-1, steps).T for mm in [mt, mr, rz, rads]]
-        # (S, M*Q*Z) --- `Fixed_Time.dadt` will only accept this shape
-        dadt_evo = hard.dadt(mt, mr, rads)
+        dadt_evo = hard.dadt(mt, mr, rads, norm=norm)
+
+        # (M, Q, S-1)
         # Integrate (inverse) hardening rates to calculate total lifetime to each separation
-        times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=0, cumsum=True)
+        times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=-1, cumsum=True)
         # Combine the binary-evolution time, with the galaxy-merger time
-        # (S, M*Q*Z)
-        times_tot = times_evo + self._gmt_time.reshape(-1)[np.newaxis, :]
-        #
-        redz_evo = utils.redz_after(times_tot, redz=rz[1:, :])
+        # (M, Q, Z, S-1)
+        rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis]
+        times_tot = times_evo[:, :, np.newaxis, :] + self._gmt_time[:, :, :, np.newaxis]
+        redz_evo = utils.redz_after(times_tot, redz=rz)
 
-        # (S, M*Q*Z)   convert from separations to rest-frame orbital frequencies
+        # convert from separations to rest-frame orbital frequencies
+        # (M, Q, S)
         frst_orb_evo = utils.kepler_freq_from_sepa(mt, rads)
-        fobs_orb_evo = frst_orb_evo / (1.0 + rz)
+        # (M, Q, Z, S)
+        fobs_orb_evo = frst_orb_evo[:, :, np.newaxis, :] / (1.0 + rz)
 
-        # interpolate to target frequencies
+        # ---- interpolate to target frequencies
         # `ndinterp` interpolates over 1th dimension
-        # `fobs_orb`     is shaped (X, M*Q*Z)    so transpose to  (M*Q*Z, X)
-        # `fobs_orb_evo` is shaped (S, M*Q*Z)    so slice and transpose to  (M*Q*Z, S-1)
-        # `redz_evo`     is shaped (S-1, M*Q*Z)  so transpose to  (M*Q*Z, S-1)
-        redz_final = utils.ndinterp(fobs_orb.T, fobs_orb_evo[1:, :].T, redz_evo.T, xlog=True, ylog=False)
 
-        # (M*Q*Z, S) ===> (M, Q, Z, S)
+        # (M, Q, Z, S-1)  ==>  (M*Q*Z, S-1)
+        fobs_orb_evo, redz_evo = [mm.reshape(-1, steps-1) for mm in [fobs_orb_evo[:, :, :, 1:], redz_evo]]
+        # (M*Q*Z, X)
+        redz_final = utils.ndinterp(fobs_orb, fobs_orb_evo, redz_evo, xlog=True, ylog=False)
+
+        # (M*Q*Z, X) ===> (M, Q, Z, X)
         redz_final = redz_final.reshape(self.shape + (fobs_orb.size,))
         coal = (redz_final > 0.0)
         frst_orb = fobs_orb * (1.0 + redz_final)
         frst_orb[frst_orb < 0.0] = 0.0
         redz_final[~coal] = -1.0
 
-        # shape: (M, Q, Z)
-        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
-
-        # (Z,) comoving-distance in [Mpc]
+        # (M, Q, Z, X) comoving-distance in [Mpc]
         dc = np.zeros_like(redz_final)
         dc[coal] = cosmo.comoving_distance(redz_final[coal]).to('Mpc').value
 
-        # (Z,) this is `(dVc/dz) * (dz/dt)` in units of [Mpc^3/s]
+        # (M, Q, Z, X) this is `(dVc/dz) * (dz/dt)` in units of [Mpc^3/s]
         cosmo_fact = np.zeros_like(redz_final)
         cosmo_fact[coal] = 4 * np.pi * (SPLC/MPC) * np.square(dc[coal]) * (1.0 + redz_final[coal])
 
         # (M, Q) calculate chirp-mass
         mt = self.mtot[:, np.newaxis, np.newaxis, np.newaxis]
         mr = self.mrat[np.newaxis, :, np.newaxis, np.newaxis]
-        mchirp = utils.m1m2_from_mtmr(mt, mr)
-        mchirp = utils.chirp_mass(*mchirp)
 
         # Convert from observer-frame orbital freq, to rest-frame orbital freq
         sa = utils.kepler_sepa_from_freq(mt, frst_orb)
-        # (X, M*Q*Z), hardening rate, negative values, units of [cm/sec]
-        args = [mt, mr, sa]
-        args = np.broadcast_arrays(*args)
-        args = [xx.reshape(-1, fobs_orb.size).T for xx in args]
-        dadt = hard.dadt(*args)
-        dadt = dadt.T.reshape(sa.shape)
+        mt, mr, sa, norm = np.broadcast_arrays(mt, mr, sa, hard._norm[:, :, np.newaxis, np.newaxis])
+        # hardening rate, negative values, units of [cm/sec]
+        dadt = hard.dadt(mt, mr, sa, norm=norm)
         # Calculate `tau = dt/dlnf_r = f_r / (df_r/dt)`
         # dfdt is positive (increasing frequency)
         dfdt, frst_orb = utils.dfdt_from_dadt(dadt, sa, frst_orb=frst_orb)
         tau = frst_orb / dfdt
 
-        # (M, Q, Z) units: [1/s] i.e. number per second
+        # (M, Q, Z, X) units: [1/s] i.e. number per second
         dnum = dens[..., np.newaxis] * cosmo_fact * tau
         dnum[~coal] = 0.0
 
-        self._redz_final = redz_final
+        if details:
+            tau[~coal] = 0.0
+            dadt[~coal] = 0.0
+            sa[~coal] = 0.0
+            cosmo_fact[~coal] = 0.0
+            # (M, Q, X)  ==>  (M, Q, Z, X)
+            dets = dict(tau=tau, cosmo_fact=cosmo_fact, dadt=dadt, fobs=fobs_orb, sepa=sa)
+            return edges, dnum, redz_final, dets
 
         return edges, dnum, redz_final
 
@@ -754,11 +794,122 @@ class Semi_Analytic_Model:
         dnum = np.zeros(new_shape)
         dnum[coal] = (dens[..., np.newaxis] * np.ones(new_shape))[coal] * cosmo_fact * tau
 
-        self._redz_final = rz
-
         return edges, dnum, rz
 
-    def new_gwb(self, fobs_gw_edges, hard, realize=100):
+    def _dynamic_binary_number_at_sepa_consistent(self, hard, target_sepa, steps=200, details=False):
+        """Get correct redshifts for full binary-number calculation.
+
+        Slower but more correct than old `dynamic_binary_number`.
+        Same as new cython implementation `holo.sam_cython.dynamic_binary_number_at_fobs`, which is
+        more than 10x faster.
+        LZK 2023-05-11
+
+        """
+        target_sepa = np.asarray(target_sepa)
+        ntarget = target_sepa.size    # this will be refered to as 'X' in shapes
+        edges = self.edges + [target_sepa, ]
+        nmtot, nmrat, nredz = self.shape
+
+        # start from the hardening model's initial separation
+        rmax = hard._sepa_init
+        # (M,) end at the ISCO
+        rmin = utils.rad_isco(self.mtot)
+        # Choose steps for each binary, log-spaced between rmin and rmax
+        extr = np.log10([rmax * np.ones_like(rmin), rmin])     # (2,M,)
+        rads = np.linspace(0.0, 1.0, steps)[np.newaxis, :]     # (1,X)
+        # (M, S)  =  (M,1) * (1,S)
+        rads = extr[0][:, np.newaxis] + (extr[1] - extr[0])[:, np.newaxis] * rads
+        rads = 10.0 ** rads
+
+        # (M, Q, Z, S)
+        norm = hard._norm
+        mt, mr, rz, rads, norm = np.broadcast_arrays(
+            self.mtot[:, np.newaxis, np.newaxis, np.newaxis],
+            self.mrat[np.newaxis, :, np.newaxis, np.newaxis],
+            self.redz[np.newaxis, np.newaxis, :, np.newaxis],
+            rads[:, np.newaxis, np.newaxis, :],
+            norm[:, :, np.newaxis, np.newaxis]
+        )
+
+        # (M, Q, Z, S)  ==>  (M, Q, Z*S)
+        mt, mr, rz, rads, norm = [mm.reshape(nmtot, nmrat, -1) for mm in [mt, mr, rz, rads, norm]]
+        dadt_evo = hard.dadt(mt, mr, rads, norm=norm)
+
+        # (M, Q, Z*S)  ==>  (M, Q, Z, S)
+        dadt_evo, rz, rads = [mm.reshape(nmtot, nmrat, nredz, steps) for mm in [dadt_evo, rz, rads]]
+        # dadt_evo = dadt_evo.reshape(nmtot, nmrat, nredz, steps)
+
+        # Integrate (inverse) hardening rates to calculate total lifetime to each separation
+        times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=-1, cumsum=True)
+        # Combine the binary-evolution time, with the galaxy-merger time
+        times_tot = times_evo + self._gmt_time[:, :, :, np.newaxis]
+        redz_evo = utils.redz_after(times_tot, redz=rz[:, :, :, 1:])
+
+        # ---- interpolate to target frequencies
+
+        # `ndinterp` interpolates over axis=1,  so get steps (S,) and target radii (X,) to axis=1
+
+        # get our target separations in the appropriate shape to match evolution arrays
+        # (X,)  ==>  (M, Q, Z, X)
+        sepa = target_sepa[np.newaxis, np.newaxis, np.newaxis, :] * np.ones(self.shape)[..., np.newaxis]
+        # (M, Q, Z, X)  ==>  (M*Q*Z, X)
+        sepa = sepa.reshape(-1, target_sepa.size)
+        # (M, Q, Z, S-1) ==>  (M*Q*Z, S-1)
+        rads, redz_evo = [mm.reshape(-1, steps-1) for mm in [rads[:, :, :, 1:], redz_evo]]
+
+        # `rads` MUST BE INCREASING for interpolation, so reverse the steps
+        rads = rads[:, ::-1]
+        redz_evo = rads[:, ::-1]
+        redz_final = utils.ndinterp(sepa, rads, redz_evo, xlog=True, ylog=False)
+
+        # (M*Q*Z, X) ===> (M, Q, Z, X)
+        redz_final = redz_final.reshape(self.shape + (ntarget,))
+        coal = (redz_final > 0.0)
+        redz_final[~coal] = -1.0
+
+        # shape: (M, Q, Z)
+        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
+
+        # (M, Q, Z, X) comoving-distance in [Mpc]
+        dc = np.zeros_like(redz_final)
+        dc[coal] = cosmo.comoving_distance(redz_final[coal]).to('Mpc').value
+
+        # (M, Q, Z, X) this is `(dVc/dz) * (dz/dt)` in units of [Mpc^3/s]
+        cosmo_fact = np.zeros_like(redz_final)
+        cosmo_fact[coal] = 4 * np.pi * (SPLC/MPC) * np.square(dc[coal]) * (1.0 + redz_final[coal])
+
+        # ---- Calculate timescale `tau = dt/dlnf_r = f_r / (df_r/dt)`
+
+        mt, mr, sepa, norm = np.broadcast_arrays(
+            self.mtot[:, np.newaxis, np.newaxis],
+            self.mrat[np.newaxis, :, np.newaxis],
+            target_sepa[np.newaxis, np.newaxis, :],
+            hard._norm[:, :, np.newaxis],
+        )
+        # hardening rate, negative values, units of [cm/sec]
+        dadt = hard.dadt(mt, mr, sepa, norm=norm)
+        # dfdt is positive (increasing frequency)
+        dfdt, frst_orb = utils.dfdt_from_dadt(dadt, sepa, mtot=mt)
+        tau = frst_orb / dfdt
+
+        # (M, Q, Z) units: [1/s] i.e. number per second
+        dnum = dens[..., np.newaxis] * cosmo_fact * tau[:, :, np.newaxis, :]
+        dnum[~coal] = 0.0
+
+        if details:
+            # (M, Q, X)  ==>  (M, Q, Z, X)
+            tau = tau[:, :, np.newaxis, :] * np.ones_like(redz_final)
+            dadt = dadt[:, :, np.newaxis, :] * np.ones_like(redz_final)
+            dets = dict(tau=tau, cosmo_fact=cosmo_fact, dadt=dadt, sepa=target_sepa)
+            return edges, dnum, redz_final, dets
+
+        return edges, dnum, redz_final
+
+    @utils.deprecated_fail("`gwb_new`")
+    def new_gwb(self, *args, **kwargs):
+        pass
+
+    def gwb_new(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100):
         """Calculate GWB using new cython implementation, 10x faster!
         """
 
@@ -785,7 +936,7 @@ class Semi_Analytic_Model:
 
         return gwb
 
-    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=100):
+    def gwb_old(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=100):
         """Calculate GWB using new `dynamic_binary_number_at_fobs` method, better, but slower.
         """
 
@@ -842,106 +993,77 @@ class Semi_Analytic_Model:
         gwb = gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
         return gwb
 
-    def ss_gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=1, loudest=1, params=False,
-               zero_stalled=None, use_redz_after_hard=None, return_details=False):
-        """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies.
+    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100, loudest=1, params=False):
+        """Calculate the (smooth/semi-analytic) GWB and CWs at the given observed GW-frequencies.
 
         Parameters
         ----------
-        fobs_gw : (F,) array_like of scalar,
+        fobs_gw_edges : (F,) array_like of scalar,
             Observer-frame GW-frequencies. [1/sec]
             These are the frequency bin edges, which are integrated across to get the number of binaries in each
             frequency bin.
         hard : holodeck.evolution._Hardening class or instance
             Hardening mechanism to apply over the range of `fobs_gw`.
-        realize : bool or int,
-            Whether to construct a Poisson 'realization' (discretization) of the SAM distribution.
+        realize : int
+            Specification of how many discrete realizations to construct.
             Realizations approximate the finite-source effects of a realistic population.
-        **kw_dynamic_binary_number : keyword-value pairs,
-            Additional arguments passed along to `Semi_Analytic_Model.dynamic_binary_number()`.
+        loudest : int
+            Number of loudest single sources to distinguish from the background.
+        params : Boolean
+            Whether or not to return astrophysical parameters of the binaries.
+
 
         Returns
         -------
-        gwb : (F,[R,]) ndarray of scalar
-            Dimensionless, characteristic strain at each frequency.
-            If `realize` is an integer with value R, then R realizations of the GWB are returned,
-            such that `hc` has shape (F,R,).
-        [details]
-
-
+        hc_ss : (F, R, L) NDarray of scalars
+            The characteristic strain of the L loudest single sources at each frequency.
+        hc_bg : (F, R) NDarray of scalars
+            Characteristic strain of the GWB.
+        sspar : (4, F, R, L) NDarray of scalars
+            Astrophysical parametes (total mass, mass ratio, initial redshift, final redshift) of each
+            loud single sources, for each frequency and realization.
+            Returned only if params = True.
+        bgpar : (7, F, R) NDarray of scalars
+            Average effective binary astrophysical parameters (total mass, mass ratio, initial redshift,
+            final redshift, final comoving distance, final separation, final angular separation)
+            for background sources at each frequency and realization,
+            Returned only if params = True.
         """
-        log = self._log
 
-        if use_redz_after_hard is None:
-            if hard.CONSISTENT is True:
-                use_redz_after_hard = True
-            elif hard.CONSISTENT is False:
-                use_redz_after_hard = False
-            else:
-                err = "`hard.CONSISTENT` or 'use_redz_after_hard' must be one of {{True, False}}!"
-                log.error(err)
-                raise ValueError(err)
-
-        fobs_gw_edges = np.atleast_1d(fobs_gw_edges)
-        if np.isscalar(fobs_gw_edges) or np.size(fobs_gw_edges) == 1:
-            err = "GWB can only be calculated across bins of frequency, `fobs_gw_edges` must provide bin edges!"
-            log.exception(err)
+        if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
+            err = (
+                "`sam_cython` methods only work with `Fixed_Time_2PL_SAM` or `Hard_GW` hardening models!  "
+                "Use `gwb_only` for alternative classes!"
+            )
+            self._log.exception(err)
             raise ValueError(err)
 
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
-        # ---- Get the differential-number of binaries for each bin
+
         # convert to orbital-frequency (from GW-frequency)
         fobs_orb_edges = fobs_gw_edges / 2.0
         fobs_orb_cents = fobs_gw_cents / 2.0
 
-        print("SS 1: ", flush=True)
-        holo.librarian._log_mem_usage(None)
+        # ---- Calculate number of binaries in each bin
 
-        # `dnum` is  ``d^4 N / [dlog10(M) dq dz dln(f)]``
-        # `dnum` has shape (M, Q, Z, F)  for mass, mass-ratio, redshift, frequency
-        edges, dnum = self.dynamic_binary_number(
-            hard, fobs_orb=fobs_orb_cents,
-            zero_stalled=zero_stalled, return_details=return_details,
+        redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
+            fobs_orb_cents, self, hard, cosmo
         )
 
-        print("SS 2: ", flush=True)
-        holo.librarian._log_mem_usage(None)
-
-        edges[-1] = fobs_orb_edges
-        log.debug(f"dnum: {utils.stats(dnum)}")
-
-        # "integrate" within each bin (i.e. multiply by bin volume)
-        number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
-        number = number * np.diff(np.log(fobs_gw_edges))
-        log.debug(f"number: {utils.stats(number)}")
-        log.debug(f"number.sum(): {number.sum():.4e}")
-
-        print("SS 3: ", flush=True)
-        holo.librarian._log_mem_usage(None)
+        edges = [self.mtot, self.mrat, self.redz, fobs_orb_edges]
+        number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
 
         # ---- Get the Single Source and GWB spectrum from number of binaries over grid
 
-        # Use the redshift based on initial redshift + galaxy-merger-time + evolution-time
-        log.debug(f"{use_redz_after_hard=}")
-        if use_redz_after_hard:
-            use_redz = self._redz_final
-        # Use the redshift based on initial redshift + galaxy-merger-time (without evo time)
-        else:
-            log.warning(f"Using `redz_prime` for redshift (includes galaxy merger time, but not evolution time)")
-            use_redz = self._redz_prime[:, :, :, np.newaxis] * np.ones_like(dnum)
-
-        ret_vals = single_sources.ss_gws_redz(edges, use_redz, number,
+        ret_vals = single_sources.ss_gws_redz(edges, redz_final, number,
                                               realize=realize, loudest=loudest, params=params)
+
         hc_ss = ret_vals[0]
         hc_bg = ret_vals[1]
         if params:
             sspar = ret_vals[2]
             bgpar = ret_vals[3]
 
-        print("SS 4: ", flush=True)
-        holo.librarian._log_mem_usage(None)
-
-        self._gwb = hc_bg
         if params:
             return hc_ss, hc_bg, sspar, bgpar
 
@@ -1165,96 +1287,6 @@ def evolve_eccen_uniform_single(sam, eccen_init, sepa_init, nsteps):
     return sepa, eccen
 
 
-def _add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, linear_interp_backup=True, logspace_interp=True):
-    """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
-
-    The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
-    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.
-          A 2nd-order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
-          In-between, a 1st-order interpolant is used if `linear_interp_backup` is True.
-    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2) to
-          account for scatter.
-    * (3) The new density distribution is interpolated back to the original (mtot, mrat) grid.
-
-    Parameters
-    ----------
-    mtot : (M,) ndarray
-        Total masses in grams.
-    mrat : (Q,) ndarray
-        Mass ratios.
-    dens : (M, Q) ndarray
-        Density of binaries over the given mtot and mrat domain.
-    scatter : float
-        Amount of scatter in the M-MBulge relationship, in dex (i.e. over log10 of masses).
-    refine : int,
-        The increased density of grid-points used in the intermediate (m1, m2) domain, in step (1).
-    linear_interp_backup : bool,
-        Whether a linear interpolant is used to fill-in bad values after the 2nd order interpolant.
-        This generally doesn't seem to fix any values.
-    logspace_interp : bool,
-        Whether interpolation should be performed in the log-space of masses.
-        NOTE: strongly recommended.
-
-    Returns
-    -------
-    m1m2_dens : (M, Q) ndarray,
-        Binary density with scatter introduced.
-
-    """
-    assert np.shape(dens) == (mtot.size, mrat.size)
-
-    dist = sp.stats.norm(loc=0.0, scale=scatter)
-
-    # Get the primary and secondary masses corresponding to these total-mass and mass-ratios
-    m1, m2 = utils.m1m2_from_mtmr(mtot[:, np.newaxis], mrat[np.newaxis, :])
-    m1m2_on_mtmr_grid = (m1.flatten(), m2.flatten())
-
-    # Construct a symmetric rectilinear grid in (m1, m2) space
-    grid_size = m1.shape[0] * refine
-    # make sure the extrema will fully span the required domain
-    mextr = utils.minmax([0.9*mtot[0]*mrat[0]/(1.0 + mrat[0]), mtot[-1]*(1.0 + mrat[0])/mrat[0]])
-    mgrid = np.logspace(*np.log10(mextr), grid_size)
-
-    # Interpolate in log-space [recommended]
-    scatter_mgrid = mgrid.copy()
-    if logspace_interp:
-        mgrid = np.log10(mgrid)
-        m1m2_on_mtmr_grid = tuple([np.log10(mm) for mm in m1m2_on_mtmr_grid])
-
-    m1m2_grid = np.meshgrid(mgrid, mgrid, indexing='ij')
-    # Interpolate from irregular m1m2 space (based on mtmr space), into regular m1m2 grid
-    m1m2_dens = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='cubic')
-    # Fill in problematic values with first-order interpolant
-    if linear_interp_backup:
-        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
-        temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='linear')
-        log.debug(f"After 2nd order interpolation, {utils.frac_str(bads)} bad values")
-        m1m2_dens[bads] = temp[bads]
-
-    # Fill in problematic values with zeroth-order interpolant
-    bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
-    log.debug(f"After interpolation, {utils.frac_str(bads)} bad values exist")
-    if np.any(bads):
-        temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='nearest')
-        m1m2_dens[bads] = temp[bads]
-        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
-        log.debug(f"After 0th order interpolation, {utils.frac_str(bads)} bad values exist")
-        if np.any(bads):
-            err = f"After 0th order interpolation, {utils.frac_str(bads)} remain!"
-            log.exception(err)
-            log.error(f"{utils.stats(dens.flatten())}")
-            raise ValueError(err)
-
-    # Introduce scatter along both the 0th (primary) and 1th (secondary) axes
-    m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=0)
-    m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=1)
-
-    # Interpolate result back to mtmr grid
-    interp = sp.interpolate.RegularGridInterpolator((mgrid, mgrid), m1m2_dens)
-    m1m2_dens = interp(m1m2_on_mtmr_grid, method='linear').reshape(m1.shape)
-    return m1m2_dens
-
-
 def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
     """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
 
@@ -1358,23 +1390,94 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
     return output
 
 
+
 '''
-def _check_bads(edges, vals, name):
-    bads = ~np.isfinite(vals) | (vals < 0.0)
-    if not np.any(bads):
-        return
+def _add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, linear_interp_backup=True, logspace_interp=True):
+    """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
 
-    err = f"Found {utils.frac_str(bads)} bad '{name}' values!"
+    The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
+    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.
+          A 2nd-order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
+          In-between, a 1st-order interpolant is used if `linear_interp_backup` is True.
+    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2) to
+          account for scatter.
+    * (3) The new density distribution is interpolated back to the original (mtot, mrat) grid.
 
-    if not np.all(bads):
-        bads = np.where(bads)
-        assert len(bads) == len(edges), f"`bads` ({len(bads)=}) does not match `edges` ({len(edges)=}) !"
-        for ii, (edge, bad) in enumerate(zip(edges, bads)):
-            idx = np.unique(bad)
-            log.error(ii)
-            log.error(idx)
-            log.error(edge[idx])
+    Parameters
+    ----------
+    mtot : (M,) ndarray
+        Total masses in grams.
+    mrat : (Q,) ndarray
+        Mass ratios.
+    dens : (M, Q) ndarray
+        Density of binaries over the given mtot and mrat domain.
+    scatter : float
+        Amount of scatter in the M-MBulge relationship, in dex (i.e. over log10 of masses).
+    refine : int,
+        The increased density of grid-points used in the intermediate (m1, m2) domain, in step (1).
+    linear_interp_backup : bool,
+        Whether a linear interpolant is used to fill-in bad values after the 2nd order interpolant.
+        This generally doesn't seem to fix any values.
+    logspace_interp : bool,
+        Whether interpolation should be performed in the log-space of masses.
+        NOTE: strongly recommended.
 
-    log.exception(err)
-    raise ValueError(err)
+    Returns
+    -------
+    m1m2_dens : (M, Q) ndarray,
+        Binary density with scatter introduced.
+
+    """
+    assert np.shape(dens) == (mtot.size, mrat.size)
+
+    dist = sp.stats.norm(loc=0.0, scale=scatter)
+
+    # Get the primary and secondary masses corresponding to these total-mass and mass-ratios
+    m1, m2 = utils.m1m2_from_mtmr(mtot[:, np.newaxis], mrat[np.newaxis, :])
+    m1m2_on_mtmr_grid = (m1.flatten(), m2.flatten())
+
+    # Construct a symmetric rectilinear grid in (m1, m2) space
+    grid_size = m1.shape[0] * refine
+    # make sure the extrema will fully span the required domain
+    mextr = utils.minmax([0.9*mtot[0]*mrat[0]/(1.0 + mrat[0]), mtot[-1]*(1.0 + mrat[0])/mrat[0]])
+    mgrid = np.logspace(*np.log10(mextr), grid_size)
+
+    # Interpolate in log-space [recommended]
+    scatter_mgrid = mgrid.copy()
+    if logspace_interp:
+        mgrid = np.log10(mgrid)
+        m1m2_on_mtmr_grid = tuple([np.log10(mm) for mm in m1m2_on_mtmr_grid])
+
+    m1m2_grid = np.meshgrid(mgrid, mgrid, indexing='ij')
+    # Interpolate from irregular m1m2 space (based on mtmr space), into regular m1m2 grid
+    m1m2_dens = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='cubic')
+    # Fill in problematic values with first-order interpolant
+    if linear_interp_backup:
+        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+        temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='linear')
+        log.debug(f"After 2nd order interpolation, {utils.frac_str(bads)} bad values")
+        m1m2_dens[bads] = temp[bads]
+
+    # Fill in problematic values with zeroth-order interpolant
+    bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+    log.debug(f"After interpolation, {utils.frac_str(bads)} bad values exist")
+    if np.any(bads):
+        temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='nearest')
+        m1m2_dens[bads] = temp[bads]
+        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
+        log.debug(f"After 0th order interpolation, {utils.frac_str(bads)} bad values exist")
+        if np.any(bads):
+            err = f"After 0th order interpolation, {utils.frac_str(bads)} remain!"
+            log.exception(err)
+            log.error(f"{utils.stats(dens.flatten())}")
+            raise ValueError(err)
+
+    # Introduce scatter along both the 0th (primary) and 1th (secondary) axes
+    m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=0)
+    m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=1)
+
+    # Interpolate result back to mtmr grid
+    interp = sp.interpolate.RegularGridInterpolator((mgrid, mgrid), m1m2_dens)
+    m1m2_dens = interp(m1m2_on_mtmr_grid, method='linear').reshape(m1.shape)
+    return m1m2_dens
 '''

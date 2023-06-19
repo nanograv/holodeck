@@ -15,8 +15,10 @@ import functools
 import inspect
 import numbers
 import os
-from typing import Optional, Tuple, Union, List  # , Sequence,
+import subprocess
 import warnings
+from pathlib import Path
+from typing import Optional, Tuple, Union, List  # , Sequence,
 
 import h5py
 import numba
@@ -27,7 +29,7 @@ import scipy.stats    # noqa
 import scipy.special  # noqa
 
 from holodeck import log, cosmo
-from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR
+from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC
 
 # [Sesana2004]_ Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
@@ -261,6 +263,13 @@ def get_file_size(fnames, precision=1):
     return byte_str
 
 
+def path_name_ending(path, ending):
+    fname = Path(path)
+    name_bare = fname.with_suffix("")
+    fname = fname.parent.joinpath(str(name_bare) + ending).with_suffix(fname.suffix)
+    return fname
+
+
 def _get_subclass_instance(value, default, superclass):
     """Convert the given `value` into a subclass instance.
 
@@ -305,6 +314,13 @@ def _get_subclass_instance(value, default, superclass):
         raise ValueError(err)
 
     return value
+
+
+def get_git_hash(short=True) -> str:
+    args = ['git', 'rev-parse', 'HEAD']
+    if short:
+        args.insert(2, "--short")
+    return subprocess.check_output(args).decode('ascii').strip()
 
 
 # =================================================================================================
@@ -371,7 +387,7 @@ def get_scatter_weights(uniform_cents, dist):
     if not np.allclose(dx, dx[0]):
         log.error(f"{dx[0]=} {dx=}")
         log.error(f"{uniform_cents=}")
-        err = f"`get_scatter_weights` only works if `uniform_cents` are uniformly spaced!"
+        err = "`get_scatter_weights` only works if `uniform_cents` are uniformly spaced!"
         log.exception(err)
         raise ValueError(err)
 
@@ -421,7 +437,7 @@ def _get_rolled_weights(log_cents, dist):
     return weights
 
 
-def scatter_redistribute(cents, dist, dens, axis=0):
+def scatter_redistribute_densities(cents, dens, dist=None, scatter=None, axis=0):
     """Redistribute `dens` across the target axis to account for scatter/variance.
 
     Parameters
@@ -440,6 +456,12 @@ def scatter_redistribute(cents, dist, dens, axis=0):
         Array with resitributed values.  Same shape as input `dens`.
 
     """
+    if (dist is None) == (scatter is None):
+        raise ValueError(f"One and only one of `dist` ({dist}) and `scatter` ({scatter}) must be provided!")
+
+    if dist is None:
+        dist = sp.stats.norm(loc=0.0, scale=scatter)
+
     log_cents = np.log10(cents)
     num = log_cents.size
     if np.shape(dens)[axis] != num:
@@ -450,6 +472,8 @@ def scatter_redistribute(cents, dist, dens, axis=0):
     weights = _get_rolled_weights(log_cents, dist)
     dens_new = _scatter_with_weights(dens, weights, axis=0)
     return dens_new
+
+
 
 
 def eccen_func(cent: float, width: float, size: int) -> np.ndarray:
@@ -680,6 +704,7 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
     xvals : (N, M) ndarray
         Evaluation points (x-values) of the functions to be interpolated.
         Interpolation is performed over the 1th (last) axis.
+        NOTE: values *must* be monotonically increasing along axis=1 !
     yvals : (N, M) ndarray
         Function values (y-values) of the function to be interpolated.
         Interpolation is performed over the 1th (last) axis.
@@ -695,6 +720,8 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
     assert np.shape(xvals) == np.shape(yvals)
 
     xx = np.asarray(xx)
+    xvals = np.asarray(xvals)
+    yvals = np.asarray(yvals)
 
     if xlog:
         xx = np.log10(xx)
@@ -1763,6 +1790,30 @@ def lambda_factor_dlnf(frst, dfdt, redz, dcom=None):
     return lambda_fact
 
 
+def angs_from_sepa(sepa, dcom, redz):
+    """ Calculate angular separation
+
+    Parameters
+    ----------
+    sepa : ArrayLike
+        Binary separation, in cm
+    dcom : ArrayLike
+        Binary comoving distance, in cm
+    redz : ArrayLike
+        Binary redshift
+
+    Returns
+    -------
+    angs : ArrayLike
+        Angular separation
+
+    """
+    dang = dcom / (1.0 + redz)   # angular-diameter distance [cm]
+    angs = sepa / dang           # angular-separation [radians]
+    return angs
+
+
+
 # =================================================================================================
 # ====    Gravitational Waves    ====
 # =================================================================================================
@@ -2220,12 +2271,12 @@ def char_strain_to_strain_amp(hc, fc, df):
 
     Parameters
     ----------
-    hc : (F,R,L) NDarray
+    hc : array_like
         Characteristic strain of the single sources.
-    fc : (F,) 1Darray
-        Frequency bin centers.
-    df : (F,) 1Darray
-        Frequency bin widths.
+    fc : array_like
+        Observed orbital frequency bin centers.
+    df : array_like
+        Observed orbital frequency bin widths.
 
     Returns
     -------
@@ -2233,11 +2284,8 @@ def char_strain_to_strain_amp(hc, fc, df):
         Strain amplitude of the single sources.
 
     """
-    hs = hc * np.sqrt(df[:,np.newaxis,np.newaxis] / fc[:,np.newaxis,np.newaxis])
+    hs = hc * np.sqrt(df/fc)
     return hs
-
-
-
 
 
 @numba.njit
@@ -2265,7 +2313,13 @@ def _gw_ecc_func(eccen):
 
 
 def _array_args(*args):
-    # args = [np.atleast_1d(aa) for aa in args]
     args = [np.asarray(aa) if aa is not None else None
             for aa in args]
     return args
+
+
+@deprecated_fail(scatter_redistribute_densities)
+def scatter_redistribute(cents, dist, dens, axis=0):
+    pass
+
+

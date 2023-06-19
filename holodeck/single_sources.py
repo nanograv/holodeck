@@ -28,6 +28,10 @@ warnings.filterwarnings("ignore", category=UserWarning)
 log = holo.log
 log.setLevel(logging.INFO)
 
+par_names = np.array(['mtot', 'mrat', 'redz_init', 'redz_final', 'dcom_final', 'sepa_final', 'angs_final'])
+par_labels = np.array(['Total Mass $M$ (g)', 'Mass Ratio $q$', 'Initial Redshift $z_i$', 'Final Redshift $z_f$', 
+                   'Final Comoving Distance $d_c$ (Mpc)', 'Final Separation (pc)', 'Final Angular Separation (rad)'])
+par_units = np.array([1/MSOL, 1, 1, 1, 1/MPC,  1/PC, 1])
 
 ###################################################
 ############## STRAIN CALCULATIONS ################
@@ -62,20 +66,20 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
         The characteristic strain of the L loudest single sources at each frequency.
     hc_bg : (F, R) NDarray of scalars
         Characteristic strain of the GWB.
-    sspar : (3, F, R, L) NDarray of scalars
-        Astrophysical parametes of each loud single sources, 
-        for each frequency and realization. 
+    sspar : (4, F, R, L) NDarray of scalars
+        Astrophysical parametes (total mass, mass ratio, initial redshift, final redshift) of each 
+        loud single sources, for each frequency and realization. 
         Returned only if params = True.
-    bgpar : (3, F, R) NDarray of scalars
-        Average effective binary astrophysical parameters for background
-        sources at each frequency and realization, 
+    bgpar : (7, F, R) NDarray of scalars
+        Average effective binary astrophysical parameters (total mass, mass ratio, initial redshift, 
+        final redshift, final comoving distances, final separation, final angular separation) for background sources at each frequency and realization, 
         Returned only if params = True.
     """
  
     # All other bin midpoints
     mt = kale.utils.midpoints(edges[0]) #: total mass
     mr = kale.utils.midpoints(edges[1]) #: mass ratio
-    rz = kale.utils.midpoints(edges[2]) #: redshift
+    rz = kale.utils.midpoints(edges[2]) #: initial redshift
 
 
     # hsfdf = hsamp^2 * f/df # this is same as hc^2
@@ -96,13 +100,32 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
             # lspar = avg parameters of loudest sources
             # bgpar = avg parameters of background
             # ssidx = indices of loud single sources
-            hc2ss, hc2bg, lspar, bgpar, ssidx = \
-                holo.cyutils.loudest_hc_and_par_from_sorted(number, h2fdf, realize, loudest,
-                                                            mt, mr, rz, msort, qsort, zsort)
+
+            # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)
+            #    where M, Q, Z are edges and Fc is frequency centers
+            # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
+            for dd in range(3):
+                redz = np.moveaxis(redz, dd, 0)
+                redz = kale.utils.midpoints(redz, axis=0)
+                redz = np.moveaxis(redz, 0, dd)
+
+            dcom_final = cosmo.comoving_distance(redz).to('cm').value # (M,Q,Z,F) in cm
+
+            fobs_orb_edges = edges[-1]
+            fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges)
+            frst_orb_cents = utils.frst_from_fobs(fobs_orb_cents[np.newaxis,np.newaxis,np.newaxis,:], redz) # (M,Q,Z,F,), final
+
+
+            sepa = utils.kepler_sepa_from_freq(mt[:,np.newaxis,np.newaxis,np.newaxis], frst_orb_cents) # (M,Q,Z,F) in cm
+            angs = utils.angs_from_sepa(sepa, dcom_final, redz) # (M,Q,Z,F) use sepa and dcom in cm
+
+            hc2ss, hc2bg, sspar, bgpar = \
+                holo.cyutils.loudest_hc_and_par_from_sorted_redz(
+                    number, h2fdf, realize, loudest,
+                    mt, mr, rz, redz, dcom_final, sepa, angs,
+                    msort, qsort, zsort)
             hc_ss = np.sqrt(hc2ss) # calculate single source strain
             hc_bg = np.sqrt(hc2bg) # calculate background strain
-            # calulate parameters of single sources
-            sspar = np.array([mt[ssidx[0,...]], mr[ssidx[1,...]], rz[ssidx[2,...]]])
             return hc_ss, hc_bg, sspar, bgpar
             
         else:
@@ -579,7 +602,7 @@ def ss_by_ndars(edges, number, realize, round = True):
         R=1
         bgnum = np.random.poisson(number[...,np.newaxis], 
                                 size = (number.shape + (R,)))
-        assert (np.all(bgnum%1 ==0)), 'nonzero numbers found with realize=True'
+        assert (np.all(bgnum%1 ==0)), 'non integer numbers found with realize=True'
     elif(utils.isinteger(realize)):
         R=realize
         bgnum = np.random.poisson(number[...,np.newaxis], 
@@ -745,6 +768,37 @@ def h2fdf(edges):
     h2fdf = hsamp**2 * (fc[np.newaxis, np.newaxis, np.newaxis,:]
                         /df[np.newaxis, np.newaxis, np.newaxis,:]) 
     return h2fdf
+
+
+def all_sspars(fobs_gw_cents, sspar):
+    """ Calculate all single source parameters incl.
+    ['mtot' 'mrat' 'redz_init' 'redz_final' 'dcom_final' 'sepa_final' 'angs_final']
+
+    Parameters
+    ----------
+    fobs_gw_cents : (F,) 1Darray of scalars
+        Observed gw frequency bin centers.
+    sspar : (4, F,R,L) NDarray
+        Single source parameters as calculated by ss_gws_redz(). 
+        Includes mtot, mrat, redz_init, redz_final.
+
+    Returns
+    -------
+    sspar_all : (7,F,R,L) NDarray
+        All single source parameters, corresponding to those in bgpar as calculated by ss_gws_redz().
+        Includes mtot, mrat, redz_init, redz_final, dcom_final, sepa_final (cm), and angs_final.
+    """
+    mtot = sspar[0,:,:] # (F,R,L) in g
+    mrat = sspar[1,:,:] # (F,R,L) dimensionless
+    redz_init = sspar[2,:,:]  # (F,R,L) dimensionless
+    redz_final = sspar[3,:,:]  # (F,R,L) dimensionless
+    dcom_final = holo.cosmo.comoving_distance(redz_final).to('cm').value # (F,R,L) in cm
+    fobs_orb_cents = fobs_gw_cents/2.0  # (F,)
+    frst_orb_cents = utils.frst_from_fobs(fobs_orb_cents[:,np.newaxis,np.newaxis], redz_final) #  (F,R,L) in Hz
+    sepa = utils.kepler_sepa_from_freq(mtot, frst_orb_cents) #  (F,R,L) in cm
+    angs = utils.angs_from_sepa(sepa, dcom_final, redz_final)  # (F,R,L) in cm
+    sspar_all = np.array([mtot, mrat, redz_init, redz_final, dcom_final, sepa, angs])
+    return sspar_all
 
 
 def parameters_from_indices(edges, ssidx):

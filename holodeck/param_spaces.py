@@ -5,7 +5,7 @@ import holodeck as holo
 from holodeck.constants import PC, GYR, MSOL
 from holodeck.librarian import (
     _Param_Space, PD_Uniform, PD_Piecewise_Uniform_Density,
-    # PD_Normal,
+    PD_Normal,
     # PD_Uniform_Log,
 )
 
@@ -52,7 +52,7 @@ class PS_Generic_1(_Param_Space):
     #         hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
     #         gsmf_phi0=PD_Uniform(-3.5, -1.5),
     #         gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
-    #         mmb_amp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
+    #         mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
     #         mmb_scatter=PD_Uniform(+0.0, +1.2),
     #     )
 
@@ -383,7 +383,6 @@ class PS_Uniform_07A(PS_Generic_2):
         super().__init__(
             log, nsamples, sam_shape, seed,
             hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
-            hard_gamma_rot=PD_Uniform(-0.5, 0.5),
             gsmf_phi0=PD_Uniform(-3.5, -1.5),
             gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
             mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
@@ -393,13 +392,14 @@ class PS_Uniform_07A(PS_Generic_2):
     @classmethod
     def model_for_params(cls, params, sam_shape=None, new_def_params={}):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
-        new_def_params = dict(
+        defs = dict(
             hard_gamma_inner=-1.0,
             hard_rchar=100.0,               # [pc]
             hard_gamma_outer=+1.5,
             hard_sepa_init=1e4,     # [pc]
         )
-        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
 
 
 class PS_Uniform_07A_Rot(PS_Generic_2):
@@ -439,13 +439,14 @@ class PS_Uniform_07A_Rot(PS_Generic_2):
     @classmethod
     def model_for_params(cls, params, sam_shape=None, new_def_params={}):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
-        new_def_params = dict(
+        defs = dict(
             hard_gamma_inner=-1.0,
             hard_rchar=100.0,               # [pc]
             hard_gamma_outer=+1.5,
             hard_sepa_init=1e4,     # [pc]
         )
-        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
 
 
 class PS_Uniform_07A_Rot_Test(PS_Generic_2):
@@ -481,13 +482,104 @@ class PS_Uniform_07A_Rot_Test(PS_Generic_2):
     @classmethod
     def model_for_params(cls, params, sam_shape=None, new_def_params={}):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
-        new_def_params = dict(
+        defs = dict(
             hard_gamma_inner=-1.0,
             hard_rchar=100.0,               # [pc]
             hard_gamma_outer=+1.5,
             hard_sepa_init=1e4,     # [pc]
         )
-        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+class PS_Uniform_07A_Rot_2(PS_Generic_2):
+    """Change `hard_gamma_rot` relative to PS_Uniform_07A_Rot
+    """
+
+    # `DEFAULTS` must have a copy of all settings that are used, so make a copy and expand it
+    DEFAULTS = PS_Generic_2.DEFAULTS.copy()
+    DEFAULTS['hard_gamma_rot'] = 0.0
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+            hard_gamma_rot=PD_Uniform(0.0, 1.0),
+        )
+
+    @classmethod
+    def _init_hard(cls, sam, settings):
+        rotation = settings['hard_gamma_rot']
+        gamma_inner = settings['hard_gamma_inner'] + rotation
+        gamma_outer = settings['hard_gamma_outer'] + rotation
+        hard = holo.hardening.Fixed_Time_2PL_SAM(
+            sam,
+            settings['hard_time']*GYR,
+            sepa_init=settings['hard_sepa_init']*PC,
+            rchar=settings['hard_rchar']*PC,
+            gamma_inner=gamma_inner,
+            gamma_outer=gamma_outer,
+        )
+        return hard
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_inner=-1.0,
+            hard_rchar=100.0,               # [pc]
+            hard_gamma_outer=+1.5,
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+class PS_Uniform_07A_Rot_Test_2(PS_Generic_2):
+    """Change `hard_gamma_rot` relative to PS_Uniform_07A_Rot_Test
+    """
+
+    # `DEFAULTS` must have a copy of all settings that are used, so make a copy and expand it
+    DEFAULTS = PS_Generic_2.DEFAULTS.copy()
+    DEFAULTS['hard_gamma_rot'] = 0.0
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            hard_gamma_rot=PD_Uniform(0.0, 1.0),
+        )
+
+    @classmethod
+    def _init_hard(cls, sam, settings):
+        rotation = settings['hard_gamma_rot']
+        gamma_inner = settings['hard_gamma_inner'] + rotation
+        gamma_outer = settings['hard_gamma_outer'] + rotation
+        hard = holo.hardening.Fixed_Time_2PL_SAM(
+            sam,
+            settings['hard_time']*GYR,
+            sepa_init=settings['hard_sepa_init']*PC,
+            rchar=settings['hard_rchar']*PC,
+            gamma_inner=gamma_inner,
+            gamma_outer=gamma_outer,
+        )
+        return hard
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_inner=-1.0,
+            hard_rchar=100.0,               # [pc]
+            hard_gamma_outer=+1.5,
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
 
 
 class PS_Uniform_07B(PS_Generic_2):
@@ -507,13 +599,104 @@ class PS_Uniform_07B(PS_Generic_2):
     @classmethod
     def model_for_params(cls, params, sam_shape=None, new_def_params={}):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
-        new_def_params = dict(
+        defs = dict(
             hard_gamma_inner=-1.0,
             hard_rchar=100.0,               # [pc]
             hard_gamma_outer=+2.5,
             hard_sepa_init=1e4,     # [pc]
         )
-        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+class PS_Uniform_07B_Rot(PS_Generic_2):
+    """Same as PS_Uniform_07B, but adding a hardening-rate power-law rotation.
+    """
+
+    # `DEFAULTS` must have a copy of all settings that are used, so make a copy and expand it
+    DEFAULTS = PS_Generic_2.DEFAULTS.copy()
+    DEFAULTS['hard_gamma_rot'] = 0.0
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+            hard_gamma_rot=PD_Uniform(-0.5, 0.5),
+        )
+
+    @classmethod
+    def _init_hard(cls, sam, settings):
+        rotation = settings['hard_gamma_rot']
+        gamma_inner = settings['hard_gamma_inner'] + rotation
+        gamma_outer = settings['hard_gamma_outer'] + rotation
+        hard = holo.hardening.Fixed_Time_2PL_SAM(
+            sam,
+            settings['hard_time']*GYR,
+            sepa_init=settings['hard_sepa_init']*PC,
+            rchar=settings['hard_rchar']*PC,
+            gamma_inner=gamma_inner,
+            gamma_outer=gamma_outer,
+        )
+        return hard
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_inner=-1.0,
+            hard_rchar=100.0,               # [pc]
+            hard_gamma_outer=+2.5,
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+class PS_Uniform_07B_Rot_Test(PS_Generic_2):
+    """Same as PS_Uniform_07A, but adding a hardening-rate power-law rotation.
+    """
+
+    # `DEFAULTS` must have a copy of all settings that are used, so make a copy and expand it
+    DEFAULTS = PS_Generic_2.DEFAULTS.copy()
+    DEFAULTS['hard_gamma_rot'] = 0.0
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            hard_gamma_rot=PD_Uniform(-0.5, 0.5),
+        )
+
+    @classmethod
+    def _init_hard(cls, sam, settings):
+        rotation = settings['hard_gamma_rot']
+        gamma_inner = settings['hard_gamma_inner'] + rotation
+        gamma_outer = settings['hard_gamma_outer'] + rotation
+        hard = holo.hardening.Fixed_Time_2PL_SAM(
+            sam,
+            settings['hard_time']*GYR,
+            sepa_init=settings['hard_sepa_init']*PC,
+            rchar=settings['hard_rchar']*PC,
+            gamma_inner=gamma_inner,
+            gamma_outer=gamma_outer,
+        )
+        return hard
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_inner=-1.0,
+            hard_rchar=100.0,               # [pc]
+            hard_gamma_outer=+2.5,
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
 
 
 class PS_Uniform_07C(PS_Generic_2):
@@ -533,13 +716,122 @@ class PS_Uniform_07C(PS_Generic_2):
     @classmethod
     def model_for_params(cls, params, sam_shape=None, new_def_params={}):
         # NOTE: these should be the same as the default case, just duplicating them here for clarity
-        new_def_params = dict(
+        defs = dict(
             hard_gamma_inner=-1.0,
             hard_rchar=30.0,               # [pc]
             hard_gamma_outer=+1.5,
             hard_sepa_init=3e3,     # [pc]
         )
-        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=new_def_params)
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+class PS_Uniform_07D(PS_Generic_2):
+    """Same as PS_Uniform_07A with a rotation of -0.5
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_inner=-1.0 - 0.5,
+            hard_rchar=100.0,               # [pc]
+            hard_gamma_outer=+1.5 - 0.5,
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+class PS_Uniform_07E(PS_Generic_2):
+    """Same as PS_Uniform_07A with a rotation of +0.5
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_inner=-1.0 + 0.5,
+            hard_rchar=100.0,               # [pc]
+            hard_gamma_outer=+1.5 + 0.5,
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+class PS_Uniform_07F(PS_Generic_2):
+    """Same as PS_Uniform_07B with a rotation of -0.5
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_inner=-1.0 - 0.5,
+            hard_rchar=100.0,               # [pc]
+            hard_gamma_outer=+2.5 - 0.5,
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+class PS_Uniform_07G(PS_Generic_2):
+    """Same as PS_Uniform_07B with a rotation of +0.5
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_inner=-1.0 + 0.5,
+            hard_rchar=100.0,               # [pc]
+            hard_gamma_outer=+2.5 + 0.5,
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
 
 
 class PS_Uniform_07_GW(PS_Generic_2):
@@ -553,6 +845,360 @@ class PS_Uniform_07_GW(PS_Generic_2):
             gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
             mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
             mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+        )
+
+    @classmethod
+    def _init_hard(cls, sam, settings):
+        hard = holo.hardening.Hard_GW()
+        return hard
+
+
+class PS_Uniform_08A(PS_Generic_2):
+    """`PS_Uniform_07A` with varying gamma_outer
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+            hard_gamma_outer=PD_Uniform(+1.5, +3.0),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_inner=-1.0,
+            hard_rchar=100.0,               # [pc]
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+'''
+#! BAD
+class PS_Uniform_08B(PS_Generic_2):
+    """`PS_Uniform_07A` with varying gamma_outer
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+            hard_gamma_inner=PD_Uniform(+0.5, +2.0),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_outer=+1.5,
+            hard_rchar=100.0,               # [pc]
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+#! BAD
+class PS_Uniform_08C(PS_Generic_2):
+    """`PS_Uniform_07A` with varying gamma_outer
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+            hard_gamma_inner=PD_Uniform(+0.5, +2.0),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_outer=+2.0,
+            hard_rchar=100.0,               # [pc]
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+#! BAD
+class PS_Uniform_08D(PS_Generic_2):
+    """`PS_Uniform_07A` with varying gamma_outer
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+            hard_gamma_inner=PD_Uniform(+0.5, +2.0),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_outer=+2.5,
+            hard_rchar=100.0,               # [pc]
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+'''
+
+
+class PS_Uniform_08E(PS_Generic_2):
+    """`PS_Uniform_07A` with varying gamma_outer
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+            hard_gamma_outer=PD_Uniform(+1.5, +3.0),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_inner=-1.5,
+            hard_rchar=100.0,               # [pc]
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+'''
+class PS_Uniform_08F(PS_Generic_2):
+    """`PS_Uniform_08A` but with hard_gamma_inner=-1.5 instead of -1.0
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+            hard_gamma_outer=PD_Uniform(+1.5, +3.0),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_inner=-1.5,
+            hard_rchar=100.0,               # [pc]
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+'''
+
+
+class PS_Uniform_09A(PS_Generic_2):
+    """`PS_Uniform_07A` with varying gamma_inner (gamma_outer=+1.5, same as 07A)
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+            hard_gamma_inner=PD_Uniform(-1.5, +0.0),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_outer=+1.5,
+            hard_rchar=100.0,               # [pc]
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+class PS_Uniform_09B(PS_Generic_2):
+    """`PS_Uniform_07B` with varying gamma_inner (gamma_outer=+2.5, same as 07B)
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+            hard_gamma_inner=PD_Uniform(-1.5, +0.0),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_gamma_outer=+2.5,
+            hard_rchar=100.0,               # [pc]
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+# ==============================================================================
+# ====    New-Astro-02 / PS_Generic_2    ====
+# ==============================================================================
+
+
+class PS_New_Astro_02A(PS_Generic_2):
+    """New version of 'PS_Astro_02' using PS_Generic_2 base.
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            hard_gamma_inner=PD_Uniform(-1.5, +0.5),
+
+            # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
+            gsmf_phi0=PD_Normal(-2.56, 0.4),
+            gsmf_mchar0_log10=PD_Normal(10.9, 0.4),   # [log10(Msol)]
+            gsmf_alpha0=PD_Normal(-1.2, 0.2),
+
+            gpf_zbeta=PD_Normal(+0.8, 0.4),
+            gpf_qgamma=PD_Normal(+0.5, 0.3),
+
+            gmt_norm=PD_Uniform(0.2, 5.0),    # [Gyr]
+            gmt_zbeta=PD_Uniform(-2.0, +0.0),
+
+            mmb_mamp_log10=PD_Normal(+8.6, 0.2),   # [log10(Msol)]
+            mmb_plaw=PD_Normal(+1.2, 0.2),
+            mmb_scatter_dex=PD_Normal(+0.32, 0.15),
+
+            # hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            # gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            # gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            # mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            # mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_rchar=100.0,               # [pc]
+            hard_gamma_outer=+1.5,
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+class PS_New_Astro_02B(PS_Generic_2):
+    """New version of 'PS_Astro_02' using PS_Generic_2 base.
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            hard_gamma_inner=PD_Uniform(-1.5, +0.5),
+
+            # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
+            gsmf_phi0=PD_Normal(-2.56, 0.4),
+            gsmf_mchar0_log10=PD_Normal(10.9, 0.4),   # [log10(Msol)]
+            gsmf_alpha0=PD_Normal(-1.2, 0.2),
+
+            gpf_zbeta=PD_Normal(+0.8, 0.4),
+            gpf_qgamma=PD_Normal(+0.5, 0.3),
+
+            gmt_norm=PD_Uniform(0.2, 5.0),    # [Gyr]
+            gmt_zbeta=PD_Uniform(-2.0, +0.0),
+
+            mmb_mamp_log10=PD_Normal(+8.6, 0.2),   # [log10(Msol)]
+            mmb_plaw=PD_Normal(+1.2, 0.2),
+            mmb_scatter_dex=PD_Normal(+0.32, 0.15),
+
+            # hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            # gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            # gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            # mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            # mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
+        )
+
+    @classmethod
+    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+        # NOTE: these should be the same as the default case, just duplicating them here for clarity
+        defs = dict(
+            hard_rchar=100.0,               # [pc]
+            hard_gamma_outer=+2.5,
+            hard_sepa_init=1e4,     # [pc]
+        )
+        defs.update(new_def_params)
+        return super().model_for_params(params, sam_shape=sam_shape, new_def_params=defs)
+
+
+class PS_New_Astro_02_GW(PS_Generic_2):
+    """New version of 'PS_Astro_02' using PS_Generic_2 base.
+    """
+
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super().__init__(
+            log, nsamples, sam_shape, seed,
+
+            # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
+            gsmf_phi0=PD_Normal(-2.56, 0.4),
+            gsmf_mchar0_log10=PD_Normal(10.9, 0.4),   # [log10(Msol)]
+            gsmf_alpha0=PD_Normal(-1.2, 0.2),
+
+            gpf_zbeta=PD_Normal(+0.8, 0.4),
+            gpf_qgamma=PD_Normal(+0.5, 0.3),
+
+            gmt_norm=PD_Uniform(0.2, 5.0),    # [Gyr]
+            gmt_zbeta=PD_Uniform(-2.0, +0.0),
+
+            mmb_mamp_log10=PD_Normal(+8.6, 0.2),   # [log10(Msol)]
+            mmb_plaw=PD_Normal(+1.2, 0.2),
+            mmb_scatter_dex=PD_Normal(+0.32, 0.15),
+
+            # hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            # gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            # gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            # mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
+            # mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
         )
 
     @classmethod
