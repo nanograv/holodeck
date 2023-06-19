@@ -22,7 +22,7 @@ from scipy.stats import qmc
 
 import holodeck as holo
 import holodeck.single_sources
-import holodeck.sam_cython
+from holodeck.sams import cyutils as sam_cyutils
 from holodeck import utils, cosmo
 from holodeck.constants import YR
 
@@ -574,11 +574,11 @@ def run_sam_at_pspace_num(args, space, pnum):
             log.exception(err)
             raise RuntimeError(err)
 
-        redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
+        redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
             fobs_orb_cents, sam, hard, cosmo
         )
         edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
-        number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
+        number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
 
         log.debug(f"{utils.stats(number)=}")
 
@@ -677,12 +677,12 @@ def run_model(sam, hard, nreals, nfreqs, nloudest=5,
 
     data = dict(fobs_cents=fobs_cents, fobs_edges=fobs_edges)
 
-    redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
+    redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
         fobs_orb_cents, sam, hard, cosmo
     )
     use_redz = redz_final
     edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
-    number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
+    number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
     if details_flag:
         data['static_binary_density'] = sam.static_binary_density
         data['number'] = number
