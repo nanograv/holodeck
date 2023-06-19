@@ -47,8 +47,8 @@ import kalepy as kale
 import holodeck as holo
 from holodeck import cosmo, utils, log
 from holodeck.constants import SPLC, MSOL, MPC
-from holodeck import relations, gravwaves, single_sources
-import holodeck.sam_cython
+from holodeck import relations, single_sources
+from . import cyutils as sam_cyutils
 from holodeck.sams.comps import (
     _Galaxy_Pair_Fraction, _Galaxy_Stellar_Mass_Function, _Galaxy_Merger_Time, _Galaxy_Merger_Rate,
     GSMF_Schechter, GPF_Power_Law, GMT_Power_Law, GMR_Illustris
@@ -113,18 +113,18 @@ class Semi_Analytic_Model:
 
         # ---- Process SAM components
 
-        gsmf = utils._get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
-        mmbulge = utils._get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
-        # gpf = utils._get_subclass_instance(gpf, None, _Galaxy_Pair_Fraction)
-        # gmt = utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
+        gsmf = utils.get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
+        mmbulge = utils.get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
+        # gpf = utils.get_subclass_instance(gpf, None, _Galaxy_Pair_Fraction)
+        # gmt = utils.get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
         if gmr is None:
             # if GMR is None, then we need both GMT and GPF
-            gmt = utils._get_subclass_instance(gmt, GMT_Power_Law, _Galaxy_Merger_Time)
-            gpf = utils._get_subclass_instance(gpf, GPF_Power_Law, _Galaxy_Pair_Fraction)
+            gmt = utils.get_subclass_instance(gmt, GMT_Power_Law, _Galaxy_Merger_Time)
+            gpf = utils.get_subclass_instance(gpf, GPF_Power_Law, _Galaxy_Pair_Fraction)
         else:
-            gmr = utils._get_subclass_instance(gmr, GMR_Illustris, _Galaxy_Merger_Rate)
+            gmr = utils.get_subclass_instance(gmr, GMR_Illustris, _Galaxy_Merger_Rate)
             # if GMR is given, GMT can still be used - for calculating GMT stalling
-            gmt = utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time, allow_none=True)
+            gmt = utils.get_subclass_instance(gmt, None, _Galaxy_Merger_Time, allow_none=True)
             # if GMR is given, GPF is not used: make sure it is not given
             if (gpf is not None):
                 err = f"When `GMR` ({gmr}) is provided, do not provide a GPF!"
@@ -339,7 +339,7 @@ class Semi_Analytic_Model:
         """Get correct redshifts for full binary-number calculation.
 
         Slower but more correct than old `dynamic_binary_number`.
-        Same as new cython implementation `holo.sam_cython.dynamic_binary_number_at_fobs`, which is
+        Same as new cython implementation `sam_cyutils.dynamic_binary_number_at_fobs`, which is
         more than 10x faster.
         LZK 2023-05-11
 
@@ -485,7 +485,7 @@ class Semi_Analytic_Model:
         """Get correct redshifts for full binary-number calculation.
 
         Slower but more correct than old `dynamic_binary_number`.
-        Same as new cython implementation `holo.sam_cython.dynamic_binary_number_at_fobs`, which is
+        Same as new cython implementation `sam_cyutils.dynamic_binary_number_at_fobs`, which is
         more than 10x faster.
         LZK 2023-05-11
 
@@ -604,16 +604,16 @@ class Semi_Analytic_Model:
 
         # ---- Calculate number of binaries in each bin
 
-        redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
+        redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
             fobs_orb_cents, self, hard, cosmo
         )
 
         edges = [self.mtot, self.mrat, self.redz, fobs_orb_edges]
-        number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
+        number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
 
         # ---- Get the GWB spectrum from number of binaries over grid
 
-        gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
+        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
 
         return gwb
 
@@ -635,11 +635,11 @@ class Semi_Analytic_Model:
 
         # ---- Get the GWB spectrum from number of binaries over grid
 
-        gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
+        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
 
         return gwb
 
-    def gwb_ideal(self, fobs_gw, sum=True, redz_prime=True):
+    def gwb_ideal(self, fobs_gw, sum=True, redz_prime=None):
         """Calculate the idealized, continuous GWB amplitude.
 
         Calculation follows [Phinney2001]_ (Eq.5) or equivalently [Enoki+Nagashima-2007] (Eq.3.6).
@@ -654,6 +654,14 @@ class Semi_Analytic_Model:
         mstar_rat = mstar_tot / mstar_pri
         # M = m1 + m2
         mstar_tot = mstar_pri + mstar_tot
+
+        # default to using `redz_prime` values if a GMT instance is stored
+        if redz_prime is None:
+            redz_prime = (self._gmt is not None)
+        elif redz_prime and (self._gmt is None):
+            err = "No `GMT` instance stored, cannot use `redz_prime` values!"
+            self._log.exception(err)
+            raise AttributeError(err)
 
         rz = self.redz
         rz = rz[np.newaxis, np.newaxis, :]
@@ -671,7 +679,7 @@ class Semi_Analytic_Model:
 
         mt = self.mtot[:, np.newaxis, np.newaxis]
         mr = self.mrat[np.newaxis, :, np.newaxis]
-        gwb = gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
+        gwb = holo.gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
         return gwb
 
     def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100, loudest=1, params=False):
@@ -713,7 +721,7 @@ class Semi_Analytic_Model:
 
         if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
             err = (
-                "`sam_cython` methods only work with `Fixed_Time_2PL_SAM` or `Hard_GW` hardening models!  "
+                "`sam_cyutils` methods only work with `Fixed_Time_2PL_SAM` or `Hard_GW` hardening models!  "
                 "Use `gwb_only` for alternative classes!"
             )
             self._log.exception(err)
@@ -727,12 +735,12 @@ class Semi_Analytic_Model:
 
         # ---- Calculate number of binaries in each bin
 
-        redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
+        redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
             fobs_orb_cents, self, hard, cosmo
         )
 
         edges = [self.mtot, self.mrat, self.redz, fobs_orb_edges]
-        number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
+        number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
 
         # ---- Get the Single Source and GWB spectrum from number of binaries over grid
 
@@ -790,7 +798,7 @@ class Semi_Analytic_Model:
             integ = integ.sum()
         return integ
 
-    @utils.deprecated_fail("`dynamic_binary_number_at_fobs` or `sam_cython.dynamic_binary_number_at_fobs`")
+    @utils.deprecated_fail("`dynamic_binary_number_at_fobs` or `sam_cyutils.dynamic_binary_number_at_fobs`")
     def dynamic_binary_number(self, *args, **kwargs):
         pass
 

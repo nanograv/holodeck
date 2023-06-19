@@ -425,11 +425,16 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
     # ---- Fixed_Time_2pwl_SAM
 
     if isinstance(hard, holo.hardening.Fixed_Time_2PL_SAM):
+        gmt_time = sam._gmt_time
+        # if `sam` is using galaxy merger rate (GMR), then `gmt_time` will be `None`
+        if gmt_time is None:
+            sam._log.info("`gmt_time` not calculated in SAM.  Setting to zeros.")
+            gmt_time = np.zeros(sam.shape)
 
         _dynamic_binary_number_at_fobs_2pwl(
             fobs_orb, hard._sepa_init, hard._num_steps,
             hard._norm, hard._rchar, hard._gamma_inner, hard._gamma_outer,
-            dens, sam.mtot, sam.mrat, sam.redz, sam._gmt_time,
+            dens, sam.mtot, sam.mrat, sam.redz, gmt_time,
             cosmo._grid_z, cosmo._grid_dcom, cosmo._grid_age,
             # output:
             redz_final, diff_num
@@ -438,9 +443,15 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
     # ---- Hard_GW
 
     elif isinstance(hard, holo.hardening.Hard_GW) or issubclass(hard, holo.hardening.Hard_GW):
+        redz_prime = sam._redz_prime
+        # if `sam` is using galaxy merger rate (GMR), then `redz_prime` will be `None`
+        if redz_prime is None:
+            sam._log.info("`redz_prime` not calculated in SAM.  Setting to `redz` (initial) values.")
+            redz_prime = sam.redz[np.newaxis, np.newaxis, :] * np.ones(sam.shape)
+
         _dynamic_binary_number_at_fobs_gw(
             fobs_orb,
-            dens, sam.mtot, sam.mrat, sam.redz, sam._redz_prime,
+            dens, sam.mtot, sam.mrat, sam.redz, redz_prime,
             cosmo._grid_z, cosmo._grid_dcom,
             # output:
             redz_final, diff_num
@@ -782,7 +793,7 @@ def gamma_of_rho_interp(rho, rsort, rho_interp_grid, gamma_interp_grid):
 @cython.nonecheck(False)
 @cython.cdivision(True)
 cdef int _gamma_of_rho_interp(
-    double[:] rho, long[:] rsort, 
+    double[:] rho, long[:] rsort,
     double[:] rho_interp_grid, double[:] gamma_interp_grid,
     # output
     double[:] gamma
@@ -795,7 +806,7 @@ cdef int _gamma_of_rho_interp(
     cdef int ii, kk, rr
     ii = 0 # get rho in order using rho[rsort[ii]]
 
-    for kk in range(n_rho): 
+    for kk in range(n_rho):
         rr = rsort[kk] # index of next largest rho, equiv to rev in redz calculation
         # print('kk =',kk,' rr =', rr, 'rho[rr] =', rho[rr])
         # get to the right index of the interpolation-grid
@@ -845,7 +856,7 @@ def snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
     npsrs, nskies = F_iplus.shape[0], F_iplus.shape[2]
     cdef np.ndarray[np.double_t, ndim=4] snr_ss = np.zeros((nfreqs, nreals, nskies, nloudest))
     _snr_ss(
-        amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs, 
+        amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs,
         npsrs, nfreqs, nreals, nskies, nloudest,
         snr_ss)
     return snr_ss
@@ -855,7 +866,7 @@ def snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
 @cython.nonecheck(False)
 @cython.cdivision(True)
 cdef int _snr_ss(
-    double[:,:,:] amp, 
+    double[:,:,:] amp,
     double[:,:,:,:] F_iplus,
     double[:,:,:,:] F_icross,
     double[:,:,:] iotas,
@@ -867,7 +878,7 @@ cdef int _snr_ss(
     # output
     double[:,:,:,:] snr_ss
     ):
-    """ 
+    """
 
     Parameters
     ----------
@@ -899,7 +910,7 @@ cdef int _snr_ss(
     cdef int pp, ff, rr, ss, ll
     cdef float a_pol, b_pol, Phi_T, pta_snr_sq, coef, term1, term2, term3
     # print('npsrs %d, nfreqs %d, nreals %d, nskies %d, nloudest %d' % (npsrs, nfreqs, nreals, nskies, nloudest))
-    
+
     for ff in range(nfreqs):
         for ss in range(nskies):
             for ll in range(nloudest):
@@ -908,15 +919,15 @@ cdef int _snr_ss(
                 Phi_T = 2 * M_PI * freqs[ff] * dur + Phi_0[ff,ss,ll]
                 for rr in range(nreals):
                     pta_snr_sq = 0
-                    for pp in range(npsrs): 
-                        # calculate coefficient depending on 
+                    for pp in range(npsrs):
+                        # calculate coefficient depending on
                         # function of amp, S_i, and freqs
                         coef = pow(amp[ff,rr,ll], 2.0) / (S_i[pp,ff,rr,ll] * 8 * pow(M_PI * freqs[ff], 3.0))
 
-                        # calculate terms that depend on p, f, s, and l 
+                        # calculate terms that depend on p, f, s, and l
                         # functions of F_iplus, F_icross, a_pol, b_pol, Phi_0, and Phi_T
                         term1 = (
-                            pow(a_pol * F_iplus[pp,ff,ss,ll], 2.0) 
+                            pow(a_pol * F_iplus[pp,ff,ss,ll], 2.0)
                             * (Phi_T * (1.0 + 2.0 * pow(sin(Phi_0[ff,ss,ll]), 2.0))
                                 + cos(Phi_T) * (-1.0 * sin(Phi_T) + 4.0 * cos(Phi_0[ff,ss,ll]))
                                 - 4.0 * sin(Phi_0[ff,ss,ll])

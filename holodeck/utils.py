@@ -294,7 +294,7 @@ def path_name_ending(path, ending):
     return fname
 
 
-def _get_subclass_instance(value, default, superclass):
+def get_subclass_instance(value, default, superclass, allow_none=False):
     """Convert the given `value` into a subclass instance.
 
     `None` ==> instance from `default` class
@@ -326,6 +326,10 @@ def _get_subclass_instance(value, default, superclass):
     # Set `value` to a default, if needed and it is given
     if (value is None) and (default is not None):
         value = default
+
+    # if `value` is not set, and there is no default, and `None` is allowed... just return None
+    if (value is None) and allow_none:
+        return value
 
     # If `value` is a class (constructor), then construct an instance from it
     if inspect.isclass(value):
@@ -2360,5 +2364,52 @@ def nyquist_freqs_edges(
             freqs_edges = freqs_edges[freqs_edges < trim[1]]
 
     return freqs_edges
+
+
+@deprecated_pass(get_subclass_instance)
+def _get_subclass_instance(value, default, superclass):
+    """Convert the given `value` into a subclass instance.
+
+    `None` ==> instance from `default` class
+    Class ==> instance from that class
+    instance ==> check that this is an instance of a subclass of `superclass`, error if not
+
+    Parameters
+    ----------
+    value : object,
+        Object to convert into a class instance.
+    default : class,
+        Default class constructor to use if `value` is None.
+    superclass : class,
+        Super/parent class to compare against the class instance from `value` or `default`.
+        If the class instance is not a subclass of `superclass`, a ValueError is raised.
+
+    Returns
+    -------
+    value : object,
+        Class instance that is a subclass of `superclass`.
+
+    Raises
+    ------
+    ValueError : if the class instance is not a subclass of `superclass`.
+
+    """
+    import inspect
+
+    # Set `value` to a default, if needed and it is given
+    if (value is None) and (default is not None):
+        value = default
+
+    # If `value` is a class (constructor), then construct an instance from it
+    if inspect.isclass(value):
+        value = value()
+
+    # Raise an error if `value` is not a subclass of `superclass`
+    if not isinstance(value, superclass):
+        err = f"argument ({value}) must be an instance or subclass of `{superclass}`!"
+        log.error(err)
+        raise ValueError(err)
+
+    return value
 
 
