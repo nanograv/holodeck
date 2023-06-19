@@ -9,6 +9,7 @@
 set -e    # exit on error
 
 CONVERTER_NAME="scripts/convert_notebook_tests.py"
+PYTHON_BUILD_COMMAND=("setup.py" "build_ext" "-i")
 TESTS_NAME="holodeck/tests/"
 NOTEBOOK_TESTS_NAME="holodeck/tests/converted_notebooks/"
 PYTEST_ARGS=("-v" "--cov=holodeck" "--cov-report=html:coverage" "--color=yes")
@@ -78,8 +79,17 @@ if ${VERBOSE}; then echo "==== holodeck tester.sh ===="; fi
 if ${DRY}; then echo "DRYRUN"; fi
 if ${VERBOSE}; then echo ""; fi
 
-# --- python convert_notebook_tests.py
+# --- Build
+
 if ${BUILD}; then
+    # build package
+    if ${VERBOSE}; then
+        echo "$(which python) ${PYTHON_BUILD_COMMAND}";
+    fi
+    if ! ${DRY}; then
+        python "${PYTHON_BUILD_COMMAND[@]}";
+    fi
+    # build notebook tests
     if ${VERBOSE}; then
         echo "$(which python) ${PATH_CONVERTER}";
     fi
