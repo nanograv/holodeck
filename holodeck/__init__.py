@@ -93,7 +93,7 @@ from . import param_spaces    # noqa
 from . import plot            # noqa
 from . import population      # noqa
 from . import relations       # noqa
-from . import sam             # noqa
+from . import sams            # noqa
 from . import utils           # noqa
 
 # ---- Handle version
