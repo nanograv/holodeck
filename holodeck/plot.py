@@ -16,10 +16,48 @@ import holodeck as holo
 from holodeck import cosmo, utils, observations, log
 from holodeck.constants import MSOL, PC, YR
 
-LABEL_GW_FREQUENCY_YR = "GW Frequency $[\mathrm{yr}^{-1}]$"
-LABEL_GW_FREQUENCY_HZ = "GW Frequency $[\mathrm{Hz}]$"
-LABEL_GW_FREQUENCY_NHZ = "GW Frequency $[\mathrm{nHz}]$"
-LABEL_CHARACTERISTIC_STRAIN = "GW Characteristic Strain"
+FIGSIZE = 6
+FONTSIZE = 13
+GOLDEN_RATIO = (np.sqrt(5) - 1) / 2
+
+mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
+plt.rcParams['axes.grid'] = True
+plt.rcParams['grid.alpha'] = 0.15
+plt.rcParams["mathtext.fontset"] = "cm"
+plt.rcParams["font.family"] = "serif"
+plt.rcParams["legend.handlelength"] = 1.5
+plt.rcParams["lines.solid_capstyle"] = 'round'
+# plt.rcParams["font.size"] = FONTSIZE
+# plt.rcParams["legend.fontsize"] = FONTSIZE*0.8
+# mpl.rcParams['xtick.labelsize'] = FONTSIZE*0.8
+# mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
+
+LABEL_GW_FREQUENCY_YR = r"GW Frequency $[\mathrm{yr}^{-1}]$"
+LABEL_GW_FREQUENCY_HZ = r"GW Frequency $[\mathrm{Hz}]$"
+LABEL_GW_FREQUENCY_NHZ = r"GW Frequency $[\mathrm{nHz}]$"
+LABEL_SEPARATION_PC = r"Binary Separation $[\mathrm{pc}]$"
+LABEL_CHARACTERISTIC_STRAIN = r"GW Characteristic Strain"
+LABEL_HARDENING_TIME = r"Hardening Time $[\mathrm{Gyr}]$"
+
+
+PARAM_KEYS = {
+    'hard_time': r"phenom $\tau_f$",
+    'hard_gamma_inner': r"phenom $\nu_\mathrm{inner}$",
+    'hard_gamma_outer': r"phenom $\nu_\mathrm{outer}$",
+    'hard_gamma_rot' : r"phenom $\nu_{\mathrm{rot}}$",
+    'gsmf_phi0': r"GSMF $\psi_0$",
+    'gsmf_mchar0_log10': r"GSMF $m_{\psi,0}$",
+    'gsmf_alpha0': r"GSMF $\alpha_{\psi,0}$",
+    'gpf_zbeta': r"GPF $\beta_{p,z}$",
+    'gpf_qgamma': r"GPF $\gamma_{p,0}$",
+    'gmt_norm': r"GMT $T_0$",
+    'gmt_zbeta': r"GMT $\beta_{t,z}$",
+    'mmb_mamp_log10': r"MMB $\mu$",
+    'mmb_plaw': r"MMB $\alpha_{\mu}$",
+    'mmb_scatter_dex': r"MMB $\epsilon_{\mu}$",
+}
+
+COLORS_MPL = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
 
 class MidpointNormalize(mpl.colors.Normalize):
@@ -62,6 +100,57 @@ class MidpointLogNormalize(mpl.colors.LogNorm):
         vals = utils.interp(value, x, y, xlog=False, ylog=True)
         # return np.ma.masked_array(vals, np.isnan(value))
         return vals
+
+
+def figax_single(height=None, **kwargs):
+    mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
+    plt.rcParams['axes.grid'] = True
+    plt.rcParams['grid.alpha'] = 0.15
+    plt.rcParams["mathtext.fontset"] = "cm"
+    plt.rcParams["font.family"] = "serif"
+    plt.rcParams["legend.handlelength"] = 1.5
+    plt.rcParams["lines.solid_capstyle"] = 'round'
+    plt.rcParams["font.size"] = FONTSIZE
+    plt.rcParams["legend.fontsize"] = FONTSIZE*0.8
+    mpl.rcParams['xtick.labelsize'] = FONTSIZE*0.8
+    mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
+
+    if height is None:
+        height = FIGSIZE * GOLDEN_RATIO
+    figsize_single = [FIGSIZE, height]
+    adjust_single = dict(left=0.15, bottom=0.15, right=0.95, top=0.95)
+
+    kwargs.setdefault('figsize', figsize_single)
+    for kk, vv in adjust_single.items():
+        kwargs.setdefault(kk, vv)
+
+    return figax(**kwargs)
+
+
+def figax_double(height=None, **kwargs):
+    mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
+    plt.rcParams['axes.grid'] = True
+    plt.rcParams['grid.alpha'] = 0.15
+    plt.rcParams["mathtext.fontset"] = "cm"
+    plt.rcParams["font.family"] = "serif"
+    plt.rcParams["legend.handlelength"] = 1.5
+    plt.rcParams["lines.solid_capstyle"] = 'round'
+    plt.rcParams["font.size"] = FONTSIZE
+    plt.rcParams["legend.fontsize"] = FONTSIZE*0.8
+    mpl.rcParams['xtick.labelsize'] = FONTSIZE*0.8
+    mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
+
+    if height is None:
+        height = 2 * FIGSIZE * GOLDEN_RATIO
+
+    figsize_double = [2*FIGSIZE, height]
+    adjust_double = dict(left=0.10, bottom=0.10, right=0.98, top=0.95)
+
+    kwargs.setdefault('figsize', figsize_double)
+    for kk, vv in adjust_double.items():
+        kwargs.setdefault(kk, vv)
+
+    return figax(**kwargs)
 
 
 def figax(figsize=[7, 5], ncols=1, nrows=1, sharex=False, sharey=False, squeeze=True,
@@ -181,8 +270,10 @@ def figax(figsize=[7, 5], ncols=1, nrows=1, sharex=False, sharey=False, squeeze=
 
         if grid is True:
             ax.set_axisbelow(True)
-            ax.grid(True, which='major', axis='both', c='0.6', zorder=2, alpha=0.4)
-            ax.grid(True, which='minor', axis='both', c='0.8', zorder=2, alpha=0.4)
+            # ax.grid(True, which='major', axis='both', c='0.6', zorder=2, alpha=0.4)
+            # ax.grid(True, which='minor', axis='both', c='0.8', zorder=2, alpha=0.4)
+            # ax.grid(True, which='major', axis='both', c='0.6', zorder=2, alpha=0.4)
+            # ax.grid(True, which='minor', axis='both', c='0.8', zorder=2, alpha=0.4)
 
     if squeeze:
         axes = np.squeeze(axes)
@@ -379,7 +470,6 @@ def draw_gwb(ax, xx, gwb, nsamp=10, color=None, label=None, **kwargs):
     kw_plot = kwargs.pop('plot', {})
     kw_plot.setdefault('color', color)
     hh = draw_med_conf(ax, xx, gwb, plot=kw_plot, **kwargs)
-
     if (nsamp is not None) and (nsamp > 0):
         nsamp_max = gwb.shape[1]
         idx = np.random.choice(nsamp_max, np.min([nsamp, nsamp_max]), replace=False)
@@ -458,7 +548,7 @@ def plot_bg_ss(fobs, bg, ss=None, bglabel=None, sslabel=None,
     return fig
 
 
-def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=cm.rainbow_r, color = None, label=None, **kwargs):
+def draw_sspars_and_bgpars(axs, xx, sspar, bgpar, nsamp=10, cmap=cm.rainbow_r, color = None, label=None, **kwargs):
     # if color is None:
     #     color = axs[0,0]._get_lines.get_next_color()
 
@@ -474,14 +564,18 @@ def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=c
     q_ss = sspar[1,:,:,:] # ss ratios
     # qq_med = draw_med_conf(axs[0,1], xx, q_bg, plot=kw_plot, **kwargs)
 
-    d_bg = holo.cosmo.comoving_distance(bgpar[2,:,:]).value # bg avg distances in Mpc
-    d_ss = holo.cosmo.comoving_distance(sspar[2,:,:,:]).value # ss distances in Mpc
+    di_bg = holo.cosmo.comoving_distance(bgpar[2,:,:]).value # bg avg distances in Mpc
+    di_ss = holo.cosmo.comoving_distance(sspar[2,:,:,:]).value # ss distances in Mpc
+
+
+    df_bg = holo.cosmo.comoving_distance(bgpar[3,:,:]).value # bg avg distances in Mpc
+    df_ss = holo.cosmo.comoving_distance(sspar[3,:,:,:]).value # ss distances in Mpc
     # dd_med = draw_med_conf(axs[1,0], xx, d_bg, plot=kw_plot, **kwargs)
 
     # hh_med = draw_med_conf(axs[1,1], xx, hc_bg, plot=kw_plot, **kwargs)
 
     if (nsamp is not None) and (nsamp > 0):
-        nsamp_max = hc_bg.shape[1]
+        nsamp_max = bgpar.shape[2]
         nsize = np.min([nsamp, nsamp_max])
         colors = cmap(np.linspace(0,1,nsize))
         ci = 0
@@ -490,36 +584,37 @@ def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=c
             # background
             axs[0,0].plot(xx, m_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # masses (upper left)
             axs[0,1].plot(xx, q_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # ratios (upper right)
-            axs[1,0].plot(xx, d_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # distances (lower left)
-            axs[1,1].plot(xx, hc_bg[:, ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # strains (lower right)
+            axs[1,0].plot(xx, di_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # initial distances (lower left)
+            axs[1,1].plot(xx, df_bg[:, ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # final distances (lower right)
 
             # single sources
-            for ll in range(len(hc_ss[0,0])):
+            for ll in range(sspar.shape[-1]):
                 if(ll==0): edgecolor='k'
                 else: edgecolor=None
                 axs[0,0].scatter(xx, m_ss[:, ii, ll], color=colors[ci], alpha=0.25,
                            edgecolor=edgecolor) # ss masses (upper left)
                 axs[0,1].scatter(xx, q_ss[:, ii, ll], color=colors[ci], alpha=0.25,
                            edgecolor=edgecolor) # ss ratios (upper right)
-                axs[1,0].scatter(xx, d_ss[:, ii, ll], color=colors[ci], alpha=0.25,
-                           edgecolor=edgecolor) # ss distances (lower left)
-                axs[1,1].scatter(xx, hc_ss[:, ii, ll], color=colors[ci], alpha=0.25,
-                           edgecolor=edgecolor) # ss strains (lower right)
+                axs[1,0].scatter(xx, di_ss[:, ii, ll], color=colors[ci], alpha=0.25,
+                           edgecolor=edgecolor) # ss intial distances (lower left)
+                axs[1,1].scatter(xx, df_ss[:, ii, ll], color=colors[ci], alpha=0.25,
+                           edgecolor=edgecolor) # ss final distances (lower left)
             ci +=1
     # return mm_med, qq_med, dd_med, hh_med
 
 
-def plot_pars(fobs, hc_ss, hc_bg, sspar, bgpar, **kwargs):
+def plot_pars(fobs, sspar, bgpar, **kwargs):
     xx= fobs * YR
     fig, axs = figax(figsize = (11,6), ncols=2, nrows=2, sharex = True)
     axs[0,0].set_ylabel('Total Mass $M/M_\odot$')
     axs[0,1].set_ylabel('Mass Ratio $q$')
-    axs[1,0].set_ylabel('Comoving Distance $d_c$')
+    axs[1,0].set_ylabel('Initial Comoving Distance $d_c$ (Mpc)')
+    axs[1,1].set_ylabel('Final Comoving Distance $d_c$ (Mpc)')
+
     axs[1,0].set_xlabel(LABEL_GW_FREQUENCY_YR)
-    axs[1,1].set_ylabel(LABEL_CHARACTERISTIC_STRAIN)
     axs[1,1].set_xlabel(LABEL_GW_FREQUENCY_YR)
-    draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, color='pink')
-    # fig.tight_layout()
+    draw_sspars_and_bgpars(axs, xx, sspar, bgpar, color='pink')
+    fig.tight_layout()
     return fig
 
 
@@ -587,8 +682,9 @@ def _draw_plaw(ax, freqs, amp=1e-15, f0=1/YR, **kwargs):
     return ax.plot(freqs, plaw, **kwargs)
 
 
-def _twin_hz(ax, nano=True, fs=8, **kw):
+def _twin_hz(ax, nano=True, fs=10, **kw):
     tw = ax.twiny()
+    tw.grid(False)
     xlim = np.array(ax.get_xlim()) / YR
     if nano:
         label = LABEL_GW_FREQUENCY_NHZ
@@ -598,22 +694,24 @@ def _twin_hz(ax, nano=True, fs=8, **kw):
 
     tw.set(xlim=xlim, xscale=ax.get_xscale())
     tw.set_xlabel(label, fontsize=fs, **kw)
-    return
+    return tw
 
 
-def _twin_yr(ax, nano=True, fs=8, **kw):
+def _twin_yr(ax, nano=True, fs=10, label=True, **kw):
     tw = ax.twiny()
+    tw.grid(False)
     xlim = np.array(ax.get_xlim()) * YR
     if nano:
         xlim /= 1e9
 
     tw.set(xlim=xlim, xscale=ax.get_xscale())
-    tw.set_xlabel(LABEL_GW_FREQUENCY_YR, fontsize=fs, **kw)
-    return
+    if label:
+        tw.set_xlabel(LABEL_GW_FREQUENCY_YR, fontsize=fs, **kw)
+    return tw
 
 
-def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={}):
-    plot.setdefault('alpha', 0.5)
+def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={}, filter=False):
+    plot.setdefault('alpha', 0.75)
     fill.setdefault('alpha', 0.2)
     percs = np.atleast_1d(fracs)
     assert np.all((0.0 <= percs) & (percs <= 1.0))
@@ -623,10 +721,16 @@ def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill=
     # Add the median value (50%)
     inter_percs = [0.5, ] + np.concatenate(inter_percs).tolist()
     # Get percentiles; they go along the last axis
-    rv = kale.utils.quantiles(vals, percs=inter_percs, weights=weights, axis=-1)
+    if filter:
+        rv = [
+            kale.utils.quantiles(vv[vv > 0.0], percs=inter_percs, weights=weights)
+            for vv in vals
+        ]
+        rv = np.asarray(rv)
+    else:
+        rv = kale.utils.quantiles(vals, percs=inter_percs, weights=weights, axis=-1)
 
     med, *conf = rv.T
-
     # plot median
     hh, = ax.plot(xx, med, **plot)
 
@@ -717,7 +821,7 @@ def violins(ax, xx, yy, zz, width, **kwargs):
     return handle
 
 
-def violin(ax, xx, yy, zz, width, side='both', clip_pdf=None,
+def violin(ax, xx, yy, zz, width, median_log10=False, side='both', clip_pdf=None,
            median={}, line={}, fill={}, **kwargs):
     assert np.ndim(xx) == 0
     assert np.shape(xx) == np.shape(width)
@@ -743,15 +847,22 @@ def violin(ax, xx, yy, zz, width, side='both', clip_pdf=None,
         assert np.ndim(clip_pdf) == 0
         assert clip_pdf < 1.0
 
-    dy = np.diff(yy)
-    cdf = 0.5 * (zz[1:] + zz[:-1]) * dy
-    cdf = np.concatenate([[0.0, ], cdf])
-    cdf = np.cumsum(cdf)
-
     zz = zz / zz.max()
 
+    if median is True:
+        median = {}
+    if median is False:
+        median = None
+
     if median is not None:
-        med = np.interp([0.5], cdf, yy)
+        if median_log10:
+            dy = np.diff(np.log10(yy))
+        else:
+            dy = np.diff(yy)
+        cdf = 0.5 * (zz[1:] + zz[:-1]) * dy
+        cdf = np.concatenate([[0.0, ], cdf])
+        cdf = np.cumsum(cdf)
+        med = np.interp([0.5], cdf/cdf.max(), yy)
 
     if clip_pdf is not None:
         idx = zz > clip_pdf
@@ -792,6 +903,514 @@ def violin(ax, xx, yy, zz, width, side='both', clip_pdf=None,
 
     handle = handle[0] if len(handle) == 1 else tuple(handle)
     return handle
+
+
+class Corner:
+
+    _LIMITS_STRETCH = 0.1
+
+    def __init__(self, ndim, origin='tl', rotate=True, axes=None, labels=None, limits=None, **kwargs):
+
+        origin = kale.plot._parse_origin(origin)
+
+        # -- Construct figure and axes
+        if axes is None:
+            fig, axes = kale.plot._figax(ndim, **kwargs)
+            self.fig = fig
+            if origin[0] == 1:
+                axes = axes[::-1]
+            if origin[1] == 1:
+                axes = axes.T[::-1].T
+        else:
+            try:
+                self.fig = axes[0, 0].figure
+            except Exception as err:
+                raise err
+
+        self.origin = origin
+        self.axes = axes
+
+        last = ndim - 1
+        if labels is None:
+            labels = [''] * ndim
+
+        for (ii, jj), ax in np.ndenumerate(axes):
+            # Set upper-right plots to invisible
+            if jj > ii:
+                ax.set_visible(False)
+                continue
+
+            ax.grid(True)
+
+            # Bottom row
+            if ii == last:
+                if rotate and (jj == last):
+                    ax.set_ylabel(labels[jj])   # currently this is being reset to empty later, that's okay
+                else:
+                    ax.set_xlabel(labels[jj])
+
+                # If vertical origin is the top
+                if origin[0] == 1:
+                    ax.xaxis.set_label_position('top')
+                    ax.xaxis.set_ticks_position('top')
+
+            # Non-bottom row
+            else:
+                ax.set_xlabel('')
+                for tlab in ax.xaxis.get_ticklabels():
+                    tlab.set_visible(False)
+
+            # First column
+            if jj == 0:
+                # Not-first rows
+                if ii != 0:
+                    ax.set_ylabel(labels[ii])
+
+                # If horizontal origin is the right
+                if origin[1] == 1:
+                    ax.yaxis.set_label_position('right')
+                    ax.yaxis.set_ticks_position('right')
+
+            # Not-first columns
+            else:
+                # if (jj != last) or (not rotate):
+                ax.set_ylabel('')
+                for tlab in ax.yaxis.get_ticklabels():
+                    tlab.set_visible(False)
+
+            # Diagonals
+            if ii == jj:
+                # not top-left
+                if (ii != 0) and (origin[1] == 0):
+                    ax.yaxis.set_label_position('right')
+                    ax.yaxis.set_ticks_position('right')
+                else:
+                    ax.yaxis.set_label_position('left')
+                    ax.yaxis.set_ticks_position('left')
+
+        # If axes limits are given, set axes to them
+        if limits is not None:
+            limit_flag = False
+            kale.plot._set_corner_axes_extrema(self.axes, limits, rotate)
+        # Otherwise, prepare to calculate limits during plotting
+        else:
+            limits = [None] * ndim
+            limit_flag = True
+
+        # --- Store key parameters
+        self.ndim = ndim
+        self._rotate = rotate
+        self._labels = labels
+        self._limits = limits
+        self._limit_flag = limit_flag
+
+        return
+
+    def plot(self, data, edges=None, weights=None, ratio=None, quantiles=None, sigmas=None, reflect=None,
+             color=None, cmap=None, limit=None, dist1d={}, dist2d={}):
+
+        if limit is None:
+            limit = self._limit_flag
+
+        # ---- Sanitize
+
+        if np.ndim(data) != 2:
+            err = "`data` (shape: {}) must be 2D with shape (parameters, data-points)!".format(
+                np.shape(data))
+            raise ValueError(err)
+
+        axes = self.axes
+        size = np.shape(data)[0]
+        shp = np.shape(axes)
+        if (np.ndim(axes) != 2) or (shp[0] != shp[1]) or (shp[0] != size):
+            raise ValueError("`axes` (shape: {}) does not match data dimension {}!".format(shp, size))
+
+        if ratio is not None:
+            if np.ndim(ratio) != 2 or np.shape(ratio)[0] != size:
+                err = f"`ratio` (shape: {np.shape(ratio)}) must be 2D with shape (parameters, data-points)!"
+                raise ValueError(err)
+
+        # ---- Set parameters
+
+        last = size - 1
+        rotate = self._rotate
+
+        # Set default color or cmap as needed
+        color, cmap = kale.plot._parse_color_cmap(ax=axes[0][0], color=color, cmap=cmap)
+
+        edges = kale.utils.parse_edges(data, edges=edges)
+        quantiles, _ = kale.plot._default_quantiles(quantiles=quantiles, sigmas=sigmas)
+
+        # ---- Draw 1D Histograms & Carpets
+
+        limits = [None] * size      # variable to store the data extrema
+        for jj, ax in enumerate(axes.diagonal()):
+            rot = (rotate and (jj == last))
+            refl = reflect[jj] if reflect is not None else None
+            rat = ratio[jj] if ratio is not None else None
+            self.dist1d(
+                ax, edges[jj], data[jj], weights=weights, ratio=rat, quantiles=quantiles, rotate=rot,
+                color=color, reflect=refl, **dist1d
+            )
+            limits[jj] = kale.utils.minmax(data[jj], stretch=self._LIMITS_STRETCH)
+
+        # ---- Draw 2D Histograms and Contours
+
+        for (ii, jj), ax in np.ndenumerate(axes):
+            if jj >= ii:
+                continue
+            rat = [ratio[jj], ratio[ii]] if ratio is not None else None
+            handle = self.dist2d(
+                ax, [edges[jj], edges[ii]], [data[jj], data[ii]], weights=weights, ratio=rat,
+                color=color, cmap=cmap, quantiles=quantiles, **dist2d
+            )
+
+        # ---- calculate and set axes limits
+
+        if limit:
+            # Update any stored values
+            for ii in range(self.ndim):
+                self._limits[ii] = kale.utils.minmax(limits[ii], prev=self._limits[ii])
+
+            # Set axes to limits
+            kale.plot._set_corner_axes_extrema(self.axes, self._limits, self._rotate)
+
+        return handle
+
+    def dist1d(self, ax, edges, data, color=None, weights=None, ratio=None, probability=True, rotate=False,
+               density=None, confidence=False, hist=None, carpet=True, quantiles=None,
+               ls=None, alpha=None, reflect=None, **kwargs):
+
+        if np.ndim(data) != 1:
+            err = "Input `data` (shape: {}) is not 1D!".format(np.shape(data))
+            raise ValueError(err)
+
+        if ratio is not None and np.ndim(ratio) != 1:
+            err = "`ratio` (shape: {}) is not 1D!".format(np.shape(ratio))
+            raise ValueError(err)
+
+        # Use `scatter` as the limiting-number of scatter-points
+        #    To disable scatter, `scatter` will be set to `None`
+        carpet = kale.plot._scatter_limit(carpet, "carpet")
+
+        # set default color to next from axes' color-cycle
+        if color is None:
+            color = kale.plot._get_next_color(ax)
+
+        # ---- Draw Components
+
+        # Draw PDF from KDE
+        handle = None     # variable to store a plotting 'handle' from one of the plotted objects
+        if density is not False:
+            kde = kale.KDE(data, weights=weights)
+
+            # If histogram is also being plotted (as a solid line) use a dashed line
+            if ls is None:
+                _ls = '--' if hist else '-'
+                _alpha = 0.8 if hist else 0.8
+            else:
+                _ls = ls
+                _alpha = alpha
+
+            # Calculate KDE density distribution for the given parameter
+            kde_kwargs = dict(probability=probability, params=0, reflect=reflect)
+            xx, yy = kde.density(**kde_kwargs)
+
+            if ratio is not None:
+                kde_ratio = kale.KDE(ratio, weights=weights)
+                _, kde_ratio = kde_ratio.density(points=xx, **kde_kwargs)
+                yy /= kde_ratio
+
+            # rescale by value of density
+            yy = yy * density
+            # Plot
+            if rotate:
+                temp = xx
+                xx = yy
+                yy = temp
+
+            handle, = ax.plot(xx, yy, color=color, ls=_ls, alpha=_alpha, **kwargs)
+
+        # Draw Histogram
+        if hist:
+            if alpha is None:
+                _alpha = 0.5 if density else 0.8
+            else:
+                _alpha = alpha
+
+            _, _, hh = self.hist1d(
+                ax, data, edges=edges, weights=weights, ratio=ratio, color=color,
+                density=True, probability=probability, joints=True, rotate=rotate,
+                ls=ls, alpha=_alpha, **kwargs
+            )
+            if handle is None:
+                handle = hh
+
+        # Draw Contours and Median Line
+        if confidence:
+            if ratio is not None:
+                raise NotImplementedError("`confidence` with `ratio` is not implemented!")
+            hh = kale.plot._confidence(data, ax=ax, color=color, quantiles=quantiles, rotate=rotate)
+            if handle is None:
+                handle = hh
+
+        # Draw Carpet Plot
+        if carpet is not None:
+            if ratio is not None:
+                raise NotImplementedError("`confidence` with `carpet` is not implemented!")
+            hh = kale.plot._carpet(data, weights=weights, ax=ax, color=color, rotate=rotate, limit=carpet)
+            if handle is None:
+                handle = hh
+
+        return handle
+
+    def hist1d(self, ax, data, edges=None, weights=None, ratio=None, density=False, probability=False,
+            renormalize=False, joints=True, positive=True, rotate=False, **kwargs):
+
+        hist_kwargs = dict(density=density, probability=probability)
+        # Calculate histogram
+        hist, edges = kale.utils.histogram(data, bins=edges, weights=weights, **hist_kwargs)
+
+        if ratio is not None:
+            hist_ratio, _ = kale.utils.histogram(data, bins=edges, **hist_kwargs)
+            hist /= hist_ratio
+
+        # Draw
+        rv = kale.plot.draw_hist1d(
+            ax, edges, hist,
+            renormalize=renormalize, joints=joints, positive=positive, rotate=rotate,
+            **kwargs
+        )
+        return hist, edges, rv
+
+    def dist2d(
+        self, ax, edges, data, weights=None, ratio=None, quantiles=None, sigmas=None,
+        color=None, cmap=None, smooth=None, upsample=None, pad=True, outline=True,
+        median=False, scatter=True, contour=True, hist=True, mask_dense=None, mask_below=True, mask_alpha=0.9
+    ):
+
+        if np.ndim(data) != 2 or np.shape(data)[0] != 2:
+            err = f"`data` (shape: {np.shape(data)}) must be 2D with shape (parameters, data-points)!"
+            raise ValueError(err)
+
+        if ratio is not None:
+            if np.ndim(ratio) != 2 or np.shape(ratio)[0] != 2:
+                err = f"`ratio` (shape: {np.shape(ratio)}) must be 2D with shape (parameters, data-points)!"
+                raise ValueError(err)
+
+        # Set default color or cmap as needed
+        color, cmap = kale.plot._parse_color_cmap(ax=ax, color=color, cmap=cmap)
+
+        # Use `scatter` as the limiting-number of scatter-points
+        #    To disable scatter, `scatter` will be set to `None`
+        scatter = kale.plot._scatter_limit(scatter, "scatter")
+
+        # Default: if either hist or contour is being plotted, mask over high-density scatter points
+        if mask_dense is None:
+            mask_dense = (scatter is not None) and (hist or contour)
+
+        # Calculate histogram
+        edges = kale.utils.parse_edges(data, edges=edges)
+        hist_kwargs = dict(bins=edges, density=True)
+        hh, *_ = np.histogram2d(*data, weights=weights, **hist_kwargs)
+
+        if ratio is not None:
+            hh_ratio, *_ = np.histogram2d(*ratio, **hist_kwargs)
+            hh /= hh_ratio
+            hh = np.nan_to_num(hh)
+
+        _, levels, quantiles = kale.plot._dfm_levels(hh, quantiles=quantiles, sigmas=sigmas)
+        if mask_below is True:
+            mask_below = levels.min()
+
+        handle = None
+
+        # ---- Draw Scatter Points
+        if (scatter is not None):
+            handle = kale.plot.draw_scatter(ax, *data, color=color, zorder=5, limit=scatter)
+
+        # ---- Draw Median Lines (cross-hairs style)
+        if median:
+            if ratio:
+                raise NotImplementedError("`median` is not impemented with `ratio`!")
+
+            for dd, func in zip(data, [ax.axvline, ax.axhline]):
+                # Calculate value
+                if weights is None:
+                    med = np.median(dd)
+                else:
+                    med = kale.utils.quantiles(dd, percs=0.5, weights=weights)
+
+                # Load path_effects
+                out_pe = kale.plot._get_outline_effects() if outline else None
+                # Draw
+                func(med, color=color, alpha=0.25, lw=1.0, zorder=40, path_effects=out_pe)
+
+        cents, hh_prep = kale.plot._prep_hist(edges, hh, smooth, upsample, pad)
+
+        # ---- Draw 2D Histogram
+        if hist:
+            _ee, _hh, handle = kale.plot.draw_hist2d(
+                ax, edges, hh, mask_below=mask_below, cmap=cmap, zorder=10, shading='auto',
+            )
+
+        # ---- Draw Contours
+        if contour:
+            contour_cmap = cmap.reversed()
+            # Narrow the range of contour colors relative to full `cmap`
+            dd = 0.7 / 2
+            nq = len(quantiles)
+            if nq < 4:
+                dd = nq*0.08
+            contour_cmap = kale.plot._cut_colormap(contour_cmap, 0.5 - dd, 0.5 + dd)
+
+            _ee, _hh, _handle = _contour2d(
+                ax, cents, hh_prep, levels=levels, cmap=contour_cmap, zorder=20, outline=outline,
+            )
+
+            # hi = 1 if len(_handle.collections) > 0 else 0
+            hi = -1
+            handle = _handle.collections[hi]
+            # for some reason the above handle is not showing up on legends... create a dummy line
+            # to get a better handle
+            col = handle.get_edgecolor()
+            handle, = ax.plot([], [], color=col)
+
+        # Mask dense scatter-points
+        if mask_dense:
+            # NOTE: levels need to be recalculated here!
+            _, levels, quantiles = kale.plot._dfm_levels(hh_prep, quantiles=quantiles)
+            span = [levels.min(), hh_prep.max()]
+            mask_cmap = mpl.colors.ListedColormap('white')
+            # Draw
+            ax.contourf(*cents, hh_prep, span, cmap=mask_cmap, antialiased=True, zorder=9, alpha=mask_alpha)
+
+        return handle
+
+    def legend(self, handles, labels, index=None,
+               loc=None, fancybox=False, borderaxespad=0, **kwargs):
+        """
+        """
+        fig = self.fig
+
+        # Set Bounding Box Location
+        # ------------------------------------
+        bbox = kwargs.pop('bbox', None)
+        bbox = kwargs.pop('bbox_to_anchor', bbox)
+        if bbox is None:
+            if index is None:
+                size = self.ndim
+                if size in [2, 3, 4]:
+                    index = (0, -1)
+                    loc = 'lower left'
+                elif size == 1:
+                    index = (0, 0)
+                    loc = 'upper right'
+                elif size % 2 == 0:
+                    index = size // 2
+                    index = (size - index - 2, index + 1)
+                    loc = 'lower left'
+                else:
+                    index = (size // 2) + 1
+                    loc = 'lower left'
+                    index = (size-index-1, index)
+
+            bbox = self.axes[index].get_position()
+            bbox = (bbox.x0, bbox.y0)
+            kwargs['bbox_to_anchor'] = bbox
+            kwargs.setdefault('bbox_transform', fig.transFigure)
+
+        # Set other defaults
+        leg = fig.legend(handles, labels, fancybox=fancybox,
+                         borderaxespad=borderaxespad, loc=loc, **kwargs)
+        return leg
+
+    def target(self, targets, upper_limits=None, lower_limits=None, lw=1.0, fill_alpha=0.1, **kwargs):
+        size = self.ndim
+        axes = self.axes
+        last = size - 1
+        # labs = self._labels
+        extr = self._limits
+
+        # ---- check / sanitize arguments
+        if len(targets) != size:
+            err = "`targets` (shape: {}) must be shaped ({},)!".format(np.shape(targets), size)
+            raise ValueError(err)
+
+        if lower_limits is None:
+            lower_limits = [None] * size
+        if len(lower_limits) != size:
+            err = "`lower_limits` (shape: {}) must be shaped ({},)!".format(np.shape(lower_limits), size)
+            raise ValueError(err)
+
+        if upper_limits is None:
+            upper_limits = [None] * size
+        if len(upper_limits) != size:
+            err = "`upper_limits` (shape: {}) must be shaped ({},)!".format(np.shape(upper_limits), size)
+            raise ValueError(err)
+
+        # ---- configure settings
+        kwargs.setdefault('color', 'red')
+        kwargs.setdefault('alpha', 0.50)
+        kwargs.setdefault('zorder', 20)
+        line_kw = dict()
+        line_kw.update(kwargs)
+        line_kw['lw'] = lw
+        span_kw = dict()
+        span_kw.update(kwargs)
+        span_kw['alpha'] = fill_alpha
+
+        # ---- draw 1D targets and limits
+        for jj, ax in enumerate(axes.diagonal()):
+            if (self._rotate and (jj == last)):
+                func = ax.axhline
+                func_up = lambda xx: ax.axhspan(extr[jj][0], xx, **span_kw)
+                func_lo = lambda xx: ax.axhspan(xx, extr[jj][1], **span_kw)
+            else:
+                func = ax.axvline
+                func_up = lambda xx: ax.axvspan(extr[jj][0], xx, **span_kw)
+                func_lo = lambda xx: ax.axvspan(xx, extr[jj][1], **span_kw)
+
+            if targets[jj] is not None:
+                func(targets[jj], **line_kw)
+            if upper_limits[jj] is not None:
+                func_up(upper_limits[jj])
+            if lower_limits[jj] is not None:
+                func_lo(lower_limits[jj])
+
+        # ---- draw 2D targets and limits
+        for (ii, jj), ax in np.ndenumerate(axes):
+            if jj >= ii:
+                continue
+            for kk, func, func_lim in zip([ii, jj], [ax.axhline, ax.axvline], [ax.axhspan, ax.axvspan]):
+                if targets[kk] is not None:
+                    func(targets[kk], **line_kw)
+                if upper_limits[kk] is not None:
+                    func_lim(extr[kk][0], upper_limits[kk], **span_kw)
+                if lower_limits[kk] is not None:
+                    func_lim(lower_limits[kk], extr[kk][0], **span_kw)
+
+        return
+
+
+def _contour2d(ax, edges, hist, levels, outline=True, **kwargs):
+
+    LW = 1.5
+
+    alpha = kwargs.setdefault('alpha', 0.8)
+    lw = kwargs.pop('linewidths', kwargs.pop('lw', LW))
+    kwargs.setdefault('linestyles', kwargs.pop('ls', '-'))
+    kwargs.setdefault('zorder', 10)
+
+    # ---- Draw contours
+    cont = ax.contour(*edges, hist, levels=levels, linewidths=lw, **kwargs)
+
+    # ---- Add Outline path effect to contours
+    if (outline is True):
+        outline = kale.plot._get_outline_effects(2*lw, alpha=1 - np.sqrt(1 - alpha))
+        plt.setp(cont.collections, path_effects=outline)
+
+    return edges, hist, cont
 
 
 # =================================================================================================

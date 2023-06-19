@@ -16,7 +16,7 @@ from scipy.optimize.cython_optimize cimport brentq
 from libc.stdio cimport printf, fflush, stdout
 from libc.stdlib cimport malloc, free
 # make sure to use c-native math functions instead of python/numpy
-from libc.math cimport pow, sqrt, M_PI, NAN, log10
+from libc.math cimport pow, sqrt, M_PI, NAN, log10, sin, cos
 
 import holodeck as holo
 from holodeck.cyutils cimport interp_at_index, _interp_between_vals
@@ -217,19 +217,68 @@ cdef void _integrate_differential_number_3dx1d(
 # ==================================================================================================
 
 
+# @cython.cdivision(True)
+# cpdef double _hard_func_2pwl(double norm, double xx, double gamma_inner, double gamma_outer):
+#     cdef double dadt = - norm * pow(1.0 + xx, -gamma_outer+gamma_inner) / pow(xx, gamma_inner-1)
+#     return dadt
+
+
+# @cython.cdivision(True)
+# cpdef double hard_func_2pwl_gw(
+#     double mtot, double mrat, double sepa,
+#     double norm, double rchar, double gamma_inner, double gamma_outer
+# ):
+#     cdef double dadt = _hard_func_2pwl(norm, sepa/rchar, gamma_inner, gamma_outer)
+#     dadt += hard_gw(mtot, mrat, sepa)
+#     return dadt
+
+
 @cython.cdivision(True)
-cpdef double _hard_func_2pwl(double norm, double xx, double gamma_inner, double gamma_outer):
+cdef double _hard_func_2pwl(double norm, double xx, double gamma_inner, double gamma_outer):
     cdef double dadt = - norm * pow(1.0 + xx, -gamma_outer+gamma_inner) / pow(xx, gamma_inner-1)
     return dadt
 
 
 @cython.cdivision(True)
-cpdef double hard_func_2pwl_gw(
+cdef double _hard_func_2pwl_gw(
     double mtot, double mrat, double sepa,
     double norm, double rchar, double gamma_inner, double gamma_outer
 ):
     cdef double dadt = _hard_func_2pwl(norm, sepa/rchar, gamma_inner, gamma_outer)
     dadt += hard_gw(mtot, mrat, sepa)
+    return dadt
+
+
+@cython.cdivision(True)
+cdef double[:] _hard_func_2pwl_gw_1darray(
+    double[:] mtot, double[:] mrat, double[:] sepa,
+    double[:] norm, double[:] rchar, double[:] gamma_inner, double[:] gamma_outer
+):
+    cdef int ii
+    cdef int size = mtot.size
+    cdef np.ndarray[np.double_t, ndim=1] dadt = np.zeros(size)
+    for ii in range(size):
+        dadt[ii] = _hard_func_2pwl(norm[ii], sepa[ii]/rchar[ii], gamma_inner[ii], gamma_outer[ii])
+        dadt[ii] += hard_gw(mtot[ii], mrat[ii], sepa[ii])
+
+    return dadt
+
+
+def hard_func_2pwl_gw(
+    mtot, mrat, sepa,
+    norm, rchar, gamma_inner, gamma_outer
+):
+    """
+
+    NOTE: this function will be somewhat slow, because of the explicit broadcasting!
+
+    """
+    args = mtot, mrat, sepa, norm, rchar, gamma_inner, gamma_outer
+    args = np.broadcast_arrays(*args)
+    shape = args[0].shape
+    mtot, mrat, sepa, norm, rchar, gamma_inner, gamma_outer = [aa.flatten() for aa in args]
+    dadt = _hard_func_2pwl_gw_1darray(mtot, mrat, sepa, norm, rchar, gamma_inner, gamma_outer)
+    dadt = np.array(dadt).reshape(shape)
     return dadt
 
 
@@ -319,7 +368,7 @@ cdef double get_binary_lifetime_2pwl(double norm_log10, void *args):
     cdef double sepa_right, dadt_right, dt
 
     cdef double sepa_left = pow(10.0, sepa_log10)
-    cdef double dadt_left = hard_func_2pwl_gw(
+    cdef double dadt_left = _hard_func_2pwl_gw(
         pars.mt, pars.mr, sepa_left,
         norm, pars.rchar, pars.gamma_inner, pars.gamma_outer
     )
@@ -329,7 +378,7 @@ cdef double get_binary_lifetime_2pwl(double norm_log10, void *args):
         sepa_right = pow(10.0, sepa_log10)
 
         # Get total hardening rate at k+1 edge
-        dadt_right = hard_func_2pwl_gw(
+        dadt_right = _hard_func_2pwl_gw(
             pars.mt, pars.mr, sepa_right,
             norm, pars.rchar, pars.gamma_inner, pars.gamma_outer
         )
@@ -483,7 +532,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
 
             # Get total hardening rate at left-most edge
             sepa_left = pow(10.0, sepa_log10)
-            dadt_left = hard_func_2pwl_gw(
+            dadt_left = _hard_func_2pwl_gw(
                 mt, mr, sepa_left,
                 norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
             )
@@ -502,7 +551,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
                 frst_orb_right = kepler_freq_from_sepa(mt, sepa_right)
 
                 # Get total hardening rate at the right-edge of this step (left-edge already obtained)
-                dadt_right = hard_func_2pwl_gw(
+                dadt_right = _hard_func_2pwl_gw(
                     mt, mr, sepa_right,
                     norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
                 )
@@ -597,7 +646,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
                         sepa = kepler_sepa_from_freq(mt, target_frst_orb)
 
                         # calculate total hardening rate at this exact separation
-                        dadt = hard_func_2pwl_gw(
+                        dadt = _hard_func_2pwl_gw(
                             mt, mr, sepa,
                             norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
                         )
@@ -701,4 +750,196 @@ cdef int _dynamic_binary_number_at_fobs_gw(
                     diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
 
     return 0
+
+
+
+# ==================================================================================================
+# ====    DetStats Functions    ====
+# ==================================================================================================
+
+
+def gamma_of_rho_interp(rho, rsort, rho_interp_grid, gamma_interp_grid):
+    """
+    rho : 1Darray of scalars
+        SNR of single sources, in flat array
+    rsort : 1Darray
+        order of flat rho values smallest to largest
+    rho_interp_grid : 1Darray
+        rho values corresponding to each gamma
+    gamma_interp_grid : 1Darray
+        gamma values corresponding to each rho
+
+    """
+    # pass in the interp grid
+    cdef np.ndarray[np.double_t, ndim=1] gamma = np.zeros(rho.shape)
+
+    _gamma_of_rho_interp(rho, rsort, rho_interp_grid, gamma_interp_grid, gamma)
+
+    return gamma
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef int _gamma_of_rho_interp(
+    double[:] rho, long[:] rsort, 
+    double[:] rho_interp_grid, double[:] gamma_interp_grid,
+    # output
+    double[:] gamma
+    ):
+    """ Find gamma of rho by interpolation over rho and gamma grids.
+    """
+
+    cdef int n_rho = rho.size
+    cdef int n_interp = rho_interp_grid.size
+    cdef int ii, kk, rr
+    ii = 0 # get rho in order using rho[rsort[ii]]
+
+    for kk in range(n_rho): 
+        rr = rsort[kk] # index of next largest rho, equiv to rev in redz calculation
+        # print('kk =',kk,' rr =', rr, 'rho[rr] =', rho[rr])
+        # get to the right index of the interpolation-grid
+        while (rho_interp_grid[ii+1] < rho[rr]) and (ii < n_interp -2):
+            ii += 1
+        # print('ii =',ii, ' rho_interp[ii] =', rho_interp_grid[ii], ' rho_interp[ii+1] =', rho_interp_grid[ii+1])
+        # interpolate
+        gamma[rr] = interp_at_index(ii, rho[rr], rho_interp_grid, gamma_interp_grid)
+        # print('rho =', rho[rr], ' gamma =', gamma[rr], '\n')\
+
+    return 0
+
+
+def snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
+    """ Calculate single source SNR
+
+
+    Parameters
+    ----------
+    amp : (F,R,L) NDarray
+        Dimensionless strain amplitude of loudest single sources
+    F_iplus : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    F_icross : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    iotas : (F,S,L) NDarray
+        Inclination, used to calculate:
+        a_pol = 1 + np.cos(iotas) **2
+        b_pol = -2 * np.cos(iotas)
+    dur : scalar
+        Duration of observations.
+    Phi_0 : (F,S,L) NDarray
+        Initial GW phase
+    S_i : (P,F,R,L) NDarray
+        Total noise of each pulsar wrt detection of each single source, in s^3
+    freqs : (F,) 1Darray
+        Observed frequency bin centers.
+
+    Returns
+    -------
+    snr_ss : (F,R,S,L) NDarray
+        SNR from the whole PTA for each single source with
+        each realized sky position (S) and realized strain (R)
+
+    """
+    nfreqs, nreals, nloudest = amp.shape[0], amp.shape[1], amp.shape[2]
+    npsrs, nskies = F_iplus.shape[0], F_iplus.shape[2]
+    cdef np.ndarray[np.double_t, ndim=4] snr_ss = np.zeros((nfreqs, nreals, nskies, nloudest))
+    _snr_ss(
+        amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs, 
+        npsrs, nfreqs, nreals, nskies, nloudest,
+        snr_ss)
+    return snr_ss
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef int _snr_ss(
+    double[:,:,:] amp, 
+    double[:,:,:,:] F_iplus,
+    double[:,:,:,:] F_icross,
+    double[:,:,:] iotas,
+    double dur,
+    double[:,:,:] Phi_0,
+    double[:,:,:,:] S_i,
+    double[:] freqs,
+    long npsrs, long nfreqs, long nreals, long nskies, long nloudest,
+    # output
+    double[:,:,:,:] snr_ss
+    ):
+    """ 
+
+    Parameters
+    ----------
+    amp : (F,R,L) NDarray
+        Dimensionless strain amplitude of loudest single sources
+    F_iplus : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    F_icross : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    iotas : (F,S,L) NDarray
+        Inclination, used to calculate:
+        a_pol = 1 + np.cos(iotas) **2
+        b_pol = -2 * np.cos(iotas)
+    dur : scalar
+        Duration of observations.
+    Phi_0 : (F,S,L) NDarray
+        Initial GW phase
+    S_i : (P,F,R,L) NDarray
+        Total noise of each pulsar wrt detection of each single source, in s^3
+    freqs : (F,) 1Darray
+        Observed frequency bin centers.
+    snr_ss : (F,R,S,L) NDarray
+        Pointer to single source SNR array, to be calculated.
+
+    NOTE: This may be improved by moving some of the math outside the function.
+    I.e., passing in sin/cos of NDarrays to be used.
+    """
+
+    cdef int pp, ff, rr, ss, ll
+    cdef float a_pol, b_pol, Phi_T, pta_snr_sq, coef, term1, term2, term3
+    # print('npsrs %d, nfreqs %d, nreals %d, nskies %d, nloudest %d' % (npsrs, nfreqs, nreals, nskies, nloudest))
+    
+    for ff in range(nfreqs):
+        for ss in range(nskies):
+            for ll in range(nloudest):
+                a_pol = 1 + pow(cos(iotas[ff,ss,ll]), 2.0)
+                b_pol = -2 * cos(iotas[ff,ss,ll])
+                Phi_T = 2 * M_PI * freqs[ff] * dur + Phi_0[ff,ss,ll]
+                for rr in range(nreals):
+                    pta_snr_sq = 0
+                    for pp in range(npsrs): 
+                        # calculate coefficient depending on 
+                        # function of amp, S_i, and freqs
+                        coef = pow(amp[ff,rr,ll], 2.0) / (S_i[pp,ff,rr,ll] * 8 * pow(M_PI * freqs[ff], 3.0))
+
+                        # calculate terms that depend on p, f, s, and l 
+                        # functions of F_iplus, F_icross, a_pol, b_pol, Phi_0, and Phi_T
+                        term1 = (
+                            pow(a_pol * F_iplus[pp,ff,ss,ll], 2.0) 
+                            * (Phi_T * (1.0 + 2.0 * pow(sin(Phi_0[ff,ss,ll]), 2.0))
+                                + cos(Phi_T) * (-1.0 * sin(Phi_T) + 4.0 * cos(Phi_0[ff,ss,ll]))
+                                - 4.0 * sin(Phi_0[ff,ss,ll])
+                                )
+                        )
+                        term2 = (
+                            pow(b_pol * F_icross[pp,ff,ss,ll], 2.0)
+                            * (Phi_T * (1.0 + 2.0 * pow(cos(Phi_0[ff,ss,ll]), 2.0))
+                                + sin(Phi_T) * cos(Phi_T) - 4.0 * cos(Phi_0[ff,ss,ll])
+                                )
+                        )
+                        term3 = (
+                            -2.0 * a_pol * b_pol * F_iplus[pp,ff,ss,ll] * F_icross[pp,ff,ss,ll]
+                            * (2.0 * Phi_T * sin(Phi_T) *cos(Phi_0[ff,ss,ll])
+                                + sin(Phi_T) * (sin(Phi_T) - 2.0 * sin(Phi_0[ff,ss,ll])
+                                                + 2.0 * cos(Phi_T) * cos(Phi_0[ff,ss,ll])
+                                                - 2.0 * cos(Phi_0[ff,ss,ll])
+                                                )
+                            )
+                        )
+                        pta_snr_sq += coef*(term1 + term2 + term3) # sum snr^2 of all pulsars for a single source
+
+                    # set snr for a single source, using sum from all pulsars
+                    snr_ss[ff,rr,ss,ll] = sqrt(pta_snr_sq)
+
 
