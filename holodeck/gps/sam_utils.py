@@ -109,6 +109,23 @@ class Hard04(SamModel):
         super().__init__(param_names=param_names)
 
     def sam_for_params(self, env_pars, sam_shape):
+        """
+        Parameters
+        ----------
+        env_pars : dict
+            A dictionary containing the environmental parameters. The keys are:
+            * time: The time at which to calculate the hardening.
+            * gamma_inner: The inner slope of the hardening profile.
+            * gamma_outer: The outer slope of the hardening profile.
+            * rchar: The characteristic radius of the hardening profile.
+            * gsmf_phi0: The normalization of the galaxy stellar mass function (GSMF).
+            * mmb_amp: The amplitude of the bulge mass-to-light ratio relation.
+        sam_shape : tuple
+            The expected shape of the SAM.
+
+        Returns
+        -------
+        """
         self.validate_params(env_pars)
         time, gamma_inner, gamma_outer, rchar, gsmf_phi0, mmb_amp = env_pars.values(
         )
@@ -151,6 +168,29 @@ class Eccen01(SamModel):
         super().__init__(param_names=param_names)
 
     def sam_for_params(self, env_pars, sam_shape):
+        """Creates a Semi-Analytic Model (SAM) from the given environmental parameters and shape.
+
+        Parameters
+        ----------
+        env_pars : dict
+            A dictionary containing the environmental parameters. The keys are:
+            * eccen: The eccentricity of the SAM.
+            * gsmf_phi0: The normalization of the galaxy stellar mass function (GSMF).
+            * gpf_zbeta: The redshift slope of the galaxy power spectrum (GPF).
+            * mmb_amp: The amplitude of the bulge mass-to-light ratio relation.
+
+        sam_shape : tuple
+            The expected shape of the SAM.
+
+        Returns
+        -------
+        sam : holo.sam.Semi_Analytic_Model
+            The created SAM.
+        sepa_evo : holo.sam.SEPA_Evol
+            The evolution of the SAM's SEPA.
+        eccen_evo : holo.sam.ECCEN_Evol
+            The evolution of the SAM's eccentricity.
+        """
         self.validate_params(env_pars)
 
         eccen, gsmf_phi0, gpf_zbeta, mmb_amp = env_pars.values()
@@ -320,6 +360,7 @@ class PS_Circ_01(SamModel):
                                                   progress=False)
         return sam, hard
 
+
 class Broad_Uniform_02B(SamModel):
     _PARAM_NAMES = [
         'hard_time',
@@ -328,8 +369,10 @@ class Broad_Uniform_02B(SamModel):
         'mmb_amp_log10',
         'mmb_scatter',
     ]
+
     def __init__(self, param_names=_PARAM_NAMES):
         super().__init__(param_names=param_names)
+
     def sam_for_params(self, env_pars, sam_shape):
         hard_gamma_inner = -1.0
         hard_rchar = 10.0 * PC
