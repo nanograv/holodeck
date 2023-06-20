@@ -21,7 +21,7 @@ _CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen']
 
 class Grav_Waves:
 
-    def __init__(self, bin_evo, fobs_gw, nharms=30, nreals=100):
+    def __init__(self, bin_evo, fobs_gw, nharms=103, nreals=100):
         self.fobs_gw = fobs_gw
         self.nharms = nharms
         self.nreals = nreals
