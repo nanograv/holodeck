@@ -73,6 +73,30 @@ class _Modifier(abc.ABC):
 # =================================================================================================
 
 
+def deprecated_warn(msg, exc_info=True):
+    """Decorator for functions that will be deprecated, add warning, but still execute function.
+    """
+
+    def decorator(func):
+        nonlocal msg
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            nonlocal msg
+            old_name = func.__name__
+            _frame = inspect.currentframe().f_back
+            file_name = inspect.getfile(_frame.f_code)
+            fline = _frame.f_lineno
+            msg = f"{file_name}({fline}):{old_name} is deprecated!" + " | " + msg
+            warnings.warn_explicit(msg, category=DeprecationWarning, filename=file_name, lineno=fline)
+            log.warning(f"DEPRECATION: {msg}", exc_info=exc_info)
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
 def deprecated_pass(new_func, msg="", exc_info=True):
     """Decorator for functions that have been deprecated, warn and pass arguments to new function.
     """
@@ -270,7 +294,7 @@ def path_name_ending(path, ending):
     return fname
 
 
-def _get_subclass_instance(value, default, superclass):
+def get_subclass_instance(value, default, superclass, allow_none=False):
     """Convert the given `value` into a subclass instance.
 
     `None` ==> instance from `default` class
@@ -302,6 +326,10 @@ def _get_subclass_instance(value, default, superclass):
     # Set `value` to a default, if needed and it is given
     if (value is None) and (default is not None):
         value = default
+
+    # if `value` is not set, and there is no default, and `None` is allowed... just return None
+    if (value is None) and allow_none:
+        return value
 
     # If `value` is a class (constructor), then construct an instance from it
     if inspect.isclass(value):
@@ -779,83 +807,17 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
     return ynew
 
 
-def nyquist_freqs(
-    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
-) -> np.ndarray:
-    """Calculate Nyquist frequencies for the given timing parameters.
-
-    Parameters
-    ----------
-    dur : float,
-        Duration of observations
-    cad : float,
-        Cadence of observations
-    trim : (2,) or None,
-        Specification of minimum and maximum frequencies outside of which to remove values.
-        `None` can be used in place of either boundary, e.g. [0.1, None] would mean removing
-        frequencies below `0.1` (and not trimming values above a certain limit).
-
-    Returns
-    -------
-    freqs : ndarray,
-        Nyquist frequencies
-
-    """
+def pta_freqs(dur=16.03*YR, num=40, cad=None):
     fmin = 1.0 / dur
-    fmax = 1.0 / cad * 0.5
-    # df = fmin / sample
-    df = fmin
-    freqs = np.arange(fmin, fmax + df/10.0, df)
-    if trim is not None:
-        if np.shape(trim) != (2,):
-            raise ValueError("`trim` (shape: {}) must be (2,) of float!".format(np.shape(trim)))
-        if trim[0] is not None:
-            freqs = freqs[freqs > trim[0]]
-        if trim[1] is not None:
-            freqs = freqs[freqs < trim[1]]
+    if cad is not None:
+        num = dur / (2.0 * cad)
+        num = int(np.floor(num))
 
-    return freqs
+    cents = np.arange(1, num+2) * fmin
 
-
-def nyquist_freqs_edges(
-    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
-) -> np.ndarray:
-    """Calculate Nyquist frequencies for the given timing parameters.
-
-    Parameters
-    ----------
-    dur : float,
-        Duration of observations
-    cad : float,
-        Cadence of observations
-    trim : (2,) or None,
-        Specification of minimum and maximum frequencies outside of which to remove values.
-        `None` can be used in place of either boundary, e.g. [0.1, None] would mean removing
-        frequencies below `0.1` (and not trimming values above a certain limit).
-
-    Returns
-    -------
-    freqs : ndarray,
-        edges of Nyquist frequency bins
-
-    """
-    fmin = 1.0 / dur
-    fmax = 1.0 / cad * 0.5
-    # df = fmin / sample
-    df = fmin    # bin width
-    freqs = np.arange(fmin, fmax + df/10.0, df)   # centers
-    freqs_edges = freqs - df/2.0    # shift to edges
-    freqs_edges = np.concatenate([freqs_edges, [fmax + df/2.0]])
-
-    if trim is not None:
-        if np.shape(trim) != (2,):
-            raise ValueError("`trim` (shape: {}) must be (2,) of float!".format(np.shape(trim)))
-        if trim[0] is not None:
-            freqs_edges = freqs_edges[freqs_edges > trim[0]]
-        if trim[1] is not None:
-            freqs_edges = freqs_edges[freqs_edges < trim[1]]
-
-    return freqs_edges
+    edges = cents - fmin / 2.0
+    cents = cents[:-1]
+    return cents, edges
 
 
 def print_stats(stack=True, print_func=print, **kwargs):
@@ -2321,5 +2283,133 @@ def _array_args(*args):
 @deprecated_fail(scatter_redistribute_densities)
 def scatter_redistribute(cents, dist, dens, axis=0):
     pass
+
+
+@deprecated_warn("use `holodeck.utils.pta_freqs` instead")
+def nyquist_freqs(
+    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
+) -> np.ndarray:
+    """Calculate Nyquist frequencies for the given timing parameters.
+
+    Parameters
+    ----------
+    dur : float,
+        Duration of observations
+    cad : float,
+        Cadence of observations
+    trim : (2,) or None,
+        Specification of minimum and maximum frequencies outside of which to remove values.
+        `None` can be used in place of either boundary, e.g. [0.1, None] would mean removing
+        frequencies below `0.1` (and not trimming values above a certain limit).
+
+    Returns
+    -------
+    freqs : ndarray,
+        Nyquist frequencies
+
+    """
+    fmin = 1.0 / dur
+    fmax = 1.0 / cad * 0.5
+    # df = fmin / sample
+    df = fmin
+    freqs = np.arange(fmin, fmax + df/10.0, df)
+    if trim is not None:
+        if np.shape(trim) != (2,):
+            raise ValueError("`trim` (shape: {}) must be (2,) of float!".format(np.shape(trim)))
+        if trim[0] is not None:
+            freqs = freqs[freqs > trim[0]]
+        if trim[1] is not None:
+            freqs = freqs[freqs < trim[1]]
+
+    return freqs
+
+
+@deprecated_warn("use `holodeck.utils.pta_freqs` instead")
+def nyquist_freqs_edges(
+    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
+) -> np.ndarray:
+    """Calculate Nyquist frequencies for the given timing parameters.
+
+    Parameters
+    ----------
+    dur : float,
+        Duration of observations
+    cad : float,
+        Cadence of observations
+    trim : (2,) or None,
+        Specification of minimum and maximum frequencies outside of which to remove values.
+        `None` can be used in place of either boundary, e.g. [0.1, None] would mean removing
+        frequencies below `0.1` (and not trimming values above a certain limit).
+
+    Returns
+    -------
+    freqs : ndarray,
+        edges of Nyquist frequency bins
+
+    """
+    fmin = 1.0 / dur
+    fmax = 1.0 / cad * 0.5
+    # df = fmin / sample
+    df = fmin    # bin width
+    freqs = np.arange(fmin, fmax + df/10.0, df)   # centers
+    freqs_edges = freqs - df/2.0    # shift to edges
+    freqs_edges = np.concatenate([freqs_edges, [fmax + df/2.0]])
+
+    if trim is not None:
+        if np.shape(trim) != (2,):
+            raise ValueError("`trim` (shape: {}) must be (2,) of float!".format(np.shape(trim)))
+        if trim[0] is not None:
+            freqs_edges = freqs_edges[freqs_edges > trim[0]]
+        if trim[1] is not None:
+            freqs_edges = freqs_edges[freqs_edges < trim[1]]
+
+    return freqs_edges
+
+
+@deprecated_pass(get_subclass_instance)
+def _get_subclass_instance(value, default, superclass):
+    """Convert the given `value` into a subclass instance.
+
+    `None` ==> instance from `default` class
+    Class ==> instance from that class
+    instance ==> check that this is an instance of a subclass of `superclass`, error if not
+
+    Parameters
+    ----------
+    value : object,
+        Object to convert into a class instance.
+    default : class,
+        Default class constructor to use if `value` is None.
+    superclass : class,
+        Super/parent class to compare against the class instance from `value` or `default`.
+        If the class instance is not a subclass of `superclass`, a ValueError is raised.
+
+    Returns
+    -------
+    value : object,
+        Class instance that is a subclass of `superclass`.
+
+    Raises
+    ------
+    ValueError : if the class instance is not a subclass of `superclass`.
+
+    """
+    import inspect
+
+    # Set `value` to a default, if needed and it is given
+    if (value is None) and (default is not None):
+        value = default
+
+    # If `value` is a class (constructor), then construct an instance from it
+    if inspect.isclass(value):
+        value = value()
+
+    # Raise an error if `value` is not a subclass of `superclass`
+    if not isinstance(value, superclass):
+        err = f"argument ({value}) must be an instance or subclass of `{superclass}`!"
+        log.error(err)
+        raise ValueError(err)
+
+    return value
 
 

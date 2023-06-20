@@ -614,7 +614,7 @@ class PM_Mass_Reset(_Population_Modifier):
         """
         # if `mhost` is a class (not an instance), then instantiate it; make sure its a subclass
         # of `_Host_Relation`
-        mhost = utils._get_subclass_instance(mhost, None, holo.relations._Host_Relation)
+        mhost = utils.get_subclass_instance(mhost, None, holo.relations._Host_Relation)
         # store attributes
         self.mhost = mhost         #: Scaling relationship between host and MBH (`holo.relations._Host_Relation`)
         self._scatter = scatter    #: Bool determining whether resampled masses should include statistical scatter

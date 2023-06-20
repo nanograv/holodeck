@@ -1,5 +1,8 @@
 #!/usr/bin/env python
-"""
+"""Convert target notebooks into python files which can be run as tests.
+
+Notebooks are listed in the file "notebooks/ci_test_notebooks.txt"
+
 """
 
 import os
@@ -8,14 +11,6 @@ import shutil
 import glob
 import subprocess
 import logging
-
-TEST_NOTEBOOK_NAMES = [
-    'discrete_illustris',
-    'host-relations',
-    'relations',
-    'semi-analytic-models',
-    'utils',
-]
 
 REPLACEMENTS = [
     ["plt.show()", "plt.close('all')"]
@@ -26,6 +21,8 @@ PATH = os.path.dirname(os.path.abspath(__file__))
 PATH = os.path.realpath(os.path.join(PATH, os.path.pardir))
 # Path in the package in which the notebooks are stored
 PATH_NOTEBOOKS = os.path.join(PATH, 'notebooks')
+# Path for file containing list of notebooks to run tests on
+LIST_NOTEBOOKS_FNAME = os.path.join(PATH_NOTEBOOKS, 'ci_test_notebooks.txt')
 # Path in the package in which tests are stored
 PATH_TESTS = os.path.join(PATH, 'holodeck', 'tests')
 
@@ -46,13 +43,15 @@ def main():
     if '-v' in sys.argv:
         logging.getLogger().setLevel(0)
 
+    def_notebook_names = load_notebook_test_names()
+
     args = sys.argv[1:]
     notebook_names = []
     if len(args) > 0:
         notebook_names = [aa.split('.')[0] for aa in args if not aa.startswith('-')]
 
     if len(notebook_names) == 0:
-        notebook_names = [nb for nb in TEST_NOTEBOOK_NAMES]
+        notebook_names = [nb for nb in def_notebook_names]
 
     logging.info("Path: '{}'".format(PATH))
     logging.info("\tnotebooks: '{}'".format(PATH_NOTEBOOKS))
@@ -63,7 +62,7 @@ def main():
     for nb in all_notebooks:
         base = os.path.basename(nb).replace(NOTEBOOK_SUFFIX, '')
         logging.debug("\t" + str(base))
-        if base not in TEST_NOTEBOOK_NAMES:
+        if base not in def_notebook_names:
             logging.warning("Found notebook '{}' not in test list".format(base))
 
     logging.info("`PATH_NOTEBOOKS_TESTS` = '{}'".format(PATH_NOTEBOOK_TESTS))
@@ -79,6 +78,12 @@ def main():
     convert_notebooks(notebook_names)
 
     return
+
+
+def load_notebook_test_names():
+    with open(LIST_NOTEBOOKS_FNAME, 'r') as list_file:
+        lines = [line.strip() for line in list_file.readlines()]
+    return lines
 
 
 def convert_notebooks(notebook_names):
