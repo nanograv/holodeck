@@ -1,8 +1,17 @@
 """Semi-Analytic Model - Components
+
+
+References
+----------
+* [Sesana2008]_ Sesana, Vecchio, Colacino 2008.
+* [Chen2019]_ Chen, Sesana, Conselice 2019.
+* [Leja2020]_ Leja, Speagle, Johnson, et al. 2020.
+    A New Census of the 0.2 < z < 3.0 Universe. I. The Stellar Mass Function
+    https://ui.adsabs.harvard.edu/abs/2020ApJ...893..111L/abstract
+
 """
 
 import abc
-# from datetime import datetime
 
 import numpy as np
 
@@ -149,6 +158,99 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
         """See: [Chen2019]_ Eq.11
         """
         return self._alpha0 + self._alphaz * redz
+
+
+class GSMF_Single_Schechter(_Galaxy_Stellar_Mass_Function):
+    r"""Single Schechter Function - Galaxy Stellar Mass Function.
+
+    This is density per unit log10-interval of stellar mass, i.e. $Phi = dn / d\\log_{10}(M)$
+
+    """
+
+    def __init__(self, phi0=-2.77, phiz=-0.27, mchar0_log10=11.24, mchar0=None, mcharz=0.0, alpha0=-1.24, alphaz=-0.03):
+        mchar0, _ = utils._parse_val_log10_val_pars(
+            mchar0, mchar0_log10, val_units=MSOL, name='mchar0', only_one=True
+        )
+
+        self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]  [log10(1/Mpc^3)]
+        self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]  [log10(1/Mpc^3)]
+        self._mchar0 = mchar0       # 10^ (+11.24  +/- [-0.17, +0.20]  [log10(Msol)])
+        self._mcharz = mcharz       #  0.0                        [log10(Msol)]    # noqa
+        self._alpha0 = alpha0     # -1.24   +/- [-0.16, +0.16]
+        self._alphaz = alphaz     # -0.03   +/- [-0.14, +0.16]
+        return
+
+    def __call__(self, mstar, redz):
+        r"""Return the number-density of galaxies at a given stellar mass.
+
+        See: [Chen2019] Eq.8
+
+        Parameters
+        ----------
+        mstar : scalar or ndarray
+            Galaxy stellar-mass in units of [grams]
+        redz : scalar or ndarray
+            Redshift.
+
+        Returns
+        -------
+        rv : scalar or ndarray
+            Number-density of galaxies per log-interval of mass in units of [Mpc^-3]
+            i.e.  ``Phi = dn / d\\log_{10}(M)``
+
+        """
+        phi = self._phi_func(redz)
+        mchar = self._mchar_func(redz)
+        alpha = self._alpha_func(redz)
+        xx = mstar / mchar
+        # [Chen2019]_ Eq.8
+        rv = np.log(10.0) * phi * np.power(xx, 1.0 + alpha) * np.exp(-xx)
+        return rv
+
+    def _phi_func(self, redz):
+        """See: [Chen2019]_ Eq.9
+        """
+        return np.power(10.0, self._phi0 + self._phiz * redz)
+
+    def _mchar_func(self, redz):
+        """See: [Chen2019]_ Eq.10 - NOTE: added `redz` term
+        """
+        return self._mchar0 + self._mcharz * redz
+
+    def _alpha_func(self, redz):
+        """See: [Chen2019]_ Eq.11
+        """
+        return self._alpha0 + self._alphaz * redz
+
+
+class GSMF_Double_Schechter(_Galaxy_Stellar_Mass_Function):
+    r"""Double Schechter Function - Galaxy Stellar Mass Function.
+
+    This is volumetric number-density per unit log10-interval of stellar mass,
+    i.e. $Phi = dn / d\\log_{10}(M)$
+
+    Phi(M') = \ln(10) \phi_\star 10^{(M'-Mstar')(a+1)} \\exp(-10^{M'-Mstar'})
+
+    See: [Leja2020]_, Eq.14
+
+    """
+
+    def __init__(self):
+        # mchar0, _ = utils._parse_val_log10_val_pars(
+        #     mchar0, mchar0_log10, val_units=MSOL, name='mchar0', only_one=True
+        # )
+
+        return
+
+    def __call__(self, mstar, redz):
+        phi = self._phi_func(redz)
+        mchar = self._mchar_func(redz)
+        alpha = self._alpha_func(redz)
+        xx = mstar / mchar
+        # [Chen2019]_ Eq.8
+        rv = np.log(10.0) * phi * np.power(xx, 1.0 + alpha) * np.exp(-xx)
+        return rv
+
 
 
 # ----    Galaxy Merger Rate    ----
