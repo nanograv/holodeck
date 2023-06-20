@@ -1,8 +1,17 @@
 """Semi-Analytic Model - Components
+
+
+References
+----------
+* [Sesana2008]_ Sesana, Vecchio, Colacino 2008.
+* [Chen2019]_ Chen, Sesana, Conselice 2019.
+* [Leja2020]_ Leja, Speagle, Johnson, et al. 2020.
+    A New Census of the 0.2 < z < 3.0 Universe. I. The Stellar Mass Function
+    https://ui.adsabs.harvard.edu/abs/2020ApJ...893..111L/abstract
+
 """
 
 import abc
-# from datetime import datetime
 
 import numpy as np
 
@@ -149,6 +158,55 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
         """See: [Chen2019]_ Eq.11
         """
         return self._alpha0 + self._alphaz * redz
+
+
+class _GSMF_Single_Schechter(_Galaxy_Stellar_Mass_Function):
+
+    def __init__(self, log10_phi_terms, log10_mstar_terms, alpha):
+        self._log10_phi_terms = log10_phi_terms
+        self._log10_mstar_terms = log10_mstar_terms
+        self._alpha = alpha
+        return
+
+    def __call__(self, mstar, redz):
+        phi = self._phi_func(redz)
+        mchar = self._mstar_func(redz)
+        alpha = self._alpha
+        xx = mstar / mchar
+        rv = np.log(10.0) * phi * np.power(xx, 1.0 + alpha) * np.exp(-xx)
+        return rv
+
+    def _phi_func(self, redz):
+        cc = self._log10_phi_terms
+        phi = np.power(10.0, cc[0] + cc[1] * redz + cc[2] * redz**2)
+        return phi
+
+    def _mstar_func(self, redz):
+        cc = self._log10_mstar_terms
+        mstar = MSOL * np.power(10.0, cc[0] + cc[1] * redz + cc[2] * redz**2)
+        return mstar
+
+
+class GSMF_Double_Schechter(_Galaxy_Stellar_Mass_Function):
+
+    def __init__(
+        self,
+        phi1=[-2.383, -0.264, -0.107],
+        phi2=[-2.818, -0.368, +0.046],
+        mstar=[+10.767, +0.124, -0.033],
+        alpha1=-0.28,
+        alpha2=-1.48
+    ):
+        gsmf_one = _GSMF_Single_Schechter(log10_phi_terms=phi1, log10_mstar_terms=mstar, alpha=alpha1)
+        gsmf_two = _GSMF_Single_Schechter(log10_phi_terms=phi2, log10_mstar_terms=mstar, alpha=alpha2)
+        self._gsmf_one = gsmf_one
+        self._gsmf_two = gsmf_two
+        return
+
+    def __call__(self, mstar, redz):
+        vals = self._gsmf_one(mstar, redz)
+        vals += self._gsmf_two(mstar, redz)
+        return vals
 
 
 # ----    Galaxy Merger Rate    ----
