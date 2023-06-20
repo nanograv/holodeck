@@ -90,3 +90,15 @@ def test_sam_basics_gmr():
     _test_sam_basics(sam)
 
     return
+
+
+def test_sam_basics__gsmf_double_chechter():
+    """explicitly construct SAM GSMF_Double_Schechter
+    """
+    SHAPE = 12
+
+    gsmf = holo.sams.GSMF_Double_Schechter()
+    sam = holo.sams.Semi_Analytic_Model(gsmf=gsmf, shape=SHAPE)
+    _test_sam_basics(sam)
+
+    return
