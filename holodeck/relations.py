@@ -540,7 +540,7 @@ def get_mmbulge_relation(mmbulge: Union[_MMBulge_Relation, Type[_MMBulge_Relatio
         Instance of an Mbh-Mbulge relationship.
 
     """
-    return utils._get_subclass_instance(mmbulge, MMBulge_KH2013, _MMBulge_Relation)
+    return utils.get_subclass_instance(mmbulge, MMBulge_KH2013, _MMBulge_Relation)
 
 
 # ----------------------------------------
@@ -689,7 +689,7 @@ def get_msigma_relation(msigma: Union[_MSigma_Relation, Type[_MSigma_Relation]] 
         Instance of an Mbh-sigma relationship.
 
     """
-    return utils._get_subclass_instance(msigma, MSigma_KH2013, _MSigma_Relation)
+    return utils.get_subclass_instance(msigma, MSigma_KH2013, _MSigma_Relation)
 
 
 def _add_scatter(vals: ArrayLike, eps: ArrayLike) -> ArrayLike:
@@ -1444,4 +1444,4 @@ def get_stellar_mass_halo_mass_relation(
         Instance of an Mbh-Mbulge relationship.
 
     """
-    return utils._get_subclass_instance(smhm, Behroozi_2013, _StellarMass_HaloMass)
+    return utils.get_subclass_instance(smhm, Behroozi_2013, _StellarMass_HaloMass)

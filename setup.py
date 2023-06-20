@@ -47,9 +47,9 @@ ext_cyutils = Extension(
     extra_compile_args=['-Wno-unreachable-code-fallthrough', '-Wno-unused-function'],
 )
 
-ext_sam_cython = Extension(
-    "holodeck.sam_cython",    # specify the resulting name/location of compiled extension
-    sources=[join('.', 'holodeck', 'sam_cython.pyx')],   # location of source code
+ext_sam_cyutils = Extension(
+    "holodeck.sams.cyutils",    # specify the resulting name/location of compiled extension
+    sources=[join('.', 'holodeck', 'sams', 'cyutils.pyx')],   # location of source code
     # define parameters external libraries
     include_dirs=[
         np.get_include()
@@ -66,7 +66,7 @@ ext_sam_cython = Extension(
 )
 
 cython_modules = cythonize(
-    [ext_cyutils, ext_sam_cython],
+    [ext_cyutils, ext_sam_cyutils],
     compiler_directives={"language_level": "3"},
     annotate=True,   # create html output about cython files
 )
