@@ -1581,9 +1581,6 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
         Fraction of realizations with a single source detection, for each sample.
     df_bg : (N,) 1Darray
         Fraction of realizations with a background detection, for each sample.
-    ev_ss : (N,) 1Darray
-        Expectation number of single source detections, averaged across realizations,
-        for each sample.
 
     """
 
@@ -1626,7 +1623,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
     snr_bg = np.zeros((nsamp, nfreqs, nreals))
     df_ss = np.zeros(nsamp)
     df_bg = np.zeros(nsamp)
-    ev_ss = np.zeros(nsamp)
+    # ev_ss = np.zeros(nsamp)
     gamma_ssi = np.zeros((nsamp, nfreqs, nreals, nskies, nloudest))
 
     # # one time calculations
@@ -1645,7 +1642,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
         # df_ss[nn] = np.sum(dp_ss[nn]>thresh)/(nreals*nskies)
         # df_bg[nn] = np.sum(dp_bg[nn]>thresh)/(nreals)
         df_ss[nn], df_bg[nn] = detfrac_of_reals(dp_ss[nn], dp_bg[nn], thresh)
-        ev_ss[nn] = expval_of_ss(gamma_ssi)
+        # ev_ss[nn] = expval_of_ss(gamma_ssi)
 
         if plot:
             fig = plot_sample_nn(fobs, hc_ss[nn], hc_bg[nn],
@@ -1665,7 +1662,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
     np.savez(output_dir+'/detstats.npz', dp_ss=dp_ss, dp_bg=dp_bg,
              df_ss=df_ss, df_bg=df_bg, snr_ss=snr_ss, snr_bg=snr_bg, gamma_ssi=gamma_ssi)
 
-    return dp_ss, dp_bg, df_ss, df_bg, snr_ss, snr_bg, ev_ss
+    return dp_ss, dp_bg, df_ss, df_bg, snr_ss, snr_bg #, ev_ss
 
 
 def _build_skies(nfreqs, nskies, nloudest):
@@ -1703,8 +1700,8 @@ def detfrac_of_reals(dp_ss, dp_bg, thresh=DEF_THRESH):
     
 
 
-def expval_of_ss(gamma_ssi, thresh=DEF_THRESH):
-    """ Calculate the expected number of single source detections for a given realization
+def expval_of_ss(gamma_ssi,):
+    """ Calculate the expected number of single source detections, across all realization
 
     Parameters
     ----------
@@ -1717,8 +1714,8 @@ def expval_of_ss(gamma_ssi, thresh=DEF_THRESH):
         Expected number of single source detection (dp_ss>thresh) averaged across all strain and sky realizations.
     
     """
-
-    ev_ss = np.sum(gamma_ssi>thresh)/(gamma_ssi.size)
+    nfreqs, nreals, nskies, nloudest = [*gamma_ssi.size]
+    ev_ss = np.sum(gamma_ssi)/(nreals*nskies)
     return ev_ss
     # df_bg[nn] = np.sum(dp_bg[nn]>thresh)/(nreals)
 
@@ -1848,7 +1845,7 @@ def plot_detfrac(df_ss, df_bg, nsamp, thresh):
 
 
 def amp_to_hc(amp_ref, fobs, dfobs):
-    """ Calculate characteristic strain from strain amplitude.
+    """ Calculate characteristic strain from strain amplitude (from 1/yr amplitude).
 
     """
     hc = amp_ref*np.sqrt(fobs/dfobs)
