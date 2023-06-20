@@ -1538,7 +1538,8 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
 
 def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
                    dur=None, cad=None, dfobs=None, plot=True, debug=False,
-                   grid_path=GAMMA_RHO_GRID_PATH, snr_cython = True):
+                   grid_path=GAMMA_RHO_GRID_PATH, snr_cython = True, 
+                   save_ssi=False, ret_dict=False):
     """ Calculate detection statistics for an ss library output.
 
     Parameters
@@ -1559,6 +1560,12 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
         Whether or not to make and save plots.
     debug : Bool
         Whether to print info along the way.
+    grid_path : string
+        Path to snr interpolation grid
+    snr_cython : Bool
+        Whether to use cython interpolation for ss snr calculation.
+    save_ssi : Bool
+        Whether to store gamma_ssi in npz arrays
 
     Returns
     -------
@@ -1627,7 +1634,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
     df_ss = np.zeros(nsamp)
     df_bg = np.zeros(nsamp)
     ev_ss = np.zeros(nsamp)
-    gamma_ssi = np.zeros((nsamp, nfreqs, nreals, nskies, nloudest))
+    if save_ssi: gamma_ssi = np.zeros((nsamp, nfreqs, nreals, nskies, nloudest))
 
     # # one time calculations
     # Num = nfreqs * nloudest # number of single sources in a single strain realization (F*L)
@@ -1641,11 +1648,10 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
                                                 gamma_cython=True, snr_cython=snr_cython,
                                                 theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss,
                                                 iota_ss=iota_ss, psi_ss=psi_ss, grid_path=grid_path)
-        dp_ss[nn,:,:], snr_ss[nn,...], gamma_ssi[nn] = vals_ss[0], vals_ss[1], vals_ss[2]
-        # df_ss[nn] = np.sum(dp_ss[nn]>thresh)/(nreals*nskies)
-        # df_bg[nn] = np.sum(dp_bg[nn]>thresh)/(nreals)
+        dp_ss[nn,:,:], snr_ss[nn,...] = vals_ss[0], vals_ss[1],
         df_ss[nn], df_bg[nn] = detfrac_of_reals(dp_ss[nn], dp_bg[nn], thresh)
         ev_ss[nn] = expval_of_ss(gamma_ssi)
+        if save_ssi: gamma_ssi[nn] = vals_ss[2]
 
         if plot:
             fig = plot_sample_nn(fobs, hc_ss[nn], hc_bg[nn],
@@ -1662,10 +1668,22 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
     fig2.savefig(output_dir+'/allsamp_detfracs.png', dpi=300)
     plt.close(fig1)
     plt.close(fig2)
-    np.savez(output_dir+'/detstats.npz', dp_ss=dp_ss, dp_bg=dp_bg,
-             df_ss=df_ss, df_bg=df_bg, snr_ss=snr_ss, snr_bg=snr_bg, gamma_ssi=gamma_ssi)
-
-    return dp_ss, dp_bg, df_ss, df_bg, snr_ss, snr_bg, ev_ss
+    if save_ssi:
+        np.savez(output_dir+'/detstats.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
+              snr_ss=snr_ss, snr_bg=snr_bg, ev_ss = ev_ss, gamma_ssi=gamma_ssi)
+    else:
+        np.savez(output_dir+'/detstats.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
+              snr_ss=snr_ss, snr_bg=snr_bg, ev_ss = ev_ss)
+        
+    # return dictionary 
+    if ret_dict:
+        data = {
+            'dp_ss':dp_ss, 'dp_bg':dp_bg, 'df_ss':df_ss, 'df_bg':df_bg,
+            'snr_ss':snr_ss, 'snr_bg':snr_bg, 'ev_ss':ev_ss
+        }
+        if save_ssi: data.update({'gamma_ssi':gamma_ssi})
+        return data
+    return 
 
 
 def _build_skies(nfreqs, nskies, nloudest):
