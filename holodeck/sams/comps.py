@@ -160,97 +160,53 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
         return self._alpha0 + self._alphaz * redz
 
 
-class GSMF_Single_Schechter(_Galaxy_Stellar_Mass_Function):
-    r"""Single Schechter Function - Galaxy Stellar Mass Function.
+class _GSMF_Single_Schechter(_Galaxy_Stellar_Mass_Function):
 
-    This is density per unit log10-interval of stellar mass, i.e. $Phi = dn / d\\log_{10}(M)$
-
-    """
-
-    def __init__(self, phi0=-2.77, phiz=-0.27, mchar0_log10=11.24, mchar0=None, mcharz=0.0, alpha0=-1.24, alphaz=-0.03):
-        mchar0, _ = utils._parse_val_log10_val_pars(
-            mchar0, mchar0_log10, val_units=MSOL, name='mchar0', only_one=True
-        )
-
-        self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]  [log10(1/Mpc^3)]
-        self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]  [log10(1/Mpc^3)]
-        self._mchar0 = mchar0       # 10^ (+11.24  +/- [-0.17, +0.20]  [log10(Msol)])
-        self._mcharz = mcharz       #  0.0                        [log10(Msol)]    # noqa
-        self._alpha0 = alpha0     # -1.24   +/- [-0.16, +0.16]
-        self._alphaz = alphaz     # -0.03   +/- [-0.14, +0.16]
+    def __init__(self, log10_phi_terms, log10_mstar_terms, alpha):
+        self._log10_phi_terms = log10_phi_terms
+        self._log10_mstar_terms = log10_mstar_terms
+        self._alpha = alpha
         return
 
     def __call__(self, mstar, redz):
-        r"""Return the number-density of galaxies at a given stellar mass.
-
-        See: [Chen2019] Eq.8
-
-        Parameters
-        ----------
-        mstar : scalar or ndarray
-            Galaxy stellar-mass in units of [grams]
-        redz : scalar or ndarray
-            Redshift.
-
-        Returns
-        -------
-        rv : scalar or ndarray
-            Number-density of galaxies per log-interval of mass in units of [Mpc^-3]
-            i.e.  ``Phi = dn / d\\log_{10}(M)``
-
-        """
         phi = self._phi_func(redz)
-        mchar = self._mchar_func(redz)
-        alpha = self._alpha_func(redz)
+        mchar = self._mstar_func(redz)
+        alpha = self._alpha
         xx = mstar / mchar
-        # [Chen2019]_ Eq.8
         rv = np.log(10.0) * phi * np.power(xx, 1.0 + alpha) * np.exp(-xx)
         return rv
 
     def _phi_func(self, redz):
-        """See: [Chen2019]_ Eq.9
-        """
-        return np.power(10.0, self._phi0 + self._phiz * redz)
+        cc = self._log10_phi_terms
+        phi = np.power(10.0, cc[0] + cc[1] * redz + cc[2] * redz**2)
+        return phi
 
-    def _mchar_func(self, redz):
-        """See: [Chen2019]_ Eq.10 - NOTE: added `redz` term
-        """
-        return self._mchar0 + self._mcharz * redz
-
-    def _alpha_func(self, redz):
-        """See: [Chen2019]_ Eq.11
-        """
-        return self._alpha0 + self._alphaz * redz
+    def _mstar_func(self, redz):
+        cc = self._log10_mstar_terms
+        mstar = MSOL * np.power(10.0, cc[0] + cc[1] * redz + cc[2] * redz**2)
+        return mstar
 
 
 class GSMF_Double_Schechter(_Galaxy_Stellar_Mass_Function):
-    r"""Double Schechter Function - Galaxy Stellar Mass Function.
 
-    This is volumetric number-density per unit log10-interval of stellar mass,
-    i.e. $Phi = dn / d\\log_{10}(M)$
-
-    Phi(M') = \ln(10) \phi_\star 10^{(M'-Mstar')(a+1)} \\exp(-10^{M'-Mstar'})
-
-    See: [Leja2020]_, Eq.14
-
-    """
-
-    def __init__(self):
-        # mchar0, _ = utils._parse_val_log10_val_pars(
-        #     mchar0, mchar0_log10, val_units=MSOL, name='mchar0', only_one=True
-        # )
-
+    def __init__(
+        self,
+        phi1=[-2.383, -0.264, -0.107],
+        phi2=[-2.818, -0.368, +0.046],
+        mstar=[+10.767, +0.124, -0.033],
+        alpha1=-0.28,
+        alpha2=-1.48
+    ):
+        gsmf_one = _GSMF_Single_Schechter(log10_phi_terms=phi1, log10_mstar_terms=mstar, alpha=alpha1)
+        gsmf_two = _GSMF_Single_Schechter(log10_phi_terms=phi2, log10_mstar_terms=mstar, alpha=alpha2)
+        self._gsmf_one = gsmf_one
+        self._gsmf_two = gsmf_two
         return
 
     def __call__(self, mstar, redz):
-        phi = self._phi_func(redz)
-        mchar = self._mchar_func(redz)
-        alpha = self._alpha_func(redz)
-        xx = mstar / mchar
-        # [Chen2019]_ Eq.8
-        rv = np.log(10.0) * phi * np.power(xx, 1.0 + alpha) * np.exp(-xx)
-        return rv
-
+        vals = self._gsmf_one(mstar, redz)
+        vals += self._gsmf_two(mstar, redz)
+        return vals
 
 
 # ----    Galaxy Merger Rate    ----
