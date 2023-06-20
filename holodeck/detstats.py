@@ -1578,11 +1578,12 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
         Signal to noise ratio of the background at each
         frequency of each realization.
     df_ss : (N,)
-        Fraction of realizations with a single source detection.
+        Fraction of realizations with a single source detection, for each sample.
     df_bg : (N,) 1Darray
-        Fraction of realizations with a background detection.
-
-    TODO: Speed it up by doing the gamma_ssi integration in cython.
+        Fraction of realizations with a background detection, for each sample.
+    ev_ss : (N,) 1Darray
+        Expectation number of single source detections, averaged across realizations,
+        for each sample.
 
     """
 
@@ -1625,6 +1626,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
     snr_bg = np.zeros((nsamp, nfreqs, nreals))
     df_ss = np.zeros(nsamp)
     df_bg = np.zeros(nsamp)
+    ev_ss = np.zeros(nsamp)
     gamma_ssi = np.zeros((nsamp, nfreqs, nreals, nskies, nloudest))
 
     # # one time calculations
@@ -1640,8 +1642,10 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
                                                 theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss,
                                                 iota_ss=iota_ss, psi_ss=psi_ss, grid_path=grid_path)
         dp_ss[nn,:,:], snr_ss[nn,...], gamma_ssi[nn] = vals_ss[0], vals_ss[1], vals_ss[2]
-        df_ss[nn] = np.sum(dp_ss[nn]>thresh)/(nreals*nskies)
-        df_bg[nn] = np.sum(dp_bg[nn]>thresh)/(nreals)
+        # df_ss[nn] = np.sum(dp_ss[nn]>thresh)/(nreals*nskies)
+        # df_bg[nn] = np.sum(dp_bg[nn]>thresh)/(nreals)
+        df_ss[nn], df_bg[nn] = detfrac_of_reals(dp_ss[nn], dp_bg[nn], thresh)
+        ev_ss[nn] = expval_of_ss(gamma_ssi)
 
         if plot:
             fig = plot_sample_nn(fobs, hc_ss[nn], hc_bg[nn],
@@ -1661,7 +1665,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
     np.savez(output_dir+'/detstats.npz', dp_ss=dp_ss, dp_bg=dp_bg,
              df_ss=df_ss, df_bg=df_bg, snr_ss=snr_ss, snr_bg=snr_bg, gamma_ssi=gamma_ssi)
 
-    return dp_ss, dp_bg, df_ss, df_bg, snr_ss, snr_bg
+    return dp_ss, dp_bg, df_ss, df_bg, snr_ss, snr_bg, ev_ss
 
 
 def _build_skies(nfreqs, nskies, nloudest):
@@ -1671,6 +1675,53 @@ def _build_skies(nfreqs, nskies, nloudest):
     iota_ss = np.random.uniform(0,  np.pi, size = theta_ss.size).reshape(theta_ss.shape)
     psi_ss = np.random.uniform(0,   np.pi, size = theta_ss.size).reshape(theta_ss.shape)
     return theta_ss, phi_ss, Phi0_ss, iota_ss, psi_ss
+
+
+def detfrac_of_reals(dp_ss, dp_bg, thresh=DEF_THRESH):
+    """ Calculate the fraction of realizations with a detection.
+
+    Parameters
+    ----------
+    dp_ss : (R,S) Ndarray
+        Single source detection probability for each of
+    dp_bg : (R) Ndarray
+        Background detectin probability.
+    thresh : float
+        Fractional threshold for DP to claim a detection.
+    
+    Returns
+    -------
+    df_ss : float
+        Fraction of realizations with dp_ss>threshold
+    def_bg : float
+        Fraction of realizations with dp_bg>threshold
+    """ 
+
+    df_ss = np.sum(dp_ss>thresh)/(dp_ss.size)
+    df_bg = np.sum(dp_bg>thresh)/(dp_bg.size)
+    return df_ss, df_bg
+    
+
+
+def expval_of_ss(gamma_ssi, thresh=DEF_THRESH):
+    """ Calculate the expected number of single source detections for a given realization
+
+    Parameters
+    ----------
+    gamma_ssi : (F,R,S,L) NDarray
+        Detection probability of each single source
+
+    Returns
+    -------
+    ev_ss : int
+        Expected number of single source detection (dp_ss>thresh) averaged across all strain and sky realizations.
+    
+    """
+
+    ev_ss = np.sum(gamma_ssi>thresh)/(gamma_ssi.size)
+    return ev_ss
+    # df_bg[nn] = np.sum(dp_bg[nn]>thresh)/(nreals)
+
 
 
 ############################# Plot Library #############################
