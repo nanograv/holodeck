@@ -179,7 +179,6 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     num_binaries = _lambda_fact * dlnf
 
     shape = (num_binaries.size, nreals)
-    # num_pois = np.random.poisson(num_binaries[:, np.newaxis], shape)
     num_pois = poisson_as_needed(num_binaries[:, np.newaxis] * np.ones(shape))
 
     # --- Calculate GW Signals

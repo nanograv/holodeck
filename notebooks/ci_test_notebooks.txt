@@ -1,4 +1,5 @@
 discrete_illustris
+discrete_hardening_models
 host-relations
 relations
 semi-analytic-models
