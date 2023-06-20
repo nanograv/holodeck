@@ -13,6 +13,8 @@ DEF_SIGMA = 1e-6
 
 DEF_NSKIES = 25
 DEF_THRESH = 0.5
+DEF_SNR_CYTHON = True
+DEF_SAVE_SSI = False
 
 GAMMA_RHO_GRID_PATH = '/Users/emigardiner/GWs/holodeck/output/rho_gamma_grids' # modify for system
 
@@ -42,8 +44,10 @@ def _setup_argparse():
                         help='produce plots for each simulation configuration')
     parser.add_argument('--debug', action='store_true', default=False,
                         help='print steps along the way')
-    parser.add_argument('--snr_cython', action='store_true', default=False,
+    parser.add_argument('--snr_cython', action='store_true', default=DEF_SNR_CYTHON,
                         help='Use cython for ss snr clculations')
+    parser.add_argument('--save_ssi', action='store_true', default=DEF_SAVE_SSI,
+                        help="Save 'gamma_ssi', the detprob of each single source.")
     
     args = parser.parse_args()
     return args
@@ -80,7 +84,7 @@ def main():
     ds.detect_lib(hdf_name, output_dir, args.npsrs, args.sigma, 
                         nskies=args.nskies, thresh=args.thresh, plot=args.plot, debug=args.debug,
                         dur=dur, cad=cad, dfobs=dfobs, grid_path=args.grid_path, 
-                        snr_cython=args.snr_cython)
+                        snr_cython=args.snr_cython, save_ssi=args.save_ssi)
   
 
 if __name__ == "__main__":
