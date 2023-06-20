@@ -4,7 +4,7 @@
 import numpy as np
 import pytest
 
-import holodeck as holo
+# import holodeck as holo
 from holodeck.constants import MSOL
 
 from holodeck.sams import comps
@@ -51,6 +51,16 @@ def test_gsmf_base():
 
 def test_GSMF_Schechter():
     gsmf = comps.GSMF_Schechter()
+    SIZE = 100
+    mstar = MSOL * (10.0**np.random.uniform(10, 15, SIZE))
+    redz = np.random.uniform(0.0, 10.0, SIZE)
+
+    vals = gsmf(mstar, redz)   # noqa
+    return
+
+
+def test_GSMF_Double_Schechter():
+    gsmf = comps.GSMF_Double_Schechter()
     SIZE = 100
     mstar = MSOL * (10.0**np.random.uniform(10, 15, SIZE))
     redz = np.random.uniform(0.0, 10.0, SIZE)
