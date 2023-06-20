@@ -27,12 +27,7 @@ in $a$ or $f$ is subtle, as it requires modeling the binary evolution (i.e. hard
 
 To-Do
 -----
-* Change mass-ratios and redshifts (1+z) to log-space; expand q parameter range.
-* Incorporate arbitrary hardening mechanisms into SAM construction, sample self-consistently.
-* Should there be an additional dimension of parameter space for galaxy properties?  This way
-  variance in scaling relations is incorporated directly before calculating realizations.
 * Allow SAM class to take M-sigma in addition to M-Mbulge.
-* Should GW calculations be moved to the `gravwaves.py` module?
 
 References
 ----------
@@ -41,7 +36,6 @@ References
 
 """
 
-import abc
 from datetime import datetime
 
 import numpy as np
@@ -51,316 +45,20 @@ import scipy.interpolate  # noqa
 import kalepy as kale
 
 import holodeck as holo
-from holodeck import cosmo, utils   # , log
-from holodeck.constants import GYR, SPLC, MSOL, MPC, YR, PC
-from holodeck import relations, gravwaves, single_sources
-import holodeck.sam_cython
+from holodeck import cosmo, utils, log
+from holodeck.constants import SPLC, MSOL, MPC
+from holodeck import relations, single_sources
+from . import cyutils as sam_cyutils
+from holodeck.sams.comps import (
+    _Galaxy_Pair_Fraction, _Galaxy_Stellar_Mass_Function, _Galaxy_Merger_Time, _Galaxy_Merger_Rate,
+    GSMF_Schechter, GPF_Power_Law, GMT_Power_Law, GMR_Illustris
+)
 
 REDZ_SAMPLE_VOLUME = True    #: get redshifts by sampling uniformly in 3D spatial volume, and converting
 
 GSMF_USES_MTOT = False       #: the mass used in the GSMF is interpretted as M=m1+m2, otherwise use primary m1
 GPF_USES_MTOT = False        #: the mass used in the GPF  is interpretted as M=m1+m2, otherwise use primary m1
 GMT_USES_MTOT = False        #: the mass used in the GMT  is interpretted as M=m1+m2, otherwise use primary m1
-
-# ZERO_GMT_STALLED_SYSTEMS = False
-
-
-# ==============================
-# ====    SAM Components    ====
-# ==============================
-
-
-# ----    Galaxy Stellar-Mass Function    ----
-
-
-class _Galaxy_Stellar_Mass_Function(abc.ABC):
-    """Galaxy Stellar-Mass Function base-class.  Used to calculate number-density of galaxies.
-
-
-    """
-
-    @abc.abstractmethod
-    def __init__(self, *args, **kwargs):
-        return
-
-    @abc.abstractmethod
-    def __call__(self, mstar, redz):
-        """Return the number-density of galaxies at a given stellar mass, per log10 interval of stellar-mass.
-
-        i.e. Phi = dn / dlog10(M)
-
-        Parameters
-        ----------
-        mstar : scalar or ndarray
-            Galaxy stellar-mass in units of [grams]
-        redz : scalar or ndarray
-            Redshift.
-
-        Returns
-        -------
-        rv : scalar or ndarray
-            Number-density of galaxies in units of [Mpc^-3]
-
-        """
-        return
-
-
-class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
-    r"""Single Schechter Function - Galaxy Stellar Mass Function.
-
-    This is density per unit log10-interval of stellar mass, i.e. $Phi = dn / d\\log_{10}(M)$
-
-    See: [Chen2019]_ Eq.9 and enclosing section.
-
-    """
-
-    def __init__(self, phi0=-2.77, phiz=-0.27, mchar0_log10=11.24, mchar0=None, mcharz=0.0, alpha0=-1.24, alphaz=-0.03):
-        mchar0, _ = utils._parse_val_log10_val_pars(
-            mchar0, mchar0_log10, val_units=MSOL, name='mchar0', only_one=True
-        )
-
-        self._phi0 = phi0         # - 2.77  +/- [-0.29, +0.27]  [log10(1/Mpc^3)]
-        self._phiz = phiz         # - 0.27  +/- [-0.21, +0.23]  [log10(1/Mpc^3)]
-        self._mchar0 = mchar0       # 10^ (+11.24  +/- [-0.17, +0.20]  [log10(Msol)])
-        self._mcharz = mcharz       #  0.0                        [log10(Msol)]    # noqa
-        self._alpha0 = alpha0     # -1.24   +/- [-0.16, +0.16]
-        self._alphaz = alphaz     # -0.03   +/- [-0.14, +0.16]
-        return
-
-    def __call__(self, mstar, redz):
-        r"""Return the number-density of galaxies at a given stellar mass.
-
-        See: [Chen2019] Eq.8
-
-        Parameters
-        ----------
-        mstar : scalar or ndarray
-            Galaxy stellar-mass in units of [grams]
-        redz : scalar or ndarray
-            Redshift.
-
-        Returns
-        -------
-        rv : scalar or ndarray
-            Number-density of galaxies per log-interval of mass in units of [Mpc^-3]
-            i.e.  ``Phi = dn / d\\log_{10}(M)``
-
-        """
-        phi = self._phi_func(redz)
-        mchar = self._mchar_func(redz)
-        alpha = self._alpha_func(redz)
-        xx = mstar / mchar
-        # [Chen2019]_ Eq.8
-        rv = np.log(10.0) * phi * np.power(xx, 1.0 + alpha) * np.exp(-xx)
-        return rv
-
-    def _phi_func(self, redz):
-        """See: [Chen2019]_ Eq.9
-        """
-        return np.power(10.0, self._phi0 + self._phiz * redz)
-
-    def _mchar_func(self, redz):
-        """See: [Chen2019]_ Eq.10 - NOTE: added `redz` term
-        """
-        return self._mchar0 + self._mcharz * redz
-
-    def _alpha_func(self, redz):
-        """See: [Chen2019]_ Eq.11
-        """
-        return self._alpha0 + self._alphaz * redz
-
-
-# ----    Galaxy Pair Fraction    ----
-
-
-class _Galaxy_Pair_Fraction(abc.ABC):
-    """Galaxy Pair Fraction base class, used to describe the fraction of galaxies in mergers/pairs.
-    """
-
-    @abc.abstractmethod
-    def __init__(self, *args, **kwargs):
-        return
-
-    @abc.abstractmethod
-    def __call__(self, mass, mrat, redz):
-        """Return the fraction of galaxies in pairs of the given parameters.
-
-        Parameters
-        ----------
-        mass : array_like,
-            Mass of the system, units of [grams].
-            NOTE: the definition of mass is ambiguous, i.e. whether it is the primary mass, or the
-            combined system mass.
-        mrat : array_like,
-            Mass-ratio of the system (m2/m1 <= 1.0), dimensionless.
-        redz : array_like,
-            Redshift.
-
-        Returns
-        -------
-        rv : scalar or ndarray,
-            Galaxy pair fraction, dimensionless.
-
-        """
-        return
-
-
-class GPF_Power_Law(_Galaxy_Pair_Fraction):
-    """Galaxy Pair Fraction - Single Power-Law
-    """
-
-    def __init__(self, frac_norm_allq=0.025, frac_norm=None, mref=None, mref_log10=11.0,
-                 malpha=0.0, zbeta=0.8, qgamma=0.0, obs_conv_qlo=0.25, max_frac=1.0):
-
-        mref, _ = utils._parse_val_log10_val_pars(
-            mref, mref_log10, val_units=MSOL, name='mref', only_one=True
-        )
-
-        # If the pair-fraction integrated over all mass-ratios is given (f0), convert to regular (f0-prime)
-        if frac_norm is None:
-            if frac_norm_allq is None:
-                raise ValueError("If `frac_norm` is not given, `frac_norm_allq` is requried!")
-            pow = qgamma + 1.0
-            qlo = obs_conv_qlo
-            qhi = 1.00
-            pair_norm = (qhi**pow - qlo**pow) / pow
-            frac_norm = frac_norm_allq / pair_norm
-
-        # normalization corresponds to f0-prime in [Chen2019]_
-        self._frac_norm = frac_norm   # f0 = 0.025 b/t [+0.02, +0.03]  [+0.01, +0.05]
-        self._malpha = malpha         #      0.0   b/t [-0.2 , +0.2 ]  [-0.5 , +0.5 ]  # noqa
-        self._zbeta = zbeta           #      0.8   b/t [+0.6 , +0.1 ]  [+0.0 , +2.0 ]  # noqa
-        self._qgamma = qgamma         #      0.0   b/t [-0.2 , +0.2 ]  [-0.2 , +0.2 ]  # noqa
-
-        if (max_frac < 0.0) or (1.0 < max_frac):
-            err = f"Given `max_frac`={max_frac:.4f} must be between [0.0, 1.0]!"
-            holo.log.exception(err)
-            raise ValueError(err)
-        self._max_frac = max_frac
-
-        self._mref = mref   # NOTE: this is `a * M_0 = 1e11 Msol` in papers
-        return
-
-    def __call__(self, mass, mrat, redz):
-        """Return the fraction of galaxies in pairs of the given parameters.
-
-        Parameters
-        ----------
-        mass : array_like,
-            Mass of the system, units of [grams].
-            NOTE: the definition of mass is ambiguous, i.e. whether it is the primary mass, or the
-            combined system mass.
-        mrat : array_like,
-            Mass-ratio of the system (m2/m1 <= 1.0), dimensionless.
-        redz : array_like,
-            Redshift.
-
-        Returns
-        -------
-        rv : scalar or ndarray,
-            Galaxy pair fraction, dimensionless.
-
-        """
-        f0p = self._frac_norm
-        am0 = self._mref
-        aa = self._malpha
-        bb = self._zbeta
-        gg = self._qgamma
-        rv = f0p * np.power(mass/am0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
-        rv = np.clip(rv, None, self._max_frac)
-        return rv
-
-
-# ----    Galaxy Merger Time    ----
-
-
-class _Galaxy_Merger_Time(abc.ABC):
-    """Galaxy Merger Time base class, used to model merger timescale of galaxy pairs.
-    """
-
-    @abc.abstractmethod
-    def __init__(self, *args, **kwargs):
-        return
-
-    @abc.abstractmethod
-    def __call__(self, mass, mrat, redz):
-        """Return the galaxy merger time for the given parameters.
-
-        Parameters
-        ----------
-        mass : (N,) array_like[scalar]
-            Mass of the system, units of [grams].
-            NOTE: the definition of mass is ambiguous, i.e. whether it is the primary mass, or the
-            combined system mass.
-        mrat : scalar or ndarray,
-            Mass-ratio of the system (m2/m1 <= 1.0), dimensionless.
-        redz : scalar or ndarray,
-            Redshift.
-
-        Returns
-        -------
-        rv : scalar or ndarray,
-            Galaxy merger time, in units of [sec].
-
-        """
-        return
-
-    def zprime(self, mass, mrat, redz, **kwargs):
-        """Return the redshift after merger (i.e. input `redz` delayed by merger time).
-        """
-        tau0 = self(mass, mrat, redz, **kwargs)  # sec
-        # Find the redshift of  t(z) + tau
-        redz_prime = utils.redz_after(tau0, redz=redz)
-        return redz_prime, tau0
-
-
-class GMT_Power_Law(_Galaxy_Merger_Time):
-    """Galaxy Merger Time - simple power law prescription
-    """
-
-    def __init__(self, time_norm=0.55*GYR, mref0=1.0e11*MSOL, malpha=0.0, zbeta=-0.5, qgamma=0.0):
-        # tau0  [sec]
-        self._time_norm = time_norm   # +0.55  b/t [+0.1, +2.0]  [+0.1, +10.0]  values for [Gyr]
-        self._malpha = malpha         # +0.0   b/t [-0.2, +0.2]  [-0.2, +0.2 ]
-        self._zbeta = zbeta           # -0.5   b/t [-2.0, +1.0]  [-3.0, +1.0 ]
-        self._qgamma = qgamma         # +0.0   b/t [-0.2, +0.2]  [-0.2, +0.2 ]
-
-        # [Msol]  NOTE: this is `b * M_0 = 0.4e11 Msol / h0` in [Chen2019]_
-        # 7.2e10*MSOL
-        mref = mref0 * (0.4 / cosmo.h)
-        self._mref = mref
-        return
-
-    def __call__(self, mass, mrat, redz):
-        """Return the galaxy merger time for the given parameters.
-
-        Parameters
-        ----------
-        mass : (N,) array_like[scalar]
-            Mass of the system, units of [grams].
-            NOTE: the definition of mass is ambiguous, i.e. whether it is the primary mass, or the
-            combined system mass.
-        mrat : (N,) array_like[scalar]
-            Mass ratio of each binary.
-        redz : (N,) array_like[scalar]
-            Redshifts of each binary.
-
-        Returns
-        -------
-        mtime : (N,) ndarray[float]
-            Merger time for each binary in [sec].
-
-        """
-        # convert to primary mass
-        # mpri = utils.m1m2_from_mtmr(mtot, mrat)[0]   # [grams]
-        tau0 = self._time_norm                       # [sec]
-        bm0 = self._mref                             # [grams]
-        aa = self._malpha
-        bb = self._zbeta
-        gg = self._qgamma
-        mtime = tau0 * np.power(mass/bm0, aa) * np.power(1.0 + redz, bb) * np.power(mrat, gg)
-        mtime = mtime
-        return mtime
 
 
 # ===================================
@@ -382,7 +80,8 @@ class Semi_Analytic_Model:
     def __init__(
         self, mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
         shape=None, log=None,
-        gsmf=GSMF_Schechter, gpf=GPF_Power_Law, gmt=GMT_Power_Law, mmbulge=relations.MMBulge_MM2013,
+        gsmf=GSMF_Schechter, mmbulge=relations.MMBulge_KH2013,
+        gpf=None, gmt=None, gmr=None,
         **kwargs
     ):
         """Construct a new Semi_Analytic_Model instance.
@@ -414,14 +113,30 @@ class Semi_Analytic_Model:
 
         # ---- Process SAM components
 
-        gsmf = utils._get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
-        gpf = utils._get_subclass_instance(gpf, None, _Galaxy_Pair_Fraction)
-        gmt = utils._get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
-        mmbulge = utils._get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
+        gsmf = utils.get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
+        mmbulge = utils.get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
+        # gpf = utils.get_subclass_instance(gpf, None, _Galaxy_Pair_Fraction)
+        # gmt = utils.get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
+        if gmr is None:
+            # if GMR is None, then we need both GMT and GPF
+            gmt = utils.get_subclass_instance(gmt, GMT_Power_Law, _Galaxy_Merger_Time)
+            gpf = utils.get_subclass_instance(gpf, GPF_Power_Law, _Galaxy_Pair_Fraction)
+        else:
+            gmr = utils.get_subclass_instance(gmr, GMR_Illustris, _Galaxy_Merger_Rate)
+            # if GMR is given, GMT can still be used - for calculating GMT stalling
+            gmt = utils.get_subclass_instance(gmt, None, _Galaxy_Merger_Time, allow_none=True)
+            # if GMR is given, GPF is not used: make sure it is not given
+            if (gpf is not None):
+                err = f"When `GMR` ({gmr}) is provided, do not provide a GPF!"
+                log.exception(err)
+                raise ValueError(err)
+
         self._gsmf = gsmf             #: Galaxy Stellar-Mass Function (`_Galaxy_Stellar_Mass_Function` instance)
+        self._mmbulge = mmbulge       #: Mbh-Mbulge relation (`relations._MMBulge_Relation` instance)
         self._gpf = gpf               #: Galaxy Pair Fraction (`_Galaxy_Pair_Fraction` instance)
         self._gmt = gmt               #: Galaxy Merger Time (`_Galaxy_Merger_Time` instance)
-        self._mmbulge = mmbulge       #: Mbh-Mbulge relation (`relations._MMBulge_Relation` instance)
+        self._gmr = gmr               #: Galaxy Merger Rate (`_Galaxy_Merger_Rate` instance)
+        log.debug(f"{gsmf=}, {gmr=}, {gpf=}, {gmt=}, {mmbulge=}")
 
         # ---- Create SAM grid edges
 
@@ -459,9 +174,6 @@ class Semi_Analytic_Model:
         self._shape = None            #: Shape of the parameter-space domain (mtot, mrat, redz)
         self._gmt_time = None         #: GMT timescale of galaxy mergers [sec]
         self._redz_prime = None       #: redshift following galaxy merger process
-
-        # These values change each time a certain function is called, but are cached after each call
-        self._gwb = None
 
         return
 
@@ -529,28 +241,39 @@ class Semi_Analytic_Model:
 
             # choose whether the primary mass, or total mass, is used in different calculations
             mass_gsmf = mstar_tot if GSMF_USES_MTOT else mstar_pri
-            mass_gpf = mstar_tot if GPF_USES_MTOT else mstar_pri
-            mass_gmt = mstar_tot if GMT_USES_MTOT else mstar_pri
 
-            # GMT returns `-1.0` for values beyond age of universe
-            zprime, gmt_time = self._gmt.zprime(mass_gmt, mstar_rat, redz)
-            self._gmt_time = gmt_time
-            self._redz_prime = zprime
+            # ---- find galaxy-merger duration and redshift after merger
 
-            # find valid entries (M, Q, Z)
-            idx_stalled = (zprime < 0.0)
-            log.info(f"Stalled SAM bins based on GMT: {utils.frac_str(idx_stalled)}")
+            if self._gmt is not None:
+                log.debug(f"{GMT_USES_MTOT=}")
+                mass_gmt = mstar_tot if GMT_USES_MTOT else mstar_pri
 
-            # ---- Get Galaxy Merger Rate  [Chen2019] Eq.5
-            log.debug(f"GSMF_USES_MTOT={GSMF_USES_MTOT}")
-            log.debug(f"GPF_USES_MTOT ={GPF_USES_MTOT}")
-            log.debug(f"GMT_USES_MTOT ={GMT_USES_MTOT}")
+                # GMT returns `-1.0` for values beyond age of universe
+                zprime, gmt_time = self._gmt.zprime(mass_gmt, mstar_rat, redz)
+                self._gmt_time = gmt_time
+                self._redz_prime = zprime
 
-            # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]
-            dens = self._gsmf(mass_gsmf, redz) * self._gpf(mass_gpf, mstar_rat, redz) * cosmo.dtdz(redz)
-            # `gmt` returns [sec]
-            dens /= gmt_time
-            # now `dens` is  ``dn_gal / [dlog10(Mstar) dq_gal dz]``  with units of [Mpc^-3]
+                # find valid entries (M, Q, Z)
+                idx_stalled = (zprime < 0.0)
+                # log.debug(f"Stalled SAM bins based on GMT: {utils.frac_str(idx_stalled)}")
+            else:
+                log.info("No GMT was provided, cannot calculate Galaxy-Merger based stalling.")
+                idx_stalled = None
+
+            # ---- get galaxy merger rate
+
+            if self._gmr is None:
+                log.debug("Calculating galaxy merger rate using pair-fraction (GPF) and merger-time (GMT)")
+                log.debug(f"GPF_USES_MTOT ={GPF_USES_MTOT}")
+                mass_gpf = mstar_tot if GPF_USES_MTOT else mstar_pri
+                # `gmt` returns [sec]  `gpf` is dimensionless,  so this is [1/sec]
+                gal_merger_rate = self._gpf(mass_gpf, mstar_rat, redz) / gmt_time
+            else:
+                log.debug("Calculating galaxy merger rate directly from GMR")
+                gal_merger_rate = self._gmr(mstar_tot, mstar_rat, redz)
+
+            # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]   `gal_merger_rate` is [1/sec]  ===>  [Mpc^-3]
+            dens = self._gsmf(mass_gsmf, redz) * gal_merger_rate * cosmo.dtdz(redz)
 
             # ---- Convert to MBH Binary density
 
@@ -570,7 +293,8 @@ class Semi_Analytic_Model:
 
             dens *= (self.mtot[:, np.newaxis, np.newaxis] / mstar_tot) * (dmstar_dmbh / dqbh_dqgal)
 
-            # Add scatter from the M-Mbulge relation
+            # ---- Add scatter from the M-Mbulge relation
+
             scatter = self._mmbulge._scatter_dex
             log.debug(f"mmbulge scatter = {scatter}")
             if scatter > 0.0:
@@ -594,19 +318,13 @@ class Semi_Analytic_Model:
                     log.error(err)
 
             # set values after redshift zero to have zero density
-            # if self.ZERO_GMT_STALLED_SYSTEMS:
-            log.info(f"zeroing out {utils.frac_str(idx_stalled)} systems stalled from GMT")
-            dens[idx_stalled] = 0.0
-            # else:
-            #     log.info("NOT zeroing out systems with GMTs extending past redshift zero!")
+            if idx_stalled is not None:
+                log.info(f"zeroing out {utils.frac_str(idx_stalled)} bins stalled from GMT")
+                dens[idx_stalled] = 0.0
 
             self._density = dens
 
         return self._density
-
-    @utils.deprecated_fail("`dynamic_binary_number_at_fobs` or `sam_cython.dynamic_binary_number_at_fobs`")
-    def dynamic_binary_number(self, *args, **kwargs):
-        pass
 
     def dynamic_binary_number_at_fobs(self, hard, fobs_orb, **kwargs):
 
@@ -621,7 +339,7 @@ class Semi_Analytic_Model:
         """Get correct redshifts for full binary-number calculation.
 
         Slower but more correct than old `dynamic_binary_number`.
-        Same as new cython implementation `holo.sam_cython.dynamic_binary_number_at_fobs`, which is
+        Same as new cython implementation `sam_cyutils.dynamic_binary_number_at_fobs`, which is
         more than 10x faster.
         LZK 2023-05-11
 
@@ -654,12 +372,10 @@ class Semi_Analytic_Model:
             hard._norm[:, :, np.newaxis],
         )
         dadt_evo = hard.dadt(mt, mr, rads, norm=norm)
-        print(f"{utils.stats(dadt_evo*YR/PC)=}")
 
         # (M, Q, S-1)
         # Integrate (inverse) hardening rates to calculate total lifetime to each separation
         times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=-1, cumsum=True)
-        print(f"{utils.stats(times_evo/GYR)=}")
         # Combine the binary-evolution time, with the galaxy-merger time
         # (M, Q, Z, S-1)
         rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis]
@@ -679,7 +395,6 @@ class Semi_Analytic_Model:
         fobs_orb_evo, redz_evo = [mm.reshape(-1, steps-1) for mm in [fobs_orb_evo[:, :, :, 1:], redz_evo]]
         # (M*Q*Z, X)
         redz_final = utils.ndinterp(fobs_orb, fobs_orb_evo, redz_evo, xlog=True, ylog=False)
-        print(f"{utils.stats(redz_final)=}")
 
         # (M*Q*Z, X) ===> (M, Q, Z, X)
         redz_final = redz_final.reshape(self.shape + (fobs_orb.size,))
@@ -702,11 +417,9 @@ class Semi_Analytic_Model:
 
         # Convert from observer-frame orbital freq, to rest-frame orbital freq
         sa = utils.kepler_sepa_from_freq(mt, frst_orb)
-        print(f"{utils.stats(sa/PC)=}")
         mt, mr, sa, norm = np.broadcast_arrays(mt, mr, sa, hard._norm[:, :, np.newaxis, np.newaxis])
         # hardening rate, negative values, units of [cm/sec]
         dadt = hard.dadt(mt, mr, sa, norm=norm)
-        print(f"{utils.stats(dadt*YR/PC)=}")
         # Calculate `tau = dt/dlnf_r = f_r / (df_r/dt)`
         # dfdt is positive (increasing frequency)
         dfdt, frst_orb = utils.dfdt_from_dadt(dadt, sa, frst_orb=frst_orb)
@@ -724,8 +437,6 @@ class Semi_Analytic_Model:
             # (M, Q, X)  ==>  (M, Q, Z, X)
             dets = dict(tau=tau, cosmo_fact=cosmo_fact, dadt=dadt, fobs=fobs_orb, sepa=sa)
             return edges, dnum, redz_final, dets
-
-        self._redz_final = redz_final
 
         return edges, dnum, redz_final
 
@@ -768,15 +479,13 @@ class Semi_Analytic_Model:
         dnum = np.zeros(new_shape)
         dnum[coal] = (dens[..., np.newaxis] * np.ones(new_shape))[coal] * cosmo_fact * tau
 
-        self._redz_final = rz
-
         return edges, dnum, rz
 
     def _dynamic_binary_number_at_sepa_consistent(self, hard, target_sepa, steps=200, details=False):
         """Get correct redshifts for full binary-number calculation.
 
         Slower but more correct than old `dynamic_binary_number`.
-        Same as new cython implementation `holo.sam_cython.dynamic_binary_number_at_fobs`, which is
+        Same as new cython implementation `sam_cyutils.dynamic_binary_number_at_fobs`, which is
         more than 10x faster.
         LZK 2023-05-11
 
@@ -879,11 +588,9 @@ class Semi_Analytic_Model:
             dets = dict(tau=tau, cosmo_fact=cosmo_fact, dadt=dadt, sepa=target_sepa)
             return edges, dnum, redz_final, dets
 
-        # self._redz_final = redz_final
-
         return edges, dnum, redz_final
 
-    def new_gwb(self, fobs_gw_edges, hard, realize=100):
+    def gwb_new(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100):
         """Calculate GWB using new cython implementation, 10x faster!
         """
 
@@ -897,16 +604,16 @@ class Semi_Analytic_Model:
 
         # ---- Calculate number of binaries in each bin
 
-        redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
+        redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
             fobs_orb_cents, self, hard, cosmo
         )
 
         edges = [self.mtot, self.mrat, self.redz, fobs_orb_edges]
-        number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
+        number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
 
         # ---- Get the GWB spectrum from number of binaries over grid
 
-        gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
+        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
 
         return gwb
 
@@ -928,11 +635,11 @@ class Semi_Analytic_Model:
 
         # ---- Get the GWB spectrum from number of binaries over grid
 
-        gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
+        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
 
         return gwb
 
-    def gwb_ideal(self, fobs_gw, sum=True, redz_prime=True):
+    def gwb_ideal(self, fobs_gw, sum=True, redz_prime=None):
         """Calculate the idealized, continuous GWB amplitude.
 
         Calculation follows [Phinney2001]_ (Eq.5) or equivalently [Enoki+Nagashima-2007] (Eq.3.6).
@@ -947,6 +654,14 @@ class Semi_Analytic_Model:
         mstar_rat = mstar_tot / mstar_pri
         # M = m1 + m2
         mstar_tot = mstar_pri + mstar_tot
+
+        # default to using `redz_prime` values if a GMT instance is stored
+        if redz_prime is None:
+            redz_prime = (self._gmt is not None)
+        elif redz_prime and (self._gmt is None):
+            err = "No `GMT` instance stored, cannot use `redz_prime` values!"
+            self._log.exception(err)
+            raise AttributeError(err)
 
         rz = self.redz
         rz = rz[np.newaxis, np.newaxis, :]
@@ -964,9 +679,8 @@ class Semi_Analytic_Model:
 
         mt = self.mtot[:, np.newaxis, np.newaxis]
         mr = self.mrat[np.newaxis, :, np.newaxis]
-        gwb = gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
+        gwb = holo.gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
         return gwb
-
 
     def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100, loudest=1, params=False):
         """Calculate the (smooth/semi-analytic) GWB and CWs at the given observed GW-frequencies.
@@ -1005,7 +719,13 @@ class Semi_Analytic_Model:
             Returned only if params = True.
         """
 
-        assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
+        if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
+            err = (
+                "`sam_cyutils` methods only work with `Fixed_Time_2PL_SAM` or `Hard_GW` hardening models!  "
+                "Use `gwb_only` for alternative classes!"
+            )
+            self._log.exception(err)
+            raise ValueError(err)
 
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
 
@@ -1015,12 +735,12 @@ class Semi_Analytic_Model:
 
         # ---- Calculate number of binaries in each bin
 
-        redz_final, diff_num = holo.sam_cython.dynamic_binary_number_at_fobs(
+        redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
             fobs_orb_cents, self, hard, cosmo
         )
 
         edges = [self.mtot, self.mrat, self.redz, fobs_orb_edges]
-        number = holo.sam_cython.integrate_differential_number_3dx1d(edges, diff_num)
+        number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
 
         # ---- Get the Single Source and GWB spectrum from number of binaries over grid
 
@@ -1033,100 +753,6 @@ class Semi_Analytic_Model:
             sspar = ret_vals[2]
             bgpar = ret_vals[3]
 
-        self._gwb = hc_bg
-        if params:
-            return hc_ss, hc_bg, sspar, bgpar
-
-        return hc_ss, hc_bg
-
-    def old_ss_gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=1, loudest=1, params=False,
-               use_redz_after_hard=None):
-        """Calculate the (smooth/semi-analytic) GWB at the given observed GW-frequencies,
-        using new `dynamic_binary_number_at_fobs` method, better, but slower than cython version.
-
-        Parameters
-        ----------
-        fobs_gw : (F,) array_like of scalar,
-            Observer-frame GW-frequencies. [1/sec]
-            These are the frequency bin edges, which are integrated across to get the number of binaries in each
-            frequency bin.
-        hard : holodeck.evolution._Hardening class or instance
-            Hardening mechanism to apply over the range of `fobs_gw`.
-        realize : int
-            Specification of how many discrete realizations to construct.
-            Realizations approximate the finite-source effects of a realistic population.
-
-        Returns
-        -------
-        hc_ss : (F, R, L) NDarray of scalars
-            The characteristic strain of the L loudest single sources at each frequency.
-        hc_bg : (F, R) NDarray of scalars
-            Characteristic strain of the GWB.
-        sspar : (3, F, R, L) NDarray of scalars
-            Astrophysical parametes of each loud single sources,
-            for each frequency and realization.
-            Returned only if params = True.
-        bgpar : (3, F, R) NDarray of scalars
-            Average effective binary astrophysical parameters for background
-            sources at each frequency and realization,
-            Returned only if params = True.
-
-
-        BUG _dynamic_binary_number_at_fobs_consistent() doesn't work for Fixed_Time_2PL
-        """
-        log = self._log
-
-        if use_redz_after_hard is None:
-            if hard.CONSISTENT is True:
-                use_redz_after_hard = True
-            elif hard.CONSISTENT is False:
-                use_redz_after_hard = False
-            else:
-                err = "`hard.CONSISTENT` or 'use_redz_after_hard' must be one of {{True, False}}!"
-                log.error(err)
-                raise ValueError(err)
-
-        fobs_gw_edges = np.atleast_1d(fobs_gw_edges)
-        if np.isscalar(fobs_gw_edges) or np.size(fobs_gw_edges) == 1:
-            err = "GWB can only be calculated across bins of frequency, `fobs_gw_edges` must provide bin edges!"
-            log.exception(err)
-            raise ValueError(err)
-
-        fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
-        # ---- Get the differential-number of binaries for each bin
-        # convert to orbital-frequency (from GW-frequency)
-        fobs_orb_edges = fobs_gw_edges / 2.0
-        fobs_orb_cents = fobs_gw_cents / 2.0
-
-
-        # TODO: fix this for Fixed_Time_2PL
-        edges, dnum, redz_final = self.dynamic_binary_number_at_fobs(hard, fobs_orb_cents)
-        edges[-1] = fobs_orb_edges
-
-        log.debug(f"dnum: {utils.stats(dnum)}")
-
-
-        # "integrate" within each bin (i.e. multiply by bin volume)
-        number = utils._integrate_grid_differential_number(edges, dnum, freq=False)
-        number = number * np.diff(np.log(fobs_gw_edges))
-        log.debug(f"number: {utils.stats(number)}")
-        log.debug(f"number.sum(): {number.sum():.4e}")
-
-
-        # ---- Get the Single Source and GWB spectrum from number of binaries over grid
-
-        # Use the redshift based on initial redshift + galaxy-merger-time + evolution-time
-        ret_vals = single_sources.ss_gws_redz(edges, redz_final, number,
-                                              realize=realize, loudest=loudest, params=params)
-
-
-        hc_ss = ret_vals[0]
-        hc_bg = ret_vals[1]
-        if params:
-            sspar = ret_vals[2]
-            bgpar = ret_vals[3]
-
-        self._gwb = hc_bg
         if params:
             return hc_ss, hc_bg, sspar, bgpar
 
@@ -1171,6 +797,14 @@ class Semi_Analytic_Model:
         if sum:
             integ = integ.sum()
         return integ
+
+    @utils.deprecated_fail("`dynamic_binary_number_at_fobs` or `sam_cyutils.dynamic_binary_number_at_fobs`")
+    def dynamic_binary_number(self, *args, **kwargs):
+        pass
+
+    @utils.deprecated_fail("`gwb_new`")
+    def new_gwb(self, *args, **kwargs):
+        pass
 
 
 # ===========================================
@@ -1350,96 +984,6 @@ def evolve_eccen_uniform_single(sam, eccen_init, sepa_init, nsteps):
     return sepa, eccen
 
 
-def _add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, linear_interp_backup=True, logspace_interp=True):
-    """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
-
-    The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
-    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.
-          A 2nd-order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
-          In-between, a 1st-order interpolant is used if `linear_interp_backup` is True.
-    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2) to
-          account for scatter.
-    * (3) The new density distribution is interpolated back to the original (mtot, mrat) grid.
-
-    Parameters
-    ----------
-    mtot : (M,) ndarray
-        Total masses in grams.
-    mrat : (Q,) ndarray
-        Mass ratios.
-    dens : (M, Q) ndarray
-        Density of binaries over the given mtot and mrat domain.
-    scatter : float
-        Amount of scatter in the M-MBulge relationship, in dex (i.e. over log10 of masses).
-    refine : int,
-        The increased density of grid-points used in the intermediate (m1, m2) domain, in step (1).
-    linear_interp_backup : bool,
-        Whether a linear interpolant is used to fill-in bad values after the 2nd order interpolant.
-        This generally doesn't seem to fix any values.
-    logspace_interp : bool,
-        Whether interpolation should be performed in the log-space of masses.
-        NOTE: strongly recommended.
-
-    Returns
-    -------
-    m1m2_dens : (M, Q) ndarray,
-        Binary density with scatter introduced.
-
-    """
-    assert np.shape(dens) == (mtot.size, mrat.size)
-
-    dist = sp.stats.norm(loc=0.0, scale=scatter)
-
-    # Get the primary and secondary masses corresponding to these total-mass and mass-ratios
-    m1, m2 = utils.m1m2_from_mtmr(mtot[:, np.newaxis], mrat[np.newaxis, :])
-    m1m2_on_mtmr_grid = (m1.flatten(), m2.flatten())
-
-    # Construct a symmetric rectilinear grid in (m1, m2) space
-    grid_size = m1.shape[0] * refine
-    # make sure the extrema will fully span the required domain
-    mextr = utils.minmax([0.9*mtot[0]*mrat[0]/(1.0 + mrat[0]), mtot[-1]*(1.0 + mrat[0])/mrat[0]])
-    mgrid = np.logspace(*np.log10(mextr), grid_size)
-
-    # Interpolate in log-space [recommended]
-    scatter_mgrid = mgrid.copy()
-    if logspace_interp:
-        mgrid = np.log10(mgrid)
-        m1m2_on_mtmr_grid = tuple([np.log10(mm) for mm in m1m2_on_mtmr_grid])
-
-    m1m2_grid = np.meshgrid(mgrid, mgrid, indexing='ij')
-    # Interpolate from irregular m1m2 space (based on mtmr space), into regular m1m2 grid
-    m1m2_dens = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='cubic')
-    # Fill in problematic values with first-order interpolant
-    if linear_interp_backup:
-        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
-        temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='linear')
-        log.debug(f"After 2nd order interpolation, {utils.frac_str(bads)} bad values")
-        m1m2_dens[bads] = temp[bads]
-
-    # Fill in problematic values with zeroth-order interpolant
-    bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
-    log.debug(f"After interpolation, {utils.frac_str(bads)} bad values exist")
-    if np.any(bads):
-        temp = sp.interpolate.griddata(m1m2_on_mtmr_grid, dens.flatten(), tuple(m1m2_grid), method='nearest')
-        m1m2_dens[bads] = temp[bads]
-        bads = np.isnan(m1m2_dens) | (m1m2_dens <= 0.0)
-        log.debug(f"After 0th order interpolation, {utils.frac_str(bads)} bad values exist")
-        if np.any(bads):
-            err = f"After 0th order interpolation, {utils.frac_str(bads)} remain!"
-            log.exception(err)
-            log.error(f"{utils.stats(dens.flatten())}")
-            raise ValueError(err)
-
-    # Introduce scatter along both the 0th (primary) and 1th (secondary) axes
-    m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=0)
-    m1m2_dens = utils.scatter_redistribute(scatter_mgrid, dist, m1m2_dens, axis=1)
-
-    # Interpolate result back to mtmr grid
-    interp = sp.interpolate.RegularGridInterpolator((mgrid, mgrid), m1m2_dens)
-    m1m2_dens = interp(m1m2_on_mtmr_grid, method='linear').reshape(m1.shape)
-    return m1m2_dens
-
-
 def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
     """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
 
@@ -1542,24 +1086,3 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
 
     return output
 
-
-'''
-def _check_bads(edges, vals, name):
-    bads = ~np.isfinite(vals) | (vals < 0.0)
-    if not np.any(bads):
-        return
-
-    err = f"Found {utils.frac_str(bads)} bad '{name}' values!"
-
-    if not np.all(bads):
-        bads = np.where(bads)
-        assert len(bads) == len(edges), f"`bads` ({len(bads)=}) does not match `edges` ({len(edges)=}) !"
-        for ii, (edge, bad) in enumerate(zip(edges, bads)):
-            idx = np.unique(bad)
-            log.error(ii)
-            log.error(idx)
-            log.error(edge[idx])
-
-    log.exception(err)
-    raise ValueError(err)
-'''

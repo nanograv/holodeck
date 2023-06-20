@@ -644,7 +644,7 @@ def strain_amp_from_bin_edges_redz(edges, redz):
     assert np.all([np.ndim(ee) == 1 for ee in edges])
 
     foo = edges[-1]                   #: should be observer-frame orbital-frequencies
-    df = np.diff(foo)                 #: frequency bin widths
+    # df = np.diff(foo)                 #: frequency bin widths
     fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
 
     # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)

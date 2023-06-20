@@ -923,7 +923,7 @@ def ss_bg_hc(number, h2fdf, nreals, normal_threshold=1e10):
     R = nreals
     cdef np.ndarray[np.double_t, ndim=2] hc2ss = np.zeros((F,R))
     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
-    cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
+    cdef np.ndarray[np.longlong_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
     _ss_bg_hc(shape, h2fdf, number, nreals, normal_threshold,
                 hc2ss, hc2bg, ssidx)
     # print(hc2ss, hc2bg, ssidx)
@@ -1056,7 +1056,7 @@ def ss_bg_hc_and_par(number, h2fdf, nreals, mt, mr, rz, normal_threshold=1e10):
     R = nreals
     cdef np.ndarray[np.double_t, ndim=2] hc2ss = np.zeros((F,R))
     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
-    cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
+    cdef np.ndarray[np.longlong_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
     cdef np.ndarray[np.double_t, ndim=3] sspar = np.zeros((3,F,R))
     _ss_bg_hc_and_par(shape, h2fdf, number, nreals, normal_threshold,
@@ -1415,7 +1415,7 @@ def loudest_hc_and_par_from_sorted(number, h2fdf, nreals, nloudest, mt, mr, rz, 
     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
     cdef np.ndarray[np.double_t, ndim=3] lspar = np.zeros((3,F,R))
     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
-    cdef np.ndarray[np.long_t, ndim=4] ssidx = np.zeros((3,F,R,L), dtype=int)
+    cdef np.ndarray[np.longlong_t, ndim=4] ssidx = np.zeros((3,F,R,L), dtype=int)
     _loudest_hc_and_par_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold,
                             mt, mr, rz, msort, qsort, zsort,
                             hc2ss, hc2bg, lspar, bgpar, ssidx)
@@ -1559,11 +1559,11 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
 
 
 def loudest_hc_and_par_from_sorted_redz(
-    number, h2fdf, nreals, nloudest, 
+    number, h2fdf, nreals, nloudest,
     mt, mr, rz, redz_final, dcom_final, sepa, angs,
     msort, qsort, zsort, normal_threshold=1e10):
     """
-    Calculates the characteristic strain and binary parameters from loud single sources and a 
+    Calculates the characteristic strain and binary parameters from loud single sources and a
     background of all other sources.
 
     Parameters
@@ -1634,7 +1634,7 @@ def loudest_hc_and_par_from_sorted_redz(
 @cython.cdivision(True)
 cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number,
             long nreals, long nloudest, long thresh,
-            double[:] mt, double[:] mr, double[:] rz, 
+            double[:] mt, double[:] mr, double[:] rz,
             double[:,:,:,:] redz_final, double[:,:,:,:] dcom_final, double[:,:,:,:] sepa, double[:,:,:,:] angs,
             long[:] msort, long[:] qsort, long[:] zsort,
             double[:,:,:] hc2ss, double[:,:] hc2bg, double[:,:,:,:] sspar, double[:,:,:] bgpar):
