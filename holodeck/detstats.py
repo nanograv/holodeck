@@ -1618,6 +1618,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
     phis = np.random.uniform(0, 2*np.pi, size = npsrs)
     thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
     # sigmas = np.ones_like(phis)*sigma
+    if debug: print(f"{phis.shape=}, {thetas.shape=}, {dur=}, {cad=}, {sigma=}")
     psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                     phi=phis, theta=thetas)
 
@@ -1650,7 +1651,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
                                                 iota_ss=iota_ss, psi_ss=psi_ss, grid_path=grid_path)
         dp_ss[nn,:,:], snr_ss[nn,...] = vals_ss[0], vals_ss[1],
         df_ss[nn], df_bg[nn] = detfrac_of_reals(dp_ss[nn], dp_bg[nn], thresh)
-        ev_ss[nn] = expval_of_ss(gamma_ssi)
+        ev_ss[nn] = expval_of_ss(vals_ss[2])
         if save_ssi: gamma_ssi[nn] = vals_ss[2]
 
         if plot:
@@ -1735,7 +1736,8 @@ def expval_of_ss(gamma_ssi,):
         Expected number of single source detection (dp_ss>thresh) averaged across all strain and sky realizations.
     
     """
-    nfreqs, nreals, nskies, nloudest = [*gamma_ssi.size]
+    print(f"{gamma_ssi.shape=}, {[*gamma_ssi.shape]}")
+    nfreqs, nreals, nskies, nloudest = [*gamma_ssi.shape]
     ev_ss = np.sum(gamma_ssi)/(nreals*nskies)
     return ev_ss
     # df_bg[nn] = np.sum(dp_bg[nn]>thresh)/(nreals)
