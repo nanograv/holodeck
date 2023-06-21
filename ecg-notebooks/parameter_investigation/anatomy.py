@@ -298,7 +298,7 @@ def plot_three_models(
     if save_dir is not None:
         str_shape = 's%d_%d_%d' % (shape[0], shape[1], shape[2])
         filename = save_dir+'/%s_allvsfreqs%s_%s.png' % (target_param, save_append, str_shape)  
-        fig.savefig(filename, dpi=100)
+        fig.savefig(filename, dpi=100, bbox_inches='tight')
 
     return fig
 
@@ -347,7 +347,7 @@ def plot_three_hs_vs_binpars(data, params,
     if save_dir is not None:
         str_shape = 's%d_%d_%d' % (shape[0], shape[1], shape[2])
         filename = save_dir+'/%s_hsvsbinpars%s_%s.png' % (target_param, save_append, str_shape)     
-        fig.savefig(filename, dpi=100)
+        fig.savefig(filename, dpi=100, bbox_inches='tight')
 
     return fig
 
