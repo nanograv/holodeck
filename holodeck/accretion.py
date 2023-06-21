@@ -12,7 +12,6 @@ import numpy as np
 from scipy.interpolate import RectBivariateSpline
 from holodeck import _PATH_DATA
 
-
 class Accretion:
     """ Preferential Accretion prescription
 
@@ -96,6 +95,7 @@ class Accretion:
         return(medd)
 
     def mdot_total(self, evol, step):
+        from holodeck.constants import PC
         if self.mdot_ext is not None:
             """ accretion rates have been supplied externally """
             mdot = self.mdot_ext[:,step-1]
