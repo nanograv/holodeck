@@ -21,7 +21,7 @@ _CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen']
 
 class Grav_Waves:
 
-    def __init__(self, bin_evo, fobs_gw, nharms=30, nreals=100):
+    def __init__(self, bin_evo, fobs_gw, nharms=103, nreals=100):
         self.fobs_gw = fobs_gw
         self.nharms = nharms
         self.nreals = nreals
@@ -179,7 +179,6 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     num_binaries = _lambda_fact * dlnf
 
     shape = (num_binaries.size, nreals)
-    # num_pois = np.random.poisson(num_binaries[:, np.newaxis], shape)
     num_pois = poisson_as_needed(num_binaries[:, np.newaxis] * np.ones(shape))
 
     # --- Calculate GW Signals
