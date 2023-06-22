@@ -92,6 +92,13 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
     qsort = unraveled[1,:]
     zsort = unraveled[2,:]
 
+    if np.any(np.logical_and(redz<0, redz!=-1)):
+                err = np.sum(np.logical_and(redz<0, redz!=-1))
+                err = f"{err} redz < 0 and !=-1 found in redz, in ss_gws_redz()"
+                raise ValueError(err)
+    
+    print('passed redz check at the beginning of ss_gws_redz()')
+
     # For multiple realizations, using cython
     if(utils.isinteger(realize)):
         if(params == True):
@@ -109,7 +116,22 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
                 redz = kale.utils.midpoints(redz, axis=0)
                 redz = np.moveaxis(redz, 0, dd)
 
-            dcom_final = cosmo.comoving_distance(redz).to('cm').value # (M,Q,Z,F) in cm
+            # if np.any(np.logical_and(redz<0, redz!=-1)):
+            #     err = np.sum(np.logical_and(redz<0, redz!=-1))
+            #     err = f"{err} redz < 0 and !=-1 found in redz, in ss_gws_redz() after kale.utils.midpoints"
+            #     raise ValueError(err)
+
+            dcom_final = +np.inf*np.ones_like(redz)
+            print(holo.utils.stats(redz), "before sel")
+            sel = (redz > 0.0)
+            redz[~sel] = -1.0
+            print(holo.utils.stats(redz), "after sel")
+            redz[redz<0] = -1.0
+            print(holo.utils.stats(redz), "after redz[redz<0]=-1")
+            dcom_final[sel] = cosmo.comoving_distance(redz[sel]).cgs.value
+            if np.any(dcom_final<0): print('dcom_final<0 found')
+
+            # redz[redz<0] = -1
 
             fobs_orb_edges = edges[-1]
             fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges)
@@ -119,6 +141,12 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
             sepa = utils.kepler_sepa_from_freq(mt[:,np.newaxis,np.newaxis,np.newaxis], frst_orb_cents) # (M,Q,Z,F) in cm
             angs = utils.angs_from_sepa(sepa, dcom_final, redz) # (M,Q,Z,F) use sepa and dcom in cm
 
+            print(f"{mt.shape=}, {redz.shape=}, {edges[0].shape=}, {number.shape=}")
+            # if np.any(np.logical_and(redz<0, redz!=-1)):
+            #     err = np.sum(np.logical_and(redz<0, redz!=-1))
+            #     err = f"{err} redz < 0 and !=-1 found in redz, in ss_gws_redz()"
+            #     raise ValueError(err)
+
             hc2ss, hc2bg, sspar, bgpar = \
                 holo.cyutils.loudest_hc_and_par_from_sorted_redz(
                     number, h2fdf, realize, loudest,
@@ -126,6 +154,29 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
                     msort, qsort, zsort)
             hc_ss = np.sqrt(hc2ss) # calculate single source strain
             hc_bg = np.sqrt(hc2bg) # calculate background strain
+
+
+            # either =  np.logical_or(sspar[3]>0, sspar[3]==-1)
+            # print('either:', sspar[3][either])
+            # neither = np.logical_not(either)
+            # print('neither:', sspar[3][neither])
+            if np.any(np.logical_and(sspar[3]<0, sspar[3]!=-1)):
+                err = np.sum(np.logical_and(sspar[3]<0, sspar[3]!=-1))
+                err = f"check 1: {err} out of {sspar[3].size} sspar[3] are negative and not -1 in sings.ss_gws_redz()"
+                neither = (np.logical_and(sspar[3]<0, sspar[3]!=-1))
+                # print('bad sspar:' ,sspar[3][neither], 'at', np.where(neither==True))
+                print(err)
+                raise ValueError(err)
+            
+            # check for negatives
+            if np.any(sspar[3]<0):
+                sumfalse = np.sum(sspar[3]<0)
+                err = f"check 2: {sumfalse} out of {sspar[3].size} redz_final are negative in sings.ss_gws_redz()"
+                # print(np.where(neither==True))
+                print(err)
+                # raise ValueError(err)
+            
+            # return
             return hc_ss, hc_bg, sspar, bgpar
             
         else:
