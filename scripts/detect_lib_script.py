@@ -1,3 +1,30 @@
+"""Run detection statistics on a library of semi-analytic-models.
+
+Usage
+-----
+
+python ./scripts/detect_lib_ss.py <LIB_PATH> --grid_path <GRID_PATH> -p <NPSRS> --sigma <SIGMA> -s <NSKIES> 
+
+    <LIB_PATH>  :  library directory that contains sam_lib.hdf5.
+    <GRID_PATH> : directory containing gamma-rho interpolation grids. Will mkdir if it doesn't exist.
+    <DUR>       : pta duration in years, default 16.03 yr
+    <NPSRS>     : number of PTA pulsars to simulate, should be calibrated to data
+    <SIGMA>     : white noise sigma of PTA pulsars, should be calibrated to data
+    <NSKIES>    : number of sky realizations to generate for each single source strain realization
+
+Example:
+
+    python ./scripts/detect_lib_ss.py /Users/emigardiner/GWs/output/2023-06-22_uniform-09b_n500_r100_f40_l10 \
+        --grid_path /Users/emigardiner/GWs/holodeck/output/rho_gamma_grids -p 45 --sigma 1e-6 -s 25
+    
+
+To-Do
+-----
+* mark output directories as incomplete until all runs have been finished.
+  Merged libraries from incomplete directories should also get some sort of flag!
+
+"""
+
 
 import holodeck as holo
 import holodeck.detstats as ds
@@ -45,7 +72,7 @@ def _setup_argparse():
     parser.add_argument('--debug', action='store_true', default=False,
                         help='print steps along the way')
     parser.add_argument('--snr_cython', action='store_true', default=DEF_SNR_CYTHON,
-                        help='Use cython for ss snr clculations')
+                        help='Use cython for ss snr calculations')
     parser.add_argument('--save_ssi', action='store_true', default=DEF_SAVE_SSI,
                         help="Save 'gamma_ssi', the detprob of each single source.")
     
