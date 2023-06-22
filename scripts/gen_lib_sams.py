@@ -25,11 +25,9 @@ To-Do
 
 """
 
-__version__ = '0.2.2'
+__version__ = '0.3.0'
 
-import argparse
 import os
-import shutil
 import sys
 import warnings
 from datetime import datetime
@@ -40,21 +38,15 @@ import numpy as np
 from mpi4py import MPI
 
 import holodeck as holo
-import holodeck.sam
+import holodeck.sams.sam
 import holodeck.logger
 # from holodeck.constants import YR
 from holodeck import log as _log     #: import the default holodeck log just so that we can silence it
+from holodeck import utils
 # silence default holodeck log
 _log.setLevel(_log.WARNING)
+# _log.setLevel(_log.DEBUG)
 
-# Default argparse parameters
-DEF_SAM_SHAPE = (61, 81, 101)
-DEF_NUM_REALS = 100
-DEF_NUM_FBINS = 40
-DEF_PTA_DUR = 16.03     # [yrs]
-
-DEF_ECCEN_NUM_STEPS = 123
-DEF_ECCEN_NHARMS = 100
 
 MAX_FAILURES = 5
 
@@ -65,7 +57,7 @@ FILES_COPY_TO_OUTPUT = [__file__, holo.librarian.__file__, holo.param_spaces.__f
 
 def main():
 
-    args, space, log = setup_basics()
+    args, space, log = holo.librarian.setup_basics(comm, FILES_COPY_TO_OUTPUT)
     comm.barrier()
 
     # Split and distribute index numbers to all processes
@@ -83,7 +75,7 @@ def main():
 
     iterator = holo.utils.tqdm(indices) if (comm.rank == 0) else np.atleast_1d(indices)
 
-    if comm.rank == 0:
+    if (comm.rank == 0) and (not args.resume):
         space_fname = space.save(args.output)
         log.info(f"saved parameter space {space} to {space_fname}")
 
@@ -118,136 +110,10 @@ def main():
 
     if (comm.rank == 0):
         log.info("Concatenating outputs into single file")
-        holo.librarian.sam_lib_combine(args.output, log, path_sims=args.output_sims)
+        holo.librarian.sam_lib_combine(args.output, log)
         log.info("Concatenating completed")
 
     return
-
-
-def setup_basics():
-    if comm.rank == 0:
-        args = _setup_argparse()
-    else:
-        args = None
-
-    # share `args` to all processes
-    args = comm.bcast(args, root=0)
-
-    # setup log instance, separate for all processes
-    log = _setup_log(args)
-    args.log = log
-
-    if comm.rank == 0:
-        # copy certain files to output directory
-        for fname in FILES_COPY_TO_OUTPUT:
-            src_file = Path(fname)
-            dst_file = args.output.joinpath("runtime_" + src_file.name)
-            shutil.copyfile(src_file, dst_file)
-            log.info(f"Copied {fname} to {dst_file}")
-
-        # setup parameter-space instance
-        try:
-            # `param_space` attribute must match the name of one of the classes in `holo.param_spaces`
-            space = getattr(holo.param_spaces, args.param_space)
-        except Exception as err:
-            log.exception(f"Failed to load '{args.param_space}' from holo.param_spaces!")
-            log.exception(err)
-            raise err
-
-        # instantiate the parameter space class
-        space = space(log, args.nsamples, args.sam_shape, args.seed)
-    else:
-        space = None
-
-    # share parameter space across processes
-    space = comm.bcast(space, root=0)
-
-    log.info(
-        f"param_space={args.param_space}, samples={args.nsamples}, sam_shape={args.sam_shape}, nreals={args.nreals}\n"
-        f"nfreqs={args.nfreqs}, pta_dur={args.pta_dur} [yr]\n"
-    )
-
-    return args, space, log
-
-
-def _setup_argparse(*args, **kwargs):
-    assert comm.rank == 0
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('param_space', type=str,
-                        help="Parameter space class name, found in 'holodeck.param_spaces'.")
-
-    parser.add_argument('output', metavar='output', type=str,
-                        help='output path [created if doesnt exist]')
-
-    parser.add_argument('-n', '--nsamples', action='store', dest='nsamples', type=int, default=1000,
-                        help='number of parameter space samples')
-    parser.add_argument('-r', '--nreals', action='store', dest='nreals', type=int,
-                        help='number of realiz  ations', default=DEF_NUM_REALS)
-    parser.add_argument('-d', '--dur', action='store', dest='pta_dur', type=float,
-                        help='PTA observing duration [yrs]', default=DEF_PTA_DUR)
-    parser.add_argument('-f', '--nfreqs', action='store', dest='nfreqs', type=int,
-                        help='Number of frequency bins', default=DEF_NUM_FBINS)
-    parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
-                        help='Shape of SAM grid', default=DEF_SAM_SHAPE)
-
-    parser.add_argument('--recreate', action='store_true', default=False,
-                        help='recreate existing simulation files')
-    parser.add_argument('--plot', action='store_true', default=False,
-                        help='produce plots for each simulation configuration')
-    parser.add_argument('--seed', action='store', type=int, default=None,
-                        help='Random seed to use')
-    # parser.add_argument('-t', '--test', action='store_true', default=False, dest='test',
-    #                     help='Do not actually run, just output what parameters would have been done.')
-    parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
-                        help='verbose output [INFO]')
-
-    args = parser.parse_args(*args, **kwargs)
-
-    output = Path(args.output).resolve()
-    if not output.is_absolute:
-        output = Path('.').resolve() / output
-        output = output.resolve()
-
-    output.mkdir(parents=True, exist_ok=True)
-    my_print(f"output path: {output}")
-    args.output = output
-
-    output_sims = output.joinpath("sims")
-    output_sims.mkdir(parents=True, exist_ok=True)
-    args.output_sims = output_sims
-
-    output_logs = output.joinpath("logs")
-    output_logs.mkdir(parents=True, exist_ok=True)
-    args.output_logs = output_logs
-
-    if args.plot:
-        output_plots = output.joinpath("figs")
-        output_plots.mkdir(parents=True, exist_ok=True)
-        args.output_plots = output_plots
-
-    return args
-
-
-def _setup_log(args):
-    beg = datetime.now()
-    log_name = f"holodeck__gen_lib_sams_{beg.strftime('%Y%m%d-%H%M%S')}"
-    if comm.rank > 0:
-        log_name = f"_{log_name}_r{comm.rank}"
-
-    output = args.output_logs
-    fname = f"{output.joinpath(log_name)}.log"
-    log_lvl = holo.logger.INFO if args.verbose else holo.logger.WARNING
-    tostr = sys.stdout if comm.rank == 0 else False
-    log = holo.logger.get_logger(name=log_name, level_stream=log_lvl, tofile=fname, tostr=tostr)
-    log.info(f"Output path: {output}")
-    log.info(f"        log: {fname}")
-    log.info(args)
-    return log
-
-
-def my_print(*args, **kwargs):
-    return print(*args, flush=True, **kwargs)
 
 
 def mpiabort_excepthook(type, value, traceback):
@@ -267,7 +133,7 @@ if __name__ == "__main__":
         this_fname = os.path.abspath(__file__)
         head = f"holodeck :: {this_fname} : {str(beg_time)} - rank: {comm.rank}/{comm.size}"
         head = "\n" + head + "\n" + "=" * len(head) + "\n"
-        my_print(head)
+        utils.my_print(head)
 
     main()
 
@@ -275,6 +141,6 @@ if __name__ == "__main__":
         end = datetime.now()
         dur = end - beg_time
         tail = f"Done at {str(end)} after {str(dur)} = {dur.total_seconds()}"
-        my_print("\n" + "=" * len(tail) + "\n" + tail + "\n")
+        utils.my_print("\n" + "=" * len(tail) + "\n" + tail + "\n")
 
     sys.exit(0)
