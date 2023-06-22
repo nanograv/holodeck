@@ -1700,6 +1700,18 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
     cdef int mm, qq, zz, ff, rr, ll
     cdef double num, cur, sum_bg, m_bg, q_bg, z_bg, zfinal_bg, dcom_bg, sepa_bg, angs_bg
 
+    # # check all redz_final are positive
+    # for mm in range(len(redz_final)):
+    #     for qq in range(len(redz_final[0])):
+    #         for zz in range(len(redz_final[0,0])):
+    #             for ff in range(len(redz_final[0,0,0])):
+    #                 if (redz_final[mm,qq,zz,ff]<0 and redz_final[mm,qq,zz,ff] !=-1):
+    #                     err = f"redz_final[{mm},{qq},{zz},{ff},] = {redz_final[mm,qq,zz,ff]} < 0"
+    #                     raise ValueError(err)
+    # print("passed redz_final check in _loudest_hc_and_par_from_sorted_redz")
+
+
+
     # Setup random number generator from numpy library
     cdef bitgen_t *rng
     cdef const char *capsule_name = "BitGenerator"
@@ -1745,6 +1757,11 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
                     sspar[2,ff,rr,ll] = rz[zz]
                     sspar[3,ff,rr,ll] = redz_final[mm,qq,zz,ff]
 
+                    # check for negative redz_final
+                    if redz_final[mm,qq,zz,ff]<0:
+                        err = f"redz_final[{mm},{qq},{zz},{ff}] = {redz_final[mm,qq,zz,ff]} < 0"
+                        print("ERROR IN CYUTILS:", err)
+
                     # update number and ll index
                     num -= 1
                     ll += 1
@@ -1768,6 +1785,14 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
             bgpar[4,ff,rr] = dcom_bg/sum_bg # bg avg comoving distance after hardening
             bgpar[5,ff,rr] = sepa_bg/sum_bg # bg avg binary separation after hardening
             bgpar[6,ff,rr] = angs_bg/sum_bg # bg avg binary angular separation after hardening
+
+    # for ff in range(len(sspar[3])):
+    #     for rr in range(len(sspar[3,0])):
+    #         for ll in range(len(sspar[3,0,0])):
+    #             if (sspar[3,ff,rr,ll]<0 and sspar[3,ff,rr,ll] !=-1):
+    #                 err = f"sspar[3,{ff},{rr},{ll}] = {sspar[3,ff,rr,ll]} < 0"
+    #                 raise ValueError(err)
+    print("skipped sspar[3] check in _loudest_hc_and_par_from_sorted_redz")
 
 
 
