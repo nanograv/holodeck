@@ -1251,12 +1251,16 @@ def _gamma_ssi_cython(rho, grid_path):
 
     TODO: change grid save location to belong to some class or something?
     """
+
     Num = np.size(rho[:,0,0,:])
 
     grid_name = grid_path+'/rho_gamma_interp_grid_Num%d.npz' % (Num)
 
     # check if interpolation grid already exists, if not, build it
     if os.path.exists(grid_name) is False:
+        # check if grid_path already exists, if not, makedir
+        if (os.path.exists(grid_path) is False):
+            os.makedirs(grid_path)
         _build_gamma_interp_grid(Num, grid_name)
 
     # read in data from saved grid
