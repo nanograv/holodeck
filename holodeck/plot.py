@@ -59,6 +59,15 @@ PARAM_KEYS = {
 
 COLORS_MPL = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
+LIBRARY_COLORS = {
+    'PhenomUniform': "#377EB8",
+    'PhenomAstro': "#FF7F00",
+    'GWOnly': "#984EA3",
+    'HDall': "#999999",
+    'HDdmgp': "#4DAF4A",
+    'priors': "0.5",
+}
+
 
 class MidpointNormalize(mpl.colors.Normalize):
     """
