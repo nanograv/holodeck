@@ -20,7 +20,7 @@ LMAX = 8
 HC_REF15_10YR = 11.2*10**-15 
 
 
-def healpix_map(hc_ss, hc_bg, nside=NSIDE):
+def healpix_map(hc_ss, hc_bg, nside=NSIDE, seed=None, ret_seed=False):
     """ Build mollview array of hc^2/dOmega for a healpix map
     
     Parameters
@@ -46,6 +46,12 @@ def healpix_map(hc_ss, hc_bg, nside=NSIDE):
     nreals = len(hc_ss[0])
     nloudest = len(hc_ss[0,0])
 
+    # set random seed
+    if seed is None:
+        seed = np.random.randint(99999)   # get a random number
+    print(f"random seed: {seed}")                           # print it out so we can reuse it if desired
+    np.random.seed(seed)   
+
     # spread background evenly across pixels in moll_hc
     moll_hc = np.ones((nfreqs,nreals,npix)) * hc_bg[:,:,np.newaxis]**2/(npix/area) # (frequency, realization, pixel)
 
@@ -55,7 +61,8 @@ def healpix_map(hc_ss, hc_bg, nside=NSIDE):
         for rr in range(nreals):
             for ll in range(nloudest):
                 moll_hc[ff,rr,pix_ss[ff,rr,ll]] = (moll_hc[ff,rr,pix_ss[ff,rr,ll]] + hc_ss[ff,rr,ll]**2/area)
-                
+    if ret_seed:
+        return moll_hc, seed           
     return moll_hc
 
 def healpix_map_oldhc2(hc_ss, hc_bg, nside=NSIDE):
