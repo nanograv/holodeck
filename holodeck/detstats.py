@@ -1931,11 +1931,11 @@ def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref
 
 ######################### Param Space Models ########################### 
 
-def detect_pspace_model(fobs_cents, hc_ss, hc_bg, dur,
+def detect_pspace_model(fobs_cents, hc_ss, hc_bg, 
                         npsrs, sigma, nskies, thresh=DEF_THRESH, debug=False):
     shape = hc_ss.shape
     nfreqs, nreals, nloudest = shape[0], shape[1], shape[2]
-
+    dur = 1/fobs_cents[0]
 
     # calculate dur, cad, dfobs
     dur = dur * YR
