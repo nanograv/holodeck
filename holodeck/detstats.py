@@ -1638,7 +1638,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
     snr_bg = np.zeros((nsamp, nfreqs, nreals))
     df_ss = np.zeros(nsamp)
     df_bg = np.zeros(nsamp)
-    ev_ss = np.zeros(nsamp)
+    ev_ss = np.zeros((nsamp, nreals, nskies))
     if save_ssi: gamma_ssi = np.zeros((nsamp, nfreqs, nreals, nskies, nloudest))
 
     # # one time calculations
@@ -1736,13 +1736,13 @@ def expval_of_ss(gamma_ssi,):
 
     Returns
     -------
-    ev_ss : int
-        Expected number of single source detection (dp_ss>thresh) averaged across all strain and sky realizations.
+    ev_ss : (R,S)
+        Expected number of single source detection (dp_ss>thresh) for each strain and sky realizations.
     
     """
     # print(f"{gamma_ssi.shape=}, {[*gamma_ssi.shape]}")
-    nfreqs, nreals, nskies, nloudest = [*gamma_ssi.shape]
-    ev_ss = np.sum(gamma_ssi)/(nreals*nskies)
+    # nfreqs, nreals, nskies, nloudest = [*gamma_ssi.shape]
+    ev_ss = np.sum(gamma_ssi, axis=(0,3))
     return ev_ss
     # df_bg[nn] = np.sum(dp_bg[nn]>thresh)/(nreals)
 
