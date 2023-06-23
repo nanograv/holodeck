@@ -1740,7 +1740,7 @@ def expval_of_ss(gamma_ssi,):
         Expected number of single source detection (dp_ss>thresh) averaged across all strain and sky realizations.
     
     """
-    print(f"{gamma_ssi.shape=}, {[*gamma_ssi.shape]}")
+    # print(f"{gamma_ssi.shape=}, {[*gamma_ssi.shape]}")
     nfreqs, nreals, nskies, nloudest = [*gamma_ssi.shape]
     ev_ss = np.sum(gamma_ssi)/(nreals*nskies)
     return ev_ss
@@ -1878,7 +1878,7 @@ def amp_to_hc(amp_ref, fobs, dfobs):
     hc = amp_ref*np.sqrt(fobs/dfobs)
     return hc
 
-def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref=None, ret_all = False):
+def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref=HC_REF15_10YR, ret_all = False):
     """ Sort samples by those with f=1/yr char strains closest to some reference value.
 
     Parameters
@@ -1913,10 +1913,6 @@ def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref
     if fidx is None:
         fidx = (np.abs(fobs - 1/(10*YR))).argmin()
 
-    if (hc_ref is None):
-        # find reference (e.g. 12.5 yr) char strain
-        hc_ref = amp_to_hc(amp_ref, fobs[fidx], dfobs[fidx])
-
 
     # extrapolate hc_ref at freq closest to 1/10yr from 1/10yr ref
     hc_ref = hc_ref * (fobs[fidx]*YR/.1)**(-2/3)
@@ -1924,9 +1920,7 @@ def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref
     # select 1/yr median strains of samples
     hc_tt = np.sqrt(hc_bg[:,fidx,:]**2 + np.sum(hc_ss[:,fidx,:,:]**2, axis=-1)) # (N,R)
     hc_diff = np.abs(hc_tt - hc_ref) # (N,R)
-    print('hc_diff', hc_diff.shape)
     hc_diff = np.median(hc_diff, axis=-1) # median of differences (N,)
-    print('hc_diff', hc_diff.shape)
 
     # sort by closest
     nsort = np.argsort(hc_diff)
