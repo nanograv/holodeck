@@ -216,11 +216,11 @@ def _gws_from_samples(vals, weights, fobs_gw_edges):
 
     Returns
     -------
-    gff : (F,) ndarry,
+    gff : (F,) ndarray,
         Observer-frame GW-frequencies of the loudest binary in each bin [1/sec].
-    gwf : (F,) ndarry,
+    gwf : (F,) ndarray,
         GW Foreground: the characteristic strain of the loudest binary in each frequency bin.
-    gwb : (F,) ndarry,
+    gwb : (F,) ndarray,
         GW Background: the characteristic strain of the GWB in each frequency bin.
         Does not include the strain from the loudest binary in each bin (`gwf`).
 
@@ -525,7 +525,7 @@ def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
 
     # convert from hc^2 to hc
     hc2 = np.sqrt(hc2)
-    # this is for clarity, note that it does not duplicate the memory
+    # hc is redefined for clarity, note that it does not duplicate the memory
     hc = hc2
 
     return hc
@@ -703,8 +703,8 @@ def char_strain_sq_from_bin_edges(edges):
 # ==============================================================================
 
 
-#! NOTE: THIS IS SLOW PYTHON IMPLEMENTATION FOR TESTING.  USE `holodeck.cytuls.sam_calc_gwb_single_eccen()` !#
-
+# ! NOTE: THIS IS SLOW PYTHON IMPLEMENTATION FOR TESTING.
+# ! USE `holodeck.cytuls.sam_calc_gwb_single_eccen()`
 def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
     """
 
@@ -721,12 +721,21 @@ def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=1
     nharms : int
         Number of harmonics to use in calculating GWB.
 
+    Returns
+    -------
+    gwfobs_harms : Observer-frame GW harmonic frequencies.
+    gwb : (F,) ndarray
+        GW Background: the ideal characteristic strain of the GWB in each frequency bin.
+        Does not include the strain from the loudest binary in each bin (`gwf`).
+    ecc_out :
+    tau_out :
     """
 
     # NOTE: need to check for coalescences and set to zero
     # NOTE: need to check for frequencies below starting separation and set to zero
 
-    frst_orb_evo = utils.kepler_freq_from_sepa(sam.mtot[:, np.newaxis], sepa_evo[np.newaxis, :])
+    frst_orb_evo = utils.kepler_freq_from_sepa(sam.mtot[:, np.newaxis],
+                                               sepa_evo[np.newaxis, :])
 
     assert np.ndim(gwfobs) == 1
     assert np.ndim(frst_orb_evo) == 2
@@ -788,7 +797,8 @@ def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=1
                 # interpolate to target (rest-frame) frequency
                 # this is the same for all mass-ratios
                 # () scalar
-                ecc = np.interp(gwfr, frst_evo, eccen_evo, left=np.nan, right=np.nan)
+                ecc = np.interp(gwfr, frst_evo, eccen_evo,
+                                left=np.nan, right=np.nan)
                 # ecc_2 = np.interp(sa, sepa[::-1], eccen_evo[::-1], left=np.nan, right=np.nan)
 
                 # da/dt values are negative, get a positive rate
@@ -839,6 +849,29 @@ def sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
 
 
 def sam_calc_gwb_single_eccen_discrete(gwfobs, sam, sepa_evo, eccen_evo, nharms=100, nreals=None):
+    """
+    Parameters
+    ----------
+    gwfobs : (F,) array_like
+        Observer-frame frequencies at which to calculate GWB.
+    sam : `Semi_Analytic_Model` instance
+        Binary population to sample. See `holodeck.simple_sam` or 'holodeck.sam`
+    sepa_evo :
+        Separation at each evolution step.
+    eccen_evo : (E,) array_like
+        Eccentricities at each evolution step.  The same for all binaries, corresponding to fixed
+        binary separations for all binaries.
+    nharms : int, optional
+        Number of harmonics to use in calculating GWB.
+    nreals : int or None, optional
+        Number of realizations to calculate in Poisson sampling.
+
+    Returns
+    -------
+    gwb : (F,) ndarray,
+        GW Background: the characteristic strain of the GWB in each frequency bin.
+        Does not include the strain from the loudest binary in each bin (`gwf`).
+    """
     import holodeck.cyutils  # noqa
 
     ndens = sam.static_binary_density
@@ -852,7 +885,10 @@ def sam_calc_gwb_single_eccen_discrete(gwfobs, sam, sepa_evo, eccen_evo, nharms=
     else:
         squeeze = False
 
-    gwb = holo.cyutils.sam_calc_gwb_single_eccen_discrete(ndens, mt_l10, mr, rz, dc, gwfobs, sepa_evo, eccen_evo, nharms, nreals)
+    gwb = holo.cyutils.sam_calc_gwb_single_eccen_discrete(ndens, mt_l10, mr,
+                                                          rz, dc, gwfobs,
+                                                          sepa_evo, eccen_evo,
+                                                          nharms, nreals)
 
     if squeeze:
         gwb = gwb.squeeze()
