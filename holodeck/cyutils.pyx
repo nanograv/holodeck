@@ -1758,7 +1758,8 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
                     sspar[3,ff,rr,ll] = redz_final[mm,qq,zz,ff]
 
                     # check for negative redz_final
-                    if redz_final[mm,qq,zz,ff]<0:
+                    if redz_final[mm,qq,zz,ff]<0 and redz_final[mm,qq,zz,ff]!=-1:
+                        # badz = badz+1
                         err = f"redz_final[{mm},{qq},{zz},{ff}] = {redz_final[mm,qq,zz,ff]} < 0"
                         print("ERROR IN CYUTILS:", err)
 
