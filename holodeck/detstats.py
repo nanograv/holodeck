@@ -1414,7 +1414,7 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
 
 
 def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
-              theta_ss=None, phi_ss=None, Phi0_ss=None, iota_ss=None, psi_ss=None,
+              theta_ss=None, phi_ss=None, Phi0_ss=None, iota_ss=None, psi_ss=None, nskies=25, 
               Fe_bar = None, Amp_red=None, gamma_red=None, alpha_0=0.001, Fe_bar_guess=15,
               ret_snr=False, print_nans=False, snr_cython=True, gamma_cython=True, grid_path=GAMMA_RHO_GRID_PATH):
     """ Calculate the single source detection probability, and all intermediary steps for
@@ -1475,6 +1475,9 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
 
     """
     # Assign random single source sky params, if not provided.
+    nfreqs, nreals, nloudest = [*hc_ss.shape]
+    if theta_ss is None:
+        theta_ss = np.random.uniform(0,np.pi, size=nfreqs*nskies*nloudest).reshape(nfreqs, nskies, nloudest)
     if phi_ss is None:
         phi_ss = np.random.uniform(0,2*np.pi, size=theta_ss.size).reshape(theta_ss.shape)
     if Phi0_ss is None:
@@ -1933,8 +1936,7 @@ def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref
 
 def detect_pspace_model(fobs_cents, hc_ss, hc_bg, 
                         npsrs, sigma, nskies, thresh=DEF_THRESH, debug=False):
-    shape = hc_ss.shape
-    nfreqs, nreals, nloudest = shape[0], shape[1], shape[2]
+    nfreqs, nreals, nloudest = [*hc_ss.shape]
     dur = 1/fobs_cents[0]
 
     # calculate dur, cad, dfobs
@@ -1960,15 +1962,18 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
     # Calculate DPs, SNRs, and DFs
     if debug: print('Calculating SS and BG detection statistics.')
     dp_bg, snr_bg = detect_bg_pta(psrs, fobs_cents, cad, hc_bg, ret_snr=True)
+    # print(f"{np.mean(dp_bg)=}")
     vals_ss = detect_ss_pta(
         psrs, cad, dur, fobs_cents, dfobs, hc_ss, hc_bg, 
         gamma_cython=True, snr_cython=True, ret_snr=True, 
         theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss, iota_ss=iota_ss, psi_ss=psi_ss,
         )
     dp_ss, snr_ss, gamma_ssi = vals_ss[0], vals_ss[1], vals_ss[2]
+    # print(f"{np.mean(dp_ss)=}")
     df_ss = np.sum(dp_ss>thresh)/(nreals*nskies)
     df_bg = np.sum(dp_bg>thresh)/(nreals)
     ev_ss = expval_of_ss(gamma_ssi)
+    # print(f"{np.mean(ev_ss)=}")
 
     dsdata = {
         'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi, 
