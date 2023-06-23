@@ -1968,11 +1968,12 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
     dp_ss, snr_ss, gamma_ssi = vals_ss[0], vals_ss[1], vals_ss[2]
     df_ss = np.sum(dp_ss>thresh)/(nreals*nskies)
     df_bg = np.sum(dp_bg>thresh)/(nreals)
+    ev_ss = expval_of_ss(gamma_ssi)
 
     dsdata = {
         'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi, 
         'dp_bg':dp_bg, 'snr_bg':snr_bg,
-        'df_ss':df_ss, 'df_bg':df_bg
+        'df_ss':df_ss, 'df_bg':df_bg, 'ev_ss':ev_ss,
     }
 
     return dsdata
