@@ -604,10 +604,11 @@ def Cl_analytic_from_dnum(edges, dnum, redz=None, realize=False):
 
 
 def draw_analytic(ax, Cl, C0, fobs_gw_cents, color='tab:orange', label='Eq. 17 analytic', 
-                  alpha=1, lw=2):
+                  alpha=1, lw=2, ls='-.'):
     xx = fobs_gw_cents
     yy = Cl/C0 # (F,)
-    ax.plot(xx, yy, color=color, lw=lw, label=label, linestyle='dashdot', alpha=alpha)
+    hh, = ax.plot(xx, yy, color=color, lw=lw, label=label, linestyle=ls, alpha=alpha)
+    return hh
 
 def draw_reals(ax, Cl_many, C0_many, fobs_gw_cents,  color='tab:orange', label= 'Poisson number/bin realization',
                 show_ci=False, show_reals=True, show_median=False, nshow=10, lw_median=2, ls_reals = ':'):
@@ -632,7 +633,7 @@ def draw_spk(ax, label='SP & K Rough Estimate'):
     spk_yy= np.array([1*10**-5, 1*10**-3, 1*10**-1])
     ax.plot(spk_xx * YR, spk_yy, label=label, color='limegreen', ls='--')
 
-def draw_bayes(ax, lmax, colors = ['k', 'b', 'r', 'g', 'c', 'm']):
+def draw_bayes(ax, lmax, colors = ['k', 'b', 'r', 'g', 'c', 'm'], ms=8):
     xx_nihan = np.array([2.0, 4.0, 5.9, 7.9, 9.9]) *10**-9 # Hz
     
     ClC0_nihan = np.array([
@@ -644,7 +645,7 @@ def draw_bayes(ax, lmax, colors = ['k', 'b', 'r', 'g', 'c', 'm']):
     for ll in range(lmax):
         ax.plot(xx_nihan, ClC0_nihan[:,ll], 
                     label = '$l=%d$' % (ll+1), 
-                color=colors[ll], marker='o', ms=8)
+                color=colors[ll], marker='o', ms=ms)
         
 def draw_sim(ax, xx, Cl_best, lmax, nshow, show_ci=True, show_reals=True):
 
@@ -684,7 +685,7 @@ def plot_ClC0_versions(fobs_gw_cents, spk=True, bayes=True,
     if sim and (Cl_best_sim is not None) and (lmax_sim is not None): 
         draw_sim(ax, fobs_gw_cents, Cl_best_sim, lmax_sim, show_ci=True, show_reals=True, nshow=10)
     # ax.set_ylim(10**-6, 10**0)
-    plot._twin_yr(ax, nano=False)
+    # plot._twin_yr(ax, nano=False)
     ax.set_xlim(fobs_gw_cents[0]- 10**(-10), xmax)
 
     if legend:
