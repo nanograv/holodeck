@@ -1938,10 +1938,10 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
     dur = 1/fobs_cents[0]
 
     # calculate dur, cad, dfobs
-    dur = dur * YR
+    # dur = dur * YR
     hifr = nfreqs/dur
     cad = 1.0 / (2 * hifr)
-    fobs_edges = holo.utils.nyquist_freqs_edges(dur, cad)
+    fobs_cents, fobs_edges = holo.utils.pta_freqs(dur)
     dfobs = np.diff(fobs_edges)
 
     # build PTA
