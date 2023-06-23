@@ -122,12 +122,12 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
             #     raise ValueError(err)
 
             dcom_final = +np.inf*np.ones_like(redz)
-            print(holo.utils.stats(redz), "before sel")
+            # print(holo.utils.stats(redz), "before sel")
             sel = (redz > 0.0)
             redz[~sel] = -1.0
-            print(holo.utils.stats(redz), "after sel")
+            # print(holo.utils.stats(redz), "after sel")
             redz[redz<0] = -1.0
-            print(holo.utils.stats(redz), "after redz[redz<0]=-1")
+            # print(holo.utils.stats(redz), "after redz[redz<0]=-1")
             dcom_final[sel] = cosmo.comoving_distance(redz[sel]).cgs.value
             if np.any(dcom_final<0): print('dcom_final<0 found')
 
