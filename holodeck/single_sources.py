@@ -844,6 +844,7 @@ def all_sspars(fobs_gw_cents, sspar):
     redz_init = sspar[2,:,:]  # (F,R,L) dimensionless
     redz_final = sspar[3,:,:]  # (F,R,L) dimensionless
     dcom_final = holo.cosmo.comoving_distance(redz_final).to('cm').value # (F,R,L) in cm
+    dcom_final[dcom_final<0] = np.nan
     fobs_orb_cents = fobs_gw_cents/2.0  # (F,)
     frst_orb_cents = utils.frst_from_fobs(fobs_orb_cents[:,np.newaxis,np.newaxis], redz_final) #  (F,R,L) in Hz
     sepa = utils.kepler_sepa_from_freq(mtot, frst_orb_cents) #  (F,R,L) in cm
