@@ -1997,6 +1997,46 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
     return dsdata
 
 
+def detect_pspace_model_clbrt_psrs(fobs_cents, hc_ss, hc_bg, 
+                        npsrs, nskies, maxtrials=1, 
+                        thresh=DEF_THRESH, debug=False): 
+    """ Detect pspace model using individual PTA calibration for each realization
+    
+    """
+    dur = 1.0/fobs_cents[0]
+    cad = 1.0/(2*fobs_cents[-1])
+
+    nfreqs, nreals, nloudest = [*hc_ss.shape]
+    # get calibrated sigmas 
+    sigmas, avg_dps, std_dps = calibrate_every_real(hc_bg, fobs_cents, npsrs, maxtrials=maxtrials)
+        
+    # form arrays for individual realization detstats
+    dp_ss = np.zeros((nreals, nskies))     
+    dp_bg = np.zeros(nreals)
+    snr_ss = np.zeros((nfreqs, nreals, nskies, nloudest))
+    snr_bg = np.zeros((nreals))
+    gamma_ssi = np.zeros((nfreqs, nreals, nskies, nloudest))
+
+    # for each realization, get individual detstats   
+    for rr in range(nreals):
+            # get psrs for the given calibrated sigma
+            psrs = _build_pta(npsrs, sigmas[rr], dur, cad)
+            # use those psrs to calculate realization detstats
+            _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1], ret_snr=True)
+            dp_bg[rr], snr_bg[rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
+            _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
+                psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], ret_snr=True)
+            dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()
+    ev_ss = expval_of_ss(gamma_ssi)
+    df_ss, df_bg = detfrac_of_reals(dp_ss, dp_bg)
+    _dsdat = {
+        'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi, 
+        'dp_bg':dp_bg, 'snr_bg':snr_bg,
+        'df_ss':df_ss, 'df_bg':df_bg, 'ev_ss':ev_ss,
+        }
+    return _dsdat
+
+
 ########################################################################
 ############################ Calibrate PTA ############################# 
 ########################################################################
