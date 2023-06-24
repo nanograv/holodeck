@@ -7,7 +7,6 @@ python ./scripts/detect_lib_ss.py <LIB_PATH> --grid_path <GRID_PATH> -p <NPSRS> 
 
     <LIB_PATH>  :  library directory that contains sam_lib.hdf5.
     <GRID_PATH> : directory containing gamma-rho interpolation grids. Will mkdir if it doesn't exist.
-    <DUR>       : pta duration in years, default 16.03 yr
     <NPSRS>     : number of PTA pulsars to simulate, should be calibrated to data
     <SIGMA>     : white noise sigma of PTA pulsars, should be calibrated to data
     <NSKIES>    : number of sky realizations to generate for each single source strain realization
@@ -33,7 +32,7 @@ import numpy as np
 import argparse
 
 DEF_NFREQS = holo.librarian.DEF_NUM_FBINS
-DEF_PTA_DUR = holo.librarian.DEF_PTA_DUR 
+# DEF_PTA_DUR = holo.librarian.DEF_PTA_DUR 
 
 DEF_NPSRS = 60
 DEF_SIGMA = 1e-6
@@ -54,8 +53,8 @@ def _setup_argparse():
     
     parser.add_argument('-f', '--nfreqs', action='store', dest='nfreqs', type=int, default=DEF_NFREQS,
                         help='number of frequency bins')
-    parser.add_argument('-d', '--dur', action='store', dest='dur', type=int, default=DEF_PTA_DUR,
-                        help='pta duration in yrs')
+    # parser.add_argument('-d', '--dur', action='store', dest='dur', type=int, default=DEF_PTA_DUR,
+    #                     help='pta duration in yrs')
     
     parser.add_argument('-p', '--npsrs', action='store', dest='npsrs', type=int, default=DEF_NPSRS,
                         help='number of pulsars in pta')
@@ -79,14 +78,14 @@ def _setup_argparse():
     args = parser.parse_args()
     return args
 
-def freq_data(args):
-    nfreqs = args.nfreqs
-    dur = args.dur * YR
-    hifr = nfreqs/dur
-    cad = 1.0 / (2 * hifr)
-    fobs_edges = holo.utils.nyquist_freqs_edges(dur, cad)
-    dfobs = np.diff(fobs_edges)
-    return dur, cad, dfobs
+# def freq_data(args):
+#     nfreqs = args.nfreqs
+#     dur = args.dur * YR
+#     hifr = nfreqs/dur
+#     cad = 1.0 / (2 * hifr)
+#     fobs_edges = holo.utils.nyquist_freqs_edges(dur, cad)
+#     dfobs = np.diff(fobs_edges)
+#     return dur, cad, dfobs
 
 def main():
     # setup command line arguments
@@ -94,11 +93,11 @@ def main():
     print('npsrs=%d, sigma=%e s, nskies=%d, thresh=%f' %
           (args.npsrs, args.sigma, args.nskies, args.thresh))
     
-    # calculate cad and dfobs from duration and nfreqs
-    dur, cad, dfobs = freq_data(args)
-    args = _setup_argparse()
-    print('dur=%f yr, cad=%f yr, nfreqs=%d' %
-          (dur/YR, cad/YR, len(dfobs)))
+    # # calculate cad and dfobs from duration and nfreqs
+    # dur, cad, dfobs = freq_data(args)
+    # args = _setup_argparse()
+    # print('dur=%f yr, cad=%f yr, nfreqs=%d' %
+    #       (dur/YR, cad/YR, len(dfobs)))
     
 
     hdf_name = args.lib_path+'/sam_lib.hdf5'
@@ -110,7 +109,7 @@ def main():
 
     ds.detect_lib(hdf_name, output_dir, args.npsrs, args.sigma, 
                         nskies=args.nskies, thresh=args.thresh, plot=args.plot, debug=args.debug,
-                        dur=dur, cad=cad, dfobs=dfobs, grid_path=args.grid_path, 
+                        grid_path=args.grid_path, 
                         snr_cython=args.snr_cython, save_ssi=args.save_ssi)
   
 
