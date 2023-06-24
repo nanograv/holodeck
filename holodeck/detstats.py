@@ -1981,3 +1981,67 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
     return dsdata
 
 ############################ Calibrate PTA ############################# 
+
+def binary_pta_calibration(hc_bg, fobs, npsrs, maxtrials=2, debug=False, 
+                          sig_start = 1e-6, sig_min = 1e-10, sig_max = 1e-3, ):
+    """ Calibrate the PTA to a 50% target DP for a given model, average over many realizations
+    
+    """
+    dur = 1.0/fobs[0]
+    cad = 1.0/(2*fobs[-1])
+    sigma=sig_start
+
+    avg_dp = 0
+    trials = 1
+    enough_trials = False
+    while avg_dp<.495 or avg_dp>.505 or enough_trials==False: # must be within the desired target range using the max number of trials
+        avg_dp, std_dp = _get_dpbg(hc_bg, npsrs=npsrs, sigma=sigma, trials=trials,
+                          fobs=fobs, dur=dur, cad=cad)
+        if debug: print(f"{avg_dp=}, {sigma=}, {sig_min=}, {sig_max=}, {trials=}")
+        
+        # if we're close, raise the number of trials
+        if avg_dp>0.4 and avg_dp<0.5:
+            if trials == maxtrials:
+                enough_trials=True
+            else:
+                trials=maxtrials
+
+        if avg_dp>=0.51:  # avg_dp too high, raise sigma
+            sig_min = sigma
+            sigma = np.mean([sig_min, sig_max])
+        elif avg_dp<=0.49: # avg_dp too low, decrease sigma
+            sig_max = sigma
+            sigma = np.mean([sig_min, sig_max])     
+    return sigma, avg_dp, std_dp
+
+def _get_dpbg(hc_bg, npsrs, sigma, trials, fobs, dur, cad,):
+    nreals = hc_bg.shape[-1]
+    all_dp = np.zeros((trials, nreals))
+
+    for ii in range(trials):
+        # build PTA
+        phis = np.random.uniform(0, 2*np.pi, size = npsrs)
+        thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+        psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
+                        phi=phis, theta=thetas)
+        # calculate bg detprob of each realizations for the given PTA
+        all_dp[ii] = detect_bg_pta(psrs, fobs, hc_bg=hc_bg)
+
+    avg_dp = np.mean(all_dp)
+    std_dp = np.std(all_dp)
+    return avg_dp, std_dp
+
+def calibrate_every_real(hc_bg, fobs, npsrs, maxtrials, 
+                         sig_start = 1e-6, sig_min=1e-9, sig_max=1e-4, debug=False):
+    nreals = hc_bg.shape[-1]
+    rsigmas = np.zeros(nreals)
+    avg_dps = np.zeros(nreals)
+    std_dps = np.zeros(nreals)
+    for rr in range(nreals):
+        hc_bg_rr = hc_bg[:,rr:rr+1]
+        # print(hc_bg_rr.shape)
+        rsigmas[rr], avg_dps[rr], std_dps[rr] = binary_pta_calibration(
+            hc_bg_rr, fobs, npsrs, maxtrials, debug=debug, 
+            sig_start = sig_start, sig_min=sig_min, sig_max=sig_max, 
+        )
+    return rsigmas, avg_dps, std_dps
