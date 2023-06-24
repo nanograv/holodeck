@@ -1986,6 +1986,8 @@ def binary_pta_calibration(hc_bg, fobs, npsrs, maxtrials=2, debug=False,
                           sig_start = 1e-6, sig_min = 1e-10, sig_max = 1e-3, ):
     """ Calibrate the PTA to a 50% target DP for a given model, average over many realizations
     
+    # BUG: This seems to get stuck on bad guesses, when requiring high max trials. 
+    # TODO: Set up a check for bar guesses. 
     """
     dur = 1.0/fobs[0]
     cad = 1.0/(2*fobs[-1])
