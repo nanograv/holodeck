@@ -1594,10 +1594,11 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
         Fraction of realizations with a single source detection, for each sample.
     df_bg : (N,) 1Darray
         Fraction of realizations with a background detection, for each sample.
-    ev_ss : (N,) 1Darray
+    ev_ss : (N,R,) NDarray
         Expectation number of single source detections, averaged across realizations,
         for each sample.
 
+    TODO: Update, no need to return ss_snr
     """
 
     # Read in hdf file
@@ -1611,7 +1612,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
     hc_ss = ssfile['hc_ss'][...]
     hc_bg = ssfile['hc_bg'][...]
     shape = hc_ss.shape
-    nsamp, nfreqs, nreals, nloudest = shape[0], shape[1], shape[2], shape[3]
+    nsamps, nfreqs, nreals, nloudest = shape[0], shape[1], shape[2], shape[3]
 
     # Assign output folder
     import os
@@ -1636,30 +1637,34 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
 
     # Calculate DPs, SNRs, and DFs
     if debug: print('Calculating SS and BG detection statistics.')
-    dp_ss = np.zeros((nsamp, nreals, nskies)) # (N,R,S)
-    dp_bg = np.zeros((nsamp, nreals)) # (N,R)
-    snr_ss = np.zeros((nsamp, nfreqs, nreals, nskies, nloudest))
-    snr_bg = np.zeros((nsamp, nfreqs, nreals))
-    df_ss = np.zeros(nsamp)
-    df_bg = np.zeros(nsamp)
-    ev_ss = np.zeros((nsamp, nreals, nskies))
-    if save_ssi: gamma_ssi = np.zeros((nsamp, nfreqs, nreals, nskies, nloudest))
+    dp_ss = np.zeros((nsamps, nreals, nskies)) # (N,R,S)
+    dp_bg = np.zeros((nsamps, nreals)) # (N,R)
+    snr_bg = np.zeros((nsamps, nfreqs, nreals))
+    df_ss = np.zeros(nsamps)
+    df_bg = np.zeros(nsamps)
+    ev_ss = np.zeros((nsamps, nreals, nskies))
+    if save_ssi: 
+        snr_ss = np.zeros((nsamps, nfreqs, nreals, nskies, nloudest))
+        gamma_ssi = np.zeros((nsamps, nfreqs, nreals, nskies, nloudest))
 
     # # one time calculations
     # Num = nfreqs * nloudest # number of single sources in a single strain realization (F*L)
     # Fe_bar = _Fe_thresh(Num) # scalar
 
-    for nn in range(nsamp):
-        if debug: print('on sample nn=%d out of N=%d' % (nn,nsamp))
+    for nn in range(nsamps):
+        if debug: print('on sample nn=%d out of N=%d' % (nn,nsamps))
         dp_bg[nn,:], snr_bg[nn,...] = detect_bg_pta(psrs, fobs, hc_bg[nn], ret_snr=True)
         vals_ss = detect_ss_pta(psrs, fobs, hc_ss[nn], hc_bg[nn], 
                                 ret_snr=True, gamma_cython=True, snr_cython=snr_cython,
                                 theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss,
                                 iota_ss=iota_ss, psi_ss=psi_ss, grid_path=grid_path)
-        dp_ss[nn,:,:], snr_ss[nn,...] = vals_ss[0], vals_ss[1],
+        dp_ss[nn,:,:]  = vals_ss[0]
+        if save_ssi: 
+            snr_ss[nn] = vals_ss[1]
+            gamma_ssi[nn] = vals_ss[2]
         df_ss[nn], df_bg[nn] = detfrac_of_reals(dp_ss[nn], dp_bg[nn], thresh)
         ev_ss[nn] = expval_of_ss(vals_ss[2])
-        if save_ssi: gamma_ssi[nn] = vals_ss[2]
+
 
         if plot:
             fig = plot_sample_nn(fobs, hc_ss[nn], hc_bg[nn],
@@ -1670,8 +1675,8 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
             plt.close(fig)
 
     if debug: print('Saving npz files and allsamp plots.')
-    fig1 = plot_detprob(dp_ss, dp_bg, nsamp)
-    fig2 = plot_detfrac(df_ss, df_bg, nsamp, thresh)
+    fig1 = plot_detprob(dp_ss, dp_bg, nsamps)
+    fig2 = plot_detfrac(df_ss, df_bg, nsamps, thresh)
     fig1.savefig(output_dir+'/allsamp_detprobs.png', dpi=300)
     fig2.savefig(output_dir+'/allsamp_detfracs.png', dpi=300)
     plt.close(fig1)
@@ -1681,18 +1686,28 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
               snr_ss=snr_ss, snr_bg=snr_bg, ev_ss = ev_ss, gamma_ssi=gamma_ssi)
     else:
         np.savez(output_dir+'/detstats.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
-              snr_ss=snr_ss, snr_bg=snr_bg, ev_ss = ev_ss)
+              snr_bg=snr_bg, ev_ss = ev_ss)
         
     # return dictionary 
     if ret_dict:
         data = {
             'dp_ss':dp_ss, 'dp_bg':dp_bg, 'df_ss':df_ss, 'df_bg':df_bg,
-            'snr_ss':snr_ss, 'snr_bg':snr_bg, 'ev_ss':ev_ss
+            'snr_bg':snr_bg, 'ev_ss':ev_ss
         }
-        if save_ssi: data.update({'gamma_ssi':gamma_ssi})
+        if save_ssi: 
+            data.update({'gamma_ssi':gamma_ssi})
+            data.update({'snr_ss':snr_ss})
         return data
     return 
 
+def _build_pta(npsrs, sigma, dur, cad):
+    # build PTA
+    phis = np.random.uniform(0, 2*np.pi, size = npsrs)
+    thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    # sigmas = np.ones_like(phis)*sigma
+    psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
+                    phi=phis, theta=thetas)
+    return psrs
 
 def _build_skies(nfreqs, nskies, nloudest):
     theta_ss = np.random.uniform(0, np.pi, size = nfreqs * nskies * nloudest).reshape(nfreqs, nskies, nloudest)
@@ -1808,7 +1823,7 @@ def plot_sample_nn(fobs, hc_ss, hc_bg, dp_ss, dp_bg, df_ss, df_bg, nn):
 
     return fig
 
-def plot_detprob(dp_ss_all, dp_bg_all, nsamp):
+def plot_detprob(dp_ss_all, dp_bg_all, nsamps):
     """ Plot detection probability for many samples.
 
     Paramaters
@@ -1826,11 +1841,11 @@ def plot_detprob(dp_ss_all, dp_bg_all, nsamp):
     fig, ax = plt.subplots(figsize=(6.5,4))
     ax.set_xlabel('Param Space Sample')
     ax.set_ylabel('Detection Probability, $\gamma$')
-    ax.errorbar(np.arange(nsamp), np.mean(dp_bg_all, axis=1),
+    ax.errorbar(np.arange(nsamps), np.mean(dp_bg_all, axis=1),
                 yerr = np.std(dp_bg_all, axis=1), linestyle='',
                 marker='d', capsize=5, color='cornflowerblue', alpha=0.5,
                 label = r'$\langle \gamma_\mathrm{BG} \rangle$')
-    ax.errorbar(np.arange(nsamp), np.mean(dp_ss_all, axis=(1,2)),
+    ax.errorbar(np.arange(nsamps), np.mean(dp_ss_all, axis=(1,2)),
                 yerr = np.std(dp_ss_all, axis=(1,2)), linestyle='',
                 marker='o', capsize=5, color='orangered', alpha=0.5,
                 label = r'$\langle \gamma_\mathrm{SS} \rangle$')
@@ -1843,7 +1858,7 @@ def plot_detprob(dp_ss_all, dp_bg_all, nsamp):
     return fig
 
 
-def plot_detfrac(df_ss, df_bg, nsamp, thresh):
+def plot_detfrac(df_ss, df_bg, nsamps, thresh):
     """ Plot detection fraction for many samples.
 
     Paramaters
@@ -1859,9 +1874,9 @@ def plot_detfrac(df_ss, df_bg, nsamp, thresh):
     fig : figure object
     """
     fig, ax = plt.subplots(figsize=(6.5,4))
-    ax.plot(np.arange(nsamp), df_bg, color='cornflowerblue', label='BG',
+    ax.plot(np.arange(nsamps), df_bg, color='cornflowerblue', label='BG',
             marker='d', alpha=0.5)
-    ax.plot(np.arange(nsamp), df_ss, color='orangered', label='SS',
+    ax.plot(np.arange(nsamps), df_ss, color='orangered', label='SS',
             marker='o', alpha=0.5)
     ax.set_xlabel('Param Space Sample')
     ax.set_ylabel('Detection Fraction')
@@ -1945,11 +1960,12 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
 
     # build PTA
     if debug: print('Building pulsar timing array.')
-    phis = np.random.uniform(0, 2*np.pi, size = npsrs)
-    thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
-    # sigmas = np.ones_like(phis)*sigma
-    psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
-                    phi=phis, theta=thetas)
+    psrs = _build_pta(npsrs, sigma, dur, cad)
+    # phis = np.random.uniform(0, 2*np.pi, size = npsrs)
+    # thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    # # sigmas = np.ones_like(phis)*sigma
+    # psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
+    #                 phi=phis, theta=thetas)
 
     # Build ss skies
     if debug: print('Building ss skies.')
@@ -1980,7 +1996,10 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
 
     return dsdata
 
+
+########################################################################
 ############################ Calibrate PTA ############################# 
+########################################################################
 
 def binary_pta_calibration(hc_bg, fobs, npsrs, maxtrials=2, debug=False, 
                           sig_start = 1e-6, sig_min = 1e-10, sig_max = 1e-3, ):
@@ -2035,6 +2054,25 @@ def _get_dpbg(hc_bg, npsrs, sigma, trials, fobs, dur, cad,):
 
 def calibrate_every_real(hc_bg, fobs, npsrs, maxtrials, 
                          sig_start = 1e-6, sig_min=1e-9, sig_max=1e-4, debug=False):
+    """ Calibrate the PTA independently for each background realizations
+
+    Parameters
+    ----------
+    hc_bg : (F,R) Ndarray
+    fobs : (F,) 1Darray
+    npsrs : integer
+    maxtrials : integer
+
+    Returns
+    -------
+    rsigmas : (R,) 1Darray
+        Calibrated PTA white noise sigma for each realization.
+    avg_dps : (R,) 1Darray
+        Average background detprob across PTA realizations, calculated for the realization's PTA.
+    std_dps : (R,) 1Darray
+        Standard deviation among PTA realizations for the given bg realizations.
+
+    """
     nreals = hc_bg.shape[-1]
     rsigmas = np.zeros(nreals)
     avg_dps = np.zeros(nreals)
