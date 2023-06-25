@@ -1997,9 +1997,49 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
     return dsdata
 
 
-def detect_pspace_model_clbrt_psrs(fobs_cents, hc_ss, hc_bg, 
+def detect_pspace_model_clbrt_sigma(fobs_cents, hc_ss, hc_bg, 
                         npsrs, nskies, maxtrials=1, 
                         thresh=DEF_THRESH, debug=False): 
+    """ Detect pspace model using individual sigma calibration for each realization
+    
+    """
+    dur = 1.0/fobs_cents[0]
+    cad = 1.0/(2*fobs_cents[-1])
+
+    nfreqs, nreals, nloudest = [*hc_ss.shape]
+        
+    # form arrays for individual realization detstats
+    dp_ss = np.zeros((nreals, nskies))     
+    dp_bg = np.zeros(nreals)
+    snr_ss = np.zeros((nfreqs, nreals, nskies, nloudest))
+    snr_bg = np.zeros((nreals))
+    gamma_ssi = np.zeros((nfreqs, nreals, nskies, nloudest))
+
+    # for each realization, 
+    for rr in range(nreals):
+            # get calibrated psrs 
+            psrs = calibrate_one_pta(hc_bg[:,rr], fobs_cents, npsrs,
+                                     sigmin=1e-9, sigmax=1e-4)
+
+            # use those psrs to calculate realization detstats
+            _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1], ret_snr=True)
+            dp_bg[rr], snr_bg[rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
+            _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
+                psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], ret_snr=True)
+            dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()
+            
+    ev_ss = expval_of_ss(gamma_ssi)
+    df_ss, df_bg = detfrac_of_reals(dp_ss, dp_bg)
+    _dsdat = {
+        'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi, 
+        'dp_bg':dp_bg, 'snr_bg':snr_bg,
+        'df_ss':df_ss, 'df_bg':df_bg, 'ev_ss':ev_ss,
+        }
+    return _dsdat
+
+
+def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, 
+                        npsrs, nskies, ): 
     """ Detect pspace model using individual PTA calibration for each realization
     
     """
@@ -2008,7 +2048,7 @@ def detect_pspace_model_clbrt_psrs(fobs_cents, hc_ss, hc_bg,
 
     nfreqs, nreals, nloudest = [*hc_ss.shape]
     # get calibrated sigmas 
-    sigmas, avg_dps, std_dps = calibrate_every_real(hc_bg, fobs_cents, npsrs, maxtrials=maxtrials)
+    sigmas, avg_dps, std_dps = calibrate_all_sigma(hc_bg, fobs_cents, npsrs, maxtrials=maxtrials)
         
     # form arrays for individual realization detstats
     dp_ss = np.zeros((nreals, nskies))     
@@ -2092,7 +2132,7 @@ def _get_dpbg(hc_bg, npsrs, sigma, trials, fobs, dur, cad,):
     std_dp = np.std(all_dp)
     return avg_dp, std_dp
 
-def calibrate_every_real(hc_bg, fobs, npsrs, maxtrials, 
+def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials, 
                          sig_start = 1e-6, sig_min=1e-9, sig_max=1e-4, debug=False):
     """ Calibrate the PTA independently for each background realizations
 
@@ -2125,3 +2165,43 @@ def calibrate_every_real(hc_bg, fobs, npsrs, maxtrials,
             sig_start = sig_start, sig_min=sig_min, sig_max=sig_max, 
         )
     return rsigmas, avg_dps, std_dps
+
+def calibrate_one_pta(hc_bg, fobs, npsrs, 
+                      sigmin=1e-9, sigmax=1e-4, debug=False):
+    """ Calibrate the specific PTA for a given realization, and return that PTA
+
+    Parameters
+    ----------
+    hc_bg : (F,) 1Darray
+        The background characteristic strain for one realization.
+    fobs : (F,) 1Darray
+        Observed GW frequencies.
+    npsrs : integer
+        Number of pulsars.
+
+    Returns 
+    -------
+    psrs : hasasia.sim.pta object
+        Calibrated PTA.
+    """
+
+    # get duration and cadence from fobs
+    dur = 1.0/fobs[0]
+    cad = 1.0/(2.0*fobs[-1])
+
+    # randomize pulsar positions
+    phis = np.random.uniform(0, 2*np.pi, size = npsrs)
+    thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+
+    # calibrate sigma
+    while dp_bg<0.495 or dp_bg>0.505:
+        sigma = np.mean([sigmin, sigmax])
+        psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
+                        phi=phis, theta=thetas)
+        dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg)
+
+        if dp_bg<0.49: # dp too low, lower sigma
+            sigmax = sigma
+        elif dp_bg>0.51: # dp too high, raise sigma
+            sigmin = sigma
+    return psrs
