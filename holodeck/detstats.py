@@ -2217,7 +2217,7 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
             nbads += 1 # check how many attempts between 0.49 and 0.51 fail
         if nbads>maxbads: # if many fail, we're stuck; expand sampling range
             if debug: print(f"{nbads=}", f"{dp_bg=}")
-            sigmin = sigmin/10
-            sigmax = sigmax*10
+            sigmin = sigmin/5
+            sigmax = sigmax*5
             nbads=0
     return psrs
