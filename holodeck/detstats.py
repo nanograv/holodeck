@@ -1817,20 +1817,20 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
 
         # calibrate individual realization PTAs
         for rr in range(nreals):
+            if rr==0:
+                _sigstart, _sigmin, _sigmax = sigstart, sigmin, sigmax 
             if debug: 
                 now = datetime.now()
                 if (rr%5==0):
-                    print(f"{nn=}, {rr=}, {now-real_dur} s per realization")
+                    print(f"{nn=}, {rr=}, {now-real_dur} s per realization, {_sigmin=:.2e}, {_sigmax=:.2e}, {_sigstart=:.2e}")
                 real_dur = now
 
             # use sigmin and sigmax from previous realization, 
             # unless it's the first realization of the sample
-            if nn==0:
-                _sigstart, _sigmin, _sigmax = sigstart, sigmin, sigmax 
             psrs, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[nn,:,rr], fobs, npsrs, tol=tol, maxbads=maxbads,
                                      sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True)
-            _sigmin /= 10
-            _sigmax *= 10
+            _sigmin /= 2
+            _sigmax *= 2
             
             # get background detstats
             _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs, hc_bg[nn,:,rr:rr+1], ret_snr=True)
@@ -2409,30 +2409,38 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
 
     nclose=0 # number of attempts close to 0.5, could be stuck close
     nfar=0 # number of attempts far from 0.5, could be stuck far
+
     # calibrate sigma
     while np.abs(dp_bg-0.50)>tol:
-        sigma = np.mean([sigmin, sigmax])
+        sigma = np.mean([sigmin, sigmax]) # a weighted average would be better
         psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                         phi=phis, theta=thetas)
         dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg)[0]
+
         # if debug: print(f"{dp_bg=}")
-        if dp_bg<0.1 or dp_bg>0.9:
+        if (dp_bg < (0.5-tol)) or (dp_bg > (0.5+tol)):
             nfar +=1
-        if nfar>3*maxbads:
-            if debug: print(f"{nfar=}, {dp_bg=}, {sigmin=:e}, {sigmax=:e}")
-            if dp_bg<0.1: # stuck way too low, allow much lower sigmin to raise DP
-                sigmin = sigmin/10**3
-            if dp_bg>0.9: # stuck way too high, allow much higher sigmax to lower DP
-                sigmax = sigmax*10**3
+
+        if (nfar>5*maxbads  # if we've had many bad guesses
+            or (sigmin/sigmax > 0.99 # or our range is small and we are far from the goal
+                and (dp_bg<0.4 or dp_bg>0.6))):
+            
+            # then we must expand the range
+            if debug: print(f"STUCK! {nfar=}, {dp_bg=}, {sigmin=:e}, {sigmax=:e}")
+            if dp_bg < 0.5-tol: # stuck way too low, allow much lower sigmin to raise DP
+                sigmin = sigmin/3
+            if dp_bg > 0.5+tol: # stuck way too high, allow much higher sigmax to lower DP
+                sigmax = sigmax*3
+
             nfar = 0
-        if dp_bg<0.49: # dp too low, lower sigma
+        if dp_bg<0.5-tol: # dp too low, lower sigma
             sigmax = sigma
-        elif dp_bg>0.51: # dp too high, raise sigma
+        elif dp_bg>0.5+tol: # dp too high, raise sigma
             sigmin = sigma
         else:
             nclose += 1 # check how many attempts between 0.49 and 0.51 fail
         if nclose>maxbads: # if many fail, we're stuck; expand sampling range
-            if debug: print(f"{nclose=}", f"{dp_bg=}")
+            if debug: print(f"{nclose=}, {dp_bg=}, {sigmin=:e}, {sigmax=:e}")
             sigmin = sigmin/5
             sigmax = sigmax*5
             nclose=0
