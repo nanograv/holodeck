@@ -2393,6 +2393,12 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
     -------
     psrs : hasasia.sim.pta object
         Calibrated PTA.
+    sigmin : float
+        minimum of the final sigma range used, returned only if ret_sig=True
+    sigmax : float, returned only if ret_sig=True
+        maximum of the final sigma range used
+    sigma : float
+        final sigma, returned only if ret_sig=True
     """
 
     # get duration and cadence from fobs
@@ -2421,6 +2427,7 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
         if (dp_bg < (0.5-tol)) or (dp_bg > (0.5+tol)):
             nfar +=1
 
+        # check if we need to expand the range
         if (nfar>5*maxbads  # if we've had many bad guesses
             or (sigmin/sigmax > 0.99 # or our range is small and we are far from the goal
                 and (dp_bg<0.4 or dp_bg>0.6))):
@@ -2432,17 +2439,22 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
             if dp_bg > 0.5+tol: # stuck way too high, allow much higher sigmax to lower DP
                 sigmax = sigmax*3
 
+            # reset count for far guesses
             nfar = 0
+
+        # check how we should narrow our range
         if dp_bg<0.5-tol: # dp too low, lower sigma
             sigmax = sigma
         elif dp_bg>0.5+tol: # dp too high, raise sigma
             sigmin = sigma
         else:
             nclose += 1 # check how many attempts between 0.49 and 0.51 fail
+
+        # check if we are stuck near the goal value with a bad range    
         if nclose>maxbads: # if many fail, we're stuck; expand sampling range
             if debug: print(f"{nclose=}, {dp_bg=}, {sigmin=:e}, {sigmax=:e}")
-            sigmin = sigmin/5
-            sigmax = sigmax*5
+            sigmin = sigmin/3
+            sigmax = sigmax*3
             nclose=0
     if ret_sig:
         return psrs, sigma, sigmin, sigmax
