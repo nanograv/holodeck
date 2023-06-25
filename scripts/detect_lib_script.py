@@ -68,6 +68,10 @@ def _setup_argparse():
                         help='number of pulsars in pta')
     parser.add_argument('--sigma', action='store', dest='sigma', type=float, default=DEF_SIGMA,
                         help='sigma for white noise of pulsars, or starting sigma if using individual realization calibration')
+    parser.add_argument('--sigmin', action='store', dest='sigmin', type=float, default=1e-10,
+                        help='sigma minimum for calibration')
+    parser.add_argument('--sigmax', action='store', dest='sigmax', type=float, default=1e-3,
+                        help='sigma maximum for calibration')
     
     parser.add_argument('-s', '--nskies', action='store', dest='nskies', type=int, default=DEF_NSKIES,
                         help='number of ss sky realizations')
@@ -122,7 +126,7 @@ def main():
 
     if args.clbrt:
         ds.detect_lib_clbrt_pta(hdf_name, output_dir, args.npsrs, 
-                                sigstart = args.sigma, sigmin=1e-8, sigmax=1e-5, tol=args.tol, maxbads=args.maxbads, 
+                                sigstart = args.sigma, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads, 
                             nskies=args.nskies, thresh=args.thresh, plot=args.plot, debug=args.debug,
                             grid_path=args.grid_path, 
                             snr_cython=args.snr_cython, save_ssi=args.save_ssi)

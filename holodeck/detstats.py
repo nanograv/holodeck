@@ -1811,19 +1811,26 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
 
     for nn in range(nsamps):
         if debug: 
-            print('on sample nn=%d out of N=%d' % (nn,nsamps))
+            print('\non sample nn=%d out of N=%d' % (nn,nsamps))
             samp_dur = datetime.now()
             real_dur = datetime.now()
 
         # calibrate individual realization PTAs
         for rr in range(nreals):
-            if debug and rr<10: 
+            if debug: 
                 now = datetime.now()
-                print(f"{nn=}, {rr=}, {now-real_dur} s")
+                if (rr%5==0):
+                    print(f"{nn=}, {rr=}, {now-real_dur} s per realization")
                 real_dur = now
 
-            psrs = calibrate_one_pta(hc_bg[nn,:,rr], fobs, npsrs, tol=tol, maxbads=maxbads,
-                                     sigmin=sigmin, sigmax=sigmax, sigstart=sigstart)
+            # use sigmin and sigmax from previous realization, 
+            # unless it's the first realization of the sample
+            if nn==0:
+                _sigstart, _sigmin, _sigmax = sigstart, sigmin, sigmax 
+            psrs, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[nn,:,rr], fobs, npsrs, tol=tol, maxbads=maxbads,
+                                     sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True)
+            _sigmin /= 10
+            _sigmax *= 10
             
             # get background detstats
             _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs, hc_bg[nn,:,rr:rr+1], ret_snr=True)
@@ -2370,7 +2377,7 @@ def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials,
 
 def calibrate_one_pta(hc_bg, fobs, npsrs, 
                       sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
-                      phis=None, thetas=None):
+                      phis=None, thetas=None, ret_sig = False):
     """ Calibrate the specific PTA for a given realization, and return that PTA
 
     Parameters
@@ -2395,11 +2402,13 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
     # randomize pulsar positions
     if phis is None: phis = np.random.uniform(0, 2*np.pi, size = npsrs)
     if thetas is None: thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
-    psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigstart,
+    sigma = sigstart
+    psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                     phi=phis, theta=thetas)
     dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis])[0]
 
-    nbads=0
+    nclose=0 # number of attempts close to 0.5, could be stuck close
+    nfar=0 # number of attempts far from 0.5, could be stuck far
     # calibrate sigma
     while np.abs(dp_bg-0.50)>tol:
         sigma = np.mean([sigmin, sigmax])
@@ -2407,15 +2416,27 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
                         phi=phis, theta=thetas)
         dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg)[0]
         # if debug: print(f"{dp_bg=}")
+        if dp_bg<0.1 or dp_bg>0.9:
+            nfar +=1
+        if nfar>3*maxbads:
+            if debug: print(f"{nfar=}, {dp_bg=}, {sigmin=:e}, {sigmax=:e}")
+            if dp_bg<0.1: # stuck way too low, allow much lower sigmin to raise DP
+                sigmin = sigmin/10**3
+            if dp_bg>0.9: # stuck way too high, allow much higher sigmax to lower DP
+                sigmax = sigmax*10**3
+            nfar = 0
         if dp_bg<0.49: # dp too low, lower sigma
             sigmax = sigma
         elif dp_bg>0.51: # dp too high, raise sigma
             sigmin = sigma
         else:
-            nbads += 1 # check how many attempts between 0.49 and 0.51 fail
-        if nbads>maxbads: # if many fail, we're stuck; expand sampling range
-            if debug: print(f"{nbads=}", f"{dp_bg=}")
+            nclose += 1 # check how many attempts between 0.49 and 0.51 fail
+        if nclose>maxbads: # if many fail, we're stuck; expand sampling range
+            if debug: print(f"{nclose=}", f"{dp_bg=}")
             sigmin = sigmin/5
             sigmax = sigmax*5
-            nbads=0
+            nclose=0
+    if ret_sig:
+        return psrs, sigma, sigmin, sigmax
     return psrs
+
