@@ -11,6 +11,8 @@ from sympy import nsolve, Symbol
 import h5py
 import matplotlib.pyplot as plt
 import os
+from datetime import datetime
+
 
 import holodeck as holo
 from holodeck import utils, cosmo, log, plot, sam_cython
@@ -1700,6 +1702,197 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
         return data
     return 
 
+
+def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
+                         sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
+                plot=True, debug=False, grid_path=GAMMA_RHO_GRID_PATH, 
+                snr_cython = True, save_ssi=False, ret_dict=False):
+    """ Calculate detection statistics for an ss library output.
+
+    Parameters
+    ----------
+    hdf_fname : String
+        Name of hdf file, including path.
+    output_dir : String
+        Where to store outputs, including full path.
+    npsrs : int
+        Number of pulsars to place in pta.
+    sigma : int or (P,) array
+        Noise in each pulsar
+    nskies : int
+        Number of sky realizationt to create.
+    thresh : float
+        Threshold for detection in realization.
+    plot : Bool
+        Whether or not to make and save plots.
+    debug : Bool
+        Whether to print info along the way.
+    grid_path : string
+        Path to snr interpolation grid
+    snr_cython : Bool
+        Whether to use cython interpolation for ss snr calculation.
+    save_ssi : Bool
+        Whether to store gamma_ssi in npz arrays
+
+    Returns
+    -------
+    dp_ss : (N,R,S) Ndarray
+        Single source detection probability for each of
+        - N parameter space samples
+        - R strain realizations
+        - S sky realizations
+    dp_bg : (N,R) Ndarray
+        Background detectin probability.
+    snr_ss : (N,F,R,S,L)
+        Signal to noise ratio for every single source in every
+        realization at each of
+        - F frequencies
+        - L loudest at frequency
+    snr_bg : (N,F,R)
+        Signal to noise ratio of the background at each
+        frequency of each realization.
+    df_ss : (N,)
+        Fraction of realizations with a single source detection, for each sample.
+    df_bg : (N,) 1Darray
+        Fraction of realizations with a background detection, for each sample.
+    ev_ss : (N,R,) NDarray
+        Expectation number of single source detections, averaged across realizations,
+        for each sample.
+
+    """
+
+    # Read in hdf file
+    ssfile = h5py.File(hdf_name, 'r')
+    fobs = ssfile['fobs'][:]
+    dur = 1.0/fobs[0]
+    cad = 1.0/(2*fobs[-1])
+    # if dfobs is None: dfobs = ssfile['dfobs'][:]
+    # if dur is None: dur = ssfile['pta_dur'][0]
+    # if cad is None: cad = ssfile['pta_cad'][0]
+    hc_ss = ssfile['hc_ss'][...]
+    hc_bg = ssfile['hc_bg'][...]
+    shape = hc_ss.shape
+    nsamps, nfreqs, nreals, nloudest = shape[0], shape[1], shape[2], shape[3]
+
+    # Assign output folder
+    import os
+    if (os.path.exists(output_dir) is False):
+        print('Making output directory.')
+        os.makedirs(output_dir)
+    else:
+        print('Writing to an existing directory.')
+
+    # build PTA pulsar positions
+    if debug: print('Placing pulsar.')
+    phis = np.random.uniform(0, 2*np.pi, size = npsrs)
+    thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    if debug: print(f"{phis.shape=}, {thetas.shape=}, {dur=}, {cad=}")
+    # psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
+    #                 phi=phis, theta=thetas)
+
+     # Build ss skies
+    if debug: print('Building ss skies.')
+    theta_ss, phi_ss, Phi0_ss, iota_ss, psi_ss = _build_skies(nfreqs, nskies, nloudest)
+
+    # Calculate DPs, SNRs, and DFs
+    if debug: print('Calculating SS and BG detection statistics.')
+    dp_ss = np.zeros((nsamps, nreals, nskies)) # (N,R,S)
+    dp_bg = np.zeros((nsamps, nreals)) # (N,R)
+    snr_bg = np.zeros((nsamps, nfreqs, nreals))
+    df_ss = np.zeros(nsamps)
+    df_bg = np.zeros(nsamps)
+    ev_ss = np.zeros((nsamps, nreals, nskies))
+    if save_ssi: 
+        snr_ss = np.zeros((nsamps, nfreqs, nreals, nskies, nloudest))
+        gamma_ssi = np.zeros((nsamps, nfreqs, nreals, nskies, nloudest))
+
+    # # one time calculations
+    # Num = nfreqs * nloudest # number of single sources in a single strain realization (F*L)
+    # Fe_bar = _Fe_thresh(Num) # scalar
+
+    for nn in range(nsamps):
+        if debug: 
+            print('on sample nn=%d out of N=%d' % (nn,nsamps))
+            samp_dur = datetime.now()
+            real_dur = datetime.now()
+
+        # calibrate individual realization PTAs
+        for rr in range(nreals):
+            if debug and rr<10: 
+                now = datetime.now()
+                print(f"{nn=}, {rr=}, {now-real_dur} s")
+                real_dur = now
+
+            psrs = calibrate_one_pta(hc_bg[nn,:,rr], fobs, npsrs, tol=tol, maxbads=maxbads,
+                                     sigmin=sigmin, sigmax=sigmax, sigstart=sigstart)
+            
+            # get background detstats
+            _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs, hc_bg[nn,:,rr:rr+1], ret_snr=True)
+            dp_bg[nn,rr], snr_bg[nn,:,rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
+
+            # get single source detstats
+            _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
+                    psrs, fobs, hc_ss[nn,:,rr:rr+1], hc_bg[nn,:,rr:rr+1], 
+                    nskies=nskies, ret_snr=True,
+                    theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss, 
+                    iota_ss=iota_ss, psi_ss=psi_ss)
+            dp_ss[nn,rr,:] = _dp_ss.squeeze()
+            if save_ssi:
+                snr_ss[nn,:,rr] = _snr_ss.squeeze()
+                gamma_ssi[nn,:,rr] = _gamma_ssi.squeeze() 
+            ev_ss[nn,rr] = expval_of_ss(_gamma_ssi)
+        if debug:
+            now = datetime.now()
+            print(f"Sample {nn} took {now-samp_dur} s")
+            samp_dur = now
+        # dp_bg[nn,:], snr_bg[nn,...] = detect_bg_pta(psrs, fobs, hc_bg[nn], ret_snr=True)
+        # vals_ss = detect_ss_pta(psrs, fobs, hc_ss[nn], hc_bg[nn], 
+        #                         ret_snr=True, gamma_cython=True, snr_cython=snr_cython,
+        #                         theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss,
+        #                         iota_ss=iota_ss, psi_ss=psi_ss, grid_path=grid_path)
+        # dp_ss[nn,:,:]  = vals_ss[0]
+        # if save_ssi: 
+        #     snr_ss[nn] = vals_ss[1]
+        #     gamma_ssi[nn] = vals_ss[2]
+        df_ss[nn], df_bg[nn] = detfrac_of_reals(dp_ss[nn], dp_bg[nn], thresh)
+
+
+        if plot:
+            fig = plot_sample_nn(fobs, hc_ss[nn], hc_bg[nn],
+                         dp_ss[nn], dp_bg[nn],
+                         df_ss[nn], df_bg[nn], nn=nn)
+            plot_fname = (output_dir+'/p%06d_detprob.png' % nn) # need to make this directory
+            fig.savefig(plot_fname, dpi=100)
+            plt.close(fig)
+
+    if debug: print('Saving npz files and allsamp plots.')
+    fig1 = plot_detprob(dp_ss, dp_bg, nsamps)
+    fig2 = plot_detfrac(df_ss, df_bg, nsamps, thresh)
+    fig1.savefig(output_dir+'/allsamp_detprobs.png', dpi=300)
+    fig2.savefig(output_dir+'/allsamp_detfracs.png', dpi=300)
+    plt.close(fig1)
+    plt.close(fig2)
+    if save_ssi:
+        np.savez(output_dir+'/detstats.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
+              snr_ss=snr_ss, snr_bg=snr_bg, ev_ss = ev_ss, gamma_ssi=gamma_ssi)
+    else:
+        np.savez(output_dir+'/detstats.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
+              snr_bg=snr_bg, ev_ss = ev_ss)
+        
+    # return dictionary 
+    if ret_dict:
+        data = {
+            'dp_ss':dp_ss, 'dp_bg':dp_bg, 'df_ss':df_ss, 'df_bg':df_bg,
+            'snr_bg':snr_bg, 'ev_ss':ev_ss
+        }
+        if save_ssi: 
+            data.update({'gamma_ssi':gamma_ssi})
+            data.update({'snr_ss':snr_ss})
+        return data
+    return 
+
+
+
 def _build_pta(npsrs, sigma, dur, cad):
     # build PTA
     phis = np.random.uniform(0, 2*np.pi, size = npsrs)
@@ -2171,7 +2364,8 @@ def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials,
     return rsigmas, avg_dps, std_dps
 
 def calibrate_one_pta(hc_bg, fobs, npsrs, 
-                      sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03):
+                      sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
+                      phis=None, thetas=None):
     """ Calibrate the specific PTA for a given realization, and return that PTA
 
     Parameters
@@ -2194,12 +2388,11 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
     cad = 1.0/(2.0*fobs[-1])
 
     # randomize pulsar positions
-    phis = np.random.uniform(0, 2*np.pi, size = npsrs)
-    thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    if phis is None: phis = np.random.uniform(0, 2*np.pi, size = npsrs)
+    if thetas is None: thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
     psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigstart,
                     phi=phis, theta=thetas)
     dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis])[0]
-    print(dp_bg)
 
     nbads=0
     # calibrate sigma

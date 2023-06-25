@@ -41,6 +41,9 @@ DEF_NSKIES = 25
 DEF_THRESH = 0.5
 DEF_SNR_CYTHON = True
 DEF_SAVE_SSI = False
+DEF_CLBRT = False
+DEF_TOL = 0.01
+DEF_MAXBADS = 5
 
 GAMMA_RHO_GRID_PATH = '/Users/emigardiner/GWs/holodeck/output/rho_gamma_grids' # modify for system
 
@@ -55,11 +58,16 @@ def _setup_argparse():
                         help='number of frequency bins')
     # parser.add_argument('-d', '--dur', action='store', dest='dur', type=int, default=DEF_PTA_DUR,
     #                     help='pta duration in yrs')
+
+    parser.add_argument('-t', '--tol', action='store', dest='tol', type=float, default=DEF_TOL,
+                         help='tolerance for BG DP calibration')
+    parser.add_argument('-b', '--maxbads', action='store', dest='maxbads', type=int, default=DEF_MAXBADS,
+                         help='number of bad sigmas to try before expanding the search range')
     
     parser.add_argument('-p', '--npsrs', action='store', dest='npsrs', type=int, default=DEF_NPSRS,
                         help='number of pulsars in pta')
     parser.add_argument('--sigma', action='store', dest='sigma', type=float, default=DEF_SIGMA,
-                        help='sigma for white noise of pulsars')
+                        help='sigma for white noise of pulsars, or starting sigma if using individual realization calibration')
     
     parser.add_argument('-s', '--nskies', action='store', dest='nskies', type=int, default=DEF_NSKIES,
                         help='number of ss sky realizations')
@@ -74,6 +82,8 @@ def _setup_argparse():
                         help='Use cython for ss snr calculations')
     parser.add_argument('--save_ssi', action='store_true', default=DEF_SAVE_SSI,
                         help="Save 'gamma_ssi', the detprob of each single source.")
+    parser.add_argument('--clbrt', action='store_true', default=DEF_CLBRT,
+                        help="Whether or not to calibrate the PTA for individual realizations.")
     
     args = parser.parse_args()
     return args
@@ -102,16 +112,26 @@ def main():
 
     hdf_name = args.lib_path+'/sam_lib.hdf5'
     print('Hdf file:', hdf_name)
-
-    output_dir = (args.lib_path+'/detstats/psrs%d_sigma%.2e'
-                % (args.npsrs, args.sigma))
+    if args.clbrt:
+        output_dir = (args.lib_path+'/detstats/clbrt_psrs%d'
+                    % (args.npsrs))
+    else:
+        output_dir = (args.lib_path+'/detstats/psrs%d_sigma%.2e'
+                    % (args.npsrs, args.sigma))
     print('Output dir:', output_dir)
 
-    ds.detect_lib(hdf_name, output_dir, args.npsrs, args.sigma, 
-                        nskies=args.nskies, thresh=args.thresh, plot=args.plot, debug=args.debug,
-                        grid_path=args.grid_path, 
-                        snr_cython=args.snr_cython, save_ssi=args.save_ssi)
-  
+    if args.clbrt:
+        ds.detect_lib_clbrt_pta(hdf_name, output_dir, args.npsrs, 
+                                sigstart = args.sigma, sigmin=1e-8, sigmax=1e-5, tol=args.tol, maxbads=args.maxbads, 
+                            nskies=args.nskies, thresh=args.thresh, plot=args.plot, debug=args.debug,
+                            grid_path=args.grid_path, 
+                            snr_cython=args.snr_cython, save_ssi=args.save_ssi)
+    else: 
+        ds.detect_lib(hdf_name, output_dir, args.npsrs, args.sigma, 
+                            nskies=args.nskies, thresh=args.thresh, plot=args.plot, debug=args.debug,
+                            grid_path=args.grid_path, 
+                            snr_cython=args.snr_cython, save_ssi=args.save_ssi)
+    
 
 if __name__ == "__main__":
     main()
