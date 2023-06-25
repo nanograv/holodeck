@@ -1775,7 +1775,6 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
     nsamps, nfreqs, nreals, nloudest = shape[0], shape[1], shape[2], shape[3]
 
     # Assign output folder
-    import os
     if (os.path.exists(output_dir) is False):
         print('Making output directory.')
         os.makedirs(output_dir)
@@ -1856,7 +1855,13 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
         #     gamma_ssi[nn] = vals_ss[2]
         df_ss[nn], df_bg[nn] = detfrac_of_reals(dp_ss[nn], dp_bg[nn], thresh)
 
-
+        if save_ssi:
+            np.savez(output_dir+f'/detstats_p{nn:06d}.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
+                snr_ss=snr_ss, snr_bg=snr_bg, ev_ss = ev_ss, gamma_ssi=gamma_ssi)
+        else:
+            np.savez(output_dir+f'/detstats_p{nn:06d}.npz', dp_ss=dp_ss[nn], dp_bg=dp_bg[nn], df_ss=df_ss[nn], df_bg=df_bg[nn],
+                snr_bg=snr_bg[nn], ev_ss = ev_ss[nn])
+        
         if plot:
             fig = plot_sample_nn(fobs, hc_ss[nn], hc_bg[nn],
                          dp_ss[nn], dp_bg[nn],
@@ -1873,10 +1878,10 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
     plt.close(fig1)
     plt.close(fig2)
     if save_ssi:
-        np.savez(output_dir+'/detstats.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
+        np.savez(output_dir+'/detstats_lib.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
               snr_ss=snr_ss, snr_bg=snr_bg, ev_ss = ev_ss, gamma_ssi=gamma_ssi)
     else:
-        np.savez(output_dir+'/detstats.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
+        np.savez(output_dir+'/detstats_lib.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
               snr_bg=snr_bg, ev_ss = ev_ss)
         
     # return dictionary 
