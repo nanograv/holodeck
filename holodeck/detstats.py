@@ -2007,6 +2007,8 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg,
     cad = 1.0/(2*fobs_cents[-1])
 
     nfreqs, nreals, nloudest = [*hc_ss.shape]
+    if debug: print(f"{[*hc_ss.shape]=}")
+    if debug: print(f"{nskies=}")
         
     # form arrays for individual realization detstats
     dp_ss = np.zeros((nreals, nskies))     
@@ -2026,7 +2028,8 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg,
             _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1], ret_snr=True)
             dp_bg[rr], snr_bg[rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
             _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
-                psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], ret_snr=True)
+                psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], nskies=nskies, ret_snr=True)
+            if debug: print(f"{_dp_ss.shape=}, {_snr_ss.shape=}, {_gamma_ssi.shape=}")
             dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()
 
     ev_ss = expval_of_ss(gamma_ssi)
