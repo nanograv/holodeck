@@ -1759,6 +1759,9 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
         Expectation number of single source detections, averaged across realizations,
         for each sample.
 
+    # TODO: Add an option to calculate just for a particular selection of samples, 
+    e.g. pass in nn_min and nn_max and use for nn in range(nn_min, nn_max) instead of 
+    nn in range(neals). Then combine these into an hdf file separately.
     """
 
     # Read in hdf file
