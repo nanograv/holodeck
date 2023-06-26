@@ -1824,7 +1824,7 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
                 _sigstart, _sigmin, _sigmax = sigstart, sigmin, sigmax 
             if debug: 
                 now = datetime.now()
-                if (rr%5==0):
+                if (rr%10==0):
                     print(f"{nn=}, {rr=}, {now-real_dur} s per realization, {_sigmin=:.2e}, {_sigmax=:.2e}, {_sigstart=:.2e}")
                 real_dur = now
 

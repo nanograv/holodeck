@@ -30,6 +30,8 @@ import holodeck.detstats as ds
 from holodeck.constants import YR
 import numpy as np
 import argparse
+from datetime import datetime
+
 
 DEF_NFREQS = holo.librarian.DEF_NUM_FBINS
 # DEF_PTA_DUR = holo.librarian.DEF_PTA_DUR 
@@ -102,6 +104,9 @@ def _setup_argparse():
 #     return dur, cad, dfobs
 
 def main():
+
+    start_time = datetime.now()
+    print(f"starting at {start_time}")
     # setup command line arguments
     args = _setup_argparse()
     print('npsrs=%d, sigma=%e s, nskies=%d, thresh=%f' %
@@ -135,7 +140,8 @@ def main():
                             nskies=args.nskies, thresh=args.thresh, plot=args.plot, debug=args.debug,
                             grid_path=args.grid_path, 
                             snr_cython=args.snr_cython, save_ssi=args.save_ssi)
-    
+    end_time = datetime.now()
+    print(f"Start time: {start_time}\nEnd time: {end_time}\nTotal time: {end_time-start_time}")
 
 if __name__ == "__main__":
     main()
