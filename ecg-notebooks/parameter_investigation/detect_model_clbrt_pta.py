@@ -5,7 +5,7 @@ from holodeck import detstats
 from datetime import datetime
 
 # sample
-SHAPE = None
+DEF_SHAPE = None
 DEF_NLOUDEST = 10
 DEF_NREALS = 100
 DEF_NFREQS = 40
@@ -25,55 +25,6 @@ CONSTRUCT_ALL = False
 CONSTRUCT_DETSTATS = False
 
 
-
-def main():
-    start_time = datetime.now()
-    print("-----------------------------------------")
-    print(f"starting at {start_time}")
-    print("-----------------------------------------")
-
-    load_data_from_file = args.anatomy_path+f'/{args.target}_{args.nvars}vars_clbrt_pta.npz' 
-    save_data_to_file = args.anatomy_path+f'/{args.target}_{args.nvars}vars_clbrt_pta.npz' 
-
-    args = _setup_argparse()
-    print("NREALS = %d, NSKIES = %d, NPSRS = %d, target = %s, NVARS=%d"
-          % (args.nreals, args.nskies, args.npsrs, args.target))
-    if args.construct or args.detstats:
-        if args.construct:
-            params_list = np.linsapce(0,1,args.nvars)
-            data, params, = vary_parameter(target_param=args.target, params_list=params_list,
-                                        nfreqs=args.nfreqs, nreals=args.nreals, nloudest=args.nloudest)
-        else:
-            file = np.load(load_data_from_file, allow_pickle=True)
-            print(file.files)
-            data = file['data']
-            params = file['params']
-            file.close()
-        dsdat = []
-        for ii, _data in enumerate(data):
-            if args.debug: print(f"on var {ii=} out of {args.nvars}")
-    else:
-        print(f"Neither {args.construct=} or {args.detstats} are true. Doing nothing.")
-
-
-
-
-
-    end_time = datetime.now()
-    print("-----------------------------------------")
-    print(f"ending at {end_time}")
-    print(f"total time: {end_time - start_time}")
-    print("-----------------------------------------")
-
-if __name__ == "__main__":
-    main()
-
-
-
-
-
-
-
 def _setup_argparse():
     parser = argparse.ArgumentParser()
     parser.add_argument('target', action='store', type=str,
@@ -84,12 +35,14 @@ def _setup_argparse():
     # sample models setup
     parser.add_argument('-f', '--nfreqs', action='store', dest='nfreqs', type=int, default=DEF_NFREQS,
                         help='number of frequency bins')
-    parser.add_argument('-f', '--nreals', action='store', dest='nreals', type=int, default=DEF_NREALS,
+    parser.add_argument('-r', '--nreals', action='store', dest='nreals', type=int, default=DEF_NREALS,
                         help='number of strain realizations')
     parser.add_argument('-l', '--nloudest', action='store', dest='nloudest', type=int, default=DEF_NLOUDEST,
                         help='number of loudest single sources')
-    parser.add_argument('-v', '--nvars', actions='store', dest='nvars', type=int, default=DEF_NVARS,
+    parser.add_argument('-v', '--nvars', action='store', dest='nvars', type=int, default=DEF_NVARS,
                         help='number of variations on target param')
+    parser.add_argument('--shape', action='store', dest='shape', type=int, default=DEF_SHAPE,
+                        help='sam shape')
     # parser.add_argument('-d', '--dur', action='store', dest='dur', type=int, default=DEF_PTA_DUR,
     #                     help='pta duration in yrs')
 
@@ -102,7 +55,7 @@ def _setup_argparse():
                         help='number of ss sky realizations')
     
     # pta calibration settings
-    parser.add_argument('--sigstart', action='store', dest='sigma', type=float, default=1e-7,
+    parser.add_argument('--sigstart', action='store', dest='sigstart', type=float, default=1e-7,
                         help='starting sigma if for realization calibration')
     parser.add_argument('--sigmin', action='store', dest='sigmin', type=float, default=1e-10,
                         help='sigma minimum for calibration')
@@ -139,35 +92,21 @@ def _setup_argparse():
     return args
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# construct a param_space instance, note that `nsamples` and `seed` don't matter here for how we'll use this
-pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=SHAPE, seed=None)
+# # construct a param_space instance, note that `nsamples` and `seed` don't matter here for how we'll use this
+# pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=SHAPE, seed=None)
 
 def vary_parameter(
         target_param,    # the name of the parameter, has to exist in `param_names`
         params_list,  # the values we'll check
         nreals, nfreqs, nloudest,
-        pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=SHAPE, seed=None),
-        pars=None, save_dir=None, 
+        pspace,
+        pars=None, save_dir=None, debug=True
         ):
 
     # get the parameter names from this library-space
     param_names = pspace.param_names
     num_pars = len(pspace.param_names)
-    print(f"{num_pars=} :: {param_names=}")
+    if debug: print(f"{num_pars=} :: {param_names=}")
 
     # choose each parameter to be half-way across the range provided by the library
     if pars is None:
@@ -180,7 +119,7 @@ def vary_parameter(
     params = []
     for ii, par in enumerate(params_list):
         pars[param_idx] = par
-        print(f"{ii=}, {pars=}")
+        if debug: print(f"{ii=}, {pars=}")
         # _params = pspace.param_samples[0]*pars
         _params = pspace.normalized_params(pars)
         params.append(_params)
@@ -198,6 +137,62 @@ def vary_parameter(
         str_shape = str(sam.shape).replace(", ", "_").replace("(", "").replace(")", "")
         filename = save_dir+'/%s_p%s_s%s.npz' % (target_param, str_pars, str_shape)
         np.savez(filename, data=data, params=params, hard_name=hard_name, shape=sam.shape, target_param=target_param )
-        print('saved to %s' % filename)
+        if debug: print('saved to %s' % filename)
 
     return (data, params)
+
+
+
+def main():
+    start_time = datetime.now()
+    print("-----------------------------------------")
+    print(f"starting at {start_time}")
+    print("-----------------------------------------")
+
+    args = _setup_argparse()
+    print("NREALS = %d, NSKIES = %d, NPSRS = %d, target = %s, NVARS=%d"
+          % (args.nreals, args.nskies, args.npsrs, args.target, args.nvars))
+    
+    load_data_from_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}.npz' 
+    save_data_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}.npz'
+
+    if args.construct or args.detstats:
+        if args.construct:
+            params_list = np.linspace(0,1,args.nvars)
+            data, params, = vary_parameter(
+                target_param=args.target, params_list=params_list,
+                nfreqs=args.nfreqs, nreals=args.nreals, nloudest=args.nloudest,
+                pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=args.shape, seed=None),)
+        else:
+            file = np.load(load_data_from_file, allow_pickle=True)
+            print('loaded files:', file.files)
+            data = file['data']
+            params = file['params']
+            file.close()
+
+        fobs_cents = data[0]['fobs_cents']
+
+        # get dsdat for each data/param
+        dsdat = []
+        for ii, _data in enumerate(data):
+            if args.debug: print(f"on var {ii=} out of {args.nvars}")
+            hc_bg = _data['hc_bg']
+            hc_ss = _data['hc_ss']
+            _dsdat = detstats.detect_pspace_model_clbrt_pta(
+                fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, 
+                sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
+                thresh=args.thresh, debug=args.debug)
+            dsdat.append(_dsdat)
+        np.savez(save_data_to_file, data=data, dsdat=dsdat,params=params)
+    else:
+        print(f"Neither {args.construct=} or {args.detstats} are true. Doing nothing.")
+
+    end_time = datetime.now()
+    print("-----------------------------------------")
+    print(f"ending at {end_time}")
+    print(f"total time: {end_time - start_time}")
+    print("-----------------------------------------")
+
+if __name__ == "__main__":
+    main()
+

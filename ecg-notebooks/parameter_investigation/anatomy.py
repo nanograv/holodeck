@@ -24,7 +24,7 @@ def detect_pspace_model(data, dur=DUR,
     fobs_cents = data['fobs_cents']
     hc_ss = data['hc_ss']
     hc_bg = data['hc_bg']
-    dsdata = detstats.detect_pspace_model(fobs_cents, hc_ss, hc_bg, dur,
+    dsdata = detstats.detect_pspace_model(fobs_cents, hc_ss, hc_bg, 
                         npsrs, sigma, nskies, thresh)
     return dsdata
 
