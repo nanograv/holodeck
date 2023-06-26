@@ -578,23 +578,23 @@ class MSigma_Standard(_MSigma_Relation):
     """
 
     MASS_AMP = 1.0e8 * MSOL
-    MASS_PLAW = 4.24
+    SIGMA_PLAW = 4.24
     SIGMA_REF = 200.0 * KMPERSEC
     SCATTER_DEX = 0.0
 
-    def __init__(self, mamp=None, mplaw=None, sigmaref=None, scatter_dex=None):
+    def __init__(self, mamp=None, sigma_plaw=None, sigma_ref=None, scatter_dex=None):
         if mamp is None:
             mamp = self.MASS_AMP
-        if mplaw is None:
-            mplaw = self.MASS_PLAW
-        if sigmaref is None:
-            sigmaref = self.SIGMA_REF
+        if sigma_plaw is None:
+            sigma_plaw = self.MASS_PLAW
+        if sigma_ref is None:
+            sigma_ref = self.SIGMA_REF
         if scatter_dex is None:
             scatter_dex = self.SCATTER_DEX
 
         self._mamp = mamp   # Mass-Amplitude [grams]
-        self._mplaw = mplaw   # Mass Power-law index
-        self._sigmaref = sigmaref   # Reference Sigma (argument normalization)
+        self._sigma_plaw = sigma_plaw   # Mass Power-law index
+        self._sigma_ref = sigma_ref   # Reference Sigma (argument normalization)
         self._scatter_dex = scatter_dex
         return
 
@@ -621,7 +621,7 @@ class MSigma_Standard(_MSigma_Relation):
 
         """
         scatter_dex = self._scatter_dex if scatter else None
-        mbh = _log10_relation(vdisp, self._mamp, self._mplaw, scatter_dex, x0=self._sigmaref)
+        mbh = _log10_relation(vdisp, self._mamp, self._sigma_plaw, scatter_dex, x0=self._sigma_ref)
         return mbh
 
     def vdisp_from_mbh(self, mbh, scatter):
@@ -642,7 +642,7 @@ class MSigma_Standard(_MSigma_Relation):
 
         """
         scatter_dex = self._scatter_dex if scatter else None
-        vdisp = _log10_relation_reverse(mbh, self._mamp, self._mplaw, scatter_dex, x0=self._sigmaref)
+        vdisp = _log10_relation_reverse(mbh, self._mamp, self._sigma_plaw, scatter_dex, x0=self._sigma_ref)
         return vdisp
 
     # def dmbh_dsigma(self, sigma):
