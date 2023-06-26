@@ -2205,9 +2205,9 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
     return dsdata
 
 
-def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, 
-                        npsrs, nskies, maxtrials=1, 
-                        thresh=DEF_THRESH, debug=False, maxbads=20, tol=0.03): 
+def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies, 
+                        sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
+                        thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True): 
     """ Detect pspace model using individual sigma calibration for each realization
     
     """
@@ -2215,8 +2215,6 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg,
     cad = 1.0/(2*fobs_cents[-1])
 
     nfreqs, nreals, nloudest = [*hc_ss.shape]
-    if debug: print(f"{[*hc_ss.shape]=}")
-    if debug: print(f"{nskies=}")
         
     # form arrays for individual realization detstats
     dp_ss = np.zeros((nreals, nskies))     
@@ -2225,20 +2223,34 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg,
     snr_bg = np.zeros((nreals))
     gamma_ssi = np.zeros((nfreqs, nreals, nskies, nloudest))
 
-    # for each realization, 
-    for rr in range(nreals):
-            if debug: print(f"{rr=}")
-            # get calibrated psrs 
-            psrs = calibrate_one_pta(hc_bg[:,rr], fobs_cents, npsrs,
-                                     sigmin=1e-9, sigmax=1e-4, debug=debug, maxbads=maxbads, tol=tol)
 
-            # use those psrs to calculate realization detstats
-            _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1], ret_snr=True)
-            dp_bg[rr], snr_bg[rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
-            _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
-                psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], nskies=nskies, ret_snr=True)
-            if debug: print(f"{_dp_ss.shape=}, {_snr_ss.shape=}, {_gamma_ssi.shape=}")
-            dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()
+    # for each realization, 
+    # use sigmin and sigmax from previous realization, 
+    # unless it's the first realization of the sample
+    _sigstart, _sigmin, _sigmax = sigstart, sigmin, sigmax 
+    if debug: 
+        mod_start = datetime.now()
+        real_dur = datetime.now()
+    for rr in range(nreals):
+        if debug: 
+            now = datetime.now()
+            if (rr%10==0):
+                print(f"{rr=}, {now-real_dur} s per realization, {_sigmin=:.2e}, {_sigmax=:.2e}, {_sigstart=:.2e}")
+            real_dur = now
+
+        # get calibrated psrs 
+        psrs, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[:,rr], fobs_cents, npsrs, tol=tol, maxbads=maxbads,
+                                    sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True)
+        _sigmin /= 2
+        _sigmax *= 2
+
+        # use those psrs to calculate realization detstats
+        _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1], ret_snr=True)
+        dp_bg[rr], snr_bg[rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
+        _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
+            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], nskies=nskies, ret_snr=True)
+        # if debug: print(f"{_dp_ss.shape=}, {_snr_ss.shape=}, {_gamma_ssi.shape=}")
+        dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()
 
     ev_ss = expval_of_ss(gamma_ssi)
     df_ss, df_bg = detfrac_of_reals(dp_ss, dp_bg)
@@ -2247,6 +2259,11 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg,
         'dp_bg':dp_bg, 'snr_bg':snr_bg,
         'df_ss':df_ss, 'df_bg':df_bg, 'ev_ss':ev_ss,
         }
+    if save_gamma_ssi:
+        _dsdat.update(gamma_ssi=gamma_ssi)
+    if save_snr_ss:
+        _dsdat.update(snr_ss=snr_ss)
+    print(f"Model took {datetime.now() - mod_start} s")
     return _dsdat
 
 
@@ -2380,7 +2397,7 @@ def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials,
 
 def calibrate_one_pta(hc_bg, fobs, npsrs, 
                       sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
-                      phis=None, thetas=None, ret_sig = False):
+                      phis=None, thetas=None, ret_sig = False,):
     """ Calibrate the specific PTA for a given realization, and return that PTA
 
     Parameters
