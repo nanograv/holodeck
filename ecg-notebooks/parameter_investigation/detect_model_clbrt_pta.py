@@ -88,9 +88,9 @@ def _setup_argparse():
     parser.add_argument('--anatomy_path', action='store', dest ='anatomy_path', type=str, default=ANATOMY_PATH,
                         help="path to load and save anatomy files")
     parser.add_argument('--load_file', action='store', dest ='load_file', type=str, default=None,
-                        help="file to load sample data and params")
+                        help="file to load sample data and params, excluding .npz suffice")
     parser.add_argument('--save_file', action='store', dest ='save_file', type=str, default=None,
-                        help="file to save sample data, params, and detstats")
+                        help="file to save sample data, excluding .npz suffix")
     
     args = parser.parse_args()
     return args
@@ -160,11 +160,13 @@ def main():
     if args.load_file is None:
         load_data_from_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}.npz' 
     else:
-        load_data_from_file = args.load_file
+        load_data_from_file = args.load_file+'.npz'
     if args.save_file is None:
         save_data_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}.npz'
+        save_dets_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}_ds.npz'
     else:
-        save_data_to_file = args.save_file
+        save_data_to_file = args.save_file+'.npz'
+        save_dets_to_file = args.save_file+'_ds.npz'
 
     if args.construct or args.detstats:
         if args.construct:
@@ -194,7 +196,7 @@ def main():
                 sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
                 thresh=args.thresh, debug=args.debug)
             dsdat.append(_dsdat)
-        np.savez(save_data_to_file, data=data, dsdat=dsdat,params=params) # overwrite
+        np.savez(save_dets_to_file, dsdat=dsdat) # overwrite
     else:
         print(f"Neither {args.construct=} or {args.detstats} are true. Doing nothing.")
 
