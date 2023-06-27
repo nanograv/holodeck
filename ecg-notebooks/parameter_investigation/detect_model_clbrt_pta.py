@@ -163,6 +163,7 @@ def main():
                 target_param=args.target, params_list=params_list,
                 nfreqs=args.nfreqs, nreals=args.nreals, nloudest=args.nloudest,
                 pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=args.shape, seed=None),)
+            np.savez(save_data_to_file, data=data, params=params) # save before calculating detstats, in case of crash
         else:
             file = np.load(load_data_from_file, allow_pickle=True)
             print('loaded files:', file.files)
@@ -183,7 +184,7 @@ def main():
                 sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
                 thresh=args.thresh, debug=args.debug)
             dsdat.append(_dsdat)
-        np.savez(save_data_to_file, data=data, dsdat=dsdat,params=params)
+        np.savez(save_data_to_file, data=data, dsdat=dsdat,params=params) # overwrite
     else:
         print(f"Neither {args.construct=} or {args.detstats} are true. Doing nothing.")
 
