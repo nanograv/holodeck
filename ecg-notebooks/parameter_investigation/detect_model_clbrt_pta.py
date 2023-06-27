@@ -21,8 +21,8 @@ GAMMA_RHO_GRID_PATH = '/Users/emigardiner/GWs/holodeck/output/rho_gamma_grids' #
 ANATOMY_PATH = '/Users/emigardiner/GWs/holodeck/output/anatomy_09B'
 
 # settings to vary
-CONSTRUCT_ALL = False
-CONSTRUCT_DETSTATS = False
+DEF_CONSTRUCT = False
+DEF_DETSTATS = False
 
 
 def _setup_argparse():
@@ -69,9 +69,9 @@ def _setup_argparse():
                          help='number of bad sigmas to try before expanding the search range')
     
     # general settings
-    parser.add_argument('--construct', action='store_true', default=CONSTRUCT_ALL,
+    parser.add_argument('--construct', action='store_true', default=DEF_CONSTRUCT,
                         help='construct data and detstats for each varying param')
-    parser.add_argument('--detstats', action='store_true', default=CONSTRUCT_DETSTATS,
+    parser.add_argument('--detstats', action='store_true', default=DEF_DETSTATS,
                         help='construct detstats, using saved data')
     parser.add_argument('--debug', action='store_true', default=False,
                         help='print steps along the way')
@@ -87,6 +87,10 @@ def _setup_argparse():
                         help="gamma-rho interpolation grid path")
     parser.add_argument('--anatomy_path', action='store', dest ='anatomy_path', type=str, default=ANATOMY_PATH,
                         help="path to load and save anatomy files")
+    parser.add_argument('--load_file', action='store', dest ='load_file', type=str, default=None,
+                        help="file to load sample data and params")
+    parser.add_argument('--save_file', action='store', dest ='save_file', type=str, default=None,
+                        help="file to save sample data, params, and detstats")
     
     args = parser.parse_args()
     return args
@@ -153,8 +157,14 @@ def main():
     print("NREALS = %d, NSKIES = %d, NPSRS = %d, target = %s, NVARS=%d"
           % (args.nreals, args.nskies, args.npsrs, args.target, args.nvars))
     
-    load_data_from_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}.npz' 
-    save_data_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}.npz'
+    if args.load_file is None:
+        load_data_from_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}.npz' 
+    else:
+        load_data_from_file = args.load_file
+    if args.save_file is None:
+        save_data_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}.npz'
+    else:
+        save_data_to_file = args.save_file
 
     if args.construct or args.detstats:
         if args.construct:
