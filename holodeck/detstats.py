@@ -463,7 +463,7 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret = False
 
 
 def detect_bg_pta(pulsars, fobs, hc_bg, alpha_0=0.001, ret_snr = False,
-                  amp_red=None, gamma_red=None, ):
+                  red_amp=None, red_gamma=None, ):
     """ Calculate the background detection probability, and all the intermediary steps
     from a list of hasasia.Pulsar objects.
 
@@ -513,8 +513,8 @@ def detect_bg_pta(pulsars, fobs, hc_bg, alpha_0=0.001, ret_snr = False,
     Sh0_bg = Sh_bg # note this refers to same object, not a copy
 
     noise = _white_noise(cad, sigmas)[:,np.newaxis] # P,1
-    if (amp_red is not None) and (gamma_red is not None):
-        red_noise = _red_noise(amp_red, gamma_red, fobs)[np.newaxis,:] # (1,F,)
+    if (red_amp is not None) and (red_gamma is not None):
+        red_noise = _red_noise(red_amp, red_gamma, fobs)[np.newaxis,:] # (1,F,)
         noise = noise + red_noise # (P,F,)
 
 
@@ -864,15 +864,15 @@ def _Sh_rest_noise(hc_ss, hc_bg, freqs):
     Sh_rest = hc2_rest / freqs[:,np.newaxis,np.newaxis]**3 /(12 * np.pi**2) # (F,R,L)
     return Sh_rest
 
-def _red_noise(A_red, gamma_red, freqs, f_ref=1/YR):
+def _red_noise(red_amp, red_gamma, freqs, f_ref=1/YR):
     """ Calculate the red noise for a given pulsar (or array of pulsars)
-    A_red * f sigma_i^gamma_red
+    red_amp * f sigma_i^red_gamma
 
     Parameters
     ----------
-    A_red : scalar
+    red_amp : scalar
         Amplitude of red noise.
-    gamma_red : scalar
+    red_gamma : scalar
         Power-law index of red noise
     freqs : (F,) 1Darray of scalars
         Frequency bin centers.
@@ -886,12 +886,12 @@ def _red_noise(A_red, gamma_red, freqs, f_ref=1/YR):
     ### what is f_ref
 
     """
-    P_red = A_red**2 / (12*np.pi**2) * (freqs/f_ref)**gamma_red * (f_ref)**-3
+    P_red = red_amp**2 / (12*np.pi**2) * (freqs/f_ref)**red_gamma * (f_ref)**-3
     return P_red
 
 
 
-def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, A_red=None, gamma_red=None):
+def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=None):
     """ Calculate the noise spectral density of each pulsar, as it pertains to single
     source detections, i.e., including the background as a noise source.
 
@@ -919,8 +919,8 @@ def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, A_red=None, gamma_red=Non
     noise = _white_noise(delta_t, sigmas) # (P,)
     Sh_rest = _Sh_rest_noise(hc_ss, hc_bg, freqs) # (F,R,L,)
     noise = noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh_rest[np.newaxis,:,:,:] # (P,F,R,L)
-    if (A_red is not None) and (gamma_red is not None):
-        red_noise = _red_noise(A_red, gamma_red, freqs) # (F,)
+    if (red_amp is not None) and (red_gamma is not None):
+        red_noise = _red_noise(red_amp, red_gamma, freqs) # (F,)
         noise = noise + red_noise[np.newaxis,:,np.newaxis,np.newaxis] # (P,F,R,L)
     return noise
 
@@ -1324,7 +1324,7 @@ def _ss_detection_probability(gamma_ss_i):
 
 def detect_ss(thetas, phis, sigmas, fobs, hc_ss, hc_bg,
               theta_ss, phi_ss=None, Phi0_ss=None, iota_ss=None, psi_ss=None,
-              amp_red=None, gamma_red=None, alpha_0=0.001, ret_snr=False,):
+              red_amp=None, red_gamma=None, alpha_0=0.001, ret_snr=False,):
     """ Calculate the single source detection probability, and all intermediary steps.
 
     Parameters
@@ -1360,9 +1360,9 @@ def detect_ss(thetas, phis, sigmas, fobs, hc_ss, hc_bg,
     psi_ss : (F,S,L) NDarray or None
         Polarization of each single source.
         If None, random values between 0 and pi will be assigned.
-    A_red : scalar or None
+    red_amp : scalar or None
         Amplitude of pulsar red noise.
-    gamma_red : scalar or None
+    red_gamma : scalar or None
         Power law index of pulsar red noise.
     alpha_0 : scalar
         False alarm probability
@@ -1403,7 +1403,7 @@ def detect_ss(thetas, phis, sigmas, fobs, hc_ss, hc_bg,
                                                    pi_hat) # (P,F,S,L)
 
     # noise spectral density
-    S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, amp_red, gamma_red)
+    S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, red_amp, red_gamma)
 
     # amplitudw
     amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
@@ -1425,7 +1425,7 @@ def detect_ss(thetas, phis, sigmas, fobs, hc_ss, hc_bg,
 
 def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,
               theta_ss=None, phi_ss=None, Phi0_ss=None, iota_ss=None, psi_ss=None, nskies=25, 
-              Fe_bar = None, amp_red=None, gamma_red=None, alpha_0=0.001, Fe_bar_guess=15,
+              Fe_bar = None, red_amp=None, red_gamma=None, alpha_0=0.001, Fe_bar_guess=15,
               ret_snr=False, print_nans=False, snr_cython=True, gamma_cython=True, grid_path=GAMMA_RHO_GRID_PATH):
     """ Calculate the single source detection probability, and all intermediary steps for
     R strain realizations and S sky realizations.
@@ -1459,9 +1459,9 @@ def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,
         If None, random values between 0 and pi will be assigned.
     Fe_bar : scalar or None
         Threshold F-statistic
-    amp_red : scalar or None
+    red_amp : scalar or None
         Amplitude of pulsar red noise.
-    gamma_red : scalar or None
+    red_gamma : scalar or None
         Power law index of pulsar red noise.
     alpha_0 : scalar
         False alarm probability
@@ -1520,7 +1520,7 @@ def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,
                                                    pi_hat) # (P,F,S,L)
 
     # noise spectral density
-    S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, amp_red, gamma_red)
+    S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, red_amp, red_gamma)
 
     # amplitudw
     amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
@@ -2216,7 +2216,7 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
 def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies, 
                         sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
                         thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
-                        amp_red=None, gamma_red=None): 
+                        red_amp=None, red_gamma=None): 
     """ Detect pspace model using individual sigma calibration for each realization
     
     """
@@ -2250,15 +2250,15 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
         # get calibrated psrs 
         psrs, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[:,rr], fobs_cents, npsrs, tol=tol, maxbads=maxbads,
                                     sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True,
-                                    amp_red=amp_red, gamma_red=gamma_red,)
+                                    red_amp=red_amp, red_gamma=red_gamma,)
         _sigmin /= 2
         _sigmax *= 2
 
         # use those psrs to calculate realization detstats
-        _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1], ret_snr=True, amp_red=amp_red, gamma_red=gamma_red)
+        _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1], ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
         dp_bg[rr], snr_bg[rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
         _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
-            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], nskies=nskies, ret_snr=True, amp_red=amp_red, gamma_red=gamm_red)
+            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], nskies=nskies, ret_snr=True, red_amp=red_amp, red_gamma=gamm_red)
         # if debug: print(f"{_dp_ss.shape=}, {_snr_ss.shape=}, {_gamma_ssi.shape=}")
         dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()
 
@@ -2407,7 +2407,7 @@ def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials,
 
 def calibrate_one_pta(hc_bg, fobs, npsrs, 
                       sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
-                      phis=None, thetas=None, ret_sig = False, amp_red=None, gamma_red=None):
+                      phis=None, thetas=None, ret_sig = False, red_amp=None, red_gamma=None):
     """ Calibrate the specific PTA for a given realization, and return that PTA
 
     Parameters
@@ -2451,7 +2451,7 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
         sigma = np.mean([sigmin, sigmax]) # a weighted average would be better
         psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                         phi=phis, theta=thetas)
-        dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg, amp_red=amp_red, gamma_red=gamma_red)[0]
+        dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg, red_amp=red_amp, red_gamma=red_gamma)[0]
 
         # if debug: print(f"{dp_bg=}")
         if (dp_bg < (0.5-tol)) or (dp_bg > (0.5+tol)):
