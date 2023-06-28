@@ -57,7 +57,7 @@ def _setup_argparse():
                         help='number of ss sky realizations')
     parser.add_argument('--red_amp', action='store', dest='red_amp', type=float, default=DEF_RED_AMP,
                         help='Red noise amplitude')
-    parser.add_argument('--red_gamma', action='store', dest='red_gamma', type=int, default=DEF_RED_GAMMA,
+    parser.add_argument('--red_gamma', action='store', dest='red_gamma', type=float, default=DEF_RED_GAMMA,
                         help='Red noise gamma')
     
     # pta calibration settings
