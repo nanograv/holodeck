@@ -14,6 +14,8 @@ DEF_NVARS = 21
 # pta calibration
 DEF_NSKIES = 100
 DEF_NPSRS = 40
+DEF_RED_AMP = None
+DEF_RED_GAMMA = None
 
 DEF_TOL = 0.01
 DEF_MAXBADS = 5
@@ -53,6 +55,10 @@ def _setup_argparse():
                         help='number of pulsars in pta')
     parser.add_argument('-s', '--nskies', action='store', dest='nskies', type=int, default=DEF_NSKIES,
                         help='number of ss sky realizations')
+    parser.add_argument('--red_amp', action='store', dest='red_amp', type=float, default=DEF_RED_AMP,
+                        help='Red noise amplitude')
+    parser.add_argument('--red_gamma', action='store', dest='red_gamma', type=int, default=DEF_RED_GAMMA,
+                        help='Red noise gamma')
     
     # pta calibration settings
     parser.add_argument('--sigstart', action='store', dest='sigstart', type=float, default=1e-7,
@@ -158,15 +164,19 @@ def main():
           % (args.nreals, args.nskies, args.npsrs, args.target, args.nvars))
     
     if args.load_file is None:
-        load_data_from_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}.npz' 
+        load_data_from_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}' 
     else:
-        load_data_from_file = args.load_file+'.npz'
+        load_data_from_file = args.load_file
+
     if args.save_file is None:
-        save_data_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}.npz'
-        save_dets_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}_ds.npz'
+        save_data_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}'
+        save_dets_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}_ds'
     else:
-        save_data_to_file = args.save_file+'.npz'
-        save_dets_to_file = args.save_file+'_ds.npz'
+        save_data_to_file = args.save_file
+
+    if args.red_amp is not None and args.red_gamma is not None:
+        save_dets_to_file = save_dets_to_file+'_ra{args.red_amp:.1e}_rg{args.red_gamma:.1e}'
+    
 
     if args.construct or args.detstats:
         if args.construct:
@@ -175,9 +185,9 @@ def main():
                 target_param=args.target, params_list=params_list,
                 nfreqs=args.nfreqs, nreals=args.nreals, nloudest=args.nloudest,
                 pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=args.shape, seed=None),)
-            np.savez(save_data_to_file, data=data, params=params) # save before calculating detstats, in case of crash
+            np.savez(save_data_to_file+'.npz', data=data, params=params) # save before calculating detstats, in case of crash
         else:
-            file = np.load(load_data_from_file, allow_pickle=True)
+            file = np.load(load_data_from_file+'.npz', allow_pickle=True)
             print('loaded files:', file.files)
             data = file['data']
             params = file['params']
@@ -194,9 +204,9 @@ def main():
             _dsdat = detstats.detect_pspace_model_clbrt_pta(
                 fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, 
                 sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
-                thresh=args.thresh, debug=args.debug)
+                thresh=args.thresh, debug=args.debug, red_amp=args.red_amp, red_gamma=args.red_gamma)
             dsdat.append(_dsdat)
-        np.savez(save_dets_to_file, dsdat=dsdat) # overwrite
+        np.savez(save_dets_to_file+'.npz', dsdat=dsdat, red_amp=args.red_amp, red_gamma=args.red_gamma, npsrs=args.npsrs) # overwrite
     else:
         print(f"Neither {args.construct=} or {args.detstats} are true. Doing nothing.")
 
