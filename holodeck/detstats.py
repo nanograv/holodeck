@@ -242,9 +242,9 @@ def _sigma0_Bstatistic(noise, Gamma, Sh0_bg):
     # P_j in shape (1,P,1,1)
 
     numer = (Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2
-             * noise[:,np.newaxis,np.newaxis,np.newaxis] * noise[np.newaxis,:,np.newaxis,np.newaxis])
-    denom = ((noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis, np.newaxis,:])
-              * (noise[np.newaxis,:,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
+             * noise[:,np.newaxis,:,np.newaxis] * noise[np.newaxis,:,:,np.newaxis])
+    denom = ((noise[:,np.newaxis,:,np.newaxis] + Sh0_bg[np.newaxis, np.newaxis,:])
+              * (noise[np.newaxis,:,:,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
              + Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2)**2
 
     sum = np.sum(numer/denom, axis=(0,1,2))
@@ -287,12 +287,12 @@ s
     # P_j in shape (1,P,1,1)
 
     numer = (Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2
-             * ((noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh_bg[np.newaxis,np.newaxis,:])
-                * (noise[np.newaxis,:,np.newaxis,np.newaxis] + Sh_bg[np.newaxis,np.newaxis,:])
+             * ((noise[:,np.newaxis,:,np.newaxis] + Sh_bg[np.newaxis,np.newaxis,:])
+                * (noise[np.newaxis,:,:,np.newaxis] + Sh_bg[np.newaxis,np.newaxis,:])
                 + Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh_bg[np.newaxis,np.newaxis,:]**2))
 
-    denom = ((noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis, np.newaxis,:])
-              * (noise[np.newaxis,:,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
+    denom = ((noise[:,np.newaxis,:,np.newaxis] + Sh0_bg[np.newaxis, np.newaxis,:])
+              * (noise[np.newaxis,:,:,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
              + Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2)**2
 
     sum = np.sum(numer/denom, axis=(0,1,2))
@@ -305,7 +305,7 @@ def _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
 
     Parameters
     ----------
-    noise : (P,) 1darray of scalars
+    noise : (P,F,) Ndarray of scalars
         Noise spectral density of each pulsar.
     Gamma : (P,P) 2Darray of scalars
         Overlap reduction function for j>i, 0 otherwise.
@@ -336,8 +336,8 @@ def _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
     numer = (Gamma[:,:,np.newaxis,np.newaxis] **2
             * Sh_bg[np.newaxis,np.newaxis,:]
             * Sh0_bg[np.newaxis,np.newaxis,:])
-    denom = ((noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
-               * (noise[np.newaxis,:,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
+    denom = ((noise[:,np.newaxis,:,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
+               * (noise[np.newaxis,:,:,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
                + Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis, np.newaxis, :]**2)
 
     # Requires Gamma have all jj<=ii parts to zero
@@ -438,7 +438,7 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret = False
     # print('Sh_bg:', Sh_bg.shape)
 
     # Noise 
-    noise = _white_noise(cad, sigmas) 
+    noise = _white_noise(cad, sigmas)[:,np.newaxis] # P, F 
     # print('noise:', noise.shape)
 
     sigma_0B = _sigma0_Bstatistic(noise, Gamma, Sh0_bg)
@@ -462,7 +462,8 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret = False
 
 
 
-def detect_bg_pta(pulsars, fobs, hc_bg, alpha_0=0.001, ret_snr = False):
+def detect_bg_pta(pulsars, fobs, hc_bg, alpha_0=0.001, ret_snr = False,
+                  amp_red=None, gamma_red=None, ):
     """ Calculate the background detection probability, and all the intermediary steps
     from a list of hasasia.Pulsar objects.
 
@@ -511,7 +512,11 @@ def detect_bg_pta(pulsars, fobs, hc_bg, alpha_0=0.001, ret_snr = False):
     Sh_bg = _power_spectral_density(hc_bg[:], fobs)
     Sh0_bg = Sh_bg # note this refers to same object, not a copy
 
-    noise = _white_noise(cad, sigmas)
+    noise = _white_noise(cad, sigmas)[:,np.newaxis] # P,1
+    if (amp_red is not None) and (gamma_red is not None):
+        red_noise = _red_noise(amp_red, gamma_red)[np.newaxis,:] # (1,F,)
+        noise = noise + red_noise # (P,F,)
+
 
     mu_1B = _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
 
@@ -1316,7 +1321,7 @@ def _ss_detection_probability(gamma_ss_i):
 
 def detect_ss(thetas, phis, sigmas, fobs, hc_ss, hc_bg,
               theta_ss, phi_ss=None, Phi0_ss=None, iota_ss=None, psi_ss=None,
-              Amp_red=None, gamma_red=None, alpha_0=0.001, ret_snr=False,):
+              amp_red=None, gamma_red=None, alpha_0=0.001, ret_snr=False,):
     """ Calculate the single source detection probability, and all intermediary steps.
 
     Parameters
@@ -1395,7 +1400,7 @@ def detect_ss(thetas, phis, sigmas, fobs, hc_ss, hc_bg,
                                                    pi_hat) # (P,F,S,L)
 
     # noise spectral density
-    S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, Amp_red, gamma_red)
+    S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, amp_red, gamma_red)
 
     # amplitudw
     amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
@@ -1417,7 +1422,7 @@ def detect_ss(thetas, phis, sigmas, fobs, hc_ss, hc_bg,
 
 def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,
               theta_ss=None, phi_ss=None, Phi0_ss=None, iota_ss=None, psi_ss=None, nskies=25, 
-              Fe_bar = None, Amp_red=None, gamma_red=None, alpha_0=0.001, Fe_bar_guess=15,
+              Fe_bar = None, amp_red=None, gamma_red=None, alpha_0=0.001, Fe_bar_guess=15,
               ret_snr=False, print_nans=False, snr_cython=True, gamma_cython=True, grid_path=GAMMA_RHO_GRID_PATH):
     """ Calculate the single source detection probability, and all intermediary steps for
     R strain realizations and S sky realizations.
@@ -1451,7 +1456,7 @@ def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,
         If None, random values between 0 and pi will be assigned.
     Fe_bar : scalar or None
         Threshold F-statistic
-    Amp_red : scalar or None
+    amp_red : scalar or None
         Amplitude of pulsar red noise.
     gamma_red : scalar or None
         Power law index of pulsar red noise.
@@ -1512,7 +1517,7 @@ def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,
                                                    pi_hat) # (P,F,S,L)
 
     # noise spectral density
-    S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, Amp_red, gamma_red)
+    S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, amp_red, gamma_red)
 
     # amplitudw
     amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
