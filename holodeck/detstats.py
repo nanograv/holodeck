@@ -2429,6 +2429,8 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
         maximum of the final sigma range used
     sigma : float
         final sigma, returned only if ret_sig=True
+
+    TODO: Check if sigma_max hits 0, then return something that essentially says to throw out this model
     """
 
     # get duration and cadence from fobs
