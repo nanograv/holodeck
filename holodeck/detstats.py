@@ -514,7 +514,7 @@ def detect_bg_pta(pulsars, fobs, hc_bg, alpha_0=0.001, ret_snr = False,
 
     noise = _white_noise(cad, sigmas)[:,np.newaxis] # P,1
     if (amp_red is not None) and (gamma_red is not None):
-        red_noise = _red_noise(amp_red, gamma_red)[np.newaxis,:] # (1,F,)
+        red_noise = _red_noise(amp_red, gamma_red, fobs)[np.newaxis,:] # (1,F,)
         noise = noise + red_noise # (P,F,)
 
 
@@ -864,7 +864,7 @@ def _Sh_rest_noise(hc_ss, hc_bg, freqs):
     Sh_rest = hc2_rest / freqs[:,np.newaxis,np.newaxis]**3 /(12 * np.pi**2) # (F,R,L)
     return Sh_rest
 
-def _red_noise(A_red, gamma_red, freqs):
+def _red_noise(A_red, gamma_red, freqs, f_ref=1/YR):
     """ Calculate the red noise for a given pulsar (or array of pulsars)
     A_red * f sigma_i^gamma_red
 
@@ -882,8 +882,11 @@ def _red_noise(A_red, gamma_red, freqs):
     P_red : (P,F) NDarray
         Red noise spectral density for the ith pulsar.
 
+    Defined by Eq. (8) in Kelley et al. 2018
+    ### what is f_ref
+
     """
-    P_red = A_red * freqs**gamma_red
+    P_red = A_red**2 / (12*np.pi**2) * (freqs/f_ref)**gamma_red * (f_ref)**-3
     return P_red
 
 
@@ -917,7 +920,7 @@ def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, A_red=None, gamma_red=Non
     Sh_rest = _Sh_rest_noise(hc_ss, hc_bg, freqs) # (F,R,L,)
     noise = noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh_rest[np.newaxis,:,:,:] # (P,F,R,L)
     if (A_red is not None) and (gamma_red is not None):
-        red_noise = _red_noise(A_red, gamma_red) # (F,)
+        red_noise = _red_noise(A_red, gamma_red, freqs) # (F,)
         noise = noise + red_noise[np.newaxis,:,np.newaxis,np.newaxis] # (P,F,R,L)
     return noise
 
@@ -2402,7 +2405,7 @@ def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials,
 
 def calibrate_one_pta(hc_bg, fobs, npsrs, 
                       sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
-                      phis=None, thetas=None, ret_sig = False,):
+                      phis=None, thetas=None, ret_sig = False, amp_red=None, gamma_red=None):
     """ Calibrate the specific PTA for a given realization, and return that PTA
 
     Parameters
@@ -2446,7 +2449,7 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
         sigma = np.mean([sigmin, sigmax]) # a weighted average would be better
         psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                         phi=phis, theta=thetas)
-        dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg)[0]
+        dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg, amp_red=amp_red, gamma_red=gamma_red)[0]
 
         # if debug: print(f"{dp_bg=}")
         if (dp_bg < (0.5-tol)) or (dp_bg > (0.5+tol)):
