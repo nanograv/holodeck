@@ -2226,11 +2226,12 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
     nfreqs, nreals, nloudest = [*hc_ss.shape]
         
     # form arrays for individual realization detstats
-    dp_ss = np.zeros((nreals, nskies))     
-    dp_bg = np.zeros(nreals)
-    snr_ss = np.zeros((nfreqs, nreals, nskies, nloudest))
-    snr_bg = np.zeros((nreals))
-    gamma_ssi = np.zeros((nfreqs, nreals, nskies, nloudest))
+    # set all to nan, only to be replaced if successful pta is found
+    dp_ss = np.ones((nreals, nskies)) * np.nan   
+    dp_bg = np.ones(nreals) * np.nan
+    snr_ss = np.ones((nfreqs, nreals, nskies, nloudest)) * np.nan
+    snr_bg = np.ones((nreals)) * np.nan
+    gamma_ssi = np.ones((nfreqs, nreals, nskies, nloudest)) * np.nan
 
 
     # for each realization, 
@@ -2240,6 +2241,7 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
     if debug: 
         mod_start = datetime.now()
         real_dur = datetime.now()
+    failed_psrs=0
     for rr in range(nreals):
         if debug: 
             now = datetime.now()
@@ -2252,13 +2254,19 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
                                     sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True,
                                     red_amp=red_amp, red_gamma=red_gamma,)
         _sigmin /= 2
-        _sigmax *= 2
+        _sigmax *= 2 + 2e-20 # >1e-20 to make sure it doesnt immediately fail the 0 check 
 
+        if psrs is None:
+            failed_psrs += 1
+            continue # leave values as nan, if no successful PTA was found
+        print(holo.utils.stats(psrs[0].toaerrs))
         # use those psrs to calculate realization detstats
         _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1], ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
+        _dp_bg,  = detect_bg_pta(psrs, fobs_cents, hc_bg=hc_bg[:,rr:rr+1], red_amp=red_amp, red_gamma=red_gamma) #, ret_snr=True)
+        print(f"test2: {_dp_bg=}")
         dp_bg[rr], snr_bg[rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
         _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
-            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], nskies=nskies, ret_snr=True, red_amp=red_amp, red_gamma=gamm_red)
+            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], nskies=nskies, ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
         # if debug: print(f"{_dp_ss.shape=}, {_snr_ss.shape=}, {_gamma_ssi.shape=}")
         dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()
 
@@ -2273,7 +2281,7 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
         _dsdat.update(gamma_ssi=gamma_ssi)
     if save_snr_ss:
         _dsdat.update(snr_ss=snr_ss)
-    print(f"Model took {datetime.now() - mod_start} s")
+    print(f"Model took {datetime.now() - mod_start} s, {failed_psrs}/{nreals} realizations failed.")
     return _dsdat
 
 
@@ -2488,6 +2496,14 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
             sigmin = sigmin/3
             sigmax = sigmax*3
             nclose=0
+
+        # check if goal DP is just impossible
+        if sigmax<1e-20:
+            psrs=None
+            if debug: print(f"FAILED! DP_BG=0.5 impossible with {red_amp=}, {red_gamma=}")
+            break
+    print(f"test1: {dp_bg=}")
+    print(f"test1: {sigma=}")
     if ret_sig:
         return psrs, sigma, sigmin, sigmax
     return psrs
