@@ -2215,7 +2215,8 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
 
 def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies, 
                         sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
-                        thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True): 
+                        thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
+                        amp_red=None, gamma_red=None): 
     """ Detect pspace model using individual sigma calibration for each realization
     
     """
@@ -2248,15 +2249,16 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
 
         # get calibrated psrs 
         psrs, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[:,rr], fobs_cents, npsrs, tol=tol, maxbads=maxbads,
-                                    sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True)
+                                    sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True,
+                                    amp_red=amp_red, gamma_red=gamma_red,)
         _sigmin /= 2
         _sigmax *= 2
 
         # use those psrs to calculate realization detstats
-        _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1], ret_snr=True)
+        _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1], ret_snr=True, amp_red=amp_red, gamma_red=gamma_red)
         dp_bg[rr], snr_bg[rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
         _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
-            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], nskies=nskies, ret_snr=True)
+            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], nskies=nskies, ret_snr=True, amp_red=amp_red, gamma_red=gamm_red)
         # if debug: print(f"{_dp_ss.shape=}, {_snr_ss.shape=}, {_gamma_ssi.shape=}")
         dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()
 
