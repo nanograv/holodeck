@@ -2259,11 +2259,14 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
         if psrs is None:
             failed_psrs += 1
             continue # leave values as nan, if no successful PTA was found
-        print(holo.utils.stats(psrs[0].toaerrs))
+        # print(f"before calculation: {utils.stats(psrs[0].toaerrs)=}, \n{utils.stats(hc_bg[rr])=},\
+        #         {utils.stats(fobs_cents)=}")
         # use those psrs to calculate realization detstats
         _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1], ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
-        _dp_bg,  = detect_bg_pta(psrs, fobs_cents, hc_bg=hc_bg[:,rr:rr+1], red_amp=red_amp, red_gamma=red_gamma) #, ret_snr=True)
-        print(f"test2: {_dp_bg=}")
+        # print(f"{utils.stats(psrs[0].toaerrs)=}, {utils.stats(hc_bg[rr])=},\
+        #         {_dp_bg=},")
+        # _dp_bg,  = detect_bg_pta(psrs, fobs_cents, hc_bg=hc_bg[:,rr:rr+1], red_amp=red_amp, red_gamma=red_gamma) #, ret_snr=True)
+        # print(f"test2: {_dp_bg=}")
         dp_bg[rr], snr_bg[rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
         _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
             psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], nskies=nskies, ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
@@ -2451,7 +2454,7 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
     sigma = sigstart
     psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                     phi=phis, theta=thetas)
-    dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis])[0]
+    dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], red_amp=red_amp, red_gamma=red_gamma)[0]
 
     nclose=0 # number of attempts close to 0.5, could be stuck close
     nfar=0 # number of attempts far from 0.5, could be stuck far
@@ -2461,7 +2464,7 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
         sigma = np.mean([sigmin, sigmax]) # a weighted average would be better
         psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                         phi=phis, theta=thetas)
-        dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg, red_amp=red_amp, red_gamma=red_gamma)[0]
+        dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], red_amp=red_amp, red_gamma=red_gamma)[0]
 
         # if debug: print(f"{dp_bg=}")
         if (dp_bg < (0.5-tol)) or (dp_bg > (0.5+tol)):
@@ -2502,8 +2505,10 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
             psrs=None
             if debug: print(f"FAILED! DP_BG=0.5 impossible with {red_amp=}, {red_gamma=}")
             break
-    print(f"test1: {dp_bg=}")
-    print(f"test1: {sigma=}")
+    # print(f"test1: {dp_bg=}")
+    # print(f"test1: {sigma=}")
+    # print(f"in calibration: {utils.stats(psrs[0].toaerrs)=}, \n{utils.stats(hc_bg)=},\
+    #             {utils.stats(fobs)=}, {dp_bg=}")
     if ret_sig:
         return psrs, sigma, sigmin, sigmax
     return psrs
