@@ -175,8 +175,11 @@ def main():
         save_data_to_file = args.save_file
 
     if args.red_amp is not None and args.red_gamma is not None:
-        save_dets_to_file = save_dets_to_file+'_ra{args.red_amp:.1e}_rg{args.red_gamma:.1e}'
+        save_dets_to_file = save_dets_to_file+f'_ra{args.red_amp:.1e}_rg{args.red_gamma:.1f}'
     
+    print(f"{load_data_from_file=}.npz")
+    print(f"{save_data_to_file=}.npz")
+    print(f"{save_dets_to_file=}.npz")
 
     if args.construct or args.detstats:
         if args.construct:
