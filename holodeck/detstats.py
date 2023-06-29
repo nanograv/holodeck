@@ -2288,6 +2288,89 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
     return _dsdat
 
 
+def detect_pspace_model_clbrt_ramp(fobs_cents, hc_ss, hc_bg, npsrs, nskies, sigma,
+                        rampstart=1e-16, rampmin=1e-20, rampmax=1e-13, tol=0.01, maxbads=5,
+                        thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
+                        red_amp=None, red_gamma=None): 
+    """ Detect pspace model using individual red noise amplitude calibration for each realization
+    
+    """
+    dur = 1.0/fobs_cents[0]
+    cad = 1.0/(2*fobs_cents[-1])
+
+    nfreqs, nreals, nloudest = [*hc_ss.shape]
+        
+    # form arrays for individual realization detstats
+    # set all to nan, only to be replaced if successful pta is found
+    dp_ss = np.ones((nreals, nskies)) * np.nan   
+    dp_bg = np.ones(nreals) * np.nan
+    snr_ss = np.ones((nfreqs, nreals, nskies, nloudest)) * np.nan
+    snr_bg = np.ones((nreals)) * np.nan
+    gamma_ssi = np.ones((nfreqs, nreals, nskies, nloudest)) * np.nan
+
+    # get psrs 
+    phis = np.random.uniform(0, 2*np.pi, size = npsrs)
+    thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
+                    phi=phis, theta=thetas)
+
+    # for each realization, 
+    # use sigmin and sigmax from previous realization, 
+    # unless it's the first realization of the sample
+    _rampstart, _rampmin, _rampmax = rampstart, rampmin, rampmax 
+    if debug: 
+        mod_start = datetime.now()
+        real_dur = datetime.now()
+    failed_psrs=0
+    for rr in range(nreals):
+        if debug: 
+            now = datetime.now()
+            if (rr%10==0):
+                print(f"{rr=}, {now-real_dur} s per realization, {_rampmin=:.2e}, {_rampmax=:.2e}, {_rampstart=:.2e}")
+            real_dur = now
+
+        # get calibrated psrs 
+        ramp, _ramp_min, _rampmax = calibrate_one_ramp(hc_bg[:,rr], fobs_cents, npsrs, sigma,
+                                    tol=tol, maxbads=maxbads,
+                                    rampstart=_rampstart, rampmin=_rampmin, rampmax=_rampmax, debug=debug, 
+                                    red_gamma=red_gamma,)
+        _rampstart = ramp
+        _rampmin /= 2
+        _rampmax *= 2 + 2e-50 # >1e-20 to make sure it doesnt immediately fail the 0 check 
+
+        if ramp is None:
+            failed_psrs += 1
+            continue # leave values as nan, if no successful PTA was found
+        # print(f"before calculation: {utils.stats(psrs[0].toaerrs)=}, \n{utils.stats(hc_bg[rr])=},\
+        #         {utils.stats(fobs_cents)=}")
+        # use those psrs to calculate realization detstats
+        _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1], ret_snr=True, red_amp=ramp, red_gamma=red_gamma)
+        # print(f"{utils.stats(psrs[0].toaerrs)=}, {utils.stats(hc_bg[rr])=},\
+        #         {_dp_bg=},")
+        # _dp_bg,  = detect_bg_pta(psrs, fobs_cents, hc_bg=hc_bg[:,rr:rr+1], red_amp=red_amp, red_gamma=red_gamma) #, ret_snr=True)
+        # print(f"test2: {_dp_bg=}")
+        dp_bg[rr], snr_bg[rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
+        _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
+            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], nskies=nskies, ret_snr=True, red_amp=ramp, red_gamma=red_gamma)
+        # if debug: print(f"{_dp_ss.shape=}, {_snr_ss.shape=}, {_gamma_ssi.shape=}")
+        dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()
+
+    ev_ss = expval_of_ss(gamma_ssi)
+    df_ss, df_bg = detfrac_of_reals(dp_ss, dp_bg)
+    _dsdat = {
+        'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi, 
+        'dp_bg':dp_bg, 'snr_bg':snr_bg,
+        'df_ss':df_ss, 'df_bg':df_bg, 'ev_ss':ev_ss,
+        }
+    if save_gamma_ssi:
+        _dsdat.update(gamma_ssi=gamma_ssi)
+    if save_snr_ss:
+        _dsdat.update(snr_ss=snr_ss)
+    print(f"Model took {datetime.now() - mod_start} s, {failed_psrs}/{nreals} realizations failed.")
+    return _dsdat
+
+
+
 def detect_pspace_model_clbrt_sigma(fobs_cents, hc_ss, hc_bg, 
                         npsrs, nskies, maxtrials=1): 
     """ Detect pspace model using individual PTA calibration for each realization
@@ -2513,3 +2596,91 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
         return psrs, sigma, sigmin, sigmax
     return psrs
 
+def calibrate_one_ramp(hc_bg, fobs, psrs,
+                      rampstart=1e-6, rampmin=1e-9, rampmax=1e-4, debug=False, maxbads=20, tol=0.03,
+                      phis=None, thetas=None, rgam=-1.5):
+    """ Calibrate the red noise amplitude, for a given realization, and return that PTA
+
+    Parameters
+    ----------
+    hc_bg : (F,) 1Darray
+        The background characteristic strain for one realization.
+    fobs : (F,) 1Darray
+        Observed GW frequencies.
+    psrs : hasasia.sim.pta object
+        PTA w/ fixed white noise
+    sigma : scalar
+        White noise sigma
+
+    Returns 
+    -------
+    redamp : float
+        final redamp, returned only if ret_ramp = True
+    redampmin : float
+        minimum of the final sigma range used, returned only if ret_sig=True
+    redampmax : float, returned only if ret_sig=True
+        maximum of the final sigma range used
+
+    TODO: Check if sigma_max hits 0, then return something that essentially says to throw out this model
+    """
+
+    # get duration and cadence from fobs
+    dur = 1.0/fobs[0]
+    cad = 1.0/(2.0*fobs[-1])
+
+    # randomize pulsar positions
+    ramp = rampstart
+    dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], red_amp=rgam, red_gamma=ramp)[0]
+
+    nclose=0 # number of attempts close to 0.5, could be stuck close
+    nfar=0 # number of attempts far from 0.5, could be stuck far
+
+    # calibrate sigma
+    while np.abs(dp_bg-0.50)>tol:
+        ramp = np.mean([rampmin, rampmax]) # a weighted average would be better
+        dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], red_amp=ramp, red_gamma=rgam)[0]
+
+        # if debug: print(f"{dp_bg=}")
+        if (dp_bg < (0.5-tol)) or (dp_bg > (0.5+tol)):
+            nfar +=1
+
+        # check if we need to expand the range
+        if (nfar>5*maxbads  # if we've had many bad guesses
+            or (rampmin/rampmax > 0.99 # or our range is small and we are far from the goal
+                and (dp_bg<0.4 or dp_bg>0.6))):
+            
+            # then we must expand the range
+            if debug: print(f"STUCK! {nfar=}, {dp_bg=}, {rampmin=:e}, {rampmax=:e}")
+            if dp_bg < 0.5-tol: # stuck way too low, allow much lower sigmin to raise DP
+                rampmin = rampmin/3
+            if dp_bg > 0.5+tol: # stuck way too high, allow much higher sigmax to lower DP
+                rampmax = rampmax*3
+
+            # reset count for far guesses
+            nfar = 0
+
+        # check how we should narrow our range
+        if dp_bg<0.5-tol: # dp too low, lower sigma
+            rampmax = ramp
+        elif dp_bg>0.5+tol: # dp too high, raise sigma
+            rampmin = ramp
+        else:
+            nclose += 1 # check how many attempts between 0.49 and 0.51 fail
+
+        # check if we are stuck near the goal value with a bad range    
+        if nclose>maxbads: # if many fail, we're stuck; expand sampling range
+            if debug: print(f"{nclose=}, {dp_bg=}, {rampmin=:e}, {rampmax=:e}")
+            rampmin = rampmin/3
+            rampmax = rampmax*3
+            nclose=0
+
+        # check if goal DP is just impossible
+        if rampmax<1e-50:
+            ramp=None
+            if debug: print(f"FAILED! DP_BG=0.5 impossible with sigma={np.mean(psrs[0].toaerrs)}, {rgam=}")
+            break
+    # print(f"test1: {dp_bg=}")
+    # print(f"test1: {sigma=}")
+    # print(f"in calibration: {utils.stats(psrs[0].toaerrs)=}, \n{utils.stats(hc_bg)=},\
+    #             {utils.stats(fobs)=}, {dp_bg=}")
+    return ramp, rampmin, rampmax
