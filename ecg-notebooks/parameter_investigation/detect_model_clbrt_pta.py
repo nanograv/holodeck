@@ -16,6 +16,7 @@ DEF_NSKIES = 100
 DEF_NPSRS = 40
 DEF_RED_AMP = None
 DEF_RED_GAMMA = None
+DEF_RED2WHITE = None
 
 DEF_TOL = 0.01
 DEF_MAXBADS = 5
@@ -59,6 +60,8 @@ def _setup_argparse():
                         help='Red noise amplitude')
     parser.add_argument('--red_gamma', action='store', dest='red_gamma', type=float, default=DEF_RED_GAMMA,
                         help='Red noise gamma')
+    parser.add_argument('--red2white', action='store', dest='red2white', type=float, default=DEF_RED2WHITE,
+                        help='Red noise amplitude to white noise amplitude ratio.')
     
     # pta calibration settings
     parser.add_argument('--sigstart', action='store', dest='sigstart', type=float, default=1e-7,
@@ -170,12 +173,17 @@ def main():
 
     if args.save_file is None:
         save_data_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}'
-        save_dets_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}_ds'
     else:
         save_data_to_file = args.save_file
 
-    if args.red_amp is not None and args.red_gamma is not None:
+    save_dets_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}_ds'
+    if args.red2white is not None and args.red_gamma is not None:
+        save_dets_to_file = save_dets_to_file+f'_r2w{args.red2white:.1e}_rg{args.red_gamma:.1f}'
+    elif args.red_amp is not None and args.red_gamma is not None:
         save_dets_to_file = save_dets_to_file+f'_ra{args.red_amp:.1e}_rg{args.red_gamma:.1f}'
+    if args.red2white is not None and args.red_amp is not None:
+        print(f"{args.red2white=} and {args.red_amp} both provided. red_amp will be overriden by red2white ratio.")
+
     
     print(f"{load_data_from_file=}.npz")
     print(f"{save_data_to_file=}.npz")
@@ -207,7 +215,7 @@ def main():
             _dsdat = detstats.detect_pspace_model_clbrt_pta(
                 fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, 
                 sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
-                thresh=args.thresh, debug=args.debug, red_amp=args.red_amp, red_gamma=args.red_gamma)
+                thresh=args.thresh, debug=args.debug, red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white)
             dsdat.append(_dsdat)
         np.savez(save_dets_to_file+'.npz', dsdat=dsdat, red_amp=args.red_amp, red_gamma=args.red_gamma, npsrs=args.npsrs) # overwrite
     else:

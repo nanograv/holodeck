@@ -2216,9 +2216,16 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
 def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies, 
                         sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
                         thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
-                        red_amp=None, red_gamma=None): 
+                        red_amp=None, red_gamma=None, red2white = None): 
     """ Detect pspace model using individual sigma calibration for each realization
     
+    Parameters
+    ----------
+
+    red2white : scalar or None
+        Fixed ratio between red and white noise amplitude, if not None. 
+        Otherwise, red noise stays fixed
+
     """
     dur = 1.0/fobs_cents[0]
     cad = 1.0/(2*fobs_cents[-1])
@@ -2250,9 +2257,9 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
             real_dur = now
 
         # get calibrated psrs 
-        psrs, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[:,rr], fobs_cents, npsrs, tol=tol, maxbads=maxbads,
+        psrs, red_amp, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[:,rr], fobs_cents, npsrs, tol=tol, maxbads=maxbads,
                                     sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True,
-                                    red_amp=red_amp, red_gamma=red_gamma,)
+                                    red_amp=red_amp, red_gamma=red_gamma, red2white=red2white)
         _sigmin /= 2
         _sigmax *= 2 + 2e-20 # >1e-20 to make sure it doesnt immediately fail the 0 check 
 
@@ -2330,10 +2337,10 @@ def detect_pspace_model_clbrt_ramp(fobs_cents, hc_ss, hc_bg, npsrs, nskies, sigm
             real_dur = now
 
         # get calibrated psrs 
-        ramp, _ramp_min, _rampmax = calibrate_one_ramp(hc_bg[:,rr], fobs_cents, npsrs, sigma,
+        ramp, _ramp_min, _rampmax = calibrate_one_ramp(hc_bg[:,rr], fobs_cents, psrs,
                                     tol=tol, maxbads=maxbads,
                                     rampstart=_rampstart, rampmin=_rampmin, rampmax=_rampmax, debug=debug, 
-                                    red_gamma=red_gamma,)
+                                    rgam=red_gamma,)
         _rampstart = ramp
         _rampmin /= 2
         _rampmax *= 2 + 2e-50 # >1e-20 to make sure it doesnt immediately fail the 0 check 
@@ -2501,7 +2508,7 @@ def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials,
 
 def calibrate_one_pta(hc_bg, fobs, npsrs, 
                       sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
-                      phis=None, thetas=None, ret_sig = False, red_amp=None, red_gamma=None):
+                      phis=None, thetas=None, ret_sig = False, red_amp=None, red_gamma=None, red2white=None):
     """ Calibrate the specific PTA for a given realization, and return that PTA
 
     Parameters
@@ -2524,7 +2531,7 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
     sigma : float
         final sigma, returned only if ret_sig=True
 
-    TODO: Check if sigma_max hits 0, then return something that essentially says to throw out this model
+    TODO: Correct ratio from red2white, so that they use the same units/convention! 
     """
 
     # get duration and cadence from fobs
@@ -2535,6 +2542,9 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
     if phis is None: phis = np.random.uniform(0, 2*np.pi, size = npsrs)
     if thetas is None: thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
     sigma = sigstart
+    if red2white is not None:
+        red_amp = sigma/red2white
+
     psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                     phi=phis, theta=thetas)
     dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], red_amp=red_amp, red_gamma=red_gamma)[0]
@@ -2545,6 +2555,8 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
     # calibrate sigma
     while np.abs(dp_bg-0.50)>tol:
         sigma = np.mean([sigmin, sigmax]) # a weighted average would be better
+        if red2white is not None:
+            red_amp = sigma * red2white
         psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                         phi=phis, theta=thetas)
         dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], red_amp=red_amp, red_gamma=red_gamma)[0]
@@ -2593,8 +2605,8 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
     # print(f"in calibration: {utils.stats(psrs[0].toaerrs)=}, \n{utils.stats(hc_bg)=},\
     #             {utils.stats(fobs)=}, {dp_bg=}")
     if ret_sig:
-        return psrs, sigma, sigmin, sigmax
-    return psrs
+        return psrs, red_amp, sigma, sigmin, sigmax
+    return psrs, red_amp
 
 def calibrate_one_ramp(hc_bg, fobs, psrs,
                       rampstart=1e-6, rampmin=1e-9, rampmax=1e-4, debug=False, maxbads=20, tol=0.03,
@@ -2621,7 +2633,6 @@ def calibrate_one_ramp(hc_bg, fobs, psrs,
     redampmax : float, returned only if ret_sig=True
         maximum of the final sigma range used
 
-    TODO: Check if sigma_max hits 0, then return something that essentially says to throw out this model
     """
 
     # get duration and cadence from fobs
