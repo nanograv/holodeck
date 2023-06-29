@@ -499,7 +499,8 @@ def draw_ss_and_gwb(ax, xx, hc_ss, gwb, nsamp=10,
             if(ii==0):
                 label=bglabel
             else: label=None
-            ax.plot(xx, gwb[:, ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-')
+            cc = colors[ci] if color is None else color
+            ax.plot(xx, gwb[:, ii], color=cc, alpha=0.25, lw=1.0, ls='-')
             for ll in range(len(hc_ss[0,0])):
                 if(ll==0):
                     edgecolor='k'
@@ -508,7 +509,7 @@ def draw_ss_and_gwb(ax, xx, hc_ss, gwb, nsamp=10,
                 else:
                     edgecolor=None
                     label=None
-                ax.scatter(xx, hc_ss[:, ii, ll], color=colors[ci], alpha=0.25,
+                ax.scatter(xx, hc_ss[:, ii, ll], color=cc, alpha=0.25,
                            edgecolor=edgecolor, label=label)
             ci+=1
 
