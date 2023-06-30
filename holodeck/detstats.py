@@ -2543,7 +2543,7 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
     if thetas is None: thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
     sigma = sigstart
     if red2white is not None:
-        red_amp = sigma/red2white
+        red_amp = _white_noise(cad, sigma) * red2white
 
     psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                     phi=phis, theta=thetas)
