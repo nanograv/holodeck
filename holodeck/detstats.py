@@ -2337,7 +2337,7 @@ def detect_pspace_model_clbrt_ramp(fobs_cents, hc_ss, hc_bg, npsrs, nskies, sigm
             real_dur = now
 
         # get calibrated psrs 
-        ramp, _ramp_min, _rampmax = calibrate_one_ramp(hc_bg[:,rr], fobs_cents, psrs,
+        ramp, _rampmin, _rampmax = calibrate_one_ramp(hc_bg[:,rr], fobs_cents, psrs,
                                     tol=tol, maxbads=maxbads,
                                     rampstart=_rampstart, rampmin=_rampmin, rampmax=_rampmax, debug=debug, 
                                     rgam=red_gamma,)
