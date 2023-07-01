@@ -178,7 +178,7 @@ def main():
 
     save_dets_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}_ds'
     if args.red2white is not None and args.red_gamma is not None:
-        save_dets_to_file = save_dets_to_file+f'_r2w{args.red2white:.1e}_rg{args.red_gamma:.1f}'
+        save_dets_to_file = save_dets_to_file+f'_r2w{args.red2white:.1f}_rg{args.red_gamma:.1f}'
     elif args.red_amp is not None and args.red_gamma is not None:
         save_dets_to_file = save_dets_to_file+f'_ra{args.red_amp:.1e}_rg{args.red_gamma:.1f}'
     if args.red2white is not None and args.red_amp is not None:
@@ -217,7 +217,7 @@ def main():
                 sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
                 thresh=args.thresh, debug=args.debug, red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white)
             dsdat.append(_dsdat)
-        np.savez(save_dets_to_file+'.npz', dsdat=dsdat, red_amp=args.red_amp, red_gamma=args.red_gamma, npsrs=args.npsrs) # overwrite
+        np.savez(save_dets_to_file+'.npz', dsdat=dsdat, red_amp=args.red_amp, red_gamma=args.red_gamma, npsrs=args.npsrs, red2white=args.red2white) # overwrite
     else:
         print(f"Neither {args.construct=} or {args.detstats} are true. Doing nothing.")
 
