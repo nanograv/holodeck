@@ -130,7 +130,7 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
             # print(holo.utils.stats(redz), "after redz[redz<0]=-1")
             dcom_final[sel] = cosmo.comoving_distance(redz[sel]).cgs.value
             if np.any(dcom_final<0): print('dcom_final<0 found')
-
+            if np.any(np.isnan(dcom_final)): print('nan dcom_final found')
             # redz[redz<0] = -1
 
             fobs_orb_edges = edges[-1]
@@ -169,11 +169,11 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
                 raise ValueError(err)
             
             # check for negatives
-            if np.any(sspar[3]<0):
-                sumfalse = np.sum(sspar[3]<0)
-                err = f"check 2: {sumfalse} out of {sspar[3].size} redz_final are negative in sings.ss_gws_redz()"
-                # print(np.where(neither==True))
-                print(err)
+            # if np.any(sspar[3]<0):
+            sumfalse = np.sum(sspar[3]<0)
+            err = f"check 2: {sumfalse} out of {sspar[3].size} redz_final are negative in sings.ss_gws_redz()"
+            # print(np.where(neither==True))
+            print(err)
                 # raise ValueError(err)
             
             # return

@@ -1742,10 +1742,9 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
                     num = <double>random_normal(rng, num, std)
                 else:            # Poisson sample
                     num = <double>random_poisson(rng, num)
-                if(num < 1):
-                    continue
                 cur = h2fdf[mm,qq,zz,ff] # h^2 * f/df of current bin
-                if (num<1):
+                
+                if (num < 1) or (cur == 0):
                     continue # to next loudest bin
                 while (ll < L) and (num > 0):
                     # store ll loudest source strain
