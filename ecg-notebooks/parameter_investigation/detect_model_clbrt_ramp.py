@@ -20,7 +20,7 @@ DEF_RED_GAMMA = -3.0
 DEF_TOL = 0.01
 DEF_MAXBADS = 5
 GAMMA_RHO_GRID_PATH = '/Users/emigardiner/GWs/holodeck/output/rho_gamma_grids' # modify for system
-ANATOMY_PATH = '/Users/emigardiner/GWs/holodeck/output/anatomy_09B'
+ANATOMY_PATH = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz'
 
 # settings to vary
 DEF_CONSTRUCT = False
