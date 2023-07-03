@@ -113,7 +113,7 @@ def vary_parameter(
         params_list,  # the values we'll check
         nreals, nfreqs, nloudest,
         pspace,
-        pars=None, save_dir=None, debug=True
+        pars=None, debug=True
         ):
 
     # get the parameter names from this library-space
@@ -138,19 +138,10 @@ def vary_parameter(
         params.append(_params)
         # construct `sam` and `hard` instances based on these parameters
         sam, hard = pspace.model_for_params(_params, pspace.sam_shape)
-        if isinstance(hard, holo.hardening.Fixed_Time_2PL_SAM):
-            hard_name = 'Fixed Time'
-        elif isinstance(hard, holo.hardening.Hard_GW):
-            hard_name = 'GW Only'
         # run this model, retrieving binary parameters and the GWB
         _data = holo.librarian.run_model(sam, hard, nreals, nfreqs, nloudest=nloudest,
                                         gwb_flag=False, singles_flag=True, params_flag=True, details_flag=True)
         data.append(_data)
-    if save_dir is not None:
-        str_shape = str(sam.shape).replace(", ", "_").replace("(", "").replace(")", "")
-        filename = save_dir+'/%s_p%s_s%s.npz' % (target_param, str_pars, str_shape)
-        np.savez(filename, data=data, params=params, hard_name=hard_name, shape=sam.shape, target_param=target_param )
-        if debug: print('saved to %s' % filename)
 
     return (data, params)
 
