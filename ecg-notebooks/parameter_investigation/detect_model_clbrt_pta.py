@@ -3,6 +3,7 @@ import holodeck as holo
 import argparse
 from holodeck import detstats
 from datetime import datetime
+import os
 
 # sample
 DEF_SHAPE = None
@@ -157,21 +158,29 @@ def main():
     print("NREALS = %d, NSKIES = %d, NPSRS = %d, target = %s, NVARS=%d"
           % (args.nreals, args.nskies, args.npsrs, args.target, args.nvars))
     
+    output_path = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}'
+    # check if output folder already exists, if not, make it.
+    if os.path.exists(output_path) is False:
+        os.makedirs(output_path)
+
     if args.load_file is None:
-        load_data_from_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}' 
+        load_data_from_file = output_path+'/data_params'
     else:
         load_data_from_file = args.load_file
 
     if args.save_file is None:
-        save_data_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}'
+        save_data_to_file =  output_path+'/data_params'
     else:
         save_data_to_file = args.save_file
 
-    save_dets_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}_ds'
+    save_dets_to_file = output_path+f'/detstats_s{args.nskies}'
     if args.red2white is not None and args.red_gamma is not None:
         save_dets_to_file = save_dets_to_file+f'_r2w{args.red2white:.1f}_rg{args.red_gamma:.1f}'
     elif args.red_amp is not None and args.red_gamma is not None:
         save_dets_to_file = save_dets_to_file+f'_ra{args.red_amp:.1e}_rg{args.red_gamma:.1f}'
+    else: 
+        save_dets_to_file = save_dets_to_file+f'_white'
+
     if args.red2white is not None and args.red_amp is not None:
         print(f"{args.red2white=} and {args.red_amp} both provided. red_amp will be overriden by red2white ratio.")
 
