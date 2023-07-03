@@ -167,12 +167,12 @@ def main():
           % (args.nreals, args.nskies, args.npsrs, args.target, args.nvars))
     
     if args.load_file is None:
-        load_data_from_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}' 
+        load_data_from_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}' 
     else:
         load_data_from_file = args.load_file
 
     if args.save_file is None:
-        save_data_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}'
+        save_data_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}'
     else:
         save_data_to_file = args.save_file
 
