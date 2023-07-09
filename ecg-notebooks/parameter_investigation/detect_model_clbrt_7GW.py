@@ -3,6 +3,7 @@ import holodeck as holo
 import argparse
 from holodeck import detstats
 from datetime import datetime
+from tqdm import tqdm
 import os
 
 # sample
@@ -125,13 +126,12 @@ def vary_parameter(
     # choose each parameter to be half-way across the range provided by the library
     if pars is None:
         pars = 0.5 * np.ones(num_pars) 
-    str_pars = str(pars).replace(" ", "_").replace("[", "").replace("]", "")
     # Choose parameter to vary
     param_idx = param_names.index(target_param)
 
     data = []
     params = []
-    for ii, par in enumerate(params_list):
+    for ii, par in enumerate(tqdm(params_list)):
         pars[param_idx] = par
         if debug: print(f"{ii=}, {pars=}")
         # _params = pspace.param_samples[0]*pars
@@ -212,7 +212,7 @@ def main():
 
         # get dsdat for each data/param
         dsdat = []
-        for ii, _data in enumerate(data):
+        for ii, _data in enumerate(tqdm(data)):
             if args.debug: print(f"on var {ii=} out of {args.nvars}")
             hc_bg = _data['hc_bg']
             hc_ss = _data['hc_ss']
