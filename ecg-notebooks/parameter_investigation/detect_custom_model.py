@@ -28,7 +28,7 @@ DEF_RED2WHITE = None
 DEF_TOL = 0.01
 DEF_MAXBADS = 5
 GAMMA_RHO_GRID_PATH = '/Users/emigardiner/GWs/holodeck/output/rho_gamma_grids' # modify for system
-ANATOMY_PATH = '/Users/emigardiner/GWs/holodeck/output/anatomy_7GW'
+ANATOMY_PATH = '/Users/emigardiner/GWs/holodeck/output/anatomy'
 
 # settings to vary
 DEF_CONSTRUCT = False
@@ -39,10 +39,13 @@ def _setup_argparse():
     parser = argparse.ArgumentParser()
     parser.add_argument('target', action='store', type=str,
                         help="target parameter to vary")
+    parser.add_argument('param_space', type=str,
+                        help="Parameter space class name, found in 'holodeck.param_spaces'.")
     # parser.add_argument('--grid_path', action='store', dest ='grid_path', type=str, default=GAMMA_RHO_GRID_PATH,
     #                     help="gamma-rho interpolation grid path")
     
     # sample models setup
+    
     parser.add_argument('-f', '--nfreqs', action='store', dest='nfreqs', type=int, default=DEF_NFREQS,
                         help='number of frequency bins')
     parser.add_argument('-r', '--nreals', action='store', dest='nreals', type=int, default=DEF_NREALS,
@@ -110,6 +113,7 @@ def _setup_argparse():
     
     args = parser.parse_args()
     return args
+
 
 def run_model(sam, hard, nreals, nfreqs, nloudest=5,
               pta_dur = DEF_PTA_DUR,
@@ -222,7 +226,7 @@ def main():
           % (args.nreals, args.nskies, args.npsrs, args.target, args.nvars))
     
     # set up output folder
-    output_path = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}'
+    output_path = args.anatomy_path+f'/{args.param_space}_{args.target}_v{args.nvars}_r{args.nreals}_d{args.pta_dur}'
     # check if output folder already exists, if not, make it.
     if os.path.exists(output_path) is False:
         os.makedirs(output_path)
@@ -254,6 +258,8 @@ def main():
     print(f"{save_dets_to_file=}.npz")
 
 
+    space_class = getattr(holo.param_spaces, args.param_space)
+    
     # calculate model and/or detstats
     if args.construct or args.detstats:
         if args.construct:
@@ -261,7 +267,7 @@ def main():
             data, params, = vary_parameter(
                 target_param=args.target, params_list=params_list,
                 nfreqs=args.nfreqs, nreals=args.nreals, nloudest=args.nloudest,
-                pspace = holo.param_spaces.PS_Uniform_07_GW(holo.log, nsamples=1, sam_shape=args.shape, seed=None),
+                pspace = space_class(holo.log, nsamples=1, sam_shape=args.shape, seed=None),
                 pta_dur=args.pta_dur)
             np.savez(save_data_to_file+'.npz', data=data, params=params) # save before calculating detstats, in case of crash
         else:
