@@ -65,7 +65,7 @@ LIBRARY_COLORS = {
     'GWOnly': "#984EA3",
     'HDall': "#999999",
     'HDdmgp': "#4DAF4A",
-    'priors': "0.5",
+    'priors': "0.6",
 }
 
 
