@@ -34,7 +34,7 @@ class Accretion:
     """
 
     def __init__(self, accmod='Basic', f_edd=0.01, mdot_ext=None, eccen=0.0,
-                 subpc=True, **kwargs):
+                 subpc=True, edd_lim=None, **kwargs):
         """ Initializes the Accretion class.
 
         Parameters
@@ -48,6 +48,7 @@ class Accretion:
         eccen : float, optional
             Eccentricity value.
         subpc : boolean, optional
+        edd_lim : None, or numerical value. This limits the accretion to a factor edd_lim the Eddington limit. 
 
         Other Parameters
         ----------------
@@ -59,6 +60,7 @@ class Accretion:
         self.mdot_ext = mdot_ext
         self.eccen = eccen
         self.subpc = subpc
+        self.edd_lim = edd_lim
 
     def mdot_eddington(self, mass, eps=0.1):
         """ Calculate the total accretion rate based on masses and a fraction of the Eddington limit.
@@ -157,6 +159,17 @@ class Accretion:
         """
         m1 = evol.mass[:, step - 1, 0]
         m2 = evol.mass[:, step - 1, 1]
+        inds_m1_primary = m1 >= m2  # where first mass is actually primary
+        m1_sorted = np.zeros(np.shape(m1))
+        m1_sorted[inds_m1_primary] = m1[inds_m1_primary]
+        m1_sorted[~inds_m1_primary] = m2[~inds_m1_primary]
+        m1 = m1_sorted
+
+        inds_m2_primary = m2 >= m1  # where second mass is actually primary
+        m2_sorted = np.zeros(np.shape(m2))
+        m2_sorted[inds_m2_primary] = m1[inds_m2_primary]
+        m2_sorted[~inds_m2_primary] = m2[~inds_m2_primary]
+        m2 = m2_sorted
 
         if self.accmod == 'Siwek22':
             # Calculate the mass ratio
@@ -199,49 +212,26 @@ class Accretion:
             mdot_1 = 1./(np.array(lamb_qe) + 1.) * mdot
             mdot_2 = np.array(lamb_qe)/(np.array(lamb_qe) + 1.) * mdot
 
-            # After calculating the primary and secondary accretion rates,
-            # they need to be placed at the correct index into `mdot_arr`, to
-            # account for primary/secondary being at 0-th OR 1-st index
-            mdot_arr = np.zeros(np.shape(evol.mass[:, step-1, :]))
-            inds_m1_primary = m1 >= m2  # where first mass is actually primary
-            inds_m2_primary = m2 >= m1  # where second mass is actually primary
-            mdot_arr[:, 0][inds_m1_primary] = mdot_1[inds_m1_primary]
-            mdot_arr[:, 0][~inds_m1_primary] = mdot_2[~inds_m1_primary]
-            mdot_arr[:, 1][inds_m2_primary] = mdot_1[inds_m2_primary]
-            mdot_arr[:, 1][~inds_m2_primary] = mdot_2[~inds_m2_primary]
-            # `mdot_arr` is then passed to `_take_next_step()` in evolution.py
-            return(mdot_arr)
-
         if self.accmod == 'Basic':
             mdot_1 = mdot_2 = 0.5 * mdot
             mdot_arr = np.array([mdot_1, mdot_2]).T
-            return(mdot_arr)
 
         if self.accmod == 'Proportional':
-            """ Get primary and secondary masses """
-            m1 = self.m1
-            m2 = self.m2
             # Calculate ratio of accretion rates so that mass ratio stays
             # constant through accretion
             mdot_ratio = m2/(m1 + m2)
             mdot_2 = mdot_ratio * mdot
             mdot_1 = (1. - mdot_ratio) * mdot
-            mdot_arr = np.array([mdot_1, mdot_2]).T
-            return(mdot_arr)
 
         if self.accmod == 'Primary':
             mdot_ratio = 0.
             mdot_2 = mdot_ratio * mdot
             mdot_1 = (1. - mdot_ratio) * mdot
-            mdot_arr = np.array([mdot_1, mdot_2]).T
-            return(mdot_arr)
 
         if self.accmod == 'Secondary':
             mdot_ratio = 1.
             mdot_2 = mdot_ratio * mdot
             mdot_1 = (1. - mdot_ratio) * mdot
-            mdot_arr = np.array([mdot_1, mdot_2]).T
-            return(mdot_arr)
 
         if self.accmod == 'Duffell':
             # Taken from Paul's paper: http://arxiv.org/abs/1911.05506
@@ -249,8 +239,25 @@ class Accretion:
             q = m2/m1
             mdot_1 = mdot/(1. + f(q))
             mdot_2 = f(q) * mdot_1
-            mdot_arr = np.array([mdot_1, mdot_2]).T
-            return(mdot_arr)
+
+        if self.edd_lim is not None:
+            #need to limit the accretion rate to edd_lim times the Eddington limit
+            medd_1 = self.edd_lim * (self.mdot_eddington(m1)/self.f_edd)
+            mdot_1 = np.minimum(np.array(medd_1), np.array(mdot_1))
+            medd_2 = self.edd_lim * (self.mdot_eddington(m2)/self.f_edd)
+            mdot_2 = np.minimum(np.array(medd_2), np.array(mdot_2))
+
+        # After calculating the primary and secondary accretion rates,
+        # they need to be placed at the correct index into `mdot_arr`, to
+        # account for primary/secondary being at 0-th OR 1-st index
+        mdot_arr = np.zeros(np.shape(evol.mass[:, step-1, :]))
+        mdot_arr[:, 0][inds_m1_primary] = mdot_1[inds_m1_primary]
+        mdot_arr[:, 0][~inds_m1_primary] = mdot_2[~inds_m1_primary]
+        mdot_arr[:, 1][inds_m2_primary] = mdot_1[inds_m2_primary]
+        mdot_arr[:, 1][~inds_m2_primary] = mdot_2[~inds_m2_primary]
+
+        #mdot_arr = np.array([mdot_1, mdot_2]).T
+        return(mdot_arr)
 
         # Catch any weirdness if no model is selected.
         if self.accmod is None:

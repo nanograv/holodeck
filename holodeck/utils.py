@@ -1714,7 +1714,7 @@ def lambda_factor_dlnf(frst, dfdt, redz, dcom=None):
     For each binary, calculate the factor: $$\\Lambda \\equiv (dVc/dz) * (dz/dt) * [dt/dln(f)]$$,
     which has units of [Mpc^3].  When multiplied by a number-density [Mpc^-3], it gives the number
     of binaries in the Universe *per log-frequency interval*.  This value must still be multiplied
-    by $\\Delta \\ln(f)$ to get a number of binaries across a frequency in.
+    by $\\Delta \\ln(f)$ to get a number of binaries across a frequency bin.
 
     Parameters
     ----------
