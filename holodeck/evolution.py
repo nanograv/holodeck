@@ -604,11 +604,11 @@ class Evolution:
 
         Returns
         -------
-        names : list[str], size (4,)
+        names : list[str], size (6,)
             Names of the returned data arrays in `samples`.
-        samples : np.ndarray, shape (4, S)
-            Sampled binary data.  For each binary samples S, 4 parameters are returned:
-            ['mtot', 'mrat', 'redz', 'fobs'] (these are listed in the `names` returned value.)
+        samples : np.ndarray, shape (6, S)
+            Sampled binary data.  For each binary samples S, 6 parameters are returned:
+            ['mtot', 'mrat', 'redz', 'fobs', 'eccen', 'sepa'] (these are listed in the `names` returned value.)
             NOTE: `fobs` is *observer*-frame *orbital*-frequencies.
 
         To-Do
@@ -618,7 +618,7 @@ class Evolution:
         """
 
         # these are `log10(values)` where values are in CGS units
-        # names = ['mtot', 'mrat', 'redz', 'fobs']
+        # names = ['mtot', 'mrat', 'redz', 'fobs', 'eccen', 'sepa']
         names, vals, weights = self._sample_universe__at_values_weights(fobs_orb_edges)
 
         samples = self._sample_universe__resample(fobs_orb_edges, vals, weights, down_sample)
@@ -626,6 +626,10 @@ class Evolution:
         # Convert back to normal-space
         samples = np.asarray([10.0 ** ss for ss in samples])
         vals = np.asarray([10.0 ** vv for vv in vals])
+        #but then take log10 of eccentricity again, because we don't take the log10 of eccen initially.
+        #this is because kale.resample() in _sample_universe__resample returns NaNs when using log10(eccen)
+        vals[4] = np.log10(vals[4]) #because we don't take log10 of eccen before interpolating
+        samples[4] = np.log10(samples[4]) #because we don't take log10 of eccen before interpolating
         return names, samples, vals, weights
 
     def _sample_universe__at_values_weights(self, fobs_orb_edges):
@@ -654,7 +658,7 @@ class Evolution:
         dlnf = np.diff(np.log(fobs_orb_edges))
 
         # Interpolate binaries to given frequencies; these are the needed parameters
-        PARAMS = ['mass', 'sepa', 'dadt', 'scafa']
+        PARAMS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen'] #added eccentricity
         # each array within `data_fobs` is shaped (N, F) for N-binaries and F-frequencies (`fobs`)
         data_fobs = self.at('fobs', fobs_orb_cents, params=PARAMS)
 
@@ -683,10 +687,15 @@ class Evolution:
         redz = redz[valid]
         weights = num_binaries[valid]
         log.debug(f"Weights (lambda values) at targets: {utils.stats(weights)}")
+        #select only valid entries for eccen and sepa
+        eccen = data_fobs['eccen'][valid]
+        sepa = data_fobs['sepa'][valid]
 
         # Convert to log-space
-        vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo)]
-        names = ['mtot', 'mrat', 'redz', 'fobs']
+        vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo), eccen, np.log10(sepa)]
+
+        names = ['mtot', 'mrat', 'redz', 'fobs', 'eccen', 'sepa']
+
         return names, vals, weights
 
     def _sample_universe__resample(self, fobs_orb_edges, vals, weights, down_sample):
@@ -702,7 +711,7 @@ class Evolution:
         # TODO/FIX: Consider sampling in comoving-volume instead of redz (like in sam.py)
         #           can also return dcom instead of redz for easier strain calculation
         nsamp = np.random.poisson(weights.sum())
-        reflect = [None, [None, 0.0], None, np.log10([fobs_orb_edges[0], fobs_orb_edges[-1]])]
+        reflect = [None, [None, 0.0], None, np.log10([fobs_orb_edges[0], fobs_orb_edges[-1]]), None, None] #what should reflection val be for eccen and sepa?
         samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
         # samples = np.power(10.0, samples)
         num_samp = samples[0].size
