@@ -546,7 +546,7 @@ def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss, alpha_0=0.001, ret_snr = False,
         noise = noise + red_noise # (P,F,)
 
     # add single source noise
-    noise = noise[:,:,np.newaxis] + _Sh_ss_noise(hc_ss, freqs) # (P, F, R) 
+    noise = noise[:,:,np.newaxis] + _Sh_ss_noise(hc_ss, fobs) # (P, F, R) 
 
     mu_1B = _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
 
@@ -2315,7 +2315,7 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
             real_dur = now
 
         # get calibrated psrs 
-        psrs, red_amp, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[:,rr], fobs_cents, npsrs, tol=tol, maxbads=maxbads,
+        psrs, red_amp, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[:,rr], hc_ss[:,rr,:], fobs_cents, npsrs, tol=tol, maxbads=maxbads,
                                     sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True,
                                     red_amp=red_amp, red_gamma=red_gamma, red2white=red2white)
         _sigmin /= 2
@@ -2327,7 +2327,7 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
         # print(f"before calculation: {utils.stats(psrs[0].toaerrs)=}, \n{utils.stats(hc_bg[rr])=},\
         #         {utils.stats(fobs_cents)=}")
         # use those psrs to calculate realization detstats
-        _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1], ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
+        _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1],  hc_ss[:,rr:rr+1,:], ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
         # print(f"{utils.stats(psrs[0].toaerrs)=}, {utils.stats(hc_bg[rr])=},\
         #         {_dp_bg=},")
         # _dp_bg,  = detect_bg_pta(psrs, fobs_cents, hc_bg=hc_bg[:,rr:rr+1], red_amp=red_amp, red_gamma=red_gamma) #, ret_snr=True)
@@ -2358,6 +2358,8 @@ def detect_pspace_model_clbrt_ramp(fobs_cents, hc_ss, hc_bg, npsrs, nskies, sigm
                         thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
                         red_amp=None, red_gamma=None): 
     """ Detect pspace model using individual red noise amplitude calibration for each realization
+
+    NOTE: Not supported, not updated for including single sources as noise for BG.
     
     """
     dur = 1.0/fobs_cents[0]
@@ -2564,7 +2566,7 @@ def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials,
         )
     return rsigmas, avg_dps, std_dps
 
-def calibrate_one_pta(hc_bg, fobs, npsrs, 
+def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs, 
                       sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
                       phis=None, thetas=None, ret_sig = False, red_amp=None, red_gamma=None, red2white=None):
     """ Calibrate the specific PTA for a given realization, and return that PTA
@@ -2573,6 +2575,8 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
     ----------
     hc_bg : (F,) 1Darray
         The background characteristic strain for one realization.
+    hc_ss : (F,L) NDarray
+        The SS characteristic strains for one realization
     fobs : (F,) 1Darray
         Observed GW frequencies.
     npsrs : integer
@@ -2589,7 +2593,6 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
     sigma : float
         final sigma, returned only if ret_sig=True
 
-    TODO: Correct ratio from red2white, so that they use the same units/convention! 
     """
 
     # get duration and cadence from fobs
@@ -2605,7 +2608,8 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
 
     psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                     phi=phis, theta=thetas)
-    dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], red_amp=red_amp, red_gamma=red_gamma)[0]
+    dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], hc_ss=hc_ss[:,np.newaxis,:],
+                            red_amp=red_amp, red_gamma=red_gamma)[0]
 
     nclose=0 # number of attempts close to 0.5, could be stuck close
     nfar=0 # number of attempts far from 0.5, could be stuck far
@@ -2617,7 +2621,8 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
             red_amp = sigma * red2white
         psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                         phi=phis, theta=thetas)
-        dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], red_amp=red_amp, red_gamma=red_gamma)[0]
+        dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], hc_ss=hc_ss[:,np.newaxis,:],
+                                 red_amp=red_amp, red_gamma=red_gamma)[0]
 
         # if debug: print(f"{dp_bg=}")
         if (dp_bg < (0.5-tol)) or (dp_bg > (0.5+tol)):
@@ -2666,7 +2671,7 @@ def calibrate_one_pta(hc_bg, fobs, npsrs,
         return psrs, red_amp, sigma, sigmin, sigmax
     return psrs, red_amp
 
-def calibrate_one_ramp(hc_bg, fobs, psrs,
+def calibrate_one_ramp(hc_bg, hc_ss, fobs, psrs,
                       rampstart=1e-6, rampmin=1e-9, rampmax=1e-4, debug=False, maxbads=20, tol=0.03,
                       phis=None, thetas=None, rgam=-1.5):
     """ Calibrate the red noise amplitude, for a given realization, and return that PTA
@@ -2675,6 +2680,8 @@ def calibrate_one_ramp(hc_bg, fobs, psrs,
     ----------
     hc_bg : (F,) 1Darray
         The background characteristic strain for one realization.
+    hc_ss : (F,L) NDarray
+        The SS characteristic strains for one realization
     fobs : (F,) 1Darray
         Observed GW frequencies.
     psrs : hasasia.sim.pta object
@@ -2699,7 +2706,8 @@ def calibrate_one_ramp(hc_bg, fobs, psrs,
 
     # randomize pulsar positions
     ramp = rampstart
-    dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], red_amp=rgam, red_gamma=ramp)[0]
+    dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], hc_ss=hc_ss[:,np.newaxis,:],
+                red_amp=rgam, red_gamma=ramp)[0]
 
     nclose=0 # number of attempts close to 0.5, could be stuck close
     nfar=0 # number of attempts far from 0.5, could be stuck far
@@ -2707,7 +2715,8 @@ def calibrate_one_ramp(hc_bg, fobs, psrs,
     # calibrate sigma
     while np.abs(dp_bg-0.50)>tol:
         ramp = np.mean([rampmin, rampmax]) # a weighted average would be better
-        dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], red_amp=ramp, red_gamma=rgam)[0]
+        dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], hc_ss=hc_ss[:,np.newaxis,:],
+                    red_amp=ramp, red_gamma=rgam)[0]
 
         # if debug: print(f"{dp_bg=}")
         if (dp_bg < (0.5-tol)) or (dp_bg > (0.5+tol)):
