@@ -214,7 +214,7 @@ def _sigma0_Bstatistic(noise, Gamma, Sh0_bg):
 
     Parameters
     ----------
-    noise : (P,) 1darray of scalars
+    noise : (P,F,R) Ndarray of scalars
         Noise spectral density of each pulsar.
     Gamma : (P,P) 2Darray of scalars
         Overlap reduction function for j>i, 0 otherwise.
@@ -238,14 +238,19 @@ def _sigma0_Bstatistic(noise, Gamma, Sh0_bg):
     # to get sum term in shape (P,P,F,R) we want:
     # Gamma in shape (P,P,1,1)
     # Sh0 and Sh in shape (1,1,F,R)
-    # P_i in shape (P,1,1,1)
-    # P_j in shape (1,P,1,1)
+    # P_i in shape (P,1,F,R)
+    # P_j in shape (1,P,F,R) 
 
-    numer = (Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2
-             * noise[:,np.newaxis,:,np.newaxis] * noise[np.newaxis,:,:,np.newaxis])
-    denom = ((noise[:,np.newaxis,:,np.newaxis] + Sh0_bg[np.newaxis, np.newaxis,:])
-              * (noise[np.newaxis,:,:,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
-             + Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2)**2
+    Gamma = Gamma[:,:,np.newaxis,np.newaxis]
+    Sh0_bg = Sh0_bg[np.newaxis,np.newaxis,:]
+    noise_i = noise[:,np.newaxis,:,np.newaxis]
+    noise_j = noise[np.newaxis,:,:,np.newaxis]
+
+    numer = (Gamma**2 * Sh0_bg**2
+             * noise_i * noise_j])
+    denom = ((noise_j + Sh0_bg)
+              * (noise_j + Sh0_bg)
+             + Gamma**2 * Sh0_bg**2)**2
 
     sum = np.sum(numer/denom, axis=(0,1,2))
     sigma_0B = np.sqrt(2*sum)
@@ -442,7 +447,7 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret = False
     # print('Sh_bg:', Sh_bg.shape)
 
     # Noise 
-    noise = _white_noise(cad, sigmas)[:,np.newaxis] # P, F 
+    noise = _white_noise(cad, sigmas)[:,np.newaxis, np.newaxis] # P, 1, 1
     # print('noise:', noise.shape)
 
     sigma_0B = _sigma0_Bstatistic(noise, Gamma, Sh0_bg)
@@ -516,10 +521,15 @@ def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss, alpha_0=0.001, ret_snr = False,
     Sh_bg = _power_spectral_density(hc_bg[:], fobs)
     Sh0_bg = Sh_bg # note this refers to same object, not a copy
 
+    # calculate white noise
     noise = _white_noise(cad, sigmas)[:,np.newaxis] # P,1
+
+    # add red noise
     if (red_amp is not None) and (red_gamma is not None):
         red_noise = _red_noise(red_amp, red_gamma, fobs)[np.newaxis,:] # (1,F,)
         noise = noise + red_noise # (P,F,)
+
+    # add single source noise
     noise = noise[:,:,np.newaxis] + _Sh_ss_noise(hc_ss, freqs) # (P, F, R) 
 
     mu_1B = _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
