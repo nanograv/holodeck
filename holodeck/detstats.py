@@ -249,7 +249,7 @@ def _sigma0_Bstatistic(noise, Gamma, Sh0_bg):
 
     # Calculate sigma_0B
     numer = (Gamma**2 * Sh0_bg**2
-             * noise_i * noise_j])
+             * noise_i * noise_j)
     denom = ((noise_j + Sh0_bg)
               * (noise_j + Sh0_bg)
              + Gamma**2 * Sh0_bg**2)**2
