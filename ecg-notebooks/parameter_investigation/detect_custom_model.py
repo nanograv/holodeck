@@ -242,7 +242,7 @@ def main():
     else:
         save_data_to_file = args.save_file
 
-    save_dets_to_file = output_path+f'/detstats_s{args.nskies}'
+    save_dets_to_file = output_path+f'/detstats_s{args.nskies}_ssn'
     if args.red2white is not None and args.red_gamma is not None:
         save_dets_to_file = save_dets_to_file+f'_r2w{args.red2white:.1f}_rg{args.red_gamma:.1f}'
     elif args.red_amp is not None and args.red_gamma is not None:

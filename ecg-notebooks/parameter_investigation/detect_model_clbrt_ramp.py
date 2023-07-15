@@ -172,7 +172,7 @@ def main():
         save_data_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}'
     else:
         save_data_to_file = args.save_file
-    save_dets_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_s{args.nskies}_shape{str(args.shape)}_ds'
+    save_dets_to_file = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}/detstats_s{args.nskies}_ssn'
     save_dets_to_file = save_dets_to_file+f'_sig{args.sigma:.1e}_rg{args.red_gamma:.1f}'
     
     print(f"{load_data_from_file=}.npz")
