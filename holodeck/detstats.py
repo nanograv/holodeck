@@ -241,11 +241,13 @@ def _sigma0_Bstatistic(noise, Gamma, Sh0_bg):
     # P_i in shape (P,1,F,R)
     # P_j in shape (1,P,F,R) 
 
+    # Cast parameters to desired shapes
     Gamma = Gamma[:,:,np.newaxis,np.newaxis]
     Sh0_bg = Sh0_bg[np.newaxis,np.newaxis,:]
-    noise_i = noise[:,np.newaxis,:,np.newaxis]
-    noise_j = noise[np.newaxis,:,:,np.newaxis]
+    noise_i = noise[:,np.newaxis,:,:]
+    noise_j = noise[np.newaxis,:,:,:]
 
+    # Calculate sigma_0B
     numer = (Gamma**2 * Sh0_bg**2
              * noise_i * noise_j])
     denom = ((noise_j + Sh0_bg)
@@ -262,7 +264,7 @@ def _sigma1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
 
     Parameters
     ----------
-    noise : (P,) 1darray of scalars
+    noise : (P,F,R) 1darray of scalars
         Noise spectral density of each pulsar.
     Gamma : (P,P) 2Darray of scalars
         Overlap reduction function for j>i, 0 otherwise.
@@ -291,26 +293,34 @@ s
     # P_i in shape (P,1,1,1)
     # P_j in shape (1,P,1,1)
 
-    numer = (Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2
-             * ((noise[:,np.newaxis,:,np.newaxis] + Sh_bg[np.newaxis,np.newaxis,:])
-                * (noise[np.newaxis,:,:,np.newaxis] + Sh_bg[np.newaxis,np.newaxis,:])
-                + Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh_bg[np.newaxis,np.newaxis,:]**2))
+    # Cast parameters to desired shapes
+    Gamma = Gamma[:,:,np.newaxis,np.newaxis]
+    Sh0_bg = Sh0_bg[np.newaxis,np.newaxis,:]
+    Sh_bg = Sh_bg[np.newaxis,np.newaxis,:]
+    noise_i = noise[:,np.newaxis,:,:]
+    noise_j = noise[np.newaxis,:,:,:]
 
-    denom = ((noise[:,np.newaxis,:,np.newaxis] + Sh0_bg[np.newaxis, np.newaxis,:])
-              * (noise[np.newaxis,:,:,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
-             + Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2)**2
+
+    # Calculate sigma_1B
+    numer = (Gamma**2 * Sh0_bg**2
+             * ((noise_i + Sh_bg) * (noise_j + Sh_bg)
+                + Gamma**2 * Sh_bg**2))
+
+    denom = ((noise_i + Sh0_bg)
+              * (noise_j + Sh0_bg)
+             + Gamma**2 * Sh0_bg**2)**2
 
     sum = np.sum(numer/denom, axis=(0,1,2))
     sigma_1B = np.sqrt(2*sum)
     return sigma_1B
 
-def _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
+def _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg, debug=False):
     """ Calculate mu_1 for the background, by summing over all pulsars and frequencies.
     Assuming the B statistic, which maximizes S/N_B = mu_1/sigma_1
 
     Parameters
     ----------
-    noise : (P,F,) Ndarray of scalars
+    noise : (P,F,R) Ndarray of scalars
         Noise spectral density of each pulsar.
     Gamma : (P,P) 2Darray of scalars
         Overlap reduction function for j>i, 0 otherwise.
@@ -328,9 +338,10 @@ def _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
     """
 
     # Check that Gamma_{j<=i} =
-    for ii in range(len(noise)):
-        for jj in range(ii+1):
-            assert Gamma[ii,jj] == 0, f'Gamma[{ii},{jj}] = {Gamma[ii,jj]}, but it should be 0!'
+    if debug:
+        for ii in range(len(Gamma)):
+            for jj in range(ii+1):
+                assert Gamma[ii,jj] == 0, f'Gamma[{ii},{jj}] = {Gamma[ii,jj]}, but it should be 0!'
 
     # to get sum term in shape (P,P,F,R) for ii,jj,kk we want:
     # Gamma in shape (P,P,1,1)
@@ -338,12 +349,17 @@ def _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
     # P_i in shape (P,1,1,1)
     # P_j in shape (1,P,1,1)
 
-    numer = (Gamma[:,:,np.newaxis,np.newaxis] **2
-            * Sh_bg[np.newaxis,np.newaxis,:]
-            * Sh0_bg[np.newaxis,np.newaxis,:])
-    denom = ((noise[:,np.newaxis,:,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
-               * (noise[np.newaxis,:,:,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
-               + Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis, np.newaxis, :]**2)
+    # Cast parameters to desired shapes
+    Gamma = Gamma[:,:,np.newaxis,np.newaxis]
+    Sh0_bg = Sh0_bg[np.newaxis,np.newaxis,:]
+    Sh_bg = Sh_bg[np.newaxis,np.newaxis,:]
+    noise_i = noise[:,np.newaxis,:,:]
+    noise_j = noise[np.newaxis,:,:,:]
+
+
+    # Calculate mu_1B
+    numer = (Gamma **2 * Sh_bg * Sh0_bg)
+    denom = ((noise_i + Sh0_bg) * (noise_j + Sh0_bg) + Gamma**2 * Sh0_bg**2)
 
     # Requires Gamma have all jj<=ii parts to zero
     sum = np.sum(numer/denom, axis=(0,1,2))
