@@ -421,7 +421,11 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret = False
     sigma_0B : (R,) 1Darray
     sigma_1B : (R,) 1Darray
 
+    TODO: Update or deprecate.
     """
+
+    print("Detect_bg() is deprecated. Use detect_bg_pta() instead for red noise and ss noise.")
+    
     # Overlap Reduction Function
     num = len(thetas) # number of pulsars, P
     Gamma = np.zeros((num, num)) # (P,P) 2Darray of scalars, Overlap reduction function between all puolsar
@@ -462,7 +466,7 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret = False
 
 
 
-def detect_bg_pta(pulsars, fobs, hc_bg, alpha_0=0.001, ret_snr = False,
+def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss, alpha_0=0.001, ret_snr = False,
                   red_amp=None, red_gamma=None, ):
     """ Calculate the background detection probability, and all the intermediary steps
     from a list of hasasia.Pulsar objects.
@@ -516,7 +520,7 @@ def detect_bg_pta(pulsars, fobs, hc_bg, alpha_0=0.001, ret_snr = False,
     if (red_amp is not None) and (red_gamma is not None):
         red_noise = _red_noise(red_amp, red_gamma, fobs)[np.newaxis,:] # (1,F,)
         noise = noise + red_noise # (P,F,)
-
+    noise = noise[:,:,np.newaxis] + _Sh_ss_noise(hc_ss, freqs) # (P, F, R) 
 
     mu_1B = _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
 
@@ -838,6 +842,7 @@ def _antenna_pattern_functions(m_hat, n_hat, Omega_hat, pi_hat):
 
 ######################## Noise Spectral Density ########################
 
+
 def _Sh_rest_noise(hc_ss, hc_bg, freqs):
     """ Calculate the noise spectral density contribution from all but the current single source.
 
@@ -852,17 +857,43 @@ def _Sh_rest_noise(hc_ss, hc_bg, freqs):
 
     Returns
     -------
-    ss_noise : (F,R,L) NDarray of scalars
+    Sh_rest : (F,R,L) NDarray of scalars
         The noise in a single pulsar from other GW sources for detecting each single source.
 
     Follows Eq. (45) in Rosado et al. 2015.
-    TODO: modify this to allow for multiple loud sources.
     """
     hc2_louds = np.sum(hc_ss**2, axis=2) # (F,R)
     # subtract the single source from rest of loud sources and the background, for each single source
     hc2_rest = hc_bg[:,:,np.newaxis]**2 + hc2_louds[:,:,np.newaxis] - hc_ss**2 # (F,R,L)
     Sh_rest = hc2_rest / freqs[:,np.newaxis,np.newaxis]**3 /(12 * np.pi**2) # (F,R,L)
     return Sh_rest
+
+
+def _Sh_ss_noise(hc_ss, freqs):
+    """ Calculate the noise spectral density contribution from all single sources.
+
+    Parameters
+    ----------
+    hc_ss : (F,R,L) NDarray
+        Characteristic strain from all loud single sources.
+    hc_bg : (F,R) NDarray
+        Characteristic strain from all but loudest source at each frequency.
+    freqs : (F,) 1Darray
+        Frequency bin centers.
+
+    Returns
+    -------
+    Sh_ss : (F,R,L) NDarray of scalars
+        The noise in a single pulsar from other GW sources for detecting each single source.
+
+    Follows Eq. (45) in Rosado et al. 2015.
+    """
+
+    # sum of noise from all loudest single sources
+    hc2_ss = np.sum(hc_ss**2, axis=2) # (F,R)
+    Sh_ss = hc2_ss / freqs[:,np.newaxis]**3 /(12 * np.pi**2) # (F,R,)
+    return Sh_ss
+
 
 def _red_noise(red_amp, red_gamma, freqs, f_ref=1/YR):
     """ Calculate the red noise for a given pulsar (or array of pulsars)
@@ -923,6 +954,7 @@ def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=N
         red_noise = _red_noise(red_amp, red_gamma, freqs) # (F,)
         noise = noise + red_noise[np.newaxis,:,np.newaxis,np.newaxis] # (P,F,R,L)
     return noise
+
 
 
 ################### GW polarization, phase, amplitude ###################
