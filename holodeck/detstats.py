@@ -28,6 +28,7 @@ HC_REF15_10YR = 11.2*10**-15
 DEF_THRESH=0.5
 
 
+
 ###################### Overlap Reduction Function ######################
 
 def _gammaij_from_thetaij(theta_ij):
