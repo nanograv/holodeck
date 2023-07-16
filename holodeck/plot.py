@@ -57,6 +57,8 @@ PARAM_KEYS = {
     'mmb_scatter_dex': r"MMB $\epsilon_{\mu}$",
 }
 
+LABEL_EVDP_RATIO = r"$\langle N_\mathrm{SS} \rangle"
+
 COLORS_MPL = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
 
