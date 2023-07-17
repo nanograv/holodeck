@@ -897,7 +897,8 @@ def _Sh_rest_noise(hc_ss, hc_bg, freqs):
 
 
 def _Sh_ss_noise(hc_ss, freqs):
-    """ Calculate the noise spectral density contribution from all single sources.
+    """ Calculate the noise spectral density contribution from all but the first loudest 
+    single sources.
 
     Parameters
     ----------
@@ -917,7 +918,7 @@ def _Sh_ss_noise(hc_ss, freqs):
     """
 
     # sum of noise from all loudest single sources
-    hc2_ss = np.sum(hc_ss**2, axis=2) # (F,R)
+    hc2_ss = np.sum(hc_ss[...,1:]**2, axis=2) # (F,R)
     Sh_ss = hc2_ss / freqs[:,np.newaxis]**3 /(12 * np.pi**2) # (F,R,)
     return Sh_ss
 
