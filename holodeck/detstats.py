@@ -489,7 +489,7 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret = False
 
 
 def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss, alpha_0=0.001, ret_snr = False,
-                  red_amp=None, red_gamma=None, ):
+                  red_amp=None, red_gamma=None, ss_noise=True):
     """ Calculate the background detection probability, and all the intermediary steps
     from a list of hasasia.Pulsar objects.
 
@@ -547,7 +547,9 @@ def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss, alpha_0=0.001, ret_snr = False,
         noise = noise + red_noise # (P,F,)
 
     # add single source noise
-    noise = noise[:,:,np.newaxis] + _Sh_ss_noise(hc_ss, fobs) # (P, F, R) 
+    noise = noise[:,:,np.newaxis]
+    if ss_noise:
+        noise = noise + _Sh_ss_noise(hc_ss, fobs) # (P, F, R) 
 
     mu_1B = _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
 
@@ -1774,7 +1776,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
 def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
                          sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
                 plot=True, debug=False, grid_path=GAMMA_RHO_GRID_PATH, 
-                snr_cython = True, save_ssi=False, ret_dict=False):
+                snr_cython = True, save_ssi=False, ret_dict=False, ss_noise=True):
     """ Calculate detection statistics for an ss library output.
 
     Parameters
@@ -1801,6 +1803,8 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
         Whether to use cython interpolation for ss snr calculation.
     save_ssi : Bool
         Whether to store gamma_ssi in npz arrays
+    ss_noise : Bool
+        Whether or not to use all but loudest SS as BG noise sources.
 
     Returns
     -------
@@ -1899,7 +1903,7 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
             # use sigmin and sigmax from previous realization, 
             # unless it's the first realization of the sample
             psrs, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[nn,:,rr], fobs, npsrs, tol=tol, maxbads=maxbads,
-                                     sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True)
+                                     sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True, ss_noise=ss_noise)
             _sigmin /= 2
             _sigmax *= 2
             
@@ -2276,7 +2280,7 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
 def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies, 
                         sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
                         thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
-                        red_amp=None, red_gamma=None, red2white = None): 
+                        red_amp=None, red_gamma=None, red2white=None, ss_noise=True): 
     """ Detect pspace model using individual sigma calibration for each realization
     
     Parameters
@@ -2319,7 +2323,7 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
         # get calibrated psrs 
         psrs, red_amp, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[:,rr], hc_ss[:,rr,:], fobs_cents, npsrs, tol=tol, maxbads=maxbads,
                                     sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True,
-                                    red_amp=red_amp, red_gamma=red_gamma, red2white=red2white)
+                                    red_amp=red_amp, red_gamma=red_gamma, red2white=red2white, ss_noise=ss_noise)
         _sigmin /= 2
         _sigmax *= 2 + 2e-20 # >1e-20 to make sure it doesnt immediately fail the 0 check 
 
@@ -2358,7 +2362,7 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
 def detect_pspace_model_clbrt_ramp(fobs_cents, hc_ss, hc_bg, npsrs, nskies, sigma,
                         rampstart=1e-16, rampmin=1e-20, rampmax=1e-13, tol=0.01, maxbads=5,
                         thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
-                        red_amp=None, red_gamma=None): 
+                        red_amp=None, red_gamma=None, ss_noise=True): 
     """ Detect pspace model using individual red noise amplitude calibration for each realization
 
     NOTE: Not supported, not updated for including single sources as noise for BG.
@@ -2402,7 +2406,7 @@ def detect_pspace_model_clbrt_ramp(fobs_cents, hc_ss, hc_bg, npsrs, nskies, sigm
         ramp, _rampmin, _rampmax = calibrate_one_ramp(hc_bg[:,rr], fobs_cents, psrs,
                                     tol=tol, maxbads=maxbads,
                                     rampstart=_rampstart, rampmin=_rampmin, rampmax=_rampmax, debug=debug, 
-                                    rgam=red_gamma,)
+                                    rgam=red_gamma, ss_noise=ss_noise)
         _rampstart = ramp
         _rampmin /= 2
         _rampmax *= 2 + 2e-50 # >1e-20 to make sure it doesnt immediately fail the 0 check 
@@ -2535,7 +2539,7 @@ def _get_dpbg(hc_bg, npsrs, sigma, trials, fobs, dur, cad,):
     return avg_dp, std_dp
 
 def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials, 
-                         sig_start = 1e-6, sig_min=1e-9, sig_max=1e-4, debug=False):
+                         sig_start=1e-6, sig_min=1e-9, sig_max=1e-4, debug=False):
     """ Calibrate the PTA independently for each background realizations
 
     Parameters
@@ -2570,7 +2574,8 @@ def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials,
 
 def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs, 
                       sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
-                      phis=None, thetas=None, ret_sig = False, red_amp=None, red_gamma=None, red2white=None):
+                      phis=None, thetas=None, ret_sig = False, red_amp=None, red_gamma=None, red2white=None,
+                      ss_noise=True):
     """ Calibrate the specific PTA for a given realization, and return that PTA
 
     Parameters
@@ -2611,7 +2616,7 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs,
     psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                     phi=phis, theta=thetas)
     dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], hc_ss=hc_ss[:,np.newaxis,:],
-                            red_amp=red_amp, red_gamma=red_gamma)[0]
+                            red_amp=red_amp, red_gamma=red_gamma, ss_noise=ss_noise)[0]
 
     nclose=0 # number of attempts close to 0.5, could be stuck close
     nfar=0 # number of attempts far from 0.5, could be stuck far
@@ -2624,7 +2629,7 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs,
         psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                         phi=phis, theta=thetas)
         dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], hc_ss=hc_ss[:,np.newaxis,:],
-                                 red_amp=red_amp, red_gamma=red_gamma)[0]
+                                 red_amp=red_amp, red_gamma=red_gamma, ss_noise=ss_noise)[0]
 
         # if debug: print(f"{dp_bg=}")
         if (dp_bg < (0.5-tol)) or (dp_bg > (0.5+tol)):
@@ -2675,7 +2680,7 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs,
 
 def calibrate_one_ramp(hc_bg, hc_ss, fobs, psrs,
                       rampstart=1e-6, rampmin=1e-9, rampmax=1e-4, debug=False, maxbads=20, tol=0.03,
-                      phis=None, thetas=None, rgam=-1.5):
+                      phis=None, thetas=None, rgam=-1.5, ss_noise=True):
     """ Calibrate the red noise amplitude, for a given realization, and return that PTA
 
     Parameters
@@ -2709,7 +2714,7 @@ def calibrate_one_ramp(hc_bg, hc_ss, fobs, psrs,
     # randomize pulsar positions
     ramp = rampstart
     dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], hc_ss=hc_ss[:,np.newaxis,:],
-                red_amp=rgam, red_gamma=ramp)[0]
+                red_amp=rgam, red_gamma=ramp, ss_noise=ss_noise)[0]
 
     nclose=0 # number of attempts close to 0.5, could be stuck close
     nfar=0 # number of attempts far from 0.5, could be stuck far
@@ -2718,7 +2723,7 @@ def calibrate_one_ramp(hc_bg, hc_ss, fobs, psrs,
     while np.abs(dp_bg-0.50)>tol:
         ramp = np.mean([rampmin, rampmax]) # a weighted average would be better
         dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], hc_ss=hc_ss[:,np.newaxis,:],
-                    red_amp=ramp, red_gamma=rgam)[0]
+                    red_amp=ramp, red_gamma=rgam, ss_noise=ss_noise)[0]
 
         # if debug: print(f"{dp_bg=}")
         if (dp_bg < (0.5-tol)) or (dp_bg > (0.5+tol)):
