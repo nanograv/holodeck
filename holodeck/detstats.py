@@ -2313,8 +2313,8 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
         if debug: 
             now = datetime.now()
             if (rr%100==99):
-                print(f"{rr=}, {now-real_dur} s per realization, {_sigmin=:.2e}, {_sigmax=:.2e}, {_sigstart=:.2e}")
-            real_dur = now
+                print(f"{rr=}, {(now-real_dur)/100} s per realization, {_sigmin=:.2e}, {_sigmax=:.2e}, {_sigstart=:.2e}")
+                real_dur = now
 
         # get calibrated psrs 
         psrs, red_amp, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[:,rr], hc_ss[:,rr,:], fobs_cents, npsrs, tol=tol, maxbads=maxbads,
