@@ -604,11 +604,11 @@ class Evolution:
 
         Returns
         -------
-        names : list[str], size (6,)
+        names : list[str], size (5,)
             Names of the returned data arrays in `samples`.
         samples : np.ndarray, shape (6, S)
-            Sampled binary data.  For each binary samples S, 6 parameters are returned:
-            ['mtot', 'mrat', 'redz', 'fobs', 'eccen', 'sepa'] (these are listed in the `names` returned value.)
+            Sampled binary data.  For each binary samples S, 5 parameters are returned:
+            ['mtot', 'mrat', 'redz', 'fobs', 'eccen'] (these are listed in the `names` returned value.)
             NOTE: `fobs` is *observer*-frame *orbital*-frequencies.
 
         To-Do
@@ -618,7 +618,7 @@ class Evolution:
         """
 
         # these are `log10(values)` where values are in CGS units
-        # names = ['mtot', 'mrat', 'redz', 'fobs', 'eccen', 'sepa']
+        # names = ['mtot', 'mrat', 'redz', 'fobs', 'eccen']
         names, vals, weights = self._sample_universe__at_values_weights(fobs_orb_edges)
 
         samples = self._sample_universe__resample(fobs_orb_edges, vals, weights, down_sample)
@@ -689,12 +689,12 @@ class Evolution:
         log.debug(f"Weights (lambda values) at targets: {utils.stats(weights)}")
         #select only valid entries for eccen and sepa
         eccen = data_fobs['eccen'][valid]
-        sepa = data_fobs['sepa'][valid]
 
         # Convert to log-space
-        vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo), eccen, np.log10(sepa)]
+        vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo), eccen]
 
-        names = ['mtot', 'mrat', 'redz', 'fobs', 'eccen', 'sepa']
+        #the order of these variables matters, look at end of sample_universe() function where we take log10(eccen)
+        names = ['mtot', 'mrat', 'redz', 'fobs', 'eccen']
 
         return names, vals, weights
 
@@ -711,9 +711,9 @@ class Evolution:
         # TODO/FIX: Consider sampling in comoving-volume instead of redz (like in sam.py)
         #           can also return dcom instead of redz for easier strain calculation
         nsamp = np.random.poisson(weights.sum())
-        reflect = [None, [None, 0.0], None, np.log10([fobs_orb_edges[0], fobs_orb_edges[-1]]), None, None] #what should reflection val be for eccen and sepa?
+        # eccentricity boundaries should be between [0,1]
+        reflect = [None, [None, 0.0], None, np.log10([fobs_orb_edges[0], fobs_orb_edges[-1]]), [0,1.0]]
         samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
-        # samples = np.power(10.0, samples)
         num_samp = samples[0].size
         log.debug(f"Sampled {num_samp:.8e} binaries in the universe")
         return samples
