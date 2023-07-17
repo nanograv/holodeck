@@ -2312,7 +2312,7 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
     for rr in range(nreals):
         if debug: 
             now = datetime.now()
-            if (rr%10==0):
+            if (rr%100==99):
                 print(f"{rr=}, {now-real_dur} s per realization, {_sigmin=:.2e}, {_sigmax=:.2e}, {_sigstart=:.2e}")
             real_dur = now
 
