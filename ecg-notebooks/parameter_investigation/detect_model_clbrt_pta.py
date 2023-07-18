@@ -64,6 +64,8 @@ def _setup_argparse():
                         help='Red noise gamma')
     parser.add_argument('--red2white', action='store', dest='red2white', type=float, default=DEF_RED2WHITE,
                         help='Red noise amplitude to white noise amplitude ratio.')
+    parser.add_argument('--ssn', action='store_true', dest='ss_noise', default=False, 
+                        help='Whether or not to use single sources as a noise source in background calculations.') # I AM WORKING ON ADDING SSN OPTION
     
     # pta calibration settings
     parser.add_argument('--sigstart', action='store', dest='sigstart', type=float, default=1e-7,
@@ -174,7 +176,8 @@ def main():
     else:
         save_data_to_file = args.save_file
 
-    save_dets_to_file = output_path+f'/detstats_s{args.nskies}_ssn'
+    save_dets_to_file = output_path+f'/detstats_s{args.nskies}'
+    if args.ss_noise: save_dets_to_file = save_dets_to_file+'_ssn'
     if args.red2white is not None and args.red_gamma is not None:
         save_dets_to_file = save_dets_to_file+f'_r2w{args.red2white:.1f}_rg{args.red_gamma:.1f}'
     elif args.red_amp is not None and args.red_gamma is not None:
@@ -216,7 +219,8 @@ def main():
             _dsdat = detstats.detect_pspace_model_clbrt_pta(
                 fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, 
                 sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
-                thresh=args.thresh, debug=args.debug, red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white)
+                thresh=args.thresh, debug=args.debug, ss_noise=args.ss_noise,
+                red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white)
             dsdat.append(_dsdat)
         np.savez(save_dets_to_file+'.npz', dsdat=dsdat, red_amp=args.red_amp, red_gamma=args.red_gamma, npsrs=args.npsrs, red2white=args.red2white) # overwrite
     else:
