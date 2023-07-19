@@ -770,7 +770,8 @@ def _calc_model_details(edges, redz_final, number):
         tpar = np.sum(number, axis=margins)
         num_pars.append(tpar)
 
-    # calculate redz_final based distributions
+    # ---- calculate redz_final based distributions
+
     # get final-redshift at bin centers
     rz = redz_final.copy()
     for ii in range(3):
@@ -782,12 +783,14 @@ def _calc_model_details(edges, redz_final, number):
     num_rz = np.zeros((nzbins, nfreqs))
     for ii in range(nfreqs):
         rz_flat = rz[:, :, :, ii].flatten()
+        # calculate GWB-weighted average final-redshift
         numer, *_ = sp.stats.binned_statistic(
             rz_flat, hc2_num[:, :, :, ii].flatten(), bins=redz, statistic='sum'
         )
         tpar = numer / denom[ii]
         gwb_rz[:, ii] = tpar
 
+        # calculate average final-redshift (number weighted)
         tpar, *_ = sp.stats.binned_statistic(
             rz_flat, number[:, :, :, ii].flatten(), bins=redz, statistic='sum'
         )
