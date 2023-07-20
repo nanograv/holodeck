@@ -58,7 +58,7 @@ PARAM_KEYS = {
 }
 
 LABEL_DPRATIO = r"$\langle N_\mathrm{SS} \rangle / \mathrm{DP}_\mathrm{BG}$"
-LABEL_EVSS = f"$\langle N_\mathrm{SS} \rangle"
+LABEL_EVSS = r"$\langle N_\mathrm{SS} \rangle"
 
 COLORS_MPL = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
