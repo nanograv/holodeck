@@ -1025,7 +1025,9 @@ def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = T
     if np.ndim(xx) == 1:
         pass
     elif np.ndim(xx) == np.ndim(yy):
-        xx = xx[axis]
+        # this used to be a bug ...
+        # xx = xx[axis]
+        pass
     else:
         err = f"Bad shape for `xx` (xx.shape={np.shape(xx)}, yy.shape={np.shape(yy)})!"
         log.error(err)
@@ -1916,9 +1918,9 @@ def gw_dade(sepa, eccen):
     Parameters
     ----------
     sepa : array_like
-        Binary semi-major axis (separation) [grams].
+        Binary semi-major axis (separation) [cm].
     eccen : array_like
-        Binary eccentricity [grams].
+        Binary eccentricity.
 
     Returns
     -------
