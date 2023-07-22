@@ -4,6 +4,9 @@
 References
 ----------
 * [Sesana2008]_ Sesana, Vecchio, Colacino 2008.
+* [Rodriguez-Gomez+2015]_  Rodriguez-Gomez, Genel, Vogelsberger, et al. 2015
+    The merger rate of galaxies in the Illustris simulation: a comparison with observations and semi-empirical models
+    https://ui.adsabs.harvard.edu/abs/2015MNRAS.449...49R/abstract
 * [Chen2019]_ Chen, Sesana, Conselice 2019.
 * [Leja2020]_ Leja, Speagle, Johnson, et al. 2020.
     A New Census of the 0.2 < z < 3.0 Universe. I. The Stellar Mass Function
