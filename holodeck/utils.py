@@ -692,6 +692,10 @@ def midpoints(vals, axis=-1, log=False):
     mm = np.moveaxis(mm, 0, axis)
     return mm
 
+def midpoints_multiax(vals, axis, log=False):
+    for aa in axis:
+        vals = midpoints(vals, aa, log=log)
+    return vals
 
 def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
     """Find the minimum and maximum values in the given array.
@@ -1009,7 +1013,7 @@ def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = T
         Input to be integrated.
     xx : ArrayLike of scalar,
         The sample points corresponding to the `yy` values.
-        This must be either be shaped as
+        This must either be shaped as
         * the same number of dimensions as `yy`, with the same length along the `axis` dimension, or
         * 1D with length matching `yy[axis]`
     axis : int,
