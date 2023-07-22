@@ -57,6 +57,9 @@ PARAM_KEYS = {
     'mmb_scatter_dex': r"MMB $\epsilon_{\mu}$",
 }
 
+LABEL_DPRATIO = r"$\langle N_\mathrm{SS} \rangle / \mathrm{DP}_\mathrm{BG}$"
+LABEL_EVSS = r"$\langle N_\mathrm{SS} \rangle"
+
 COLORS_MPL = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
 
@@ -499,7 +502,8 @@ def draw_ss_and_gwb(ax, xx, hc_ss, gwb, nsamp=10,
             if(ii==0):
                 label=bglabel
             else: label=None
-            ax.plot(xx, gwb[:, ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-')
+            cc = colors[ci] if color is None else color
+            ax.plot(xx, gwb[:, ii], color=cc, alpha=0.25, lw=1.0, ls='-')
             for ll in range(len(hc_ss[0,0])):
                 if(ll==0):
                     edgecolor='k'
@@ -508,7 +512,7 @@ def draw_ss_and_gwb(ax, xx, hc_ss, gwb, nsamp=10,
                 else:
                     edgecolor=None
                     label=None
-                ax.scatter(xx, hc_ss[:, ii, ll], color=colors[ci], alpha=0.25,
+                ax.scatter(xx, hc_ss[:, ii, ll], color=cc, alpha=0.25,
                            edgecolor=edgecolor, label=label)
             ci+=1
 
@@ -733,6 +737,48 @@ def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill=
     med, *conf = rv.T
     # plot median
     hh, = ax.plot(xx, med, **plot)
+
+    # Reshape confidence intervals to nice plotting shape
+    # 2*P, X ==> (P, 2, X)
+    conf = np.array(conf).reshape(len(percs), 2, xx.size)
+
+    kw = dict(color=hh.get_color())
+    kw.update(fill)
+    fill = kw
+
+    # plot each confidence interval
+    for lo, hi in conf:
+        gg = ax.fill_between(xx, lo, hi, **fill)
+
+    return (hh, gg)
+
+def draw_med_conf_color(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={}, filter=False, color=None):
+    plot.setdefault('alpha', 0.75)
+    fill.setdefault('alpha', 0.2)
+    percs = np.atleast_1d(fracs)
+    assert np.all((0.0 <= percs) & (percs <= 1.0))
+
+    # center the target percentages into pairs around 50%, e.g.  68 ==> [16,84]
+    inter_percs = [[0.5-pp/2, 0.5+pp/2] for pp in percs]
+    # Add the median value (50%)
+    inter_percs = [0.5, ] + np.concatenate(inter_percs).tolist()
+    # Get percentiles; they go along the last axis
+    if filter:
+        rv = [
+            kale.utils.quantiles(vv[vv > 0.0], percs=inter_percs, weights=weights)
+            for vv in vals
+        ]
+        rv = np.asarray(rv)
+    else:
+        rv = kale.utils.quantiles(vals, percs=inter_percs, weights=weights, axis=-1)
+
+    med, *conf = rv.T
+    
+    # plot median
+    if color is not None:
+        hh, = ax.plot(xx, med, color=color, **plot)
+    else:
+        hh, = ax.plot(xx, med, **plot)
 
     # Reshape confidence intervals to nice plotting shape
     # 2*P, X ==> (P, 2, X)
