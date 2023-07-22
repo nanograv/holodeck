@@ -926,7 +926,6 @@ def ss_bg_hc(number, h2fdf, nreals, normal_threshold=1e10):
     cdef np.ndarray[np.longlong_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
     _ss_bg_hc(shape, h2fdf, number, nreals, normal_threshold,
                 hc2ss, hc2bg, ssidx)
-    # print(hc2ss, hc2bg, ssidx)
     return hc2ss, hc2bg, ssidx
 
 @cython.boundscheck(False)
@@ -1010,8 +1009,6 @@ cdef void _ss_bg_hc(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number
             ssidx[0,ff,rr] = m_max
             ssidx[1,ff,rr] = q_max
             ssidx[2,ff,rr] = z_max
-            if (max==0):
-                print('No sources found at %dth frequency' % ff) # could warn
     # still need to sqrt and sum! (or do this back in python)
 
     return
@@ -1062,7 +1059,6 @@ def ss_bg_hc_and_par(number, h2fdf, nreals, mt, mr, rz, normal_threshold=1e10):
     _ss_bg_hc_and_par(shape, h2fdf, number, nreals, normal_threshold,
                  mt, mr, rz,
                 hc2ss, hc2bg, ssidx, bgpar, sspar)
-    # print(hc2ss, hc2bg, ssidx)
     return hc2ss, hc2bg, ssidx, bgpar, sspar
 
 @cython.boundscheck(True)
@@ -1179,22 +1175,6 @@ cdef void _ss_bg_hc_and_par(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:
                 print('No sources found at %dth frequency' % ff) # could warn
     # still need to sqrt and sum! (back in python)
 
-    return
-
-
-def test_sort():
-    _test_sort()
-    return None
-
-cdef void _test_sort():
-    cdef double test[4]
-    test[:] = [1.0, -2.3, 7.8, 0.0]
-    cdef (int *)indices = <int *>malloc(4 * sizeof(int))
-    print(test)
-
-    argsort(test, 4, &indices)
-    print(test)
-    print(test[indices[0]], test[indices[1]], test[indices[2]], test[indices[3]])
     return
 
 def sort_h2fdf(h2fdf):
@@ -1785,14 +1765,6 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
             bgpar[4,ff,rr] = dcom_bg/sum_bg # bg avg comoving distance after hardening
             bgpar[5,ff,rr] = sepa_bg/sum_bg # bg avg binary separation after hardening
             bgpar[6,ff,rr] = angs_bg/sum_bg # bg avg binary angular separation after hardening
-
-    # for ff in range(len(sspar[3])):
-    #     for rr in range(len(sspar[3,0])):
-    #         for ll in range(len(sspar[3,0,0])):
-    #             if (sspar[3,ff,rr,ll]<0 and sspar[3,ff,rr,ll] !=-1):
-    #                 err = f"sspar[3,{ff},{rr},{ll}] = {sspar[3,ff,rr,ll]} < 0"
-    #                 raise ValueError(err)
-    print("skipped sspar[3] check in _loudest_hc_and_par_from_sorted_redz")
 
 
 
