@@ -629,6 +629,27 @@ class Evolution:
         return names, samples, vals, weights
 
     def _sample_universe__at_values_weights(self, fobs_orb_edges):
+        """Interpolate binary histories to target frequency bins, obtaining parameters and weights.
+
+        The `weights` correspond to the number of binaries in an observer's Universe (light-cone)
+        corresponding to each simulated binary sample.
+
+        Arguments
+        ---------
+        fobs_orb_edges : (F,)
+            Frequency bin edges, for observer-frame orbital frequencies.
+
+        Returns
+        -------
+        names : (4,) of str
+            Names of variables being returned
+        vals : (4, N)
+            The physical values for each binary and each frequency.
+        weights : (N,)
+            The weight of each binary-frequency sample.  i.e. number of observer-universe binaries
+            corresponding to this simulated binary.
+
+        """
         fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges, log=False)
         dlnf = np.diff(np.log(fobs_orb_edges))
 
@@ -683,7 +704,7 @@ class Evolution:
         nsamp = np.random.poisson(weights.sum())
         reflect = [None, [None, 0.0], None, np.log10([fobs_orb_edges[0], fobs_orb_edges[-1]])]
         samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
-        samples = np.power(10.0, samples)
+        # samples = np.power(10.0, samples)
         num_samp = samples[0].size
         log.debug(f"Sampled {num_samp:.8e} binaries in the universe")
         return samples
