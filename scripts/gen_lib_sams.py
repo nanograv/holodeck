@@ -38,7 +38,7 @@ import numpy as np
 from mpi4py import MPI
 
 import holodeck as holo
-import holodeck.sam
+import holodeck.sams.sam
 import holodeck.logger
 # from holodeck.constants import YR
 from holodeck import log as _log     #: import the default holodeck log just so that we can silence it

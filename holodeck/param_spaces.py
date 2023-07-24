@@ -184,7 +184,7 @@ class PS_Generic_2(PS_Generic_1):
 
     @classmethod
     def _init_sam(cls, sam_shape, settings):
-        gsmf = holo.sam.GSMF_Schechter(
+        gsmf = holo.sams.GSMF_Schechter(
             phi0=settings['gsmf_phi0'],
             phiz=settings['gsmf_phiz'],
             mchar0_log10=settings['gsmf_mchar0_log10'],
@@ -192,14 +192,14 @@ class PS_Generic_2(PS_Generic_1):
             alpha0=settings['gsmf_alpha0'],
             alphaz=settings['gsmf_alphaz'],
         )
-        gpf = holo.sam.GPF_Power_Law(
+        gpf = holo.sams.GPF_Power_Law(
             frac_norm_allq=settings['gpf_frac_norm_allq'],
             malpha=settings['gpf_malpha'],
             qgamma=settings['gpf_qgamma'],
             zbeta=settings['gpf_zbeta'],
             max_frac=settings['gpf_max_frac'],
         )
-        gmt = holo.sam.GMT_Power_Law(
+        gmt = holo.sams.GMT_Power_Law(
             time_norm=settings['gmt_norm']*GYR,
             malpha=settings['gmt_malpha'],
             qgamma=settings['gmt_qgamma'],
@@ -211,7 +211,7 @@ class PS_Generic_2(PS_Generic_1):
             scatter_dex=settings['mmb_scatter_dex'],
         )
 
-        sam = holo.sam.Semi_Analytic_Model(
+        sam = holo.sams.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
             shape=sam_shape,
         )

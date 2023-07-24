@@ -926,7 +926,6 @@ def ss_bg_hc(number, h2fdf, nreals, normal_threshold=1e10):
     cdef np.ndarray[np.longlong_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
     _ss_bg_hc(shape, h2fdf, number, nreals, normal_threshold,
                 hc2ss, hc2bg, ssidx)
-    # print(hc2ss, hc2bg, ssidx)
     return hc2ss, hc2bg, ssidx
 
 @cython.boundscheck(False)
@@ -1010,8 +1009,6 @@ cdef void _ss_bg_hc(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number
             ssidx[0,ff,rr] = m_max
             ssidx[1,ff,rr] = q_max
             ssidx[2,ff,rr] = z_max
-            if (max==0):
-                print('No sources found at %dth frequency' % ff) # could warn
     # still need to sqrt and sum! (or do this back in python)
 
     return
@@ -1062,7 +1059,6 @@ def ss_bg_hc_and_par(number, h2fdf, nreals, mt, mr, rz, normal_threshold=1e10):
     _ss_bg_hc_and_par(shape, h2fdf, number, nreals, normal_threshold,
                  mt, mr, rz,
                 hc2ss, hc2bg, ssidx, bgpar, sspar)
-    # print(hc2ss, hc2bg, ssidx)
     return hc2ss, hc2bg, ssidx, bgpar, sspar
 
 @cython.boundscheck(True)
@@ -1179,22 +1175,6 @@ cdef void _ss_bg_hc_and_par(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:
                 print('No sources found at %dth frequency' % ff) # could warn
     # still need to sqrt and sum! (back in python)
 
-    return
-
-
-def test_sort():
-    _test_sort()
-    return None
-
-cdef void _test_sort():
-    cdef double test[4]
-    test[:] = [1.0, -2.3, 7.8, 0.0]
-    cdef (int *)indices = <int *>malloc(4 * sizeof(int))
-    print(test)
-
-    argsort(test, 4, &indices)
-    print(test)
-    print(test[indices[0]], test[indices[1]], test[indices[2]], test[indices[3]])
     return
 
 def sort_h2fdf(h2fdf):
@@ -1700,6 +1680,18 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
     cdef int mm, qq, zz, ff, rr, ll
     cdef double num, cur, sum_bg, m_bg, q_bg, z_bg, zfinal_bg, dcom_bg, sepa_bg, angs_bg
 
+    # # check all redz_final are positive
+    # for mm in range(len(redz_final)):
+    #     for qq in range(len(redz_final[0])):
+    #         for zz in range(len(redz_final[0,0])):
+    #             for ff in range(len(redz_final[0,0,0])):
+    #                 if (redz_final[mm,qq,zz,ff]<0 and redz_final[mm,qq,zz,ff] !=-1):
+    #                     err = f"redz_final[{mm},{qq},{zz},{ff},] = {redz_final[mm,qq,zz,ff]} < 0"
+    #                     raise ValueError(err)
+    # print("passed redz_final check in _loudest_hc_and_par_from_sorted_redz")
+
+
+
     # Setup random number generator from numpy library
     cdef bitgen_t *rng
     cdef const char *capsule_name = "BitGenerator"
@@ -1730,10 +1722,9 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
                     num = <double>random_normal(rng, num, std)
                 else:            # Poisson sample
                     num = <double>random_poisson(rng, num)
-                if(num < 1):
-                    continue
                 cur = h2fdf[mm,qq,zz,ff] # h^2 * f/df of current bin
-                if (num<1):
+                
+                if (num < 1) or (cur == 0):
                     continue # to next loudest bin
                 while (ll < L) and (num > 0):
                     # store ll loudest source strain
@@ -1744,6 +1735,12 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
                     sspar[1,ff,rr,ll] = mr[qq]
                     sspar[2,ff,rr,ll] = rz[zz]
                     sspar[3,ff,rr,ll] = redz_final[mm,qq,zz,ff]
+
+                    # check for negative redz_final
+                    if redz_final[mm,qq,zz,ff]<0 and redz_final[mm,qq,zz,ff]!=-1:
+                        # badz = badz+1
+                        err = f"redz_final[{mm},{qq},{zz},{ff}] = {redz_final[mm,qq,zz,ff]} < 0"
+                        print("ERROR IN CYUTILS:", err)
 
                     # update number and ll index
                     num -= 1
