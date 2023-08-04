@@ -32,6 +32,8 @@ try:
 except Exception as err:
     comm = None
     holo.log.warning(f"failed to load `mpi4py` in {__file__}: {err}")
+    holo.log.warning("`mpi4py` may not be included in the standard `requirements.txt` file")
+    holo.log.warning("Check if you have `mpi4py` installed, and if not, please install it")
 
 
 __version__ = "0.6"
