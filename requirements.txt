@@ -9,8 +9,8 @@ scipy
 pydoe
 psutil
 tqdm
-cython
+cython<3.0.0
 schwimmbad
 emcee
 george
-mpi4py
+# mpi4py
