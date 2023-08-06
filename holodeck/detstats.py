@@ -2788,7 +2788,22 @@ def calibrate_one_ramp(hc_bg, hc_ss, fobs, psrs,
 ########################################################################
 
 def weighted_mean_variance(data, weights, debug=False,):
-    """ Calculate the dp-weighted average frequency """
+    """ Calculate the weighted average frequency and variance
+    
+    Parameters
+    ----------
+    data: NDarray
+        Data
+    weights: NDarray
+        Weights
+
+    Returns
+    -------
+    mean : float
+        Weighted mean
+    var2 : float
+        Weighted variance (std^2)
+    """
     mean = np.sum(weights * data) / np.sum(weights)
     if debug: print(f"{mean=}")
     var2 = np.sum(weights * (data - mean)**2) 
