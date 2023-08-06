@@ -2780,3 +2780,19 @@ def calibrate_one_ramp(hc_bg, hc_ss, fobs, psrs,
     # print(f"in calibration: {utils.stats(psrs[0].toaerrs)=}, \n{utils.stats(hc_bg)=},\
     #             {utils.stats(fobs)=}, {dp_bg=}")
     return ramp, rampmin, rampmax
+
+
+
+########################################################################
+########################## Average Frequency ########################### 
+########################################################################
+
+def weighted_mean_variance(data, weights, debug=False,):
+    """ Calculate the dp-weighted average frequency """
+    mean = np.sum(weights * data) / np.sum(weights)
+    if debug: print(f"{mean=}")
+    var2 = np.sum(weights * (data - mean)**2) 
+    nn = data.size
+    var2 /= (nn-1)/nn * np.sum(weights)
+    if debug: print(f"{var2=}")
+    return mean, var2
