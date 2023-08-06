@@ -12,19 +12,30 @@ on:
 
 jobs:
   test:
-    name: Test Python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: Test Python ${{ matrix.python-version }}, ${{ matrix.os }}, ${{ matrix.mpi }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest] #[macOS-latest, windows-latest]
-        # python-version: ['3.8', '3.9', '3.10']
-        python-version: ['3.10']
+        # os: [ubuntu-latest, macOS-latest, windows-latest]
+        os: [ubuntu-latest, macOS-latest]
+        # os: [ubuntu-latest]
+        python-version: ['3.9', '3.10', '3.11']
+        # python-version: ['3.10']
+        # mpi: [ 'mpich', 'openmpi', 'intelmpi']
+        # mpi: ['openmpi']
 
     steps:
     - name: Check out repository
       uses: actions/checkout@v2
       with:
         fetch-depth: 2
+
+    # Install MPI (required to build mpi4py)
+    # see: https://github.com/mpi4py/setup-mpi
+    # - name: Setup MPI
+    #     uses: mpi4py/setup-mpi@v1
+    #     with:
+    #       mpi: ${{ matrix.mpi }}
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2

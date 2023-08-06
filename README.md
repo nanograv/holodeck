@@ -24,6 +24,16 @@ The recommended installation for active development is to:
 
 The 'editable' installation allows the code base to be modified, and have those changes take effect when using the `holodeck` module without having to rebuild/reinstall it.
 
+### MPI
+
+For some scripts (particularly for generating libraries), an MPI implementation is required (e.g. `openmpi`), along with the [`mpi4py` package](https://github.com/mpi4py/mpi4py).  This is not included as a requirement in the `requirements.txt` file as it significantly increases the installation complexity, and is not needed for many `holodeck` use cases.  If you need the additional functionality, try installing `mpi4py` and if needed an MPI implementation.
+
+To see if you have `mpi4py` installed, run `python -c 'import mpi4py; print(mpi4py.__version__)'` from a terminal.
+
+#### macos
+
+If you are using homebrew on macos, you should be able to simply run: `brew install mpi4py` which will [include the required openmpi implementation](https://mpi4py.readthedocs.io/en/latest/install.html#macos).  If you already have an MPI implementation installed, and you are using anaconda, you should be able to install the `mpy4py` python package with: `conda install mpi4py`.
+
 
 ## Quickstart
 
@@ -65,7 +75,7 @@ To install this package for just this repository:
 
 ## Copyright
 
-Copyright (c) 2022, NANOGrav
+Copyright (c) 2023, NANOGrav
 
 The `holodeck` package uses an [MIT license](./LICENSE).
 
