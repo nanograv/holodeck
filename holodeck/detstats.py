@@ -1488,7 +1488,7 @@ def detect_ss(thetas, phis, sigmas, fobs, hc_ss, hc_bg,
         return gamma_ss
 
 
-def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,
+def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg, custom_noise=None,
               theta_ss=None, phi_ss=None, Phi0_ss=None, iota_ss=None, psi_ss=None, nskies=25, 
               Fe_bar = None, red_amp=None, red_gamma=None, alpha_0=0.001, Fe_bar_guess=15,
               ret_snr=False, print_nans=False, snr_cython=True, gamma_cython=True, grid_path=GAMMA_RHO_GRID_PATH):
@@ -1507,6 +1507,8 @@ def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,
     hc_bg : (F,R)
         Characteristic strain of the background at each frequency,
         for R realizations.
+    custom_noise : (P,F,R,L) array or None
+        Custom noise if not None, otherwise noise is calcualted normally.
     theta_ss : (F,S,L) NDarray
         Polar (latitudinal) angular position in the sky of each single source.
         Must be provided, to give the shape for sky realizations.
@@ -1585,7 +1587,13 @@ def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,
                                                    pi_hat) # (P,F,S,L)
 
     # noise spectral density
-    S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, red_amp, red_gamma)
+    if custom_noise is not None:
+        if custom_noise.shape != (len(pulsars), nfreqs, nreals, nloudest):
+            err = f"{custom_noise.shape=}, must be shape (P,F,R,L)"
+            raise ValueError(err)
+        S_i = custom_noise
+    else:
+        S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, red_amp, red_gamma)
 
     # amplitudw
     amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
