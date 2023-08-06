@@ -489,7 +489,7 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret = False
 
 
 def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss, alpha_0=0.001, ret_snr = False,
-                  red_amp=None, red_gamma=None, ss_noise=True):
+                  red_amp=None, red_gamma=None, ss_noise=False):
     """ Calculate the background detection probability, and all the intermediary steps
     from a list of hasasia.Pulsar objects.
 
@@ -1776,7 +1776,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
 def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
                          sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
                 plot=True, debug=False, grid_path=GAMMA_RHO_GRID_PATH, 
-                snr_cython = True, save_ssi=False, ret_dict=False, ss_noise=True):
+                snr_cython = True, save_ssi=False, ret_dict=False, ss_noise=False):
     """ Calculate detection statistics for an ss library output.
 
     Parameters
@@ -2280,7 +2280,7 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
 def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies, 
                         sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
                         thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
-                        red_amp=None, red_gamma=None, red2white=None, ss_noise=True): 
+                        red_amp=None, red_gamma=None, red2white=None, ss_noise=False): 
     """ Detect pspace model using individual sigma calibration for each realization
     
     Parameters
@@ -2362,7 +2362,7 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
 def detect_pspace_model_clbrt_ramp(fobs_cents, hc_ss, hc_bg, npsrs, nskies, sigma,
                         rampstart=1e-16, rampmin=1e-20, rampmax=1e-13, tol=0.01, maxbads=5,
                         thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
-                        red_amp=None, red_gamma=None, ss_noise=True): 
+                        red_amp=None, red_gamma=None, ss_noise=False): 
     """ Detect pspace model using individual red noise amplitude calibration for each realization
 
     NOTE: Not supported, not updated for including single sources as noise for BG.
@@ -2575,7 +2575,7 @@ def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials,
 def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs, 
                       sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
                       phis=None, thetas=None, ret_sig = False, red_amp=None, red_gamma=None, red2white=None,
-                      ss_noise=True):
+                      ss_noise=False):
     """ Calibrate the specific PTA for a given realization, and return that PTA
 
     Parameters
@@ -2680,7 +2680,7 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs,
 
 def calibrate_one_ramp(hc_bg, hc_ss, fobs, psrs,
                       rampstart=1e-6, rampmin=1e-9, rampmax=1e-4, debug=False, maxbads=20, tol=0.03,
-                      phis=None, thetas=None, rgam=-1.5, ss_noise=True):
+                      phis=None, thetas=None, rgam=-1.5, ss_noise=False):
     """ Calibrate the red noise amplitude, for a given realization, and return that PTA
 
     Parameters
