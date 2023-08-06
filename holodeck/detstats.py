@@ -1589,7 +1589,7 @@ def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg, custom_noise=None,
     # noise spectral density
     if custom_noise is not None:
         if custom_noise.shape != (len(pulsars), nfreqs, nreals, nloudest):
-            err = f"{custom_noise.shape=}, must be shape (P,F,R,L)"
+            err = f"{custom_noise.shape=}, must be shape (P,F,R,L)=({len(pulsars)}, {nfreqs}, {nreals}, {nloudest})"
             raise ValueError(err)
         S_i = custom_noise
     else:
