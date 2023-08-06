@@ -65,7 +65,9 @@ def _setup_argparse():
     parser.add_argument('--red2white', action='store', dest='red2white', type=float, default=DEF_RED2WHITE,
                         help='Red noise amplitude to white noise amplitude ratio.')
     parser.add_argument('--ssn', action='store_true', dest='ss_noise', default=False, 
-                        help='Whether or not to use single sources as a noise source in background calculations.') # I AM WORKING ON ADDING SSN OPTION
+                        help='Whether or not to use single sources as a noise source in background calculations.') 
+    parser.add_argument('--dsc', action='store_true', dest='dsc', default=False, 
+                        help='Whether or not to use single sources as a noise source in background calculations.') 
     
     # pta calibration settings
     parser.add_argument('--sigstart', action='store', dest='sigstart', type=float, default=1e-7,
