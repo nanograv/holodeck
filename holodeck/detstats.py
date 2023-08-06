@@ -2288,7 +2288,7 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
     return dsdata
 
 
-def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies, 
+def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies, dsc_flag=False,
                         sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
                         thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
                         red_amp=None, red_gamma=None, red2white=None, ss_noise=False): 
@@ -2296,6 +2296,12 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
     
     Parameters
     ----------
+    fobs_cents : 1Darray
+        GW frequencies in Hz
+    hc_ss : (F,R,L) NDarray
+    hc_bg : (F,R) NDarray
+    npsrs : int
+    nskies : int
 
     red2white : scalar or None
         Fixed ratio between red and white noise amplitude, if not None. 
@@ -2331,6 +2337,7 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
                 print(f"{rr=}, {(now-real_dur)/100} s per realization, {_sigmin=:.2e}, {_sigmax=:.2e}, {_sigstart=:.2e}")
                 real_dur = now
 
+
         # get calibrated psrs 
         psrs, red_amp, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[:,rr], hc_ss[:,rr,:], fobs_cents, npsrs, tol=tol, maxbads=maxbads,
                                     sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True,
@@ -2341,18 +2348,36 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
         if psrs is None:
             failed_psrs += 1
             continue # leave values as nan, if no successful PTA was found
-        # print(f"before calculation: {utils.stats(psrs[0].toaerrs)=}, \n{utils.stats(hc_bg[rr])=},\
-        #         {utils.stats(fobs_cents)=}")
+
+
         # use those psrs to calculate realization detstats
         _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1],  hc_ss[:,rr:rr+1,:], ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
-        # print(f"{utils.stats(psrs[0].toaerrs)=}, {utils.stats(hc_bg[rr])=},\
-        #         {_dp_bg=},")
-        # _dp_bg,  = detect_bg_pta(psrs, fobs_cents, hc_bg=hc_bg[:,rr:rr+1], red_amp=red_amp, red_gamma=red_gamma) #, ret_snr=True)
-        # print(f"test2: {_dp_bg=}")
+
         dp_bg[rr], snr_bg[rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
+
+
+        # calculate SS noise from DeterSensitivityCurve and S_h,rest
+        if dsc_flag:
+            spectra = []
+            for psr in psrs:
+                sp = hsen.Spectrum(psr, freqs=fobs_cents)
+                sp.NcalInv
+                spectra.append(sp)
+            sc_hc = hsen.DeterSensitivityCurve(spectra).h_c
+            noise_dsc = sc_hc**2 / (12 * np.pi**2 * fobs_cents**3)
+            noise_dsc = np.repeat(noise_dsc, npsrs*1*nloudest).reshape(nfreqs, npsrs, 1, nloudest) # (F,P,R,L)
+            noise_dsc = np.swapaxes(noise_dsc, 0, 1)  # (P,F,R,L)
+            noise_rest = _Sh_rest_noise(hc_ss[:,rr:rr+1,:], hc_bg[:,rr:rr+1], fobs_cents) # (F,R,L)
+            noise_ss = noise_dsc + noise_rest[np.newaxis,:,:,:]
+            
+        else:
+            noise_ss = None
+
+        # calculate realizatoin SS detstats
         _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
-            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], nskies=nskies, ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
-        # if debug: print(f"{_dp_ss.shape=}, {_snr_ss.shape=}, {_gamma_ssi.shape=}")
+            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], custom_noise=noise_ss,
+            nskies=nskies, ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
+
         dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()
 
     ev_ss = expval_of_ss(gamma_ssi)
