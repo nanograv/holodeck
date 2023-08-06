@@ -12,6 +12,7 @@ import h5py
 import matplotlib.pyplot as plt
 import os
 from datetime import datetime
+import warnings
 
 
 import holodeck as holo
@@ -1439,6 +1440,8 @@ def detect_ss(thetas, phis, sigmas, fobs, hc_ss, hc_bg,
         SNR of each single source.
 
     """
+
+    warnings.warn("'detect_ss()' is deprecated. Use 'detect_ss_pta()' instead.", DeprecationWarning)
     dur = 1.0/fobs[0]
     cad = 1.0/(2*fobs[-1])
     fobs_cents, fobs_edges = utils.pta_freqs(dur, num=len(fobs))
