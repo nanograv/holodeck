@@ -489,7 +489,8 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret = False
 
 
 
-def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss, alpha_0=0.001, ret_snr = False,
+def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss=None, custom_noise=None,
+                  alpha_0=0.001, ret_snr = False,
                   red_amp=None, red_gamma=None, ss_noise=False):
     """ Calculate the background detection probability, and all the intermediary steps
     from a list of hasasia.Pulsar objects.
@@ -539,18 +540,25 @@ def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss, alpha_0=0.001, ret_snr = False,
     Sh_bg = _power_spectral_density(hc_bg[:], fobs)
     Sh0_bg = Sh_bg # note this refers to same object, not a copy
 
-    # calculate white noise
-    noise = _white_noise(cad, sigmas)[:,np.newaxis] # P,1
+    # noise spectral density
+    if custom_noise is not None:
+        if custom_noise.shape != (len(pulsars), len(fobs), len(hc_bg[0])):
+            err = f"{custom_noise.shape=}, must be shape (P,F,R)=({len(pulsars)}, {len(fobs)}, {len(hc_bg[0])})"
+            raise ValueError(err)
+        noise = custom_noise
+    else:
+        # calculate white noise
+        noise = _white_noise(cad, sigmas)[:,np.newaxis] # P,1
 
-    # add red noise
-    if (red_amp is not None) and (red_gamma is not None):
-        red_noise = _red_noise(red_amp, red_gamma, fobs)[np.newaxis,:] # (1,F,)
-        noise = noise + red_noise # (P,F,)
+        # add red noise
+        if (red_amp is not None) and (red_gamma is not None):
+            red_noise = _red_noise(red_amp, red_gamma, fobs)[np.newaxis,:] # (1,F,)
+            noise = noise + red_noise # (P,F,)
 
-    # add single source noise
-    noise = noise[:,:,np.newaxis]
-    if ss_noise:
-        noise = noise + _Sh_ss_noise(hc_ss, fobs) # (P, F, R) 
+        # add single source noise
+        noise = noise[:,:,np.newaxis]
+        if ss_noise:
+            noise = noise + _Sh_ss_noise(hc_ss, fobs) # (P, F, R) 
 
     mu_1B = _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
 
@@ -986,6 +994,40 @@ def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=N
         noise = noise + red_noise[np.newaxis,:,np.newaxis,np.newaxis] # (P,F,R,L)
     return noise
 
+
+def psrs_spectra_gwbnoise(psrs, fobs, nreals, npsrs):
+    """ Get GWBSensitivityCurve noise and spectra for psrs
+    
+    """
+    spectra = []
+    for psr in psrs:
+        sp = hsen.Spectrum(psr, freqs=fobs)
+        sp.NcalInv
+        spectra.append(sp)
+    sc_bg = hsen.GWBSensitivityCurve(spectra).h_c
+    noise_gsc = sc_bg**2 / (12 *np.pi**2 *fobs**3)
+    noise_gsc = np.repeat(noise_gsc, npsrs*nreals).reshape(len(fobs), npsrs, nreals) # (F,P,R)
+    noise_gsc = np.swapaxes(noise_gsc, 0, 1) # (P,F,R)
+
+    return spectra, noise_gsc
+
+def dsc_noise(fobs, nreals, npsrs, nloudest, psrs=None, spectra=None):
+    """ Get DeterSensitivityCurve noise using either psrs or spectra
+
+    """
+
+    if spectra is None:
+        assert psrs is not None, 'Must provide spectra or psrs'
+        spectra = []
+        for psr in psrs:
+            sp = hsen.Spectrum(psr, freqs=fobs)
+            sp.NcalInv
+            spectra.append(sp)
+    sc_ss = hsen.DeterSensitivityCurve(spectra).h_c
+    noise_dsc = sc_ss**2 / (12 *np.pi**2 *fobs**3)
+    noise_dsc = np.repeat(noise_dsc, npsrs*nreals*nloudest).reshape(len(fobs), npsrs, nreals, nloudest) # (F,P,R,L)
+    noise_dsc = np.swapaxes(noise_dsc, 0, 1) # (P,F,R,L)
+    return noise_dsc
 
 
 ################### GW polarization, phase, amplitude ###################
@@ -2713,6 +2755,119 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs,
     if ret_sig:
         return psrs, red_amp, sigma, sigmin, sigmax
     return psrs, red_amp
+
+
+def calibrate_one_pta_gsc(hc_bg, hc_ss, fobs, npsrs, 
+                      sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
+                      phis=None, thetas=None, ret_sig = False, red_amp=None, red_gamma=None, red2white=None,
+                      ss_noise=False):
+    """ Calibrate the specific PTA for a given realization, and return that PTA
+
+    Parameters
+    ----------
+    hc_bg : (F,) 1Darray
+        The background characteristic strain for one realization.
+    hc_ss : (F,L) NDarray
+        The SS characteristic strains for one realization
+    fobs : (F,) 1Darray
+        Observed GW frequencies.
+    npsrs : integer
+        Number of pulsars.
+
+    Returns 
+    -------
+    psrs : hasasia.sim.pta object
+        Calibrated PTA.
+    sigmin : float
+        minimum of the final sigma range used, returned only if ret_sig=True
+    sigmax : float, returned only if ret_sig=True
+        maximum of the final sigma range used
+    sigma : float
+        final sigma, returned only if ret_sig=True
+
+    """
+
+    # get duration and cadence from fobs
+    dur = 1.0/fobs[0]
+    cad = 1.0/(2.0*fobs[-1])
+
+    # randomize pulsar positions
+    if phis is None: phis = np.random.uniform(0, 2*np.pi, size = npsrs)
+    if thetas is None: thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    sigma = sigstart
+    if red2white is not None:
+        red_amp = _white_noise(cad, sigma) * red2white
+
+    psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
+                    phi=phis, theta=thetas)
+    
+    # get sensitivity curve
+    spectra, noise_gsc = psrs_spectra_gwbnoise(psrs, fobs, nreals=1, npsrs=npsrs) 
+    
+    dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], custom_noise=noise_gsc,
+                            red_amp=red_amp, red_gamma=red_gamma, ss_noise=ss_noise)[0]
+
+    nclose=0 # number of attempts close to 0.5, could be stuck close
+    nfar=0 # number of attempts far from 0.5, could be stuck far
+
+    # calibrate sigma
+    while np.abs(dp_bg-0.50)>tol:
+        sigma = np.mean([sigmin, sigmax]) # a weighted average would be better
+        if red2white is not None:
+            red_amp = sigma * red2white
+        psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
+                        phi=phis, theta=thetas)
+        spectra, noise_gsc = psrs_spectra_gwbnoise(psrs, fobs, nreals=1, npsrs=npsrs) 
+        dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], custom_noise=noise_gsc,
+                                 red_amp=red_amp, red_gamma=red_gamma, ss_noise=ss_noise)[0]
+
+        # if debug: print(f"{dp_bg=}")
+        if (dp_bg < (0.5-tol)) or (dp_bg > (0.5+tol)):
+            nfar +=1
+
+        # check if we need to expand the range
+        if (nfar>5*maxbads  # if we've had many bad guesses
+            or (sigmin/sigmax > 0.99 # or our range is small and we are far from the goal
+                and (dp_bg<0.4 or dp_bg>0.6))):
+            
+            # then we must expand the range
+            if debug: print(f"STUCK! {nfar=}, {dp_bg=}, {sigmin=:e}, {sigmax=:e}")
+            if dp_bg < 0.5-tol: # stuck way too low, allow much lower sigmin to raise DP
+                sigmin = sigmin/3
+            if dp_bg > 0.5+tol: # stuck way too high, allow much higher sigmax to lower DP
+                sigmax = sigmax*3
+
+            # reset count for far guesses
+            nfar = 0
+
+        # check how we should narrow our range
+        if dp_bg<0.5-tol: # dp too low, lower sigma
+            sigmax = sigma
+        elif dp_bg>0.5+tol: # dp too high, raise sigma
+            sigmin = sigma
+        else:
+            nclose += 1 # check how many attempts between 0.49 and 0.51 fail
+
+        # check if we are stuck near the goal value with a bad range    
+        if nclose>maxbads: # if many fail, we're stuck; expand sampling range
+            if debug: print(f"{nclose=}, {dp_bg=}, {sigmin=:e}, {sigmax=:e}")
+            sigmin = sigmin/3
+            sigmax = sigmax*3
+            nclose=0
+
+        # check if goal DP is just impossible
+        if sigmax<1e-20:
+            psrs=None
+            if debug: print(f"FAILED! DP_BG=0.5 impossible with {red_amp=}, {red_gamma=}")
+            break
+    # print(f"test1: {dp_bg=}")
+    # print(f"test1: {sigma=}")
+    # print(f"in calibration: {utils.stats(psrs[0].toaerrs)=}, \n{utils.stats(hc_bg)=},\
+    #             {utils.stats(fobs)=}, {dp_bg=}")
+    if ret_sig:
+        return psrs, red_amp, sigma, sigmin, sigmax
+    return psrs, red_amp
+
 
 def calibrate_one_ramp(hc_bg, hc_ss, fobs, psrs,
                       rampstart=1e-6, rampmin=1e-9, rampmax=1e-4, debug=False, maxbads=20, tol=0.03,
