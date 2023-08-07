@@ -68,6 +68,8 @@ def _setup_argparse():
                         help='Whether or not to use single sources as a noise source in background calculations.') 
     parser.add_argument('--dsc', action='store_true', dest='dsc_flag', default=False, 
                         help='Whether or not to use single sources as a noise source in background calculations.') 
+    parser.add_argument('--gsc-clbrt', action='store_true', dest='gsc_flag', default=False, 
+                        help='Whether or not to use gsc noise to calibrate the background and dsc noise for SS detstats.') 
     
     # pta calibration settings
     parser.add_argument('--sigstart', action='store', dest='sigstart', type=float, default=1e-7,
@@ -180,7 +182,10 @@ def main():
 
     save_dets_to_file = output_path+f'/detstats_s{args.nskies}'
     if args.ss_noise: save_dets_to_file = save_dets_to_file+'_ssn'
-    if args.dsc_flag: save_dets_to_file = save_dets_to_file+'_dsc'
+
+    if args.gsc_flag: save_dets_to_file = save_dets_to_file+'_gsc'
+    elif args.dsc_flag: save_dets_to_file = save_dets_to_file+'_dsc' # only append 'dsc' if not gsc-calibrated
+
     if args.red2white is not None and args.red_gamma is not None:
         save_dets_to_file = save_dets_to_file+f'_r2w{args.red2white:.1f}_rg{args.red_gamma:.1f}'
     elif args.red_amp is not None and args.red_gamma is not None:
@@ -219,11 +224,18 @@ def main():
             if args.debug: print(f"on var {ii=} out of {args.nvars}")
             hc_bg = _data['hc_bg']
             hc_ss = _data['hc_ss']
-            _dsdat = detstats.detect_pspace_model_clbrt_pta(
-                fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, dsc_flag=args.dsc_flag,
-                sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
-                thresh=args.thresh, debug=args.debug, ss_noise=args.ss_noise,
-                red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white)
+            if args.gsc_flag:
+                _dsdat = detstats.detect_pspace_model_clbrt_pta_gsc(
+                    fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, 
+                    sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
+                    thresh=args.thresh, debug=args.debug, ss_noise=args.ss_noise,
+                )
+            else:
+                _dsdat = detstats.detect_pspace_model_clbrt_pta(
+                    fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, dsc_flag=args.dsc_flag,
+                    sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
+                    thresh=args.thresh, debug=args.debug, ss_noise=args.ss_noise,
+                    red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white)
             dsdat.append(_dsdat)
         np.savez(save_dets_to_file+'.npz', dsdat=dsdat, red_amp=args.red_amp, red_gamma=args.red_gamma, npsrs=args.npsrs, red2white=args.red2white) # overwrite
     else:
