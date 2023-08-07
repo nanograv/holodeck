@@ -604,11 +604,19 @@ class Evolution:
 
         Returns
         -------
+<<<<<<< HEAD
         names : list[str], size (5,)
             Names of the returned data arrays in `samples`.
         samples : np.ndarray, shape (6, S)
             Sampled binary data.  For each binary samples S, 5 parameters are returned:
             ['mtot', 'mrat', 'redz', 'fobs', 'eccen'] (these are listed in the `names` returned value.)
+=======
+        names : (4,) list of str,
+            Names of the returned binary parameters (i.e. each array in `samples` and `vals`).
+        samples : (4, S) ndarray,
+            Sampled binary data.  For each binary samples S, 4 parameters are returned:
+            ['mtot', 'mrat', 'redz', 'fobs'] (these are listed in the `names` returned value.)
+>>>>>>> 232d86bcf9e747afa1323be3a920b57e792ee8a3
             NOTE: `fobs` is *observer*-frame *orbital*-frequencies.
             These values correspond to all of the binaries in an observer's Universe
             (i.e. light-cone), within the given frequency bins.  The number of samples `S` is
