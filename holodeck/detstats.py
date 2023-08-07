@@ -1011,7 +1011,7 @@ def psrs_spectra_gwbnoise(psrs, fobs, nreals, npsrs):
 
     return spectra, noise_gsc
 
-def dsc_noise(fobs, nreals, npsrs, nloudest, psrs=None, spectra=None):
+def _dsc_noise(fobs, nreals, npsrs, nloudest, psrs=None, spectra=None):
     """ Get DeterSensitivityCurve noise using either psrs or spectra
 
     """
@@ -2437,6 +2437,104 @@ def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies, dsc_f
     return _dsdat
 
 
+def detect_pspace_model_clbrt_pta_gsc(fobs_cents, hc_ss, hc_bg, npsrs, nskies, 
+                        sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
+                        thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
+                        red_amp=None, red_gamma=None, red2white=None, ss_noise=False): 
+    """ Detect pspace model using individual sigma calibration for each realization 
+    and sensitivity curve noise for both BG calibration and SS detstats.
+    
+    Parameters
+    ----------
+    fobs_cents : 1Darray
+        GW frequencies in Hz
+    hc_ss : (F,R,L) NDarray
+    hc_bg : (F,R) NDarray
+    npsrs : int
+    nskies : int
+
+    red2white : scalar or None
+        Fixed ratio between red and white noise amplitude, if not None. 
+        Otherwise, red noise stays fixed
+
+    """
+    dur = 1.0/fobs_cents[0]
+    cad = 1.0/(2*fobs_cents[-1])
+
+    nfreqs, nreals, nloudest = [*hc_ss.shape]
+        
+    # form arrays for individual realization detstats
+    # set all to nan, only to be replaced if successful pta is found
+    dp_ss = np.ones((nreals, nskies)) * np.nan   
+    dp_bg = np.ones(nreals) * np.nan
+    snr_ss = np.ones((nfreqs, nreals, nskies, nloudest)) * np.nan
+    snr_bg = np.ones((nreals)) * np.nan
+    gamma_ssi = np.ones((nfreqs, nreals, nskies, nloudest)) * np.nan
+
+
+    # for each realization, 
+    # use sigmin and sigmax from previous realization, 
+    # unless it's the first realization of the sample
+    _sigstart, _sigmin, _sigmax = sigstart, sigmin, sigmax 
+    if debug: 
+        mod_start = datetime.now()
+        real_dur = datetime.now()
+    failed_psrs=0
+    for rr in range(nreals):
+        if debug: 
+            now = datetime.now()
+            if (rr%100==99):
+                print(f"{rr=}, {(now-real_dur)/100} s per realization, {_sigmin=:.2e}, {_sigmax=:.2e}, {_sigstart=:.2e}")
+                real_dur = now
+
+
+        # get calibrated psrs 
+        psrs, red_amp, _sigstart, _sigmin, _sigmax, spectra, noise_gsc = calibrate_one_pta_gsc(hc_bg[:,rr], fobs_cents, npsrs, tol=tol, maxbads=maxbads,
+                                    sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True,
+                                    red_amp=red_amp, red_gamma=red_gamma, red2white=red2white, ss_noise=ss_noise)
+        _sigmin /= 2
+        _sigmax *= 2 + 2e-20 # >1e-20 to make sure it doesnt immediately fail the 0 check 
+
+        if psrs is None:
+            failed_psrs += 1
+            continue # leave values as nan, if no successful PTA was found
+
+
+        # use those psrs to calculate realization detstats
+        _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1],  hc_ss[:,rr:rr+1,:], custom_noise=noise_gsc,
+                                        ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
+
+        dp_bg[rr], snr_bg[rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
+
+
+        # calculate SS noise from DeterSensitivityCurve and S_h,rest
+        noise_dsc = _dsc_noise(fobs_cents, spectra=spectra, nreals=1, npsrs=npsrs, nloudest=nloudest,)
+        noise_rest = _Sh_rest_noise(hc_ss[:,rr:rr+1,:], hc_bg[:,rr:rr+1], fobs_cents) # (F,R,L)
+        noise_ss = noise_dsc + noise_rest[np.newaxis,:,:,:]
+
+
+        # calculate realizatoin SS detstats
+        _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
+            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], custom_noise=noise_ss,
+            nskies=nskies, ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
+
+        dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()
+
+    ev_ss = expval_of_ss(gamma_ssi)
+    df_ss, df_bg = detfrac_of_reals(dp_ss, dp_bg)
+    _dsdat = {
+        'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi, 
+        'dp_bg':dp_bg, 'snr_bg':snr_bg,
+        'df_ss':df_ss, 'df_bg':df_bg, 'ev_ss':ev_ss,
+        }
+    if save_gamma_ssi:
+        _dsdat.update(gamma_ssi=gamma_ssi)
+    if save_snr_ss:
+        _dsdat.update(snr_ss=snr_ss)
+    print(f"Model took {datetime.now() - mod_start} s, {failed_psrs}/{nreals} realizations failed.")
+    return _dsdat
+
+
 def detect_pspace_model_clbrt_ramp(fobs_cents, hc_ss, hc_bg, npsrs, nskies, sigma,
                         rampstart=1e-16, rampmin=1e-20, rampmax=1e-13, tol=0.01, maxbads=5,
                         thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
@@ -2757,7 +2855,7 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs,
     return psrs, red_amp
 
 
-def calibrate_one_pta_gsc(hc_bg, hc_ss, fobs, npsrs, 
+def calibrate_one_pta_gsc(hc_bg, fobs, npsrs, 
                       sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
                       phis=None, thetas=None, ret_sig = False, red_amp=None, red_gamma=None, red2white=None,
                       ss_noise=False):
@@ -2865,7 +2963,7 @@ def calibrate_one_pta_gsc(hc_bg, hc_ss, fobs, npsrs,
     # print(f"in calibration: {utils.stats(psrs[0].toaerrs)=}, \n{utils.stats(hc_bg)=},\
     #             {utils.stats(fobs)=}, {dp_bg=}")
     if ret_sig:
-        return psrs, red_amp, sigma, sigmin, sigmax
+        return psrs, red_amp, sigma, sigmin, sigmax, spectra, noise_gsc
     return psrs, red_amp
 
 
