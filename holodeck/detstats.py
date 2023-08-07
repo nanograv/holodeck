@@ -8,9 +8,14 @@ for Hasasia PTA's.
 import numpy as np
 from scipy import special, integrate
 from sympy import nsolve, Symbol
+import h5py
+import matplotlib.pyplot as plt
+import os
+from datetime import datetime
+
 
 import holodeck as holo
-from holodeck import utils, cosmo, log
+from holodeck import utils, cosmo, log, plot, sam_cython
 from holodeck.constants import MPC, YR
 from holodeck.sams import cyutils as sam_cyutils
 
@@ -19,14 +24,16 @@ import hasasia.sim as hsim
 import hasasia as has
 
 GAMMA_RHO_GRID_PATH = '/Users/emigardiner/GWs/holodeck/output/rho_gamma_grids'
-HC_REF15_10YR = 11.2*10**-15
+HC_REF15_10YR = 11.2*10**-15 
+DEF_THRESH=0.5
+
 
 
 ###################### Overlap Reduction Function ######################
 
 def _gammaij_from_thetaij(theta_ij):
-    """ Calcualte gamma_ij for two pulsars of relative angle theta_ij.
-
+    """ Calculate gamma_ij for two pulsars of relative angle theta_ij.
+    
     Parameters
     ----------
     theta_ij : scalar
@@ -208,7 +215,7 @@ def _sigma0_Bstatistic(noise, Gamma, Sh0_bg):
 
     Parameters
     ----------
-    noise : (P,) 1darray of scalars
+    noise : (P,F,R) Ndarray of scalars
         Noise spectral density of each pulsar.
     Gamma : (P,P) 2Darray of scalars
         Overlap reduction function for j>i, 0 otherwise.
@@ -232,14 +239,21 @@ def _sigma0_Bstatistic(noise, Gamma, Sh0_bg):
     # to get sum term in shape (P,P,F,R) we want:
     # Gamma in shape (P,P,1,1)
     # Sh0 and Sh in shape (1,1,F,R)
-    # P_i in shape (P,1,1,1)
-    # P_j in shape (1,P,1,1)
+    # P_i in shape (P,1,F,R)
+    # P_j in shape (1,P,F,R) 
 
-    numer = (Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2
-             * noise[:,np.newaxis,np.newaxis,np.newaxis] * noise[np.newaxis,:,np.newaxis,np.newaxis])
-    denom = ((noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis, np.newaxis,:])
-              * (noise[np.newaxis,:,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
-             + Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2)**2
+    # Cast parameters to desired shapes
+    Gamma = Gamma[:,:,np.newaxis,np.newaxis]
+    Sh0_bg = Sh0_bg[np.newaxis,np.newaxis,:]
+    noise_i = noise[:,np.newaxis,:,:]
+    noise_j = noise[np.newaxis,:,:,:]
+
+    # Calculate sigma_0B
+    numer = (Gamma**2 * Sh0_bg**2
+             * noise_i * noise_j)
+    denom = ((noise_j + Sh0_bg)
+              * (noise_j + Sh0_bg)
+             + Gamma**2 * Sh0_bg**2)**2
 
     sum = np.sum(numer/denom, axis=(0,1,2))
     sigma_0B = np.sqrt(2*sum)
@@ -251,7 +265,7 @@ def _sigma1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
 
     Parameters
     ----------
-    noise : (P,) 1darray of scalars
+    noise : (P,F,R) 1darray of scalars
         Noise spectral density of each pulsar.
     Gamma : (P,P) 2Darray of scalars
         Overlap reduction function for j>i, 0 otherwise.
@@ -280,26 +294,34 @@ s
     # P_i in shape (P,1,1,1)
     # P_j in shape (1,P,1,1)
 
-    numer = (Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2
-             * ((noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh_bg[np.newaxis,np.newaxis,:])
-                * (noise[np.newaxis,:,np.newaxis,np.newaxis] + Sh_bg[np.newaxis,np.newaxis,:])
-                + Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh_bg[np.newaxis,np.newaxis,:]**2))
+    # Cast parameters to desired shapes
+    Gamma = Gamma[:,:,np.newaxis,np.newaxis]
+    Sh0_bg = Sh0_bg[np.newaxis,np.newaxis,:]
+    Sh_bg = Sh_bg[np.newaxis,np.newaxis,:]
+    noise_i = noise[:,np.newaxis,:,:]
+    noise_j = noise[np.newaxis,:,:,:]
 
-    denom = ((noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis, np.newaxis,:])
-              * (noise[np.newaxis,:,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
-             + Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis,np.newaxis,:]**2)**2
+
+    # Calculate sigma_1B
+    numer = (Gamma**2 * Sh0_bg**2
+             * ((noise_i + Sh_bg) * (noise_j + Sh_bg)
+                + Gamma**2 * Sh_bg**2))
+
+    denom = ((noise_i + Sh0_bg)
+              * (noise_j + Sh0_bg)
+             + Gamma**2 * Sh0_bg**2)**2
 
     sum = np.sum(numer/denom, axis=(0,1,2))
     sigma_1B = np.sqrt(2*sum)
     return sigma_1B
 
-def _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
+def _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg, debug=False):
     """ Calculate mu_1 for the background, by summing over all pulsars and frequencies.
     Assuming the B statistic, which maximizes S/N_B = mu_1/sigma_1
 
     Parameters
     ----------
-    noise : (P,) 1darray of scalars
+    noise : (P,F,R) Ndarray of scalars
         Noise spectral density of each pulsar.
     Gamma : (P,P) 2Darray of scalars
         Overlap reduction function for j>i, 0 otherwise.
@@ -317,9 +339,10 @@ def _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
     """
 
     # Check that Gamma_{j<=i} =
-    for ii in range(len(noise)):
-        for jj in range(ii+1):
-            assert Gamma[ii,jj] == 0, f'Gamma[{ii},{jj}] = {Gamma[ii,jj]}, but it should be 0!'
+    if debug:
+        for ii in range(len(Gamma)):
+            for jj in range(ii+1):
+                assert Gamma[ii,jj] == 0, f'Gamma[{ii},{jj}] = {Gamma[ii,jj]}, but it should be 0!'
 
     # to get sum term in shape (P,P,F,R) for ii,jj,kk we want:
     # Gamma in shape (P,P,1,1)
@@ -327,12 +350,17 @@ def _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
     # P_i in shape (P,1,1,1)
     # P_j in shape (1,P,1,1)
 
-    numer = (Gamma[:,:,np.newaxis,np.newaxis] **2
-            * Sh_bg[np.newaxis,np.newaxis,:]
-            * Sh0_bg[np.newaxis,np.newaxis,:])
-    denom = ((noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
-               * (noise[np.newaxis,:,np.newaxis,np.newaxis] + Sh0_bg[np.newaxis,np.newaxis,:])
-               + Gamma[:,:,np.newaxis,np.newaxis]**2 * Sh0_bg[np.newaxis, np.newaxis, :]**2)
+    # Cast parameters to desired shapes
+    Gamma = Gamma[:,:,np.newaxis,np.newaxis]
+    Sh0_bg = Sh0_bg[np.newaxis,np.newaxis,:]
+    Sh_bg = Sh_bg[np.newaxis,np.newaxis,:]
+    noise_i = noise[:,np.newaxis,:,:]
+    noise_j = noise[np.newaxis,:,:,:]
+
+
+    # Calculate mu_1B
+    numer = (Gamma **2 * Sh_bg * Sh0_bg)
+    denom = ((noise_i + Sh0_bg) * (noise_j + Sh0_bg) + Gamma**2 * Sh0_bg**2)
 
     # Requires Gamma have all jj<=ii parts to zero
     sum = np.sum(numer/denom, axis=(0,1,2))
@@ -373,7 +401,7 @@ def _bg_detection_probability(sigma_0, sigma_1, mu_1, alpha_0=0.001):
     return dp_bg
 
 
-def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret_all = False):
+def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret = False):
     """ Calculate the background detection probability, and all intermediary steps.
 
     Parameters
@@ -393,7 +421,7 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret_all = F
         for R realizations.
     alpha_0 : scalar
         False alarm probability
-    ret_all : Bool
+    ret : Bool
         Whether to return all parameters or just dp_bg
 
     Returns
@@ -402,20 +430,24 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret_all = F
         Background detection probability, for R realizations.
     Gamma : (P, P) 2D Array
         Overlap reduction function for j>i, 0 otherwise.
-        Only returned if return_all = True.
+        Only returned if return = True.
     Sh_bg : (F,R) 1Darray
         Spectral density, for R realizations
-        Only returned if return_all = True.
+        Only returned if return = True.
     noise : (P,) 1Darray
         Spectral noise density of each pulsar.
-        Only returned if return_all = True.
+        Only returned if return = True.
     mu_1B : (R,) 1Darray
         Expected value for the B statistic.
-        Only returned if return_all = True.
+        Only returned if return = True.
     sigma_0B : (R,) 1Darray
     sigma_1B : (R,) 1Darray
 
+    TODO: Update or deprecate.
     """
+
+    print("Detect_bg() is deprecated. Use detect_bg_pta() instead for red noise and ss noise.")
+    
     # Overlap Reduction Function
     num = len(thetas) # number of pulsars, P
     Gamma = np.zeros((num, num)) # (P,P) 2Darray of scalars, Overlap reduction function between all puolsar
@@ -428,20 +460,26 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret_all = F
 
     # Spectral Density
     Sh_bg = _power_spectral_density(hc_bg, fobs) # spectral density of bg, using 0th realization
-    Sh0_bg = Sh_bg # approximation used in Rosado et al. 2015
+    Sh0_bg = Sh_bg # appropsimation used in Rosado et al. 2015
+    # print('Sh_bg:', Sh_bg.shape)
 
-    # Noise
-    noise = _white_noise(cad, sigmas)
+    # Noise 
+    noise = _white_noise(cad, sigmas)[:,np.newaxis, np.newaxis] # P, 1, 1
+    # print('noise:', noise.shape)
 
     sigma_0B = _sigma0_Bstatistic(noise, Gamma, Sh0_bg)
+    # print('sigma_0B:', sigma_0B.shape)
 
     sigma_1B = _sigma1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
+    # print('sigma_1B:', sigma_1B.shape)
 
     mu_1B = _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
+    # print('mu_1B:', mu_1B.shape)
 
     dp_bg = _bg_detection_probability(sigma_0B, sigma_1B, mu_1B, alpha_0)
+    # print('dp_bg', dp_bg.shape)
 
-    if(ret_all):
+    if(ret):
         return dp_bg, Gamma, Sh_bg, noise, mu_1B, sigma_0B, sigma_1B
     else:
         return dp_bg
@@ -450,7 +488,8 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret_all = F
 
 
 
-def detect_bg_pta(pulsars, spectra, cad, hc_bg, alpha_0=0.001, ret_all = False):
+def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss, alpha_0=0.001, ret_snr = False,
+                  red_amp=None, red_gamma=None, ss_noise=True):
     """ Calculate the background detection probability, and all the intermediary steps
     from a list of hasasia.Pulsar objects.
 
@@ -458,36 +497,23 @@ def detect_bg_pta(pulsars, spectra, cad, hc_bg, alpha_0=0.001, ret_all = False):
     ----------
     pulsars : (P,) list of hasasia.Pulsar objects
         A set of pulsars generated by hasasia.sim.sim_pta()
-    spectra : (P,) list of hasasia.Spectrum objects
-        The spectrum for each pulsar.
-    cad : scalar
-        Cadence of observations in seconds.
+    fobs : (F,) 1Darray of scalars
+        Frequency bin centers in hertz.
     hc_bg : (F,R)
         Characteristic strain of the background at each frequency,
         for R realizations.
     alpha_0 : scalar
         Falsa alarm probability
-    return_all : Bool
+    return : Bool
         Whether or not to return intermediate variables.
 
     Returns
     -------
-    dp_bg : scalar
+    dp_bg : (R,) 1Darray
         Background detection probability
-    Gamma : (P, P) 2D Array
-        Overlap reduction function for j>i, 0 otherwise.
-        Only returned if return_all = True.
-    Sh_bg : (F,) 1Darray
-        Spectral density
-        Only returned if return_all = True.
-    noise : (P,) 1Darray
-        Spectral noise density of each pulsar.
-        Only returned if return_all = True.
-    mu_1B : scalar
-        Expected value for the B statistic.
-        Only returned if return_all = True.
-    sigma_0B : scalar
-    sigma_1B : scalar
+    snr_bg : (R,) 1Darray
+        Signal to noise ratio of the background, using the
+        B statistic. 
 
 
     If a pulsar had differing toaerrs, the mean of that pulsar's
@@ -495,8 +521,8 @@ def detect_bg_pta(pulsars, spectra, cad, hc_bg, alpha_0=0.001, ret_all = False):
     TODO: implement red noise
     """
 
-    # check inputs
-    assert len(pulsars) == len(spectra), f"'pulsars ({len(pulsars)}) does not match 'spectra' ({len(spectra)}) !"
+    cad = 1.0/(2*fobs[-1])
+
     # get pulsar properties
     thetas = np.zeros(len(pulsars))
     phis = np.zeros(len(pulsars))
@@ -506,14 +532,24 @@ def detect_bg_pta(pulsars, spectra, cad, hc_bg, alpha_0=0.001, ret_all = False):
         phis[ii] = pulsars[ii].phi
         sigmas[ii] = np.mean(pulsars[ii].toaerrs)
 
-    fobs = spectra[0].freqs
 
     Gamma = _orf_pta(pulsars)
 
     Sh_bg = _power_spectral_density(hc_bg[:], fobs)
     Sh0_bg = Sh_bg # note this refers to same object, not a copy
 
-    noise = _white_noise(cad, sigmas)
+    # calculate white noise
+    noise = _white_noise(cad, sigmas)[:,np.newaxis] # P,1
+
+    # add red noise
+    if (red_amp is not None) and (red_gamma is not None):
+        red_noise = _red_noise(red_amp, red_gamma, fobs)[np.newaxis,:] # (1,F,)
+        noise = noise + red_noise # (P,F,)
+
+    # add single source noise
+    noise = noise[:,:,np.newaxis]
+    if ss_noise:
+        noise = noise + _Sh_ss_noise(hc_ss, fobs) # (P, F, R) 
 
     mu_1B = _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
 
@@ -523,8 +559,9 @@ def detect_bg_pta(pulsars, spectra, cad, hc_bg, alpha_0=0.001, ret_all = False):
 
     dp_bg = _bg_detection_probability(sigma_0B, sigma_1B, mu_1B, alpha_0)
 
-    if(ret_all):
-        return dp_bg, Gamma, Sh_bg, noise, mu_1B, sigma_0B, sigma_1B
+    if(ret_snr):
+        snr_bg = mu_1B/sigma_1B
+        return dp_bg, snr_bg
     else:
         return dp_bg
 
@@ -532,7 +569,7 @@ def detect_bg_pta(pulsars, spectra, cad, hc_bg, alpha_0=0.001, ret_all = False):
 
 ######################## Signal-to-Noise Ratio ########################
 
-def SNR_bg_B(noise, Gamma, Sh_bg):
+def snr_bg_B(noise, Gamma, Sh_bg):
     """ Calculate S/N_B for the background, using P_i, Gamma, S_h and S_h0
 
     Parameters
@@ -546,7 +583,7 @@ def SNR_bg_B(noise, Gamma, Sh_bg):
 
     Returns
     -------
-    SNR_B : (R,) 1Darray of scalars
+    snr_B : (R,) 1Darray of scalars
         Signal to noise ratio assuming the B statistic, mu_1B/sigma_1B, for each realization.
 
 
@@ -570,8 +607,8 @@ def SNR_bg_B(noise, Gamma, Sh_bg):
     denom = (P_i*P_j + Sh_bg*(P_i+P_j) + Sh_bg**2 *(1 + Gamma**2))
 
     sum = np.sum(numer/denom, axis=(0,1,2))
-    SNR_B = np.sqrt(2*sum)
-    return SNR_B
+    snr_B = np.sqrt(2*sum)
+    return snr_B
 
 def _Sh_hasasia_noise_bg(scGWB):
     """ Calculate the noise strain power spectral density,
@@ -596,7 +633,7 @@ def _Sh_hasasia_noise_bg(scGWB):
     Sh_h = 3*H0**2 / (2*np.pi**2) * Omega_gw / freqs**3
     return Sh_h
 
-def SNR_hasasia_noise_bg(scGWB):
+def snr_hasasia_noise_bg(scGWB):
     """ Calculate the effective noise signal to noise ratio with hasasia.
 
     Parameters
@@ -606,16 +643,16 @@ def SNR_hasasia_noise_bg(scGWB):
 
     Returns
     -------
-    SNR_h : scalar
+    snr_h : scalar
         Signal to noise ratio from hasasia.
 
     This function may not be working as we expect, since it does not produce SNR
     of noise to be 1.
     """
     Sh_h = _Sh_hasasia_noise_bg(scGWB)
-    SNR_h = scGWB.SNR(Sh_h)
-    return SNR_h
-
+    snr_h = scGWB.SNR(Sh_h)
+    return snr_h
+    
 
 def _Sh_hasasia_modeled_bg(freqs, hc_bg):
     """ Calculate Sh for hsen.GWBSensitivityCurve.SNR(Sh) from a
@@ -637,7 +674,7 @@ def _Sh_hasasia_modeled_bg(freqs, hc_bg):
     Sh_h = hc_bg**2 / freqs[:,np.newaxis]
     return Sh_h
 
-def SNR_hasasia_modeled_bg(scGWB, hc_bg):
+def snr_hasasia_modeled_bg(scGWB, hc_bg):
     """ Calculate the GWB signal to noise ratio with hasasia.
 
     Parameters
@@ -649,15 +686,15 @@ def SNR_hasasia_modeled_bg(scGWB, hc_bg):
 
     Returns
     -------
-    SNR_h : (R,) 1Darray)
+    snr_h : (R,) 1Darray)
         Signal to noise ratio from hasasia, for each realization.
     """
     Sh_h = _Sh_hasasia_modeled_bg(scGWB.freqs, hc_bg)
-    SNR_h = np.zeros(len(hc_bg[0]))
+    snr_h = np.zeros(len(hc_bg[0]))
     for rr in range(len(hc_bg[0])):
-        SNR_h[rr] = scGWB.SNR(Sh_h[:,rr])
-    return SNR_h
-
+        snr_h[rr] = scGWB.SNR(Sh_h[:,rr])
+    return snr_h
+    
 
 
 
@@ -834,6 +871,7 @@ def _antenna_pattern_functions(m_hat, n_hat, Omega_hat, pi_hat):
 
 ######################## Noise Spectral Density ########################
 
+
 def _Sh_rest_noise(hc_ss, hc_bg, freqs):
     """ Calculate the noise spectral density contribution from all but the current single source.
 
@@ -848,11 +886,10 @@ def _Sh_rest_noise(hc_ss, hc_bg, freqs):
 
     Returns
     -------
-    ss_noise : (F,R,L) NDarray of scalars
+    Sh_rest : (F,R,L) NDarray of scalars
         The noise in a single pulsar from other GW sources for detecting each single source.
 
     Follows Eq. (45) in Rosado et al. 2015.
-    TODO: modify this to allow for multiple loud sources.
     """
     hc2_louds = np.sum(hc_ss**2, axis=2) # (F,R)
     # subtract the single source from rest of loud sources and the background, for each single source
@@ -860,15 +897,43 @@ def _Sh_rest_noise(hc_ss, hc_bg, freqs):
     Sh_rest = hc2_rest / freqs[:,np.newaxis,np.newaxis]**3 /(12 * np.pi**2) # (F,R,L)
     return Sh_rest
 
-def _red_noise(A_red, gamma_red, freqs):
-    """ Calculate the red noise for a given pulsar (or array of pulsars)
-    A_red * f sigma_i^gamma_red
+
+def _Sh_ss_noise(hc_ss, freqs):
+    """ Calculate the noise spectral density contribution from all but the first loudest 
+    single sources.
 
     Parameters
     ----------
-    A_red : scalar
+    hc_ss : (F,R,L) NDarray
+        Characteristic strain from all loud single sources.
+    hc_bg : (F,R) NDarray
+        Characteristic strain from all but loudest source at each frequency.
+    freqs : (F,) 1Darray
+        Frequency bin centers.
+
+    Returns
+    -------
+    Sh_ss : (F,R,L) NDarray of scalars
+        The noise in a single pulsar from other GW sources for detecting each single source.
+
+    Follows Eq. (45) in Rosado et al. 2015.
+    """
+
+    # sum of noise from all loudest single sources
+    hc2_ss = np.sum(hc_ss[...,1:]**2, axis=2) # (F,R)
+    Sh_ss = hc2_ss / freqs[:,np.newaxis]**3 /(12 * np.pi**2) # (F,R,)
+    return Sh_ss
+
+
+def _red_noise(red_amp, red_gamma, freqs, f_ref=1/YR):
+    """ Calculate the red noise for a given pulsar (or array of pulsars)
+    red_amp * f sigma_i^red_gamma
+
+    Parameters
+    ----------
+    red_amp : scalar
         Amplitude of red noise.
-    gamma_red : scalar
+    red_gamma : scalar
         Power-law index of red noise
     freqs : (F,) 1Darray of scalars
         Frequency bin centers.
@@ -878,13 +943,16 @@ def _red_noise(A_red, gamma_red, freqs):
     P_red : (P,F) NDarray
         Red noise spectral density for the ith pulsar.
 
+    Defined by Eq. (8) in Kelley et al. 2018
+    ### what is f_ref
+
     """
-    P_red = A_red * freqs**gamma_red
+    P_red = red_amp**2 / (12*np.pi**2) * (freqs/f_ref)**red_gamma * (f_ref)**-3
     return P_red
 
 
 
-def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, A_red=None, gamma_red=None):
+def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=None):
     """ Calculate the noise spectral density of each pulsar, as it pertains to single
     source detections, i.e., including the background as a noise source.
 
@@ -912,10 +980,11 @@ def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, A_red=None, gamma_red=Non
     noise = _white_noise(delta_t, sigmas) # (P,)
     Sh_rest = _Sh_rest_noise(hc_ss, hc_bg, freqs) # (F,R,L,)
     noise = noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh_rest[np.newaxis,:,:,:] # (P,F,R,L)
-    if (A_red is not None) and (gamma_red is not None):
-        red_noise = _red_noise(A_red, gamma_red) # (F,)
+    if (red_amp is not None) and (red_gamma is not None):
+        red_noise = _red_noise(red_amp, red_gamma, freqs) # (F,)
         noise = noise + red_noise[np.newaxis,:,np.newaxis,np.newaxis] # (P,F,R,L)
     return noise
+
 
 
 ################### GW polarization, phase, amplitude ###################
@@ -1254,12 +1323,16 @@ def _gamma_ssi_cython(rho, grid_path):
 
     TODO: change grid save location to belong to some class or something?
     """
+
     Num = np.size(rho[:,0,0,:])
 
     grid_name = grid_path+'/rho_gamma_interp_grid_Num%d.npz' % (Num)
 
     # check if interpolation grid already exists, if not, build it
     if os.path.exists(grid_name) is False:
+        # check if grid_path already exists, if not, makedir
+        if (os.path.exists(grid_path) is False):
+            os.makedirs(grid_path)
         _build_gamma_interp_grid(Num, grid_name)
 
     # read in data from saved grid
@@ -1311,9 +1384,9 @@ def _ss_detection_probability(gamma_ss_i):
 
 ######################## Detection Probability #########################
 
-def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
+def detect_ss(thetas, phis, sigmas, fobs, hc_ss, hc_bg,
               theta_ss, phi_ss=None, Phi0_ss=None, iota_ss=None, psi_ss=None,
-              Amp_red=None, gamma_red=None, alpha_0=0.001, ret_snr=False,):
+              red_amp=None, red_gamma=None, alpha_0=0.001, ret_snr=False,):
     """ Calculate the single source detection probability, and all intermediary steps.
 
     Parameters
@@ -1324,10 +1397,6 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
         Azimuthal (longitudinal) angular position of each pulsar in radians.
     sigmas : (P,) 1Darray of scalars
         Sigma_i of each pulsar in seconds.
-    cad : scalar
-        Cadence of observations in seconds.
-    dur : scalar
-        Duration of observations in seconds.
     fobs : (F,) 1Darray of scalars
         Observer frame gw frequency bin centers in Hz.
     dfobs : (F-1,) 1Darray of scalars
@@ -1353,9 +1422,9 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     psi_ss : (F,S,L) NDarray or None
         Polarization of each single source.
         If None, random values between 0 and pi will be assigned.
-    A_red : scalar or None
+    red_amp : scalar or None
         Amplitude of pulsar red noise.
-    gamma_red : scalar or None
+    red_gamma : scalar or None
         Power law index of pulsar red noise.
     alpha_0 : scalar
         False alarm probability
@@ -1370,6 +1439,10 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
         SNR of each single source.
 
     """
+    dur = 1.0/fobs[0]
+    cad = 1.0/(2*fobs[-1])
+    fobs_cents, fobs_edges = utils.pta_freqs(dur, num=len(fobs))
+    dfobs = np.diff(fobs_edges)
 
     # Assign random single source sky params, if not provided.
     if phi_ss is None:
@@ -1392,7 +1465,7 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
                                                    pi_hat) # (P,F,S,L)
 
     # noise spectral density
-    S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, Amp_red, gamma_red)
+    S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, red_amp, red_gamma)
 
     # amplitudw
     amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
@@ -1412,9 +1485,9 @@ def detect_ss(thetas, phis, sigmas, cad, dur, fobs, dfobs, hc_ss, hc_bg,
         return gamma_ss
 
 
-def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
-              theta_ss=None, phi_ss=None, Phi0_ss=None, iota_ss=None, psi_ss=None,
-              Fe_bar = None, Amp_red=None, gamma_red=None, alpha_0=0.001, Fe_bar_guess=15,
+def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,
+              theta_ss=None, phi_ss=None, Phi0_ss=None, iota_ss=None, psi_ss=None, nskies=25, 
+              Fe_bar = None, red_amp=None, red_gamma=None, alpha_0=0.001, Fe_bar_guess=15,
               ret_snr=False, print_nans=False, snr_cython=True, gamma_cython=True, grid_path=GAMMA_RHO_GRID_PATH):
     """ Calculate the single source detection probability, and all intermediary steps for
     R strain realizations and S sky realizations.
@@ -1423,14 +1496,8 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
     ----------
     pulsars : (P,) list of hasasia.Pulsar objects
         A set of pulsars generated by hasasia.sim.sim_pta()
-    cad : scalar
-        Cadence of observations in seconds.
-    dur : scalar
-        Duration of observations in seconds.
     fobs : (F,) 1Darray of scalars
         Observer frame gw frequency bin centers in Hz.
-    dfobs : (F-1,) 1Darray of scalars
-        Observer frame gw frequency bin widths in Hz.
     hc_ss : (F,R,L) NDarray of scalars
         Characteristic strain of the L loudest single sources at
         each frequency, for R realizations.
@@ -1454,9 +1521,9 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
         If None, random values between 0 and pi will be assigned.
     Fe_bar : scalar or None
         Threshold F-statistic
-    Amp_red : scalar or None
+    red_amp : scalar or None
         Amplitude of pulsar red noise.
-    gamma_red : scalar or None
+    red_gamma : scalar or None
         Power law index of pulsar red noise.
     alpha_0 : scalar
         False alarm probability
@@ -1473,7 +1540,16 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
         DP of each single source. Returned only if ret_snr is True.
 
     """
+
+    dur = 1.0/fobs[0]
+    cad = 1.0/(2*fobs[-1])
+    fobs_cents, fobs_edges = utils.pta_freqs(dur, num=len(fobs))
+    dfobs = np.diff(fobs_edges)
+
     # Assign random single source sky params, if not provided.
+    nfreqs, nreals, nloudest = [*hc_ss.shape]
+    if theta_ss is None:
+        theta_ss = np.random.uniform(0,np.pi, size=nfreqs*nskies*nloudest).reshape(nfreqs, nskies, nloudest)
     if phi_ss is None:
         phi_ss = np.random.uniform(0,2*np.pi, size=theta_ss.size).reshape(theta_ss.shape)
     if Phi0_ss is None:
@@ -1506,7 +1582,7 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
                                                    pi_hat) # (P,F,S,L)
 
     # noise spectral density
-    S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, Amp_red, gamma_red)
+    S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, red_amp, red_gamma)
 
     # amplitudw
     amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
@@ -1539,9 +1615,9 @@ def detect_ss_pta(pulsars, cad, dur, fobs, dfobs, hc_ss, hc_bg,
 ######################### Running on Libraries #########################
 ########################################################################
 
-def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=0.5,
-                   dur=None, cad=None, dfobs=None, plot=True, debug=False,
-                   grid_path=GAMMA_RHO_GRID_PATH, snr_cython = True):
+def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
+                plot=True, debug=False, grid_path=GAMMA_RHO_GRID_PATH, 
+                snr_cython = True, save_ssi=False, ret_dict=False):
     """ Calculate detection statistics for an ss library output.
 
     Parameters
@@ -1562,6 +1638,12 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=0.5,
         Whether or not to make and save plots.
     debug : Bool
         Whether to print info along the way.
+    grid_path : string
+        Path to snr interpolation grid
+    snr_cython : Bool
+        Whether to use cython interpolation for ss snr calculation.
+    save_ssi : Bool
+        Whether to store gamma_ssi in npz arrays
 
     Returns
     -------
@@ -1581,24 +1663,28 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=0.5,
         Signal to noise ratio of the background at each
         frequency of each realization.
     df_ss : (N,)
-        Fraction of realizations with a single source detection.
+        Fraction of realizations with a single source detection, for each sample.
     df_bg : (N,) 1Darray
-        Fraction of realizations with a background detection.
+        Fraction of realizations with a background detection, for each sample.
+    ev_ss : (N,R,) NDarray
+        Expectation number of single source detections, averaged across realizations,
+        for each sample.
 
-    TODO: Speed it up by doing the gamma_ssi integration in cython.
-
+    TODO: Update, no need to return ss_snr
     """
 
     # Read in hdf file
     ssfile = h5py.File(hdf_name, 'r')
     fobs = ssfile['fobs'][:]
-    if dfobs is None: dfobs = ssfile['dfobs'][:]
-    if dur is None: dur = ssfile['pta_dur'][0]
-    if cad is None: cad = ssfile['pta_cad'][0]
+    dur = 1.0/fobs[0]
+    cad = 1.0/(2*fobs[-1])
+    # if dfobs is None: dfobs = ssfile['dfobs'][:]
+    # if dur is None: dur = ssfile['pta_dur'][0]
+    # if cad is None: cad = ssfile['pta_cad'][0]
     hc_ss = ssfile['hc_ss'][...]
     hc_bg = ssfile['hc_bg'][...]
     shape = hc_ss.shape
-    nsamp, nfreqs, nreals, nloudest = shape[0], shape[1], shape[2], shape[3]
+    nsamps, nfreqs, nreals, nloudest = shape[0], shape[1], shape[2], shape[3]
 
     # Assign output folder
     import os
@@ -1613,6 +1699,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=0.5,
     phis = np.random.uniform(0, 2*np.pi, size = npsrs)
     thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
     # sigmas = np.ones_like(phis)*sigma
+    if debug: print(f"{phis.shape=}, {thetas.shape=}, {dur=}, {cad=}, {sigma=}")
     psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                     phi=phis, theta=thetas)
 
@@ -1622,29 +1709,34 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=0.5,
 
     # Calculate DPs, SNRs, and DFs
     if debug: print('Calculating SS and BG detection statistics.')
-    dp_ss = np.zeros((nsamp, nreals, nskies)) # (N,R,S)
-    dp_bg = np.zeros((nsamp, nreals)) # (N,R)
-    snr_ss = np.zeros((nsamp, nfreqs, nreals, nskies, nloudest))
-    snr_bg = np.zeros((nsamp, nfreqs, nreals))
-    df_ss = np.zeros(nsamp)
-    df_bg = np.zeros(nsamp)
-    gamma_ssi = np.zeros((nsamp, nfreqs, nreals, nskies, nloudest))
+    dp_ss = np.zeros((nsamps, nreals, nskies)) # (N,R,S)
+    dp_bg = np.zeros((nsamps, nreals)) # (N,R)
+    snr_bg = np.zeros((nsamps, nfreqs, nreals))
+    df_ss = np.zeros(nsamps)
+    df_bg = np.zeros(nsamps)
+    ev_ss = np.zeros((nsamps, nreals, nskies))
+    if save_ssi: 
+        snr_ss = np.zeros((nsamps, nfreqs, nreals, nskies, nloudest))
+        gamma_ssi = np.zeros((nsamps, nfreqs, nreals, nskies, nloudest))
 
     # # one time calculations
     # Num = nfreqs * nloudest # number of single sources in a single strain realization (F*L)
     # Fe_bar = _Fe_thresh(Num) # scalar
 
-    for nn in range(nsamp):
-        if debug: print('on sample nn=%d out of N=%d' % (nn,nsamp))
-        dp_bg[nn,:], snr_bg[nn,...] = detect_bg_pta(psrs, fobs, cad, hc_bg[nn], ret_snr=True)
-        vals_ss = detect_ss_pta(psrs, cad, dur, fobs, dfobs,
-                                                hc_ss[nn], hc_bg[nn], ret_snr=True,
-                                                gamma_cython=True, snr_cython=snr_cython,
-                                                theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss,
-                                                iota_ss=iota_ss, psi_ss=psi_ss, grid_path=grid_path)
-        dp_ss[nn,:,:], snr_ss[nn,...], gamma_ssi[nn] = vals_ss[0], vals_ss[1], vals_ss[2]
-        df_ss[nn] = np.sum(dp_ss[nn]>thresh)/(nreals*nskies)
-        df_bg[nn] = np.sum(dp_bg[nn]>thresh)/(nreals)
+    for nn in range(nsamps):
+        if debug: print('on sample nn=%d out of N=%d' % (nn,nsamps))
+        dp_bg[nn,:], snr_bg[nn,...] = detect_bg_pta(psrs, fobs, hc_bg[nn], ret_snr=True)
+        vals_ss = detect_ss_pta(psrs, fobs, hc_ss[nn], hc_bg[nn], 
+                                ret_snr=True, gamma_cython=True, snr_cython=snr_cython,
+                                theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss,
+                                iota_ss=iota_ss, psi_ss=psi_ss, grid_path=grid_path)
+        dp_ss[nn,:,:]  = vals_ss[0]
+        if save_ssi: 
+            snr_ss[nn] = vals_ss[1]
+            gamma_ssi[nn] = vals_ss[2]
+        df_ss[nn], df_bg[nn] = detfrac_of_reals(dp_ss[nn], dp_bg[nn], thresh)
+        ev_ss[nn] = expval_of_ss(vals_ss[2])
+
 
         if plot:
             fig = plot_sample_nn(fobs, hc_ss[nn], hc_bg[nn],
@@ -1655,17 +1747,247 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=0.5,
             plt.close(fig)
 
     if debug: print('Saving npz files and allsamp plots.')
-    fig1 = plot_detprob(dp_ss, dp_bg, nsamp)
-    fig2 = plot_detfrac(df_ss, df_bg, nsamp, thresh)
+    fig1 = plot_detprob(dp_ss, dp_bg, nsamps)
+    fig2 = plot_detfrac(df_ss, df_bg, nsamps, thresh)
     fig1.savefig(output_dir+'/allsamp_detprobs.png', dpi=300)
     fig2.savefig(output_dir+'/allsamp_detfracs.png', dpi=300)
     plt.close(fig1)
     plt.close(fig2)
-    np.savez(output_dir+'/detstats.npz', dp_ss=dp_ss, dp_bg=dp_bg,
-             df_ss=df_ss, df_bg=df_bg, snr_ss=snr_ss, snr_bg=snr_bg, gamma_ssi=gamma_ssi)
+    if save_ssi:
+        np.savez(output_dir+'/detstats.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
+              snr_ss=snr_ss, snr_bg=snr_bg, ev_ss = ev_ss, gamma_ssi=gamma_ssi)
+    else:
+        np.savez(output_dir+'/detstats.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
+              snr_bg=snr_bg, ev_ss = ev_ss)
+        
+    # return dictionary 
+    if ret_dict:
+        data = {
+            'dp_ss':dp_ss, 'dp_bg':dp_bg, 'df_ss':df_ss, 'df_bg':df_bg,
+            'snr_bg':snr_bg, 'ev_ss':ev_ss
+        }
+        if save_ssi: 
+            data.update({'gamma_ssi':gamma_ssi})
+            data.update({'snr_ss':snr_ss})
+        return data
+    return 
 
-    return dp_ss, dp_bg, df_ss, df_bg, snr_ss, snr_bg
 
+def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
+                         sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
+                plot=True, debug=False, grid_path=GAMMA_RHO_GRID_PATH, 
+                snr_cython = True, save_ssi=False, ret_dict=False, ss_noise=True):
+    """ Calculate detection statistics for an ss library output.
+
+    Parameters
+    ----------
+    hdf_fname : String
+        Name of hdf file, including path.
+    output_dir : String
+        Where to store outputs, including full path.
+    npsrs : int
+        Number of pulsars to place in pta.
+    sigma : int or (P,) array
+        Noise in each pulsar
+    nskies : int
+        Number of sky realizationt to create.
+    thresh : float
+        Threshold for detection in realization.
+    plot : Bool
+        Whether or not to make and save plots.
+    debug : Bool
+        Whether to print info along the way.
+    grid_path : string
+        Path to snr interpolation grid
+    snr_cython : Bool
+        Whether to use cython interpolation for ss snr calculation.
+    save_ssi : Bool
+        Whether to store gamma_ssi in npz arrays
+    ss_noise : Bool
+        Whether or not to use all but loudest SS as BG noise sources.
+
+    Returns
+    -------
+    dp_ss : (N,R,S) Ndarray
+        Single source detection probability for each of
+        - N parameter space samples
+        - R strain realizations
+        - S sky realizations
+    dp_bg : (N,R) Ndarray
+        Background detectin probability.
+    snr_ss : (N,F,R,S,L)
+        Signal to noise ratio for every single source in every
+        realization at each of
+        - F frequencies
+        - L loudest at frequency
+    snr_bg : (N,F,R)
+        Signal to noise ratio of the background at each
+        frequency of each realization.
+    df_ss : (N,)
+        Fraction of realizations with a single source detection, for each sample.
+    df_bg : (N,) 1Darray
+        Fraction of realizations with a background detection, for each sample.
+    ev_ss : (N,R,) NDarray
+        Expectation number of single source detections, averaged across realizations,
+        for each sample.
+
+    # TODO: Add an option to calculate just for a particular selection of samples, 
+    e.g. pass in nn_min and nn_max and use for nn in range(nn_min, nn_max) instead of 
+    nn in range(neals). Then combine these into an hdf file separately.
+    """
+
+    # Read in hdf file
+    ssfile = h5py.File(hdf_name, 'r')
+    fobs = ssfile['fobs'][:]
+    dur = 1.0/fobs[0]
+    cad = 1.0/(2*fobs[-1])
+    # if dfobs is None: dfobs = ssfile['dfobs'][:]
+    # if dur is None: dur = ssfile['pta_dur'][0]
+    # if cad is None: cad = ssfile['pta_cad'][0]
+    hc_ss = ssfile['hc_ss'][...]
+    hc_bg = ssfile['hc_bg'][...]
+    shape = hc_ss.shape
+    nsamps, nfreqs, nreals, nloudest = shape[0], shape[1], shape[2], shape[3]
+
+    # Assign output folder
+    if (os.path.exists(output_dir) is False):
+        print('Making output directory.')
+        os.makedirs(output_dir)
+    else:
+        print('Writing to an existing directory.')
+
+    # build PTA pulsar positions
+    if debug: print('Placing pulsar.')
+    phis = np.random.uniform(0, 2*np.pi, size = npsrs)
+    thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    if debug: print(f"{phis.shape=}, {thetas.shape=}, {dur=}, {cad=}")
+    # psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
+    #                 phi=phis, theta=thetas)
+
+     # Build ss skies
+    if debug: print('Building ss skies.')
+    theta_ss, phi_ss, Phi0_ss, iota_ss, psi_ss = _build_skies(nfreqs, nskies, nloudest)
+
+    # Calculate DPs, SNRs, and DFs
+    if debug: print('Calculating SS and BG detection statistics.')
+    dp_ss = np.zeros((nsamps, nreals, nskies)) # (N,R,S)
+    dp_bg = np.zeros((nsamps, nreals)) # (N,R)
+    snr_bg = np.zeros((nsamps, nfreqs, nreals))
+    df_ss = np.zeros(nsamps)
+    df_bg = np.zeros(nsamps)
+    ev_ss = np.zeros((nsamps, nreals, nskies))
+    if save_ssi: 
+        snr_ss = np.zeros((nsamps, nfreqs, nreals, nskies, nloudest))
+        gamma_ssi = np.zeros((nsamps, nfreqs, nreals, nskies, nloudest))
+
+    # # one time calculations
+    # Num = nfreqs * nloudest # number of single sources in a single strain realization (F*L)
+    # Fe_bar = _Fe_thresh(Num) # scalar
+
+    for nn in range(nsamps):
+        if debug: 
+            print('\non sample nn=%d out of N=%d' % (nn,nsamps))
+            samp_dur = datetime.now()
+            real_dur = datetime.now()
+
+        # calibrate individual realization PTAs
+        for rr in range(nreals):
+            if rr==0:
+                _sigstart, _sigmin, _sigmax = sigstart, sigmin, sigmax 
+            if debug: 
+                now = datetime.now()
+                if (rr%10==0):
+                    print(f"{nn=}, {rr=}, {now-real_dur} s per realization, {_sigmin=:.2e}, {_sigmax=:.2e}, {_sigstart=:.2e}")
+                real_dur = now
+
+            # use sigmin and sigmax from previous realization, 
+            # unless it's the first realization of the sample
+            psrs, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[nn,:,rr], fobs, npsrs, tol=tol, maxbads=maxbads,
+                                     sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True, ss_noise=ss_noise)
+            _sigmin /= 2
+            _sigmax *= 2
+            
+            # get background detstats
+            _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs, hc_bg[nn,:,rr:rr+1], ret_snr=True)
+            dp_bg[nn,rr], snr_bg[nn,:,rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
+
+            # get single source detstats
+            _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
+                    psrs, fobs, hc_ss[nn,:,rr:rr+1], hc_bg[nn,:,rr:rr+1], 
+                    nskies=nskies, ret_snr=True,
+                    theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss, 
+                    iota_ss=iota_ss, psi_ss=psi_ss)
+            dp_ss[nn,rr,:] = _dp_ss.squeeze()
+            if save_ssi:
+                snr_ss[nn,:,rr] = _snr_ss.squeeze()
+                gamma_ssi[nn,:,rr] = _gamma_ssi.squeeze() 
+            ev_ss[nn,rr] = expval_of_ss(_gamma_ssi)
+        if debug:
+            now = datetime.now()
+            print(f"Sample {nn} took {now-samp_dur} s")
+            samp_dur = now
+        # dp_bg[nn,:], snr_bg[nn,...] = detect_bg_pta(psrs, fobs, hc_bg[nn], ret_snr=True)
+        # vals_ss = detect_ss_pta(psrs, fobs, hc_ss[nn], hc_bg[nn], 
+        #                         ret_snr=True, gamma_cython=True, snr_cython=snr_cython,
+        #                         theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss,
+        #                         iota_ss=iota_ss, psi_ss=psi_ss, grid_path=grid_path)
+        # dp_ss[nn,:,:]  = vals_ss[0]
+        # if save_ssi: 
+        #     snr_ss[nn] = vals_ss[1]
+        #     gamma_ssi[nn] = vals_ss[2]
+        df_ss[nn], df_bg[nn] = detfrac_of_reals(dp_ss[nn], dp_bg[nn], thresh)
+
+        if save_ssi:
+            np.savez(output_dir+f'/detstats_p{nn:06d}.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
+                snr_ss=snr_ss, snr_bg=snr_bg, ev_ss = ev_ss, gamma_ssi=gamma_ssi)
+        else:
+            np.savez(output_dir+f'/detstats_p{nn:06d}.npz', dp_ss=dp_ss[nn], dp_bg=dp_bg[nn], df_ss=df_ss[nn], df_bg=df_bg[nn],
+                snr_bg=snr_bg[nn], ev_ss = ev_ss[nn])
+        
+        if plot:
+            fig = plot_sample_nn(fobs, hc_ss[nn], hc_bg[nn],
+                         dp_ss[nn], dp_bg[nn],
+                         df_ss[nn], df_bg[nn], nn=nn)
+            plot_fname = (output_dir+'/p%06d_detprob.png' % nn) # need to make this directory
+            fig.savefig(plot_fname, dpi=100)
+            plt.close(fig)
+
+    if debug: print('Saving npz files and allsamp plots.')
+    fig1 = plot_detprob(dp_ss, dp_bg, nsamps)
+    fig2 = plot_detfrac(df_ss, df_bg, nsamps, thresh)
+    fig1.savefig(output_dir+'/allsamp_detprobs.png', dpi=300)
+    fig2.savefig(output_dir+'/allsamp_detfracs.png', dpi=300)
+    plt.close(fig1)
+    plt.close(fig2)
+    if save_ssi:
+        np.savez(output_dir+'/detstats_lib.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
+              snr_ss=snr_ss, snr_bg=snr_bg, ev_ss = ev_ss, gamma_ssi=gamma_ssi)
+    else:
+        np.savez(output_dir+'/detstats_lib.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
+              snr_bg=snr_bg, ev_ss = ev_ss)
+        
+    # return dictionary 
+    if ret_dict:
+        data = {
+            'dp_ss':dp_ss, 'dp_bg':dp_bg, 'df_ss':df_ss, 'df_bg':df_bg,
+            'snr_bg':snr_bg, 'ev_ss':ev_ss
+        }
+        if save_ssi: 
+            data.update({'gamma_ssi':gamma_ssi})
+            data.update({'snr_ss':snr_ss})
+        return data
+    return 
+
+
+
+def _build_pta(npsrs, sigma, dur, cad):
+    # build PTA
+    phis = np.random.uniform(0, 2*np.pi, size = npsrs)
+    thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    # sigmas = np.ones_like(phis)*sigma
+    psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
+                    phi=phis, theta=thetas)
+    return psrs
 
 def _build_skies(nfreqs, nskies, nloudest):
     theta_ss = np.random.uniform(0, np.pi, size = nfreqs * nskies * nloudest).reshape(nfreqs, nskies, nloudest)
@@ -1674,6 +1996,54 @@ def _build_skies(nfreqs, nskies, nloudest):
     iota_ss = np.random.uniform(0,  np.pi, size = theta_ss.size).reshape(theta_ss.shape)
     psi_ss = np.random.uniform(0,   np.pi, size = theta_ss.size).reshape(theta_ss.shape)
     return theta_ss, phi_ss, Phi0_ss, iota_ss, psi_ss
+
+
+def detfrac_of_reals(dp_ss, dp_bg, thresh=DEF_THRESH):
+    """ Calculate the fraction of realizations with a detection.
+
+    Parameters
+    ----------
+    dp_ss : (R,S) Ndarray
+        Single source detection probability for each of
+    dp_bg : (R) Ndarray
+        Background detectin probability.
+    thresh : float
+        Fractional threshold for DP to claim a detection.
+    
+    Returns
+    -------
+    df_ss : float
+        Fraction of realizations with dp_ss>threshold
+    def_bg : float
+        Fraction of realizations with dp_bg>threshold
+    """ 
+
+    df_ss = np.sum(dp_ss>thresh)/(dp_ss.size)
+    df_bg = np.sum(dp_bg>thresh)/(dp_bg.size)
+    return df_ss, df_bg
+    
+
+
+def expval_of_ss(gamma_ssi,):
+    """ Calculate the expected number of single source detections, across all realization
+
+    Parameters
+    ----------
+    gamma_ssi : (F,R,S,L) NDarray
+        Detection probability of each single source
+
+    Returns
+    -------
+    ev_ss : (R,S)
+        Expected number of single source detection (dp_ss>thresh) for each strain and sky realizations.
+    
+    """
+    # print(f"{gamma_ssi.shape=}, {[*gamma_ssi.shape]}")
+    # nfreqs, nreals, nskies, nloudest = [*gamma_ssi.shape]
+    ev_ss = np.sum(gamma_ssi, axis=(0,3))
+    return ev_ss
+    # df_bg[nn] = np.sum(dp_bg[nn]>thresh)/(nreals)
+
 
 
 ############################# Plot Library #############################
@@ -1733,7 +2103,7 @@ def plot_sample_nn(fobs, hc_ss, hc_bg, dp_ss, dp_bg, df_ss, df_bg, nn):
 
     return fig
 
-def plot_detprob(dp_ss_all, dp_bg_all, nsamp):
+def plot_detprob(dp_ss_all, dp_bg_all, nsamps):
     """ Plot detection probability for many samples.
 
     Paramaters
@@ -1751,11 +2121,11 @@ def plot_detprob(dp_ss_all, dp_bg_all, nsamp):
     fig, ax = plt.subplots(figsize=(6.5,4))
     ax.set_xlabel('Param Space Sample')
     ax.set_ylabel('Detection Probability, $\gamma$')
-    ax.errorbar(np.arange(nsamp), np.mean(dp_bg_all, axis=1),
+    ax.errorbar(np.arange(nsamps), np.mean(dp_bg_all, axis=1),
                 yerr = np.std(dp_bg_all, axis=1), linestyle='',
                 marker='d', capsize=5, color='cornflowerblue', alpha=0.5,
                 label = r'$\langle \gamma_\mathrm{BG} \rangle$')
-    ax.errorbar(np.arange(nsamp), np.mean(dp_ss_all, axis=(1,2)),
+    ax.errorbar(np.arange(nsamps), np.mean(dp_ss_all, axis=(1,2)),
                 yerr = np.std(dp_ss_all, axis=(1,2)), linestyle='',
                 marker='o', capsize=5, color='orangered', alpha=0.5,
                 label = r'$\langle \gamma_\mathrm{SS} \rangle$')
@@ -1768,7 +2138,7 @@ def plot_detprob(dp_ss_all, dp_bg_all, nsamp):
     return fig
 
 
-def plot_detfrac(df_ss, df_bg, nsamp, thresh):
+def plot_detfrac(df_ss, df_bg, nsamps, thresh):
     """ Plot detection fraction for many samples.
 
     Paramaters
@@ -1784,9 +2154,9 @@ def plot_detfrac(df_ss, df_bg, nsamp, thresh):
     fig : figure object
     """
     fig, ax = plt.subplots(figsize=(6.5,4))
-    ax.plot(np.arange(nsamp), df_bg, color='cornflowerblue', label='BG',
+    ax.plot(np.arange(nsamps), df_bg, color='cornflowerblue', label='BG',
             marker='d', alpha=0.5)
-    ax.plot(np.arange(nsamp), df_ss, color='orangered', label='SS',
+    ax.plot(np.arange(nsamps), df_ss, color='orangered', label='SS',
             marker='o', alpha=0.5)
     ax.set_xlabel('Param Space Sample')
     ax.set_ylabel('Detection Fraction')
@@ -1800,13 +2170,13 @@ def plot_detfrac(df_ss, df_bg, nsamp, thresh):
 
 
 def amp_to_hc(amp_ref, fobs, dfobs):
-    """ Calculate characteristic strain from strain amplitude.
+    """ Calculate characteristic strain from strain amplitude (from 1/yr amplitude).
 
     """
     hc = amp_ref*np.sqrt(fobs/dfobs)
     return hc
 
-def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref=None, ret_all = False):
+def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref=HC_REF15_10YR, ret_all = False):
     """ Sort samples by those with f=1/yr char strains closest to some reference value.
 
     Parameters
@@ -1841,10 +2211,6 @@ def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref
     if fidx is None:
         fidx = (np.abs(fobs - 1/(10*YR))).argmin()
 
-    if (hc_ref is None):
-        # find reference (e.g. 12.5 yr) char strain
-        hc_ref = amp_to_hc(amp_ref, fobs[fidx], dfobs[fidx])
-
 
     # extrapolate hc_ref at freq closest to 1/10yr from 1/10yr ref
     hc_ref = hc_ref * (fobs[fidx]*YR/.1)**(-2/3)
@@ -1852,9 +2218,7 @@ def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref
     # select 1/yr median strains of samples
     hc_tt = np.sqrt(hc_bg[:,fidx,:]**2 + np.sum(hc_ss[:,fidx,:,:]**2, axis=-1)) # (N,R)
     hc_diff = np.abs(hc_tt - hc_ref) # (N,R)
-    print('hc_diff', hc_diff.shape)
     hc_diff = np.median(hc_diff, axis=-1) # median of differences (N,)
-    print('hc_diff', hc_diff.shape)
 
     # sort by closest
     nsort = np.argsort(hc_diff)
@@ -1863,5 +2227,545 @@ def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref
         return nsort, fidx, hc_ref
     return nsort
 
-############################ Calibrate PTA #############################
+######################### Param Space Models ########################### 
 
+def detect_pspace_model(fobs_cents, hc_ss, hc_bg, 
+                        npsrs, sigma, nskies, thresh=DEF_THRESH, debug=False):
+    
+    nfreqs, nreals, nloudest = [*hc_ss.shape]
+    dur = 1/fobs_cents[0]
+    cad = 1.0 / (2 * fobs_cents[-1])
+    # fobs_cents, fobs_edges = holo.utils.pta_freqs(dur)
+    # dfobs = np.diff(fobs_edges)
+
+    # build PTA
+    if debug: print('Building pulsar timing array.')
+    psrs = _build_pta(npsrs, sigma, dur, cad)
+    # phis = np.random.uniform(0, 2*np.pi, size = npsrs)
+    # thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    # # sigmas = np.ones_like(phis)*sigma
+    # psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
+    #                 phi=phis, theta=thetas)
+
+    # Build ss skies
+    if debug: print('Building ss skies.')
+    theta_ss, phi_ss, Phi0_ss, iota_ss, psi_ss = _build_skies(nfreqs, nskies, nloudest)
+
+
+    # Calculate DPs, SNRs, and DFs
+    if debug: print('Calculating SS and BG detection statistics.')
+    dp_bg, snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg, ret_snr=True)
+    # print(f"{np.mean(dp_bg)=}")
+    vals_ss = detect_ss_pta(
+        psrs, fobs_cents, hc_ss, hc_bg, 
+        gamma_cython=True, snr_cython=True, ret_snr=True, 
+        theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss, iota_ss=iota_ss, psi_ss=psi_ss,
+        )
+    dp_ss, snr_ss, gamma_ssi = vals_ss[0], vals_ss[1], vals_ss[2]
+    # print(f"{np.mean(dp_ss)=}")
+    df_ss = np.sum(dp_ss>thresh)/(nreals*nskies)
+    df_bg = np.sum(dp_bg>thresh)/(nreals)
+    ev_ss = expval_of_ss(gamma_ssi)
+    # print(f"{np.mean(ev_ss)=}")
+
+    dsdata = {
+        'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi, 
+        'dp_bg':dp_bg, 'snr_bg':snr_bg,
+        'df_ss':df_ss, 'df_bg':df_bg, 'ev_ss':ev_ss,
+    }
+
+    return dsdata
+
+
+def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies, 
+                        sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
+                        thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
+                        red_amp=None, red_gamma=None, red2white=None, ss_noise=True): 
+    """ Detect pspace model using individual sigma calibration for each realization
+    
+    Parameters
+    ----------
+
+    red2white : scalar or None
+        Fixed ratio between red and white noise amplitude, if not None. 
+        Otherwise, red noise stays fixed
+
+    """
+    dur = 1.0/fobs_cents[0]
+    cad = 1.0/(2*fobs_cents[-1])
+
+    nfreqs, nreals, nloudest = [*hc_ss.shape]
+        
+    # form arrays for individual realization detstats
+    # set all to nan, only to be replaced if successful pta is found
+    dp_ss = np.ones((nreals, nskies)) * np.nan   
+    dp_bg = np.ones(nreals) * np.nan
+    snr_ss = np.ones((nfreqs, nreals, nskies, nloudest)) * np.nan
+    snr_bg = np.ones((nreals)) * np.nan
+    gamma_ssi = np.ones((nfreqs, nreals, nskies, nloudest)) * np.nan
+
+
+    # for each realization, 
+    # use sigmin and sigmax from previous realization, 
+    # unless it's the first realization of the sample
+    _sigstart, _sigmin, _sigmax = sigstart, sigmin, sigmax 
+    if debug: 
+        mod_start = datetime.now()
+        real_dur = datetime.now()
+    failed_psrs=0
+    for rr in range(nreals):
+        if debug: 
+            now = datetime.now()
+            if (rr%100==99):
+                print(f"{rr=}, {(now-real_dur)/100} s per realization, {_sigmin=:.2e}, {_sigmax=:.2e}, {_sigstart=:.2e}")
+                real_dur = now
+
+        # get calibrated psrs 
+        psrs, red_amp, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[:,rr], hc_ss[:,rr,:], fobs_cents, npsrs, tol=tol, maxbads=maxbads,
+                                    sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True,
+                                    red_amp=red_amp, red_gamma=red_gamma, red2white=red2white, ss_noise=ss_noise)
+        _sigmin /= 2
+        _sigmax *= 2 + 2e-20 # >1e-20 to make sure it doesnt immediately fail the 0 check 
+
+        if psrs is None:
+            failed_psrs += 1
+            continue # leave values as nan, if no successful PTA was found
+        # print(f"before calculation: {utils.stats(psrs[0].toaerrs)=}, \n{utils.stats(hc_bg[rr])=},\
+        #         {utils.stats(fobs_cents)=}")
+        # use those psrs to calculate realization detstats
+        _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1],  hc_ss[:,rr:rr+1,:], ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
+        # print(f"{utils.stats(psrs[0].toaerrs)=}, {utils.stats(hc_bg[rr])=},\
+        #         {_dp_bg=},")
+        # _dp_bg,  = detect_bg_pta(psrs, fobs_cents, hc_bg=hc_bg[:,rr:rr+1], red_amp=red_amp, red_gamma=red_gamma) #, ret_snr=True)
+        # print(f"test2: {_dp_bg=}")
+        dp_bg[rr], snr_bg[rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
+        _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
+            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], nskies=nskies, ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
+        # if debug: print(f"{_dp_ss.shape=}, {_snr_ss.shape=}, {_gamma_ssi.shape=}")
+        dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()
+
+    ev_ss = expval_of_ss(gamma_ssi)
+    df_ss, df_bg = detfrac_of_reals(dp_ss, dp_bg)
+    _dsdat = {
+        'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi, 
+        'dp_bg':dp_bg, 'snr_bg':snr_bg,
+        'df_ss':df_ss, 'df_bg':df_bg, 'ev_ss':ev_ss,
+        }
+    if save_gamma_ssi:
+        _dsdat.update(gamma_ssi=gamma_ssi)
+    if save_snr_ss:
+        _dsdat.update(snr_ss=snr_ss)
+    print(f"Model took {datetime.now() - mod_start} s, {failed_psrs}/{nreals} realizations failed.")
+    return _dsdat
+
+
+def detect_pspace_model_clbrt_ramp(fobs_cents, hc_ss, hc_bg, npsrs, nskies, sigma,
+                        rampstart=1e-16, rampmin=1e-20, rampmax=1e-13, tol=0.01, maxbads=5,
+                        thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
+                        red_amp=None, red_gamma=None, ss_noise=True): 
+    """ Detect pspace model using individual red noise amplitude calibration for each realization
+
+    NOTE: Not supported, not updated for including single sources as noise for BG.
+    
+    """
+    dur = 1.0/fobs_cents[0]
+    cad = 1.0/(2*fobs_cents[-1])
+
+    nfreqs, nreals, nloudest = [*hc_ss.shape]
+        
+    # form arrays for individual realization detstats
+    # set all to nan, only to be replaced if successful pta is found
+    dp_ss = np.ones((nreals, nskies)) * np.nan   
+    dp_bg = np.ones(nreals) * np.nan
+    snr_ss = np.ones((nfreqs, nreals, nskies, nloudest)) * np.nan
+    snr_bg = np.ones((nreals)) * np.nan
+    gamma_ssi = np.ones((nfreqs, nreals, nskies, nloudest)) * np.nan
+
+    # get psrs 
+    phis = np.random.uniform(0, 2*np.pi, size = npsrs)
+    thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
+                    phi=phis, theta=thetas)
+
+    # for each realization, 
+    # use sigmin and sigmax from previous realization, 
+    # unless it's the first realization of the sample
+    _rampstart, _rampmin, _rampmax = rampstart, rampmin, rampmax 
+    if debug: 
+        mod_start = datetime.now()
+        real_dur = datetime.now()
+    failed_psrs=0
+    for rr in range(nreals):
+        if debug: 
+            now = datetime.now()
+            if (rr%10==0):
+                print(f"{rr=}, {now-real_dur} s per realization, {_rampmin=:.2e}, {_rampmax=:.2e}, {_rampstart=:.2e}")
+            real_dur = now
+
+        # get calibrated psrs 
+        ramp, _rampmin, _rampmax = calibrate_one_ramp(hc_bg[:,rr], fobs_cents, psrs,
+                                    tol=tol, maxbads=maxbads,
+                                    rampstart=_rampstart, rampmin=_rampmin, rampmax=_rampmax, debug=debug, 
+                                    rgam=red_gamma, ss_noise=ss_noise)
+        _rampstart = ramp
+        _rampmin /= 2
+        _rampmax *= 2 + 2e-50 # >1e-20 to make sure it doesnt immediately fail the 0 check 
+
+        if ramp is None:
+            failed_psrs += 1
+            continue # leave values as nan, if no successful PTA was found
+        # print(f"before calculation: {utils.stats(psrs[0].toaerrs)=}, \n{utils.stats(hc_bg[rr])=},\
+        #         {utils.stats(fobs_cents)=}")
+        # use those psrs to calculate realization detstats
+        _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1], ret_snr=True, red_amp=ramp, red_gamma=red_gamma)
+        # print(f"{utils.stats(psrs[0].toaerrs)=}, {utils.stats(hc_bg[rr])=},\
+        #         {_dp_bg=},")
+        # _dp_bg,  = detect_bg_pta(psrs, fobs_cents, hc_bg=hc_bg[:,rr:rr+1], red_amp=red_amp, red_gamma=red_gamma) #, ret_snr=True)
+        # print(f"test2: {_dp_bg=}")
+        dp_bg[rr], snr_bg[rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
+        _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
+            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], nskies=nskies, ret_snr=True, red_amp=ramp, red_gamma=red_gamma)
+        # if debug: print(f"{_dp_ss.shape=}, {_snr_ss.shape=}, {_gamma_ssi.shape=}")
+        dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()
+
+    ev_ss = expval_of_ss(gamma_ssi)
+    df_ss, df_bg = detfrac_of_reals(dp_ss, dp_bg)
+    _dsdat = {
+        'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi, 
+        'dp_bg':dp_bg, 'snr_bg':snr_bg,
+        'df_ss':df_ss, 'df_bg':df_bg, 'ev_ss':ev_ss,
+        }
+    if save_gamma_ssi:
+        _dsdat.update(gamma_ssi=gamma_ssi)
+    if save_snr_ss:
+        _dsdat.update(snr_ss=snr_ss)
+    print(f"Model took {datetime.now() - mod_start} s, {failed_psrs}/{nreals} realizations failed.")
+    return _dsdat
+
+
+
+def detect_pspace_model_clbrt_sigma(fobs_cents, hc_ss, hc_bg, 
+                        npsrs, nskies, maxtrials=1): 
+    """ Detect pspace model using individual PTA calibration for each realization
+    
+    """
+    dur = 1.0/fobs_cents[0]
+    cad = 1.0/(2*fobs_cents[-1])
+
+    nfreqs, nreals, nloudest = [*hc_ss.shape]
+    # get calibrated sigmas 
+    sigmas, avg_dps, std_dps = calibrate_all_sigma(hc_bg, fobs_cents, npsrs, maxtrials=maxtrials)
+        
+    # form arrays for individual realization detstats
+    dp_ss = np.zeros((nreals, nskies))     
+    dp_bg = np.zeros(nreals)
+    snr_ss = np.zeros((nfreqs, nreals, nskies, nloudest))
+    snr_bg = np.zeros((nreals))
+    gamma_ssi = np.zeros((nfreqs, nreals, nskies, nloudest))
+
+    # for each realization, get individual detstats   
+    for rr in range(nreals):
+            # get psrs for the given calibrated sigma
+            psrs = _build_pta(npsrs, sigmas[rr], dur, cad)
+            # use those psrs to calculate realization detstats
+            _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1], ret_snr=True)
+            dp_bg[rr], snr_bg[rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
+            _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
+                psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], ret_snr=True)
+            dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()
+    ev_ss = expval_of_ss(gamma_ssi)
+    df_ss, df_bg = detfrac_of_reals(dp_ss, dp_bg)
+    _dsdat = {
+        'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi, 
+        'dp_bg':dp_bg, 'snr_bg':snr_bg,
+        'df_ss':df_ss, 'df_bg':df_bg, 'ev_ss':ev_ss,
+        }
+    return _dsdat
+
+
+########################################################################
+############################ Calibrate PTA ############################# 
+########################################################################
+
+def binary_sigma_calibration(hc_bg, fobs, npsrs, maxtrials=2, debug=False, 
+                          sig_start = 1e-6, sig_min = 1e-10, sig_max = 1e-3, ):
+    """ Calibrate the PTA to a 50% target DP for a given model, average over many realizations
+    
+    # BUG: This seems to get stuck on bad guesses, when requiring high max trials. 
+    # TODO: Set up a check for bar guesses. 
+    """
+    dur = 1.0/fobs[0]
+    cad = 1.0/(2*fobs[-1])
+    sigma=sig_start
+
+    avg_dp = 0
+    trials = 1
+    enough_trials = False
+    while avg_dp<.495 or avg_dp>.505 or enough_trials==False: # must be within the desired target range using the max number of trials
+        avg_dp, std_dp = _get_dpbg(hc_bg, npsrs=npsrs, sigma=sigma, trials=trials,
+                          fobs=fobs, dur=dur, cad=cad)
+        if debug: print(f"{avg_dp=}, {sigma=}, {sig_min=}, {sig_max=}, {trials=}")
+        
+        # if we're close, raise the number of trials
+        if avg_dp>0.4 and avg_dp<0.5:
+            if trials == maxtrials:
+                enough_trials=True
+            else:
+                trials=maxtrials
+
+        if avg_dp>=0.51:  # avg_dp too high, raise sigma
+            sig_min = sigma
+            sigma = np.mean([sig_min, sig_max])
+        elif avg_dp<=0.49: # avg_dp too low, decrease sigma
+            sig_max = sigma
+            sigma = np.mean([sig_min, sig_max])     
+    return sigma, avg_dp, std_dp
+
+def _get_dpbg(hc_bg, npsrs, sigma, trials, fobs, dur, cad,):
+    nreals = hc_bg.shape[-1]
+    all_dp = np.zeros((trials, nreals))
+
+    for ii in range(trials):
+        # build PTA
+        phis = np.random.uniform(0, 2*np.pi, size = npsrs)
+        thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+        psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
+                        phi=phis, theta=thetas)
+        # calculate bg detprob of each realizations for the given PTA
+        all_dp[ii] = detect_bg_pta(psrs, fobs, hc_bg=hc_bg)
+
+    avg_dp = np.mean(all_dp)
+    std_dp = np.std(all_dp)
+    return avg_dp, std_dp
+
+def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials, 
+                         sig_start=1e-6, sig_min=1e-9, sig_max=1e-4, debug=False):
+    """ Calibrate the PTA independently for each background realizations
+
+    Parameters
+    ----------
+    hc_bg : (F,R) Ndarray
+    fobs : (F,) 1Darray
+    npsrs : integer
+    maxtrials : integer
+
+    Returns
+    -------
+    rsigmas : (R,) 1Darray
+        Calibrated PTA white noise sigma for each realization.
+    avg_dps : (R,) 1Darray
+        Average background detprob across PTA realizations, calculated for the realization's PTA.
+    std_dps : (R,) 1Darray
+        Standard deviation among PTA realizations for the given bg realizations.
+
+    """
+    nreals = hc_bg.shape[-1]
+    rsigmas = np.zeros(nreals)
+    avg_dps = np.zeros(nreals)
+    std_dps = np.zeros(nreals)
+    for rr in range(nreals):
+        hc_bg_rr = hc_bg[:,rr:rr+1]
+        # print(hc_bg_rr.shape)
+        rsigmas[rr], avg_dps[rr], std_dps[rr] = binary_sigma_calibration(
+            hc_bg_rr, fobs, npsrs, maxtrials, debug=debug, 
+            sig_start = sig_start, sig_min=sig_min, sig_max=sig_max, 
+        )
+    return rsigmas, avg_dps, std_dps
+
+def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs, 
+                      sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
+                      phis=None, thetas=None, ret_sig = False, red_amp=None, red_gamma=None, red2white=None,
+                      ss_noise=True):
+    """ Calibrate the specific PTA for a given realization, and return that PTA
+
+    Parameters
+    ----------
+    hc_bg : (F,) 1Darray
+        The background characteristic strain for one realization.
+    hc_ss : (F,L) NDarray
+        The SS characteristic strains for one realization
+    fobs : (F,) 1Darray
+        Observed GW frequencies.
+    npsrs : integer
+        Number of pulsars.
+
+    Returns 
+    -------
+    psrs : hasasia.sim.pta object
+        Calibrated PTA.
+    sigmin : float
+        minimum of the final sigma range used, returned only if ret_sig=True
+    sigmax : float, returned only if ret_sig=True
+        maximum of the final sigma range used
+    sigma : float
+        final sigma, returned only if ret_sig=True
+
+    """
+
+    # get duration and cadence from fobs
+    dur = 1.0/fobs[0]
+    cad = 1.0/(2.0*fobs[-1])
+
+    # randomize pulsar positions
+    if phis is None: phis = np.random.uniform(0, 2*np.pi, size = npsrs)
+    if thetas is None: thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    sigma = sigstart
+    if red2white is not None:
+        red_amp = _white_noise(cad, sigma) * red2white
+
+    psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
+                    phi=phis, theta=thetas)
+    dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], hc_ss=hc_ss[:,np.newaxis,:],
+                            red_amp=red_amp, red_gamma=red_gamma, ss_noise=ss_noise)[0]
+
+    nclose=0 # number of attempts close to 0.5, could be stuck close
+    nfar=0 # number of attempts far from 0.5, could be stuck far
+
+    # calibrate sigma
+    while np.abs(dp_bg-0.50)>tol:
+        sigma = np.mean([sigmin, sigmax]) # a weighted average would be better
+        if red2white is not None:
+            red_amp = sigma * red2white
+        psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
+                        phi=phis, theta=thetas)
+        dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], hc_ss=hc_ss[:,np.newaxis,:],
+                                 red_amp=red_amp, red_gamma=red_gamma, ss_noise=ss_noise)[0]
+
+        # if debug: print(f"{dp_bg=}")
+        if (dp_bg < (0.5-tol)) or (dp_bg > (0.5+tol)):
+            nfar +=1
+
+        # check if we need to expand the range
+        if (nfar>5*maxbads  # if we've had many bad guesses
+            or (sigmin/sigmax > 0.99 # or our range is small and we are far from the goal
+                and (dp_bg<0.4 or dp_bg>0.6))):
+            
+            # then we must expand the range
+            if debug: print(f"STUCK! {nfar=}, {dp_bg=}, {sigmin=:e}, {sigmax=:e}")
+            if dp_bg < 0.5-tol: # stuck way too low, allow much lower sigmin to raise DP
+                sigmin = sigmin/3
+            if dp_bg > 0.5+tol: # stuck way too high, allow much higher sigmax to lower DP
+                sigmax = sigmax*3
+
+            # reset count for far guesses
+            nfar = 0
+
+        # check how we should narrow our range
+        if dp_bg<0.5-tol: # dp too low, lower sigma
+            sigmax = sigma
+        elif dp_bg>0.5+tol: # dp too high, raise sigma
+            sigmin = sigma
+        else:
+            nclose += 1 # check how many attempts between 0.49 and 0.51 fail
+
+        # check if we are stuck near the goal value with a bad range    
+        if nclose>maxbads: # if many fail, we're stuck; expand sampling range
+            if debug: print(f"{nclose=}, {dp_bg=}, {sigmin=:e}, {sigmax=:e}")
+            sigmin = sigmin/3
+            sigmax = sigmax*3
+            nclose=0
+
+        # check if goal DP is just impossible
+        if sigmax<1e-20:
+            psrs=None
+            if debug: print(f"FAILED! DP_BG=0.5 impossible with {red_amp=}, {red_gamma=}")
+            break
+    # print(f"test1: {dp_bg=}")
+    # print(f"test1: {sigma=}")
+    # print(f"in calibration: {utils.stats(psrs[0].toaerrs)=}, \n{utils.stats(hc_bg)=},\
+    #             {utils.stats(fobs)=}, {dp_bg=}")
+    if ret_sig:
+        return psrs, red_amp, sigma, sigmin, sigmax
+    return psrs, red_amp
+
+def calibrate_one_ramp(hc_bg, hc_ss, fobs, psrs,
+                      rampstart=1e-6, rampmin=1e-9, rampmax=1e-4, debug=False, maxbads=20, tol=0.03,
+                      phis=None, thetas=None, rgam=-1.5, ss_noise=True):
+    """ Calibrate the red noise amplitude, for a given realization, and return that PTA
+
+    Parameters
+    ----------
+    hc_bg : (F,) 1Darray
+        The background characteristic strain for one realization.
+    hc_ss : (F,L) NDarray
+        The SS characteristic strains for one realization
+    fobs : (F,) 1Darray
+        Observed GW frequencies.
+    psrs : hasasia.sim.pta object
+        PTA w/ fixed white noise
+    sigma : scalar
+        White noise sigma
+
+    Returns 
+    -------
+    redamp : float
+        final redamp, returned only if ret_ramp = True
+    redampmin : float
+        minimum of the final sigma range used, returned only if ret_sig=True
+    redampmax : float, returned only if ret_sig=True
+        maximum of the final sigma range used
+
+    """
+
+    # get duration and cadence from fobs
+    dur = 1.0/fobs[0]
+    cad = 1.0/(2.0*fobs[-1])
+
+    # randomize pulsar positions
+    ramp = rampstart
+    dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], hc_ss=hc_ss[:,np.newaxis,:],
+                red_amp=rgam, red_gamma=ramp, ss_noise=ss_noise)[0]
+
+    nclose=0 # number of attempts close to 0.5, could be stuck close
+    nfar=0 # number of attempts far from 0.5, could be stuck far
+
+    # calibrate sigma
+    while np.abs(dp_bg-0.50)>tol:
+        ramp = np.mean([rampmin, rampmax]) # a weighted average would be better
+        dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], hc_ss=hc_ss[:,np.newaxis,:],
+                    red_amp=ramp, red_gamma=rgam, ss_noise=ss_noise)[0]
+
+        # if debug: print(f"{dp_bg=}")
+        if (dp_bg < (0.5-tol)) or (dp_bg > (0.5+tol)):
+            nfar +=1
+
+        # check if we need to expand the range
+        if (nfar>5*maxbads  # if we've had many bad guesses
+            or (rampmin/rampmax > 0.99 # or our range is small and we are far from the goal
+                and (dp_bg<0.4 or dp_bg>0.6))):
+            
+            # then we must expand the range
+            if debug: print(f"STUCK! {nfar=}, {dp_bg=}, {rampmin=:e}, {rampmax=:e}")
+            if dp_bg < 0.5-tol: # stuck way too low, allow much lower sigmin to raise DP
+                rampmin = rampmin/3
+            if dp_bg > 0.5+tol: # stuck way too high, allow much higher sigmax to lower DP
+                rampmax = rampmax*3
+
+            # reset count for far guesses
+            nfar = 0
+
+        # check how we should narrow our range
+        if dp_bg<0.5-tol: # dp too low, lower sigma
+            rampmax = ramp
+        elif dp_bg>0.5+tol: # dp too high, raise sigma
+            rampmin = ramp
+        else:
+            nclose += 1 # check how many attempts between 0.49 and 0.51 fail
+
+        # check if we are stuck near the goal value with a bad range    
+        if nclose>maxbads: # if many fail, we're stuck; expand sampling range
+            if debug: print(f"{nclose=}, {dp_bg=}, {rampmin=:e}, {rampmax=:e}")
+            rampmin = rampmin/3
+            rampmax = rampmax*3
+            nclose=0
+
+        # check if goal DP is just impossible
+        if rampmax<1e-50:
+            ramp=None
+            if debug: print(f"FAILED! DP_BG=0.5 impossible with sigma={np.mean(psrs[0].toaerrs)}, {rgam=}")
+            break
+    # print(f"test1: {dp_bg=}")
+    # print(f"test1: {sigma=}")
+    # print(f"in calibration: {utils.stats(psrs[0].toaerrs)=}, \n{utils.stats(hc_bg)=},\
+    #             {utils.stats(fobs)=}, {dp_bg=}")
+    return ramp, rampmin, rampmax
