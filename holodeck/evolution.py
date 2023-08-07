@@ -610,6 +610,18 @@ class Evolution:
             Sampled binary data.  For each binary samples S, 5 parameters are returned:
             ['mtot', 'mrat', 'redz', 'fobs', 'eccen'] (these are listed in the `names` returned value.)
             NOTE: `fobs` is *observer*-frame *orbital*-frequencies.
+            These values correspond to all of the binaries in an observer's Universe
+            (i.e. light-cone), within the given frequency bins.  The number of samples `S` is
+            roughly the sum of the `weights` --- but the specific number is drawn from a Poisson
+            distribution around the sum of the `weights`.
+        vals : (4,) list of (V,) ndarrays or float
+            Binary parameters (log10 of parameters specified in the `names` return values) at each
+            frequency bin.  Binaries not reaching the target frequency bins before redshift zero,
+            or before coalescing, are not returned.  Thus the number of values `V` may be less than
+            F*N for F frequency bins and N binaries.
+        weights : (V,) ndarray of float
+            The weight of each binary-frequency sample.  i.e. number of observer-universe binaries
+            corresponding to this binary in the simulation, at the target frequency.
 
         To-Do
         -----
@@ -640,18 +652,23 @@ class Evolution:
 
         Arguments
         ---------
-        fobs_orb_edges : (F,)
-            Frequency bin edges, for observer-frame orbital frequencies.
+        fobs_orb_edges : (F+1,) arraylike
+            Edges of target frequency bins to sample population.  These are observer-frame orbital
+            frequencies.  Binaries are interpolated to frequency bin centers, calculated from the
+            midpoints of the provided bin edges.
 
         Returns
         -------
-        names : (4,) of str
-            Names of variables being returned
-        vals : (4, N)
-            The physical values for each binary and each frequency.
-        weights : (N,)
+        names : (4,) list of str,
+            Names of the returned binary parameters (i.e. each array in `vals`).
+        vals : (4,) list of (V,) ndarrays or float
+            Binary parameters (log10 of parameters specified in the `names` return values) at each
+            frequency bin.  Binaries not reaching the target frequency bins before redshift zero,
+            or before coalescing, are not returned.  Thus the number of values `V` may be less than
+            F*N for F frequency bins and N binaries.
+        weights : (V,) ndarray of float
             The weight of each binary-frequency sample.  i.e. number of observer-universe binaries
-            corresponding to this simulated binary.
+            corresponding to this binary in the simulation, at the target frequency.
 
         """
         fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges, log=False)
