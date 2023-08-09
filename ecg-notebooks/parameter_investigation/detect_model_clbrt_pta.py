@@ -132,7 +132,6 @@ def vary_parameter(
     # choose each parameter to be half-way across the range provided by the library
     if pars is None:
         pars = 0.5 * np.ones(num_pars) 
-    str_pars = str(pars).replace(" ", "_").replace("[", "").replace("]", "")
     # Choose parameter to vary
     param_idx = param_names.index(target_param)
 
@@ -161,15 +160,18 @@ def main():
     print(f"starting at {start_time}")
     print("-----------------------------------------")
 
+    # set up args
     args = _setup_argparse()
     print("NREALS = %d, NSKIES = %d, NPSRS = %d, target = %s, NVARS=%d"
           % (args.nreals, args.nskies, args.npsrs, args.target, args.nvars))
     
+    # set up output folder
     output_path = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}'
     # check if output folder already exists, if not, make it.
     if os.path.exists(output_path) is False:
         os.makedirs(output_path)
 
+    # set up load and save locations
     if args.load_file is None:
         load_data_from_file = output_path+'/data_params'
     else:
@@ -195,12 +197,13 @@ def main():
 
     if args.red2white is not None and args.red_amp is not None:
         print(f"{args.red2white=} and {args.red_amp} both provided. red_amp will be overriden by red2white ratio.")
-
     
     print(f"{load_data_from_file=}.npz")
     print(f"{save_data_to_file=}.npz")
     print(f"{save_dets_to_file=}.npz")
 
+
+    # calculate model and/or detstats
     if args.construct or args.detstats:
         if args.construct:
             params_list = np.linspace(0,1,args.nvars)
