@@ -64,12 +64,16 @@ def _setup_argparse():
                         help='Red noise gamma')
     parser.add_argument('--red2white', action='store', dest='red2white', type=float, default=DEF_RED2WHITE,
                         help='Red noise amplitude to white noise amplitude ratio.')
+    
+    # pta noise settings
     parser.add_argument('--ssn', action='store_true', dest='ss_noise', default=False, 
                         help='Whether or not to use single sources as a noise source in background calculations.') 
     parser.add_argument('--dsc', action='store_true', dest='dsc_flag', default=False, 
                         help='Whether or not to use single sources as a noise source in background calculations.') 
     parser.add_argument('--gsc-clbrt', action='store_true', dest='gsc_flag', default=False, 
                         help='Whether or not to use gsc noise to calibrate the background and dsc noise for SS detstats.') 
+    parser.add_argument('--divide', action='store_true', dest='divide_flag', default=False, 
+                        help='Whether or not to divide sensitivity curves among the pulsars.') 
     
     # pta calibration settings
     parser.add_argument('--sigstart', action='store', dest='sigstart', type=float, default=1e-7,
@@ -231,7 +235,7 @@ def main():
                 _dsdat = detstats.detect_pspace_model_clbrt_pta_gsc(
                     fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, 
                     sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
-                    thresh=args.thresh, debug=args.debug, ss_noise=args.ss_noise,
+                    thresh=args.thresh, debug=args.debug, ss_noise=args.ss_noise, divide_flag=args.divide_flag
                 )
             else:
                 _dsdat = detstats.detect_pspace_model_clbrt_pta(
