@@ -1009,7 +1009,7 @@ def psrs_spectra_gwbnoise(psrs, fobs, nreals, npsrs, divide_flag=False):
     noise_gsc = np.repeat(noise_gsc, npsrs*nreals).reshape(len(fobs), npsrs, nreals) # (F,P,R)
     noise_gsc = np.swapaxes(noise_gsc, 0, 1) # (P,F,R)
 
-    if divide_flag: noise_gsc /= npsrs
+    if divide_flag: noise_gsc *= npsrs*(npsrs-1)
 
     return spectra, noise_gsc
 
@@ -1030,7 +1030,7 @@ def _dsc_noise(fobs, nreals, npsrs, nloudest, psrs=None, spectra=None, divide_fl
     noise_dsc = np.repeat(noise_dsc, npsrs*nreals*nloudest).reshape(len(fobs), npsrs, nreals, nloudest) # (F,P,R,L)
     noise_dsc = np.swapaxes(noise_dsc, 0, 1) # (P,F,R,L)
 
-    if divide_flag: noise_dsc /= npsrs
+    if divide_flag: noise_dsc *= npsrs*(npsrs-1)
     return noise_dsc
 
 
