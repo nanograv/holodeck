@@ -2334,6 +2334,45 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
     return dsdata
 
 
+def detect_pspace_model_psrs(fobs_cents, hc_ss, hc_bg, psrs, nskies, 
+                        thresh=DEF_THRESH, debug=False):
+    
+    nfreqs, nreals, nloudest = [*hc_ss.shape]
+    dur = 1/fobs_cents[0]
+    cad = 1.0 / (2 * fobs_cents[-1])
+    # fobs_cents, fobs_edges = holo.utils.pta_freqs(dur)
+    # dfobs = np.diff(fobs_edges)
+
+
+    # Build ss skies
+    if debug: print('Building ss skies.')
+    theta_ss, phi_ss, Phi0_ss, iota_ss, psi_ss = _build_skies(nfreqs, nskies, nloudest)
+
+
+    # Calculate DPs, SNRs, and DFs
+    if debug: print('Calculating SS and BG detection statistics.')
+    dp_bg, snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg, ret_snr=True)
+    # print(f"{np.mean(dp_bg)=}")
+    vals_ss = detect_ss_pta(
+        psrs, fobs_cents, hc_ss, hc_bg, 
+        gamma_cython=True, snr_cython=True, ret_snr=True, 
+        theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss, iota_ss=iota_ss, psi_ss=psi_ss,
+        )
+    dp_ss, snr_ss, gamma_ssi = vals_ss[0], vals_ss[1], vals_ss[2]
+    # print(f"{np.mean(dp_ss)=}")
+    df_ss = np.sum(dp_ss>thresh)/(nreals*nskies)
+    df_bg = np.sum(dp_bg>thresh)/(nreals)
+    ev_ss = expval_of_ss(gamma_ssi)
+    # print(f"{np.mean(ev_ss)=}")
+
+    dsdata = {
+        'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi, 
+        'dp_bg':dp_bg, 'snr_bg':snr_bg,
+        'df_ss':df_ss, 'df_bg':df_bg, 'ev_ss':ev_ss,
+    }
+
+    return dsdata
+
 def detect_pspace_model_clbrt_pta(
         fobs_cents, hc_ss, hc_bg, npsrs, nskies, 
         sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
@@ -2860,7 +2899,7 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs,
     #             {utils.stats(fobs)=}, {dp_bg=}")
     if ret_sig:
         return psrs, red_amp, sigma, sigmin, sigmax
-    return psrs, red_amp
+    return psrs
 
 
 def calibrate_one_pta_gsc(hc_bg, fobs, npsrs, 
