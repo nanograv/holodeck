@@ -77,7 +77,7 @@ def _setup_argparse():
                         help='Whether or not to divide sensitivity curves among the pulsars.') 
     
     # pta calibration settings
-    parser.add_argument('-c-v', '--calvar', action='store', dest='calvar', type=int, default=DEF_CALVAR,
+    parser.add_argument('--cv', '--calvar', action='store', dest='calvar', type=int, default=DEF_CALVAR,
                         help='variation to use for calibration')
     parser.add_argument('--sigstart', action='store', dest='sigstart', type=float, default=1e-7,
                         help='starting sigma if for realization calibration')
