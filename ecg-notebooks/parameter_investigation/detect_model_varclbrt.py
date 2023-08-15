@@ -189,7 +189,7 @@ def main():
     else:
         save_data_to_file = args.save_file
 
-    save_dets_to_file = output_path+f'/detstats_s{args.nskies}_midclbrt'
+    save_dets_to_file = output_path+f'/detstats_s{args.nskies}_cv{args.calvar}'
     if args.ss_noise: save_dets_to_file = save_dets_to_file+'_ssn'
 
     if args.red2white is not None and args.red_gamma is not None:
@@ -229,7 +229,7 @@ def main():
         # get a calibrated pta 
         # use median gwb
         hc_bg = np.median(data[args.calvar]['hc_bg'], axis=-1)
-        hc_ss = np.median(data[args.calvar], axis=-2) # dummy hc_ss, not actually used 
+        hc_ss = np.median(data[args.calvar]['hc_ss'], axis=-2) # dummy hc_ss, not actually used 
         psrs = detstats.calibrate_one_pta(
             hc_bg, hc_ss, fobs_cents, args.npsrs, ret_sig=False,
             sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
