@@ -49,6 +49,8 @@ def _setup_argparse():
                         help='number of variations on target param')
     parser.add_argument('--shape', action='store', dest='shape', type=int, default=DEF_SHAPE,
                         help='sam shape')
+    parser.add_argument('--gw_only', action='store_true', dest='gw_only', default=False,
+                        help='whether or not to use gw-only evolution')
     # parser.add_argument('-d', '--dur', action='store', dest='dur', type=int, default=DEF_PTA_DUR,
     #                     help='pta duration in yrs')
 
@@ -109,8 +111,8 @@ def _setup_argparse():
                         help="Whether or not to calibrate the PTA for individual realizations.")
     parser.add_argument('--grid_path', action='store', dest ='grid_path', type=str, default=GAMMA_RHO_GRID_PATH,
                         help="gamma-rho interpolation grid path")
-    parser.add_argument('--anatomy_path', action='store', dest ='anatomy_path', type=str, default=ANATOMY_PATH,
-                        help="path to load and save anatomy files")
+    # parser.add_argument('--anatomy_path', action='store', dest ='anatomy_path', type=str, default=ANATOMY_PATH,
+    #                     help="path to load and save anatomy files")
     parser.add_argument('--load_file', action='store', dest ='load_file', type=str, default=None,
                         help="file to load sample data and params, excluding .npz suffice")
     parser.add_argument('--save_file', action='store', dest ='save_file', type=str, default=None,
@@ -173,7 +175,12 @@ def main():
           % (args.nreals, args.nskies, args.npsrs, args.target, args.nvars))
     
     # set up output folder
-    output_path = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}'
+    if args.gw_only:
+        anatomy_path = '/Users/emigardiner/GWs/holodeck/output/anatomy_7GW'
+    else:
+        anatomy_path = ANATOMY_PATH
+
+    output_path = anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}'
     # check if output folder already exists, if not, make it.
     if os.path.exists(output_path) is False:
         os.makedirs(output_path)
