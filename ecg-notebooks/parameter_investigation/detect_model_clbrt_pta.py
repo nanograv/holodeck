@@ -74,6 +74,8 @@ def _setup_argparse():
                         help='Whether or not to use gsc noise to calibrate the background and dsc noise for SS detstats.') 
     parser.add_argument('--divide', action='store_true', dest='divide_flag', default=False, 
                         help='Whether or not to divide sensitivity curves among the pulsars.') 
+    parser.add_argument('--onepsr', action='store_true', dest='onepsr_flag', default=False, 
+                        help='Whether or not to treat PTA with gsc/dsc noise as 1 psr.') 
     
     # pta calibration settings
     parser.add_argument('--sigstart', action='store', dest='sigstart', type=float, default=1e-7,
@@ -189,7 +191,14 @@ def main():
     save_dets_to_file = output_path+f'/detstats_s{args.nskies}'
     if args.ss_noise: save_dets_to_file = save_dets_to_file+'_ssn'
 
-    if args.gsc_flag: save_dets_to_file = save_dets_to_file+'_gsc'
+    if args.gsc_flag: 
+        save_dets_to_file = save_dets_to_file+'_gsc'
+        if args.onepsr_flag:
+            save_dets_to_file = save_dets_to_file+'_onepsr'
+            assert args.npsrs == 1, "To use '--onepsr' set -p 1"
+            assert args.divide_flag is False, "only one of '--divide' and '--onepsr' should be True"
+        elif args.divide_flag:
+            save_dets_to_file = save_dets_to_file+'_divide'
     elif args.dsc_flag: save_dets_to_file = save_dets_to_file+'_dsc' # only append 'dsc' if not gsc-calibrated
 
     if args.red2white is not None and args.red_gamma is not None:
@@ -235,7 +244,8 @@ def main():
                 _dsdat = detstats.detect_pspace_model_clbrt_pta_gsc(
                     fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, 
                     sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
-                    thresh=args.thresh, debug=args.debug, ss_noise=args.ss_noise, divide_flag=args.divide_flag
+                    thresh=args.thresh, debug=args.debug, 
+                    ss_noise=args.ss_noise, divide_flag=args.divide_flag,
                 )
             else:
                 _dsdat = detstats.detect_pspace_model_clbrt_pta(
