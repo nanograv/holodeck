@@ -2459,12 +2459,14 @@ def detect_pspace_model_clbrt_pta(
         else:
             noise_ss = None
 
-        # calculate realizatoin SS detstats
+        # calculate realization SS detstats
         _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
             psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], custom_noise=noise_ss,
             nskies=nskies, ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
 
-        dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()
+        dp_ss[rr] = _dp_ss.reshape(nskies) # from R=1,S to S
+        snr_ss[:,rr] = _snr_ss.reshape(nfreqs, nskies, nloudest) # from F,R=1,S,L to F,S,L
+        gamma_ssi[:,rr,:,:] = _gamma_ssi.reshape(nfreqs, nskies, nloudest) # from F,R=1,S,L to F,S,L
 
     ev_ss = expval_of_ss(gamma_ssi)
     df_ss, df_bg = detfrac_of_reals(dp_ss, dp_bg)
