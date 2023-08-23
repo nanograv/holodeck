@@ -12,6 +12,7 @@ DEF_NLOUDEST = 10
 DEF_NREALS = 100
 DEF_NFREQS = 40
 DEF_NVARS = 21
+DEF_CALVAR = None
 
 # pta calibration
 DEF_NSKIES = 100
@@ -78,6 +79,8 @@ def _setup_argparse():
                         help='Whether or not to treat PTA with gsc/dsc noise as 1 psr.') 
     
     # pta calibration settings
+    parser.add_argument('--cv', '--calvar', action='store', dest='calvar', type=int, default=DEF_CALVAR,
+                        help='variation to use for calibration')
     parser.add_argument('--sigstart', action='store', dest='sigstart', type=float, default=1e-7,
                         help='starting sigma if for realization calibration')
     parser.add_argument('--sigmin', action='store', dest='sigmin', type=float, default=1e-10,
@@ -168,8 +171,8 @@ def main():
 
     # set up args
     args = _setup_argparse()
-    print("NREALS = %d, NSKIES = %d, NPSRS = %d, target = %s, NVARS=%d"
-          % (args.nreals, args.nskies, args.npsrs, args.target, args.nvars))
+    print("NREALS = %d, NSKIES = %d, NPSRS = %d, target = %s, NVARS=%d, CV=%s"
+          % (args.nreals, args.nskies, args.npsrs, args.target, args.nvars, str(args.calvar)))
     
     # set up output folder
     output_path = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}'
@@ -189,6 +192,7 @@ def main():
         save_data_to_file = args.save_file
 
     save_dets_to_file = output_path+f'/detstats_s{args.nskies}'
+    if args.calvar is not None: save_dets_to_file = save_data_to_file+f"_cv{args.calvar}"
     if args.ss_noise: save_dets_to_file = save_dets_to_file+'_ssn'
 
     if args.gsc_flag: 
@@ -234,26 +238,71 @@ def main():
 
         fobs_cents = data[0]['fobs_cents']
 
-        # get dsdat for each data/param
-        dsdat = []
-        for ii, _data in enumerate(tqdm(data)):
-            if args.debug: print(f"on var {ii=} out of {args.nvars}")
-            hc_bg = _data['hc_bg']
-            hc_ss = _data['hc_ss']
+
+        #### 'FIXED-PTA' METHOD
+        # calibrate one pta if using calvar
+        if args.calvar is not None:
+            # use median gwb
+            hc_bg = np.median(data[args.calvar]['hc_bg'], axis=-1)
+            hc_ss = np.median(data[args.calvar]['hc_ss'], axis=-2) # dummy hc_ss, not actually used 
+
             if args.gsc_flag:
-                _dsdat = detstats.detect_pspace_model_clbrt_pta_gsc(
-                    fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, 
+                psrs = detstats.calibrate_one_pta_gsc(
+                    hc_bg, hc_ss, fobs_cents, args.npsrs, ret_sig=False,
                     sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
-                    thresh=args.thresh, debug=args.debug, 
-                    ss_noise=args.ss_noise, divide_flag=args.divide_flag,
-                )
+                    red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white,
+                    divide_flag=args.divide_flag)
             else:
-                _dsdat = detstats.detect_pspace_model_clbrt_pta(
-                    fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, dsc_flag=args.dsc_flag,
+                psrs = detstats.calibrate_one_pta(
+                    hc_bg, hc_ss, fobs_cents, args.npsrs, ret_sig=False,
                     sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
-                    thresh=args.thresh, debug=args.debug, ss_noise=args.ss_noise,
-                    red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white)
-            dsdat.append(_dsdat)
+                    red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white,
+                    )
+
+
+            # get dsdat for each data/param
+            dsdat = []
+            for ii, _data in enumerate(tqdm(data)):
+                if args.debug: print(f"on var {ii=} out of {args.nvars}")
+                hc_bg = _data['hc_bg']
+                hc_ss = _data['hc_ss']
+
+                _dsdat = detstats.detect_pspace_model_psrs(
+                        fobs_cents, hc_ss, hc_bg, psrs, args.nskies,
+                        thresh=args.thresh, debug=args.debug, )
+                dsdat.append(_dsdat)
+                # not updated to allow for dsc alonegi
+
+
+        #### 'REALIZATION-CALIBRATED' METHOD
+        else:
+            # get dsdat for each data/param
+            dsdat = []
+            for ii, _data in enumerate(tqdm(data)):
+                if args.debug: print(f"on var {ii=} out of {args.nvars}")
+                hc_bg = _data['hc_bg']
+                hc_ss = _data['hc_ss']
+
+                if args.calvar is not None:
+                        _dsdat = detstats.detect_pspace_model_psrs(
+                        fobs_cents, hc_ss, hc_bg, psrs, args.nskies,
+                        thresh=args.thresh, debug=args.debug, )
+                elif args.gsc_flag:
+                    _dsdat = detstats.detect_pspace_model_clbrt_pta_gsc(
+                        fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, 
+                        sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
+                        thresh=args.thresh, debug=args.debug, 
+                        ss_noise=args.ss_noise, divide_flag=args.divide_flag,
+                    )
+                else:
+                    _dsdat = detstats.detect_pspace_model_clbrt_pta(
+                        fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, dsc_flag=args.dsc_flag,
+                        sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
+                        thresh=args.thresh, debug=args.debug, ss_noise=args.ss_noise,
+                        red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white)
+                dsdat.append(_dsdat)
+
+        # Save npz file
         np.savez(save_dets_to_file+'.npz', dsdat=dsdat, red_amp=args.red_amp, red_gamma=args.red_gamma, npsrs=args.npsrs, red2white=args.red2white) # overwrite
     else:
         print(f"Neither {args.construct=} or {args.detstats} are true. Doing nothing.")
