@@ -122,8 +122,111 @@ def _setup_argparse():
     return args
 
 
-# # construct a param_space instance, note that `nsamples` and `seed` don't matter here for how we'll use this
-# pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=SHAPE, seed=None)
+
+def main():
+    start_time = datetime.now()
+    print("-----------------------------------------")
+    print(f"starting at {start_time}")
+    print("-----------------------------------------")
+
+    # set up args
+    args = _setup_argparse()
+    print("NREALS = %d, NSKIES = %d, NPSRS = %d, target = %s, NVARS=%d, CV=%s, NLOUDEST=%d"
+          % (args.nreals, args.nskies, args.npsrs, args.target, args.nvars, str(args.calvar), args.nloudest))
+    
+    # get file names based on arguments
+    load_data_from_file, save_data_to_file, save_dets_to_file = file_names(args)
+    print(f"{load_data_from_file=}.npz")
+    print(f"{save_data_to_file=}.npz")
+    print(f"{save_dets_to_file=}.npz")
+
+
+    # calculate model and/or detstats
+    if args.construct or args.detstats:
+        # calculate model
+        if args.construct:
+            data, params = construct_data(args)
+
+            # save data file
+            np.savez(save_data_to_file+'.npz', data=data, params=params) # save before calculating detstats, in case of crash
+
+        # or just load model
+        else:
+            file = np.load(load_data_from_file+'.npz', allow_pickle=True)
+            print('loaded files:', file.files)
+            data = file['data']
+            params = file['params']
+            file.close()
+
+        # calculate detection statistics
+        if args.calvar is not None:  #### 'FIXED-PTA' METHOD
+            dsdat = fixed_pta_method(args, data)
+        else:                        #### 'REALIZATION-CALIBRATED' METHOD
+            dsdat = realization_calibrated_method(args, data)
+
+        # Save detection statistics file
+        np.savez(save_dets_to_file+'.npz', dsdat=dsdat, red_amp=args.red_amp, red_gamma=args.red_gamma, npsrs=args.npsrs, red2white=args.red2white) # overwrite
+
+    else:
+        print(f"Neither {args.construct=} or {args.detstats} are true. Doing nothing.")
+
+    end_time = datetime.now()
+    print("-----------------------------------------")
+    print(f"ending at {end_time}")
+    print(f"total time: {end_time - start_time}")
+    print("-----------------------------------------")
+
+
+
+
+
+def file_names(args):
+    # set up output folder
+    output_path = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}'
+    # check if output folder already exists, if not, make it.
+    if os.path.exists(output_path) is False:
+        os.makedirs(output_path)
+
+    # set up load and save locations
+    if args.load_file is None:
+        load_data_from_file = output_path+'/data_params'
+    else:
+        load_data_from_file = args.load_file
+
+    if args.save_file is None:
+        save_data_to_file =  output_path+'/data_params'
+    else:
+        save_data_to_file = args.save_file
+
+    # define detstats file name
+    save_dets_to_file = output_path+f'/detstats_s{args.nskies}'
+    if args.nloudest != DEF_NLOUDEST:                                           # if using nloudest that isn't the default 10
+        save_dets_to_file += f"_l{args.nloudest}" 
+        save_data_to_file += f"_l{args.nloudest}"
+    if args.calvar is not None: save_dets_to_file += f"_cv{args.calvar}"        # if using one variation to calibrate
+    if args.ss_noise: save_dets_to_file += '_ssn'                               # if using single sources as noise
+
+    if args.gsc_flag:                                                           # if using GSC as noise
+        save_dets_to_file = save_dets_to_file+'_gsc'
+        if args.onepsr_flag:
+            save_dets_to_file = save_dets_to_file+'_onepsr'
+            assert args.npsrs == 1, "To use '--onepsr' set -p 1"
+            assert args.divide_flag is False, "only one of '--divide' and '--onepsr' should be True"
+        elif args.divide_flag:
+            save_dets_to_file = save_dets_to_file+'_divide'
+    elif args.dsc_flag: save_dets_to_file = save_dets_to_file+'_dsc' # only append 'dsc' if not gsc-calibrated
+
+    if args.red2white is not None and args.red_gamma is not None:               # if using red noise with fixed red_gamma
+        save_dets_to_file = save_dets_to_file+f'_r2w{args.red2white:.1f}_rg{args.red_gamma:.1f}'
+    elif args.red_amp is not None and args.red_gamma is not None:               # if using fixed red noise 
+        save_dets_to_file = save_dets_to_file+f'_ra{args.red_amp:.1e}_rg{args.red_gamma:.1f}'
+    else: 
+        save_dets_to_file = save_dets_to_file+f'_white'
+
+    if args.red2white is not None and args.red_amp is not None:
+        print(f"{args.red2white=} and {args.red_amp} both provided. red_amp will be overriden by red2white ratio.")
+    
+    return load_data_from_file, save_data_to_file, save_dets_to_file
 
 def vary_parameter(
         target_param,    # the name of the parameter, has to exist in `param_names`
@@ -162,157 +265,113 @@ def vary_parameter(
     return (data, params)
 
 
+def construct_data(args):
+        params_list = np.linspace(0,1,args.nvars)
+        data, params, = vary_parameter(
+            target_param=args.target, params_list=params_list,
+            nfreqs=args.nfreqs, nreals=args.nreals, nloudest=args.nloudest,
+            pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=args.shape, seed=None),)
+        return data, params
 
-def main():
-    start_time = datetime.now()
-    print("-----------------------------------------")
-    print(f"starting at {start_time}")
-    print("-----------------------------------------")
 
-    # set up args
-    args = _setup_argparse()
-    print("NREALS = %d, NSKIES = %d, NPSRS = %d, target = %s, NVARS=%d, CV=%s"
-          % (args.nreals, args.nskies, args.npsrs, args.target, args.nvars, str(args.calvar)))
+def resample_loudest(hc_ss, hc_bg, nloudest):
+    if nloudest > hc_ss.shape[-1]: # check for valid nloudest
+        err = f"{nloudest=} for detstats must be <= nloudest of hc data"
+        raise ValueError(err)
     
-    # set up output folder
-    output_path = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}'
-    # check if output folder already exists, if not, make it.
-    if os.path.exists(output_path) is False:
-        os.makedirs(output_path)
+    # recalculate new hc_bg and hc_ss
+    new_hc_bg = np.sqrt(hc_bg**2 + np.sum(hc_ss[...,nloudest:]**2, axis=-1))
+    new_hc_ss = hc_ss[...,:nloudest]
+    return new_hc_ss, new_hc_bg
 
-    # set up load and save locations
-    if args.load_file is None:
-        load_data_from_file = output_path+'/data_params'
-    else:
-        load_data_from_file = args.load_file
 
-    if args.save_file is None:
-        save_data_to_file =  output_path+'/data_params'
-    else:
-        save_data_to_file = args.save_file
-
-    save_dets_to_file = output_path+f'/detstats_s{args.nskies}'
-    if args.calvar is not None: save_dets_to_file = save_data_to_file+f"_cv{args.calvar}"
-    if args.ss_noise: save_dets_to_file = save_dets_to_file+'_ssn'
-
-    if args.gsc_flag: 
-        save_dets_to_file = save_dets_to_file+'_gsc'
-        if args.onepsr_flag:
-            save_dets_to_file = save_dets_to_file+'_onepsr'
-            assert args.npsrs == 1, "To use '--onepsr' set -p 1"
-            assert args.divide_flag is False, "only one of '--divide' and '--onepsr' should be True"
-        elif args.divide_flag:
-            save_dets_to_file = save_dets_to_file+'_divide'
-    elif args.dsc_flag: save_dets_to_file = save_dets_to_file+'_dsc' # only append 'dsc' if not gsc-calibrated
-
-    if args.red2white is not None and args.red_gamma is not None:
-        save_dets_to_file = save_dets_to_file+f'_r2w{args.red2white:.1f}_rg{args.red_gamma:.1f}'
-    elif args.red_amp is not None and args.red_gamma is not None:
-        save_dets_to_file = save_dets_to_file+f'_ra{args.red_amp:.1e}_rg{args.red_gamma:.1f}'
-    else: 
-        save_dets_to_file = save_dets_to_file+f'_white'
-
-    if args.red2white is not None and args.red_amp is not None:
-        print(f"{args.red2white=} and {args.red_amp} both provided. red_amp will be overriden by red2white ratio.")
+def fixed_pta_method(args, data):
+    """ 'FIXED-PTA' METHOD
     
-    print(f"{load_data_from_file=}.npz")
-    print(f"{save_data_to_file=}.npz")
-    print(f"{save_dets_to_file=}.npz")
+    calibrate pta once if using calvar (calibration variation)
+    """
+
+    fobs_cents = data[0]['fobs_cents']
+
+    # use median gwb
+    hc_ss = data[args.calvar]['hc_bg']
+    hc_bg = data[args.calvar]['hc_ss']
+    if args.nloudest != hc_ss.shape[-1]:
+        hc_ss, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest)
+
+    # get median across realizations of calvar, for psr calibration
+    hc_bg_med = np.median(hc_bg, axis=-1)
+    hc_ss_med = np.median(hc_ss, axis=-2) # dummy hc_ss, not actually used 
+
+    if args.gsc_flag:
+        psrs = detstats.calibrate_one_pta_gsc(
+            hc_bg_med, hc_ss_med, fobs_cents, args.npsrs, ret_sig=False,
+            sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
+            red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white,
+            divide_flag=args.divide_flag)
+    else:
+        psrs = detstats.calibrate_one_pta(
+            hc_bg_med, hc_ss_med, fobs_cents, args.npsrs, ret_sig=False,
+            sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
+            red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white,
+            )
 
 
-    # calculate model and/or detstats
-    if args.construct or args.detstats:
-        if args.construct:
-            params_list = np.linspace(0,1,args.nvars)
-            data, params, = vary_parameter(
-                target_param=args.target, params_list=params_list,
-                nfreqs=args.nfreqs, nreals=args.nreals, nloudest=args.nloudest,
-                pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=args.shape, seed=None),)
-            np.savez(save_data_to_file+'.npz', data=data, params=params) # save before calculating detstats, in case of crash
-        else:
-            file = np.load(load_data_from_file+'.npz', allow_pickle=True)
-            print('loaded files:', file.files)
-            data = file['data']
-            params = file['params']
-            file.close()
+    # get dsdat for each data/param
+    dsdat = []
+    for ii, _data in enumerate(tqdm(data)):
+        if args.debug: print(f"on var {ii=} out of {args.nvars}")
+        hc_bg = _data['hc_bg']
+        hc_ss = _data['hc_ss']
 
-        fobs_cents = data[0]['fobs_cents']
+        # shift loudest as needed
+        if args.nloudest != hc_ss.shape[-1]:
+            hc_ss, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest)
 
+        _dsdat = detstats.detect_pspace_model_psrs(
+                fobs_cents, hc_ss, hc_bg, psrs, args.nskies,
+                thresh=args.thresh, debug=args.debug, )
+        dsdat.append(_dsdat)
+        # not updated to allow for dsc alone
+        
+    return dsdat
 
-        #### 'FIXED-PTA' METHOD
-        # calibrate one pta if using calvar
+def realization_calibrated_method(args, data):
+    """ 'REALIZATION-CALIBRATED' METHOD
+    
+    calibrate PTA realization by realization
+    """
+    fobs_cents = data[0]['fobs_cents']
+
+    # get dsdat for each data/param
+    dsdat = []
+    for ii, _data in enumerate(tqdm(data)):
+        if args.debug: print(f"on var {ii=} out of {args.nvars}")
+        hc_bg = _data['hc_bg']
+        hc_ss = _data['hc_ss']
+
         if args.calvar is not None:
-            # use median gwb
-            hc_bg = np.median(data[args.calvar]['hc_bg'], axis=-1)
-            hc_ss = np.median(data[args.calvar]['hc_ss'], axis=-2) # dummy hc_ss, not actually used 
-
-            if args.gsc_flag:
-                psrs = detstats.calibrate_one_pta_gsc(
-                    hc_bg, hc_ss, fobs_cents, args.npsrs, ret_sig=False,
-                    sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
-                    red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white,
-                    divide_flag=args.divide_flag)
-            else:
-                psrs = detstats.calibrate_one_pta(
-                    hc_bg, hc_ss, fobs_cents, args.npsrs, ret_sig=False,
-                    sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
-                    red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white,
-                    )
-
-
-            # get dsdat for each data/param
-            dsdat = []
-            for ii, _data in enumerate(tqdm(data)):
-                if args.debug: print(f"on var {ii=} out of {args.nvars}")
-                hc_bg = _data['hc_bg']
-                hc_ss = _data['hc_ss']
-
                 _dsdat = detstats.detect_pspace_model_psrs(
-                        fobs_cents, hc_ss, hc_bg, psrs, args.nskies,
-                        thresh=args.thresh, debug=args.debug, )
-                dsdat.append(_dsdat)
-                # not updated to allow for dsc alonegi
-
-
-        #### 'REALIZATION-CALIBRATED' METHOD
+                fobs_cents, hc_ss, hc_bg, psrs, args.nskies,
+                thresh=args.thresh, debug=args.debug, )
+        if args.gsc_flag:
+            _dsdat = detstats.detect_pspace_model_clbrt_pta_gsc(
+                fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, 
+                sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
+                thresh=args.thresh, debug=args.debug, 
+                ss_noise=args.ss_noise, divide_flag=args.divide_flag,
+            )
         else:
-            # get dsdat for each data/param
-            dsdat = []
-            for ii, _data in enumerate(tqdm(data)):
-                if args.debug: print(f"on var {ii=} out of {args.nvars}")
-                hc_bg = _data['hc_bg']
-                hc_ss = _data['hc_ss']
+            _dsdat = detstats.detect_pspace_model_clbrt_pta(
+                fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, dsc_flag=args.dsc_flag,
+                sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
+                thresh=args.thresh, debug=args.debug, ss_noise=args.ss_noise,
+                red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white)
+        dsdat.append(_dsdat)
 
-                if args.calvar is not None:
-                        _dsdat = detstats.detect_pspace_model_psrs(
-                        fobs_cents, hc_ss, hc_bg, psrs, args.nskies,
-                        thresh=args.thresh, debug=args.debug, )
-                elif args.gsc_flag:
-                    _dsdat = detstats.detect_pspace_model_clbrt_pta_gsc(
-                        fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, 
-                        sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
-                        thresh=args.thresh, debug=args.debug, 
-                        ss_noise=args.ss_noise, divide_flag=args.divide_flag,
-                    )
-                else:
-                    _dsdat = detstats.detect_pspace_model_clbrt_pta(
-                        fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, dsc_flag=args.dsc_flag,
-                        sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
-                        thresh=args.thresh, debug=args.debug, ss_noise=args.ss_noise,
-                        red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white)
-                dsdat.append(_dsdat)
+    return dsdat
 
-        # Save npz file
-        np.savez(save_dets_to_file+'.npz', dsdat=dsdat, red_amp=args.red_amp, red_gamma=args.red_gamma, npsrs=args.npsrs, red2white=args.red2white) # overwrite
-    else:
-        print(f"Neither {args.construct=} or {args.detstats} are true. Doing nothing.")
 
-    end_time = datetime.now()
-    print("-----------------------------------------")
-    print(f"ending at {end_time}")
-    print(f"total time: {end_time - start_time}")
-    print("-----------------------------------------")
 
 if __name__ == "__main__":
     main()
-
