@@ -293,7 +293,7 @@ def fixed_pta_method(args, data):
 
     fobs_cents = data[0]['fobs_cents']
 
-    # use median gwb
+    # get hc_ss and hc_bg from appropriate calibration variation
     hc_ss = data[args.calvar]['hc_bg']
     hc_bg = data[args.calvar]['hc_ss']
     if args.nloudest != hc_ss.shape[-1]:
@@ -315,7 +315,6 @@ def fixed_pta_method(args, data):
             sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
             red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white,
             )
-
 
     # get dsdat for each data/param
     dsdat = []
@@ -347,13 +346,15 @@ def realization_calibrated_method(args, data):
     dsdat = []
     for ii, _data in enumerate(tqdm(data)):
         if args.debug: print(f"on var {ii=} out of {args.nvars}")
+        
+        # get characteristic strains for the current variation
         hc_bg = _data['hc_bg']
         hc_ss = _data['hc_ss']
 
-        if args.calvar is not None:
-                _dsdat = detstats.detect_pspace_model_psrs(
-                fobs_cents, hc_ss, hc_bg, psrs, args.nskies,
-                thresh=args.thresh, debug=args.debug, )
+        # shift loudest as needed
+        if args.nloudest != hc_ss.shape[-1]:
+            hc_ss, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest)
+
         if args.gsc_flag:
             _dsdat = detstats.detect_pspace_model_clbrt_pta_gsc(
                 fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, 
