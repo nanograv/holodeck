@@ -283,7 +283,6 @@ def resample_loudest(hc_ss, hc_bg, nloudest):
     new_hc_bg = np.sqrt(hc_bg**2 + np.sum(hc_ss[...,nloudest:-1]**2, axis=-1))
     new_hc_ss = hc_ss[...,0:nloudest]
 
-    print(new_hc_ss.shape)
     return new_hc_ss, new_hc_bg
 
 
