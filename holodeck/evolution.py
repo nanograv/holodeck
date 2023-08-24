@@ -604,12 +604,24 @@ class Evolution:
 
         Returns
         -------
-        names : list[str], size (4,)
-            Names of the returned data arrays in `samples`.
-        samples : np.ndarray, shape (4, S)
+        names : (4,) list of str,
+            Names of the returned binary parameters (i.e. each array in `samples` and `vals`).
+        samples : (4, S) ndarray,
             Sampled binary data.  For each binary samples S, 4 parameters are returned:
             ['mtot', 'mrat', 'redz', 'fobs'] (these are listed in the `names` returned value.)
             NOTE: `fobs` is *observer*-frame *orbital*-frequencies.
+            These values correspond to all of the binaries in an observer's Universe
+            (i.e. light-cone), within the given frequency bins.  The number of samples `S` is
+            roughly the sum of the `weights` --- but the specific number is drawn from a Poisson
+            distribution around the sum of the `weights`.
+        vals : (4,) list of (V,) ndarrays or float
+            Binary parameters (log10 of parameters specified in the `names` return values) at each
+            frequency bin.  Binaries not reaching the target frequency bins before redshift zero,
+            or before coalescing, are not returned.  Thus the number of values `V` may be less than
+            F*N for F frequency bins and N binaries.
+        weights : (V,) ndarray of float
+            The weight of each binary-frequency sample.  i.e. number of observer-universe binaries
+            corresponding to this binary in the simulation, at the target frequency.
 
         To-Do
         -----
@@ -629,6 +641,32 @@ class Evolution:
         return names, samples, vals, weights
 
     def _sample_universe__at_values_weights(self, fobs_orb_edges):
+        """Interpolate binary histories to target frequency bins, obtaining parameters and weights.
+
+        The `weights` correspond to the number of binaries in an observer's Universe (light-cone)
+        corresponding to each simulated binary sample.
+
+        Arguments
+        ---------
+        fobs_orb_edges : (F+1,) arraylike
+            Edges of target frequency bins to sample population.  These are observer-frame orbital
+            frequencies.  Binaries are interpolated to frequency bin centers, calculated from the
+            midpoints of the provided bin edges.
+
+        Returns
+        -------
+        names : (4,) list of str,
+            Names of the returned binary parameters (i.e. each array in `vals`).
+        vals : (4,) list of (V,) ndarrays or float
+            Binary parameters (log10 of parameters specified in the `names` return values) at each
+            frequency bin.  Binaries not reaching the target frequency bins before redshift zero,
+            or before coalescing, are not returned.  Thus the number of values `V` may be less than
+            F*N for F frequency bins and N binaries.
+        weights : (V,) ndarray of float
+            The weight of each binary-frequency sample.  i.e. number of observer-universe binaries
+            corresponding to this binary in the simulation, at the target frequency.
+
+        """
         fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges, log=False)
         dlnf = np.diff(np.log(fobs_orb_edges))
 
@@ -846,31 +884,16 @@ class Evolution:
 
         if self._acc is not None:
             """ An instance of the accretion class has been supplied,
-                and we will evolve the binary masses through accretion
+                and binary masses are evolved through accretion
                 First, get total accretion rates """
-            if self._acc.mdot_ext is not None:
-                """ accretion rates have been supplied externally """
-                mdot_total = self._acc.mdot_ext[:, step-1]
-            else:
-                """ Get accretion rates as a fraction (f_edd in self._acc) of the
-                    Eddington limit from current BH masses """
-                total_bh_masses = np.sum(self.mass[:, step-1, :], axis=1)
-                mdot_total = self._acc.mdot_eddington(total_bh_masses)
 
-            """ Calculate individual accretion rates """
-            if self._acc.subpc:
-                """ Indices where separation is less than or equal to a parsec """
-                ind_sepa = self.sepa[:, step] <= PC
-            else:
-                """ Indices where separation is less than or equal to 10 kilo-parsec """
-                ind_sepa = self.sepa[:, step] <= 10**4 * PC
-
-            """ Set total accretion rates to 0 when separation is larger than 1pc or 10kpc,
-                depending on subpc switch applied to accretion instance """
-            mdot_total[~ind_sepa] = 0
-            self.mdot[:, step-1, :] = self._acc.pref_acc(mdot_total, self, step)
-            self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:, step-1, 0]
-            self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:, step-1, 1]
+            mdot_t = self._acc.mdot_total(self, step)
+            """ A preferential accretion model is called to divide up
+                total accretion rates into primary and secondary accretion rates """
+            self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_t, self, step)
+            """ Accreted mass is calculated and added to primary and secondary masses """
+            self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:,step-1,0]
+            self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:,step-1,1]
 
         return
 
