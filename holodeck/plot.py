@@ -753,7 +753,8 @@ def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill=
 
     return (hh, gg)
 
-def draw_med_conf_color(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={}, filter=False, color=None):
+def draw_med_conf_color(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={}, 
+                        filter=False, color=None, linestyle='-'):
     plot.setdefault('alpha', 0.75)
     fill.setdefault('alpha', 0.2)
     percs = np.atleast_1d(fracs)
@@ -777,7 +778,7 @@ def draw_med_conf_color(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={},
     
     # plot median
     if color is not None:
-        hh, = ax.plot(xx, med, color=color, **plot)
+        hh, = ax.plot(xx, med, color=color, linestyle=linestyle, **plot)
     else:
         hh, = ax.plot(xx, med, **plot)
 
