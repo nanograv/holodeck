@@ -49,8 +49,11 @@ def _setup_argparse():
                         help='number of variations on target param')
     parser.add_argument('--shape', action='store', dest='shape', type=int, default=DEF_SHAPE,
                         help='sam shape')
-    # parser.add_argument('-d', '--dur', action='store', dest='dur', type=int, default=DEF_PTA_DUR,
-    #                     help='pta duration in yrs')
+
+    # parameters
+
+    parser.add_argument('--var_hard_time', action='store', dest='var_hard_time', type=int, default=None,
+                        help='hardening time parameter variation')
 
 
     
@@ -266,12 +269,20 @@ def vary_parameter(
 
 
 def construct_data(args):
-        params_list = np.linspace(0,1,args.nvars)
-        data, params, = vary_parameter(
-            target_param=args.target, params_list=params_list,
-            nfreqs=args.nfreqs, nreals=args.nreals, nloudest=args.nloudest,
-            pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=args.shape, seed=None),)
-        return data, params
+    params_list = np.linspace(0,1,args.nvars)
+
+    # set a hardening time other than the middle ones as args.var_hard_time
+    if args.var_hard_time is not None:
+        pars = 0.5 * np.ones(6) 
+        pars[0] = params_list[args.var_hard_time]
+    else:
+        pars = None
+        
+    data, params, = vary_parameter(
+        target_param=args.target, params_list=params_list,
+        nfreqs=args.nfreqs, nreals=args.nreals, nloudest=args.nloudest, pars=pars,
+        pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=args.shape, seed=None),)
+    return data, params
 
 
 def resample_loudest(hc_ss, hc_bg, nloudest):
