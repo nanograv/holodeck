@@ -1631,6 +1631,26 @@ def rad_isco(m1, m2=0.0, factor=3.0):
     return factor * schwarzschild_radius(m1+m2)
 
 
+def frst_isco(m1, m2=0.0, **kwargs):
+    """Get rest-frame orbital frequency of ISCO orbit.
+
+    Arguments
+    ---------
+    m1 : array_like, units of [gram]
+        Total mass, or mass of the primary.  Added together with `m2` to get total mass.
+    m2 : array_like, units of [gram]  or  None
+        Mass of secondary, or None if `m1` is already total mass.
+
+    Returns
+    -------
+    fisco : array_like, units of [Hz]
+
+    """
+    risco = rad_isco(m1, m2, **kwargs)
+    fisco = kepler_freq_from_sepa(m1+m2, risco)
+    return fisco
+
+
 def redz_after(time, redz=None, age=None):
     """Calculate the redshift after the given amount of time has passed.
 
