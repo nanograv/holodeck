@@ -45,6 +45,9 @@ def _setup_argparse():
                         help='number of strain realizations')
     parser.add_argument('-l', '--nloudest', action='store', dest='nloudest', type=int, default=DEF_NLOUDEST,
                         help='number of loudest single sources')
+    
+    parser.add_argument('--bgll', '--bg_nloudest', action='store', dest='bg_nloudest', type=int, default=DEF_NLOUDEST,
+                        help='number of loudest single sources subtracted from the background')
     parser.add_argument('-v', '--nvars', action='store', dest='nvars', type=int, default=DEF_NVARS,
                         help='number of variations on target param')
     parser.add_argument('--shape', action='store', dest='shape', type=int, default=DEF_SHAPE,
@@ -206,6 +209,8 @@ def file_names(args):
     if args.nloudest != DEF_NLOUDEST:                                           # if using nloudest that isn't the default 10
         save_dets_to_file += f"_l{args.nloudest}" 
         save_data_to_file += f"_l{args.nloudest}"
+    if args.bg_nloudest != args.nloudest:
+        save_dets_to_file += f"_bgl{args.bg_nloudest}" # only change nloudest subtracted from bg, not single sources loudest
     if args.calvar is not None: save_dets_to_file += f"_cv{args.calvar}"        # if using one variation to calibrate
     if args.ss_noise: save_dets_to_file += '_ssn'                               # if using single sources as noise
 
@@ -277,7 +282,7 @@ def construct_data(args):
         pars[0] = params_list[args.var_hard_time]
     else:
         pars = None
-        
+
     data, params, = vary_parameter(
         target_param=args.target, params_list=params_list,
         nfreqs=args.nfreqs, nreals=args.nreals, nloudest=args.nloudest, pars=pars,
@@ -310,6 +315,8 @@ def fixed_pta_method(args, data):
     hc_bg = data[args.calvar]['hc_ss']
     if args.nloudest != hc_ss.shape[-1]:
         hc_ss, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest)
+    elif args.bg_nloudest != hc_ss.shape[-1]:
+        _, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest) # only change nloudest subtracted from bg, not single sources loudest
 
     # get median across realizations of calvar, for psr calibration
     hc_bg_med = np.median(hc_bg, axis=-1)
@@ -338,6 +345,8 @@ def fixed_pta_method(args, data):
         # shift loudest as needed
         if args.nloudest != hc_ss.shape[-1]:
             hc_ss, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest)
+        elif args.bg_nloudest != hc_ss.shape[-1]:
+            _, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest) # only change nloudest subtracted from bg, not single sources loudest
 
         _dsdat = detstats.detect_pspace_model_psrs(
                 fobs_cents, hc_ss, hc_bg, psrs, args.nskies,
@@ -366,6 +375,8 @@ def realization_calibrated_method(args, data):
         # shift loudest as needed
         if args.nloudest != hc_ss.shape[-1]:
             hc_ss, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest)
+        elif args.bg_nloudest != hc_ss.shape[-1]:
+            _, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest) # only change nloudest subtracted from bg, not single sources loudest
 
         if args.gsc_flag:
             _dsdat = detstats.detect_pspace_model_clbrt_pta_gsc(
