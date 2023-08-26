@@ -46,7 +46,7 @@ def _setup_argparse():
     parser.add_argument('-l', '--nloudest', action='store', dest='nloudest', type=int, default=DEF_NLOUDEST,
                         help='number of loudest single sources')
     
-    parser.add_argument('--bgll', '--bg_nloudest', action='store', dest='bg_nloudest', type=int, default=DEF_NLOUDEST,
+    parser.add_argument('--bgl', '--bg_nloudest', action='store', dest='bg_nloudest', type=int, default=DEF_NLOUDEST,
                         help='number of loudest single sources subtracted from the background')
     parser.add_argument('-v', '--nvars', action='store', dest='nvars', type=int, default=DEF_NVARS,
                         help='number of variations on target param')
@@ -137,8 +137,9 @@ def main():
 
     # set up args
     args = _setup_argparse()
-    print("NREALS = %d, NSKIES = %d, NPSRS = %d, target = %s, NVARS=%d, CV=%s, NLOUDEST=%d"
-          % (args.nreals, args.nskies, args.npsrs, args.target, args.nvars, str(args.calvar), args.nloudest))
+    print(f"NREALS = {args.nreals}, NSKIES = {args.nskies}, NPSRS = {args.npsrs}, \
+          target = {args.target}, NVARS={args.nvars}, CV={args.calvar}, NLOUDEST={args.nloudest}, \
+            BGL={args.bg_nloudest}")
     
     # get file names based on arguments
     load_data_from_file, save_data_to_file, save_dets_to_file = file_names(args)
@@ -346,6 +347,7 @@ def fixed_pta_method(args, data):
         if args.nloudest != hc_ss.shape[-1]:
             hc_ss, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest)
         elif args.bg_nloudest != hc_ss.shape[-1]:
+            print(f"resampling {args.bg_nloudest=} loudest!")
             _, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest) # only change nloudest subtracted from bg, not single sources loudest
 
         _dsdat = detstats.detect_pspace_model_psrs(
@@ -376,6 +378,7 @@ def realization_calibrated_method(args, data):
         if args.nloudest != hc_ss.shape[-1]:
             hc_ss, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest)
         elif args.bg_nloudest != hc_ss.shape[-1]:
+            print(f"resampling {args.bg_nloudest=} loudest!")
             _, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest) # only change nloudest subtracted from bg, not single sources loudest
 
         if args.gsc_flag:
