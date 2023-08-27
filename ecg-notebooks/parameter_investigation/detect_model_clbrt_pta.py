@@ -317,7 +317,7 @@ def fixed_pta_method(args, data):
     if args.nloudest != hc_ss.shape[-1]:
         hc_ss, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest)
     elif args.bg_nloudest != hc_ss.shape[-1]:
-        _, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest) # only change nloudest subtracted from bg, not single sources loudest
+        _, hc_bg = resample_loudest(hc_ss, hc_bg, args.bg_nloudest) # only change nloudest subtracted from bg, not single sources loudest
 
     # get median across realizations of calvar, for psr calibration
     hc_bg_med = np.median(hc_bg, axis=-1)
@@ -348,7 +348,7 @@ def fixed_pta_method(args, data):
             hc_ss, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest)
         elif args.bg_nloudest != hc_ss.shape[-1]:
             print(f"resampling {args.bg_nloudest=} loudest!")
-            _, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest) # only change nloudest subtracted from bg, not single sources loudest
+            _, hc_bg = resample_loudest(hc_ss, hc_bg, args.bg_nloudest) # only change nloudest subtracted from bg, not single sources loudest
 
         _dsdat = detstats.detect_pspace_model_psrs(
                 fobs_cents, hc_ss, hc_bg, psrs, args.nskies,
@@ -379,7 +379,7 @@ def realization_calibrated_method(args, data):
             hc_ss, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest)
         elif args.bg_nloudest != hc_ss.shape[-1]:
             print(f"resampling {args.bg_nloudest=} loudest!")
-            _, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest) # only change nloudest subtracted from bg, not single sources loudest
+            _, hc_bg = resample_loudest(hc_ss, hc_bg, args.bg_nloudest) # only change nloudest subtracted from bg, not single sources loudest
 
         if args.gsc_flag:
             _dsdat = detstats.detect_pspace_model_clbrt_pta_gsc(
