@@ -52,9 +52,10 @@ def _setup_argparse():
                         help='number of variations on target param')
     parser.add_argument('--shape', action='store', dest='shape', type=int, default=DEF_SHAPE,
                         help='sam shape')
+    parser.add_argument('--gw_only', action='store_true', dest='gw_only', default=False,
+                        help='whether or not to use gw-only evolution')
 
     # parameters
-
     parser.add_argument('--var_hard_time', action='store', dest='var_hard_time', type=int, default=None,
                         help='hardening time parameter variation')
 
@@ -188,8 +189,14 @@ def main():
 
 
 def file_names(args):
+    """ Set up output folder, data load/save file, and detstats save file."""
     # set up output folder
-    output_path = args.anatomy_path+f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}'
+    if args.gw_only:
+        anatomy_path = '/Users/emigardiner/GWs/holodeck/output/anatomy_7GW'
+    else:
+        anatomy_path = args.anatomy_path
+
+    output_path = anatomy_path + f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}'
     # check if output folder already exists, if not, make it.
     if os.path.exists(output_path) is False:
         os.makedirs(output_path)
