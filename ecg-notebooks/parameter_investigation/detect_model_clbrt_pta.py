@@ -312,11 +312,14 @@ def fixed_pta_method(args, data):
     fobs_cents = data[0]['fobs_cents']
 
     # get hc_ss and hc_bg from appropriate calibration variation
-    hc_ss = data[args.calvar]['hc_bg']
-    hc_bg = data[args.calvar]['hc_ss']
+    hc_bg = data[args.calvar]['hc_bg']
+    hc_ss = data[args.calvar]['hc_ss']
+    print(f"{hc_ss.shape=}")
     if args.nloudest != hc_ss.shape[-1]:
+        print(f"Resampling {args.nloudest=} loudest.")
         hc_ss, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest)
     elif args.bg_nloudest != hc_ss.shape[-1]:
+        print(f"Resampling {args.bg_nloudest} BG nloudest.")
         _, hc_bg = resample_loudest(hc_ss, hc_bg, args.bg_nloudest) # only change nloudest subtracted from bg, not single sources loudest
 
     # get median across realizations of calvar, for psr calibration
