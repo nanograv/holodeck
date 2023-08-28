@@ -3150,3 +3150,77 @@ def weighted_mean_variance(data, weights, debug=False,):
     var2 /= (nn-1)/nn * np.sum(weights)
     if debug: print(f"{var2=}")
     return mean, var2
+
+
+
+
+
+
+
+
+########################################################################
+###################### Functions Using V21 Models ######################
+########################################################################
+
+def get_data(
+        target, 
+        nvars=21, nreals=500, nskies=100, shape=None,  # keep as defaults
+        nloudest = 10, bg_nloudest = 10, cv=None, ssn_flag=False,
+        red_gamma = None, red2white=None, 
+        gsc_flag=False,  dsc_flag=False, divide_flag=False, 
+        gw_only=False,
+):
+    if gw_only:
+        path = '/Users/emigardiner/GWs/holodeck/output/anatomy_7GW'
+    else:
+        path = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz'
+
+    data_file = path+f'/{target}_v{nvars}_r{nreals}_shape{str(shape)}/data_params.npz' 
+    dets_file = path+f'/{target}_v{nvars}_r{nreals}_shape{str(shape)}/detstats_s{nskies}' 
+
+    if nloudest != 10:                                           # if using nloudest that isn't the default 10
+        dets_file += f"_l{nloudest}" 
+        data_file += f"_l{nloudest}"
+    if bg_nloudest != nloudest:
+        dets_file += f"_bgl{bg_nloudest}" # only change nloudest subtracted from bg, not single sources loudest
+    if cv is not None: 
+        dets_file += f"_cv{cv}"        # if using one variation to calibrate
+    if ssn_flag: 
+        dets_file += '_ssn'                               # if using single sources as noise
+
+    if gsc_flag:                                                           # if using GSC as noise
+        dets_file += '_gsc'
+        if dsc_flag is False:                                          # if using GSC as noise
+            dets_file += 'both'
+        if divide_flag:
+            dets_file += '_divide'
+        else:
+            dets_file += '_nodiv'
+    if dsc_flag: 
+        dets_file += '_dsc'
+
+    if red2white is not None and red_gamma is not None:               # if using red noise with fixed red_gamma
+        dets_file += f'_r2w{red2white:.1f}_rg{red_gamma:.1f}'
+    else: 
+        dets_file += f'_white'
+
+    load_dets_from_file = load_dets_from_file+'.npz'
+
+    if os.path.exists(data_file) is False:
+        err = f"load data file '{data_file}' does not exist, you need to construct it."
+        raise Exception(err)
+    if os.path.exists(dets_file) is False:
+        err = f"load dets file '{dets_file}' does not exist, you need to construct it."
+        raise Exception(err)
+    file = np.load(data_file, allow_pickle=True)
+    data = file['data']
+    params = file['params']
+    file.close()
+    print(target, "got data")
+    file = np.load(dets_file, allow_pickle=True)
+    print(target, "loaded dets")
+    print(file.files)
+    dsdat = file['dsdat']
+    file.close()
+
+    return data, params, dsdat
