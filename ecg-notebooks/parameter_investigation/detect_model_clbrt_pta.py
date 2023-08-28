@@ -77,7 +77,7 @@ def _setup_argparse():
     parser.add_argument('--ssn', action='store_true', dest='ss_noise', default=False, 
                         help='Whether or not to use single sources as a noise source in background calculations.') 
     parser.add_argument('--dsc', action='store_true', dest='dsc_flag', default=False, 
-                        help='Whether or not to use single sources as a noise source in background calculations.') 
+                        help='Whether or not to use DeterSensitivityCurve as single source noise.') 
     parser.add_argument('--gsc-clbrt', action='store_true', dest='gsc_flag', default=False, 
                         help='Whether or not to use gsc noise to calibrate the background and dsc noise for SS detstats.') 
     parser.add_argument('--divide', action='store_true', dest='divide_flag', default=False, 
@@ -138,9 +138,8 @@ def main():
 
     # set up args
     args = _setup_argparse()
-    print(f"NREALS = {args.nreals}, NSKIES = {args.nskies}, NPSRS = {args.npsrs}, \
-          target = {args.target}, NVARS={args.nvars}, CV={args.calvar}, NLOUDEST={args.nloudest}, \
-            BGL={args.bg_nloudest}")
+    print(f"NREALS = {args.nreals}, NSKIES = {args.nskies}, NPSRS = {args.npsrs}, target = {args.target}, NVARS={args.nvars}")
+    print(f"CV={args.calvar}, NLOUDEST={args.nloudest}, BGL={args.bg_nloudest}, {args.gsc_flag=}, {args.dsc_flag=}")
     
     # get file names based on arguments
     load_data_from_file, save_data_to_file, save_dets_to_file = file_names(args)
@@ -223,14 +222,19 @@ def file_names(args):
     if args.ss_noise: save_dets_to_file += '_ssn'                               # if using single sources as noise
 
     if args.gsc_flag:                                                           # if using GSC as noise
-        save_dets_to_file = save_dets_to_file+'_gsc'
+        save_dets_to_file += '_gsc'
+        if args.dsc_flag is False:                                          # if using GSC as noise
+            save_dets_to_file += 'both'
+
         if args.onepsr_flag:
             save_dets_to_file = save_dets_to_file+'_onepsr'
             assert args.npsrs == 1, "To use '--onepsr' set -p 1"
             assert args.divide_flag is False, "only one of '--divide' and '--onepsr' should be True"
-        elif args.divide_flag:
-            save_dets_to_file = save_dets_to_file+'_divide'
-    elif args.dsc_flag: save_dets_to_file = save_dets_to_file+'_dsc' # only append 'dsc' if not gsc-calibrated
+        if args.divide_flag:
+            save_dets_to_file += '_divide'
+        else:
+            save_dets_to_file += '_nodiv'
+    if args.dsc_flag: save_dets_to_file += '_dsc' # only append 'dsc' if not gsc-calibrated
 
     if args.red2white is not None and args.red_gamma is not None:               # if using red noise with fixed red_gamma
         save_dets_to_file = save_dets_to_file+f'_r2w{args.red2white:.1f}_rg{args.red_gamma:.1f}'
@@ -338,7 +342,7 @@ def fixed_pta_method(args, data):
             hc_bg_med, hc_ss_med, fobs_cents, args.npsrs, ret_sig=False,
             sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
             red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white,
-            divide_flag=args.divide_flag)
+            divide_flag=args.divide_flag,)
     else:
         psrs = detstats.calibrate_one_pta(
             hc_bg_med, hc_ss_med, fobs_cents, args.npsrs, ret_sig=False,
@@ -396,13 +400,13 @@ def realization_calibrated_method(args, data):
                 fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, 
                 sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
                 thresh=args.thresh, debug=args.debug, 
-                ss_noise=args.ss_noise, divide_flag=args.divide_flag,
+                ss_noise=args.ss_noise, divide_flag=args.divide_flag, dsc_flag=args.dsc_flag,
             )
         else:
             _dsdat = detstats.detect_pspace_model_clbrt_pta(
-                fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, dsc_flag=args.dsc_flag,
+                fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies,
                 sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
-                thresh=args.thresh, debug=args.debug, ss_noise=args.ss_noise,
+                thresh=args.thresh, debug=args.debug, ss_noise=args.ss_noise, dsc_flag=args.dsc_flag,
                 red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white)
         dsdat.append(_dsdat)
 

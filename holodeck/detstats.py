@@ -998,6 +998,10 @@ def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=N
 def psrs_spectra_gwbnoise(psrs, fobs, nreals, npsrs, divide_flag=False):
     """ Get GWBSensitivityCurve noise and spectra for psrs
     
+    Returns
+    -------
+    spectra : 
+    noise_gsc : (P,F,R)
     """
     spectra = []
     for psr in psrs:
@@ -1016,6 +1020,9 @@ def psrs_spectra_gwbnoise(psrs, fobs, nreals, npsrs, divide_flag=False):
 def _dsc_noise(fobs, nreals, npsrs, nloudest, psrs=None, spectra=None, divide_flag=False):
     """ Get DeterSensitivityCurve noise using either psrs or spectra
 
+    Returns
+    -------
+    noise_dsc : (P,F,R,L) NDarray
     """
 
     if spectra is None:
@@ -2451,11 +2458,11 @@ def detect_pspace_model_clbrt_pta(
                 spectra.append(sp)
             sc_hc = hsen.DeterSensitivityCurve(spectra).h_c
             noise_dsc = sc_hc**2 / (12 * np.pi**2 * fobs_cents**3)
-            noise_dsc = np.repeat(noise_dsc, npsrs*1*nloudest).reshape(nfreqs, npsrs, 1, nloudest) # (F,P,R,L)
-            noise_dsc = np.swapaxes(noise_dsc, 0, 1)  # (P,F,R,L)
+            noise_dsc = _dsc_noise(fobs_cents, nreals, npsrs, nloudest, psrs, spectra) # (P,F,R,L)
+            # np.repeat(noise_dsc, npsrs*1*nloudest).reshape(nfreqs, npsrs, 1, nloudest) # (F,P,R,L)
+            # noise_dsc = np.swapaxes(noise_dsc, 0, 1)  # (P,F,R,L)
             noise_rest = _Sh_rest_noise(hc_ss[:,rr:rr+1,:], hc_bg[:,rr:rr+1], fobs_cents) # (F,R,L)
-            noise_ss = noise_dsc + noise_rest[np.newaxis,:,:,:]
-            
+            noise_ss = noise_dsc + noise_rest[np.newaxis,:,:,:] # (P,F,R,L)
         else:
             noise_ss = None
 
@@ -2488,7 +2495,7 @@ def detect_pspace_model_clbrt_pta_gsc(
         sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
         thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
         red_amp=None, red_gamma=None, red2white=None, ss_noise=False,
-        divide_flag=False): 
+        divide_flag=False, dsc_flag=False): 
     """ Detect pspace model using individual sigma calibration for each realization 
     and sensitivity curve noise for both BG calibration and SS detstats.
     
@@ -2557,9 +2564,12 @@ def detect_pspace_model_clbrt_pta_gsc(
 
 
         # calculate SS noise from DeterSensitivityCurve and S_h,rest
-        noise_dsc = _dsc_noise(fobs_cents, spectra=spectra, nreals=1, npsrs=npsrs, nloudest=nloudest, divide_flag=divide_flag)
+        if dsc_flag: # calculate the DSC noise separately
+            noise_dsc = _dsc_noise(fobs_cents, spectra=spectra, nreals=1, npsrs=npsrs, nloudest=nloudest, divide_flag=divide_flag)
+        else: # use the GSC as the DSC noise
+            noise_dsc = np.repeat(noise_gsc, nloudest).reshape(npsrs, nfreqs, 1, nloudest) # (P,F,R,L)
         noise_rest = _Sh_rest_noise(hc_ss[:,rr:rr+1,:], hc_bg[:,rr:rr+1], fobs_cents) # (F,R,L)
-        noise_ss = noise_dsc + noise_rest[np.newaxis,:,:,:]
+        noise_ss = noise_dsc + noise_rest[np.newaxis,:,:,:] # (P,F,R,L)
 
 
         # calculate realizatoin SS detstats
@@ -2907,7 +2917,7 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs,
 def calibrate_one_pta_gsc(hc_bg, fobs, npsrs, 
                       sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
                       phis=None, thetas=None, ret_sig = False, red_amp=None, red_gamma=None, red2white=None,
-                      ss_noise=False, divide_flag=False):
+                      ss_noise=False, divide_flag=False,):
     """ Calibrate the specific PTA for a given realization, and return that PTA
 
     Parameters
