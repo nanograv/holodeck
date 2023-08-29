@@ -46,7 +46,7 @@ import kalepy as kale
 
 import holodeck as holo
 from holodeck import cosmo, utils, log
-from holodeck.constants import SPLC, MSOL, MPC
+from holodeck.constants import SPLC, MSOL, MPC, GYR
 from holodeck import relations, single_sources
 from . import cyutils as sam_cyutils
 from holodeck.sams.comps import (
@@ -757,6 +757,102 @@ class Semi_Analytic_Model:
             return hc_ss, hc_bg, sspar, bgpar
 
         return hc_ss, hc_bg
+
+    def rate_chirps(self, hard=None, integrate=True):
+        """Find the event rate of binary coalescences ('chirps').
+
+        Get the number of coalescence events per unit time, in units of [1/sec].
+
+        Parameters
+        ----------
+        hard : None  or  `_Hardening` subclass instance
+        integrate : bool
+
+        Returns
+        -------
+        redz_final : (M, Q, Z)
+            Redshift of binary coalescence.
+            NOTE: binaries stalling before redshift zero, have values set to `-1.0`.
+        rate : ndarray
+            Rate of coalescence events in each bin, in units of [1/sec].
+            The shape and meaning depends on the value of the `integrate` flag:
+            * if `integrate == True`,
+              then the returned values is ``dN/dt``, with shape (M-1, Q-1, Z-1)
+            * if `integrate == False`,
+              then the returned values is ``dN/[dlog10M dq dz dt]``, with shape (M, Q, Z)
+
+        """
+        log = self._log
+
+        if hard is not None:
+            if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM,)):
+                err = "Only the `Fixed_Time` models, or no hardening, are supported for rate calculation!"
+                log.exception(err)
+                raise ValueError(err)
+
+        # get number density of binaries dn/[dlog10M dq dz] in units of [Mpc^-3]
+        # NOTE: `static_binary_density` must be called for `_gmt_time` to be set
+        ndens = self.static_binary_density
+
+        # Find initialization times (Z,) in [sec]
+        time_init = cosmo.z_to_tage(self.redz)
+        # NOTE: `static_binary_density` must be called for `_gmt_time` to be set
+        # Galaxy Merger Time, time in [sec]  shape (M, Q, Z)
+        time_gmt = self._gmt_time
+        # if `sam` is using galaxy merger rate (GMR), then `gmt_time` will be `None`
+        if time_gmt is None:
+            log.info("`gmt_time` not calculated in SAM.  Setting to zeros.")
+            time_gmt = np.zeros(self.shape)
+
+        if hard is None:
+            time_life = 0.0
+        else:
+            # Target lifetime of fixed_time model, single scalar value in [sec]
+            time_life = hard._target_time
+
+        time_tot = time_init[np.newaxis, np.newaxis, :] + time_gmt + time_life
+        # when `time_tot` is greater than age of Universe, `redz_final` will be NaN
+        redz_final = cosmo.tage_to_z(time_tot)
+        # find bins where the binary coalesces before redshift zero (this includes checking that redz_final is not NaN)
+        valid = (redz_final > 0.0)
+        # set redshift final for stalled binaries to -1.0
+        redz_final[~valid] = -1.0
+
+        # (M, Q, Z)
+        rate = np.zeros(self.shape)
+        rz = redz_final[valid]
+        # get rest-frame dz/dt
+        dzdt = 1.0 / cosmo.dtdz(rz)
+        # get dVc/dz in units of [Mpc^3] to match `ndens` in units of [Mpc^-3]
+        dVcdz = cosmo.dVcdz(rz, cgs=False)
+
+        # factor of 1/1+z to convert from rest-frame to observer-frame time-interval
+        rate[valid] = ndens[valid] * dzdt * dVcdz / (1.0 + rz)
+
+        # integrate over each bin to go from ``dN/[dlog10M dq dz dt]`` to ``dN/dt``
+        if integrate:
+            rate = self._integrate_event_rate(rate)
+
+        return redz_final, rate
+
+    def _integrate_event_rate(self, rate):
+        # (Z-1,)
+        dz = np.diff(self.redz)
+        # perform 'integration', but don't sum over redshift bins
+        # (M, Q, Z-1)
+        integ = 0.5 * (rate[:, :, :-1] + rate[:, :, 1:]) * dz
+
+        # ---- Integrate over mass and mass-ratio
+        # (M-1,)
+        dlogm = np.diff(np.log10(self.mtot))
+        # (Q-1,)
+        dq = np.diff(self.mrat)
+        # (M-1, Q, Z-1)
+        integ = 0.5 * (integ[:-1, :, :] + integ[1:, :, :]) * dlogm[:, np.newaxis, np.newaxis]
+        # (M-1, Q-1, Z-1)
+        integ = 0.5 * (integ[:, :-1, :] + integ[:, 1:, :]) * dq[np.newaxis, :, np.newaxis]
+
+        return integ
 
     def _ndens_gal(self, mass_gal, mrat_gal, redz):
         if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
