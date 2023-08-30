@@ -18,7 +18,12 @@ import os
 import subprocess
 import warnings
 from pathlib import Path
-from typing import Optional, Tuple, Union, List  # , Sequence,
+from typing import Optional, Tuple, Union, List, Callable, TypeVar, Any, TypeAlias  # , Sequence,
+
+try:
+    from typing import ParamSpec
+except ImportError:
+    from typing_extensions import ParamSpec
 
 import h5py
 import numba
@@ -66,6 +71,23 @@ class _Modifier(abc.ABC):
 
         """
         pass
+
+
+T = TypeVar('T')
+P = ParamSpec('P')
+WrappedFuncDeco: TypeAlias = Callable[[Callable[P, T]], Callable[P, T]]
+
+def copy_docstring(copy_func: Callable[..., Any]) -> WrappedFuncDeco[P, T]:
+    """Copies the doc string of the given function to the wrapped function.
+
+    see: https://stackoverflow.com/a/68901244/230468
+    """
+
+    def wrapped(func: Callable[P, T]) -> Callable[P, T]:
+        func.__doc__ = copy_func.__doc__
+        return func
+
+    return wrapped
 
 
 # =================================================================================================
@@ -500,8 +522,6 @@ def scatter_redistribute_densities(cents, dens, dist=None, scatter=None, axis=0)
     weights = _get_rolled_weights(log_cents, dist)
     dens_new = _scatter_with_weights(dens, weights, axis=0)
     return dens_new
-
-
 
 
 def eccen_func(cent: float, width: float, size: int) -> np.ndarray:
