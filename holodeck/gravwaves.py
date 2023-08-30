@@ -6,6 +6,7 @@ and not the semi-analytic or observational population models.
 
 """
 
+from typing import Any
 import numba
 import numpy as np
 
@@ -88,6 +89,65 @@ class GW_Discrete(Grav_Waves):
         self.strain = np.sqrt(back + fore)
         self.loudest = loudest
         return
+
+
+class LISA:
+
+    def __init__(self, mission_duration_yrs=5.0, fobs=(1.0e-7, 1.0, 1000)):
+        from astropy import units as u
+        try:
+            import legwork
+        except ModuleNotFoundError:
+            err = (
+                "Could not load `legwork` module, required for `LISA` class.  "
+                "Run `$ pip install legwork` to install."
+            )
+            raise ModuleNotFoundError(err)
+
+        dur = mission_duration_yrs * u.yr
+        fobs = np.logspace(*np.log10(fobs[:2]), fobs[2]) * u.Hz
+
+        # --- plot LISA sensitivity curve
+        lisa_psd = legwork.psd.power_spectral_density(f=fobs, t_obs=dur)
+        lisa_hc = np.sqrt(fobs * lisa_psd)
+        self.sensitivity_fo = fobs.cgs.value
+        self.sensitivity_hc = lisa_hc.value
+        return
+
+    @property
+    def sensitivity(self):
+        return self.sensitivity_fo, self.sensitivity_hc
+
+    def __call__(self, ff, hc):
+        return self.is_above_hc_curve(ff, hc)
+
+    def is_above_hc_curve(self, ff, hc):
+        """Determine which frequencies and strains are above the LISA sensitivity curve.
+
+        Arguments
+        ---------
+        ff : array_like of float
+            Frequencies of binaries.  Units of [Hz]
+        hc : array_like of float
+            Characterstic-strains of binaries.
+
+        Returns
+        -------
+        sel : array_like of bool
+            Whether or not the corresponding binary is detectable.
+            Matches the shape of `ff`.
+
+        """
+
+        # get sensitivity curve, `fl` frequencies in [1/sec], `hl` characteristic-strain sensitivity
+        fl, hl = self.sensitivity
+
+        # use logarithmic interpolation to find the LISA sensitivity curve at the binary frequencies
+        # if the binary frequencies are outside of the LISA band, `NaN` values are returned
+        sens_at_ff = utils.interp(ff, fl, hl, xlog=True, ylog=True)
+        # select binaries above sensitivity curve, `NaN` values (i.e. outside of band) will be False.
+        sel = (hc > sens_at_ff)
+        return sel
 
 
 def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, loudest=5):
