@@ -794,6 +794,8 @@ class Semi_Analytic_Model:
         # NOTE: `static_binary_density` must be called for `_gmt_time` to be set
         ndens = self.static_binary_density
 
+        # ---- Get redshift of coalescence
+
         # Find initialization times (Z,) in [sec]
         time_init = cosmo.z_to_tage(self.redz)
         # NOTE: `static_binary_density` must be called for `_gmt_time` to be set
@@ -818,6 +820,30 @@ class Semi_Analytic_Model:
         # set redshift final for stalled binaries to -1.0
         redz_final[~valid] = -1.0
 
+        # ---- calculate coalescence properties
+
+        mt, mr, _ = np.meshgrid(self.mtot, self.mrat, None, indexing='ij')
+        m1, m2 = utils.m1m2_from_mtmr(mt, mr)
+        mc = utils.chirp_mass_mtmr(mt, mr)
+
+        # Place all binaries at the ISCO, find the corresponding frequency, strain, and characteristic strain
+        risco = utils.rad_isco(mt)
+        fisco_rst = utils.kepler_freq_from_sepa(mt, risco)
+        fisco = fisco_rst / (1.0 + redz_final)
+
+        dc = cosmo.z_to_dcom(redz_final)
+        hs = utils.gw_strain_source(mc, dc, fisco_rst)
+        dadt = utils.gw_hardening_rate_dadt(m1, m2, risco)
+        dfdt, _ = utils.dfdt_from_dadt(dadt, risco, mtot=mt, frst_orb=fisco_rst)
+
+        log.warning("!! assuming ncycles = f^2 / (dfdt) !!")
+        ncycles = fisco_rst**2 / dfdt
+
+        hc = np.sqrt(ncycles) * hs
+        fisco[~valid] = np.nan
+
+        # ---- calculate event rates
+
         # (M, Q, Z)
         rate = np.zeros(self.shape)
         rz = redz_final[valid]
@@ -833,7 +859,7 @@ class Semi_Analytic_Model:
         if integrate:
             rate = self._integrate_event_rate(rate)
 
-        return redz_final, rate
+        return redz_final, rate, fisco, hc
 
     def _integrate_event_rate(self, rate):
         # (Z-1,)
