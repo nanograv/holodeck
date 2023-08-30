@@ -3224,3 +3224,64 @@ def get_data(
     file.close()
 
     return data, params, dsdat
+
+def append_filename(filename='', 
+        gw_only=False, red_gamma = None, red2white=None, 
+        nloudest = 10, bgl = 10, cv=None, 
+        gsc_flag=False,  dsc_flag=False, divide_flag=False, 
+        ):
+    
+    if cv is not None:
+        filename += f"_cv{cv}"
+
+    if nloudest != 10:
+        filename += f"_l{nloudest}"        
+    if bgl != nloudest:
+        filename += f"_bgl{bgl}"
+
+    if red2white is not None and red_gamma is not None:
+        filename += f"_r2w{red2white:.1f}_rg{red_gamma:.1f}"
+
+    if gsc_flag: 
+        filename = filename + '_gsc'
+        if dsc_flag: filename += 'both'
+        if divide_flag:
+            filename += '_divide'
+        else:
+            filename += '_nodiv'
+    elif dsc_flag: filename += '_dsc'
+
+    if gw_only:
+        filename = filename+'_gw'
+
+    filename = filename +'.npz'
+    return filename
+
+def build_ratio_arrays(
+        target, nreals=500, nskies=100,
+        gw_only=False, red2white=None, red_gamma=None, 
+        nloudest=10, bgl=10, 
+        gsc_flag=False, dsc_flag=False, divide_flag=False,
+        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',):
+
+    # white noise only
+    data, params, dsdat = get_data(target,
+        gw_only=gw_only, red2white=red2white, red_gamma=red_gamma,
+        nloudest=10, bgl=10, 
+        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
+    xx=[]
+    yy=[]
+    for pp, par in enumerate(params):
+        xx.append(params[pp][target])
+        dp_bg = np.repeat(dsdat[pp]['dp_bg'], nskies).reshape(nreals, nskies)
+        dp_ss = dsdat[pp]['ev_ss']
+        yy.append(dp_ss/dp_bg)
+
+    filename = figpath+f'/ratio_arrays_{target}'
+    filename = append_filename(
+        filename, 
+        gw_only=gw_only, red_gamma=red_gamma, red2white=red2white, 
+        nloudest=nloudest, bgl=bgl, cv=None, 
+        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
+    
+    np.savez(filename, xx_params = xx, yy_ratio = yy,)
