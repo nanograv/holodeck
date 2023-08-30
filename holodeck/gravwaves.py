@@ -107,7 +107,6 @@ class LISA:
         dur = mission_duration_yrs * u.yr
         fobs = np.logspace(*np.log10(fobs[:2]), fobs[2]) * u.Hz
 
-        # --- plot LISA sensitivity curve
         lisa_psd = legwork.psd.power_spectral_density(f=fobs, t_obs=dur)
         lisa_hc = np.sqrt(fobs * lisa_psd)
         self.sensitivity_fo = fobs.cgs.value
@@ -117,9 +116,6 @@ class LISA:
     @property
     def sensitivity(self):
         return self.sensitivity_fo, self.sensitivity_hc
-
-    def __call__(self, ff, hc):
-        return self.is_above_hc_curve(ff, hc)
 
     def is_above_hc_curve(self, ff, hc):
         """Determine which frequencies and strains are above the LISA sensitivity curve.
@@ -148,6 +144,10 @@ class LISA:
         # select binaries above sensitivity curve, `NaN` values (i.e. outside of band) will be False.
         sel = (hc > sens_at_ff)
         return sel
+
+    @utils.copy_docstring(is_above_hc_curve)
+    def __call__(self, ff, hc):
+        return self.is_above_hc_curve(ff, hc)
 
 
 def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, loudest=5):
