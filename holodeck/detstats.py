@@ -3204,7 +3204,7 @@ def get_data(
     else: 
         dets_file += f'_white'
 
-    load_dets_from_file = load_dets_from_file+'.npz'
+    dets_file += '.npz'
 
     if os.path.exists(data_file) is False:
         err = f"load data file '{data_file}' does not exist, you need to construct it."
@@ -3264,7 +3264,6 @@ def build_ratio_arrays(
         gsc_flag=False, dsc_flag=False, divide_flag=False,
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',):
 
-    # white noise only
     data, params, dsdat = get_data(target,
         gw_only=gw_only, red2white=red2white, red_gamma=red_gamma,
         nloudest=10, bgl=10, 

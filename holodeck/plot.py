@@ -38,7 +38,7 @@ LABEL_GW_FREQUENCY_NHZ = r"GW Frequency $[\mathrm{nHz}]$"
 LABEL_SEPARATION_PC = r"Binary Separation $[\mathrm{pc}]$"
 LABEL_CHARACTERISTIC_STRAIN = r"GW Characteristic Strain"
 LABEL_HARDENING_TIME = r"Hardening Time $[\mathrm{Gyr}]$"
-
+LABEL_CLC0 = r"$C_\ell / C_0$"
 
 PARAM_KEYS = {
     'hard_time': r"phenom $\tau_f$",
@@ -1460,6 +1460,17 @@ def _contour2d(ax, edges, hist, levels, outline=True, **kwargs):
 
     return edges, hist, cont
 
+
+def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
+    '''
+    https://stackoverflow.com/a/18926541
+    '''
+    if isinstance(cmap, str):
+        cmap = plt.get_cmap(cmap)
+    new_cmap = mpl.colors.LinearSegmentedColormap.from_list(
+        'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
+        cmap(np.linspace(minval, maxval, n)))
+    return new_cmap
 
 # =================================================================================================
 # ====    Below Needs Review / Cleaning    ====
