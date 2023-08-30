@@ -3163,7 +3163,7 @@ def weighted_mean_variance(data, weights, debug=False,):
 ########################################################################
 
 def get_data(
-        target, 
+        target, dets=True,
         nvars=21, nreals=500, nskies=100, shape=None,  # keep as defaults
         nloudest = 10, bg_nloudest = 10, cv=None, ssn_flag=False,
         red_gamma = None, red2white=None, 
@@ -3175,7 +3175,7 @@ def get_data(
     else:
         path = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz'
 
-    data_file = path+f'/{target}_v{nvars}_r{nreals}_shape{str(shape)}/data_params.npz' 
+    data_file = path+f'/{target}_v{nvars}_r{nreals}_shape{str(shape)}/data_params' 
     dets_file = path+f'/{target}_v{nvars}_r{nreals}_shape{str(shape)}/detstats_s{nskies}' 
 
     if nloudest != 10:                                           # if using nloudest that isn't the default 10
@@ -3205,17 +3205,20 @@ def get_data(
         dets_file += f'_white'
 
     dets_file += '.npz'
+    data_file += '.npz'
 
     if os.path.exists(data_file) is False:
         err = f"load data file '{data_file}' does not exist, you need to construct it."
         raise Exception(err)
-    if os.path.exists(dets_file) is False:
+    if os.path.exists(dets_file) is False and dets is True:
         err = f"load dets file '{dets_file}' does not exist, you need to construct it."
         raise Exception(err)
     file = np.load(data_file, allow_pickle=True)
     data = file['data']
     params = file['params']
     file.close()
+    if dets is False:
+        return data, params
     print(target, "got data")
     file = np.load(dets_file, allow_pickle=True)
     print(target, "loaded dets")
@@ -3284,3 +3287,63 @@ def build_ratio_arrays(
         gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
     
     np.savez(filename, xx_params = xx, yy_ratio = yy,)
+
+
+def build_anis_arrays(
+        target, nvars=21, nreals=500, nskies=100, shape=None,
+        gw_only=False, red2white=None, red_gamma=None, 
+        nloudest=10, bgl=10, 
+        gsc_flag=False, dsc_flag=False, divide_flag=False,
+        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',
+        parvars = [0,10,20],
+        lmax=8 
+
+        ):
+    
+    data, params, = get_data(target, dets=False,
+        nvars=nvars, nreals=nreals, nskies=nskies, shape=shape,  # keep as defaults
+        gw_only=gw_only, red2white=red2white, red_gamma=red_gamma,
+        nloudest=nloudest, bg_nloudest=bgl, 
+        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
+
+
+    yy_cl = [] # PV len array of (F,R,l=1) arrays
+    params_cl = []
+    xx_fobs = data[0]['fobs_cents']
+    for var in parvars:
+        _, Cl = holo.anisotropy.sph_harm_from_hc(
+            data[var]['hc_ss'], data[var]['hc_bg'], nside=8, lmax=lmax
+        )
+        yy_cl.append(Cl)
+        params_cl.append(params[var])
+
+    filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis/anis_{target}'
+    filename = append_filename(filename, nloudest=nloudest)
+    filename += f"_pv{len(parvars)}"
+    filename += f".npz"
+    np.savez(filename, yy_cl=yy_cl, xx_fobs=xx_fobs, params_cl=params_cl)
+
+    return yy_cl, xx_fobs, params_cl
+
+def get_anis_arrays(
+        target, nvars=21, nreals=500, nskies=100, shape=None,
+        gw_only=False, red2white=None, red_gamma=None, 
+        nloudest=10, bgl=10, 
+        gsc_flag=False, dsc_flag=False, divide_flag=False,
+        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',
+        parvars = [0,10,20],
+        lmax=8 
+
+        ):
+
+
+    filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis/anis_{target}'
+    filename = append_filename(filename, nloudest=nloudest)
+    filename += f"_pv{len(parvars)}"
+    filename += f".npz"
+    file = np.load(filename, allow_pickle=True)
+    yy_cl=file['yy_cl']
+    xx_fobs=file['xx_fobs']
+    params_cl=file['params_cl']
+
+    return yy_cl, xx_fobs, params_cl
