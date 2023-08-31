@@ -164,15 +164,16 @@ def main():
             data = file['data']
             params = file['params']
             file.close()
+            
+        if args.detstats:
+            # calculate detection statistics
+            if args.calvar is not None:  #### 'FIXED-PTA' METHOD
+                dsdat = fixed_pta_method(args, data)
+            else:                        #### 'REALIZATION-CALIBRATED' METHOD
+                dsdat = realization_calibrated_method(args, data)
 
-        # calculate detection statistics
-        if args.calvar is not None:  #### 'FIXED-PTA' METHOD
-            dsdat = fixed_pta_method(args, data)
-        else:                        #### 'REALIZATION-CALIBRATED' METHOD
-            dsdat = realization_calibrated_method(args, data)
-
-        # Save detection statistics file
-        np.savez(save_dets_to_file+'.npz', dsdat=dsdat, red_amp=args.red_amp, red_gamma=args.red_gamma, npsrs=args.npsrs, red2white=args.red2white) # overwrite
+            # Save detection statistics file
+            np.savez(save_dets_to_file+'.npz', dsdat=dsdat, red_amp=args.red_amp, red_gamma=args.red_gamma, npsrs=args.npsrs, red2white=args.red2white) # overwrite
 
     else:
         print(f"Neither {args.construct=} or {args.detstats} are true. Doing nothing.")
