@@ -3354,7 +3354,7 @@ def build_hcpar_arrays(
         target,nvars=21, nreals=500, shape=None,
         gw_only=False,
         nloudest=1, 
-        parvars = [0,10,20],
+        parvars = [0,1,2,3,4],
         ):
     """ Save and return hcpar arrays for plotting
     
@@ -3412,10 +3412,10 @@ def build_hcpar_arrays(
     return xx, yy_ss, yy_bg, labels
 
 def get_hcpar_arrays(
-        target,nvars=21, nreals=500, shape=None,
+        target, 
         gw_only=False,
         nloudest=1, 
-        parvars = [0,10,20],
+        parvars = [0,1,2,3,4],
         ):
     """ Save and return hcpar arrays for plotting
     
