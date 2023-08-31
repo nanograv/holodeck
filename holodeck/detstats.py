@@ -3257,7 +3257,6 @@ def append_filename(filename='',
     if gw_only:
         filename = filename+'_gw'
 
-    filename = filename +'.npz'
     return filename
 
 def build_ratio_arrays(
@@ -3285,7 +3284,8 @@ def build_ratio_arrays(
         gw_only=gw_only, red_gamma=red_gamma, red2white=red2white, 
         nloudest=nloudest, bgl=bgl, cv=None, 
         gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
-    
+    filename += '.npz'  
+
     np.savez(filename, xx_params = xx, yy_ratio = yy,)
 
 
@@ -3296,7 +3296,7 @@ def build_anis_arrays(
         gsc_flag=False, dsc_flag=False, divide_flag=False,
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',
         parvars = [0,10,20],
-        lmax=8 
+        lmax=8, nside=8,
 
         ):
     
@@ -3312,7 +3312,7 @@ def build_anis_arrays(
     xx_fobs = data[0]['fobs_cents']
     for var in parvars:
         _, Cl = holo.anisotropy.sph_harm_from_hc(
-            data[var]['hc_ss'], data[var]['hc_bg'], nside=8, lmax=lmax
+            data[var]['hc_ss'], data[var]['hc_bg'], nside=nside, lmax=lmax
         )
         yy_cl.append(Cl)
         params_cl.append(params[var])
@@ -3320,6 +3320,10 @@ def build_anis_arrays(
     filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis/anis_{target}'
     filename = append_filename(filename, nloudest=nloudest)
     filename += f"_pv{len(parvars)}"
+    if nside != 8:
+        filename += f"_ns{nside}"
+    if lmax != 8:
+        filename += f"_lmax{lmax}"
     filename += f".npz"
     np.savez(filename, yy_cl=yy_cl, xx_fobs=xx_fobs, params_cl=params_cl)
 
