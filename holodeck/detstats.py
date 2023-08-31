@@ -3336,14 +3336,17 @@ def get_anis_arrays(
         gsc_flag=False, dsc_flag=False, divide_flag=False,
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',
         parvars = [0,10,20],
-        lmax=8 
+        nside=8, lmax=8 
 
         ):
-
 
     filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis/anis_{target}'
     filename = append_filename(filename, nloudest=nloudest)
     filename += f"_pv{len(parvars)}"
+    if nside != 8:
+        filename += f"_ns{nside}"
+    if lmax != 8:
+        filename += f"_lmax{lmax}"
     filename += f".npz"
     file = np.load(filename, allow_pickle=True)
     yy_cl=file['yy_cl']
