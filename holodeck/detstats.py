@@ -3290,7 +3290,7 @@ def build_ratio_arrays(
 
 
 def build_anis_arrays(
-        target, nvars=21, nreals=500, nskies=100, shape=None,
+        target, nvars=21, nreals=500, shape=None,
         gw_only=False, red2white=None, red_gamma=None, 
         nloudest=10, 
         parvars = [0,10,20],
@@ -3299,7 +3299,7 @@ def build_anis_arrays(
         ):
     
     data, params, = get_data(target, dets=False,
-        nvars=nvars, nreals=nreals, nskies=nskies, shape=shape,  # keep as defaults
+        nvars=nvars, nreals=nreals, shape=shape,  # keep as defaults
         gw_only=gw_only, 
         nloudest=nloudest, )
 
@@ -3350,38 +3350,50 @@ def get_anis_arrays(
 
     return yy_cl, xx_fobs, params_cl
 
-def build_hcpar_arrays(target, nloudest=1,
-    parvars = [0,5,10,15,20], 
-    path = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz',
-                         ):
+def build_hcpar_arrays(
+        target,nvars=21, nreals=500, shape=None,
+        gw_only=False,
+        nloudest=1, 
+        parvars = [0,10,20],
+        ):
+    """ Save and return hcpar arrays for plotting
+    
+    returns
+    -----
+    xx : 
+    yy_ss : len(parvars) array of [F,R] NDarrays
+        0th loudest [hc_ss, mass, distance] in dimensionless, M_sol, and Mpc units
+    yy_bg : len(parvars) array of [F,R] NDarrays
+        Background (all but nloudets) average [hc_ss, mass, distance] 
+        in dimensionless, M_sol, and Mpc units
+    labels : nparvars array of target values
 
-    path='/Users/emigardiner/GWs/holodeck/output/anatomy_redz'
+    """
 
     labels = []
     yy_ss = []
     yy_bg = []
-    data, params = get_data(target, nvars=NVARS, nskies=NSKIES, nreals=NREALS,
-                            path=path)
+    data, params, = get_data(target, dets=False,
+        nvars=nvars, nreals=nreals, shape=shape,  # keep as defaults
+        gw_only=gw_only, 
+        nloudest=nloudest, )
+    
     fobs_cents = data[0]['fobs_cents']
     xx = fobs_cents * YR
 
     for vv, var in enumerate(parvars):
-        labels.append(f"{params[var][target]:.2f}")
+        labels.append(f"{params[var][target]}")
 
-        hc_ss_old = data[var]['hc_ss']
-        hc_bg_old = data[var]['hc_bg']
-        hc_ss, hc_bg = resample_loudest(hc_ss_old, hc_bg_old, nloudest)
+        hc_ss = data[var]['hc_ss']
+        hc_bg = data[var]['hc_bg']
 
         sspar = data[var]['sspar']
         bgpar = data[var]['bgpar']
 
-        sspar = sings.all_sspars(fobs_cents, sspar)
-        bgpar = bgpar*sings.par_units[:,np.newaxis,np.newaxis]
-        sspar = sspar*sings.par_units[:,np.newaxis,np.newaxis,np.newaxis]
+        sspar = holo.single_sources.all_sspars(fobs_cents, sspar)
+        bgpar = bgpar*holo.single_sources.par_units[:,np.newaxis,np.newaxis]
+        sspar = sspar*holo.single_sources.par_units[:,np.newaxis,np.newaxis,np.newaxis]
         
-        sspar, bgpar = resample_par(hc_ss_old, hc_bg_old, sspar, bgpar, nloudest)
-        print(f"{sspar.shape=}, {bgpar.shape=}")
-
     # parameters to plot
         _yy_ss = [hc_ss[...,0], sspar[0,...,0], #sspar[1,...,0], # sspar[2,],  # strain, mass, mass ratio,
                 sspar[4,...,0]] # final comoving distance, single loudest only
@@ -3391,8 +3403,43 @@ def build_hcpar_arrays(target, nloudest=1,
         yy_ss.append(_yy_ss)
         yy_bg.append(_yy_bg)
 
+    filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/hcpar/hcpar_{target}'
+    filename = append_filename(filename, nloudest=nloudest, gw_only=gw_only, )
+    filename += f"_pv{len(parvars)}"
+    filename += f".npz"
+    
+    np.savez(filename, xx=xx, yy_ss=yy_ss, yy_bg=yy_bg, labels=labels)
+    return xx, yy_ss, yy_bg, labels
 
-    save_name = path+f'/figdata/hcpar/hcpar_arrays_{target}_v{NVARS}_r{NREALS}_s{NSKIES}_shape{str(SHAPE)}'
-    if nloudest != 10: save_name += f"_l{nloudest}"
-    save_name += '.npz'
-    np.savez(save_name, xx=xx, yy_ss=yy_ss, yy_bg=yy_bg, labels=labels)
+def get_hcpar_arrays(
+        target,nvars=21, nreals=500, shape=None,
+        gw_only=False,
+        nloudest=1, 
+        parvars = [0,10,20],
+        ):
+    """ Save and return hcpar arrays for plotting
+    
+    returns
+    -------
+    xx : [F,] 1Darray
+    yy_ss : len(parvars) array of [F,R] NDarrays
+        0th loudest [hc_ss, mass, distance] in dimensionless, M_sol, and Mpc units
+    yy_bg : len(parvars) array of [F,R] NDarrays
+        Background (all but nloudets) average [hc_ss, mass, distance] 
+        in dimensionless, M_sol, and Mpc units
+    labels : nparvars array of target values
+
+    """
+
+    filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/hcpar/hcpar_{target}'
+    filename = append_filename(filename, nloudest=nloudest, gw_only=gw_only, )
+    filename += f"_pv{len(parvars)}"
+    filename += f".npz"
+
+    file = np.load(filename, allow_pickle=True)
+    xx = file['xx']
+    yy_ss = file['yy_ss']
+    yy_bg = file['yy_bg']
+    labels = file['labels']
+
+    return xx, yy_ss, yy_bg, labels
