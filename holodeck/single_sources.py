@@ -2141,6 +2141,21 @@ def plot_params(axs, xx, REALS=1, LABEL='', grid=None,
             if(SHOW_LEGEND): axs[ii,jj].legend(loc='lower left')
 
 
+###################################################
+############ Utilities  #################
+###################################################
+
+def resample_loudest(hc_ss, hc_bg, nloudest):
+    if nloudest > hc_ss.shape[-1]: # check for valid nloudest
+        err = f"{nloudest=} for detstats must be <= nloudest of hc data"
+        raise ValueError(err)
+    
+    # recalculate new hc_bg and hc_ss
+    new_hc_bg = np.sqrt(hc_bg**2 + np.sum(hc_ss[...,nloudest:-1]**2, axis=-1))
+    new_hc_ss = hc_ss[...,0:nloudest]
+
+    return new_hc_ss, new_hc_bg
+
 
 ###################################################
 ############ DETECTION STATISTICS #################
@@ -2184,3 +2199,5 @@ def false_alarm_probability():
     TODO
     """
     return 0
+
+
