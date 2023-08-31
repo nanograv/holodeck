@@ -3292,9 +3292,7 @@ def build_ratio_arrays(
 def build_anis_arrays(
         target, nvars=21, nreals=500, nskies=100, shape=None,
         gw_only=False, red2white=None, red_gamma=None, 
-        nloudest=10, bgl=10, 
-        gsc_flag=False, dsc_flag=False, divide_flag=False,
-        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',
+        nloudest=10, 
         parvars = [0,10,20],
         lmax=8, nside=8,
 
@@ -3302,9 +3300,8 @@ def build_anis_arrays(
     
     data, params, = get_data(target, dets=False,
         nvars=nvars, nreals=nreals, nskies=nskies, shape=shape,  # keep as defaults
-        gw_only=gw_only, red2white=red2white, red_gamma=red_gamma,
-        nloudest=nloudest, bg_nloudest=bgl, 
-        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
+        gw_only=gw_only, 
+        nloudest=nloudest, )
 
 
     yy_cl = [] # PV len array of (F,R,l=1) arrays
@@ -3331,17 +3328,15 @@ def build_anis_arrays(
 
 def get_anis_arrays(
         target, nvars=21, nreals=500, nskies=100, shape=None,
-        gw_only=False, red2white=None, red_gamma=None, 
-        nloudest=10, bgl=10, 
-        gsc_flag=False, dsc_flag=False, divide_flag=False,
-        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',
+        gw_only=False, 
+        nloudest=10, 
         parvars = [0,10,20],
         nside=8, lmax=8 
 
         ):
 
     filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis/anis_{target}'
-    filename = append_filename(filename, nloudest=nloudest)
+    filename = append_filename(filename, nloudest=nloudest, gw_only=gw_only, )
     filename += f"_pv{len(parvars)}"
     if nside != 8:
         filename += f"_ns{nside}"
@@ -3354,3 +3349,50 @@ def get_anis_arrays(
     params_cl=file['params_cl']
 
     return yy_cl, xx_fobs, params_cl
+
+def build_hcpar_arrays(target, nloudest=1,
+    parvars = [0,5,10,15,20], 
+    path = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz',
+                         ):
+
+    path='/Users/emigardiner/GWs/holodeck/output/anatomy_redz'
+
+    labels = []
+    yy_ss = []
+    yy_bg = []
+    data, params = get_data(target, nvars=NVARS, nskies=NSKIES, nreals=NREALS,
+                            path=path)
+    fobs_cents = data[0]['fobs_cents']
+    xx = fobs_cents * YR
+
+    for vv, var in enumerate(parvars):
+        labels.append(f"{params[var][target]:.2f}")
+
+        hc_ss_old = data[var]['hc_ss']
+        hc_bg_old = data[var]['hc_bg']
+        hc_ss, hc_bg = resample_loudest(hc_ss_old, hc_bg_old, nloudest)
+
+        sspar = data[var]['sspar']
+        bgpar = data[var]['bgpar']
+
+        sspar = sings.all_sspars(fobs_cents, sspar)
+        bgpar = bgpar*sings.par_units[:,np.newaxis,np.newaxis]
+        sspar = sspar*sings.par_units[:,np.newaxis,np.newaxis,np.newaxis]
+        
+        sspar, bgpar = resample_par(hc_ss_old, hc_bg_old, sspar, bgpar, nloudest)
+        print(f"{sspar.shape=}, {bgpar.shape=}")
+
+    # parameters to plot
+        _yy_ss = [hc_ss[...,0], sspar[0,...,0], #sspar[1,...,0], # sspar[2,],  # strain, mass, mass ratio,
+                sspar[4,...,0]] # final comoving distance, single loudest only
+
+        _yy_bg = [hc_bg, bgpar[0], #bgpar[1],  # strain, mass, mass ratio, initial redshift, final com distance
+                bgpar[4],]
+        yy_ss.append(_yy_ss)
+        yy_bg.append(_yy_bg)
+
+
+    save_name = path+f'/figdata/hcpar/hcpar_arrays_{target}_v{NVARS}_r{NREALS}_s{NSKIES}_shape{str(SHAPE)}'
+    if nloudest != 10: save_name += f"_l{nloudest}"
+    save_name += '.npz'
+    np.savez(save_name, xx=xx, yy_ss=yy_ss, yy_bg=yy_bg, labels=labels)
