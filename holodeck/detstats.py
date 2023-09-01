@@ -3404,7 +3404,7 @@ def build_hcpar_arrays(
         yy_bg.append(_yy_bg)
 
     filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/hcpar/hcpar_{target}'
-    filename = append_filename(filename, nloudest=nloudest, gw_only=gw_only, )
+    filename = append_filename(filename, nloudest=nloudest, gw_only=gw_only, bgl=nloudest)
     filename += f"_pv{len(parvars)}"
     filename += f".npz"
     
@@ -3432,7 +3432,7 @@ def get_hcpar_arrays(
     """
 
     filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/hcpar/hcpar_{target}'
-    filename = append_filename(filename, nloudest=nloudest, gw_only=gw_only, )
+    filename = append_filename(filename, nloudest=nloudest, gw_only=gw_only, bgl=nloudest,)
     filename += f"_pv{len(parvars)}"
     filename += f".npz"
 
