@@ -39,9 +39,9 @@ class GW_Discrete(Grav_Waves):
         super().__init__(*args, **kwargs)
         self._box_vol_cgs = self._bin_evo._sample_volume
 
-        dlnf = np.diff(np.log(self.fobs_gw))
-        if not np.allclose(dlnf[0], dlnf):
-            log.exception("`GW_Discrete` will not work properly with unevenly sampled frequency (log-space)!")
+        # dlnf = np.diff(np.log(self.fobs_gw))
+        # if not np.allclose(dlnf[0], dlnf):
+        #     log.exception("`GW_Discrete` will not work properly with unevenly sampled frequency (log-space)!")
 
         return
 
@@ -147,6 +147,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     # If there are eccentricities, calculate the freq-dist-function
     # shape (N, H)
     eccen = data_harms['eccen']
+    # eccen[...] = 0.0
     if eccen is None:
         gne = 1
     else:
