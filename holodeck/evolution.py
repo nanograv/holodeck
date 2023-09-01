@@ -604,17 +604,17 @@ class Evolution:
 
         Returns
         -------
-        names : list[str], size (5,)
+        names : list[str], size (7,)
             Names of the returned data arrays in `samples`.
-        samples : np.ndarray, shape (6, S)
-            Sampled binary data.  For each binary samples S, 5 parameters are returned:
+        samples : np.ndarray, shape (7, S)
+            Sampled binary data.  For each binary samples S, 7 parameters are returned:
             ['mtot', 'mrat', 'redz', 'fobs', 'eccen'] (these are listed in the `names` returned value.)
             NOTE: `fobs` is *observer*-frame *orbital*-frequencies.
             These values correspond to all of the binaries in an observer's Universe
             (i.e. light-cone), within the given frequency bins.  The number of samples `S` is
             roughly the sum of the `weights` --- but the specific number is drawn from a Poisson
             distribution around the sum of the `weights`.
-        vals : (4,) list of (V,) ndarrays or float
+        vals : (7,) list of (V,) ndarrays or float
             Binary parameters (log10 of parameters specified in the `names` return values) at each
             frequency bin.  Binaries not reaching the target frequency bins before redshift zero,
             or before coalescing, are not returned.  Thus the number of values `V` may be less than
@@ -630,7 +630,7 @@ class Evolution:
         """
 
         # these are `log10(values)` where values are in CGS units
-        # names = ['mtot', 'mrat', 'redz', 'fobs', 'eccen']
+        # names = ['mtot', 'mrat', 'redz', 'fobs', 'eccen', 'dadt', 'dedt']
         names, vals, weights = self._sample_universe__at_values_weights(fobs_orb_edges)
 
         samples = self._sample_universe__resample(fobs_orb_edges, vals, weights, down_sample)
@@ -638,10 +638,11 @@ class Evolution:
         # Convert back to normal-space
         samples = np.asarray([10.0 ** ss for ss in samples])
         vals = np.asarray([10.0 ** vv for vv in vals])
-        #but then take log10 of eccentricity again, because we don't take the log10 of eccen initially.
+        #but then take log10 of eccentricity, dadt and dedt again, because we don't take the log10 of eccen initially.
         #this is because kale.resample() in _sample_universe__resample returns NaNs when using log10(eccen)
-        vals[4] = np.log10(vals[4]) #because we don't take log10 of eccen before interpolating
-        samples[4] = np.log10(samples[4]) #because we don't take log10 of eccen before interpolating
+        for v_ind in [4,5,6]:
+            vals[v_ind] = np.log10(vals[v_ind]) #because we don't take log10 of eccen, dadt and dedt before interpolating
+            samples[v_ind] = np.log10(samples[v_ind]) #because we don't take log10 of eccen, dadt and dedt before interpolating
         return names, samples, vals, weights
 
     def _sample_universe__at_values_weights(self, fobs_orb_edges):
@@ -659,9 +660,9 @@ class Evolution:
 
         Returns
         -------
-        names : (4,) list of str,
+        names : (7,) list of str,
             Names of the returned binary parameters (i.e. each array in `vals`).
-        vals : (4,) list of (V,) ndarrays or float
+        vals : (7,) list of (V,) ndarrays or float
             Binary parameters (log10 of parameters specified in the `names` return values) at each
             frequency bin.  Binaries not reaching the target frequency bins before redshift zero,
             or before coalescing, are not returned.  Thus the number of values `V` may be less than
@@ -675,7 +676,7 @@ class Evolution:
         dlnf = np.diff(np.log(fobs_orb_edges))
 
         # Interpolate binaries to given frequencies; these are the needed parameters
-        PARAMS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen'] #added eccentricity
+        PARAMS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen', 'dadt', 'dedt'] #added eccentricity, dadt, dedt
         # each array within `data_fobs` is shaped (N, F) for N-binaries and F-frequencies (`fobs`)
         data_fobs = self.at('fobs', fobs_orb_cents, params=PARAMS)
 
@@ -706,12 +707,14 @@ class Evolution:
         log.debug(f"Weights (lambda values) at targets: {utils.stats(weights)}")
         #select only valid entries for eccen and sepa
         eccen = data_fobs['eccen'][valid]
+        dadt = data_fobs['dadt'][valid]
+        dedt = data_fobs['dedt'][valid]
 
-        # Convert to log-space
-        vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo), eccen]
+        # Convert to log-space, except for eccen, dadt and dedt
+        vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo), eccen, dadt, dedt]
 
         #the order of these variables matters, look at end of sample_universe() function where we take log10(eccen)
-        names = ['mtot', 'mrat', 'redz', 'fobs', 'eccen']
+        names = ['mtot', 'mrat', 'redz', 'fobs', 'eccen', 'dadt', 'dedt']
 
         return names, vals, weights
 
@@ -729,7 +732,7 @@ class Evolution:
         #           can also return dcom instead of redz for easier strain calculation
         nsamp = np.random.poisson(weights.sum())
         # eccentricity boundaries should be between [0,1]
-        reflect = [None, [None, 0.0], None, np.log10([fobs_orb_edges[0], fobs_orb_edges[-1]]), [0,1.0]]
+        reflect = [None, [None, 0.0], None, np.log10([fobs_orb_edges[0], fobs_orb_edges[-1]]), [0,1.0], None, None]
         samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
         num_samp = samples[0].size
         log.debug(f"Sampled {num_samp:.8e} binaries in the universe")
@@ -901,8 +904,13 @@ class Evolution:
                 total accretion rates into primary and secondary accretion rates """
             self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_t, self, step)
             """ Accreted mass is calculated and added to primary and secondary masses """
-            self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:,step-1,0]
-            self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:,step-1,1]
+            if self._acc.evol_mass:
+                #this switch helps to separate out accretion effects from other cbd effects
+                self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:,step-1,0]
+                self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:,step-1,1]
+            else:
+                self.mass[:, step, 0] = self.mass[:, step-1, 0]
+                self.mass[:, step, 1] = self.mass[:, step-1, 1]
 
         return
 
