@@ -34,7 +34,7 @@ class Accretion:
     """
 
     def __init__(self, accmod='Basic', f_edd=0.01, mdot_ext=None, eccen=0.0,
-                 subpc=True, edd_lim=None, **kwargs):
+                 subpc=True, edd_lim=None, evol_mass=True, **kwargs):
         """ Initializes the Accretion class.
 
         Parameters
@@ -61,6 +61,7 @@ class Accretion:
         self.eccen = eccen
         self.subpc = subpc
         self.edd_lim = edd_lim
+        self.evol_mass = evol_mass
 
     def mdot_eddington(self, mass, eps=0.1):
         """ Calculate the total accretion rate based on masses and a fraction of the Eddington limit.
