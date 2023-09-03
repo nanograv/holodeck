@@ -3165,7 +3165,7 @@ def weighted_mean_variance(data, weights, debug=False,):
 def get_data(
         target, dets=True,
         nvars=21, nreals=500, nskies=100, shape=None,  # keep as defaults
-        nloudest = 10, bg_nloudest = 10, cv=None, ssn_flag=False,
+        nloudest = 10, bgl = 10, cv=None, ssn_flag=False,
         red_gamma = None, red2white=None, 
         gsc_flag=False,  dsc_flag=False, divide_flag=False, 
         gw_only=False,
@@ -3181,8 +3181,8 @@ def get_data(
     if nloudest != 10:                                           # if using nloudest that isn't the default 10
         dets_file += f"_l{nloudest}" 
         data_file += f"_l{nloudest}"
-    if bg_nloudest != nloudest:
-        dets_file += f"_bgl{bg_nloudest}" # only change nloudest subtracted from bg, not single sources loudest
+    if bgl != nloudest:
+        dets_file += f"_bgl{bgl}" # only change nloudest subtracted from bg, not single sources loudest
     if cv is not None: 
         dets_file += f"_cv{cv}"        # if using one variation to calibrate
     if ssn_flag: 
@@ -3262,21 +3262,21 @@ def append_filename(filename='',
 def build_ratio_arrays(
         target, nreals=500, nskies=100,
         gw_only=False, red2white=None, red_gamma=None, 
-        nloudest=10, bgl=10, 
+        nloudest=10, bgl=1, 
         gsc_flag=False, dsc_flag=False, divide_flag=False,
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',):
 
     data, params, dsdat = get_data(target,
         gw_only=gw_only, red2white=red2white, red_gamma=red_gamma,
-        nloudest=10, bgl=10, 
+        nloudest=nloudest, bgl=bgl, 
         gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
     xx=[]
     yy=[]
     for pp, par in enumerate(params):
         xx.append(params[pp][target])
         dp_bg = np.repeat(dsdat[pp]['dp_bg'], nskies).reshape(nreals, nskies)
-        dp_ss = dsdat[pp]['ev_ss']
-        yy.append(dp_ss/dp_bg)
+        ev_ss = dsdat[pp]['ev_ss']
+        yy.append(ev_ss/dp_bg)
 
     filename = figpath+f'/ratio_arrays_{target}'
     filename = append_filename(
@@ -3288,6 +3288,26 @@ def build_ratio_arrays(
 
     np.savez(filename, xx_params = xx, yy_ratio = yy,)
 
+def get_ratio_arrays(
+        target, nreals=500, nskies=100,
+        gw_only=False, red2white=None, red_gamma=None, 
+        nloudest=10, bgl=1, 
+        gsc_flag=False, dsc_flag=False, divide_flag=False,
+        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',):
+
+    filename = figpath+f'/ratio_arrays_{target}'
+    filename = append_filename(
+        filename, 
+        gw_only=gw_only, red_gamma=red_gamma, red2white=red2white, 
+        nloudest=nloudest, bgl=bgl, cv=None, 
+        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
+    filename += '.npz'  
+
+    file = np.load(filename)
+    xx_params = file['xx_params']
+    yy_ratio = file['yy_ratio']
+    file.close()
+    return xx_params, yy_ratio
 
 def build_anis_arrays(
         target, nvars=21, nreals=500, shape=None,
@@ -3443,3 +3463,65 @@ def get_hcpar_arrays(
     labels = file['labels']
 
     return xx, yy_ss, yy_bg, labels
+
+def build_freq_arrays(
+        target, nreals=500, nskies=100,
+        gw_only=False, red2white=None, red_gamma=None, 
+        nloudest=10, bgl=10, cv=None,
+        gsc_flag=False, dsc_flag=False, divide_flag=False,
+        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',):
+
+    data, params, dsdat = get_data(target,
+        gw_only=gw_only, red2white=red2white, red_gamma=red_gamma,
+        nloudest=nloudest, bgl=bgl, nreals=nreals, nskies=nskies,
+        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
+
+    xx = [] # param
+    favg = [] # frequency means in log space
+    stdv = [] # stdev in log space
+
+    freqs = data[0]['fobs_cents']
+    nfreqs = len(freqs)
+    freqs = np.repeat(freqs, nreals*nskies*nloudest).reshape(
+        nfreqs, nreals, nskies, nloudest)
+
+    for pp, par in enumerate(params):
+        xx.append(params[pp][target])
+        dpssi = dsdat[pp]['gamma_ssi']
+        logmean, logvar2 = weighted_mean_variance(np.log10(freqs), weights=dpssi)
+
+        favg.append(logmean)
+        stdv.append(np.sqrt(logvar2))
+
+    filename = figpath+f'/favg_{target}'
+    filename = append_filename(filename,
+                gw_only=gw_only, red_gamma=red_gamma, red2white=red2white,
+                nloudest=nloudest, bgl=bgl, cv=cv, 
+                gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
+
+    filename=filename+'.npz'
+    np.savez(filename, xx = xx, yy_log = favg, sd_log=stdv)
+
+
+def get_freq_arrays(
+        target, nreals=500, nskies=100,
+        gw_only=False, red2white=None, red_gamma=None, 
+        nloudest=10, bgl=10, cv=None,
+        gsc_flag=False, dsc_flag=False, divide_flag=False,
+        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',):
+
+
+    filename = figpath+f'/favg_{target}'
+    filename = append_filename(filename,
+                gw_only=gw_only, red_gamma=red_gamma, red2white=red2white,
+                nloudest=nloudest, bgl=bgl, cv=cv, 
+                gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
+
+    filename=filename+'.npz'
+    file = np.load(filename)
+    xx = file['xx']
+    yy_log = file['yy_log']
+    sd_log = file['sd_log']
+    file.close()
+
+    return xx, yy_log, sd_log
