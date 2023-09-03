@@ -1966,7 +1966,7 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
 
             # use sigmin and sigmax from previous realization, 
             # unless it's the first realization of the sample
-            psrs, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[nn,:,rr], fobs, npsrs, tol=tol, maxbads=maxbads,
+            psrs, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[nn,:,rr], hc_ss[nn,:,rr,:], fobs, npsrs, tol=tol, maxbads=maxbads,
                                      sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True, ss_noise=ss_noise)
             _sigmin /= 2
             _sigmax *= 2
