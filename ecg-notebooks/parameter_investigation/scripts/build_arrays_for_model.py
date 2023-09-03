@@ -44,7 +44,7 @@ def _setup_argparse():
                         help='sam shape')
     parser.add_argument('-l', '--nloudest', action='store', dest='nloudest', type=int, default=DEF_NLOUDEST,
                         help='number of loudest single sources')
-    parser.add_argument('--bgl', '--bg_nloudest', action='store', dest='bg_nloudest', type=int, default=DEF_NLOUDEST,
+    parser.add_argument('--bgl', '--bgl', action='store', dest='bgl', type=int, default=DEF_NLOUDEST,
                         help='number of loudest single sources subtracted from the background')
     parser.add_argument('-v', '--nvars', action='store', dest='nvars', type=int, default=DEF_NVARS,
                         help='number of variations on target param')
@@ -55,8 +55,6 @@ def _setup_argparse():
                         help='number of ss sky realizations')
     parser.add_argument('--cv', '--calvar', action='store', dest='calvar', type=int, default=DEF_CALVAR,
                         help='variation to use for calibration')
-    parser.add_argument('--red_amp', action='store', dest='red_amp', type=float, default=DEF_RED_AMP,
-                        help='Red noise amplitude')
     parser.add_argument('--red_gamma', action='store', dest='red_gamma', type=float, default=DEF_RED_GAMMA,
                         help='Red noise gamma')
     parser.add_argument('--red2white', action='store', dest='red2white', type=float, default=DEF_RED2WHITE,
@@ -90,17 +88,17 @@ def main():
 
     # set up args
     args = _setup_argparse()
-    print(f"NREALS = {args.nreals}, NSKIES = {args.nskies}, NPSRS = {args.npsrs}, target = {args.target}, NVARS={args.nvars}")
-    print(f"CV={args.calvar}, NLOUDEST={args.nloudest}, BGL={args.bg_nloudest}, {args.gsc_flag=}, {args.dsc_flag=}")
+    print(f"NREALS = {args.nreals}, NSKIES = {args.nskies}, target = {args.target}, NVARS={args.nvars}")
+    print(f"CV={args.calvar}, NLOUDEST={args.nloudest}, BGL={args.bgl}, {args.gsc_flag=}, {args.dsc_flag=}")
     print(f"RED2WHITE={args.red2white}, RED_GAMMA={args.red_gamma}")
 
     if args.favg:
-        print("---building favg arrays---")
+        print("---building favg array---")
         detstats.build_favg_arrays(
             target=args.target, nreals=args.nreals, nskies=args.nskies,
             gw_only=args.gw_only, red2white=args.red2white, red_gamma=args.red_gamma,
-            nloudest=args.nloudest, bgl=args.bgl, cv=args.cv, 
-            gsc_flag=args.gsc_clbrt, dsc_flag=args.dsc, divide_flag=args.divide,
+            nloudest=args.nloudest, bgl=args.bgl, cv=args.calvar, 
+            gsc_flag=args.gsc_flag, dsc_flag=args.dsc_flag, divide_flag=args.divide_flag,
             )
 
     end_time = datetime.now()

@@ -3222,7 +3222,7 @@ def get_data(
     print(target, "got data")
     file = np.load(dets_file, allow_pickle=True)
     print(target, "loaded dets")
-    print(file.files)
+    # print(file.files)
     dsdat = file['dsdat']
     file.close()
 
