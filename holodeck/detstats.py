@@ -2486,7 +2486,8 @@ def detect_pspace_model_clbrt_pta(
         _dsdat.update(gamma_ssi=gamma_ssi)
     if save_snr_ss:
         _dsdat.update(snr_ss=snr_ss)
-    print(f"Model took {datetime.now() - mod_start} s, {failed_psrs}/{nreals} realizations failed.")
+    if debug:
+        print(f"Model took {datetime.now() - mod_start} s, {failed_psrs}/{nreals} realizations failed.")
     return _dsdat
 
 
