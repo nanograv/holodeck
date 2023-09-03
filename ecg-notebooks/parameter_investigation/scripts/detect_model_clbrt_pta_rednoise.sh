@@ -7,7 +7,7 @@ do
         for RED2WHITE in 0.1 10.0
         do
             python ecg-notebooks/parameter_investigation/detect_model_clbrt_pta.py $TARGET --detstats --debug -r 500 -v 21 -l 10 --bgl 1 --red2white $RED2WHITE --red_gamma $RED_GAMMA
-            python ecg-notebooks/parameter_investigation/scripts/build_arrays_for_model.py $TARGET --favg -r 500 -v 21 -l 10 --bgl 1 --red2white $RED2WHITE --red_gamma $RED_GAMMA
+            python ecg-notebooks/parameter_investigation/scripts/build_arrays_for_model.py $TARGET --favg --ratio -r 500 -v 21 -l 10 --bgl 1 --red2white $RED2WHITE --red_gamma $RED_GAMMA
             
         done
     done

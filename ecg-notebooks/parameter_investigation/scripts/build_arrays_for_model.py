@@ -29,6 +29,8 @@ def _setup_argparse():
                         help="target parameter to vary")
     parser.add_argument('--favg', action='store_true', dest='favg', default=False,
                         help='whether or not to build favg arrays')
+    parser.add_argument('--ratio', action='store_true', dest='ratio', default=False,
+                        help='whether or not to build ratio arrays')
     
     # what to do
     parser.add_argument('--gw_only', action='store_true', dest='gw_only', default=False,
@@ -98,6 +100,14 @@ def main():
             target=args.target, nreals=args.nreals, nskies=args.nskies,
             gw_only=args.gw_only, red2white=args.red2white, red_gamma=args.red_gamma,
             nloudest=args.nloudest, bgl=args.bgl, cv=args.calvar, 
+            gsc_flag=args.gsc_flag, dsc_flag=args.dsc_flag, divide_flag=args.divide_flag,
+            )
+    if args.ratio:
+        print("---building ratio array---")
+        detstats.build_ratio_arrays(
+            target=args.target, nreals=args.nreals, nskies=args.nskies,
+            gw_only=args.gw_only, red2white=args.red2white, red_gamma=args.red_gamma,
+            nloudest=args.nloudest, bgl=args.bgl, 
             gsc_flag=args.gsc_flag, dsc_flag=args.dsc_flag, divide_flag=args.divide_flag,
             )
 
