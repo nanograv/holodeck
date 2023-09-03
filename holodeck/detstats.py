@@ -3464,12 +3464,12 @@ def get_hcpar_arrays(
 
     return xx, yy_ss, yy_bg, labels
 
-def build_freq_arrays(
+def build_favg_arrays(
         target, nreals=500, nskies=100,
         gw_only=False, red2white=None, red_gamma=None, 
         nloudest=10, bgl=10, cv=None,
         gsc_flag=False, dsc_flag=False, divide_flag=False,
-        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',):
+        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/favg',):
 
     data, params, dsdat = get_data(target,
         gw_only=gw_only, red2white=red2white, red_gamma=red_gamma,
@@ -3501,14 +3501,14 @@ def build_freq_arrays(
 
     filename=filename+'.npz'
     np.savez(filename, xx = xx, yy_log = favg, sd_log=stdv)
+    return xx, favg, stdv
 
-
-def get_freq_arrays(
-        target, nreals=500, nskies=100,
+def get_favg_arrays(
+        target, 
         gw_only=False, red2white=None, red_gamma=None, 
         nloudest=10, bgl=10, cv=None,
         gsc_flag=False, dsc_flag=False, divide_flag=False,
-        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',):
+        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/favg',):
 
 
     filename = figpath+f'/favg_{target}'
