@@ -2861,7 +2861,7 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs,
     while np.abs(dp_bg-0.50)>tol:
         sigma = np.mean([sigmin, sigmax]) # a weighted average would be better
         if red2white is not None:
-            red_amp = sigma * red2white
+            red_amp = _white_noise(cad, sigma) * red2white
         psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                         phi=phis, theta=thetas)
         dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], hc_ss=hc_ss[:,np.newaxis,:],

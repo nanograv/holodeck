@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for TARGET in gsmf_mchar0_log10 mmb_mamp_log10 mmb_scatter_dex hard_gamma_inner
+for TARGET in hard_time gsmf_phi0
 do 
     python ecg-notebooks/parameter_investigation/scripts/build_arrays_for_model.py $TARGET --favg -r 500 -v 21 -l 10 --bgl 1 
         
