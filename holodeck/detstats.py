@@ -922,7 +922,7 @@ def _Sh_ss_noise(hc_ss, freqs):
 
     Returns
     -------
-    Sh_ss : (F,R,L) NDarray of scalars
+    Sh_ss : (P,F,R) NDarray of scalars
         The noise in a single pulsar from other GW sources for detecting each single source.
 
     Follows Eq. (45) in Rosado et al. 2015.
@@ -2808,6 +2808,12 @@ def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials,
         )
     return rsigmas, avg_dps, std_dps
 
+
+def _red_amp_from_white_noise(cad, sigma, red2white, fref=1/YR):
+    red_amp = np.sqrt(12 * np.pi**2 * fref**-3 * red2white *
+                      _white_noise(cad, sigma)) 
+    return red_amp
+
 def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs, 
                       sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
                       phis=None, thetas=None, ret_sig = False, red_amp=None, red_gamma=None, red2white=None,
@@ -2847,7 +2853,7 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs,
     if thetas is None: thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
     sigma = sigstart
     if red2white is not None:
-        red_amp = _white_noise(cad, sigma) * red2white
+        red_amp = _red_amp_from_white_noise(cad, sigma, red2white) 
 
     psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                     phi=phis, theta=thetas)
@@ -2861,7 +2867,7 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs,
     while np.abs(dp_bg-0.50)>tol:
         sigma = np.mean([sigmin, sigmax]) # a weighted average would be better
         if red2white is not None:
-            red_amp = _white_noise(cad, sigma) * red2white
+            red_amp = _red_amp_from_white_noise(cad, sigma, red2white) 
         psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                         phi=phis, theta=thetas)
         dp_bg = detect_bg_pta(psrs, fobs, hc_bg=hc_bg[:,np.newaxis], hc_ss=hc_ss[:,np.newaxis,:],
