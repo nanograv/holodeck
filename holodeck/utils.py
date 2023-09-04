@@ -29,7 +29,7 @@ import scipy.stats    # noqa
 import scipy.special  # noqa
 
 from holodeck import log, cosmo
-from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC
+from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, EDDT
 
 # [Sesana2004]_ Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
@@ -500,8 +500,6 @@ def scatter_redistribute_densities(cents, dens, dist=None, scatter=None, axis=0)
     weights = _get_rolled_weights(log_cents, dist)
     dens_new = _scatter_with_weights(dens, weights, axis=0)
     return dens_new
-
-
 
 
 def eccen_func(cent: float, width: float, size: int) -> np.ndarray:
@@ -1778,6 +1776,32 @@ def angs_from_sepa(sepa, dcom, redz):
     angs = sepa / dang           # angular-separation [radians]
     return angs
 
+
+def eddington_accretion(mass, eps=0.1):
+    """Eddington Accretion rate, $\\dot{M}_{Edd} = L_{Edd}/\\epsilon c^2$.
+
+    Arguments
+    ---------
+    mass : array_like of scalar
+        BH Mass.
+    eps : array_like of scalar
+        Efficiency parameter.
+
+    Returns
+    -------
+    mdot : array_like of scalar
+        Eddington accretion rate.
+
+    """
+    edd_lum = eddington_luminosity(mass, eps=eps)
+    # NOTE: no `epsilon` (efficiency) in this equation, because included in `eddington_luminosity`
+    mdot = edd_lum/np.square(SPLC)
+    return mdot
+
+
+def eddington_luminosity(mass, eps=0.1):
+    ledd = EDDT * mass / eps
+    return ledd
 
 
 # =================================================================================================
