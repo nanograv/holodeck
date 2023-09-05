@@ -3207,7 +3207,7 @@ def get_data(
         dets_file += '_dsc'
 
     if red2white is not None and red_gamma is not None:               # if using red noise with fixed red_gamma
-        dets_file += f'_r2w{red2white:.1f}_rg{red_gamma:.1f}'
+        dets_file += f'_r2w{red2white:.1e}_rg{red_gamma:.1f}'
     else: 
         dets_file += f'_white'
 
