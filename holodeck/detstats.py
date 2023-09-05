@@ -990,6 +990,7 @@ def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=N
     Sh_rest = _Sh_rest_noise(hc_ss, hc_bg, freqs) # (F,R,L,)
     noise = noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh_rest[np.newaxis,:,:,:] # (P,F,R,L)
     if (red_amp is not None) and (red_gamma is not None):
+        print('test checkpoint1!')
         red_noise = _red_noise(red_amp, red_gamma, freqs) # (F,)
         noise = noise + red_noise[np.newaxis,:,np.newaxis,np.newaxis] # (P,F,R,L)
     return noise
