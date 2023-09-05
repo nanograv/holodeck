@@ -2810,8 +2810,8 @@ def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials,
 
 
 def _red_amp_from_white_noise(cad, sigma, red2white, fref=1/YR):
-    red_amp = np.sqrt(12 * np.pi**2 * fref**-3 * red2white *
-                      _white_noise(cad, sigma)) 
+    red_amp = np.sqrt(12 * np.pi**2 * fref**3 * 
+                      red2white * _white_noise(cad, sigma)) 
     return red_amp
 
 def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs, 
