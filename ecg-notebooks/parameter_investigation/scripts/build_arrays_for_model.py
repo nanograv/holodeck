@@ -27,15 +27,22 @@ def _setup_argparse():
     parser = argparse.ArgumentParser()
     parser.add_argument('target', action='store', type=str,
                         help="target parameter to vary")
+    parser.add_argument('--gw_only', action='store_true', dest='gw_only', default=False,
+                        help='whether or not to use gw-only evolution')
+    
+    # what to do
     parser.add_argument('--favg', action='store_true', dest='favg', default=False,
                         help='whether or not to build favg arrays')
     parser.add_argument('--ratio', action='store_true', dest='ratio', default=False,
                         help='whether or not to build ratio arrays')
+    parser.add_argument('--anis_var', action='store_true', dest='anis_var', default=False,
+                        help='whether or not to build anis vs var arrays')
+    parser.add_argument('--anis_freq', action='store_true', dest='anis_freq', default=False,
+                        help='whether or not to build anis vs freq arrays')
     
-    # what to do
-    parser.add_argument('--gw_only', action='store_true', dest='gw_only', default=False,
-                        help='whether or not to use gw-only evolution')
-      
+   
+
+     
 
     # retrieve data, params, detstats information
     parser.add_argument('-f', '--nfreqs', action='store', dest='nfreqs', type=int, default=DEF_NFREQS,
@@ -95,7 +102,7 @@ def main():
     print(f"RED2WHITE={args.red2white}, RED_GAMMA={args.red_gamma}")
 
     if args.favg:
-        print("---building favg array---")
+        print("---building favg arrays---")
         detstats.build_favg_arrays(
             target=args.target, nreals=args.nreals, nskies=args.nskies,
             gw_only=args.gw_only, red2white=args.red2white, red_gamma=args.red_gamma,
@@ -103,12 +110,25 @@ def main():
             gsc_flag=args.gsc_flag, dsc_flag=args.dsc_flag, divide_flag=args.divide_flag,
             )
     if args.ratio:
-        print("---building ratio array---")
+        print("---building ratio arrays---")
         detstats.build_ratio_arrays(
             target=args.target, nreals=args.nreals, nskies=args.nskies,
             gw_only=args.gw_only, red2white=args.red2white, red_gamma=args.red_gamma,
             nloudest=args.nloudest, bgl=args.bgl, 
             gsc_flag=args.gsc_flag, dsc_flag=args.dsc_flag, divide_flag=args.divide_flag,
+            )
+    if args.anis_var:
+        print("---building anisotropy var arrays---")
+        detstats.build_anis_var_arrays(
+            target=args.target, nvars=args.nvars, nreals=args.nreals, shape=args.shape,
+            gw_only=args.gw_only,
+            nloudest=args.nloudest, bgl=args.bgl, 
+            )
+    if args.anis_freq:
+        print("---building anisotropy vs frequency arrays---")
+        detstats.build_anis_freq_arrays(
+            target=args.target, nvars=args.nvars, nreals=args.nreals, shape=args.shape,
+            gw_only=args.gw_only, nloudest=args.nloudest, bgl=args.bgl, 
             )
 
     end_time = datetime.now()

@@ -16,7 +16,7 @@ import warnings
 
 
 import holodeck as holo
-from holodeck import utils, cosmo, log, plot, sam_cython
+from holodeck import utils, cosmo, log, plot, sam_cython, anisotropy
 from holodeck.constants import MPC, YR
 from holodeck.sams import cyutils as sam_cyutils
 
@@ -3316,10 +3316,70 @@ def get_ratio_arrays(
     file.close()
     return xx_params, yy_ratio
 
-def build_anis_arrays(
+def build_anis_var_arrays(
         target, nvars=21, nreals=500, shape=None,
-        gw_only=False, red2white=None, red_gamma=None, 
-        nloudest=10, 
+        gw_only=False, 
+        nloudest=10, bgl=1,
+        lmax=8, nside=8, 
+        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',
+      
+):
+    """ Calculate xx=params and yy=C1C0
+    
+    """
+    data, params, = get_data(target, nvars=nvars, nreals=nreals, shape=shape,
+        gw_only=gw_only, 
+        nloudest=nloudest, bgl=bgl, dets=False)
+    xx=[]
+    yy=[]
+    for pp, par in enumerate(params):
+        xx.append(params[pp][target])
+        _, Cl = holo.anisotropy.sph_harm_from_hc(
+            data[pp]['hc_ss'], data[pp]['hc_bg'], nside=nside, lmax=lmax
+        )
+        yy.append(Cl[...,1]/Cl[...,0])
+
+    filename = figpath+f'/ratio_arrays_{target}'
+    filename += f"_l{lmax}_ns{nside}"
+    filename = append_filename(
+        filename, 
+        gw_only=gw_only, 
+        nloudest=nloudest, bgl=bgl, )
+    filename += '.npz'  
+
+    np.savez(filename, xx_params=xx, yy_c1c0=yy)
+    return xx, yy
+
+def get_anis_var_arrays(
+        target, 
+        gw_only=False, 
+        nloudest=10, bgl=1,
+        lmax=8, nside=8, 
+        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',
+      
+):
+    """ Get xx=params and yy=C1C0
+    
+    """
+
+    filename = figpath+f'/ratio_arrays_{target}'
+    filename += f"_l{lmax}_ns{nside}"
+    filename = append_filename(
+        filename, 
+        gw_only=gw_only, 
+        nloudest=nloudest, bgl=bgl, )
+    filename += '.npz'  
+
+    file = np.load(filename)
+    xx_params = file['xx_params']
+    yy_c1c0 = file['yy_c1c0']
+    file.close()
+    return xx_params, yy_c1c0\
+    
+
+def build_anis_freq_arrays(
+        target, nvars=21, nreals=500, shape=None,
+        gw_only=False, nloudest=10, bgl=1,
         parvars = [0,10,20],
         lmax=8, nside=8,
 
@@ -3327,8 +3387,8 @@ def build_anis_arrays(
     
     data, params, = get_data(target, dets=False,
         nvars=nvars, nreals=nreals, shape=shape,  # keep as defaults
-        gw_only=gw_only, 
-        nloudest=nloudest, )
+        gw_only=gw_only, nloudest=nloudest,  bgl=bgl,
+        )
 
 
     yy_cl = [] # PV len array of (F,R,l=1) arrays
@@ -3353,7 +3413,7 @@ def build_anis_arrays(
 
     return yy_cl, xx_fobs, params_cl
 
-def get_anis_arrays(
+def get_anis_freq_arrays(
         target, nvars=21, nreals=500, nskies=100, shape=None,
         gw_only=False, 
         nloudest=10, 
@@ -3376,6 +3436,7 @@ def get_anis_arrays(
     params_cl=file['params_cl']
 
     return yy_cl, xx_fobs, params_cl
+
 
 def build_hcpar_arrays(
         target,nvars=21, nreals=500, shape=None,
