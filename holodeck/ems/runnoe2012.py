@@ -99,14 +99,18 @@ class Runnoe2012:
 
         lbol = ap.units.Quantity(lbol, 'erg/s')
         lband = _lbol_to_lband__pow_law(lbol, alpha, beta, fiso=fiso)
-        print(f"{lbol=} {lband=}")
+        # if this is one of the x-ray bands, then wlen is None, and `lband` is the luminosity across
+        # the band, in units of erg/s
         if wlen is None:
-            units = 'erg / s'
+            # units = 'erg / s'
+            pass
+        # if this is one of the (near-)optical bands, then `wlen` should be wavelength in Angstroms
+        # and `lband` starts out as lambda * F_lambda in units of [erg/s]
+        # convert that to just F_lambda in units of [erg/s/Angstrom]
         else:
             lband = lband / wlen
-            units = 'erg / (s angstrom)'
+            # units = 'erg / (s angstrom)'
 
-        # lband = ap.units.Quantity(lband, units)
         return lband
 
     def lbol_from_lband(self, band_name, lband, scatter=False, fiso=FRAC_ISO):
@@ -152,13 +156,11 @@ class Runnoe2012:
         lbol = ap.units.Quantity(lbol, units)
         return lbol
 
-    def iband_from_mass_fedd(self, mass, fedd, eps=0.1, magnitude=False):
+    def iband_from_mass_fedd(self, mass, fedd, eps=0.1, magnitude=True):
         lbol = utils.eddington_luminosity(mass, eps) * fedd
         lbol = ap.units.Quantity(lbol, 'erg/s')
         iband = self.lband_from_lbol('5100', lbol)
-        # L_lambda = l5100 * (5100e-8)
         if magnitude:
-            print(f"21342 {iband=}")
             iband = holo.ems.bands_sdss['i'].lum_to_abs_mag(iband, type='w')
         return iband
 
