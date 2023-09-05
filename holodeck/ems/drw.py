@@ -8,6 +8,57 @@ from holodeck.constants import MSOL
 # from holodeck.ems import runnoe2012, bands_sdss
 
 
+class MacLeod2010:
+    """Damped Random Walk models from MacLeod+2010.
+
+    MacLeod et al. 2010 - Modeling the Time Variability of SDSS Stripe 82 Quasars as a Damped Random Walk
+    https://arxiv.org/abs/1004.0276
+    https://ui.adsabs.harvard.edu/abs/2010ApJ...721.1014M/abstract
+    """
+
+    @classmethod
+    def _fit_func(cls, pars, errs, lambda_rf, imag, mbh, randomize=False):
+        if (randomize is not None) and (randomize is not False):
+            shape = np.shape(mbh)
+            if int(randomize) > 1:
+                shape = shape + (int(randomize),)
+                if not np.isscalar(imag):
+                    imag = imag[..., np.newaxis]
+                if not np.isscalar(mbh):
+                    mbh = mbh[..., np.newaxis]
+
+            shape = shape + (len(pars),)
+            pars = np.random.normal(pars, errs, size=shape)
+            pars = np.moveaxis(pars, -1, 0)
+
+        aa, bb, cc, dd = pars
+
+        # lf = aa + bb*np.log(lambda_rf/4000e-8) + cc*(imag + 23) + dd*np.log(mbh/(1e9*MSOL))
+        # ff = np.exp(lf)
+        rv = aa + bb*np.log10(lambda_rf/4000e-8) + cc*(imag + 23) + dd*np.log10(mbh/(1e9*MSOL))
+        rv = 10**rv
+        return rv
+
+    @classmethod
+    def sfinf(cls, imag, mbh, randomize=False):
+        """`mbh` should be in grams (NOTE: I THINK!)
+        """
+        lambda_iband = 7690e-8
+        pars = [-0.51, -0.479, 0.131, 0.18]
+        errs = [0.02, 0.005, 0.008, 0.03]
+        return cls._fit_func(pars, errs, lambda_iband, imag, mbh, randomize=randomize)
+
+    @classmethod
+    def tau(cls, imag, mbh, randomize=False):
+        """`mbh` should be in grams (NOTE: I THINK!)
+        `tau` is returned in units of days (NOTE: I THINK!)
+        """
+        lambda_iband = 7690e-8
+        pars = [2.4, 0.17, 0.03, 0.21]
+        errs = [0.2, 0.02, 0.04, 0.07]
+        return cls._fit_func(pars, errs, lambda_iband, imag, mbh, randomize=randomize)
+
+
 def drw_lightcurve(times, tau, mean_mag, sfinf, size=None):
     """Construct an AGN DRW lightcurve based on MacLeod+2010 model.
 
@@ -83,48 +134,7 @@ def drw_params(mass, fedd, eps=0.1, samples=False):
 
     """
     imag = holo.ems.runnoe2012.iband_from_mass_fedd(mass, fedd, eps=eps, magnitude=True).value
-    print(f"{imag=}")
-    taus = macleod2010_tau(imag, mass, randomize=samples)
-    sfis = macleod2010_sfinf(imag, mass, randomize=samples)
+    taus = MacLeod2010.tau(imag, mass, randomize=samples)
+    sfis = MacLeod2010.sfinf(imag, mass, randomize=samples)
     return imag, taus, sfis
 
-
-def _macleod2010_fit_func(pars, errs, lambda_rf, imag, mbh, randomize=False):
-    if (randomize is not None) and (randomize is not False):
-        shape = np.shape(mbh)
-        if int(randomize) > 1:
-            shape = shape + (int(randomize),)
-            if not np.isscalar(imag):
-                imag = imag[..., np.newaxis]
-            if not np.isscalar(mbh):
-                mbh = mbh[..., np.newaxis]
-
-        shape = shape + (len(pars),)
-        pars = np.random.normal(pars, errs, size=shape)
-        pars = np.moveaxis(pars, -1, 0)
-
-    aa, bb, cc, dd = pars
-
-    lf = aa + bb*np.log(lambda_rf/4000e-8) + cc*(imag + 23) + dd*np.log(mbh/(1e9*MSOL))
-    # ff = np.exp(lf)
-    ff = 10**lf
-    return ff
-
-
-def macleod2010_sfinf(imag, mbh, randomize=False):
-    """`mbh` should be in grams (NOTE: I THINK!)
-    """
-    lambda_iband = 7690e-8
-    pars = [-0.51, -0.479, 0.131, 0.18]
-    errs = [0.02, 0.005, 0.008, 0.03]
-    return _macleod2010_fit_func(pars, errs, lambda_iband, imag, mbh, randomize=randomize)
-
-
-def macleod2010_tau(imag, mbh, randomize=False):
-    """`mbh` should be in grams (NOTE: I THINK!)
-    `tau` is returned in units of days (NOTE: I THINK!)
-    """
-    lambda_iband = 7690e-8
-    pars = [2.4, 0.17, 0.03, 0.21]
-    errs = [0.2, 0.02, 0.04, 0.07]
-    return _macleod2010_fit_func(pars, errs, lambda_iband, imag, mbh, randomize=randomize)
