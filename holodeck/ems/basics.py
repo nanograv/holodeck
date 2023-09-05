@@ -15,6 +15,42 @@ UNITS_FREQ = 'Hz'
 UNITS_FLUX_WLEN = 'erg/(s cm2 angstrom)'
 UNITS_FLUX_FREQ = 'erg/(s cm2 Hz)'
 
+_units_erg_s_cm2_angstrom = ap.units.erg / ap.units.second / ap.units.cm**2 / ap.units.angstrom
+
+# SDSS AB Magnitudes
+BANDS_SDSS_AB_MAGS = {
+    "u": {
+        "wlen": 356 * ap.units.nm,
+        "bandwidth_wlen": 46.3 * ap.units.nm,
+        "flux_ref_freq": 3631 * ap.units.jansky,
+        "flux_ref_wlen": 859.5e-11 * _units_erg_s_cm2_angstrom,
+    },
+    "g": {
+        "wlen": 483 * ap.units.nm,
+        "bandwidth_wlen": 98.8 * ap.units.nm,
+        "flux_ref_freq": 3631 * ap.units.jansky,
+        "flux_ref_wlen": 466.9e-11 * _units_erg_s_cm2_angstrom,
+    },
+    "r": {
+        "wlen": 626 * ap.units.nm,
+        "bandwidth_wlen": 95.5 * ap.units.nm,
+        "flux_ref_freq": 3631 * ap.units.jansky,
+        "flux_ref_wlen": 278.0e-11 * _units_erg_s_cm2_angstrom,
+    },
+    "i": {
+        "wlen": 767 * ap.units.nm,
+        "bandwidth_wlen": 106.4 * ap.units.nm,
+        "flux_ref_freq": 3631 * ap.units.jansky,
+        "flux_ref_wlen": 185.2e-11 * _units_erg_s_cm2_angstrom,
+    },
+    "z": {
+        "wlen": 910 * ap.units.nm,
+        "bandwidth_wlen": 124.8 * ap.units.nm,
+        "flux_ref_freq": 3631 * ap.units.jansky,
+        "flux_ref_wlen": 131.5e-11 * _units_erg_s_cm2_angstrom,
+    },
+}
+
 
 def _get_wlen_freq(wlen, freq, error_if_neither):
     if error_if_neither and (wlen is None) and (freq is None):
@@ -42,7 +78,6 @@ def _get_flux_wlen_flux_freq(flux_wlen, flux_freq, freq, wlen):
         flux_freq = Band.spectral_freq(flux_wlen, wlen=wlen)
 
     return flux_wlen, flux_freq
-
 
 
 class Band:
@@ -247,43 +282,6 @@ class SDSS_Bands(BANDS):
     def __init__(self):
         super().__init__(BANDS_SDSS_AB_MAGS)
         return
-
-
-units_erg_s_cm2_angstrom = ap.units.erg / ap.units.second / ap.units.cm**2 / ap.units.angstrom
-
-# SDSS AB Magnitudes
-BANDS_SDSS_AB_MAGS = {
-    "u": {
-        "wlen": 356 * ap.units.nm,
-        "bandwidth_wlen": 46.3 * ap.units.nm,
-        "flux_ref_freq": 3631 * ap.units.jansky,
-        "flux_ref_wlen": 859.5e-11 * units_erg_s_cm2_angstrom,
-    },
-    "g": {
-        "wlen": 483 * ap.units.nm,
-        "bandwidth_wlen": 98.8 * ap.units.nm,
-        "flux_ref_freq": 3631 * ap.units.jansky,
-        "flux_ref_wlen": 466.9e-11 * units_erg_s_cm2_angstrom,
-    },
-    "r": {
-        "wlen": 626 * ap.units.nm,
-        "bandwidth_wlen": 95.5 * ap.units.nm,
-        "flux_ref_freq": 3631 * ap.units.jansky,
-        "flux_ref_wlen": 278.0e-11 * units_erg_s_cm2_angstrom,
-    },
-    "i": {
-        "wlen": 767 * ap.units.nm,
-        "bandwidth_wlen": 106.4 * ap.units.nm,
-        "flux_ref_freq": 3631 * ap.units.jansky,
-        "flux_ref_wlen": 185.2e-11 * units_erg_s_cm2_angstrom,
-    },
-    "z": {
-        "wlen": 910 * ap.units.nm,
-        "bandwidth_wlen": 124.8 * ap.units.nm,
-        "flux_ref_freq": 3631 * ap.units.jansky,
-        "flux_ref_wlen": 131.5e-11 * units_erg_s_cm2_angstrom,
-    },
-}
 
 
 '''

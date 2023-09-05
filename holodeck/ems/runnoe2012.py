@@ -6,147 +6,161 @@ https://ui.adsabs.harvard.edu/abs/2012MNRAS.422..478R/abstract
 """
 
 import numpy as np
+import astropy as ap
+import astropy.units
 
+import holodeck as holo
 from holodeck import utils
 
+
 __all__ = ["Runnoe2012"]
+
+FRAC_ISO = 0.75
 
 
 class Runnoe2012:
 
+    _FITS = {
+        '5100': {
+            'alpha': (4.89, 1.66),
+            'beta':  (0.91, 0.04),
+            'wlen': 5100.0 * ap.units.angstrom,
+        },
+        '3000': {
+            'alpha': (1.85, 1.27),
+            'beta':  (0.98, 0.03),
+            'wlen': 3000.0 * ap.units.angstrom,
+        },
+        '1450': {
+            'alpha': (4.74, 1.00),
+            'beta':  (0.91, 0.02),
+            'wlen': 1450.0 * ap.units.angstrom,
+        },
+        '2to10': {
+            'alpha': (25.14, 1.93),
+            'beta':  (0.47, 0.043),
+            'wlen': None,
+        },
+        '2to10rl': {
+            'alpha': (23.04, 3.60),
+            'beta':  (0.52, 0.080),
+            'wlen': None,
+        },
+        '2to10rq': {
+            'alpha': (33.06, 3.17),
+            'beta':  (0.29, 0.072),
+            'wlen': None,
+        },
+    }
+
     def __init__(self):
+        self._names = self._FITS.keys()
         return
 
-    @classmethod
-    def lum5100_from_lbol(cls, lbol, scatter=False):
-        """
-        Runnoe+2012 [1201.5155]
-        Eq.11 & 13
+    @property
+    def names(self):
+        return self._names
 
-        log(Liso) = (4.89 ± 1.66) + (0.91 ± 0.04) log(5100, L5100),   [Eq.11]
+    def _fit_params_for_band(self, band):
+        if band not in self.names:
+            raise KeyError(f"`band` ({band}) must be one of {self._options}!")
+
+        vals = self._FITS[band]
+        alpha = vals['alpha']
+        beta = vals['beta']
+        wlen = ap.units.Quantity(vals['wlen'], 'angstrom')
+        return alpha, beta, wlen
+
+    def lband_from_lbol(self, band, lbol, scatter=False, fiso=FRAC_ISO):
+        """Convert from bolometric luminosity to luminosity in photometric band.
+
+        Arguments
+        ---------
+        band : str
+            Specification of which photometric band.  One of `Runnoe2012.names`:
+            {'5100', '3000', '1450', '2to10', '2to10rl', '2to10rq'}
+        lbol : array_like, units of [erg/s]
+            Bolometric luminosity.
+
+        Returns
+        -------
+        lband : array_like,
+            Luminosity in photometric band.
+            * If `band` is one of the optical bands, return spectral luminosity,
+              with units of [erg/s/Angstrom].
+            * If `band` is one of the x-ray bands, return luminosity across the band,
+              with units of [erg/s].
 
         """
-        alpha = (4.89, 1.66)
-        beta = (0.91, 0.04)
+        alpha, beta, wlen = self._fit_params_for_band(band)
         if not scatter:
             alpha = alpha[0]
             beta = beta[0]
 
-        lam_lum_lam = _lbol_to_lband__pow_law(lbol, alpha, beta, lum0=1.0, fiso=0.75)
-        return lam_lum_lam
+        lbol = ap.units.Quantity(lbol, 'erg/s')
+        lband = _lbol_to_lband__pow_law(lbol, alpha, beta, fiso=fiso)
+        print(f"{lbol=} {lband=}")
+        if wlen is None:
+            units = 'erg / s'
+        else:
+            lband = lband / wlen
+            units = 'erg / (s angstrom)'
 
-    @classmethod
-    def lum3000_from_lbol(cls, lbol):
-        """
-        Runnoe+2012 [1201.5155]
-        Eq.10 & 13
+        # lband = ap.units.Quantity(lband, units)
+        return lband
 
-        log(Liso) = (1.85 ± 1.27) + (0.98 ± 0.03) log(3000L3000).
+    def lbol_from_lband(self, band_name, lband, scatter=False, fiso=FRAC_ISO):
+        """Convert from luminosity in photometric band to bolometric luminosity.
 
-        """
-        lam_lum_lam = _lbol_to_lband__pow_law(lbol, 1.85, 0.98, lum0=1.0, fiso=0.75)
-        return lam_lum_lam
+        Arguments
+        ---------
+        band_name : str
+            Specification of which photometric band.  One of `Runnoe2012.names`:
+            {'5100', '3000', '1450', '2to10', '2to10rl', '2to10rq'}
+        lband : array_like,
+            Luminosity in photometric band.
+            * If `band_name` is one of the optical bands, `lband` must be spectral luminosity,
+              with units of [erg/s/Angstrom].
+            * If `band_name` is one of the x-ray bands, `lband` must be luminosity across the band,
+              with units of [erg/s].
 
-    @classmethod
-    def lum1450_from_lbol(cls, lbol):
-        """
-        Runnoe+2012 [1201.5155]
-        Eq.9 & 13
-
-        log(Liso) = (4.74 ± 1.00) + (0.91 ± 0.02) log(1450L1450).
-        """
-        lam_lum_lam = _lbol_to_lband__pow_law(lbol, 4.74, 0.91, lum0=1.0, fiso=0.75)
-        return lam_lum_lam
-
-    @classmethod
-    def lbol_from_5100ang(cls, lam_lum_lam, scatter=False):
-        """
-        Runnoe+2012 [1201.5155]
-        Eq.11 & 13
-
-        log(Liso) = (4.89 ± 1.66) + (0.91 ± 0.04) log(5100, L5100),   [Eq.11]
+        Returns
+        -------
+        lbol : array_like, units of [erg/s]
+            Bolometric luminosity.
 
         """
-        alpha = (4.89, 1.66)
-        beta = (0.91, 0.04)
+
+        alpha, beta, wlen = self._fit_params_for_band(band_name)
         if not scatter:
             alpha = alpha[0]
             beta = beta[0]
 
-        lbol = _lband_to_lbol__pow_law(lam_lum_lam, alpha, beta, lum0=1.0, fiso=0.75)
+        # For the x-ray bands, `wlen` is `None`, and `lband` must have units of erg/s
+        if wlen is None:
+            pass
+        # For the (near-)optical bands, `wlen` is the wavelength in Angstroms, and the relation
+        # requires lambda * L_lambda, with units of erg/s.
+        # Convert from `L_lambda` (units of [erg/s/Angstrom]) to lambda * L_lambda
+        else:
+            lband = lband * wlen
+
+        units = 'erg / s'
+        lband = ap.units.Quantity(lband, units)
+
+        lbol = _lband_to_lbol__pow_law(lband, alpha, beta, fiso=0.75)
+        lbol = ap.units.Quantity(lbol, units)
         return lbol
 
-    @classmethod
-    def lbol_from_3000ang(cls, lam_lum_lam):
-        """
-        Runnoe+2012 [1201.5155]
-        Eq.10 & 13
-
-        log(Liso) = (1.85 ± 1.27) + (0.98 ± 0.03) log(3000L3000).
-        """
-        lbol = _lband_to_lbol__pow_law(lam_lum_lam, 1.85, 0.98, lum0=1.0, fiso=0.75)
-        return lbol
-
-    @classmethod
-    def lbol_from_1450ang(cls, lam_lum_lam):
-        """
-        Runnoe+2012 [1201.5155]
-        Eq.9 & 13
-
-        log(Liso) = (4.74 ± 1.00) + (0.91 ± 0.02) log(1450L1450).
-        """
-        lbol = _lband_to_lbol__pow_law(lam_lum_lam, 4.74, 0.91, lum0=1.0, fiso=0.75)
-        return lbol
-
-    @classmethod
-    def lbol_from_2to10kev_all(cls, lam_lum_lam):
-        """
-        Bolometric correction from X-Ray (2–10keV) full sample of quasars
-
-        Runnoe+2012 [1201.5155]
-        Table 5
-
-        log (Liso) = (25.14 ± 01.93) + (0.47 ± 0.043) log (L2-10 keV),
-        """
-        lbol = _lband_to_lbol__pow_law(lam_lum_lam, 25.14, 0.47, lum0=1.0, fiso=0.75)
-        return lbol
-
-    @classmethod
-    def lbol_from_2to10kev_RL(cls, lam_lum_lam):
-        """
-        Bolometric correction from X-Ray (2–10keV) radio-loud quasars
-
-        Runnoe+2012 [1201.5155]
-        Eq.14
-
-        log(Liso,RL) = (23.04 ± 03.60) + (0.52 ± 0.080) log(L2-10 keV),
-        """
-        lbol = _lband_to_lbol__pow_law(lam_lum_lam, 23.04, 0.52, lum0=1.0, fiso=0.75)
-        return lbol
-
-    @classmethod
-    def lbol_from_2to10kev_RQ(cls, lam_lum_lam):
-        """
-        Bolometric correction from X-Ray (2–10keV) radio-quiet quasars
-
-        Runnoe+2012 [1201.5155]
-        Eq.15
-
-        log(Liso,RQ) = (33.06 ± 03.17) + (0.29 ± 0.072) log(L2-10 keV).
-        """
-        lbol = _lband_to_lbol__pow_law(lam_lum_lam, 33.06, 0.29, lum0=1.0, fiso=0.75)
-        return lbol
-
-    @classmethod
-    def iband_from_mass_fedd(cls, mass, fedd, eps=0.1, magnitude=False):
+    def iband_from_mass_fedd(self, mass, fedd, eps=0.1, magnitude=False):
         lbol = utils.eddington_luminosity(mass, eps) * fedd
-        l5100 = cls.lum5100_from_lbol_runnoe2012(lbol)
-        L_lambda = l5100 * (5100e-8)
+        lbol = ap.units.Quantity(lbol, 'erg/s')
+        iband = self.lband_from_lbol('5100', lbol)
+        # L_lambda = l5100 * (5100e-8)
         if magnitude:
-            imag = zastro.obs.lum_to_abs_mag('i', L_lambda, type='l')
-        return imag
-
-
+            print(f"21342 {iband=}")
+            iband = holo.ems.bands_sdss['i'].lum_to_abs_mag(iband, type='w')
+        return iband
 
 
 def _dist_pars(arg, num):
@@ -160,28 +174,30 @@ def _dist_pars(arg, num):
     return arg
 
 
-def _lband_to_lbol__pow_law(lam_lum_lam, alpha, beta, lum0=1.0, fiso=1.0):
+def _lband_to_lbol__pow_law(lam_lum_lam, alpha, beta, fiso=1.0):
     """
-    log(L_iso) = alpha + beta * log10(lambda * L_lambda / lum0)
+    log(L_iso) = alpha + beta * log10(lambda * L_lambda)
     L_bol = fiso * L_iso
     """
-    liso = alpha + beta*np.log10(lam_lum_lam / lum0)
+    liso = alpha + beta*np.log10(lam_lum_lam.to('erg/s').value)
     lbol = fiso * (10**liso)
+    lbol = ap.units.Quantity(lbol, 'erg/s')
     return lbol
 
 
-def _lbol_to_lband__pow_law(lbol, alpha, beta, lum0=1.0, fiso=1.0):
+def _lbol_to_lband__pow_law(lbol, alpha, beta, fiso=1.0):
     """Returns lambda*L_lambda
 
-    log(L_iso) = alpha + beta * log10(lambda * L_lambda / lum0)
+    log(L_iso) = alpha + beta * log10(lambda * L_lambda)
     L_iso = L_bol / fiso
     """
-    liso_log = np.log10(lbol/fiso)
+    liso_log = np.log10(lbol.to('erg/s').value/fiso)
     num = np.size(lbol)
 
     alpha = _dist_pars(alpha, num)
     beta = _dist_pars(beta, num)
 
-    lam_lum_lam = lum0 * np.power(10, (liso_log - alpha)/beta)
-    return lam_lum_lam
+    lband = np.power(10, (liso_log - alpha)/beta)
+    lband = ap.units.Quantity(lband, 'erg/s')
+    return lband
 
