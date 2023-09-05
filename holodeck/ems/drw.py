@@ -3,7 +3,9 @@
 
 import numpy as np
 
+import holodeck as holo
 from holodeck.constants import MSOL
+# from holodeck.ems import runnoe2012, bands_sdss
 
 
 def drw_lightcurve(times, tau, mean_mag, sfinf, size=None):
@@ -67,7 +69,7 @@ def drw_lightcurve(times, tau, mean_mag, sfinf, size=None):
     return mags, lums
 
 
-def drw_params(mass, fedd, samples=False):
+def drw_params(mass, fedd, eps=0.1, samples=False):
     """DRW Parameters
 
     Returns
@@ -80,8 +82,8 @@ def drw_params(mass, fedd, samples=False):
         Structure-Function at Infinity
 
     """
-    imag = bhem.bel.iband_from_mass_fedd(mass, fedd, eps=1.0)
-
+    imag = holo.ems.runnoe2012.iband_from_mass_fedd(mass, fedd, eps=eps, magnitude=True).value
+    print(f"{imag=}")
     taus = macleod2010_tau(imag, mass, randomize=samples)
     sfis = macleod2010_sfinf(imag, mass, randomize=samples)
     return imag, taus, sfis
