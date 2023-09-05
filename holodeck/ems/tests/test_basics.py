@@ -106,3 +106,34 @@ def test_sdss_bands():
         assert np.isclose(rmag, 0.0, atol=1e-5)
 
     return
+
+
+
+def test_sdss_bands__regression_2023_09_05():
+    """Compare `flux_to_mag` calculation using current code, and previously computed data to check for regression.
+    """
+
+    bands = basics.SDSS_Bands()
+
+    import json
+    from pathlib import Path
+    path = Path(__file__).resolve().parent
+    FNAME = "./basics_sdss_bands_2023-09-05.json"
+    data = json.load(open(path.joinpath(FNAME), 'r'))
+
+    names = data.keys()
+    for band in names:
+        flux = data[band]['flux']
+        mag_hz = data[band]['mag_hz']
+        mag_angstrom = data[band]['mag_angstrom']
+        units_hz = data[band]['units_hz']
+        units_angstrom = data[band]['units_angstrom']
+
+        b1 = bands[band].flux_to_mag(flux, 'f', units=units_hz).value
+        b2 = bands[band].flux_to_mag(flux, 'w', units=units_angstrom).value
+
+        assert np.allclose(b1, mag_hz, atol=0.0, rtol=1e-4)
+        assert np.allclose(b2, mag_angstrom, atol=0.0, rtol=1e-4)
+
+    return
+
