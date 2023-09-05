@@ -238,7 +238,7 @@ def file_names(args):
     if args.dsc_flag: save_dets_to_file += '_dsc' # only append 'dsc' if not gsc-calibrated
 
     if args.red2white is not None and args.red_gamma is not None:               # if using red noise with fixed red_gamma
-        save_dets_to_file = save_dets_to_file+f'_r2w{args.red2white:.1f}_rg{args.red_gamma:.1f}'
+        save_dets_to_file = save_dets_to_file+f'_r2w{args.red2white:.1e}_rg{args.red_gamma:.1f}'
     elif args.red_amp is not None and args.red_gamma is not None:               # if using fixed red noise 
         save_dets_to_file = save_dets_to_file+f'_ra{args.red_amp:.1e}_rg{args.red_gamma:.1f}'
     else: 

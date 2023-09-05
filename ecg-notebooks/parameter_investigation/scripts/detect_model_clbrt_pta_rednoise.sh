@@ -1,6 +1,6 @@
 #!/bin/bash
     
-for TARGET in hard_time gsmf_phi0 gsmf_mchar0_log10 mmb_mamp_log10 mmb_scatter_dex hard_gamma_inner
+for TARGET in gsmf_mchar0_log10 mmb_mamp_log10 mmb_scatter_dex hard_gamma_inner
 do 
     for RED_GAMMA in -1.5 -3.0
     do

@@ -3250,7 +3250,7 @@ def append_filename(filename='',
         filename += f"_bgl{bgl}"
 
     if red2white is not None and red_gamma is not None:
-        filename += f"_r2w{red2white:.1f}_rg{red_gamma:.1f}"
+        filename += f"_r2w{red2white:.1e}_rg{red_gamma:.1f}"
 
     if gsc_flag: 
         filename = filename + '_gsc'
