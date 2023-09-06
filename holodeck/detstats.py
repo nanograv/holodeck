@@ -3321,7 +3321,7 @@ def build_anis_var_arrays(
         gw_only=False, 
         nloudest=10, bgl=1,
         lmax=8, nside=8, 
-        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',
+        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis_var',
       
 ):
     """ Calculate xx=params and yy=C1C0
@@ -3339,7 +3339,7 @@ def build_anis_var_arrays(
         )
         yy.append(Cl[...,1]/Cl[...,0])
 
-    filename = figpath+f'/ratio_arrays_{target}'
+    filename = figpath+f'/anis_var_arrays_{target}'
     filename += f"_l{lmax}_ns{nside}"
     filename = append_filename(
         filename, 
@@ -3355,14 +3355,14 @@ def get_anis_var_arrays(
         gw_only=False, 
         nloudest=10, bgl=1,
         lmax=8, nside=8, 
-        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',
+        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis_var',
       
 ):
     """ Get xx=params and yy=C1C0
     
     """
 
-    filename = figpath+f'/ratio_arrays_{target}'
+    filename = figpath+f'/anis_var_arrays_{target}'
     filename += f"_l{lmax}_ns{nside}"
     filename = append_filename(
         filename, 
@@ -3401,7 +3401,7 @@ def build_anis_freq_arrays(
         yy_cl.append(Cl)
         params_cl.append(params[var])
 
-    filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis/anis_{target}'
+    filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis_freq/anis_freq_{target}'
     filename = append_filename(filename, nloudest=nloudest)
     filename += f"_pv{len(parvars)}"
     if nside != 8:
@@ -3422,7 +3422,7 @@ def get_anis_freq_arrays(
 
         ):
 
-    filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis/anis_{target}'
+    filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis_freq/anis_freq_{target}'
     filename = append_filename(filename, nloudest=nloudest, gw_only=gw_only, )
     filename += f"_pv{len(parvars)}"
     if nside != 8:
