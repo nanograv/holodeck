@@ -3388,8 +3388,9 @@ def build_anis_freq_arrays(
 
         ):
 
-    if nvars<len(parvars):
+    if np.any(np.array(parvars)>nvars):
         parvars = np.arange(nvars)
+        print(f'setting new parvars t {parvars}')
   
     data, params, = get_data(target, dets=False,
         nvars=nvars, nreals=nreals, shape=shape,  # keep as defaults
@@ -3429,7 +3430,7 @@ def get_anis_freq_arrays(
         ):
 
 
-    if nvars<len(parvars):
+    if np.any(np.array(parvars)>nvars):
         parvars = np.arange(nvars)
 
     filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis_freq/anis_freq_{target}'
@@ -3468,7 +3469,7 @@ def build_hcpar_arrays(
 
     """
 
-    if nvars<len(parvars):
+    if np.any(np.array(parvars)>nvars):
         parvars = np.arange(nvars)
 
     labels = []
@@ -3534,7 +3535,7 @@ def get_hcpar_arrays(
     """
 
 
-    if nvars<len(parvars):
+    if np.any(np.array(parvars)>nvars):
         parvars = np.arange(nvars)
 
     filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/hcpar/hcpar_{target}'
