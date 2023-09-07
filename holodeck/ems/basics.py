@@ -148,7 +148,7 @@ BANDS_LSST = {
             "flux_ref_freq": 3631.00 * ap.units.jansky,
         },
     },
-},
+}
 
 
 def _get_wlen_freq(wlen, freq, error_if_neither):
