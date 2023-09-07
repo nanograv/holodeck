@@ -122,13 +122,13 @@ def main():
         detstats.build_anis_var_arrays(
             target=args.target, nvars=args.nvars, nreals=args.nreals, shape=args.shape,
             gw_only=args.gw_only,
-            nloudest=args.nloudest, bgl=args.bgl, 
+            nloudest=args.nloudest, 
             )
     if args.anis_freq:
         print("---building anisotropy vs frequency arrays---")
         detstats.build_anis_freq_arrays(
             target=args.target, nvars=args.nvars, nreals=args.nreals, shape=args.shape,
-            gw_only=args.gw_only, nloudest=args.nloudest, bgl=args.bgl, 
+            gw_only=args.gw_only, nloudest=args.nloudest, 
             )
 
     end_time = datetime.now()

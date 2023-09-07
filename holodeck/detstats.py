@@ -3319,7 +3319,7 @@ def get_ratio_arrays(
 def build_anis_var_arrays(
         target, nvars=21, nreals=500, shape=None,
         gw_only=False, 
-        nloudest=10, bgl=1,
+        nloudest=10,
         lmax=8, nside=8, 
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis_var',
       
@@ -3329,7 +3329,7 @@ def build_anis_var_arrays(
     """
     data, params, = get_data(target, nvars=nvars, nreals=nreals, shape=shape,
         gw_only=gw_only, 
-        nloudest=nloudest, bgl=bgl, dets=False)
+        nloudest=nloudest, dets=False)
     xx=[]
     yy=[]
     cl=[]
@@ -3346,7 +3346,7 @@ def build_anis_var_arrays(
     filename = append_filename(
         filename, 
         gw_only=gw_only, 
-        nloudest=nloudest, bgl=bgl, )
+        nloudest=nloudest, bgl=nloudest)
     filename += '.npz'  
 
     np.savez(filename, xx_params=xx, yy_c1c0=yy, cl=cl)
@@ -3355,7 +3355,7 @@ def build_anis_var_arrays(
 def get_anis_var_arrays(
         target, 
         gw_only=False, 
-        nloudest=10, bgl=1,
+        nloudest=10, 
         lmax=8, nside=8, 
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis_var',
       
@@ -3369,7 +3369,7 @@ def get_anis_var_arrays(
     filename = append_filename(
         filename, 
         gw_only=gw_only, 
-        nloudest=nloudest, bgl=bgl, )
+        nloudest=nloudest, bgl=nloudest, )
     filename += '.npz'  
 
     file = np.load(filename)
@@ -3382,7 +3382,7 @@ def get_anis_var_arrays(
 
 def build_anis_freq_arrays(
         target, nvars=21, nreals=500, shape=None,
-        gw_only=False, nloudest=10, bgl=1,
+        gw_only=False, nloudest=10, 
         parvars = [0,10,20],
         lmax=8, nside=8,
 
@@ -3390,11 +3390,11 @@ def build_anis_freq_arrays(
 
     if np.any(np.array(parvars)>nvars):
         parvars = np.arange(nvars)
-        print(f'setting new parvars t {parvars}')
+        print(f'setting new parvars to {parvars}')
   
     data, params, = get_data(target, dets=False,
         nvars=nvars, nreals=nreals, shape=shape,  # keep as defaults
-        gw_only=gw_only, nloudest=nloudest,  bgl=bgl,
+        gw_only=gw_only, nloudest=nloudest,
         )
 
 
@@ -3409,7 +3409,8 @@ def build_anis_freq_arrays(
         params_cl.append(params[var])
 
     filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis_freq/anis_freq_{target}'
-    filename = append_filename(filename, nloudest=nloudest)
+    filename = append_filename(filename, nloudest=nloudest, bgl=nloudest,
+                                gw_only=gw_only)
     filename += f"_pv{len(parvars)}"
     if nside != 8:
         filename += f"_ns{nside}"
@@ -3434,7 +3435,7 @@ def get_anis_freq_arrays(
         parvars = np.arange(nvars)
 
     filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis_freq/anis_freq_{target}'
-    filename = append_filename(filename, nloudest=nloudest, gw_only=gw_only, )
+    filename = append_filename(filename, nloudest=nloudest, gw_only=gw_only, bgl=nloudest)
     filename += f"_pv{len(parvars)}"
     if nside != 8:
         filename += f"_ns{nside}"
