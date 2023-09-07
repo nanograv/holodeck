@@ -3332,12 +3332,14 @@ def build_anis_var_arrays(
         nloudest=nloudest, bgl=bgl, dets=False)
     xx=[]
     yy=[]
+    cl=[]
     for pp, par in enumerate(params):
         xx.append(params[pp][target])
         _, Cl = holo.anisotropy.sph_harm_from_hc(
             data[pp]['hc_ss'], data[pp]['hc_bg'], nside=nside, lmax=lmax
         )
         yy.append(Cl[...,1]/Cl[...,0])
+        cl.append(Cl)
 
     filename = figpath+f'/anis_var_arrays_{target}'
     filename += f"_l{lmax}_ns{nside}"
@@ -3347,8 +3349,8 @@ def build_anis_var_arrays(
         nloudest=nloudest, bgl=bgl, )
     filename += '.npz'  
 
-    np.savez(filename, xx_params=xx, yy_c1c0=yy)
-    return xx, yy
+    np.savez(filename, xx_params=xx, yy_c1c0=yy, cl=cl)
+    return xx, yy, cl
 
 def get_anis_var_arrays(
         target, 
@@ -3373,8 +3375,9 @@ def get_anis_var_arrays(
     file = np.load(filename)
     xx_params = file['xx_params']
     yy_c1c0 = file['yy_c1c0']
+    cl = file['cl']
     file.close()
-    return xx_params, yy_c1c0\
+    return xx_params, yy_c1c0, cl
     
 
 def build_anis_freq_arrays(
