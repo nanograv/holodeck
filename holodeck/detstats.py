@@ -3461,6 +3461,9 @@ def build_hcpar_arrays(
 
     """
 
+    if nvars<len(parvars):
+        parvars = np.arange(nvars)
+
     labels = []
     yy_ss = []
     yy_bg = []
