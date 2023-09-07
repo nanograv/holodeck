@@ -3435,7 +3435,8 @@ def get_anis_freq_arrays(
         parvars = np.arange(nvars)
 
     filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis_freq/anis_freq_{target}'
-    filename = append_filename(filename, nloudest=nloudest, gw_only=gw_only, bgl=nloudest)
+    filename = append_filename(filename, nloudest=nloudest, bgl=nloudest,
+                               gw_only=gw_only, )
     filename += f"_pv{len(parvars)}"
     if nside != 8:
         filename += f"_ns{nside}"
