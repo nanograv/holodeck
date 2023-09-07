@@ -1,8 +1,24 @@
 """Astronomical observations calculations.
 
+http://svo2.cab.inta-csic.es/theory/fps/index.php?mode=browse&gname=SLOAN&asttype=
+
 - lots of reference fluxes: https://coolwiki.ipac.caltech.edu/index.php/Central_wavelengths_and_zero_points
 - VEGA/Johnson/Bessell: http://web.ipac.caltech.edu/staff/fmasci/home/astro_refs/magsystems.pdf
 - SDSS/AB/Fukugita: http://www.astronomy.ohio-state.edu/~martini/usefuldata.html
+
+
+    "u": {
+        "wlen":  * ap.units.angstrom,      # wavelength effective [Angstrom]
+        "bandwidth_wlen":  * ap.units.angstrom,   # bandwidth effective [Angstrom]
+        "AB": {
+            "flux_ref_wlen":  * _units_erg_s_cm2_angstrom,
+            "flux_ref_freq":  * ap.units.jansky,
+        },
+        "vega": {
+            "flux_ref_wlen":  * _units_erg_s_cm2_angstrom,
+            "flux_ref_freq":  * ap.units.jansky,
+        },
+    },
 
 """
 
@@ -18,38 +34,121 @@ UNITS_FLUX_FREQ = 'erg/(s cm2 Hz)'
 _units_erg_s_cm2_angstrom = ap.units.erg / ap.units.second / ap.units.cm**2 / ap.units.angstrom
 
 # SDSS AB Magnitudes
-BANDS_SDSS_AB_MAGS = {
+# from http://svo2.cab.inta-csic.es/theory/fps/index.php?mode=browse&gname=SLOAN&asttype=
+# Using "full transmission" filters, obtained on 2023-09-06
+BANDS_SDSS = {
     "u": {
-        "wlen": 356 * ap.units.nm,
-        "bandwidth_wlen": 46.3 * ap.units.nm,
-        "flux_ref_freq": 3631 * ap.units.jansky,
-        "flux_ref_wlen": 859.5e-11 * _units_erg_s_cm2_angstrom,
+        "wlen": 3608.04 * ap.units.angstrom,
+        "bandwidth_wlen": 540.97 * ap.units.angstrom,
+        "vega": {
+            "flux_ref_freq": 1582.54 * ap.units.jansky,
+            "flux_ref_wlen": 3.75079e-9 * _units_erg_s_cm2_angstrom,
+        },
+        "AB": {
+            "flux_ref_freq": 3631.00 * ap.units.jansky,
+            "flux_ref_wlen": 8.60588e-9 * _units_erg_s_cm2_angstrom,
+        },
     },
     "g": {
-        "wlen": 483 * ap.units.nm,
-        "bandwidth_wlen": 98.8 * ap.units.nm,
-        "flux_ref_freq": 3631 * ap.units.jansky,
-        "flux_ref_wlen": 466.9e-11 * _units_erg_s_cm2_angstrom,
+        "wlen": 4671.78 * ap.units.angstrom,
+        "bandwidth_wlen": 1064.68 * ap.units.angstrom,
+        "vega": {
+            "flux_ref_freq": 4023.57 * ap.units.jansky,
+            "flux_ref_wlen": 5.45476e-9 * _units_erg_s_cm2_angstrom,
+        },
+        "AB": {
+            "flux_ref_freq": 3631.00 * ap.units.jansky,
+            "flux_ref_wlen": 4.92255e-9 * _units_erg_s_cm2_angstrom,
+        },
     },
     "r": {
-        "wlen": 626 * ap.units.nm,
-        "bandwidth_wlen": 95.5 * ap.units.nm,
-        "flux_ref_freq": 3631 * ap.units.jansky,
-        "flux_ref_wlen": 278.0e-11 * _units_erg_s_cm2_angstrom,
+        "wlen": 6141.12 * ap.units.angstrom,
+        "bandwidth_wlen": 1055.51 * ap.units.angstrom,
+        "vega": {
+            "flux_ref_freq": 3177.38 * ap.units.jansky,
+            "flux_ref_wlen": 2.49767e-9 * _units_erg_s_cm2_angstrom,
+        },
+        "AB": {
+            "flux_ref_freq": 3631.00 * ap.units.jansky,
+            "flux_ref_wlen": 2.85425e-9 * _units_erg_s_cm2_angstrom,
+        },
     },
     "i": {
-        "wlen": 767 * ap.units.nm,
-        "bandwidth_wlen": 106.4 * ap.units.nm,
-        "flux_ref_freq": 3631 * ap.units.jansky,
-        "flux_ref_wlen": 185.2e-11 * _units_erg_s_cm2_angstrom,
+        "wlen": 7457.89 * ap.units.angstrom,
+        "bandwidth_wlen": 1102.57 * ap.units.angstrom,
+        "vega": {
+            "flux_ref_freq": 2593.40 * ap.units.jansky,
+            "flux_ref_wlen": 1.38589e-9 * _units_erg_s_cm2_angstrom,
+        },
+        "AB": {
+            "flux_ref_freq": 3631.00 * ap.units.jansky,
+            "flux_ref_wlen": 1.94038e-9 * _units_erg_s_cm2_angstrom,
+        },
     },
     "z": {
-        "wlen": 910 * ap.units.nm,
-        "bandwidth_wlen": 124.8 * ap.units.nm,
-        "flux_ref_freq": 3631 * ap.units.jansky,
-        "flux_ref_wlen": 131.5e-11 * _units_erg_s_cm2_angstrom,
+        "wlen": 8922.78 * ap.units.angstrom,
+        "bandwidth_wlen": 1164.01 * ap.units.angstrom,
+        "vega": {
+            "flux_ref_freq": 2238.99 * ap.units.jansky,
+            "flux_ref_wlen": 8.38585e-10 * _units_erg_s_cm2_angstrom,
+        },
+        "AB": {
+            "flux_ref_freq": 3631.00 * ap.units.jansky,
+            "flux_ref_wlen": 1.35994e-9	 * _units_erg_s_cm2_angstrom,
+        },
     },
 }
+
+BANDS_LSST = {
+    "u": {
+        "wlen": 3751.20 * ap.units.angstrom,
+        "bandwidth_wlen": 473.19 * ap.units.angstrom,
+        "AB": {
+            "flux_ref_wlen": 8.03787e-9 * _units_erg_s_cm2_angstrom,
+            "flux_ref_freq": 3631.00 * ap.units.jansky,
+        },
+    },
+    "g": {
+        "wlen": 4740.66 * ap.units.angstrom,
+        "bandwidth_wlen": 1253.26 * ap.units.angstrom,
+        "AB": {
+            "flux_ref_wlen": 4.7597e-9 * _units_erg_s_cm2_angstrom,
+            "flux_ref_freq": 3631.00 * ap.units.jansky,
+        },
+    },
+    "r": {
+        "wlen": 6172.34 * ap.units.angstrom,
+        "bandwidth_wlen": 1206.92 * ap.units.angstrom,
+        "AB": {
+            "flux_ref_wlen": 2.8156e-9 * _units_erg_s_cm2_angstrom,
+            "flux_ref_freq": 3631.00 * ap.units.jansky,
+        },
+    },
+    "i": {
+        "wlen": 7500.97 * ap.units.angstrom,
+        "bandwidth_wlen": 1174.77 * ap.units.angstrom,
+        "AB": {
+            "flux_ref_wlen": 1.91864e-9 * _units_erg_s_cm2_angstrom,
+            "flux_ref_freq": 3631.00 * ap.units.jansky,
+        },
+    },
+    "z": {
+        "wlen": 8678.90 * ap.units.angstrom,
+        "bandwidth_wlen": 997.51 * ap.units.angstrom,
+        "AB": {
+            "flux_ref_wlen": 1.44312e-9 * _units_erg_s_cm2_angstrom,
+            "flux_ref_freq": 3631.00 * ap.units.jansky,
+        },
+    },
+    "y": {
+        "wlen": 9711.82 	 * ap.units.angstrom,
+        "bandwidth_wlen": 871.83 * ap.units.angstrom,
+        "AB": {
+            "flux_ref_wlen": 1.14978e-9 * _units_erg_s_cm2_angstrom,
+            "flux_ref_freq": 3631.00 * ap.units.jansky,
+        },
+    },
+},
 
 
 def _get_wlen_freq(wlen, freq, error_if_neither):
@@ -225,7 +324,7 @@ class Band:
 
 class BANDS:
 
-    def __init__(self, bands_dict):
+    def __init__(self, bands_dict, mag_type):
         bands = {}
         for name, values in bands_dict.items():
 
@@ -238,21 +337,24 @@ class BANDS:
             if freq is None:
                 freq = Band.wlen_to_freq(wlen)
 
-            flux_ref_wlen = values.get('flux_ref_wlen', None)
-            flux_ref_freq = values.get('flux_ref_freq', None)
-            if (flux_ref_wlen is None) and (flux_ref_freq is None):
-                raise ValueError(f"Band {name} has neither 'flux_ref_wlen' or 'flux_ref_freq' specification!")
-            if (flux_ref_wlen is None):
-                flux_ref_wlen = Band.spectral_wlen(flux_ref_freq, freq=freq)
-            if (flux_ref_freq is None):
-                flux_ref_freq = Band.spectral_freq(flux_ref_wlen, wlen=wlen)
-
             bandwidth_wlen = values.get('bandwidth_wlen', None)
             bandwidth_freq = values.get('bandwidth_freq', None)
             if (bandwidth_wlen is None) and (bandwidth_freq is not None):
                 bandwidth_wlen = Band.freq_to_wlen(bandwidth_freq)
             if (bandwidth_freq is None) and (bandwidth_wlen is not None):
                 bandwidth_freq = Band.wlen_to_freq(bandwidth_wlen)
+
+            zero_points = values.get(mag_type, None)
+            if zero_points is None:
+                raise ValueError(f"Band '{name}' does not have specification for mag_type '{mag_type}'!")
+            flux_ref_wlen = zero_points.get('flux_ref_wlen', None)
+            flux_ref_freq = zero_points.get('flux_ref_freq', None)
+            if (flux_ref_wlen is None) and (flux_ref_freq is None):
+                raise ValueError(f"Band '{name}' '{mag_type}' has neither 'flux_ref_wlen' nor 'flux_ref_freq'!")
+            if (flux_ref_wlen is None):
+                flux_ref_wlen = Band.spectral_wlen(flux_ref_freq, freq=freq)
+            if (flux_ref_freq is None):
+                flux_ref_freq = Band.spectral_freq(flux_ref_wlen, wlen=wlen)
 
             band = Band(
                 name, wlen, freq, flux_ref_wlen, flux_ref_freq,
@@ -277,101 +379,19 @@ class BANDS:
         return self._bands.keys()
 
 
-class SDSS_Bands(BANDS):
+class Bands_SDSS(BANDS):
+    """SDSS Generally uses AB magnitudes.
+    """
 
     def __init__(self):
-        super().__init__(BANDS_SDSS_AB_MAGS)
+        super().__init__(BANDS_SDSS, "AB")
         return
 
 
-'''
-# These wavelengths are in [cm]
-BAND_EFF_LOC = {
-    # Vega/Johnson/Bessell
-    "U": {"l": 366e-7},
-    "B": {"l": 438e-7},
-    "V": {"l": 545e-7},
-    "R": {"l": 641e-7},
-    "I": {"l": 798e-7},
-    # SDSS AB Magnitudes
-    "u": {"l": 356e-7},
-    "g": {"l": 483e-7},
-    "r": {"l": 626e-7},
-    "i": {"l": 767e-7},
-    "z": {"l": 910e-7}
-}
-BAND_REF_FLUX = {
-    # Vega/Johnson/Bessell
-    "U": {"f": 1.790, "l": 417.5},
-    "B": {"f": 4.063, "l": 632.0},
-    "V": {"f": 2.636, "l": 363.1},
-    "R": {"f": 3.064, "l": 217.7},
-    "I": {"f": 2.416, "l": 112.6},
-    # SDSS AB Magnitudes
-    "u": {"f": 3.631, "l": 859.5},
-    "g": {"f": 3.631, "l": 466.9},
-    "r": {"f": 3.631, "l": 278.0},
-    "i": {"f": 3.631, "l": 185.2},
-    "z": {"f": 3.631, "l": 131.5}
-}
-BAND_ZERO_POINT = {
-    # Vega/Johnson/Bessell
-    "U": {"f": +0.770, "l": -0.152},
-    "B": {"f": -0.120, "l": -0.602},
-    "V": {"f": +0.000, "l": +0.000},
-    "R": {"f": +0.186, "l": +0.555},
-    "I": {"f": +0.444, "l": +1.271},
-    # SDSS AB Magnitudes
-    "u": {"f": 0.0, "l": 0.0},
-    "g": {"f": 0.0, "l": 0.0},
-    "r": {"f": 0.0, "l": 0.0},
-    "i": {"f": 0.0, "l": 0.0},
-    "z": {"f": 0.0, "l": 0.0}
-}
-UNITS = {
-    "f": 1.0e-20,  # erg/s/Hz/cm^2
-    "l": 1.0e-11   # erg/s/Angstrom/cm^2
-}
-
-# _band_name = ['u', 'b', 'v', 'r', 'i']
-# _band_wlen = [365, 445, 551, 658, 806]   # nm
-# _band_color = ['violet', 'blue', 'green', 'red', 'darkred']
-# Band = namedtuple('band', ['name', 'freq', 'wlen', 'color'])
-#
-# BANDS = {nn: Band(nn, SPLC/(ll*1e-7), ll*1e-7, cc)
-#          for nn, ll, cc in zip(_band_name, _band_wlen, _band_color)}
-
-
-def _get_units_type(type):
-    try:
-        units = UNITS[type]
-    except Exception:
-        raise ValueError("Unrecognized `type` = '{}'".format(type))
-
-    return units, type
-
-
-def ABmag_to_flux(mag):
-    """Convert from AB Magnitude to spectral-flux density.
-
-    See: http://web.ipac.caltech.edu/staff/fmasci/home/astro_refs/magsystems.pdf
-
-    Returns
-    -------
-    fnu : () scalar
-        Spectral-flux density in units of [erg/s/cm^2/Hz]
-
+class Bands_LSST(BANDS):
+    """LSST Generally uses AB magnitudes.
     """
-    fnu = np.power(10.0, (mag + 48.6)/-2.5)
-    return fnu
 
-
-def mag_to_flux_zero(mag, zero_jansky=None):
-    if zero_jansky is None:
-        raise
-
-    zero_point = zero_jansky * JY
-    flux = np.power(10.0, mag / -2.5) * zero_point
-    return flux
-
-'''
+    def __init__(self):
+        super().__init__(BANDS_LSST, "AB")
+        return
