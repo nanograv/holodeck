@@ -1,6 +1,7 @@
 """Astronomical observations calculations.
 
 http://svo2.cab.inta-csic.es/theory/fps/index.php?mode=browse&gname=SLOAN&asttype=
+See also: https://ui.adsabs.harvard.edu/abs/2018ApJS..236...47W/abstract
 
 - lots of reference fluxes: https://coolwiki.ipac.caltech.edu/index.php/Central_wavelengths_and_zero_points
 - VEGA/Johnson/Bessell: http://web.ipac.caltech.edu/staff/fmasci/home/astro_refs/magsystems.pdf
