@@ -271,7 +271,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         mbulge = host['mbulge']
         return self.mbh_from_mbulge(mbulge, scatter=scatter)
 
-    def mbh_from_mbulge(self, mbulge, scatter):
+    def mbh_from_mbulge(self, mbulge, redz, scatter):
         """Convert from stellar-bulge mass to black-hole mass.
 
         Parameters
@@ -292,7 +292,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         mbh = _log10_relation(mbulge, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
 
-    def mbulge_from_mbh(self, mbh, scatter):
+    def mbulge_from_mbh(self, mbh, redz, scatter):
         """Convert from black-hole mass to stellar-bulge mass.
 
         Parameters
@@ -312,7 +312,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         mbulge = _log10_relation_reverse(mbh, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbulge
 
-    def mstar_from_mbulge(self, mbulge):
+    def mstar_from_mbulge(self, mbulge, redz):
         """Convert from stellar bulge-mass to black-hole mass.
 
         Parameters
@@ -331,7 +331,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         """
         return mbulge / self._bulge_mfrac
 
-    def mbh_from_mstar(self, mstar, scatter):
+    def mbh_from_mstar(self, mstar, redz, scatter):
         """Convert from total stellar mass to black-hole mass.
 
         Parameters
@@ -348,10 +348,10 @@ class MMBulge_Standard(_MMBulge_Relation):
             Mass of black hole.  [grams]
 
         """
-        mbulge = self.mbulge_from_mstar(mstar)
-        return self.mbh_from_mbulge(mbulge, scatter)
+        mbulge = self.mbulge_from_mstar(mstar, redz=redz)
+        return self.mbh_from_mbulge(mbulge, redz=redz, scatter=scatter)
 
-    def mstar_from_mbh(self, mbh, scatter):
+    def mstar_from_mbh(self, mbh, redz, scatter):
         """Convert from black-hole mass to total stellar mass.
 
         Parameters
@@ -368,10 +368,10 @@ class MMBulge_Standard(_MMBulge_Relation):
             Total stellar mass of host galaxy.  [grams]
 
         """
-        mbulge = self.mbulge_from_mbh(mbh, scatter)
-        return self.mstar_from_mbulge(mbulge)
+        mbulge = self.mbulge_from_mbh(mbh, redz=redz, scatter=scatter)
+        return self.mstar_from_mbulge(mbulge, redz=redz)
 
-    def dmstar_dmbh(self, mstar):
+    def dmstar_dmbh(self, mstar, redz):
         """Calculate the partial derivative of stellar mass versus BH mass :math:`d M_star / d M_bh`.
 
         .. math::
@@ -392,7 +392,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         plaw = self._mplaw
         fbulge = self._bulge_mfrac
         mbulge = mstar * fbulge
-        mbh = self.mbh_from_mbulge(mbulge, scatter=False)
+        mbh = self.mbh_from_mbulge(mbulge, scatter=False, redz=redz)
         deriv = mstar / (plaw * mbh)
         return deriv
 
@@ -483,7 +483,7 @@ class MMBulge_Redshift(MMBulge_Standard):
 
     def mstar_from_mbh(self, mbh, redz, scatter):
         mbulge = self.mbulge_from_mbh(mbh, redz, scatter)
-        return self.mstar_from_mbulge(mbulge)
+        return self.mstar_from_mbulge(mbulge, redz)
 
     def dmstar_dmbh(self, mstar, redz):
         plaw = self._mplaw
