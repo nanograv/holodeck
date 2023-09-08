@@ -266,10 +266,10 @@ class MMBulge_Standard(_MMBulge_Relation):
     def bulge_mass_frac(self, mstar):
         return self._bulge_mfrac
 
-    def mbh_from_host(self, pop, scatter) -> ArrayLike:
+    def mbh_from_host(self, pop, redz, scatter) -> ArrayLike:
         host = self.get_host_properties(pop)
         mbulge = host['mbulge']
-        return self.mbh_from_mbulge(mbulge, scatter=scatter)
+        return self.mbh_from_mbulge(mbulge, redz=redz, scatter=scatter)
 
     def mbh_from_mbulge(self, mbulge, redz, scatter):
         """Convert from stellar-bulge mass to black-hole mass.
