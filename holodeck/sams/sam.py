@@ -203,7 +203,7 @@ class Semi_Analytic_Model:
         # total-mass, mass-ratio ==> (M1, M2)
         masses = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
         # BH-masses to stellar-masses
-        masses = self._mmbulge.mstar_from_mbh(masses, scatter=False)
+        masses = self._mmbulge.mstar_from_mbh(masses, scatter=False, redz=self.redz)
         return masses
 
     @property
@@ -287,7 +287,7 @@ class Semi_Analytic_Model:
             # ==> (dMstar-tot/dMbh-tot) = (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) / (dMstar-pri / dMstar-tot)
             #                           = (dMstar-pri / dMbh-pri) * (1 / (1+q_bh)) / (1 / (1+q_star))
             #                           = (dMstar-pri / dMbh-pri) * ((1+q_star) / (1+q_bh))
-            dmstar_dmbh_pri = self._mmbulge.dmstar_dmbh(mstar_pri)   # [unitless]
+            dmstar_dmbh_pri = self._mmbulge.dmstar_dmbh(mstar_pri, redz=redz)   # [unitless]
             qterm = (1.0 + mstar_rat) / (1.0 + self.mrat[np.newaxis, :, np.newaxis])
             dmstar_dmbh = dmstar_dmbh_pri * qterm
 
@@ -777,7 +777,7 @@ class Semi_Analytic_Model:
         mplaw = self._mmbulge._mplaw
         dqbh_dqgal = mplaw * np.power(mrat_gal, mplaw - 1.0)
 
-        dmstar_dmbh__pri = self._mmbulge.dmstar_dmbh(mass_gal)   # [unitless]
+        dmstar_dmbh__pri = self._mmbulge.dmstar_dmbh(mass_gal, redz=redz)   # [unitless]
         mbh_pri = self._mmbulge.mbh_from_mstar(mass_gal, scatter=False)
         mbh_sec = self._mmbulge.mbh_from_mstar(mass_gal * mrat_gal, scatter=False)
         mbh = mbh_pri + mbh_sec
