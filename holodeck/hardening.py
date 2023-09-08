@@ -388,7 +388,7 @@ class Sesana_Scattering(_Hardening):
         dadt, dedt = self._dadt_dedt(mass, sepa, eccen)
         return dadt, dedt
 
-    def _dadt_dedt(self, mass, sepa, eccen):
+    def _dadt_dedt(self, mass, sepa, eccen, redz=None):
         """Stellar scattering hardening rate calculated from physical quantities.
 
         Parameters
@@ -415,7 +415,7 @@ class Sesana_Scattering(_Hardening):
         mtot, mrat = utils.mtmr_from_m1m2(mass)
 
 
-        mbulge = self._mmbulge.mbulge_from_mbh(mtot, redz=None, scatter=False)
+        mbulge = self._mmbulge.mbulge_from_mbh(mtot, redz=redz, scatter=False)
         vdisp = self._msigma.vdisp_from_mbh(mtot, scatter=False)
         dens = _density_at_influence_radius_dehnen(mtot, mbulge, self._gamma_dehnen)
 
