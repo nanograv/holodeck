@@ -415,7 +415,7 @@ class Sesana_Scattering(_Hardening):
         mtot, mrat = utils.mtmr_from_m1m2(mass)
 
 
-        mbulge = self._mmbulge.mbulge_from_mbh(mtot, scatter=False)
+        mbulge = self._mmbulge.mbulge_from_mbh(mtot, redz=None, scatter=False)
         vdisp = self._msigma.vdisp_from_mbh(mtot, scatter=False)
         dens = _density_at_influence_radius_dehnen(mtot, mbulge, self._gamma_dehnen)
 
@@ -574,12 +574,12 @@ class Dynamical_Friction_NFW(_Hardening):
 
         # Get Host DM-Halo mass
         # assume galaxies are merged, and total stellar mass is given from Mstar-Mbh of total MBH mass
-        mstar = self._mmbulge.mstar_from_mbh(mass.sum(axis=-1), scatter=False)
+        mstar = self._mmbulge.mstar_from_mbh(mass.sum(axis=-1), redz=redz, scatter=False)
         mhalo = self._smhm.halo_mass(mstar, redz, clip=True)
 
         # ---- Get effective mass of inspiraling secondary
         m2 = mass[:, 1]
-        mstar_sec = self._mmbulge.mstar_from_mbh(m2, scatter=False)
+        mstar_sec = self._mmbulge.mstar_from_mbh(m2, redz=redz, scatter=False)
         # model tidal-stripping of secondary's bulge (see: [Kelley2017a]_ Eq.6)
         time_dyn = self._NFW.time_dynamical(sepa, mhalo, redz)
         tfrac = dt / (time_dyn * self._TIDAL_STRIPPING_DYNAMICAL_TIMES)
