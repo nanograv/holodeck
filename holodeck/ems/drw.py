@@ -120,7 +120,7 @@ def drw_lightcurve(times, tau, mean_mag, sfinf, size=None):
     return mags, lums
 
 
-def drw_params(mass, fedd, eps=0.1, samples=False):
+def drw_params(mass, fedd, eps=0.1, scatter=False):
     """DRW Parameters
 
     Returns
@@ -134,7 +134,7 @@ def drw_params(mass, fedd, eps=0.1, samples=False):
 
     """
     imag = holo.ems.runnoe2012.iband_from_mass_fedd(mass, fedd, eps=eps, magnitude=True).value
-    taus = MacLeod2010.tau(imag, mass, randomize=samples)
-    sfis = MacLeod2010.sfinf(imag, mass, randomize=samples)
+    taus = MacLeod2010.tau(imag, mass, randomize=scatter)
+    sfis = MacLeod2010.sfinf(imag, mass, randomize=scatter)
     return imag, taus, sfis
 
