@@ -213,7 +213,7 @@ class Test_MMBulge_Standard:
             # numerically calculate derivative   dmstar / dmbh
             mstar = MSTAR * (1.0 + np.array([-dm, +dm]))
             mbulge = relation._bulge_mfrac * mstar
-            mbh = relation.mbh_from_mbulge(mbulge, scatter=False)
+            mbh = relation.mbh_from_mbulge(mbulge, redz=None, scatter=False)
             deriv = np.diff(mstar) / np.diff(mbh)
             deriv = deriv[0]
             # use analytic function in MMBulge_Standard relation
