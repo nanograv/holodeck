@@ -52,7 +52,7 @@ def mbh_from_mbulge_KH2013(mbulge):
     return mbh
 
 
-def check_relation(mmbulge_relation, truth_func):
+def check_relation(mmbulge_relation, truth_func, redz=None):
     print(f"check_relation() : testing '{mmbulge_relation.__class__}' against '{truth_func}'")
 
     # mbulge ==> mbh
@@ -60,7 +60,7 @@ def check_relation(mmbulge_relation, truth_func):
     class host:
         mbulge = np.logspace(8, 13, 11) * MSOL
 
-    vals = mmbulge_relation.mbh_from_host(host, scatter=False)
+    vals = mmbulge_relation.mbh_from_host(host, redz=redz, scatter=False)
     truth = truth_func(host.mbulge)
 
     print(f"mbulge [grams] = {host.mbulge}")
@@ -69,7 +69,7 @@ def check_relation(mmbulge_relation, truth_func):
     assert np.allclose(vals, truth)
 
     # mbh ==> mbulge
-    check_mbulge = mmbulge_relation.mbulge_from_mbh(vals, scatter=False)
+    check_mbulge = mmbulge_relation.mbulge_from_mbh(vals, redz=redz, scatter=False)
     print(f"mbulge    = {host.mbulge}")
     print(f"check rev = {check_mbulge}")
     assert np.allclose(host.mbulge, check_mbulge)
@@ -77,7 +77,7 @@ def check_relation(mmbulge_relation, truth_func):
     return
 
 
-def check_scatter_per_dex(mmbulge_relation, scatter_dex):
+def check_scatter_per_dex(mmbulge_relation, scatter_dex, redz=None):
     EXTR = [9.0, 12.0]   # values are log10(X/Msol)
     NUM = 1e4
     TOL = 4.0
@@ -92,10 +92,10 @@ def check_scatter_per_dex(mmbulge_relation, scatter_dex):
 
     # convert from mbulge to MBH including scatter, using uniform input values
     class host: mbulge = xx    # noqa
-    vals = mmbulge_relation.mbh_from_host(host, scatter=True)
+    vals = mmbulge_relation.mbh_from_host(host, redz=redz, scatter=True)
     # without scatter, get the expected (central) value of MBH mass
     class host: mbulge = 10.0**mbulge_log10    # noqa
-    cent = mmbulge_relation.mbh_from_host(host, scatter=False)
+    cent = mmbulge_relation.mbh_from_host(host, redz=redz, scatter=False)
     cent = np.log10(cent)
     vals = np.log10(vals)
 
@@ -157,9 +157,9 @@ def test_KH2013_basic():
     return
 
 
-def check_mass_reset(mmbulge_relation, truth_func):
+def check_mass_reset(mmbulge_relation, truth_func, redz=redz):
     pop = holo.population.Pop_Illustris()
-    mod_MM2013 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=False)
+    mod_MM2013 = holo.population.PM_Mass_Reset(mmbulge_relation, redz=redz, scatter=False)
     pop.modify(mod_MM2013)
     mass = pop.mass
 
