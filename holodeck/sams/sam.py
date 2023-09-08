@@ -778,7 +778,7 @@ class Semi_Analytic_Model:
         dqbh_dqgal = mplaw * np.power(mrat_gal, mplaw - 1.0)
 
         dmstar_dmbh__pri = self._mmbulge.dmstar_dmbh(mass_gal, redz=redz)   # [unitless]
-        mbh_pri = self._mmbulge.mbh_from_mstar(mass_gal, scatter=False)
+        mbh_pri = self._mmbulge.mbh_from_mstar(mass_gal, redz=redz, scatter=False)
         mbh_sec = self._mmbulge.mbh_from_mstar(mass_gal * mrat_gal, scatter=False)
         mbh = mbh_pri + mbh_sec
         mrat_mbh = mbh_sec / mbh_pri
