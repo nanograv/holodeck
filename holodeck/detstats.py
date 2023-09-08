@@ -3455,7 +3455,7 @@ def build_hcpar_arrays(
         target,nvars=21, nreals=500, shape=None,
         gw_only=False,
         nloudest=1, 
-        parvars = [0,1,2,3,4],
+        parvars = [0,1,2,3,4], ss_zero=True,
         ):
     """ Save and return hcpar arrays for plotting
     
@@ -3498,9 +3498,13 @@ def build_hcpar_arrays(
         bgpar = bgpar*holo.single_sources.par_units[:,np.newaxis,np.newaxis]
         sspar = sspar*holo.single_sources.par_units[:,np.newaxis,np.newaxis,np.newaxis]
         
-    # parameters to plot
-        _yy_ss = [hc_ss[...,0], sspar[0,...,0], #sspar[1,...,0], # sspar[2,],  # strain, mass, mass ratio,
-                sspar[4,...,0]] # final comoving distance, single loudest only
+        # parameters to plot
+        if ss_zero:
+            _yy_ss = [hc_ss[...,0], sspar[0,...,0], #sspar[1,...,0], # sspar[2,],  # strain, mass, mass ratio,
+                    sspar[4,...,0]] # final comoving distance, single loudest only
+        else:
+            _yy_ss = [hc_ss[...], sspar[0,...], #sspar[1,...,0], # sspar[2,],  # strain, mass, mass ratio,
+                    sspar[4,...]] # final comoving distance, single loudest only
 
         _yy_bg = [hc_bg, bgpar[0], #bgpar[1],  # strain, mass, mass ratio, initial redshift, final com distance
                 bgpar[4],]
@@ -3513,7 +3517,7 @@ def build_hcpar_arrays(
     filename += f".npz"
     
     np.savez(filename, xx=xx, yy_ss=yy_ss, yy_bg=yy_bg, labels=labels)
-    return xx, yy_ss, yy_bg, labels
+    return np.array(xx), np.array(yy_ss), np.array(yy_bg), labels
 
 def get_hcpar_arrays(
         target, 
