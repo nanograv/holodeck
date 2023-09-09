@@ -23,7 +23,7 @@ cimport scipy.special.cython_special as sp_special
 from libc.stdio cimport printf
 from libc.stdlib cimport malloc, free, qsort
 # make sure to use c-native math functions instead of python/numpy
-from libc.math cimport pow, sqrt, abs, M_PI, NAN
+from libc.math cimport pow, sqrt, abs, M_PI, NAN, cos, sin
 
 from cpython.pycapsule cimport PyCapsule_IsValid, PyCapsule_GetPointer
 from numpy.random cimport bitgen_t
@@ -2038,14 +2038,14 @@ def Sh_rest(hc_ss, hc_bg, freqs, nexcl):
 
     """
 
-    nfreqs, nreals, nloudest = [*hc_ss.shape] 
+    nfreqs, nreals, nloudest = hc_ss.shape[0], hc_ss.shape[1], hc_ss.shape[2]
     cdef np.ndarray[np.double_t, ndim=3] Sh_rest = np.zeros((nfreqs, nreals, nloudest))
     _Sh_rest(hc_ss, hc_bg, freqs, nexcl, nreals, nfreqs, nloudest, Sh_rest)
     return Sh_rest
 
 
 cdef void _Sh_rest(
-    double[:,:,:] hc_ss, double[:,:,:,:] hc_bg, double[:] freqs, long nexcl,
+    double[:,:,:] hc_ss, double[:,:,] hc_bg, double[:] freqs, long nexcl,
     long nreals, long nfreqs, long nloudest,
     double[:,:,:] Sh_rest):
     """
@@ -2087,9 +2087,9 @@ cdef void _Sh_rest(
                     # if current is in top N_excl, must be (N_excl+1)th or above
                     # if current is >= top N_excl, must be (N_excl)th or above
                         if ((ll < nexcl) and (ii > nexcl)) or ((ll >= nexcl) and (ii > nexcl-1)): 
-                            Sh_ss += hc_ss[ff,rr,ii]**2 / freq**3 / (12*M_PI**2)
+                            Sh_ss += pow(hc_ss[ff,rr,ii], 2.0) / pow(freq, 3.0) / (12*pow(M_PI, 2.0))
                             count += 1
-                Sh_bg = hc_bg[ff,rr]**2 / freq**3 / (12*M_PI**2)
+                Sh_bg = pow(hc_bg[ff,rr], 2.0) / pow(freq, 3.0) / (12*pow(M_PI, 2.0))
                 Sh_rest[ff,rr,ll] = Sh_rest[ff,rr,ll] + Sh_ss + Sh_bg
                 if count != (nloudest - nexcl - 1):
                     err = (f"ERROR in calculate Sh_rest! count of sources={count}")
