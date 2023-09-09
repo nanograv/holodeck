@@ -881,7 +881,7 @@ def _antenna_pattern_functions(m_hat, n_hat, Omega_hat, pi_hat):
 ######################## Noise Spectral Density ########################
 
 
-def _Sh_rest_noise(hc_ss, hc_bg, freqs, exclude_loudest=0):
+def _Sh_rest_noise(hc_ss, hc_bg, freqs, nexcl=0):
     """ Calculate the noise spectral density contribution from all but the current single source.
 
     Parameters
@@ -904,8 +904,8 @@ def _Sh_rest_noise(hc_ss, hc_bg, freqs, exclude_loudest=0):
     Follows Eq. (45) in Rosado et al. 2015.
     """
 
-    if exclude_loudest>0:
-        Sh_rest = cyutils.Sh_rest(hc_ss, hc_bg, freqs, exclude_loudest)
+    if nexcl>0:
+        Sh_rest = cyutils.Sh_rest(hc_ss, hc_bg, freqs, nexcl)
     else:
         hc2_louds = np.sum(hc_ss**2, axis=2) # (F,R)
         # subtract the single source from rest of loud sources and the background, for each single source
@@ -970,7 +970,7 @@ def _red_noise(red_amp, red_gamma, freqs, f_ref=1/YR):
 
 
 def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=None,
-                 exclude_loudest=0):
+                 nexcl=0):
     """ Calculate the noise spectral density of each pulsar, as it pertains to single
     source detections, i.e., including the background as a noise source.
 
@@ -998,7 +998,7 @@ def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=N
     """
 
     noise = _white_noise(delta_t, sigmas) # (P,)
-    Sh_rest = _Sh_rest_noise(hc_ss, hc_bg, freqs, exclude_loudest) # (F,R,L,)
+    Sh_rest = _Sh_rest_noise(hc_ss, hc_bg, freqs, nexcl) # (F,R,L,)
     noise = noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh_rest[np.newaxis,:,:,:] # (P,F,R,L)
     if (red_amp is not None) and (red_gamma is not None):
         red_noise = _red_noise(red_amp, red_gamma, freqs) # (F,)
@@ -1544,7 +1544,8 @@ def detect_ss(thetas, phis, sigmas, fobs, hc_ss, hc_bg,
         return gamma_ss
 
 
-def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg, custom_noise=None,
+def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg, 
+                custom_noise=None, nexcl_noise=0,
               theta_ss=None, phi_ss=None, Phi0_ss=None, iota_ss=None, psi_ss=None, nskies=25, 
               Fe_bar = None, red_amp=None, red_gamma=None, alpha_0=0.001, Fe_bar_guess=15,
               ret_snr=False, print_nans=False, snr_cython=True, gamma_cython=True, grid_path=GAMMA_RHO_GRID_PATH):
@@ -1565,6 +1566,9 @@ def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg, custom_noise=None,
         for R realizations.
     custom_noise : (P,F,R,L) array or None
         Custom noise if not None, otherwise noise is calcualted normally.
+    nexcl_noise : int
+        Number of loudest single sources to exclude from hc_rest noise, in addition 
+        to the source in question.
     theta_ss : (F,S,L) NDarray
         Polar (latitudinal) angular position in the sky of each single source.
         Must be provided, to give the shape for sky realizations.
@@ -1649,7 +1653,7 @@ def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg, custom_noise=None,
             raise ValueError(err)
         S_i = custom_noise
     else:
-        S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, red_amp, red_gamma)
+        S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, red_amp, red_gamma, nexcl=nexcl_noise)
 
     # amplitudw
     amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
@@ -2330,7 +2334,7 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
 
 
 def detect_pspace_model_psrs(fobs_cents, hc_ss, hc_bg, psrs, nskies, 
-                        thresh=DEF_THRESH, debug=False):
+                        thresh=DEF_THRESH, debug=False, nexcl_noise=0):
     
     nfreqs, nreals, nloudest = [*hc_ss.shape]
     dur = 1/fobs_cents[0]
@@ -2352,6 +2356,7 @@ def detect_pspace_model_psrs(fobs_cents, hc_ss, hc_bg, psrs, nskies,
         psrs, fobs_cents, hc_ss, hc_bg, 
         gamma_cython=True, snr_cython=True, ret_snr=True, 
         theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss, iota_ss=iota_ss, psi_ss=psi_ss,
+        nexcl_noise=nexcl_noise
         )
     dp_ss, snr_ss, gamma_ssi = vals_ss[0], vals_ss[1], vals_ss[2]
     # print(f"{np.mean(dp_ss)=}")
@@ -2372,7 +2377,7 @@ def detect_pspace_model_clbrt_pta(
         fobs_cents, hc_ss, hc_bg, npsrs, nskies, 
         sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
         thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
-        red_amp=None, red_gamma=None, red2white=None, ss_noise=False, dsc_flag=False,): 
+        red_amp=None, red_gamma=None, red2white=None, ss_noise=False, dsc_flag=False, nexcl_noise=0): 
     """ Detect pspace model using individual sigma calibration for each realization
     
     Parameters
@@ -2383,11 +2388,12 @@ def detect_pspace_model_clbrt_pta(
     hc_bg : (F,R) NDarray
     npsrs : int
     nskies : int
-
     red2white : scalar or None
         Fixed ratio between red and white noise amplitude, if not None. 
         Otherwise, red noise stays fixed
-
+    nexcl_noise : int
+        Number of loudest single sources to exclude from hc_rest noise, in addition 
+        to the source in question.
     """
     dur = 1.0/fobs_cents[0]
     cad = 1.0/(2*fobs_cents[-1])
@@ -2457,7 +2463,7 @@ def detect_pspace_model_clbrt_pta(
         # calculate realization SS detstats
         _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
             psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], custom_noise=noise_ss,
-            nskies=nskies, ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
+            nskies=nskies, ret_snr=True, red_amp=red_amp, red_gamma=red_gamma, nexcl_noise=nexcl_noise)
 
         dp_ss[rr] = _dp_ss.reshape(nskies) # from R=1,S to S
         snr_ss[:,rr] = _snr_ss.reshape(nfreqs, nskies, nloudest) # from F,R=1,S,L to F,S,L
@@ -2484,7 +2490,7 @@ def detect_pspace_model_clbrt_pta_gsc(
         sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
         thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
         red_amp=None, red_gamma=None, red2white=None, ss_noise=False,
-        divide_flag=False, dsc_flag=False): 
+        divide_flag=False, dsc_flag=False, nexcl_noise=0): 
     """ Detect pspace model using individual sigma calibration for each realization 
     and sensitivity curve noise for both BG calibration and SS detstats.
     
@@ -2496,11 +2502,12 @@ def detect_pspace_model_clbrt_pta_gsc(
     hc_bg : (F,R) NDarray
     npsrs : int
     nskies : int
-
     red2white : scalar or None
         Fixed ratio between red and white noise amplitude, if not None. 
         Otherwise, red noise stays fixed
-
+    nexcl_noise : int
+        Number of loudest single sources to exclude from hc_rest noise, in addition 
+        to the source in question.
     """
     dur = 1.0/fobs_cents[0]
     cad = 1.0/(2*fobs_cents[-1])
@@ -2564,7 +2571,7 @@ def detect_pspace_model_clbrt_pta_gsc(
         # calculate realizatoin SS detstats
         _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
             psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], custom_noise=noise_ss,
-            nskies=nskies, ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
+            nskies=nskies, ret_snr=True, red_amp=red_amp, red_gamma=red_gamma, nexcl_noise=nexcl_noise)
 
         dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()
 

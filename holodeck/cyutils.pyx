@@ -2092,7 +2092,8 @@ cdef void _Sh_rest(
                 Sh_bg = hc_bg[ff,rr]**2 / freq**3 / (12*M_PI**2)
                 Sh_rest[ff,rr,ll] = Sh_rest[ff,rr,ll] + Sh_ss + Sh_bg
                 if count != (nloudest - nexcl - 1):
-                    print("ERROR in calculate Sh_rest! count of sources=", count)
+                    err = (f"ERROR in calculate Sh_rest! count of sources={count}")
+                    print(err)
                 
 
 
