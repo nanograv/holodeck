@@ -81,6 +81,9 @@ def _setup_argparse():
                         help='Whether or not to divide sensitivity curves among the pulsars.') 
     parser.add_argument('--onepsr', action='store_true', dest='onepsr_flag', default=False, 
                         help='Whether or not to treat PTA with gsc/dsc noise as 1 psr.') 
+    parser.add_argument('--nexcl', '--nexcl_noise', action='store', dest='nexcl', type=int, default=0,
+                        help='number of loudest single sources to exclude in hc_rest noise')
+    
     
     # rarely need changing
     
@@ -107,7 +110,7 @@ def main():
             target=args.target, nreals=args.nreals, nskies=args.nskies,
             gw_only=args.gw_only, red2white=args.red2white, red_gamma=args.red_gamma,
             nloudest=args.nloudest, bgl=args.bgl, cv=args.calvar, 
-            gsc_flag=args.gsc_flag, dsc_flag=args.dsc_flag, divide_flag=args.divide_flag,
+            gsc_flag=args.gsc_flag, dsc_flag=args.dsc_flag, divide_flag=args.divide_flag, nexcl=args.nexcl
             )
     if args.ratio:
         print("---building ratio arrays---")
@@ -115,7 +118,7 @@ def main():
             target=args.target, nreals=args.nreals, nskies=args.nskies,
             gw_only=args.gw_only, red2white=args.red2white, red_gamma=args.red_gamma,
             nloudest=args.nloudest, bgl=args.bgl, 
-            gsc_flag=args.gsc_flag, dsc_flag=args.dsc_flag, divide_flag=args.divide_flag,
+            gsc_flag=args.gsc_flag, dsc_flag=args.dsc_flag, divide_flag=args.divide_flag, nexcl=args.nexcl
             )
     if args.anis_var:
         print("---building anisotropy var arrays---")

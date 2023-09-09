@@ -84,6 +84,8 @@ def _setup_argparse():
                         help='Whether or not to divide sensitivity curves among the pulsars.') 
     parser.add_argument('--onepsr', action='store_true', dest='onepsr_flag', default=False, 
                         help='Whether or not to treat PTA with gsc/dsc noise as 1 psr.') 
+    parser.add_argument('--nexcl', '--nexcl_noise', action='store', dest='nexcl', type=int, default=0,
+                        help='number of loudest single sources to exclude in hc_rest noise')
     
     # pta calibration settings
     parser.add_argument('--cv', '--calvar', action='store', dest='calvar', type=int, default=DEF_CALVAR,
@@ -237,6 +239,10 @@ def file_names(args):
             save_dets_to_file += '_nodiv'
     if args.dsc_flag: save_dets_to_file += '_dsc' # only append 'dsc' if not gsc-calibrated
 
+    if args.nexcl > 0:
+        save_dets_to_file += f'_nexcl{args.nexcl}'
+
+
     if args.red2white is not None and args.red_gamma is not None:               # if using red noise with fixed red_gamma
         save_dets_to_file = save_dets_to_file+f'_r2w{args.red2white:.1e}_rg{args.red_gamma:.1f}'
     elif args.red_amp is not None and args.red_gamma is not None:               # if using fixed red noise 
@@ -246,6 +252,7 @@ def file_names(args):
 
     if args.red2white is not None and args.red_amp is not None:
         print(f"{args.red2white=} and {args.red_amp} both provided. red_amp will be overriden by red2white ratio.")
+
     
     return load_data_from_file, save_data_to_file, save_dets_to_file
 
@@ -321,6 +328,10 @@ def fixed_pta_method(args, data):
     calibrate pta once if using calvar (calibration variation)
     """
 
+    if args.red2white is not None or args.red_gamma is not None:
+        err = "Error! Fixed_pta_method() is not set up for red noise."
+        raise ValueError(err)
+
     fobs_cents = data[0]['fobs_cents']
 
     # get hc_ss and hc_bg from appropriate calibration variation
@@ -342,13 +353,11 @@ def fixed_pta_method(args, data):
         psrs = detstats.calibrate_one_pta_gsc(
             hc_bg_med, hc_ss_med, fobs_cents, args.npsrs, ret_sig=False,
             sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
-            red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white,
             divide_flag=args.divide_flag,)
     else:
         psrs = detstats.calibrate_one_pta(
-            hc_bg_med, hc_ss_med, fobs_cents, args.npsrs, ret_sig=False,
+            hc_bg_med, hc_ss_med, fobs_cents, args.npsrs, ret_sig=False, 
             sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
-            red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white,
             )
 
     # get dsdat for each data/param
@@ -366,8 +375,8 @@ def fixed_pta_method(args, data):
             _, hc_bg = resample_loudest(hc_ss, hc_bg, args.bg_nloudest) # only change nloudest subtracted from bg, not single sources loudest
 
         _dsdat = detstats.detect_pspace_model_psrs(
-                fobs_cents, hc_ss, hc_bg, psrs, args.nskies,
-                thresh=args.thresh, debug=args.debug, )
+                fobs_cents, hc_ss, hc_bg, psrs, args.nskies, 
+                thresh=args.thresh, debug=args.debug, nexcl_noise=args.nexcl )
         dsdat.append(_dsdat)
         # not updated to allow for dsc alone
         
@@ -401,13 +410,13 @@ def realization_calibrated_method(args, data):
                 fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, 
                 sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
                 thresh=args.thresh, debug=args.debug, 
-                ss_noise=args.ss_noise, divide_flag=args.divide_flag, dsc_flag=args.dsc_flag,
+                ss_noise=args.ss_noise, divide_flag=args.divide_flag, dsc_flag=args.dsc_flag, nexcl_noise=args.nexcl
             )
         else:
             _dsdat = detstats.detect_pspace_model_clbrt_pta(
                 fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies,
                 sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
-                thresh=args.thresh, debug=args.debug, ss_noise=args.ss_noise, dsc_flag=args.dsc_flag,
+                thresh=args.thresh, debug=args.debug, ss_noise=args.ss_noise, dsc_flag=args.dsc_flag, nexcl_noise=args.nexcl,
                 red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white)
         dsdat.append(_dsdat)
 

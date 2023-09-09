@@ -3169,7 +3169,7 @@ def get_data(
         nvars=21, nreals=500, nskies=100, shape=None,  # keep as defaults
         nloudest = 10, bgl = 10, cv=None, ssn_flag=False,
         red_gamma = None, red2white=None, 
-        gsc_flag=False,  dsc_flag=False, divide_flag=False, 
+        gsc_flag=False,  dsc_flag=False, divide_flag=False, nexcl=0,
         gw_only=False,
 ):
     if gw_only:
@@ -3200,6 +3200,9 @@ def get_data(
             dets_file += '_nodiv'
     if dsc_flag: 
         dets_file += '_dsc'
+    
+    if nexcl>0:
+        dets_file += f'_nexcl{nexcl}'
 
     if red2white is not None and red_gamma is not None:               # if using red noise with fixed red_gamma
         dets_file += f'_r2w{red2white:.1e}_rg{red_gamma:.1f}'
@@ -3233,7 +3236,7 @@ def get_data(
 def append_filename(filename='', 
         gw_only=False, red_gamma = None, red2white=None, 
         nloudest = 10, bgl = 10, cv=None, 
-        gsc_flag=False,  dsc_flag=False, divide_flag=False, 
+        gsc_flag=False,  dsc_flag=False, divide_flag=False, nexcl=0,
         ):
     
     if cv is not None:
@@ -3256,6 +3259,9 @@ def append_filename(filename='',
             filename += '_nodiv'
     elif dsc_flag: filename += '_dsc'
 
+    if nexcl>0:
+        filename += f'_nexcl{nexcl}'
+
     if gw_only:
         filename = filename+'_gw'
 
@@ -3265,12 +3271,12 @@ def build_ratio_arrays(
         target, nreals=500, nskies=100,
         gw_only=False, red2white=None, red_gamma=None, 
         nloudest=10, bgl=1, 
-        gsc_flag=False, dsc_flag=False, divide_flag=False,
+        gsc_flag=False, dsc_flag=False, divide_flag=False, nexcl=0,
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',):
 
     data, params, dsdat = get_data(target,
         gw_only=gw_only, red2white=red2white, red_gamma=red_gamma,
-        nloudest=nloudest, bgl=bgl, 
+        nloudest=nloudest, bgl=bgl, nexcl=nexcl,
         gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
     xx=[]
     yy=[]
@@ -3285,7 +3291,7 @@ def build_ratio_arrays(
         filename, 
         gw_only=gw_only, red_gamma=red_gamma, red2white=red2white, 
         nloudest=nloudest, bgl=bgl, cv=None, 
-        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
+        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag, nexcl=nexcl)
     filename += '.npz'  
 
     np.savez(filename, xx_params = xx, yy_ratio = yy,)
@@ -3294,7 +3300,7 @@ def get_ratio_arrays(
         target, nreals=500, nskies=100,
         gw_only=False, red2white=None, red_gamma=None, 
         nloudest=10, bgl=1, 
-        gsc_flag=False, dsc_flag=False, divide_flag=False,
+        gsc_flag=False, dsc_flag=False, divide_flag=False, nexcl=0,
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',):
 
     filename = figpath+f'/ratio_arrays_{target}'
@@ -3302,7 +3308,7 @@ def get_ratio_arrays(
         filename, 
         gw_only=gw_only, red_gamma=red_gamma, red2white=red2white, 
         nloudest=nloudest, bgl=bgl, cv=None, 
-        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
+        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag, nexcl=nexcl)
     filename += '.npz'  
 
     file = np.load(filename)
@@ -3556,13 +3562,13 @@ def build_favg_arrays(
         target, nreals=500, nskies=100,
         gw_only=False, red2white=None, red_gamma=None, 
         nloudest=10, bgl=10, cv=None,
-        gsc_flag=False, dsc_flag=False, divide_flag=False,
+        gsc_flag=False, dsc_flag=False, divide_flag=False, nexcl=0,
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/favg',):
 
     data, params, dsdat = get_data(target,
         gw_only=gw_only, red2white=red2white, red_gamma=red_gamma,
         nloudest=nloudest, bgl=bgl, nreals=nreals, nskies=nskies,
-        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
+        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag, nexcl=nexcl)
 
     xx = [] # param
     favg = [] # frequency means in log space
@@ -3585,7 +3591,7 @@ def build_favg_arrays(
     filename = append_filename(filename,
                 gw_only=gw_only, red_gamma=red_gamma, red2white=red2white,
                 nloudest=nloudest, bgl=bgl, cv=cv, 
-                gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
+                gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag, nexcl=nexcl)
 
     filename=filename+'.npz'
     np.savez(filename, xx = xx, yy_log = favg, sd_log=stdv)
@@ -3595,7 +3601,7 @@ def get_favg_arrays(
         target, 
         gw_only=False, red2white=None, red_gamma=None, 
         nloudest=10, bgl=10, cv=None,
-        gsc_flag=False, dsc_flag=False, divide_flag=False,
+        gsc_flag=False, dsc_flag=False, divide_flag=False, nexcl=0,
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/favg',):
 
 
@@ -3603,7 +3609,7 @@ def get_favg_arrays(
     filename = append_filename(filename,
                 gw_only=gw_only, red_gamma=red_gamma, red2white=red2white,
                 nloudest=nloudest, bgl=bgl, cv=cv, 
-                gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
+                gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag, nexcl=nexcl)
 
     filename=filename+'.npz'
     file = np.load(filename)
