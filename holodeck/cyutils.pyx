@@ -2014,3 +2014,85 @@ cdef int _snr_ss(
                     snr_ss[ff,rr,ss,ll] = sqrt(pta_snr_sq)
 
 
+def Sh_rest(hc_ss, hc_bg, freqs, nexcl):
+    """
+    Calculate the noise from all the single sources except the source in question
+    and the next N_excl loudest sources.
+
+    Parameters
+    ----------
+    hc_ss : (F,R,L) NDarray
+        Characteristic strain from all loud single sources.
+    hc_bg : (F,R) NDarray
+        Characteristic strain from all but loudest source at each frequency.
+    freqs : (F,) 1Darray
+        Frequency bin centers.
+    nexcl : int
+        Number of loudest single sources to exclude from hc_rest noise, in addition 
+        to the source in question.
+
+    Returns
+    -------
+    Sh_rest : (F,R,L) NDarray of scalars
+        The noise in a single pulsar from other GW sources for detecting each single source.
+
+    """
+
+    nfreqs, nreals, nloudest = [*hc_ss.shape] 
+    cdef np.ndarray[np.double_t, ndim=3] Sh_rest = np.zeros((nfreqs, nreals, nloudest))
+    _Sh_rest(hc_ss, hc_bg, freqs, nexcl, nreals, nfreqs, nloudest, Sh_rest)
+    return Sh_rest
+
+
+cdef void _Sh_rest(
+    double[:,:,:] hc_ss, double[:,:,:,:] hc_bg, double[:] freqs, long nexcl,
+    long nreals, long nfreqs, long nloudest,
+    double[:,:,:] Sh_rest):
+    """
+    Calculate the noise from all the single sources except the source in question
+    and the next N_excl loudest sources.
+
+    Parameters
+    ----------
+    hc_ss : (F,R,L) NDarray
+        Characteristic strain from all loud single sources.
+    hc_bg : (F,R) NDarray
+        Characteristic strain from all but loudest source at each frequency.
+    freqs : (F,) 1Darray
+        Frequency bin centers.
+    nexcl : int
+        Number of loudest single sources to exclude from hc_rest noise, in addition 
+        to the source in question.
+
+    Returns
+    -------
+    void
+    Sh_rest : (F,R,L) NDarray of scalars, updated via memory address
+
+
+    Sh = hc^2 / (f^3 12 pi^2)
+
+    """
+    cdef int ff, rr, ll, count
+    cdef double Sh_ss, Sh_bg
+
+    for ff in range(nfreqs):
+        freq = freqs[ff]
+        for rr in range(nreals):
+            for ll in range(nloudest): # calculating for the llth loduest
+                Sh_ss = 0
+                count = 0
+                for ii in range(nloudest): # adding other loudest with index ii
+                    if (ii != ll): # check it's not our current source
+                    # if current is in top N_excl, must be (N_excl+1)th or above
+                    # if current is >= top N_excl, must be (N_excl)th or above
+                        if ((ll < nexcl) and (ii > nexcl)) or ((ll >= nexcl) and (ii > nexcl-1)): 
+                            Sh_ss += hc_ss[ff,rr,ii]**2 / freq**3 / (12*M_PI**2)
+                            count += 1
+                Sh_bg = hc_bg[ff,rr]**2 / freq**3 / (12*M_PI**2)
+                Sh_rest[ff,rr,ll] = Sh_rest[ff,rr,ll] + Sh_ss + Sh_bg
+                if count != (nloudest - nexcl - 1):
+                    print("ERROR in calculate Sh_rest! count of sources=", count)
+                
+
+

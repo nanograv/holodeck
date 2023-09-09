@@ -18,7 +18,7 @@ import warnings
 import holodeck as holo
 from holodeck import utils, cosmo, log, plot, sam_cython, anisotropy
 from holodeck.constants import MPC, YR
-from holodeck.sams import cyutils as sam_cyutils
+from holodeck import cyutils 
 
 import hasasia.sensitivity as hsen
 import hasasia.sim as hsim
@@ -881,7 +881,7 @@ def _antenna_pattern_functions(m_hat, n_hat, Omega_hat, pi_hat):
 ######################## Noise Spectral Density ########################
 
 
-def _Sh_rest_noise(hc_ss, hc_bg, freqs):
+def _Sh_rest_noise(hc_ss, hc_bg, freqs, exclude_loudest=0):
     """ Calculate the noise spectral density contribution from all but the current single source.
 
     Parameters
@@ -892,6 +892,9 @@ def _Sh_rest_noise(hc_ss, hc_bg, freqs):
         Characteristic strain from all but loudest source at each frequency.
     freqs : (F,) 1Darray
         Frequency bin centers.
+    exclude_loudest : int
+        Number of loudest single sources to exclude from hc_rest noise, in addition 
+        to the source in question.
 
     Returns
     -------
@@ -900,10 +903,15 @@ def _Sh_rest_noise(hc_ss, hc_bg, freqs):
 
     Follows Eq. (45) in Rosado et al. 2015.
     """
-    hc2_louds = np.sum(hc_ss**2, axis=2) # (F,R)
-    # subtract the single source from rest of loud sources and the background, for each single source
-    hc2_rest = hc_bg[:,:,np.newaxis]**2 + hc2_louds[:,:,np.newaxis] - hc_ss**2 # (F,R,L)
-    Sh_rest = hc2_rest / freqs[:,np.newaxis,np.newaxis]**3 /(12 * np.pi**2) # (F,R,L)
+
+    if exclude_loudest>0:
+        Sh_rest = cyutils.Sh_rest(hc_ss, hc_bg, freqs, exclude_loudest)
+    else:
+        hc2_louds = np.sum(hc_ss**2, axis=2) # (F,R)
+        # subtract the single source from rest of loud sources and the background, for each single source
+        hc2_rest = hc_bg[:,:,np.newaxis]**2 + hc2_louds[:,:,np.newaxis] - hc_ss**2 # (F,R,L)
+        Sh_rest = hc2_rest / freqs[:,np.newaxis,np.newaxis]**3 /(12 * np.pi**2) # (F,R,L)
+    
     return Sh_rest
 
 
@@ -961,7 +969,8 @@ def _red_noise(red_amp, red_gamma, freqs, f_ref=1/YR):
 
 
 
-def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=None):
+def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=None,
+                 exclude_loudest=0):
     """ Calculate the noise spectral density of each pulsar, as it pertains to single
     source detections, i.e., including the background as a noise source.
 
@@ -977,6 +986,8 @@ def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=N
         Characteristic strain from all but loudest source at each frequency.
     freqs : (F,) 1Darray
         Frequency bin centers.
+    exclude_loudest : int
+        Number of loudest single sources to exclude from hc_rest noise
 
     Returns
     -------
@@ -987,7 +998,7 @@ def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=N
     """
 
     noise = _white_noise(delta_t, sigmas) # (P,)
-    Sh_rest = _Sh_rest_noise(hc_ss, hc_bg, freqs) # (F,R,L,)
+    Sh_rest = _Sh_rest_noise(hc_ss, hc_bg, freqs, exclude_loudest) # (F,R,L,)
     noise = noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh_rest[np.newaxis,:,:,:] # (P,F,R,L)
     if (red_amp is not None) and (red_gamma is not None):
         red_noise = _red_noise(red_amp, red_gamma, freqs) # (F,)
@@ -1147,7 +1158,7 @@ def _snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
     """
 
 
-    snr_ss = sam_cyutils.snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs)
+    snr_ss = cyutils.snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs)
     return snr_ss
 
 def _snr_ss_5dim(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
@@ -1182,24 +1193,16 @@ def _snr_ss_5dim(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
     """
 
     amp = amp[np.newaxis,:,:,np.newaxis,:]  # (F,R,L) to (P,F,R,S,L)
-    # print('amp', amp.shape)
 
     a_pol, b_pol = _a_b_polarization(iotas) # (F,S,L)
     a_pol = a_pol[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
     b_pol = b_pol[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
-    # print('a_pol', a_pol.shape)
-    # print('b_pol', b_pol.shape)
 
     Phi_T = _gw_phase(dur, freqs, Phi_0) # (F,)
-    # print('Phi_T', Phi_T.shape)
     Phi_T = Phi_T[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
-    # print('Phi_T', Phi_T.shape)
 
     Phi_0 = Phi_0[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
-    # print('Phi_0', Phi_0.shape)
-
     freqs = freqs[np.newaxis,:,np.newaxis,np.newaxis,np.newaxis] # (F,) to (1,F,1,1,1)
-    # print('freqs', freqs.shape)
 
     S_i = S_i[:,:,:,np.newaxis,:] # (P,F,R,L) to (P,F,R,1,L)
     F_iplus = F_iplus[:,:,np.newaxis,:,:] # (P,F,S,L) to (P,F,1,S,L)
@@ -1401,14 +1404,14 @@ def _gamma_ssi_cython(rho, grid_path):
     #         # interpolate for gamma in cython
     #         rho_flat = rho[ff,rr].flatten()
     #         rsort = np.argsort(rho_flat)
-    #         gamma_flat = sam_cyutils.gamma_of_rho_interp(rho_flat, rsort, rho_interp_grid, gamma_interp_grid)
+    #         gamma_flat = cyutils.gamma_of_rho_interp(rho_flat, rsort, rho_interp_grid, gamma_interp_grid)
     #         gamma_ssi[ff,rr] = gamma_flat.reshape(rho[ff,rr].shape)
 
     for rr in range(len(rho[0])):
         # interpolate for gamma in cython
         rho_flat = rho[:,rr].flatten()
         rsort = np.argsort(rho_flat)
-        gamma_flat = sam_cyutils.gamma_of_rho_interp(rho_flat, rsort, rho_interp_grid, gamma_interp_grid)
+        gamma_flat = cyutils.gamma_of_rho_interp(rho_flat, rsort, rho_interp_grid, gamma_interp_grid)
         gamma_ssi[:,rr] = gamma_flat.reshape(rho[:,rr].shape)
 
 
@@ -1839,8 +1842,8 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
 
 def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
                          sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
-                plot=True, debug=False, grid_path=GAMMA_RHO_GRID_PATH, 
-                snr_cython = True, save_ssi=False, ret_dict=False, ss_noise=False):
+                plot=True, debug=False, 
+                save_ssi=False, ret_dict=False, ss_noise=False):
     """ Calculate detection statistics for an ss library output.
 
     Parameters
@@ -1905,9 +1908,6 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
     fobs = ssfile['fobs'][:]
     dur = 1.0/fobs[0]
     cad = 1.0/(2*fobs[-1])
-    # if dfobs is None: dfobs = ssfile['dfobs'][:]
-    # if dur is None: dur = ssfile['pta_dur'][0]
-    # if cad is None: cad = ssfile['pta_cad'][0]
     hc_ss = ssfile['hc_ss'][...]
     hc_bg = ssfile['hc_bg'][...]
     shape = hc_ss.shape
@@ -1943,10 +1943,6 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
     if save_ssi: 
         snr_ss = np.zeros((nsamps, nfreqs, nreals, nskies, nloudest))
         gamma_ssi = np.zeros((nsamps, nfreqs, nreals, nskies, nloudest))
-
-    # # one time calculations
-    # Num = nfreqs * nloudest # number of single sources in a single strain realization (F*L)
-    # Fe_bar = _Fe_thresh(Num) # scalar
 
     for nn in range(nsamps):
         if debug: 
@@ -1990,15 +1986,7 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
             now = datetime.now()
             print(f"Sample {nn} took {now-samp_dur} s")
             samp_dur = now
-        # dp_bg[nn,:], snr_bg[nn,...] = detect_bg_pta(psrs, fobs, hc_bg[nn], ret_snr=True)
-        # vals_ss = detect_ss_pta(psrs, fobs, hc_ss[nn], hc_bg[nn], 
-        #                         ret_snr=True, gamma_cython=True, snr_cython=snr_cython,
-        #                         theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss,
-        #                         iota_ss=iota_ss, psi_ss=psi_ss, grid_path=grid_path)
-        # dp_ss[nn,:,:]  = vals_ss[0]
-        # if save_ssi: 
-        #     snr_ss[nn] = vals_ss[1]
-        #     gamma_ssi[nn] = vals_ss[2]
+
         df_ss[nn], df_bg[nn] = detfrac_of_reals(dp_ss[nn], dp_bg[nn], thresh)
 
         if save_ssi:
