@@ -16,10 +16,11 @@ from holodeck import cosmo
 from holodeck.constants import YR
 import holodeck.librarian
 from holodeck.librarian import lib_utils
+from holodeck.sams import sam_cyutils
 
 MAX_FAILURES = 5
 
-FILES_COPY_TO_OUTPUT = [__file__, holo.librarian.__file__, holo.param_spaces.__file__]
+# FILES_COPY_TO_OUTPUT = [__file__, holo.librarian.__file__, holo.param_spaces.__file__]
 
 
 def main():
@@ -135,8 +136,10 @@ def main():
 
     if (comm.rank == 0):
         log.info("Concatenating outputs into single file")
-        holo.librarian.sam_lib_combine(args.output, log)
+        holo.librarian.combine.sam_lib_combine(args.output, log)
         log.info("Concatenating completed")
+
+    return
 
 
 def run_sam_at_pspace_num(args, space, pnum):
@@ -261,6 +264,7 @@ def run_sam_at_pspace_num(args, space, pnum):
     # ---- Plot hc and pars
 
     if rv and args.plot:
+        import matplotlib.pyplot as plt
         log.info("generating characteristic strain/psd plots")
         try:
             log.info("generating strain plots")
@@ -397,7 +401,7 @@ def _calc_model_details(edges, redz_final, number):
     # get final-redshift at bin centers
     rz = redz_final.copy()
     for ii in range(3):
-        rz = utils.midpoints(rz, axis=ii)
+        rz = holo.utils.midpoints(rz, axis=ii)
 
     gwb_mtot_redz_final = np.zeros((nmbins, nzbins, nfreqs))
     num_mtot_redz_final = np.zeros((nmbins, nzbins, nfreqs))
@@ -556,6 +560,114 @@ def get_freqs(args):
     nfreqs = args.nfreqs
     fobs_cents, fobs_edges = holo.utils.pta_freqs(dur=pta_dur, num=nfreqs)
     return fobs_cents, fobs_edges
+
+
+# ==============================================================================
+# ====    Plotting Functions    ====
+# ==============================================================================
+
+
+def make_gwb_plot(fobs, gwb, fit_data):
+    # fig = holo.plot.plot_gwb(fobs, gwb)
+    psd = holo.utils.char_strain_to_psd(fobs[:, np.newaxis], gwb)
+    fig = holo.plot.plot_gwb(fobs, psd)
+    ax = fig.axes[0]
+
+    xx = fobs * YR
+    yy = 1e-15 * np.power(xx, -2.0/3.0)
+    ax.plot(xx, yy, 'k--', alpha=0.5, lw=1.0, label=r"$10^{-15} \cdot f_\mathrm{yr}^{-2/3}$")
+
+    if len(fit_data) > 0:
+        fit_nbins = fit_data['fit_plaw_nbins']
+        med_pars = fit_data['fit_plaw_med']
+
+        plot_nbins = [4, 14]
+
+        for nbins in plot_nbins:
+            idx = fit_nbins.index(nbins)
+            pars = med_pars[idx]
+
+            pars[0] = 10.0 ** pars[0]
+            yy = holo.utils._func_powerlaw_psd(fobs, 1/YR, *pars)
+            label = fit_nbins[idx]
+            label = 'all' if label in [0, None] else f"{label:02d}"
+            ax.plot(xx, yy, alpha=0.75, lw=1.0, label="plaw: " + str(label) + " bins", ls='--')
+
+        fit_nbins = fit_data['fit_turn_nbins']
+        med_pars = fit_data['fit_turn_med']
+
+        plot_nbins = [14, 30]
+
+        for nbins in plot_nbins:
+            idx = fit_nbins.index(nbins)
+            pars = med_pars[idx]
+
+            pars[0] = 10.0 ** pars[0]
+            zz = holo.utils._func_turnover_psd(fobs, 1/YR, *pars)
+            label = fit_nbins[idx]
+            label = 'all' if label in [0, None] else f"{label:02d}"
+            ax.plot(xx, zz, alpha=0.75, lw=1.0, label="turn: " + str(label) + " bins")
+
+    ax.legend(fontsize=6, loc='upper right')
+
+    return fig
+
+
+def make_ss_plot(fobs, hc_ss, hc_bg, fit_data):
+    # fig = holo.plot.plot_gwb(fobs, gwb)
+    psd_bg = holo.utils.char_strain_to_psd(fobs[:, np.newaxis], hc_bg)
+    psd_ss = holo.utils.char_strain_to_psd(fobs[:, np.newaxis, np.newaxis], hc_ss)
+    fig = holo.plot.plot_bg_ss(fobs, bg=psd_bg, ss=psd_ss, ylabel='GW Power Spectral Density')
+    ax = fig.axes[0]
+
+    xx = fobs * YR
+    yy = 1e-15 * np.power(xx, -2.0/3.0)
+    ax.plot(xx, yy, 'k--', alpha=0.5, lw=1.0, label=r"$10^{-15} \cdot f_\mathrm{yr}^{-2/3}$")
+
+    if len(fit_data) > 0:
+        fit_nbins = fit_data['fit_plaw_nbins']
+        med_pars = fit_data['fit_plaw_med']
+
+        plot_nbins = [4, 14]
+
+        for nbins in plot_nbins:
+            idx = fit_nbins.index(nbins)
+            pars = med_pars[idx]
+
+            pars[0] = 10.0 ** pars[0]
+            yy = holo.utils._func_powerlaw_psd(fobs, 1/YR, *pars)
+            label = fit_nbins[idx]
+            label = 'all' if label in [0, None] else f"{label:02d}"
+            ax.plot(xx, yy, alpha=0.75, lw=1.0, label="plaw: " + str(label) + " bins", ls='--')
+
+        fit_nbins = fit_data['fit_turn_nbins']
+        med_pars = fit_data['fit_turn_med']
+
+        plot_nbins = [14, 30]
+
+        for nbins in plot_nbins:
+            idx = fit_nbins.index(nbins)
+            pars = med_pars[idx]
+
+            pars[0] = 10.0 ** pars[0]
+            zz = holo.utils._func_turnover_psd(fobs, 1/YR, *pars)
+            label = fit_nbins[idx]
+            label = 'all' if label in [0, None] else f"{label:02d}"
+            ax.plot(xx, zz, alpha=0.75, lw=1.0, label="turn: " + str(label) + " bins")
+
+    ax.legend(fontsize=6, loc='upper right')
+
+    return fig
+
+
+def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar):
+    """ Plot total mass, mass ratio, initial d_c, final d_c
+
+    """
+    # fig = holo.plot.plot_gwb(fobs, gwb)
+    fig = holo.plot.plot_pars(fobs, sspar, bgpar)
+
+    return fig
 
 
 if __name__ == "__main__":
