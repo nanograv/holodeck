@@ -2,22 +2,44 @@
 """
 
 import abc
+from pathlib import Path
 
 import numpy as np
-from scipy.stats import qmc
+import scipy as sp
+import scipy.stats
 
+import holodeck as holo
 
 
 class _Param_Space(abc.ABC):
+    """Base class for generating holodeck libraries.  Defines the parameter space and settings.
 
-    _SAVED_ATTRIBUTES = ["sam_shape", "param_names", "_uniform_samples", "param_samples"]
+    Libraries are generated over some parameter space defined by which parameters are being varied.
+
+    Subclasses
+    ----------
+
+    ```
+    def __init__(self, log, nsamples, sam_shape, seed):
+        super(_Param_Space, self).__init__(
+            log, nsamples, sam_shape, seed,
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
+            mmb_scatter=PD_Uniform(+0.0, +1.2),
+        )
+    ```
+
+    """
+
+    _SAVED_ATTRIBUTES = ["sam_shape", "param_names", "_uniform_samples", "param_samples", "random_state"]
 
     DEFAULTS = {}
 
     def __init__(self, log, nsamples=None, sam_shape=None, seed=None, **param_kwargs):
         log.debug(f"seed = {seed}")
         np.random.seed(seed)
-        # NOTE: this should be saved to output
         random_state = np.random.get_state()
 
         param_names = list(param_kwargs.keys())
@@ -52,7 +74,7 @@ class _Param_Space(abc.ABC):
             param_samples = None
         else:
             # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
-            lhs = qmc.LatinHypercube(d=ndims, centered=False, strength=1, seed=seed)
+            lhs = sp.stats.qmc.LatinHypercube(d=ndims, centered=False, strength=1, seed=seed)
             # (S, D) - samples, dimensions
             uniform_samples = lhs.random(n=nsamples)
             param_samples = np.zeros_like(uniform_samples)
@@ -69,17 +91,6 @@ class _Param_Space(abc.ABC):
         self._dists = dists
         self._uniform_samples = uniform_samples
         return
-
-    # ! This is included as an example:
-    # def __init__(self, log, nsamples, sam_shape, seed):
-    #     super(_Param_Space, self).__init__(
-    #         log, nsamples, sam_shape, seed,
-    #         hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
-    #         gsmf_phi0=PD_Uniform(-3.5, -1.5),
-    #         gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
-    #         mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
-    #         mmb_scatter=PD_Uniform(+0.0, +1.2),
-    #     )
 
     @classmethod
     def model_for_params(cls, params, sam_shape=None, new_def_params={}):
@@ -167,7 +178,7 @@ class _Param_Space(abc.ABC):
         """
         log = self._log
         my_name = self.__class__.__name__
-        vers = __version__
+        vers = holo.librarian.__version__
 
         # make sure `path_output` is a directory, and that it exists
         path_output = Path(path_output)
@@ -176,7 +187,7 @@ class _Param_Space(abc.ABC):
             log.exception(err)
             raise ValueError(err)
 
-        fname = f"{my_name}{PSPACE_FILE_SUFFIX}"
+        fname = f"{my_name}{holo.librarian.PSPACE_FILE_SUFFIX}"
         fname = path_output.joinpath(fname)
         log.debug(f"{my_name=} {vers=} {fname=}")
 
@@ -189,7 +200,7 @@ class _Param_Space(abc.ABC):
             **data,
         )
 
-        log.info(f"Saved to {fname} size {utils.get_file_size(fname)}")
+        log.info(f"Saved to {fname} size {holo.utils.get_file_size(fname)}")
         return fname
 
     @classmethod
@@ -232,15 +243,9 @@ class _Param_Space(abc.ABC):
 
         return space
 
-    def params(self, samp_num):
-        return self.param_samples[samp_num]
-
     def param_dict(self, samp_num):
-        rv = {nn: pp for nn, pp in zip(self.param_names, self.params(samp_num))}
+        rv = {nn: pp for nn, pp in zip(self.param_names, self.param_samples[samp_num])}
         return rv
-
-    def __call__(self, samp_num, **kwargs):
-        return self.model_for_number(samp_num, **kwargs)
 
     @property
     def shape(self):
@@ -254,14 +259,14 @@ class _Param_Space(abc.ABC):
     def npars(self):
         return self.shape[1]
 
-    def model_for_number(self, samp_num, sam_shape=None):
+    def model_for_sample_number(self, samp_num, sam_shape=None):
         if sam_shape is None:
             sam_shape = self.sam_shape
         params = self.param_dict(samp_num)
         self._log.debug(f"params {samp_num} :: {params}")
         return self.model_for_params(params, sam_shape)
 
-    def normalized_params(self, vals):
+    def _normalized_params(self, vals):
         if np.ndim(vals) == 0:
             vals = self.npars * [vals]
         assert len(vals) == self.npars
@@ -297,14 +302,10 @@ class _Param_Space(abc.ABC):
             "`model_for_normalized_params() is deprecated, use "
             "space.model_for_params(space.normalized_params(vals)) instead."
         )
-        params = self.normalized_params(vals)
+        params = self._normalized_params(vals)
         kwargs.setdefault('sam_shape', self.sam_shape)
         return self.model_for_params(params, **kwargs)
 
-    @classmethod
-    @abc.abstractmethod
-    def model_for_params(cls, params, **kwargs):
-        raise
 
 
 class _Param_Dist(abc.ABC):
