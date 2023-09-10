@@ -1,22 +1,32 @@
-"""
+"""'Classic' parameter spaces used in the 15yr analysis.
 """
 
 import holodeck as holo
 from holodeck.constants import PC, GYR
-from holodeck.librarian.params import _Param_Space, PD_Uniform
+from holodeck.librarian.params import _Param_Space, PD_Uniform, PD_Normal
 
 
-class PS_Classic_Phenom(_Param_Space):
+__all__ = [
+    "PS_Classic_Phenom_Uniform",
+    "PS_Classic_Phenom_Astro_Extended",
+    "PS_Classic_GWOnly_Uniform",
+    "PS_Classic_GWOnly_Astro_Extended",
+]
+
+
+class _PS_Classic_Phenom(_Param_Space):
+    """Base class for classic phenomenological parameter space used in 15yr analysis.
+    """
 
     DEFAULTS = dict(
         hard_time=3.0,          # [Gyr]
-        hard_gamma_inner=-1.0,
-        hard_rchar=100.0,       # [pc]
-        hard_gamma_outer=+2.5,
         hard_sepa_init=1e4,     # [pc]
+        hard_rchar=100.0,       # [pc]
+        hard_gamma_inner=-1.0,
+        hard_gamma_outer=+2.5,
 
         # Parameters are based on `sam-parameters.ipynb` fit to [Tomczak+2014]
-        gsmf_phi0=-2.77,
+        gsmf_phi0_log10=-2.77,
         gsmf_phiz=-0.6,
         gsmf_mchar0_log10=11.24,
         gsmf_mcharz=0.11,
@@ -39,21 +49,10 @@ class PS_Classic_Phenom(_Param_Space):
         mmb_scatter_dex=0.3,
     )
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
-        super(_Param_Space, self).__init__(
-            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
-
-            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
-            gsmf_phi0=PD_Uniform(-3.5, -1.5),
-            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
-            mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
-            mmb_scatter=PD_Uniform(+0.0, +1.2),
-        )
-
     @classmethod
     def _init_sam(cls, sam_shape, params):
         gsmf = holo.sams.GSMF_Schechter(
-            phi0=params['gsmf_phi0'],
+            phi0=params['gsmf_phi0_log10'],
             phiz=params['gsmf_phiz'],
             mchar0_log10=params['gsmf_mchar0_log10'],
             mcharz=params['gsmf_mcharz'],
@@ -98,7 +97,60 @@ class PS_Classic_Phenom(_Param_Space):
         return hard
 
 
-class PS_Classic_Uniform_GWOnly(_Param_Space):
+class PS_Classic_Phenom_Uniform(_PS_Classic_Phenom):
+    """Classic 5D phenomenological, uniform parameter space used in 15yr analysis.
+
+    Previously called the `PS_Uniform_09B` parameter space, or 'phenom-uniform'.
+
+    """
+
+    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+        super(_Param_Space, self).__init__(
+            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            gsmf_phi0_log10=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
+            mmb_scatter_dex=PD_Uniform(+0.0, +1.2),
+        )
+
+
+class PS_Classic_Phenom_Astro_Extended(_PS_Classic_Phenom):
+    """Classic 12D phenomenological, uniform parameter space used in 15yr analysis.
+
+    Previously called the `PS_New_Astro_02B` parameter space, or 'phenom-astro+extended'.
+
+    """
+
+    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+        super(_Param_Space, self).__init__(
+            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            hard_gamma_inner=PD_Uniform(-1.5, +0.5),
+
+            # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
+            gsmf_phi0=PD_Normal(-2.56, 0.4),
+            gsmf_mchar0_log10=PD_Normal(10.9, 0.4),   # [log10(Msol)]
+            gsmf_alpha0=PD_Normal(-1.2, 0.2),
+
+            gpf_zbeta=PD_Normal(+0.8, 0.4),
+            gpf_qgamma=PD_Normal(+0.5, 0.3),
+
+            gmt_norm=PD_Uniform(0.2, 5.0),    # [Gyr]
+            gmt_zbeta=PD_Uniform(-2.0, +0.0),
+
+            mmb_mamp_log10=PD_Normal(+8.6, 0.2),   # [log10(Msol)]
+            mmb_plaw=PD_Normal(+1.2, 0.2),
+            mmb_scatter_dex=PD_Normal(+0.32, 0.15),
+        )
+
+
+
+class _PS_Classic_GWOnly(_Param_Space):
+    """Base class for classic GW-Only parameter space used in 15yr analysis.
+    """
 
     DEFAULTS = dict(
         # Parameters are based on `sam-parameters.ipynb` fit to [Tomczak+2014]
@@ -126,10 +178,9 @@ class PS_Classic_Uniform_GWOnly(_Param_Space):
     )
 
     def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
-        super(_Param_Space, self).__init__(
+        super().__init__(
             log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
 
-            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
             gsmf_phi0=PD_Uniform(-3.5, -1.5),
             gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
             mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
@@ -173,13 +224,52 @@ class PS_Classic_Uniform_GWOnly(_Param_Space):
 
     @classmethod
     def _init_hard(cls, sam, params):
-        hard = holo.hardening.Fixed_Time_2PL_SAM(
-            sam,
-            params['hard_time']*GYR,
-            sepa_init=params['hard_sepa_init']*PC,
-            rchar=params['hard_rchar']*PC,
-            gamma_inner=params['hard_gamma_inner'],
-            gamma_outer=params['hard_gamma_outer'],
-        )
+        hard = holo.hardening.Hard_GW()
         return hard
+
+
+class PS_Classic_GWOnly_Uniform(_PS_Classic_GWOnly):
+    """Classic 4D GW-Only, uniform parameter space used in 15yr analysis.
+
+    Previously called the `PS_Uniform_07_GW` parameter space, or 'gw-only'.
+
+    """
+
+    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+        super(_Param_Space, self).__init__(
+            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+
+            gsmf_phi0=PD_Uniform(-3.5, -1.5),
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
+            mmb_scatter=PD_Uniform(+0.0, +1.2),
+        )
+
+
+class PS_Classic_GWOnly_Astro_Extended(_PS_Classic_GWOnly):
+    """Classic 10D GW-Only, uniform parameter space used in 15yr analysis.
+
+    Previously called the `PS_New_Astro_02_GW` parameter space, or 'gw-only+extended'.
+
+    """
+
+    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+        super(_Param_Space, self).__init__(
+            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+
+            # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
+            gsmf_phi0=PD_Normal(-2.56, 0.4),
+            gsmf_mchar0_log10=PD_Normal(10.9, 0.4),   # [log10(Msol)]
+            gsmf_alpha0=PD_Normal(-1.2, 0.2),
+
+            gpf_zbeta=PD_Normal(+0.8, 0.4),
+            gpf_qgamma=PD_Normal(+0.5, 0.3),
+
+            gmt_norm=PD_Uniform(0.2, 5.0),    # [Gyr]
+            gmt_zbeta=PD_Uniform(-2.0, +0.0),
+
+            mmb_mamp_log10=PD_Normal(+8.6, 0.2),   # [log10(Msol)]
+            mmb_plaw=PD_Normal(+1.2, 0.2),
+            mmb_scatter_dex=PD_Normal(+0.32, 0.15),
+        )
 
