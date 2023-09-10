@@ -1249,7 +1249,7 @@ def _setup_argparse(comm, *args, **kwargs):
     # ---- Create output directories as needed
 
     output.mkdir(parents=True, exist_ok=True)
-    utils.my_print(f"output path: {output}")
+    utils.mpi_print(f"output path: {output}")
     args.output = output
 
     output_sims = output.joinpath("sims")

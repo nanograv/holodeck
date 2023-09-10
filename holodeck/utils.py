@@ -219,7 +219,7 @@ def load_hdf5(fname, keys=None):
     return header, data
 
 
-def my_print(*args, **kwargs):
+def mpi_print(*args, **kwargs):
     return print(*args, flush=True, **kwargs)
 
 
@@ -712,10 +712,12 @@ def midpoints(vals, axis=-1, log=False):
     mm = np.moveaxis(mm, 0, axis)
     return mm
 
+
 def midpoints_multiax(vals, axis, log=False):
     for aa in axis:
         vals = midpoints(vals, aa, log=log)
     return vals
+
 
 def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
     """Find the minimum and maximum values in the given array.
@@ -2327,87 +2329,6 @@ def _array_args(*args):
 @deprecated_fail(scatter_redistribute_densities)
 def scatter_redistribute(cents, dist, dens, axis=0):
     pass
-
-
-@deprecated_warn("use `holodeck.utils.pta_freqs` instead")
-def nyquist_freqs(
-    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
-) -> np.ndarray:
-    """Calculate Nyquist frequencies for the given timing parameters.
-
-    Parameters
-    ----------
-    dur : float,
-        Duration of observations
-    cad : float,
-        Cadence of observations
-    trim : (2,) or None,
-        Specification of minimum and maximum frequencies outside of which to remove values.
-        `None` can be used in place of either boundary, e.g. [0.1, None] would mean removing
-        frequencies below `0.1` (and not trimming values above a certain limit).
-
-    Returns
-    -------
-    freqs : ndarray,
-        Nyquist frequencies
-
-    """
-    fmin = 1.0 / dur
-    fmax = 1.0 / cad * 0.5
-    # df = fmin / sample
-    df = fmin
-    freqs = np.arange(fmin, fmax + df/10.0, df)
-    if trim is not None:
-        if np.shape(trim) != (2,):
-            raise ValueError("`trim` (shape: {}) must be (2,) of float!".format(np.shape(trim)))
-        if trim[0] is not None:
-            freqs = freqs[freqs > trim[0]]
-        if trim[1] is not None:
-            freqs = freqs[freqs < trim[1]]
-
-    return freqs
-
-
-@deprecated_warn("use `holodeck.utils.pta_freqs` instead")
-def nyquist_freqs_edges(
-    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
-) -> np.ndarray:
-    """Calculate Nyquist frequencies for the given timing parameters.
-
-    Parameters
-    ----------
-    dur : float,
-        Duration of observations
-    cad : float,
-        Cadence of observations
-    trim : (2,) or None,
-        Specification of minimum and maximum frequencies outside of which to remove values.
-        `None` can be used in place of either boundary, e.g. [0.1, None] would mean removing
-        frequencies below `0.1` (and not trimming values above a certain limit).
-
-    Returns
-    -------
-    freqs : ndarray,
-        edges of Nyquist frequency bins
-
-    """
-    fmin = 1.0 / dur
-    fmax = 1.0 / cad * 0.5
-    # df = fmin / sample
-    df = fmin    # bin width
-    freqs = np.arange(fmin, fmax + df/10.0, df)   # centers
-    freqs_edges = freqs - df/2.0    # shift to edges
-    freqs_edges = np.concatenate([freqs_edges, [fmax + df/2.0]])
-
-    if trim is not None:
-        if np.shape(trim) != (2,):
-            raise ValueError("`trim` (shape: {}) must be (2,) of float!".format(np.shape(trim)))
-        if trim[0] is not None:
-            freqs_edges = freqs_edges[freqs_edges > trim[0]]
-        if trim[1] is not None:
-            freqs_edges = freqs_edges[freqs_edges < trim[1]]
-
-    return freqs_edges
 
 
 @deprecated_pass(get_subclass_instance)
