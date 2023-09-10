@@ -48,8 +48,8 @@ ext_cyutils = Extension(
 )
 
 ext_sam_cyutils = Extension(
-    "holodeck.sams.cyutils",    # specify the resulting name/location of compiled extension
-    sources=[join('.', 'holodeck', 'sams', 'cyutils.pyx')],   # location of source code
+    "holodeck.sams.sam_cyutils",    # specify the resulting name/location of compiled extension
+    sources=[join('.', 'holodeck', 'sams', 'sam_cyutils.pyx')],   # location of source code
     # define parameters external libraries
     include_dirs=[
         np.get_include()
@@ -100,7 +100,7 @@ setup(
 
     # Additional entries you may want simply uncomment the lines you want and fill in the data
     # url='http://www.my_package.com',  # Website
-    python_requires=">=3.8",          # Python version restrictions
+    python_requires=">=3.9",          # Python version restrictions
 
     ext_modules=cython_modules,
 )
