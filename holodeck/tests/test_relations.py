@@ -52,7 +52,7 @@ def mbh_from_mbulge_KH2013(mbulge):
     return mbh
 
 
-def check_relation(mmbulge_relation, truth_func, redz=None):
+def check_relation(mmbulge_relation, truth_func, redz=(1e-3, 10.0, 101)):
     print(f"check_relation() : testing '{mmbulge_relation.__class__}' against '{truth_func}'")
 
     # mbulge ==> mbh
