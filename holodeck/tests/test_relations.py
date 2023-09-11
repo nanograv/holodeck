@@ -213,11 +213,11 @@ class Test_MMBulge_Standard:
             # numerically calculate derivative   dmstar / dmbh
             mstar = MSTAR * (1.0 + np.array([-dm, +dm]))
             mbulge = relation._bulge_mfrac * mstar
-            mbh = relation.mbh_from_mbulge(mbulge, redz=None, scatter=False)
+            mbh = relation.mbh_from_mbulge(mbulge, redz=(1e-3, 10.0, 101), scatter=False)
             deriv = np.diff(mstar) / np.diff(mbh)
             deriv = deriv[0]
             # use analytic function in MMBulge_Standard relation
-            test = relation.dmstar_dmbh(MSTAR)
+            test = relation.dmstar_dmbh(MSTAR, redz=(1e-3, 10.0, 101))
 
             # make sure they're equal
             err = f"MMBulge_Standard({arg}).dmstar_dmbh value ({test:.8e}) does not match truth ({deriv:.8e})!"
