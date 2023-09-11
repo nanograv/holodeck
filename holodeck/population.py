@@ -633,7 +633,7 @@ class PM_Mass_Reset(_Population_Modifier):
         # Store old version
         pop._mass = pop.mass
         # if `scatter` is `True`, then it is set to the value in `mhost.SCATTER_DEX`
-        pop.mass = self.mhost.mbh_from_host(pop, scatter)
+        pop.mass = self.mhost.mbh_from_host(pop, redz=pop.redz, scatter=scatter)
         return
 
 
