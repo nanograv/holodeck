@@ -266,12 +266,12 @@ class MMBulge_Standard(_MMBulge_Relation):
     def bulge_mass_frac(self, mstar):
         return self._bulge_mfrac
 
-    def mbh_from_host(self, pop, redz, scatter) -> ArrayLike:
+    def mbh_from_host(self, pop, redz=(1e-3, 10.0, 101), scatter) -> ArrayLike:
         host = self.get_host_properties(pop)
         mbulge = host['mbulge']
         return self.mbh_from_mbulge(mbulge, redz=redz, scatter=scatter)
 
-    def mbh_from_mbulge(self, mbulge, redz, scatter):
+    def mbh_from_mbulge(self, mbulge, redz=(1e-3, 10.0, 101), scatter):
         """Convert from stellar-bulge mass to black-hole mass.
 
         Parameters
@@ -292,7 +292,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         mbh = _log10_relation(mbulge, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
 
-    def mbulge_from_mbh(self, mbh, redz, scatter):
+    def mbulge_from_mbh(self, mbh, redz=(1e-3, 10.0, 101), scatter):
         """Convert from black-hole mass to stellar-bulge mass.
 
         Parameters
@@ -312,7 +312,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         mbulge = _log10_relation_reverse(mbh, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbulge
 
-    def mstar_from_mbulge(self, mbulge, redz):
+    def mstar_from_mbulge(self, mbulge, redz=(1e-3, 10.0, 101)):
         """Convert from stellar bulge-mass to black-hole mass.
 
         Parameters
@@ -331,7 +331,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         """
         return mbulge / self._bulge_mfrac
 
-    def mbh_from_mstar(self, mstar, redz, scatter):
+    def mbh_from_mstar(self, mstar, redz=(1e-3, 10.0, 101), scatter):
         """Convert from total stellar mass to black-hole mass.
 
         Parameters
@@ -351,7 +351,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         mbulge = self.mbulge_from_mstar(mstar, redz=redz)
         return self.mbh_from_mbulge(mbulge, redz=redz, scatter=scatter)
 
-    def mstar_from_mbh(self, mbh, redz, scatter):
+    def mstar_from_mbh(self, mbh, redz=(1e-3, 10.0, 101), scatter):
         """Convert from black-hole mass to total stellar mass.
 
         Parameters
@@ -371,7 +371,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         mbulge = self.mbulge_from_mbh(mbh, redz=redz, scatter=scatter)
         return self.mstar_from_mbulge(mbulge, redz=redz)
 
-    def dmstar_dmbh(self, mstar, redz):
+    def dmstar_dmbh(self, mstar, redz=(1e-3, 10.0, 101)):
         """Calculate the partial derivative of stellar mass versus BH mass :math:`d M_star / d M_bh`.
 
         .. math::
@@ -456,13 +456,13 @@ class MMBulge_Redshift(MMBulge_Standard):
         self._zplaw = zplaw
         return
 
-    def mbh_from_host(self, pop, redz, scatter):
+    def mbh_from_host(self, pop, redz=(1e-3, 10.0, 101), scatter):
         host = self.get_host_properties(pop, copy=False)
         mbulge = host['mbulge']    # shape (N, 2)
         redz = host['redz']        # shape (N,)
         return self.mbh_from_mbulge(mbulge, redz, scatter=scatter)
 
-    def mbh_from_mbulge(self, mbulge, redz, scatter):
+    def mbh_from_mbulge(self, mbulge, redz=(1e-3, 10.0, 101), scatter):
         scatter_dex = self._scatter_dex if scatter else None
         # Broadcast `redz` to match shape of `mbulge`, if needed
         # NOTE: this will work for (N,) ==> (N,)    or   (N,) ==> (N,X)
@@ -471,25 +471,25 @@ class MMBulge_Redshift(MMBulge_Standard):
         mbh = _log10_relation(mbulge, zmamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
 
-    def mbulge_from_mbh(self, mbh, redz, scatter):
+    def mbulge_from_mbh(self, mbh, redz=(1e-3, 10.0, 101), scatter):
         scatter_dex = self._scatter_dex if scatter else None
         zmamp = self._mamp * (1.0 + redz)**self._zplaw
         mbulge = _log10_relation_reverse(mbh, zmamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbulge
 
-    def mbh_from_mstar(self, mstar, redz, scatter):
+    def mbh_from_mstar(self, mstar, redz=(1e-3, 10.0, 101), scatter):
         mbulge = self.mbulge_from_mstar(mstar)
         return self.mbh_from_mbulge(mbulge, redz, scatter)
 
-    def mstar_from_mbh(self, mbh, redz, scatter):
+    def mstar_from_mbh(self, mbh, redz=(1e-3, 10.0, 101), scatter):
         mbulge = self.mbulge_from_mbh(mbh, redz, scatter)
         return self.mstar_from_mbulge(mbulge, redz)
 
-    def dmstar_dmbh(self, mstar, redz):
+    def dmstar_dmbh(self, mstar, redz=(1e-3, 10.0, 101)):
         plaw = self._mplaw
         fbulge = self._bulge_mfrac
         mbulge = mstar * fbulge
-        mbh = self.mbh_from_mbulge(mbulge, redz, scatter=False)
+        mbh = self.mbh_from_mbulge(mbulge, redz=redz, scatter=False)
         deriv = mbulge / (fbulge * plaw * mbh)
         return deriv
 
