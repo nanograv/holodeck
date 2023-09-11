@@ -77,7 +77,7 @@ def check_relation(mmbulge_relation, truth_func, redz=(1e-3, 10.0, 101)):
     return
 
 
-def check_scatter_per_dex(mmbulge_relation, scatter_dex, redz=None):
+def check_scatter_per_dex(mmbulge_relation, scatter_dex, redz=(1e-3, 10.0, 101)):
     EXTR = [9.0, 12.0]   # values are log10(X/Msol)
     NUM = 1e4
     TOL = 4.0
@@ -157,7 +157,7 @@ def test_KH2013_basic():
     return
 
 
-def check_mass_reset(mmbulge_relation, truth_func, redz=redz):
+def check_mass_reset(mmbulge_relation, truth_func, redz=(1e-3, 10.0, 101)):
     pop = holo.population.Pop_Illustris()
     mod_MM2013 = holo.population.PM_Mass_Reset(mmbulge_relation, redz=redz, scatter=False)
     pop.modify(mod_MM2013)
