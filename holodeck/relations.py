@@ -278,6 +278,8 @@ class MMBulge_Standard(_MMBulge_Relation):
         ----------
         mbulge : array_like,
             Stellar bulge-mass of host galaxy.  [grams]
+        redz : list, optional
+            Redshift ranges of the binaries, not used in this function.
         scatter : bool,
             Whether or not to include scatter in scaling relationship.
             Uses `self._scatter_dex` attribute.
