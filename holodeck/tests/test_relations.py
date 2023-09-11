@@ -157,9 +157,9 @@ def test_KH2013_basic():
     return
 
 
-def check_mass_reset(mmbulge_relation, truth_func, redz=(1e-3, 10.0, 101)):
+def check_mass_reset(mmbulge_relation, truth_func):
     pop = holo.population.Pop_Illustris()
-    mod_MM2013 = holo.population.PM_Mass_Reset(mmbulge_relation, redz=redz, scatter=False)
+    mod_MM2013 = holo.population.PM_Mass_Reset(mmbulge_relation, redz=(1e-3, 10.0, 101), scatter=False)
     pop.modify(mod_MM2013)
     mass = pop.mass
 
