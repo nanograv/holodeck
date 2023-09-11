@@ -456,7 +456,7 @@ class MMBulge_Redshift(MMBulge_Standard):
         self._zplaw = zplaw
         return
 
-    def mbh_from_host(self, pop, scatter):
+    def mbh_from_host(self, pop, redz, scatter):
         host = self.get_host_properties(pop, copy=False)
         mbulge = host['mbulge']    # shape (N, 2)
         redz = host['redz']        # shape (N,)
