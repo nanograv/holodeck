@@ -350,7 +350,7 @@ class MMBulge_Standard(_MMBulge_Relation):
             Mass of black hole.  [grams]
 
         """
-        mbulge = self.mbulge_from_mstar(mstar, redz=redz)
+        mbulge = self.mbulge_from_mstar(mstar)
         return self.mbh_from_mbulge(mbulge, redz=redz, scatter=scatter)
 
     def mstar_from_mbh(self, mbh, redz=(1e-3, 10.0, 101), scatter=None):
