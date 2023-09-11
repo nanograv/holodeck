@@ -600,7 +600,7 @@ class PM_Mass_Reset(_Population_Modifier):
     """Reset the masses of a target population based on a given M-Host relation.
     """
 
-    def __init__(self, mhost, scatter=True):
+    def __init__(self, mhost, redz=(1e-3, 10.0, 101), scatter=True):
         """Initialize the modifier.
 
         Parameters
@@ -618,6 +618,7 @@ class PM_Mass_Reset(_Population_Modifier):
         # store attributes
         self.mhost = mhost         #: Scaling relationship between host and MBH (`holo.relations._Host_Relation`)
         self._scatter = scatter    #: Bool determining whether resampled masses should include statistical scatter
+        self._redz = redz
         return
 
     def modify(self, pop):
