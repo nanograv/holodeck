@@ -2420,6 +2420,7 @@ def detect_pspace_model_clbrt_pta(
     snr_ss = np.ones((nfreqs, nreals, nskies, nloudest)) * np.nan
     snr_bg = np.ones((nreals)) * np.nan
     gamma_ssi = np.ones((nfreqs, nreals, nskies, nloudest)) * np.nan
+    sigmas = np.ones((nreals)) * np.nan
 
 
     # for each realization, 
@@ -2444,6 +2445,7 @@ def detect_pspace_model_clbrt_pta(
                                     red_amp=red_amp, red_gamma=red_gamma, red2white=red2white, ss_noise=ss_noise)
         _sigmin /= 2
         _sigmax *= 2 + 2e-20 # >1e-20 to make sure it doesnt immediately fail the 0 check 
+        sigmas[rr] = _sigstart
 
         if psrs is None:
             failed_psrs += 1
@@ -2487,7 +2489,8 @@ def detect_pspace_model_clbrt_pta(
     _dsdat = {
         'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi, 
         'dp_bg':dp_bg, 'snr_bg':snr_bg,
-        'df_ss':df_ss, 'df_bg':df_bg, 'ev_ss':ev_ss,
+        'df_ss':df_ss, 'df_bg':df_bg, 'ev_ss':ev_ss, 
+        'sigmas':sigmas,
         }
     if save_gamma_ssi:
         _dsdat.update(gamma_ssi=gamma_ssi)
