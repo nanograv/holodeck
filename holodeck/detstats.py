@@ -2344,6 +2344,8 @@ def detect_pspace_model_psrs(fobs_cents, hc_ss, hc_bg, psrs, nskies, hc_bg_noise
 
     if hc_bg_noise is None:
         hc_bg_noise=hc_bg
+    elif debug:
+        print("Using different hc_bg_noise for SS detstats.")
 
 
     # Build ss skies
@@ -2408,6 +2410,8 @@ def detect_pspace_model_clbrt_pta(
 
     if hc_bg_noise is None:
         hc_bg_noise=hc_bg
+    elif debug:
+        print("Using different hc_bg_noise for SS detstats.")
         
     # form arrays for individual realization detstats
     # set all to nan, only to be replaced if successful pta is found

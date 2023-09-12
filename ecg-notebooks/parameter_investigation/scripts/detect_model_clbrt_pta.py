@@ -408,6 +408,7 @@ def realization_calibrated_method(args, data):
             print(f"resampling {args.bg_nloudest=} loudest!")
             hc_bg_noise=hc_bg
             _, hc_bg = resample_loudest(hc_ss, hc_bg, args.bg_nloudest) # only change nloudest subtracted from bg, not single sources loudest
+            # print(f"{np.shares_memory(hc_bg_noise, hc_bg)=}")
 
         if args.gsc_flag:
             _dsdat = detstats.detect_pspace_model_clbrt_pta_gsc(
