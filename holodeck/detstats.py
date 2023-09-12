@@ -2333,7 +2333,7 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
     return dsdata
 
 
-def detect_pspace_model_psrs(fobs_cents, hc_ss, hc_bg, psrs, nskies, 
+def detect_pspace_model_psrs(fobs_cents, hc_ss, hc_bg, psrs, nskies, hc_bg_noise=None,
                         thresh=DEF_THRESH, debug=False, nexcl_noise=0):
     
     nfreqs, nreals, nloudest = [*hc_ss.shape]
@@ -2341,6 +2341,9 @@ def detect_pspace_model_psrs(fobs_cents, hc_ss, hc_bg, psrs, nskies,
     cad = 1.0 / (2 * fobs_cents[-1])
     # fobs_cents, fobs_edges = holo.utils.pta_freqs(dur)
     # dfobs = np.diff(fobs_edges)
+
+    if hc_bg_noise is None:
+        hc_bg_noise=hc_bg
 
 
     # Build ss skies
@@ -2353,7 +2356,7 @@ def detect_pspace_model_psrs(fobs_cents, hc_ss, hc_bg, psrs, nskies,
     dp_bg, snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg, ret_snr=True)
     # print(f"{np.mean(dp_bg)=}")
     vals_ss = detect_ss_pta(
-        psrs, fobs_cents, hc_ss, hc_bg, 
+        psrs, fobs_cents, hc_ss, hc_bg_noise, 
         gamma_cython=True, snr_cython=True, ret_snr=True, 
         theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss, iota_ss=iota_ss, psi_ss=psi_ss,
         nexcl_noise=nexcl_noise
@@ -2375,6 +2378,7 @@ def detect_pspace_model_psrs(fobs_cents, hc_ss, hc_bg, psrs, nskies,
 
 def detect_pspace_model_clbrt_pta(
         fobs_cents, hc_ss, hc_bg, npsrs, nskies, 
+        hc_bg_noise=None,
         sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
         thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
         red_amp=None, red_gamma=None, red2white=None, ss_noise=False, dsc_flag=False, nexcl_noise=0): 
@@ -2388,6 +2392,8 @@ def detect_pspace_model_clbrt_pta(
     hc_bg : (F,R) NDarray
     npsrs : int
     nskies : int
+    hc_bg_noise " (F,R) NDarray or None
+        the background to use as single source noise, when normal hc_bg has extra SS added to it.
     red2white : scalar or None
         Fixed ratio between red and white noise amplitude, if not None. 
         Otherwise, red noise stays fixed
@@ -2399,6 +2405,9 @@ def detect_pspace_model_clbrt_pta(
     cad = 1.0/(2*fobs_cents[-1])
 
     nfreqs, nreals, nloudest = [*hc_ss.shape]
+
+    if hc_bg_noise is None:
+        hc_bg_noise=hc_bg
         
     # form arrays for individual realization detstats
     # set all to nan, only to be replaced if successful pta is found
@@ -2462,7 +2471,7 @@ def detect_pspace_model_clbrt_pta(
 
         # calculate realization SS detstats
         _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
-            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], custom_noise=noise_ss,
+            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg_noise[:,rr:rr+1], custom_noise=noise_ss,
             nskies=nskies, ret_snr=True, red_amp=red_amp, red_gamma=red_gamma, nexcl_noise=nexcl_noise)
 
         dp_ss[rr] = _dp_ss.reshape(nskies) # from R=1,S to S
@@ -2486,7 +2495,7 @@ def detect_pspace_model_clbrt_pta(
 
 
 def detect_pspace_model_clbrt_pta_gsc(
-        fobs_cents, hc_ss, hc_bg, npsrs, nskies, 
+        fobs_cents, hc_ss, hc_bg, npsrs, nskies, hc_bg_noise=None,
         sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
         thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
         red_amp=None, red_gamma=None, red2white=None, ss_noise=False,
@@ -2502,6 +2511,8 @@ def detect_pspace_model_clbrt_pta_gsc(
     hc_bg : (F,R) NDarray
     npsrs : int
     nskies : int
+    hc_bg_noise " (F,R) NDarray or None
+        the background to use as single source noise, when normal hc_bg has extra SS added to it.
     red2white : scalar or None
         Fixed ratio between red and white noise amplitude, if not None. 
         Otherwise, red noise stays fixed
@@ -2511,6 +2522,8 @@ def detect_pspace_model_clbrt_pta_gsc(
     """
     dur = 1.0/fobs_cents[0]
     cad = 1.0/(2*fobs_cents[-1])
+    if hc_bg_noise is None:
+        hc_bg_noise=hc_bg
 
     nfreqs, nreals, nloudest = [*hc_ss.shape]
         
@@ -2570,7 +2583,7 @@ def detect_pspace_model_clbrt_pta_gsc(
 
         # calculate realizatoin SS detstats
         _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
-            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg[:,rr:rr+1], custom_noise=noise_ss,
+            psrs, fobs_cents, hc_ss[:,rr:rr+1], hc_bg_noise[:,rr:rr+1], custom_noise=noise_ss,
             nskies=nskies, ret_snr=True, red_amp=red_amp, red_gamma=red_gamma, nexcl_noise=nexcl_noise)
 
         dp_ss[rr], snr_ss[:,rr], gamma_ssi[:,rr] = _dp_ss.squeeze(), _snr_ss.squeeze(), _gamma_ssi.squeeze()

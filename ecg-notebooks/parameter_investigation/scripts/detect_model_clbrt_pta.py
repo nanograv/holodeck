@@ -337,12 +337,14 @@ def fixed_pta_method(args, data):
     # get hc_ss and hc_bg from appropriate calibration variation
     hc_bg = data[args.calvar]['hc_bg']
     hc_ss = data[args.calvar]['hc_ss']
+    hc_bg_noise = None
     print(f"{hc_ss.shape=}")
     if args.nloudest != hc_ss.shape[-1]:
         print(f"Resampling {args.nloudest=} loudest.")
         hc_ss, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest)
     elif args.bg_nloudest != hc_ss.shape[-1]:
         print(f"Resampling {args.bg_nloudest} BG nloudest.")
+        hc_bg_noise = hc_bg
         _, hc_bg = resample_loudest(hc_ss, hc_bg, args.bg_nloudest) # only change nloudest subtracted from bg, not single sources loudest
 
     # get median across realizations of calvar, for psr calibration
@@ -375,7 +377,7 @@ def fixed_pta_method(args, data):
             _, hc_bg = resample_loudest(hc_ss, hc_bg, args.bg_nloudest) # only change nloudest subtracted from bg, not single sources loudest
 
         _dsdat = detstats.detect_pspace_model_psrs(
-                fobs_cents, hc_ss, hc_bg, psrs, args.nskies, 
+                fobs_cents, hc_ss, hc_bg, psrs, args.nskies, hc_bg_noise=hc_bg_noise,
                 thresh=args.thresh, debug=args.debug, nexcl_noise=args.nexcl )
         dsdat.append(_dsdat)
         # not updated to allow for dsc alone
@@ -397,24 +399,26 @@ def realization_calibrated_method(args, data):
         # get characteristic strains for the current variation
         hc_bg = _data['hc_bg']
         hc_ss = _data['hc_ss']
+        hc_bg_noise=None
 
         # shift loudest as needed
         if args.nloudest != hc_ss.shape[-1]:
             hc_ss, hc_bg = resample_loudest(hc_ss, hc_bg, args.nloudest)
         elif args.bg_nloudest != hc_ss.shape[-1]:
             print(f"resampling {args.bg_nloudest=} loudest!")
+            hc_bg_noise=hc_bg
             _, hc_bg = resample_loudest(hc_ss, hc_bg, args.bg_nloudest) # only change nloudest subtracted from bg, not single sources loudest
 
         if args.gsc_flag:
             _dsdat = detstats.detect_pspace_model_clbrt_pta_gsc(
-                fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, 
+                fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, hc_bg_noise=hc_bg_noise,
                 sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
                 thresh=args.thresh, debug=args.debug, 
                 ss_noise=args.ss_noise, divide_flag=args.divide_flag, dsc_flag=args.dsc_flag, nexcl_noise=args.nexcl
             )
         else:
             _dsdat = detstats.detect_pspace_model_clbrt_pta(
-                fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies,
+                fobs_cents, hc_ss, hc_bg, args.npsrs, args.nskies, hc_bg_noise=hc_bg_noise,
                 sigstart=args.sigstart, sigmin=args.sigmin, sigmax=args.sigmax, tol=args.tol, maxbads=args.maxbads,
                 thresh=args.thresh, debug=args.debug, ss_noise=args.ss_noise, dsc_flag=args.dsc_flag, nexcl_noise=args.nexcl,
                 red_amp=args.red_amp, red_gamma=args.red_gamma, red2white=args.red2white)
