@@ -3337,6 +3337,50 @@ def get_ratio_arrays(
     file.close()
     return xx_params, yy_ratio
 
+def build_noise_arrays(
+        target, nreals=500, nskies=100,
+        gw_only=False, red2white=None, red_gamma=None, 
+        nloudest=10, bgl=1, 
+        gsc_flag=False, dsc_flag=False, divide_flag=False, nexcl=0,
+        figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/noise',):
+
+    data, params, dsdat = get_data(target,
+        gw_only=gw_only, red2white=red2white, red_gamma=red_gamma,
+        nloudest=nloudest, bgl=bgl, nexcl=nexcl,
+        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
+    fobs_cents = data[0]['fobs_cents']
+    cad = 1.0/(2.0*fobs_cents[-1])
+
+    sigmas = []
+    hc_ss = []
+    hc_bg = []
+    count_cws = [] # number of single sources with DP>0.5 in any realization
+    for ii, dat in enumerate(data):
+        sigmas.append(dsdat[ii]['sigmas']) # R,
+        hc_ss.append(dat['hc_ss'])
+        hc_bg.append(dat['hc_bg']) 
+        dp_ssi = dsdat[ii]['gamma_ssi'] # F,R,S,L
+        count = np.sum(dp_ssi>0.5, axis=(0,3))
+        count_cws.append(count)
+
+    sigmas = np.array(sigmas) # V, R
+    hc_ss = np.array(hc_ss) # (V,F,R,L)
+    hc_bg = np.array(hc_bg) # (V,F,R)
+    count_cws = np.array(count_cws) # V,R
+
+
+    white_noise = _white_noise(cad, sigmas) # V,R, array
+    if red2white is not None:
+        red_amp = _red_amp_from_white_noise(cad, sigmas, red2white) # V,R, array
+        red_noise = _red_noise(red_amp[np.newaxis,:,:], # (V,1,R,)
+                               red_gamma, 
+                               fobs_cents[np.newaxis,:,np.newaxis] # (1,F,1)
+                               )
+        return white_noise, red_noise, count_cws
+
+    return white_noise, count_cws
+
+
 def build_anis_var_arrays(
         target, nvars=21, nreals=500, shape=None,
         gw_only=False, 
