@@ -3251,7 +3251,7 @@ def get_data(
         return data, params
     print(f"got data from {data_file}")
     file = np.load(dets_file, allow_pickle=True)
-    print(f"got detsats from {dets_file}")
+    print(f"got detstats from {dets_file}")
     # print(file.files)
     dsdat = file['dsdat']
     file.close()
@@ -3318,7 +3318,7 @@ def build_ratio_arrays(
         nloudest=nloudest, bgl=bgl, cv=None, 
         gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag, nexcl=nexcl)
     filename += '.npz'  
-
+    print(f'saving to {filename}')
     np.savez(filename, xx_params = xx, yy_ratio = yy,)
 
 def get_ratio_arrays(
@@ -3345,7 +3345,7 @@ def get_ratio_arrays(
 def build_noise_arrays(
         target, nreals=500, nskies=100,
         gw_only=False, red2white=None, red_gamma=None, 
-        nloudest=10, bgl=1, 
+        nloudest=10, bgl=1, save_temp=True,
         gsc_flag=False, dsc_flag=False, divide_flag=False, nexcl=0,
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/noise',):
 
