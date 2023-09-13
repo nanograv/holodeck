@@ -184,7 +184,7 @@ def _white_noise(delta_t, sigma_i):
 
 ######################## Power Spectral Density ########################
 
-def _power_spectral_density(hc_bg, freqs):
+def _power_spectral_density(hc_bg, freqs, reshape_freqs=True):
     """ Calculate the spectral density S_h(f_k) ~ S_h0(f_k) at the kth frequency
 
     Parameters
@@ -203,8 +203,10 @@ def _power_spectral_density(hc_bg, freqs):
 
     Follows Eq. (25) of Rosado et al. 2015
     """
+    if reshape_freqs:
+        freqs = freqs[:,np.newaxis]
 
-    S_h = hc_bg**2 / (12 * np.pi**2 * freqs[:,np.newaxis]**3)
+    S_h = hc_bg**2 / (12 * np.pi**2 * freqs**3)
     return S_h
 
 
@@ -2412,6 +2414,9 @@ def detect_pspace_model_clbrt_pta(
         hc_bg_noise=hc_bg
     elif debug:
         print("Using different hc_bg_noise for SS detstats.")
+        if np.any(hc_bg_noise>hc_bg):
+            err = f"hc_bg_noise excluding SS is somehow larger than hc_bg with SS added in!!"
+            raise ValueError(err)
         
     # form arrays for individual realization detstats
     # set all to nan, only to be replaced if successful pta is found
@@ -3244,9 +3249,9 @@ def get_data(
     file.close()
     if dets is False:
         return data, params
-    print(target, "got data")
+    print(f"got data from {data_file}")
     file = np.load(dets_file, allow_pickle=True)
-    print(target, "loaded dets")
+    print(f"got detsats from {dets_file}")
     # print(file.files)
     dsdat = file['dsdat']
     file.close()
@@ -3354,20 +3359,24 @@ def build_noise_arrays(
     sigmas = []
     hc_ss = []
     hc_bg = []
-    count_cws = [] # number of single sources with DP>0.5 in any realization
+    count_cws_50 = [] # number of single sources with DP>0.5 in any realization
+    count_cws_01 = [] # number of single sources with DP>0.5 in any realization
     for ii, dat in enumerate(data):
         sigmas.append(dsdat[ii]['sigmas']) # R,
         hc_ss.append(dat['hc_ss'])
         hc_bg.append(dat['hc_bg']) 
         dp_ssi = dsdat[ii]['gamma_ssi'] # F,R,S,L
-        count = np.sum(dp_ssi>0.5, axis=(0,3))
-        count_cws.append(count)
+        count_cws_01.append(np.sum(dp_ssi>0.01, axis=(0,3)))
+        count_cws_50.append(np.sum(dp_ssi>0.50, axis=(0,3)))
 
     sigmas = np.array(sigmas) # V, R
     hc_ss = np.array(hc_ss) # (V,F,R,L)
     hc_bg = np.array(hc_bg) # (V,F,R)
-    count_cws = np.array(count_cws) # V,R
+    count_cws_50 = np.array(count_cws_50) # V,S,R
+    count_cws_01 = np.array(count_cws_01) # V,S,R
 
+    temp_name = '/Users/emigardiner/GWs/holodeck/output/temp'
+    temp_name += f'/noise_arrays_{target}.npz'
 
     white_noise = _white_noise(cad, sigmas) # V,R, array
     if red2white is not None:
@@ -3376,9 +3385,31 @@ def build_noise_arrays(
                                red_gamma, 
                                fobs_cents[np.newaxis,:,np.newaxis] # (1,F,1)
                                )
-        return white_noise, red_noise, count_cws
+        np.savez(temp_name, white_noise=white_noise, red_noise=red_noise,
+                 count_cws_50=count_cws_50, count_cws_01=count_cws_01,
+                hc_ss=hc_ss, hc_bg=hc_bg)
+        return white_noise, red_noise, count_cws_50, count_cws_01, hc_ss, hc_bg
+    np.savez(temp_name, white_noise=white_noise,
+                count_cws_50=count_cws_50, count_cws_01=count_cws_01,
+                hc_ss=hc_ss, hc_bg=hc_bg)
+    return white_noise, count_cws_50, count_cws_01, hc_ss, hc_bg
 
-    return white_noise, count_cws
+def get_noise_arrays_temp(target, red=False):
+    temp_name = '/Users/emigardiner/GWs/holodeck/output/temp'
+    temp_name += f'/noise_arrays_{target}.npz'
+    file = np.load(temp_name)
+    white_noise = file['white_noise']
+    count_cws_50 = file['count_cws_50']
+    count_cws_01 = file['count_cws_01']
+    hc_ss = file['hc_ss']
+    hc_bg = file['hc_bg']
+    if red:
+        red_noise = file['red_noise']
+        file.close()
+        return white_noise, red_noise, count_cws_50, count_cws_01, hc_ss, hc_bg
+    file.close()
+    return white_noise, count_cws_50, count_cws_01, hc_ss, hc_bg
+
 
 
 def build_anis_var_arrays(
