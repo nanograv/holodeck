@@ -296,19 +296,27 @@ def vary_parameter(
 
 
 def construct_data(args):
+
     params_list = np.linspace(0,1,args.nvars)
 
-    # set a hardening time other than the middle ones as args.var_hard_time
-    if args.var_hard_time is not None:
-        pars = 0.5 * np.ones(6) 
-        pars[0] = params_list[args.var_hard_time]
-    else:
+    if args.gw_only is True:
+        print('using GW only')
+        pspace = holo.param_spaces.PS_Uniform_07_GW(holo.log, nsamples=1, sam_shape=args.shape, seed=None)
         pars = None
+    else:
+        pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=args.shape, seed=None)
+
+        # set a hardening time other than the middle ones as args.var_hard_time
+        if args.var_hard_time is not None:
+            pars = 0.5 * np.ones(6) 
+            pars[0] = params_list[args.var_hard_time]
+        else:
+            pars = None
 
     data, params, = vary_parameter(
         target_param=args.target, params_list=params_list,
         nfreqs=args.nfreqs, nreals=args.nreals, nloudest=args.nloudest, pars=pars,
-        pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=args.shape, seed=None),)
+        pspace = pspace,)
     return data, params
 
 

@@ -137,7 +137,8 @@ def main():
         detstats.build_anis_freq_arrays(
             target=args.target, nvars=args.nvars, nreals=args.nreals, shape=args.shape,
             gw_only=args.gw_only, nloudest=args.nloudest,
-            var_hard_time=args.var_hard_time, 
+            var_hard_time=args.var_hard_time,
+             
             )
 
     end_time = datetime.now()
