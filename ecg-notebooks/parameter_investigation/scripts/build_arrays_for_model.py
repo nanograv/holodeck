@@ -42,8 +42,6 @@ def _setup_argparse():
     
    
 
-     
-
     # retrieve data, params, detstats information
     parser.add_argument('-f', '--nfreqs', action='store', dest='nfreqs', type=int, default=DEF_NFREQS,
                         help='number of frequency bins')
@@ -58,6 +56,10 @@ def _setup_argparse():
     parser.add_argument('-v', '--nvars', action='store', dest='nvars', type=int, default=DEF_NVARS,
                         help='number of variations on target param')
  
+
+    # parameters
+    parser.add_argument('--var_hard_time', action='store', dest='var_hard_time', type=int, default=None,
+                        help='hardening time parameter variation')
     
     # pta information
     parser.add_argument('-s', '--nskies', action='store', dest='nskies', type=int, default=DEF_NSKIES,
@@ -102,7 +104,7 @@ def main():
     args = _setup_argparse()
     print(f"NREALS = {args.nreals}, NSKIES = {args.nskies}, target = {args.target}, NVARS={args.nvars}")
     print(f"CV={args.calvar}, NLOUDEST={args.nloudest}, BGL={args.bgl}, {args.gsc_flag=}, {args.dsc_flag=}")
-    print(f"RED2WHITE={args.red2white}, RED_GAMMA={args.red_gamma}")
+    print(f"RED2WHITE={args.red2white}, RED_GAMMA={args.red_gamma}, vtau={args.var_hard_time}")
 
     if args.favg:
         print("---building favg arrays---")
@@ -110,7 +112,8 @@ def main():
             target=args.target, nreals=args.nreals, nskies=args.nskies,
             gw_only=args.gw_only, red2white=args.red2white, red_gamma=args.red_gamma,
             nloudest=args.nloudest, bgl=args.bgl, cv=args.calvar, 
-            gsc_flag=args.gsc_flag, dsc_flag=args.dsc_flag, divide_flag=args.divide_flag, nexcl=args.nexcl
+            gsc_flag=args.gsc_flag, dsc_flag=args.dsc_flag, divide_flag=args.divide_flag, nexcl=args.nexcl,
+            var_hard_time=args.var_hard_time,
             )
     if args.ratio:
         print("---building ratio arrays---")
@@ -118,20 +121,23 @@ def main():
             target=args.target, nreals=args.nreals, nskies=args.nskies,
             gw_only=args.gw_only, red2white=args.red2white, red_gamma=args.red_gamma,
             nloudest=args.nloudest, bgl=args.bgl, 
-            gsc_flag=args.gsc_flag, dsc_flag=args.dsc_flag, divide_flag=args.divide_flag, nexcl=args.nexcl
+            gsc_flag=args.gsc_flag, dsc_flag=args.dsc_flag, divide_flag=args.divide_flag, nexcl=args.nexcl,
+            var_hard_time=args.var_hard_time,
             )
     if args.anis_var:
         print("---building anisotropy var arrays---")
         detstats.build_anis_var_arrays(
             target=args.target, nvars=args.nvars, nreals=args.nreals, shape=args.shape,
             gw_only=args.gw_only,
-            nloudest=args.nloudest, 
+            nloudest=args.nloudest,
+            var_hard_time=args.var_hard_time, 
             )
     if args.anis_freq:
         print("---building anisotropy vs frequency arrays---")
         detstats.build_anis_freq_arrays(
             target=args.target, nvars=args.nvars, nreals=args.nreals, shape=args.shape,
-            gw_only=args.gw_only, nloudest=args.nloudest, 
+            gw_only=args.gw_only, nloudest=args.nloudest,
+            var_hard_time=args.var_hard_time, 
             )
 
     end_time = datetime.now()

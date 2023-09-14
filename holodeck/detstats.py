@@ -3195,15 +3195,21 @@ def get_data(
         nloudest = 10, bgl = 10, cv=None, ssn_flag=False,
         red_gamma = None, red2white=None, 
         gsc_flag=False,  dsc_flag=False, divide_flag=False, nexcl=0,
-        gw_only=False,
+        gw_only=False, 
+        var_hard_time=None,
 ):
     if gw_only:
         path = '/Users/emigardiner/GWs/holodeck/output/anatomy_7GW'
     else:
         path = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz'
 
-    data_file = path+f'/{target}_v{nvars}_r{nreals}_shape{str(shape)}/data_params' 
-    dets_file = path+f'/{target}_v{nvars}_r{nreals}_shape{str(shape)}/detstats_s{nskies}' 
+    output_path = path+f'/{target}_v{nvars}_r{nreals}_shape{str(shape)}'
+
+    if var_hard_time is not None:
+        f"_vtau{var_hard_time}"
+
+    data_file = output_path +f'/data_params' 
+    dets_file = output_path + f'/detstats_s{nskies}' 
 
     if nloudest != 10:                                           # if using nloudest that isn't the default 10
         dets_file += f"_l{nloudest}" 
@@ -3262,6 +3268,8 @@ def append_filename(filename='',
         gw_only=False, red_gamma = None, red2white=None, 
         nloudest = 10, bgl = 10, cv=None, 
         gsc_flag=False,  dsc_flag=False, divide_flag=False, nexcl=0,
+        var_hard_time=None,
+        
         ):
     
     if cv is not None:
@@ -3271,6 +3279,9 @@ def append_filename(filename='',
         filename += f"_l{nloudest}"        
     if bgl != nloudest:
         filename += f"_bgl{bgl}"
+    
+    if var_hard_time is not None:
+        filename += f"_vtau{var_hard_time}"
 
     if red2white is not None and red_gamma is not None:
         filename += f"_r2w{red2white:.1e}_rg{red_gamma:.1f}"
@@ -3289,6 +3300,7 @@ def append_filename(filename='',
 
     if gw_only:
         filename = filename+'_gw'
+    
 
     return filename
 
@@ -3297,12 +3309,14 @@ def build_ratio_arrays(
         gw_only=False, red2white=None, red_gamma=None, 
         nloudest=10, bgl=1, 
         gsc_flag=False, dsc_flag=False, divide_flag=False, nexcl=0,
+        var_hard_time=None, 
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',):
 
     data, params, dsdat = get_data(target,
         gw_only=gw_only, red2white=red2white, red_gamma=red_gamma,
         nloudest=nloudest, bgl=bgl, nexcl=nexcl,
-        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
+        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag,
+        var_hard_time=var_hard_time)
     xx=[]
     yy=[]
     for pp, par in enumerate(params):
@@ -3316,7 +3330,8 @@ def build_ratio_arrays(
         filename, 
         gw_only=gw_only, red_gamma=red_gamma, red2white=red2white, 
         nloudest=nloudest, bgl=bgl, cv=None, 
-        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag, nexcl=nexcl)
+        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag, nexcl=nexcl,
+        var_hard_time=var_hard_time)
     filename += '.npz'  
     print(f'saving to {filename}')
     np.savez(filename, xx_params = xx, yy_ratio = yy,)
@@ -3326,6 +3341,7 @@ def get_ratio_arrays(
         gw_only=False, red2white=None, red_gamma=None, 
         nloudest=10, bgl=1, 
         gsc_flag=False, dsc_flag=False, divide_flag=False, nexcl=0,
+        var_hard_time=None,
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',):
 
     filename = figpath+f'/ratio_arrays_{target}'
@@ -3333,7 +3349,8 @@ def get_ratio_arrays(
         filename, 
         gw_only=gw_only, red_gamma=red_gamma, red2white=red2white, 
         nloudest=nloudest, bgl=bgl, cv=None, 
-        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag, nexcl=nexcl)
+        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag, nexcl=nexcl,
+        var_hard_time=var_hard_time)
     filename += '.npz'  
 
     file = np.load(filename)
@@ -3347,12 +3364,14 @@ def build_noise_arrays(
         gw_only=False, red2white=None, red_gamma=None, 
         nloudest=10, bgl=1, save_temp=True,
         gsc_flag=False, dsc_flag=False, divide_flag=False, nexcl=0,
+        var_hard_time=None,
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/noise',):
 
     data, params, dsdat = get_data(target,
         gw_only=gw_only, red2white=red2white, red_gamma=red_gamma,
         nloudest=nloudest, bgl=bgl, nexcl=nexcl,
-        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag)
+        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag,
+        var_hard_time=var_hard_time)
     fobs_cents = data[0]['fobs_cents']
     cad = 1.0/(2.0*fobs_cents[-1])
 
@@ -3417,6 +3436,7 @@ def build_anis_var_arrays(
         gw_only=False, 
         nloudest=10,
         lmax=8, nside=8, 
+        var_hard_time=None,
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis_var',
       
 ):
@@ -3425,7 +3445,8 @@ def build_anis_var_arrays(
     """
     data, params, = get_data(target, nvars=nvars, nreals=nreals, shape=shape,
         gw_only=gw_only, 
-        nloudest=nloudest, dets=False)
+        nloudest=nloudest, dets=False,
+        var_hard_time=var_hard_time)
     xx=[]
     yy=[]
     cl=[]
@@ -3442,7 +3463,8 @@ def build_anis_var_arrays(
     filename = append_filename(
         filename, 
         gw_only=gw_only, 
-        nloudest=nloudest, bgl=nloudest)
+        nloudest=nloudest, bgl=nloudest,
+        var_hard_time=var_hard_time)
     filename += '.npz'  
 
     np.savez(filename, xx_params=xx, yy_c1c0=yy, cl=cl)
@@ -3453,6 +3475,7 @@ def get_anis_var_arrays(
         gw_only=False, 
         nloudest=10, 
         lmax=8, nside=8, 
+        var_hard_time=None,
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis_var',
       
 ):
@@ -3465,7 +3488,8 @@ def get_anis_var_arrays(
     filename = append_filename(
         filename, 
         gw_only=gw_only, 
-        nloudest=nloudest, bgl=nloudest, )
+        nloudest=nloudest, bgl=nloudest,
+        var_hard_time=var_hard_time)
     filename += '.npz'  
 
     file = np.load(filename)
@@ -3481,6 +3505,7 @@ def build_anis_freq_arrays(
         gw_only=False, nloudest=10, 
         parvars = [0,10,20],
         lmax=8, nside=8,
+        var_hard_time=None,
 
         ):
 
@@ -3491,6 +3516,7 @@ def build_anis_freq_arrays(
     data, params, = get_data(target, dets=False,
         nvars=nvars, nreals=nreals, shape=shape,  # keep as defaults
         gw_only=gw_only, nloudest=nloudest,
+        var_hard_time=var_hard_time
         )
 
 
@@ -3506,7 +3532,8 @@ def build_anis_freq_arrays(
 
     filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis_freq/anis_freq_{target}'
     filename = append_filename(filename, nloudest=nloudest, bgl=nloudest,
-                                gw_only=gw_only)
+                                gw_only=gw_only,
+        var_hard_time=var_hard_time)
     filename += f"_pv{len(parvars)}"
     if nside != 8:
         filename += f"_ns{nside}"
@@ -3523,6 +3550,7 @@ def get_anis_freq_arrays(
         nloudest=10, 
         parvars = [0,10,20],
         nside=8, lmax=8 
+        var_hard_time=None,
 
         ):
 
@@ -3532,7 +3560,8 @@ def get_anis_freq_arrays(
 
     filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/anis_freq/anis_freq_{target}'
     filename = append_filename(filename, nloudest=nloudest, bgl=nloudest,
-                               gw_only=gw_only, )
+                               gw_only=gw_only,
+        var_hard_time=var_hard_time)
     filename += f"_pv{len(parvars)}"
     if nside != 8:
         filename += f"_ns{nside}"
@@ -3552,6 +3581,7 @@ def build_hcpar_arrays(
         gw_only=False,
         nloudest=1, 
         parvars = [0,1,2,3,4], ss_zero=True,
+        var_hard_time=None,
         ):
     """ Save and return hcpar arrays for plotting
     
@@ -3576,7 +3606,8 @@ def build_hcpar_arrays(
     data, params, = get_data(target, dets=False,
         nvars=nvars, nreals=nreals, shape=shape,  # keep as defaults
         gw_only=gw_only, 
-        nloudest=nloudest, )
+        nloudest=nloudest, ,
+        var_hard_time=var_hard_time)
     
     fobs_cents = data[0]['fobs_cents']
     xx = fobs_cents * YR
@@ -3608,7 +3639,8 @@ def build_hcpar_arrays(
         yy_bg.append(_yy_bg)
 
     filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/hcpar/hcpar_{target}'
-    filename = append_filename(filename, nloudest=nloudest, gw_only=gw_only, bgl=nloudest)
+    filename = append_filename(filename, nloudest=nloudest, gw_only=gw_only, bgl=nloudest,
+        var_hard_time=var_hard_time)
     filename += f"_pv{len(parvars)}"
     filename += f".npz"
     
@@ -3620,7 +3652,8 @@ def get_hcpar_arrays(
         gw_only=False,
         nloudest=1, 
         parvars = [0,1,2,3,4],
-        nvars=21
+        nvars=21,
+        var_hard_time=None,
         ):
     """ Save and return hcpar arrays for plotting
     
@@ -3641,7 +3674,8 @@ def get_hcpar_arrays(
         parvars = np.arange(nvars)
 
     filename = f'/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/hcpar/hcpar_{target}'
-    filename = append_filename(filename, nloudest=nloudest, gw_only=gw_only, bgl=nloudest,)
+    filename = append_filename(filename, nloudest=nloudest, gw_only=gw_only, bgl=nloudest,
+        var_hard_time=var_hard_time)
     filename += f"_pv{len(parvars)}"
     filename += f".npz"
 
@@ -3658,12 +3692,14 @@ def build_favg_arrays(
         gw_only=False, red2white=None, red_gamma=None, 
         nloudest=10, bgl=10, cv=None,
         gsc_flag=False, dsc_flag=False, divide_flag=False, nexcl=0,
+        var_hard_time=None,
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/favg',):
 
     data, params, dsdat = get_data(target,
         gw_only=gw_only, red2white=red2white, red_gamma=red_gamma,
         nloudest=nloudest, bgl=bgl, nreals=nreals, nskies=nskies,
-        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag, nexcl=nexcl)
+        gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag, nexcl=nexcl,
+        var_hard_time=var_hard_time)
 
     xx = [] # param
     favg = [] # frequency means in log space
@@ -3686,7 +3722,8 @@ def build_favg_arrays(
     filename = append_filename(filename,
                 gw_only=gw_only, red_gamma=red_gamma, red2white=red2white,
                 nloudest=nloudest, bgl=bgl, cv=cv, 
-                gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag, nexcl=nexcl)
+                gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag, nexcl=nexcl,
+        var_hard_time=var_hard_time)
 
     filename=filename+'.npz'
     np.savez(filename, xx = xx, yy_log = favg, sd_log=stdv)
@@ -3697,6 +3734,7 @@ def get_favg_arrays(
         gw_only=False, red2white=None, red_gamma=None, 
         nloudest=10, bgl=10, cv=None,
         gsc_flag=False, dsc_flag=False, divide_flag=False, nexcl=0,
+        var_hard_time=None,
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/favg',):
 
 
@@ -3704,7 +3742,8 @@ def get_favg_arrays(
     filename = append_filename(filename,
                 gw_only=gw_only, red_gamma=red_gamma, red2white=red2white,
                 nloudest=nloudest, bgl=bgl, cv=cv, 
-                gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag, nexcl=nexcl)
+                gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag, nexcl=nexcl,
+        var_hard_time=var_hard_time)
 
     filename=filename+'.npz'
     file = np.load(filename)
