@@ -3549,7 +3549,7 @@ def get_anis_freq_arrays(
         gw_only=False, 
         nloudest=10, 
         parvars = [0,10,20],
-        nside=8, lmax=8 
+        nside=8, lmax=8, 
         var_hard_time=None,
 
         ):
@@ -3606,7 +3606,7 @@ def build_hcpar_arrays(
     data, params, = get_data(target, dets=False,
         nvars=nvars, nreals=nreals, shape=shape,  # keep as defaults
         gw_only=gw_only, 
-        nloudest=nloudest, ,
+        nloudest=nloudest, 
         var_hard_time=var_hard_time)
     
     fobs_cents = data[0]['fobs_cents']
