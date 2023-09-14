@@ -199,6 +199,8 @@ def file_names(args):
         anatomy_path = args.anatomy_path
 
     output_path = anatomy_path + f'/{args.target}_v{args.nvars}_r{args.nreals}_shape{str(args.shape)}'
+    if args.var_hard_time is not None:
+        output_path += f"_vtau{args.var_hard_time}"
     # check if output folder already exists, if not, make it.
     if os.path.exists(output_path) is False:
         os.makedirs(output_path)
