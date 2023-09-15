@@ -3206,10 +3206,11 @@ def get_data(
     output_path = path+f'/{target}_v{nvars}_r{nreals}_shape{str(shape)}'
 
     if var_hard_time is not None:
-        f"_vtau{var_hard_time}"
+        output_path+=f"_vtau{var_hard_time}"
 
     data_file = output_path +f'/data_params' 
     dets_file = output_path + f'/detstats_s{nskies}' 
+
 
     if nloudest != 10:                                           # if using nloudest that isn't the default 10
         dets_file += f"_l{nloudest}" 
@@ -3242,6 +3243,9 @@ def get_data(
 
     dets_file += '.npz'
     data_file += '.npz'
+
+    print(f'{data_file=}')
+    print(f'{dets_file=}')
 
     if os.path.exists(data_file) is False:
         err = f"load data file '{data_file}' does not exist, you need to construct it."
