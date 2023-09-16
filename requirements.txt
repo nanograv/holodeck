@@ -6,6 +6,7 @@ kalepy
 matplotlib
 numpy
 scipy
+sympy
 pydoe
 psutil
 tqdm
