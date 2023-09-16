@@ -116,8 +116,14 @@ n_bins = F_bin_centers.size
 # F_bins = np.array(F_bins)
 
 #set up realizer object used to create realizations of a binary population (need to use orbital frequency instead of GW)
-# TODO: replace this Realizer thing
-ealizer = holo_extensions.Realizer(F_bins/2, resample=RESAMP, lifetime=TIME, mamp=MAMP, dens=DENS)
+params = {'hard_time': 2.3580737294474514, 
+          'gsmf_phi0': -2.012540540307903, 
+          'gsmf_mchar0_log10': 11.358074707612774, 
+          'mmb_mamp_log10': 8.87144417474846, 
+          'mmb_scatter_dex': 0.027976545572248435, 
+          'hard_gamma_inner': -0.38268820924239666}
+nn, samples = holo_extensions.realizer(params, nreals=1. nloudest=1000)
+samples = samples.squeeze() # just using 1 realization
 
 
 ####################################################################################
@@ -129,12 +135,13 @@ for i in range(N_real):
     print(i)
 
     #sample binary parameters from population
-    nn, samples = realizer()
+    # nn, samples = realizer()
     #nn, samples = realizer(down_sample=50) #optional downsampling for quick testing
     print(samples.shape)
 
     units = [1.99e+33, 1, 3.17e-08]
 
+    # TODO figure out if these should be in log space or not!!!
     #Mtots = samples[0,:]/units[0] #solar mass
     Mtots = samples[0,:] #cgs
     Mrs = samples[1,:]
