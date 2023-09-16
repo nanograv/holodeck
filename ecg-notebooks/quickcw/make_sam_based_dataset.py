@@ -122,7 +122,7 @@ params = {'hard_time': 2.3580737294474514,
           'mmb_mamp_log10': 8.87144417474846, 
           'mmb_scatter_dex': 0.027976545572248435, 
           'hard_gamma_inner': -0.38268820924239666}
-nn, samples = holo_extensions.realizer(params, nreals=1. nloudest=1000)
+nn, samples = holo_extensions.realizer(params, nreals=1, nloudest=1000)
 samples = samples.squeeze() # just using 1 realization
 
 
