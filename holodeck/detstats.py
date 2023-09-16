@@ -16,7 +16,7 @@ import warnings
 
 
 import holodeck as holo
-from holodeck import utils, cosmo, log, plot, sam_cython, anisotropy
+from holodeck import utils, cosmo, log, plot, anisotropy
 from holodeck.constants import MPC, YR
 from holodeck import cyutils 
 
@@ -3396,7 +3396,7 @@ def build_noise_arrays(
         _dp_2nd = np.max(dp_ssi, axis=(0,3)) # R,S
         dp_max.append(_dp_max)
         dp_2nd.append(_dp_2nd)
-        
+
         count_cws_01.append(np.sum(dp_ssi>0.01, axis=(0,3))) # from F,R,S,L to R,S
         count_cws_50.append(np.sum(dp_ssi>0.50, axis=(0,3)))
 
