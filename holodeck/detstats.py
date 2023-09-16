@@ -3382,6 +3382,8 @@ def build_noise_arrays(
     sigmas = []
     hc_ss = []
     hc_bg = []
+    dp_max = []
+    dp_2nd = []
     count_cws_50 = [] # number of single sources with DP>0.5 in any realization
     count_cws_01 = [] # number of single sources with DP>0.5 in any realization
     for ii, dat in enumerate(data):
@@ -3389,14 +3391,22 @@ def build_noise_arrays(
         hc_ss.append(dat['hc_ss'])
         hc_bg.append(dat['hc_bg']) 
         dp_ssi = dsdat[ii]['gamma_ssi'] # F,R,S,L
-        count_cws_01.append(np.sum(dp_ssi>0.01, axis=(0,3)))
+        _dp_max = np.max(dp_ssi, axis=(0,3)) # R,S
+        dp_ssi[dp_ssi==_dp_max[np.newaxis,:,:,np.newaxis]] = 0
+        _dp_2nd = np.max(dp_ssi, axis=(0,3)) # R,S
+        dp_max.append(_dp_max)
+        dp_2nd.append(_dp_2nd)
+        
+        count_cws_01.append(np.sum(dp_ssi>0.01, axis=(0,3))) # from F,R,S,L to R,S
         count_cws_50.append(np.sum(dp_ssi>0.50, axis=(0,3)))
 
     sigmas = np.array(sigmas) # V, R
     hc_ss = np.array(hc_ss) # (V,F,R,L)
     hc_bg = np.array(hc_bg) # (V,F,R)
-    count_cws_50 = np.array(count_cws_50) # V,S,R
-    count_cws_01 = np.array(count_cws_01) # V,S,R
+    count_cws_50 = np.array(count_cws_50) # V,R,S
+    count_cws_01 = np.array(count_cws_01) # V,R,S
+    dp_max=np.array(dp_max) # V,R,S,
+    dp_2nd=np.array(dp_2nd) # V,R,S,
 
     temp_name = '/Users/emigardiner/GWs/holodeck/output/temp'
     temp_name += f'/noise_arrays_{target}.npz'
@@ -3411,11 +3421,11 @@ def build_noise_arrays(
         np.savez(temp_name, white_noise=white_noise, red_noise=red_noise,
                  count_cws_50=count_cws_50, count_cws_01=count_cws_01,
                 hc_ss=hc_ss, hc_bg=hc_bg)
-        return white_noise, red_noise, count_cws_50, count_cws_01, hc_ss, hc_bg
+        return white_noise, red_noise, count_cws_50, count_cws_01, hc_ss, hc_bg,  dp_max, dp_2nd
     np.savez(temp_name, white_noise=white_noise,
                 count_cws_50=count_cws_50, count_cws_01=count_cws_01,
-                hc_ss=hc_ss, hc_bg=hc_bg)
-    return white_noise, count_cws_50, count_cws_01, hc_ss, hc_bg
+                hc_ss=hc_ss, hc_bg=hc_bg, dp_max=dp_max, dp_2nd=dp_2nd)
+    return white_noise, count_cws_50, count_cws_01, hc_ss, hc_bg, dp_max, dp_2nd
 
 def get_noise_arrays_temp(target, red=False):
     temp_name = '/Users/emigardiner/GWs/holodeck/output/temp'
@@ -3426,12 +3436,14 @@ def get_noise_arrays_temp(target, red=False):
     count_cws_01 = file['count_cws_01']
     hc_ss = file['hc_ss']
     hc_bg = file['hc_bg']
+    dp_max = file['dp_max']
+    dp_2nd = file['dp_2nd']
     if red:
         red_noise = file['red_noise']
         file.close()
-        return white_noise, red_noise, count_cws_50, count_cws_01, hc_ss, hc_bg
+        return white_noise, red_noise, count_cws_50, count_cws_01, hc_ss, hc_bg, dp_max, dp_2nd
     file.close()
-    return white_noise, count_cws_50, count_cws_01, hc_ss, hc_bg
+    return white_noise, count_cws_50, count_cws_01, hc_ss, hc_bg, dp_max, dp_2nd
 
 
 
