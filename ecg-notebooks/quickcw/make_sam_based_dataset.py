@@ -122,8 +122,7 @@ params = {'hard_time': 2.3580737294474514,
           'mmb_mamp_log10': 8.87144417474846, 
           'mmb_scatter_dex': 0.027976545572248435, 
           'hard_gamma_inner': -0.38268820924239666}
-nn, samples = holo_extensions.realizer(params, nreals=1, nloudest=1000)
-samples = samples.squeeze() # just using 1 realization
+nn, real_samples = holo_extensions.realizer(params, nreals=N_real, nloudest=1000)
 
 
 ####################################################################################
@@ -131,8 +130,9 @@ samples = samples.squeeze() # just using 1 realization
 # Do GWB + outlier injections over multiple realizations of the population and noise
 #
 ####################################################################################
-for i in range(N_real):
-    print(i)
+for rr in range(N_real):
+    print(rr)
+    samples = real_samples[rr]
 
     #sample binary parameters from population
     # nn, samples = realizer()
@@ -171,7 +171,7 @@ for i in range(N_real):
     for psr in psrs:
         #print("WN")
         #print(psr.name)
-        LT.add_efac(psr, efac=1.00, seed=1_000_000+i)
+        LT.add_efac(psr, efac=1.00, seed=1_000_000+rr)
         #psr.fit()
 
     #Add per-psr RN
@@ -182,13 +182,13 @@ for i in range(N_real):
         #print(psr.name)
         A = 10**noisedict[psr.name+"_red_noise_log10_A"]
         gamma = noisedict[psr.name+"_red_noise_gamma"]
-        LT.add_rednoise(psr, A, gamma, components=30, seed=1848_1919+i)
+        LT.add_rednoise(psr, A, gamma, components=30, seed=1848_1919+rr)
         #psr.fit()
 
     #Add population of BBHs
     inj_return = LT_catalog.add_gwb_plus_outlier_cws(psrs,
                                                      vals, weights, F_bins, T_obs,
-                                                     outlier_per_bin=1_000, seed=1994+i)
+                                                     outlier_per_bin=1_000, seed=1994+rr)
     f_centers, free_spec, outlier_fo, outlier_hs, outlier_mc, outlier_dl, random_gwthetas, random_gwphis, random_phases, random_psis, random_incs = inj_return
     #save simulated dataset to tim files
     real_dir = savedir+"real{0:03d}/".format(i)
