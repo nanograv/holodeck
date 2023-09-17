@@ -4,6 +4,7 @@
 import holodeck as holo
 from holodeck import log
 from holodeck.constants import MSOL, GYR
+import numpy as np
 
 
 class Realizer:
@@ -53,3 +54,53 @@ class Realizer:
         weights = self._binary_weights
         samples = evo._sample_universe__resample(fobs_orb_edges, vals, weights, down_sample)
         return names, samples
+
+
+
+
+def realizer_sam(params, nreals, nloudest, nfreqs=40, log10=False,
+               pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=None, seed=None)):
+    """ Like Realizer but for SAMs instead of illustris populations
+
+    Parameters
+    ----------
+    params : dict
+        model parameters for parameter space
+    nreal : int
+        number of realizations
+    nloudest : int
+        number of loudest sources to use
+
+    Returns
+    -------
+    names : names of parameters
+    samples : [R, 4, nloudest*nreals] NDarray
+        mtot, mrat, redz, and fobs of each source in log space
+
+    sspar is in shape [F,R,L]
+    
+    """
+    fobs_cents, fobs_edges = holo.utils.pta_freqs(num=nfreqs)
+    
+    sam, hard = pspace.model_for_params(params=params, sam_shape=None,)
+    _, _, sspar, bgpar = sam.gwb(
+        fobs_edges, hard=hard, nreals=nreals, nloudest=nloudest, params=True)
+    
+    vals_names=['mtot', 'mrat', 'redz', 'fobs']
+    fobs = np.repeat(fobs_cents, nreals*nloudest).reshape(nfreqs, nreals, nloudest)
+    mtot = sspar[0] # g
+    mrat = sspar[1]
+    redz = sspar[3] # final redshift, not initial
+
+    samples = []
+    for par in [mtot, mrat, redz, fobs]: # starts in shape F,R,L
+        par = np.swapaxes(par, 0, 1) # R,F,L
+        par = par.reshape(nreals, nfreqs*nloudest) # R, F*L
+        if log10:    
+            samples.append(np.log10(par))
+        else:
+            samples.append(par)
+    samples = np.array(samples) # 4,R,F*L
+    samples = np.swapaxes(samples, 0,1) # R,4,F*L
+
+    return vals_names, samples
