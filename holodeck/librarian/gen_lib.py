@@ -15,15 +15,21 @@ import holodeck as holo
 from holodeck import cosmo
 from holodeck.constants import YR
 import holodeck.librarian
-from holodeck.librarian import lib_utils
+from holodeck.librarian import (
+    lib_utils,
+    DEF_NUM_FBINS, DEF_NUM_LOUDEST, DEF_NUM_REALS, DEF_PTA_DUR,
+)
 from holodeck.sams import sam_cyutils
 
 MAX_FAILURES = 5
 
 # FILES_COPY_TO_OUTPUT = [__file__, holo.librarian.__file__, holo.param_spaces.__file__]
+FILES_COPY_TO_OUTPUT = []
 
 
 def main():
+
+    # ---- load mpi4py module
 
     try:
         from mpi4py import MPI
@@ -35,35 +41,48 @@ def main():
         holo.log.error("Check if you have `mpi4py` installed, and if not, please install it")
         raise err
 
+    # ---- setup arguments / settings and loggers
+
     if comm.rank == 0:
         args = _setup_argparse(comm)
     else:
         args = None
 
-    # share `args` to all processes
+    # share `args` to all processes from rank=0
     args = comm.bcast(args, root=0)
 
     # setup log instance, separate for all processes
     log = _setup_log(comm, args)
     args.log = log
 
-    if comm.rank == 0:
-        copy_files = FILES_COPY_TO_OUTPUT
-        # copy certain files to output directory
-        if (not args.resume) and (copy_files is not None):
-            for fname in copy_files:
-                src_file = Path(fname)
-                dst_file = args.output.joinpath("runtime_" + src_file.name)
-                shutil.copyfile(src_file, dst_file)
-                log.info(f"Copied {fname} to {dst_file}")
+    # if comm.rank == 0:
+    #     copy_files = FILES_COPY_TO_OUTPUT
+    #     # copy certain files to output directory
+    #     if (not args.resume) and (copy_files is not None):
+    #         for fname in copy_files:
+    #             src_file = Path(fname)
+    #             dst_file = args.output.joinpath("runtime_" + src_file.name)
+    #             shutil.copyfile(src_file, dst_file)
+    #             log.info(f"Copied {fname} to {dst_file}")
 
-        # get parameter-space class
+    # ---- get parameter-space class
+
+    if comm.rank == 0:
+
+        # `param_space` attribute must match the name of one of the classes in `holodeck.librarian`
         try:
-            # `param_space` attribute must match the name of one of the classes in `holo.param_spaces`
-            space_class = getattr(holo.param_spaces, args.param_space)
+            # if a namespace is specified for the parameter space, recursively follow it
+            # i.e. this will work in two cases:
+            # - `PS_Test` : if `PS_Test` is a class loaded in `librarian`
+            # - `file_name.PS_Test` : as long as `file_name` is a module within `librarian`
+            space_name = args.param_space.split(".")
+            space_class = holo.librarian
+            for class_name in space_name:
+                space_class = getattr(space_class, class_name)
         except Exception as err:
-            log.exception(f"Failed to load '{args.param_space}' from holo.param_spaces!")
-            log.exception(err)
+            log.error(f"Failed to load '{args.param_space}' from holo.librarian!")
+            log.error("Make sure the class is defined, and imported into the `librarian` module.")
+            log.error(err)
             raise err
 
         # instantiate the parameter space class
@@ -86,6 +105,8 @@ def main():
     )
     comm.barrier()
 
+    # ---- distribute jobs to processors
+
     # Split and distribute index numbers to all processes
     if comm.rank == 0:
         npars = args.nsamples
@@ -98,9 +119,9 @@ def main():
         indices = None
 
     indices = comm.scatter(indices, root=0)
-
     iterator = holo.utils.tqdm(indices) if (comm.rank == 0) else np.atleast_1d(indices)
 
+    # Save parameter space to output directory
     if (comm.rank == 0) and (not args.resume):
         space_fname = space.save(args.output)
         log.info(f"saved parameter space {space} to {space_fname}")
@@ -109,6 +130,8 @@ def main():
     beg = datetime.now()
     log.info(f"beginning tasks at {beg}")
     failures = 0
+
+    # ---- iterate over each processors jobs
 
     for par_num in iterator:
         log.info(f"{comm.rank=} {par_num=}")
@@ -137,7 +160,7 @@ def main():
     if (comm.rank == 0):
         log.info("Concatenating outputs into single file")
         holo.librarian.combine.sam_lib_combine(args.output, log)
-        log.info("Concatenating completed")
+        log.info("Concatenation completed")
 
     return
 
@@ -176,113 +199,38 @@ def run_sam_at_pspace_num(args, space, pnum):
         if not args.recreate:
             return True
 
-    # ---- Setup PTA frequencies
-    fobs_cents, fobs_edges = get_freqs(args)
-    log.info(f"Created {fobs_cents.size} frequency bins")
-    log.info(f"\t[{fobs_cents[0]*YR}, {fobs_cents[-1]*YR}] [1/yr]")
-    log.info(f"\t[{fobs_cents[0]*1e9}, {fobs_cents[-1]*1e9}] [nHz]")
-    lib_utils.log_mem_usage(log)
-    assert args.nfreqs == fobs_cents.size
-
-    # ---- Calculate hc_ss, hc_bg, sspar, and bgpar from SAM
+    # ---- run Model
 
     try:
         log.debug("Selecting `sam` and `hard` instances")
         sam, hard = space(pnum)
-        lib_utils.log_mem_usage(log)
 
-        log.debug("Calculating 'edges' and 'number' for this SAM.")
-        fobs_orb_edges = fobs_edges / 2.0
-        fobs_orb_cents = fobs_cents / 2.0
-        data = dict(fobs=fobs_cents, fobs_edges=fobs_edges)
-
-        if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
-            err = f"`holo.hardening.Fixed_Time_2PL_SAM` must be used here!  Not {hard}!"
-            log.exception(err)
-            raise RuntimeError(err)
-
-        redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
-            fobs_orb_cents, sam, hard, cosmo
+        data = run_model(
+            sam, hard,
+            pta_dur=args.pta_dur, nfreqs=args.nfreqs, nreals=args.nreals, nloudest=args.nloudest,
+            gwb_flag=args.gwb_flag, singles_flag=args.ss_flag, details_flag=False, params_flag=args.params_flag,
+            log=log,
         )
-        edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
-        number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
-
-        lib_utils.log_mem_usage(log)
-
-        # if use_redz is None:
-        #     try:
-        #         use_redz = sam._redz_final
-        #         log.info("using `redz_final`")
-        #     except AttributeError:
-        #         use_redz = sam._redz_prime[:, :, :, np.newaxis] * np.ones_like(number)
-        #         log.warning("using `redz_prime`")
-
-        # ---- Calculate SS/CW Sources & binary parameters
-
-        if args.ss_flag:
-            log.debug(f"Calculating `ss_gws` for shape ({fobs_cents.size}, {args.nreals}) | {args.params_flag=}")
-            vals = holo.single_sources.ss_gws_redz(
-                edges, redz_final, number, realize=args.nreals,
-                loudest=args.nloudest, params=args.params_flag,
-            )
-            if args.params_flag:
-                hc_ss, hc_bg, sspar, bgpar = vals
-                data['sspar'] = sspar
-                data['bgpar'] = bgpar
-            else:
-                hc_ss, hc_bg = vals
-
-            data['hc_ss'] = hc_ss
-            data['hc_bg'] = hc_bg
-            log.debug(f"{holo.utils.stats(hc_ss)=}")
-            log.debug(f"{holo.utils.stats(hc_bg)=}")
-            lib_utils.log_mem_usage(log)
-
-        # ---- Calculate GWB
-
-        if args.gwb_flag:
-            log.debug(f"Calculating `gwb` for shape ({fobs_cents.size}, {args.nreals})")
-            gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, args.nreals)
-            log.debug(f"{holo.utils.stats(gwb)=}")
-            lib_utils.log_mem_usage(log)
-            data['gwb'] = gwb
 
         rv = True
     except Exception as err:
-        log.exception(f"`run_ss` FAILED on {pnum=}\n")
+        log.exception(f"`run_model` FAILED on {pnum=}\n")
         log.exception(err)
         rv = False
         data = dict(fail=str(err))
 
-    # ---- Save data to file
+    # ---- save data to file
 
     log.debug(f"Saving {pnum} to file | {args.gwb_flag=} {args.ss_flag=} {args.params_flag=}")
     log.debug(f"data has keys: {list(data.keys())}")
     np.savez(sim_fname, **data)
     log.info(f"Saved to {sim_fname}, size {holo.utils.get_file_size(sim_fname)} after {(datetime.now()-beg)}")
 
-    # ---- Plot hc and pars
+    # ---- make diagnostic plots
 
     if rv and args.plot:
-        import matplotlib.pyplot as plt
-        log.info("generating characteristic strain/psd plots")
         try:
-            log.info("generating strain plots")
-            plot_fname = args.output_plots.joinpath(sim_fname.name)
-            hc_fname = str(plot_fname.with_suffix(''))+"_strain.png"
-            fig = holo.plot.plot_bg_ss(fobs_cents, bg=hc_bg, ss=hc_ss)
-            fig.savefig(hc_fname, dpi=100)
-            # log.info("generating PSD plots")
-            # psd_fname = str(plot_fname.with_suffix('')) + "_psd.png"
-            # fig = make_ss_plot(fobs_cents, hc_ss, hc_bg, fit_data)
-            # fig.savefig(psd_fname, dpi=100)
-            # log.info(f"Saved to {psd_fname}, size {holo.utils.get_file_size(psd_fname)}")
-            log.info("generating pars plots")
-            pars_fname = str(plot_fname.with_suffix('')) + "_pars.png"
-            fig = make_pars_plot(fobs_cents, hc_ss, hc_bg, sspar, bgpar)
-            fig.savefig(pars_fname, dpi=100)
-            log.info(f"Saved to {pars_fname}, size {holo.utils.get_file_size(pars_fname)}")
-            plt.close('all')
+            make_plots(args, data, sim_fname)
         except Exception as err:
             log.exception("Failed to make strain plot!")
             log.exception(err)
@@ -290,18 +238,30 @@ def run_sam_at_pspace_num(args, space, pnum):
     return rv
 
 
-def run_model(sam, hard, nreals, nfreqs, nloudest=5,
-              gwb_flag=True, details_flag=False, singles_flag=False, params_flag=False):
+def run_model(
+    sam, hard,
+    pta_dur=DEF_PTA_DUR, nfreqs=DEF_NUM_FBINS, nreals=DEF_NUM_REALS, nloudest=DEF_NUM_LOUDEST,
+    gwb_flag=True, details_flag=False, singles_flag=False, params_flag=False,
+    log=None,
+):
     """Run the given modeling, storing requested data
     """
-    fobs_cents, fobs_edges = holo.librarian.get_freqs(None)
-    if nfreqs is not None:
-        fobs_edges = fobs_edges[:nfreqs+1]
-        fobs_cents = fobs_cents[:nfreqs]
-    fobs_orb_cents = fobs_cents / 2.0     # convert from GW to orbital frequencies
-    fobs_orb_edges = fobs_edges / 2.0     # convert from GW to orbital frequencies
 
-    data = dict(fobs_cents=fobs_cents, fobs_edges=fobs_edges)
+    data = {}
+
+    fobs_cents, fobs_edges = holo.utils.pta_freqs(dur=pta_dur*YR, num=nfreqs)
+    # convert from GW to orbital frequencies
+    fobs_orb_cents = fobs_cents / 2.0
+    fobs_orb_edges = fobs_edges / 2.0
+
+    data['fobs_cents'] = fobs_cents
+    data['fobs_edges'] = fobs_edges
+
+    if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
+        err = f"`holo.hardening.Fixed_Time_2PL_SAM` must be used here!  Not {hard}!"
+        if log is not None:
+            log.exception(err)
+        raise RuntimeError(err)
 
     redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
         fobs_orb_cents, sam, hard, cosmo
@@ -313,7 +273,6 @@ def run_model(sam, hard, nreals, nfreqs, nloudest=5,
         data['static_binary_density'] = sam.static_binary_density
         data['number'] = number
         data['redz_final'] = redz_final
-        data['coalescing'] = (redz_final > 0.0)
 
         gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final = _calc_model_details(edges, redz_final, number)
 
@@ -452,6 +411,7 @@ def _setup_argparse(comm, *args, **kwargs):
     parser.add_argument('output', metavar='output', type=str,
                         help='output path [created if doesnt exist]')
 
+    # basic parameters
     parser.add_argument('-n', '--nsamples', action='store', dest='nsamples', type=int, default=1000,
                         help='number of parameter space samples')
     parser.add_argument('-r', '--nreals', action='store', dest='nreals', type=int,
@@ -464,6 +424,8 @@ def _setup_argparse(comm, *args, **kwargs):
                         help='Shape of SAM grid', default=None)
     parser.add_argument('-l', '--nloudest', action='store', dest='nloudest', type=int,
                         help='Number of loudest single sources', default=holo.librarian.DEF_NUM_LOUDEST)
+
+    # what do run
     parser.add_argument('--gwb', action='store_true', dest="gwb_flag", default=False,
                         help="calculate and store the 'gwb' per se")
     parser.add_argument('--ss', action='store_true', dest="ss_flag", default=False,
@@ -471,6 +433,7 @@ def _setup_argparse(comm, *args, **kwargs):
     parser.add_argument('--params', action='store_true', dest="params_flag", default=False,
                         help="calculate and store SS/BG binary parameters [NOTE: requires `--ss`]")
 
+    # how do run
     parser.add_argument('--resume', action='store_true', default=False,
                         help='resume production of a library by loading previous parameter-space from output directory')
     parser.add_argument('--recreate', action='store_true', default=False,
@@ -479,11 +442,15 @@ def _setup_argparse(comm, *args, **kwargs):
                         help='produce plots for each simulation configuration')
     parser.add_argument('--seed', action='store', type=int, default=None,
                         help='Random seed to use')
+    parser.add_argument('--TEST', action='store_true', default=False,
+                        help='Run in test mode (NOTE: this resets other values)')
 
     # parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
     #                     help='verbose output [INFO]')
 
     args = parser.parse_args(*args, **kwargs)
+
+    # ---- check / sanitize arguments
 
     output = Path(args.output).resolve()
     if not output.is_absolute:
@@ -499,6 +466,24 @@ def _setup_argparse(comm, *args, **kwargs):
     if args.resume:
         if not output.exists() or not output.is_dir():
             raise FileNotFoundError(f"`--resume` is active but output path does not exist! '{output}'")
+
+    #
+    if args.TEST:
+        msg = "==== WARNING: running in test mode.  other settings being overridden. ===="
+        print("=" * len(msg))
+        print(msg)
+        print("=" * len(msg))
+
+        args.nsamples = 10
+        args.nreals = 3
+        args.pta_dur = 10.0
+        args.nfreqs = 5
+        args.shape = (11, 12, 13)
+        args.nloudest = 2
+
+        if args.resume:
+            raise RuntimeError("Cannot use `resume` in TEST mode!")
+
 
     # ---- Create output directories as needed
 
@@ -524,12 +509,29 @@ def _setup_argparse(comm, *args, **kwargs):
 
 def _setup_log(comm, args):
     beg = datetime.now()
-    log_name = f"holodeck__gen_lib_sams_{beg.strftime('%Y%m%d-%H%M%S')}"
+
+    # ---- setup name of log file
+
+    str_time = f"{beg.strftime('%Y%m%d-%H%M%S')}"
+    # get the path to the directory containing the `holodeck` module
+    # e.g.: "/Users/lzkelley/Programs/nanograv/holodeck"
+    holo_parent = Path(holo.__file__).parent.parent
+    # get the relative path from holodeck to this file
+    # e.g.: "holodeck/librarian/gen_lib.py"
+    log_name = Path(__file__).relative_to(holo_parent)
+    # e.g.: "holodeck.librarian.gen_lib"
+    log_name = ".".join(log_name.with_suffix("").parts)
+    # e.g.: "holodeck.librarian.gen_lib__20230918-140722"
+    log_name = f"{log_name}__{str_time}"
+    # e.g.: "_holodeck.librarian.gen_lib__20230918-140722__r0003"
     if comm.rank > 0:
-        log_name = f"_{log_name}_r{comm.rank}"
+        log_name = f"_{log_name}__r{comm.rank:04d}"
 
     output = args.output_logs
     fname = f"{output.joinpath(log_name)}.log"
+
+    # ---- setup logger
+
     # log_lvl = holo.logger.INFO if args.verbose else holo.logger.WARNING
     log_lvl = holo.logger.DEBUG
     tostr = sys.stdout if comm.rank == 0 else False
@@ -537,34 +539,48 @@ def _setup_log(comm, args):
     log.info(f"Output path: {output}")
     log.info(f"        log: {fname}")
     log.info(args)
+
     return log
-
-
-def get_freqs(args):
-    """Get PTA frequency bin centers and edges.
-
-    Arguments
-    ---------
-    args : `argparse` namespace, with `pta_dur` and `nfreqs` attributes.
-        `pta_dur` must be in units of [yr]
-
-    Returns
-    -------
-    fobs_cents : (F,) ndarray
-        Observer-frame GW-frequencies at frequency-bin centers.
-    fobs_edges : (F+1,) ndarray
-        Observer-frame GW-frequencies at frequency-bin edges.
-
-    """
-    pta_dur = args.pta_dur * YR
-    nfreqs = args.nfreqs
-    fobs_cents, fobs_edges = holo.utils.pta_freqs(dur=pta_dur, num=nfreqs)
-    return fobs_cents, fobs_edges
 
 
 # ==============================================================================
 # ====    Plotting Functions    ====
 # ==============================================================================
+
+
+def make_plots(args, data, sim_fname):
+    import matplotlib.pyplot as plt
+    log = args.log
+    log.info("generating characteristic strain/psd plots")
+    log.info("generating strain plots")
+    plot_fname = args.output_plots.joinpath(sim_fname.name)
+    hc_fname = str(plot_fname.with_suffix('')) + "_strain.png"
+
+    if args.singles_flag:
+        fobs_cents = data['fobs_cents']
+        hc_bg = data['hc_bg']
+        hc_ss = data['hc_ss']
+        fig = holo.plot.plot_bg_ss(fobs_cents, bg=hc_bg, ss=hc_ss)
+        fig.savefig(hc_fname, dpi=100)
+
+    # log.info("generating PSD plots")
+    # psd_fname = str(plot_fname.with_suffix('')) + "_psd.png"
+    # fig = make_ss_plot(fobs_cents, hc_ss, hc_bg, fit_data)
+    # fig.savefig(psd_fname, dpi=100)
+    # log.info(f"Saved to {psd_fname}, size {holo.utils.get_file_size(psd_fname)}")
+
+    if args.params_flag:
+        log.info("generating pars plots")
+        pars_fname = str(plot_fname.with_suffix('')) + "_pars.png"
+
+        sspar = data['sspar']
+        bgpar = data['bgpar']
+        fig = make_pars_plot(fobs_cents, hc_ss, hc_bg, sspar, bgpar)
+        fig.savefig(pars_fname, dpi=100)
+        log.info(f"Saved to {pars_fname}, size {holo.utils.get_file_size(pars_fname)}")
+
+    plt.close('all')
+    return
 
 
 def make_gwb_plot(fobs, gwb, fit_data):
