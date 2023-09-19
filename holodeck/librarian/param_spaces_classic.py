@@ -97,6 +97,19 @@ class _PS_Classic_Phenom(_Param_Space):
         return hard
 
 
+class PS_Test(_PS_Classic_Phenom):
+    """Simple test parameter space in 2D.
+    """
+
+    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+        super().__init__(
+            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+
+            mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+        )
+
+
 class PS_Classic_Phenom_Uniform(_PS_Classic_Phenom):
     """Classic 5D phenomenological, uniform parameter space used in 15yr analysis.
 
@@ -105,14 +118,15 @@ class PS_Classic_Phenom_Uniform(_PS_Classic_Phenom):
     """
 
     def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
-        super(_Param_Space, self).__init__(
+        super().__init__(
             log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
 
-            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
             gsmf_phi0_log10=PD_Uniform(-3.5, -1.5),
             gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
             mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
             mmb_scatter_dex=PD_Uniform(+0.0, +1.2),
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+            hard_gamma_inner=PD_Uniform(-1.5, +0.0),
         )
 
 
@@ -124,7 +138,7 @@ class PS_Classic_Phenom_Astro_Extended(_PS_Classic_Phenom):
     """
 
     def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
-        super(_Param_Space, self).__init__(
+        super().__init__(
             log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
 
             hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
@@ -236,7 +250,7 @@ class PS_Classic_GWOnly_Uniform(_PS_Classic_GWOnly):
     """
 
     def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
-        super(_Param_Space, self).__init__(
+        super().__init__(
             log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
 
             gsmf_phi0=PD_Uniform(-3.5, -1.5),
@@ -254,7 +268,7 @@ class PS_Classic_GWOnly_Astro_Extended(_PS_Classic_GWOnly):
     """
 
     def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
-        super(_Param_Space, self).__init__(
+        super().__init__(
             log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
 
             # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
