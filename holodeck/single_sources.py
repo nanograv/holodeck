@@ -96,8 +96,6 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
                 err = np.sum(np.logical_and(redz<0, redz!=-1))
                 err = f"{err} redz < 0 and !=-1 found in redz, in ss_gws_redz()"
                 raise ValueError(err)
-    
-    print('passed redz check at the beginning of ss_gws_redz()')
 
     # For multiple realizations, using cython
     if(utils.isinteger(realize)):
