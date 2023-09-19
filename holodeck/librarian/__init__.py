@@ -17,11 +17,14 @@ FNAME_SIM_FILE = "sam-lib__p{pnum:06d}.npz"
 PSPACE_FILE_SUFFIX = ".pspace.npz"
 
 from . import params        # noqa
-from . param_spaces_classic import (   # noqa
-    PS_Classic_Phenom_Uniform,
-    PS_Classic_Phenom_Astro_Extended,
-    PS_Classic_GWOnly_Uniform,
-    PS_Classic_GWOnly_Astro_Extended,
-)
+# from . param_spaces_classic import (   # noqa
+#     PS_Classic_Phenom_Uniform,
+#     PS_Classic_Phenom_Astro_Extended,
+#     PS_Classic_GWOnly_Uniform,
+#     PS_Classic_GWOnly_Astro_Extended,
+# )
 
-
+param_spaces = {}
+from . import param_spaces_classic  # noqa
+param_spaces.update(param_spaces_classic._param_spaces)
+del param_spaces_classic

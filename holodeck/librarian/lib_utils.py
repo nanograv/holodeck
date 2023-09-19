@@ -62,7 +62,9 @@ def load_pspace_from_path(log, path, space_class=None):
 
 def _get_space_class_from_space_fname(space_fname):
     # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces`
-
+    space_name = space_fname.name.split(".")[0]
+    space_class = holo.librarian.param_spaces[space_name]
+    '''
     # get the filename without path, this should contain the name of the PS class
     space_name = space_fname.name
     # get a list of all parameter-space classes (assuming they all start with 'PS')
@@ -79,6 +81,7 @@ def _get_space_class_from_space_fname(space_fname):
         raise ValueError(f"Unable to find a PS class matching {space_name}!")
 
     space_class = getattr(holo.param_spaces, space)
+    '''
     return space_class
 
 

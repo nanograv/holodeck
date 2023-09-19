@@ -5,7 +5,7 @@ import argparse
 import sys
 from datetime import datetime
 from pathlib import Path
-# import shutil
+import shutil
 
 import numpy as np
 import scipy as sp
@@ -15,6 +15,7 @@ import holodeck as holo
 from holodeck import cosmo
 from holodeck.constants import YR
 import holodeck.librarian
+import holodeck.librarian.combine
 from holodeck.librarian import (
     lib_utils,
     DEF_NUM_FBINS, DEF_NUM_LOUDEST, DEF_NUM_REALS, DEF_PTA_DUR,
@@ -34,14 +35,14 @@ def main():   # noqa : ignore complexity warning
     try:
         from mpi4py import MPI
         comm = MPI.COMM_WORLD
-    except Exception as err:
+    except ModuleNotFoundError as err:
         comm = None
         holo.log.error(f"failed to load `mpi4py` in {__file__}: {err}")
         holo.log.error("`mpi4py` may not be included in the standard `requirements.txt` file")
         holo.log.error("Check if you have `mpi4py` installed, and if not, please install it")
         raise err
 
-    # ---- setup arguments / settings and loggers
+    # ---- setup arguments / settings, loggers, and outputs
 
     if comm.rank == 0:
         args = _setup_argparse(comm)
@@ -55,15 +56,15 @@ def main():   # noqa : ignore complexity warning
     log = _setup_log(comm, args)
     args.log = log
 
-    # if comm.rank == 0:
-    #     copy_files = FILES_COPY_TO_OUTPUT
-    #     # copy certain files to output directory
-    #     if (not args.resume) and (copy_files is not None):
-    #         for fname in copy_files:
-    #             src_file = Path(fname)
-    #             dst_file = args.output.joinpath("runtime_" + src_file.name)
-    #             shutil.copyfile(src_file, dst_file)
-    #             log.info(f"Copied {fname} to {dst_file}")
+    if comm.rank == 0:
+        copy_files = FILES_COPY_TO_OUTPUT
+        # copy certain files to output directory
+        if (not args.resume) and (copy_files is not None):
+            for fname in copy_files:
+                src_file = Path(fname)
+                dst_file = args.output.joinpath("runtime_" + src_file.name)
+                shutil.copyfile(src_file, dst_file)
+                log.info(f"Copied {fname} to {dst_file}")
 
     # ---- get parameter-space class
 

@@ -17,6 +17,17 @@ from holodeck.librarian.params import _Param_Space
 def main():
     log = holo.log
 
+    try:
+        from mpi4py import MPI
+        comm = MPI.COMM_WORLD
+    except ModuleNotFoundError:
+        comm = None
+
+    if (comm is not None) and (comm.rank > 0):
+        err = f"Cannot run `{__file__}::main()` with multiple processors!"
+        log.exception(err)
+        raise RuntimeError(err)
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -83,6 +94,7 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
 
     # ---- load parameter space from save file
 
+    '''
     if path_pspace is None:
         # look for parameter-space save files
         regex = "*" + holo.librarian.PSPACE_FILE_SUFFIX   # "*.pspace.npz"
@@ -98,7 +110,12 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
         path_pspace = files[0]
 
     pspace = _Param_Space.from_save(path_pspace, log)
-    log.info(f"loaded param space: {pspace}")
+    '''
+    if path_pspace is None:
+        path_pspace = path_output
+    pspace, pspace_fname = lib_utils.load_pspace_from_path(log, path_pspace)
+
+    log.info(f"loaded param space: {pspace} from '{pspace_fname}'")
     param_names = pspace.param_names
     param_samples = pspace.param_samples
     nsamp, ndim = param_samples.shape
@@ -143,7 +160,8 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
     gwb, hc_ss, hc_bg, sspar, bgpar, bad_files = _load_library_from_all_files(
         path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log,
     )
-    if has_gwb: log.info(f"Loaded data from all library files | {holo.utils.stats(gwb)=}")
+    if has_gwb:
+        log.info(f"Loaded data from all library files | {holo.utils.stats(gwb)=}")
     param_samples[bad_files] = np.nan
 
     # ---- Save to concatenated output file ----
@@ -211,7 +229,10 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
         log.debug(f"{ii=} {temp_fname.name=} {data_keys=}")
 
         if fobs is None:
-            fobs = temp['fobs'][()]
+            fobs = temp.get('fobs', None)
+            if fobs is None:
+                fobs = temp['fobs_cents']
+            fobs =[()]
 
         if (not has_gwb) and ('gwb' in data_keys):
             has_gwb = True
