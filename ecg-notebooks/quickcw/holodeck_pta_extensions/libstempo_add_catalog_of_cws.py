@@ -322,7 +322,8 @@ def add_gwb_plus_outlier_cws(psrs, vals, weights, fobs, T_obs, outlier_per_bin=1
     """
     Parameters
     ----------
-    psrs : 
+    psrs : array of 'libstempo.toasim.fakepulsar's 
+        Pulsars
     vals : [4, Nsamples] NDarray
         NDarray containing the total mass, mass ratio, redshift, and f_obs 
         for each sample bin.
