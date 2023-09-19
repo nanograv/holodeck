@@ -10,6 +10,10 @@ import scipy.stats
 
 import holodeck as holo
 
+RENAMED_PARAMS = {
+    "gsmf_phi0": "gsmf_phi0_log10"
+}
+
 
 class _Param_Space(abc.ABC):
     """Base class for generating holodeck libraries.  Defines the parameter space and settings.
@@ -33,7 +37,10 @@ class _Param_Space(abc.ABC):
 
     """
 
-    _SAVED_ATTRIBUTES = ["sam_shape", "param_names", "_uniform_samples", "param_samples", "random_state"]
+    _SAVED_ATTRIBUTES = [
+        "sam_shape", "param_names", "_uniform_samples", "param_samples",
+        # "_random_state"
+    ]
 
     DEFAULTS = {}
 
@@ -46,11 +53,11 @@ class _Param_Space(abc.ABC):
         ndims = len(param_names)
 
         dists = []
-        for nam in param_names:
-            val = param_kwargs[nam]
+        for name in param_names:
+            val = param_kwargs[name]
 
             if not isinstance(val, _Param_Dist):
-                err = f"{nam}: {val} is not a `_Param_Dist` object!"
+                err = f"{name}: {val} is not a `_Param_Dist` object!"
                 log.exception(err)
                 raise ValueError(err)
 
@@ -119,9 +126,9 @@ class _Param_Space(abc.ABC):
 
         settings = cls.DEFAULTS.copy()
 
-        if len(params) < 1:
-            err = "No `params` included in call to `model_for_params`!"
-            raise ValueError(err)
+        # if len(params) < 1:
+        #     err = "No `params` included in call to `model_for_params`!"
+        #     raise ValueError(err)
 
         # Update default parameters specified in sub-classes
 
@@ -133,15 +140,22 @@ class _Param_Space(abc.ABC):
 
         # Update parameters passes in using the `params` dict, typically from LHC sampling
 
-        for kk, vv in params.items():
-            if kk not in settings:
-                err = f"`params` has key '{kk}' not found in settings!  ({settings.keys()})!"
+        for name, value in params.items():
+            # fix deprecated parameter names
+            if name in RENAMED_PARAMS:
+                new_name = RENAMED_PARAMS[name]
+                msg = f"Parameter name deprecated: '{name}' ==> '{new_name}'"
+                print(msg)
+                name = new_name
+
+            if name not in settings:
+                err = f"`params` has key '{name}' not found in settings!  ({settings.keys()})!"
                 raise ValueError(err)
-            if kk in new_def_params:
-                err = f"`params` has key '{kk}' which is also in `new_def_params`!  ({new_def_params.keys()})!"
+            if name in new_def_params:
+                err = f"`params` has key '{name}' which is also in `new_def_params`!  ({new_def_params.keys()})!"
                 raise ValueError(err)
 
-            settings[kk] = vv
+            settings[name] = value
 
         # ---- Construct SAM and hardening model
 
@@ -248,7 +262,16 @@ class _Param_Space(abc.ABC):
         return rv
 
     @property
-    def shape(self):
+    def extrema(self):
+        extr = [dd.extrema for dd in self._dists]
+        return np.asarray(extr)
+
+    @property
+    def name(self):
+        return self.__class__.__name__
+
+    @property
+    def lib_shape(self):
         return self.param_samples.shape
 
     @property
@@ -307,7 +330,6 @@ class _Param_Space(abc.ABC):
         return self.model_for_params(params, **kwargs)
 
 
-
 class _Param_Dist(abc.ABC):
     """Parameter Distribution classes for use in Latin HyperCube sampling.
 
@@ -330,6 +352,10 @@ class _Param_Dist(abc.ABC):
     @property
     def extrema(self):
         return self(np.asarray([0.0, 1.0]))
+
+    @abc.abstractmethod
+    def _dist_func(self, *args, **kwargs):
+        pass
 
 
 class PD_Uniform(_Param_Dist):
