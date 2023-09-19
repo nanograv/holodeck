@@ -3,11 +3,11 @@
 
 from typing import Any
 import holodeck as holo
-from holodeck import log, cosmo
+from holodeck import log, cosmo, gravwaves
 from holodeck.constants import MSOL, GYR
 import numpy as np
 import kalepy as kale
-from sams import cyutils as sam_cyutils
+from holodeck.sams import cyutils as sam_cyutils
 
 
 class Realizer:
@@ -94,14 +94,34 @@ class Realizer_SAM:
         self._hard = hard
         self._fobs_orb_edges = fobs_orb_edges
 
-    def __call__(self, nreals=100):
+    def __call__(self, nreals=100, clean=False):
         """ Calculate samples and weights for an entire semi-analytic population.
         
+        Parameters
+        ----------
+        nreals : int
+            Number of realizations
+        clean : boolean
+            Whether or not to make a samples array for every realization 
+            and clean weights==zero bins from each array
+
+        Returns
+        -------
+        names : array of strings
+            Names of the parameters returned in samples
+        samples : array of R or 4 NDarrays
+            if clean: R arrays of 4 x N_clean NDarrays [R,] x [4,N_clean] for each realization
+            else: NDarrays for mass, ratio, redshift, and frequency [4,M*Q*Z*F]
+        weights : array of R NDarrays 
+            array of number of sources per sample bin for R
+            If clean, the shape is [R,] arrays of len N_clean for each realizations, with zero values removed.
+            Otherwise, the shape is [R, M*Q*Z*F]
+
         """
 
         sam = self._sam
         hard = self._hard
-        fobs_orb_edges = self.fobs_orb_edges
+        fobs_orb_edges = self._fobs_orb_edges
 
         fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges)
         fobs = 2.0 * fobs_orb_cents
@@ -114,14 +134,85 @@ class Realizer_SAM:
         )
 
         edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
-        number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num) # weights
+        number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num) # fractional number per bin
 
         samples = get_samples_from_edges(edges, redz, number.shape, flatten=True)
         names = ['mtot', 'mrat', 'redz', 'fobs']
-        weights = number.flatten()
+        number = number.flatten()
+        shape = (number.size, nreals)
+        weights = gravwaves.poisson_as_needed(number[..., np.newaxis] * np.ones(shape)).reshape(shape)
 
         return names, samples, weights
             
+
+def get_samples_from_edges(edges, redz, number_shape, flatten=True):
+    """ Get the sample parameters for every bin center and return as flattened arrays.
+
+    Parameters
+    ----------
+    edges : array of [M+1,], [Q+1,], [Z+1,], and [F+1,] NDarrays
+        Edges for mtot, mrat, redz, fobs_orb_edges 
+    redz : [M+1, Q+1, Z+1, F+1] NDarray
+        Final redshifts
+    number_shape : array
+        Shape [M,Q,Z,F]
+    flatten : boolean
+        Whether or not to flatten each sample array
+    
+    Returns
+    -------
+    samples : array of 4 flattened [M*Q*Z*F,] NDarrays
+    
+    """
+    
+     # ---- Find bin center properties
+    mtot = kale.utils.midpoints(edges[0]) #: total mass
+    mrat = kale.utils.midpoints(edges[1]) #: mass ratio
+    fobs_orb_cents = kale.utils.midpoints(edges[3]) 
+    fobs = 2.0 * fobs_orb_cents           #: gw fobs
+
+    for dd in range(3):
+        redz = np.moveaxis(redz, dd, 0)
+        redz = kale.utils.midpoints(redz, axis=0) # get final redz at bin centers
+        redz = np.moveaxis(redz, 0, dd)
+    sel = (redz > 0.0) # identify emitting sources
+    redz[~sel] = -1.0 # set all other redshifts to zero
+    redz[redz<0] = -1.0
+
+    # get bin shape
+    nmtot = len(mtot)
+    nmrat = len(mrat)
+    nredz = redz.shape[2]
+    nfobs = len(fobs)
+    # if np.any([number_shape[0] != nmtot, number_shape[1]!=nmrat, number_shape[2]!=nredz, number_shape[3]!=nfobs]):
+    #     err = f"Parameter bin shape [{nmtot=}, {nmrat=}, {nredz=}, {nfobs=}] does not match {number_shape=}."
+    #     raise ValueError(err)
+    print(f"Parameter bin shape [{nmtot=}, {nmrat=}, {nredz=}, {nfobs=}] should match {number_shape=}.")
+
+    # Reshape arrays to [M,Q,Z,F]
+    mtot = np.repeat(mtot, nmrat*nredz*nfobs).reshape(nmtot, nmrat, nredz, nfobs)
+
+    mrat = np.repeat(mrat, nmtot*nredz*nfobs).reshape(nmrat, nmtot, nredz, nfobs) # Q,M,Z,F
+    mrat = np.swapaxes(mrat, 0, 1) # M,Q,Z,F
+
+    fobs = np.repeat(fobs, nmrat*nredz*nmtot).reshape(nfobs, nmrat, nredz, nmtot) # F,Q,Z,M
+    fobs = np.swapaxes(fobs, 0, 3) # M,Q,Z,F
+
+    # check shapes again
+    if np.any([mtot.shape != number_shape, 
+                mrat.shape != number_shape,
+                redz.shape != number_shape,
+                fobs.shape != number_shape]):
+        err = f"Sample shapes don't all match number! {mtot.shape=}, {mrat.shape=}, {redz.shape=}, {fobs.shape=}"
+        raise ValueError(err)
+
+    if flatten:
+        samples = [mtot.flatten(), mrat.flatten(), redz.flatten(), fobs.flatten()]
+    else:
+        samples = [mtot, mrat, redz, fobs]
+
+    return samples
+
 
 def realizer_single_sources(params, nreals, nloudest, nfreqs=40, log10=False,
                pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=None, seed=None)):
@@ -169,74 +260,3 @@ def realizer_single_sources(params, nreals, nloudest, nfreqs=40, log10=False,
     samples = np.swapaxes(samples, 0,1) # R,4,F*L
 
     return vals_names, samples
-
-def get_samples_from_edges(edges, redz, number_shape, flatten=True):
-    """ Get the sample parameters for every bin center and return as flattened arrays.
-
-    Parameters
-    ----------
-    edges : array of [M+1,], [Q+1,], [Z+1,], and [F+1,] NDarrays
-        Edges for mtot, mrat, redz, fobs_orb_edges 
-    redz : [M+1, Q+1, Z+1, F+1] NDarray
-        Final redshifts
-    number_shape : array
-        Shape [M,Q,Z,F]
-    flatten : boolean
-        Whether or not to flatten each sample array
-    
-    Returns
-    -------
-    samples : array of 4 flattened [M*Q*Z*F,] NDarrays
-    
-    """
-    
-     # ---- Find bin center properties
-    mtot = kale.utils.midpoints(edges[0]) #: total mass
-    mrat = kale.utils.midpoints(edges[1]) #: mass ratio
-    fobs_orb_cents = kale.utils.midpoints(edges[3]) 
-    fobs = 2.0 * fobs_orb_cents           #: gw fobs
-
-    for dd in range(3):
-        redz = np.moveaxis(redz, dd, 0)
-        redz = kale.utils.midpoints(redz, axis=0) # get final redz at bin centers
-        redz = np.moveaxis(redz, 0, dd)
-    sel = (redz > 0.0) # identify emitting sources
-    redz[~sel] = -1.0 # set all other redshifts to zero
-    redz[redz<0] = -1.0
-
-    # get bin shape
-    nmtot = len(mtot)
-    nmrat = len(mrat)
-    nredz = len(redz)
-    nfobs = len(fobs)
-    if number_shape != np.array([nmtot, nmrat, nredz, nfobs]):
-        err = f"Parameter bin shape [{nmtot=}, {nmrat=}, {nredz=}, {nfobs=}] does not match {number_shape=}."
-        raise ValueError(err)
-    print(f"Parameter bin shape [{nmtot=}, {nmrat=}, {nredz=}, {nfobs=}] matches {number_shape=}.")
-
-    # Reshape arrays to [M,Q,Z,F]
-    mtot = np.repeat(mtot, nmrat*nredz*nfobs).reshape(nmtot, nmrat, nredz, nfobs)
-
-    mrat = np.repeat(mrat, nmtot*nredz*nfobs).reshape(nmrat, nmtot, nredz, nfobs) # Q,M,Z,F
-    mrat = np.swapaxes(mrat, 0, 1) # M,Q,Z,F
-
-    redz = np.repeat(redz, nmrat*nmtot*nfobs).reshape(nredz, nmrat, nmtot, nfobs) # Z,Q,M,F
-    redz = np.swapaxes(redz, 0, 2) # M,Q,Z,F
-
-    fobs = np.repeat(fobs, nmrat*nredz*nmtot).reshape(nfobs, nmrat, nredz, nmtot) # F,Q,Z,M
-    fobs = np.swapaxes(fobs, 0, 3) # M,Q,Z,F
-
-    # check shapes again
-    if np.any([mtot.shape != number_shape, 
-                mrat.shape != number_shape,
-                redz.shape != number_shape,
-                fobs.shape != number_shape]):
-        err = f"Sample shapes don't all match number! {mtot.shape=}, {mrat.shape=}, {redz.shape=}, {fobs.shape=}"
-        raise ValueError(err)
-
-    if flatten:
-        samples = [mtot.flatten(), mrat.flatten(), redz.flatten(), fobs.flatten()]
-    else:
-        samples = [mtot, mrat, redz, fobs]
-
-    return samples
