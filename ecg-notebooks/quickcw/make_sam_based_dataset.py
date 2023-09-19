@@ -14,6 +14,7 @@ import libstempo_add_catalog_of_cws as LT_catalog
 from holodeck.constants import MSOL, PC, YR, MPC, GYR, SPLC
 from holodeck import log, cosmo, utils, plot
 from holodeck import extensions as holo_extensions
+import holodeck as holo
 
 
 ####################################################################################
@@ -21,8 +22,9 @@ from holodeck import extensions as holo_extensions
 # Input parameters
 #
 ####################################################################################
-#number of realizations to produce
-N_real = 100
+
+N_real = 100     # number of realizations to produce
+debug = True     # whether to print steps
 
 #path to directory where par and tim files will be saved
 #savedir = "../Test_datasets_12p5yr_based_2real/"
@@ -101,28 +103,23 @@ for i, p in enumerate(parfiles):
 #
 ####################################################################################
 #set up frequency bin centers
-F_bin_centers, F_bins = utils.pta_freqs()
+F_bin_centers, F_bins_edges = utils.pta_freqs()
 
 n_bins = F_bin_centers.size
-# print(f"{n_bins=}")
+print(f"{n_bins=}")
 
-# #get bin edges from bin centers
-# F_bins = [F_bin_centers[0]*2/3,]
-# for iii in range(F_bin_centers.size-1):
-#     F_bins.append((F_bin_centers[iii+1]+F_bin_centers[iii])/2)
-
-# F_bins.append(F_bins[-1]+F_bin_centers[-1]-F_bin_centers[-2])
-
-# F_bins = np.array(F_bins)
-
-#set up realizer object used to create realizations of a binary population (need to use orbital frequency instead of GW)
+# set up realizer object used to create realizations of a binary population for a specific model
+# (need to use orbital frequency instead of GW)
 params = {'hard_time': 2.3580737294474514, 
           'gsmf_phi0': -2.012540540307903, 
           'gsmf_mchar0_log10': 11.358074707612774, 
           'mmb_mamp_log10': 8.87144417474846, 
           'mmb_scatter_dex': 0.027976545572248435, 
           'hard_gamma_inner': -0.38268820924239666}
-nn, real_samples = holo_extensions.realizer(params, nreals=N_real, nloudest=1000)
+pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=None, seed=None)
+realizer = holo_extensions.Realizer_SAM(
+    fobs_orb_edges=F_bins_edges/2.0, params=params,
+    pspace=pspace)
 
 
 ####################################################################################
@@ -130,36 +127,38 @@ nn, real_samples = holo_extensions.realizer(params, nreals=N_real, nloudest=1000
 # Do GWB + outlier injections over multiple realizations of the population and noise
 #
 ####################################################################################
+
+names, real_samples, real_weights = realizer(nreals=N_real)
 for rr in range(N_real):
-    print(rr)
-    samples = real_samples[rr]
+    print(f"--- Realization: {rr}")
 
     #sample binary parameters from population
+
     # nn, samples = realizer()
-    #nn, samples = realizer(down_sample=50) #optional downsampling for quick testing
+    # nn, samples = realizer(down_sample=50) #optional downsampling for quick testing
+    samples = real_samples[rr]
     print(samples.shape)
 
     units = [1.99e+33, 1, 3.17e-08]
 
-    # TODO figure out if these should be in log space or not!!!
     #Mtots = samples[0,:]/units[0] #solar mass
-    Mtots = samples[0,:] #cgs
-    Mrs = samples[1,:]
-    MCHs = utils.chirp_mass(*utils.m1m2_from_mtmr(Mtots, Mrs)) #cgs
+    Mtots = samples[0] #cgs
+    Mrats = samples[1]
+    MCHs = utils.chirp_mass(*utils.m1m2_from_mtmr(Mtots, Mrats)) #cgs
 
-    REDZs = samples[2,:]/units[1]
+    REDZs = samples[2,:]/units[1] # dimensionless
 
-    FOs = samples[3,:] #Hz
+    FOs = samples[3,:]  #Hz
 
-    print(MCHs)
-    print(REDZs)
-    print(FOs)
+    print(f"MCHs: {MCHs.shape=}, {utils.stats(MCHs)}")
+    print(f"REDZs: {REDZs.shap=}, {utils.stats(REDZs)}")
+    print(f"FOs: {FOs.shape=}, {utils.stats(FOs)}")
 
     #make weights array with ones (included so we can support non-unit weights)
-    weights = np.ones(FOs.size)
+    weights = real_weights[rr] # np.ones(FOs.size)
 
-    #make vals array containing chirp mass, mass ratio, redshift, and observer frame GW frequency for each binary
-    vals = np.array([Mtots, Mrs, REDZs, FOs])
+    #make vals array containing total mass, mass ratio, redshift, and observer frame GW frequency for each binary
+    vals = np.array([Mtots, Mrats, REDZs, FOs]) # should this not be Mchirps?
     
     #reset psr objects so they have zero residuals
     for psr in psrs:
@@ -186,15 +185,15 @@ for rr in range(N_real):
         #psr.fit()
 
     #Add population of BBHs
-    inj_return = LT_catalog.add_gwb_plus_outlier_cws(psrs,
-                                                     vals, weights, F_bins, T_obs,
-                                                     outlier_per_bin=1_000, seed=1994+rr)
+    inj_return = LT_catalog.add_gwb_plus_outlier_cws(
+        psrs, vals, weights, F_bins_edges, T_obs,
+        outlier_per_bin=1_000, seed=1994+rr)
     f_centers, free_spec, outlier_fo, outlier_hs, outlier_mc, outlier_dl, random_gwthetas, random_gwphis, random_phases, random_psis, random_incs = inj_return
     #save simulated dataset to tim files
     real_dir = savedir+"real{0:03d}/".format(i)
     os.mkdir(real_dir)
     
-    np.savez(real_dir+"simulation_info.npz", free_spec=free_spec, f_centers=f_centers, F_bins=F_bins,
+    np.savez(real_dir+"simulation_info.npz", free_spec=free_spec, f_centers=f_centers, F_bins=F_bins_edges,
                                              outlier_fo=outlier_fo, outlier_hs=outlier_hs,
                                              outlier_mc=outlier_mc, outlier_dl=outlier_dl,
                                              random_gwthetas=random_gwthetas, random_gwphis=random_gwphis,
