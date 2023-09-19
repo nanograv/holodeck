@@ -102,23 +102,65 @@ class Realizer_SAM:
         sam = self._sam
         hard = self._hard
         fobs_orb_edges = self.fobs_orb_edges
-        names = ['mtot', 'mrat', 'redz', 'fobs']
 
         fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges)
-        fobs_cents = 2.0 * fobs_orb_cents
-        fobs_edges = 2.0 * fobs_orb_edges
+        fobs = 2.0 * fobs_orb_cents
 
 
         # ---- Calculate number of binaries in each bin
 
-        redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
+        redz, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
             fobs_orb_cents, sam, hard, cosmo
         )
 
         edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
         number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num) # weights
 
+        # ---- Find bin center properties
+        mtot = kale.utils.midpoints(edges[0]) #: total mass
+        mrat = kale.utils.midpoints(edges[1]) #: mass ratio
 
+        for dd in range(3):
+            redz = np.moveaxis(redz, dd, 0)
+            redz = kale.utils.midpoints(redz, axis=0) # get final redz at bin centers
+            redz = np.moveaxis(redz, 0, dd)
+        sel = (redz > 0.0) # identify emitting sources
+        redz[~sel] = -1.0 # set all other redshifts to zero
+        redz[redz<0] = -1.0
+
+        # get bin shape
+        nmtot = len(mtot)
+        nmrat = len(mrat)
+        nredz = len(redz)
+        nfobs = len(fobs)
+        if number.shape != np.array([nmtot, nmrat, nredz, nfobs]):
+            err = f"Parameter bin shape [{nmtot=}, {nmrat=}, {nredz=}, {nfobs=}] does not match {number.shape=}."
+            raise ValueError(err)
+        print(f"Parameter bin shape [{nmtot=}, {nmrat=}, {nredz=}, {nfobs=}] matches {number.shape=}.")
+
+        # Reshape arrays to [M,Q,Z,F]
+        mtot = np.repeat(mtot, nmrat*nredz*nfobs).reshape(nmtot, nmrat, nredz, nfobs)
+
+        mrat = np.repeat(mrat, nmtot*nredz*nfobs).reshape(nmrat, nmtot, nredz, nfobs) # Q,M,Z,F
+        mrat = np.swapaxes(mrat, 0, 1) # M,Q,Z,F
+
+        redz = np.repeat(redz, nmrat*nmtot*nfobs).reshape(nredz, nmrat, nmtot, nfobs) # Z,Q,M,F
+        redz = np.swapaxes(redz, 0, 2) # M,Q,Z,F
+
+        fobs = np.repeat(fobs, nmrat*nredz*nmtot).reshape(nfobs, nmrat, nredz, nmtot) # F,Q,Z,M
+        fobs = np.swapaxes(fobs, 0, 3) # M,Q,Z,F
+
+        if np.any([mtot.shape != number.shape, 
+                   mrat.shape != number.shape,
+                   redz.shape != number.shape,
+                   fobs.shape != number.shape]):
+            err = f"Sample shapes don't all match number! {mtot.shape=}, {mrat.shape=}, {redz.shape=}, {fobs.shape=}"
+  
+        samples = [mtot.flatten(), mrat.flatten(), redz.flatten(), fobs.flatten()]
+        names = ['mtot', 'mrat', 'redz', 'fobs']
+        weights = number.flatten()
+
+        return names, samples, weights
             
 
 def realizer_single_sources(params, nreals, nloudest, nfreqs=40, log10=False,
@@ -167,3 +209,10 @@ def realizer_single_sources(params, nreals, nloudest, nfreqs=40, log10=False,
     samples = np.swapaxes(samples, 0,1) # R,4,F*L
 
     return vals_names, samples
+
+def get_samples_from_edges(edges):
+    """
+    
+    
+    """
+    pass
