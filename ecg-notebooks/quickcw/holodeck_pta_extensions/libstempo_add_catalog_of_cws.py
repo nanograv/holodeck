@@ -390,7 +390,7 @@ def add_gwb_plus_outlier_cws(psrs, vals, weights, fobs, T_obs, outlier_per_bin=1
     
     FreeSpec = N.array([f_centers,N.sqrt(free_spec)]).T
     
-    print(FreeSpec)
+    print(f"{FreeSpec=}")
 
     howml = 10
     
@@ -416,6 +416,7 @@ def add_gwb_plus_outlier_cws(psrs, vals, weights, fobs, T_obs, outlier_per_bin=1
     random_psis = N.random.uniform(low=0.0, high=N.pi, size=N_CW)
     random_incs = N.arccos(N.random.uniform(low=-1.0, high=1.0, size=N_CW))
     
+    print("Add catalog of cws for each pulsar")
     for pulsar in psrs:
         add_catalog_of_cws(pulsar,
                            gwtheta_list=random_gwthetas, gwphi_list=random_gwphis, 

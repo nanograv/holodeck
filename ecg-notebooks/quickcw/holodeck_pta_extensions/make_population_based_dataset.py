@@ -22,7 +22,7 @@ from holodeck import extensions as holo_extensions
 #
 ####################################################################################
 #number of realizations to produce
-N_real = 100
+N_real = 50
 
 #path to directory where par and tim files will be saved
 #savedir = "../Test_datasets_12p5yr_based_2real/"
@@ -33,19 +33,27 @@ N_real = 100
 #savedir = "../Test_datasets_15yr_based_100real_v2/"
 #savedir = "../Test_datasets_15yr_based_100real_v3/"
 #savedir = "../Test_datasets_15yr_based_100real_v4/"
-savedir = "../Test_datasets_15yr_based_100real_v10/"
+savedir = "../Test_datasets_15yr_based_100real_v1/"
+savedir = f"/Users/emigardiner/GWs/holodeck/output/holodeck_extension_15yr_stuff/Test_pop_datasets_15yr_based_r{N_real:03d}_v01/"
+
 
 #path to par files used for the dataset
 #parpath = '../12p5yr_stripped_pars/'
 parpath = '../stripped_pars_15yr_v1p1/'
+parpath = '../../../output/holodeck_extension_15yr_stuff/stripped_pars_15yr_v1p1/'
+
 
 #path to json file with pulsar summary data made a la Atro4Cast
 #summary_data_json = '../psr_sumdata_v2.json' #'../psr_sumdata_12p5yr_based_15yr.json'
 summary_data_json = '../psr_sumdata_15yr_v1p1.json'
+summary_data_json = '../../../output/holodeck_extension_15yr_stuff/psr_sumdata_15yr_v1p1.json'
+
 
 #path to json with RN values
 #rn_json = '../channelized_12p5yr_v3_full_noisedict.json'
 rn_json = '../v1p1_all_dict.json'
+rn_json = '../../../output/holodeck_extension_15yr_stuff/v1p1_all_dict.json'
+
 
 #observational timespan and minimum time resolution
 #used to set lower and upper boundary on frequency for simulating binaries
@@ -135,13 +143,13 @@ for i in range(N_real):
     units = [1.99e+33, 1, 3.17e-08]
 
     #Mtots = samples[0,:]/units[0] #solar mass
-    Mtots = samples[0,:] #cgs
-    Mrs = samples[1,:]
+    Mtots = 10**samples[0,:] #cgs
+    Mrs = 10**samples[1,:]
     MCHs = utils.chirp_mass(*utils.m1m2_from_mtmr(Mtots, Mrs)) #cgs
 
-    REDZs = samples[2,:]/units[1]
+    REDZs = 10**samples[2,:]/units[1]
 
-    FOs = samples[3,:] #Hz
+    FOs = 10**samples[3,:] #Hz
 
     print(MCHs)
     print(REDZs)

@@ -77,6 +77,9 @@ class Realizer_SAM:
         pspace : _Param_Space object
             Parameter space.
         
+            
+        NOTE: To match the Realizer above I could initialize with weights and whatnot, then
+        possibly use the same resample/downsample function.
         """
 
         # check that ('sam' and 'hard') OR 'params' is provided

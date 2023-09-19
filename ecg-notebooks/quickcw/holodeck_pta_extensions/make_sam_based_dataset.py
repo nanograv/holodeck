@@ -23,31 +23,28 @@ import holodeck as holo
 #
 ####################################################################################
 
-N_real = 100     # number of realizations to produce
+N_REAL = 3     # number of realizations to produce
 debug = True     # whether to print steps
 
 #path to directory where par and tim files will be saved
-#savedir = "../Test_datasets_12p5yr_based_2real/"
-#savedir = "../Test_datasets_15yr_based_2real/"
-#savedir = "../Test_datasets_15yr_based_100real/"
-#savedir = "../Test_datasets_15yr_based_1real_debug_wn_only/"
-#savedir = "../Test_datasets_15yr_based_1real_v2/"
-#savedir = "../Test_datasets_15yr_based_100real_v2/"
-#savedir = "../Test_datasets_15yr_based_100real_v3/"
-#savedir = "../Test_datasets_15yr_based_100real_v4/"
-savedir = "../Test_datasets_15yr_based_100real_v10/"
+# savedir = "../Test_datasets_15yr_based_100real_v10/"
+# savedir = "../../../output/holodeck_extension_15yr_stuff/holodeck_extension_15yr_stuff/Test_datasets_15yr_based_100real_v10/"
+savedir = f"/Users/emigardiner/GWs/holodeck/output/holodeck_extension_15yr_stuff/Test_sam_datasets_15yr_based_r{N_REAL:03d}_v01/"
+
 
 #path to par files used for the dataset
-#parpath = '../12p5yr_stripped_pars/'
-parpath = '../stripped_pars_15yr_v1p1/'
+# parpath = '../stripped_pars_15yr_v1p1/'
+parpath = '../../../output/holodeck_extension_15yr_stuff/stripped_pars_15yr_v1p1/'
+
 
 #path to json file with pulsar summary data made a la Atro4Cast
-#summary_data_json = '../psr_sumdata_v2.json' #'../psr_sumdata_12p5yr_based_15yr.json'
-summary_data_json = '../psr_sumdata_15yr_v1p1.json'
+# summary_data_json = '../psr_sumdata_15yr_v1p1.json'
+summary_data_json = '../../../output/holodeck_extension_15yr_stuff/psr_sumdata_15yr_v1p1.json'
+
 
 #path to json with RN values
-#rn_json = '../channelized_12p5yr_v3_full_noisedict.json'
-rn_json = '../v1p1_all_dict.json'
+# rn_json = '../v1p1_all_dict.json'
+rn_json = '../../../output/holodeck_extension_15yr_stuff/v1p1_all_dict.json'
 
 #observational timespan and minimum time resolution
 #used to set lower and upper boundary on frequency for simulating binaries
@@ -56,10 +53,19 @@ T_obs = 16.03*YR
 # T_min = 1/24.0*YR
 
 # Choose binary population parameters
-RESAMP = 2.0       # resample initial population for smoother statistics
-TIME = 3.0 * GYR   # lifetime of systems between formation and coalescence
-DENS = 2.0         # change the density of binaries in the universe by this factor
-MAMP = 1e9 * MSOL  # normalization of the MBH-Galaxy mass relation
+# RESAMP = 2.0       # resample initial population for smoother statistics
+# TIME = 3.0 * GYR   # lifetime of systems between formation and coalescence
+# DENS = 2.0         # change the density of binaries in the universe by this factor
+# MAMP = 1e9 * MSOL  # normalization of the MBH-Galaxy mass relation
+SHAPE = 40 #[90,70,70]
+PARAMS = {'hard_time': 2.3580737294474514, 
+          'gsmf_phi0': -2.012540540307903, 
+          'gsmf_mchar0_log10': 11.358074707612774, 
+          'mmb_mamp_log10': 8.87144417474846, 
+          'mmb_scatter_dex': 0.027976545572248435, 
+          'hard_gamma_inner': -0.38268820924239666}
+PSPACE = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=SHAPE, seed=None)
+
 
 ####################################################################################
 #
@@ -67,14 +73,17 @@ MAMP = 1e9 * MSOL  # normalization of the MBH-Galaxy mass relation
 #
 ####################################################################################
 #make directory to save datasets to
-os.mkdir(savedir)
+if os.path.exists(savedir) is False:
+    os.mkdir(savedir)
+else:
+    print(f"Overwriting {savedir=}")
 
 #get list of par files
 parfiles = sorted(glob.glob(parpath + '/*.par'))
 #reduce number of psrs for testing
 #parfiles = parfiles[:5]
-print(len(parfiles))
-print(parfiles)
+print(f"{len(parfiles)=}")
+print(f"{parfiles=}")
 
 #copy parfiles to output directory to have them at the same place
 for p in parfiles:
@@ -88,7 +97,7 @@ with open(summary_data_json) as fp:
 psrs = []
 for i, p in enumerate(parfiles):
     psrname = p.split('/')[-1].split('.')[0]
-    print(psrname)
+    print(f"{psrname=}")
     
     t = np.array(psr_sumdata[psrname]['toas']) / 86400.0
     toaerrs = np.array(psr_sumdata[psrname]['toaerrs']) / 1e-6
@@ -110,16 +119,9 @@ print(f"{n_bins=}")
 
 # set up realizer object used to create realizations of a binary population for a specific model
 # (need to use orbital frequency instead of GW)
-params = {'hard_time': 2.3580737294474514, 
-          'gsmf_phi0': -2.012540540307903, 
-          'gsmf_mchar0_log10': 11.358074707612774, 
-          'mmb_mamp_log10': 8.87144417474846, 
-          'mmb_scatter_dex': 0.027976545572248435, 
-          'hard_gamma_inner': -0.38268820924239666}
-pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=None, seed=None)
 realizer = holo_extensions.Realizer_SAM(
-    fobs_orb_edges=F_bins_edges/2.0, params=params,
-    pspace=pspace)
+    fobs_orb_edges=F_bins_edges/2.0, params=PARAMS,
+    pspace=PSPACE)
 
 
 ####################################################################################
@@ -128,8 +130,8 @@ realizer = holo_extensions.Realizer_SAM(
 #
 ####################################################################################
 
-names, real_samples, real_weights = realizer(nreals=N_real)
-for rr in range(N_real):
+names, real_samples, real_weights = realizer(nreals=N_REAL, clean=True)
+for rr in range(N_REAL):
     print(f"--- Realization: {rr}")
 
     #sample binary parameters from population
@@ -137,21 +139,21 @@ for rr in range(N_real):
     # nn, samples = realizer()
     # nn, samples = realizer(down_sample=50) #optional downsampling for quick testing
     samples = real_samples[rr]
-    print(samples.shape)
+    print(f"{len(samples[0])=}")
 
     units = [1.99e+33, 1, 3.17e-08]
 
     #Mtots = samples[0,:]/units[0] #solar mass
     Mtots = samples[0] #cgs
     Mrats = samples[1]
-    MCHs = utils.chirp_mass(*utils.m1m2_from_mtmr(Mtots, Mrats)) #cgs
+    # MCHs = utils.chirp_mass(*utils.m1m2_from_mtmr(Mtots, Mrats)) #cgs
 
-    REDZs = samples[2,:]/units[1] # dimensionless
+    REDZs = samples[2]/units[1] # dimensionless
 
-    FOs = samples[3,:]  #Hz
+    FOs = samples[3]  #Hz
 
-    print(f"MCHs: {MCHs.shape=}, {utils.stats(MCHs)}")
-    print(f"REDZs: {REDZs.shap=}, {utils.stats(REDZs)}")
+    # print(f"MCHs: {MCHs.shape=}, {utils.stats(MCHs)}")
+    print(f"REDZs: {REDZs.shape=}, {utils.stats(REDZs)}")
     print(f"FOs: {FOs.shape=}, {utils.stats(FOs)}")
 
     #make weights array with ones (included so we can support non-unit weights)
@@ -159,14 +161,17 @@ for rr in range(N_real):
 
     #make vals array containing total mass, mass ratio, redshift, and observer frame GW frequency for each binary
     vals = np.array([Mtots, Mrats, REDZs, FOs]) # should this not be Mchirps?
+    print(f"{vals.shape=}")
     
     #reset psr objects so they have zero residuals
+    print('Resetting pulsars')
     for psr in psrs:
         for I in range(3):
             psr.stoas[:] -= psr.residuals() / 86400.0
             psr.formbats()
 
     #Add WN (only efac needed for epoch-averaged TOAs)
+    print('Adding white noise')
     for psr in psrs:
         #print("WN")
         #print(psr.name)
@@ -174,6 +179,7 @@ for rr in range(N_real):
         #psr.fit()
 
     #Add per-psr RN
+    print('Adding per-pulsar red noise')
     with open(rn_json, 'r') as f:
         noisedict = json.load(f)
     for psr in psrs:
@@ -185,6 +191,7 @@ for rr in range(N_real):
         #psr.fit()
 
     #Add population of BBHs
+    print('Adding population of BBHs')
     inj_return = LT_catalog.add_gwb_plus_outlier_cws(
         psrs, vals, weights, F_bins_edges, T_obs,
         outlier_per_bin=1_000, seed=1994+rr)
