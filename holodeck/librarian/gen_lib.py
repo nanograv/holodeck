@@ -5,7 +5,7 @@ import argparse
 import sys
 from datetime import datetime
 from pathlib import Path
-import shutil
+# import shutil
 
 import numpy as np
 import scipy as sp
@@ -27,7 +27,7 @@ MAX_FAILURES = 5
 FILES_COPY_TO_OUTPUT = []
 
 
-def main():
+def main():   # noqa : ignore complexity warning
 
     # ---- load mpi4py module
 
@@ -134,11 +134,13 @@ def main():
     # ---- iterate over each processors jobs
 
     for par_num in iterator:
+
         log.info(f"{comm.rank=} {par_num=}")
         pdict = space.param_dict(par_num)
-        msg = "\n"
+        msg = []
         for kk, vv in pdict.items():
-            msg += f"{kk}={vv}\n"
+            msg.append(f"{kk}={vv:.4e}")
+        msg = ", ".join(msg)
         log.info(msg)
 
         rv = run_sam_at_pspace_num(args, space, par_num)
@@ -146,6 +148,7 @@ def main():
             failures += 1
 
         if failures > MAX_FAILURES:
+            log.error("\n\n")
             err = f"Failed {failures} times on rank:{comm.rank}!"
             log.exception(err)
             raise RuntimeError(err)
@@ -203,7 +206,7 @@ def run_sam_at_pspace_num(args, space, pnum):
 
     try:
         log.debug("Selecting `sam` and `hard` instances")
-        sam, hard = space(pnum)
+        sam, hard = space.model_for_sample_number(pnum)
 
         data = run_model(
             sam, hard,
@@ -469,17 +472,23 @@ def _setup_argparse(comm, *args, **kwargs):
 
     #
     if args.TEST:
-        msg = "==== WARNING: running in test mode.  other settings being overridden. ===="
-        print("=" * len(msg))
+        msg = "==== WARNING: running in test mode, other settings being overridden! ===="
+        print("\n" + "=" * len(msg))
         print(msg)
-        print("=" * len(msg))
+        print("=" * len(msg) + "\n")
 
+        global MAX_FAILURES
+        MAX_FAILURES = 0
         args.nsamples = 10
         args.nreals = 3
         args.pta_dur = 10.0
         args.nfreqs = 5
-        args.shape = (11, 12, 13)
+        args.sam_shape = (11, 12, 13)
         args.nloudest = 2
+
+        if not output.name.startswith("_"):
+            output = output.with_name("_" + output.name)
+            print(f"WARNING: changed output to '{output}'\n")
 
         if args.resume:
             raise RuntimeError("Cannot use `resume` in TEST mode!")
