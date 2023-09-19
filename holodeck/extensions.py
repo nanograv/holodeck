@@ -142,6 +142,23 @@ class Realizer_SAM:
         shape = (number.size, nreals)
         weights = gravwaves.poisson_as_needed(number[..., np.newaxis] * np.ones(shape)).reshape(shape)
 
+        
+
+        if clean:
+            nonzero_samples = []
+            nonzero_weights = []
+            for rr in range(nreals):
+                nonzero = weights[:,rr]!=0
+                mtot = samples[0][nonzero]
+                mrat = samples[1][nonzero]
+                redz = samples[2][nonzero]
+                fobs = samples[3][nonzero]
+                nonzero_samples.append([mtot, mrat, redz, fobs])
+                nonzero_weights.append(weights[:,rr][nonzero])
+    
+            weights = nonzero_weights
+            samples = nonzero_samples
+
         return names, samples, weights
             
 
