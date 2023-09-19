@@ -1,10 +1,13 @@
 """Custom holodeck extensions not supported as part of the core package.
 """
 
+from typing import Any
 import holodeck as holo
-from holodeck import log
+from holodeck import log, cosmo
 from holodeck.constants import MSOL, GYR
 import numpy as np
+import kalepy as kale
+from sams import cyutils as sam_cyutils
 
 
 class Realizer:
@@ -56,11 +59,71 @@ class Realizer:
         return names, samples
 
 
+class Realizer_SAM:
+    def __init__(
+            self, fobs_orb_edges, sam=None, hard=None, params=None, 
+            pspace=holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=None, seed=None)):
+        """Construct a Realizer for a given semi-analytic model and hardening model,
+        or build this model using params and a pspace.
+
+        Parameters
+        ----------
+        sam : Semi_Analytic_Model object or None
+            Semi-analytic model instance, if not using pspace.
+        hard : Fixed_Time_2PL_SAM object, GW_Only object, None
+            Hardening model instance, if not using pspace.
+        params : dict or None
+            Parameters for a given parameter space, if sam is not provided.
+        pspace : _Param_Space object
+            Parameter space.
+        
+        """
+
+        # check that ('sam' and 'hard') OR 'params' is provided
+        if params is not None:
+            if sam is not None or hard is not None:
+                err = "Only 'params' or ('sam' and 'hard') should be provided."
+                raise ValueError(err)
+            sam, hard = pspace.model_for_params(params=params, sam_shape=pspace.sam_shape,)
+        else:
+            if sam is None or hard is None:
+                err = "'params' or ('sam' and 'hard') must be provided."
+                raise ValueError(err)
+            
+        self._sam = sam
+        self._hard = hard
+        self._fobs_orb_edges = fobs_orb_edges
+
+    def __call__(self, nreals=100):
+        """ Calculate samples and weights for an entire semi-analytic population.
+        
+        """
+
+        sam = self._sam
+        hard = self._hard
+        fobs_orb_edges = self.fobs_orb_edges
+        names = ['mtot', 'mrat', 'redz', 'fobs']
+
+        fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges)
+        fobs_cents = 2.0 * fobs_orb_cents
+        fobs_edges = 2.0 * fobs_orb_edges
 
 
-def realizer_sam(params, nreals, nloudest, nfreqs=40, log10=False,
+        # ---- Calculate number of binaries in each bin
+
+        redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
+            fobs_orb_cents, sam, hard, cosmo
+        )
+
+        edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
+        number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num) # weights
+
+
+            
+
+def realizer_single_sources(params, nreals, nloudest, nfreqs=40, log10=False,
                pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=None, seed=None)):
-    """ Like Realizer but for SAMs instead of illustris populations
+    """ Like Realizer but using single sources from a SAM instead of Illustris populations
 
     Parameters
     ----------
