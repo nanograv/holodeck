@@ -116,47 +116,7 @@ class Realizer_SAM:
         edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
         number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num) # weights
 
-        # ---- Find bin center properties
-        mtot = kale.utils.midpoints(edges[0]) #: total mass
-        mrat = kale.utils.midpoints(edges[1]) #: mass ratio
-
-        for dd in range(3):
-            redz = np.moveaxis(redz, dd, 0)
-            redz = kale.utils.midpoints(redz, axis=0) # get final redz at bin centers
-            redz = np.moveaxis(redz, 0, dd)
-        sel = (redz > 0.0) # identify emitting sources
-        redz[~sel] = -1.0 # set all other redshifts to zero
-        redz[redz<0] = -1.0
-
-        # get bin shape
-        nmtot = len(mtot)
-        nmrat = len(mrat)
-        nredz = len(redz)
-        nfobs = len(fobs)
-        if number.shape != np.array([nmtot, nmrat, nredz, nfobs]):
-            err = f"Parameter bin shape [{nmtot=}, {nmrat=}, {nredz=}, {nfobs=}] does not match {number.shape=}."
-            raise ValueError(err)
-        print(f"Parameter bin shape [{nmtot=}, {nmrat=}, {nredz=}, {nfobs=}] matches {number.shape=}.")
-
-        # Reshape arrays to [M,Q,Z,F]
-        mtot = np.repeat(mtot, nmrat*nredz*nfobs).reshape(nmtot, nmrat, nredz, nfobs)
-
-        mrat = np.repeat(mrat, nmtot*nredz*nfobs).reshape(nmrat, nmtot, nredz, nfobs) # Q,M,Z,F
-        mrat = np.swapaxes(mrat, 0, 1) # M,Q,Z,F
-
-        redz = np.repeat(redz, nmrat*nmtot*nfobs).reshape(nredz, nmrat, nmtot, nfobs) # Z,Q,M,F
-        redz = np.swapaxes(redz, 0, 2) # M,Q,Z,F
-
-        fobs = np.repeat(fobs, nmrat*nredz*nmtot).reshape(nfobs, nmrat, nredz, nmtot) # F,Q,Z,M
-        fobs = np.swapaxes(fobs, 0, 3) # M,Q,Z,F
-
-        if np.any([mtot.shape != number.shape, 
-                   mrat.shape != number.shape,
-                   redz.shape != number.shape,
-                   fobs.shape != number.shape]):
-            err = f"Sample shapes don't all match number! {mtot.shape=}, {mrat.shape=}, {redz.shape=}, {fobs.shape=}"
-  
-        samples = [mtot.flatten(), mrat.flatten(), redz.flatten(), fobs.flatten()]
+        samples = get_samples_from_edges(edges, redz, number.shape, flatten=True)
         names = ['mtot', 'mrat', 'redz', 'fobs']
         weights = number.flatten()
 
@@ -210,9 +170,73 @@ def realizer_single_sources(params, nreals, nloudest, nfreqs=40, log10=False,
 
     return vals_names, samples
 
-def get_samples_from_edges(edges):
+def get_samples_from_edges(edges, redz, number_shape, flatten=True):
+    """ Get the sample parameters for every bin center and return as flattened arrays.
+
+    Parameters
+    ----------
+    edges : array of [M+1,], [Q+1,], [Z+1,], and [F+1,] NDarrays
+        Edges for mtot, mrat, redz, fobs_orb_edges 
+    redz : [M+1, Q+1, Z+1, F+1] NDarray
+        Final redshifts
+    number_shape : array
+        Shape [M,Q,Z,F]
+    flatten : boolean
+        Whether or not to flatten each sample array
+    
+    Returns
+    -------
+    samples : array of 4 flattened [M*Q*Z*F,] NDarrays
+    
     """
     
-    
-    """
-    pass
+     # ---- Find bin center properties
+    mtot = kale.utils.midpoints(edges[0]) #: total mass
+    mrat = kale.utils.midpoints(edges[1]) #: mass ratio
+    fobs_orb_cents = kale.utils.midpoints(edges[3]) 
+    fobs = 2.0 * fobs_orb_cents           #: gw fobs
+
+    for dd in range(3):
+        redz = np.moveaxis(redz, dd, 0)
+        redz = kale.utils.midpoints(redz, axis=0) # get final redz at bin centers
+        redz = np.moveaxis(redz, 0, dd)
+    sel = (redz > 0.0) # identify emitting sources
+    redz[~sel] = -1.0 # set all other redshifts to zero
+    redz[redz<0] = -1.0
+
+    # get bin shape
+    nmtot = len(mtot)
+    nmrat = len(mrat)
+    nredz = len(redz)
+    nfobs = len(fobs)
+    if number_shape != np.array([nmtot, nmrat, nredz, nfobs]):
+        err = f"Parameter bin shape [{nmtot=}, {nmrat=}, {nredz=}, {nfobs=}] does not match {number_shape=}."
+        raise ValueError(err)
+    print(f"Parameter bin shape [{nmtot=}, {nmrat=}, {nredz=}, {nfobs=}] matches {number_shape=}.")
+
+    # Reshape arrays to [M,Q,Z,F]
+    mtot = np.repeat(mtot, nmrat*nredz*nfobs).reshape(nmtot, nmrat, nredz, nfobs)
+
+    mrat = np.repeat(mrat, nmtot*nredz*nfobs).reshape(nmrat, nmtot, nredz, nfobs) # Q,M,Z,F
+    mrat = np.swapaxes(mrat, 0, 1) # M,Q,Z,F
+
+    redz = np.repeat(redz, nmrat*nmtot*nfobs).reshape(nredz, nmrat, nmtot, nfobs) # Z,Q,M,F
+    redz = np.swapaxes(redz, 0, 2) # M,Q,Z,F
+
+    fobs = np.repeat(fobs, nmrat*nredz*nmtot).reshape(nfobs, nmrat, nredz, nmtot) # F,Q,Z,M
+    fobs = np.swapaxes(fobs, 0, 3) # M,Q,Z,F
+
+    # check shapes again
+    if np.any([mtot.shape != number_shape, 
+                mrat.shape != number_shape,
+                redz.shape != number_shape,
+                fobs.shape != number_shape]):
+        err = f"Sample shapes don't all match number! {mtot.shape=}, {mrat.shape=}, {redz.shape=}, {fobs.shape=}"
+        raise ValueError(err)
+
+    if flatten:
+        samples = [mtot.flatten(), mrat.flatten(), redz.flatten(), fobs.flatten()]
+    else:
+        samples = [mtot, mrat, redz, fobs]
+
+    return samples
