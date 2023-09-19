@@ -319,6 +319,14 @@ def loop_over_CWs(phat, toas, gwtheta_list, gwphi_list, mc_list, dist_list, fgw_
 
 #@profile
 def add_gwb_plus_outlier_cws(psrs, vals, weights, fobs, T_obs, outlier_per_bin=100, seed=1234):
+    """
+    Parameters
+    ----------
+    psrs : 
+    vals : [4, Nsamples] NDarray
+        NDarray containing the total mass, mass ratio, redshift, and f_obs 
+        for each sample bin.
+    """
     PC = ap.constants.pc.cgs.value
     MSOL = ap.constants.M_sun.cgs.value
     
