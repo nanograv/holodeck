@@ -136,8 +136,8 @@ for i in range(N_real):
     print(i)
 
     #sample binary parameters from population
-    nn, samples = realizer()
-    #nn, samples = realizer(down_sample=50) #optional downsampling for quick testing
+    # nn, samples = realizer()
+    nn, samples = realizer(down_sample=50) #optional downsampling for quick testing
     print(samples.shape)
 
     units = [1.99e+33, 1, 3.17e-08]
