@@ -238,7 +238,8 @@ class _Param_Space(abc.ABC):
         # `holodeck.param_spaces` module
         class_name = data['class_name'][()]
         log.debug(f"loaded: {class_name=}, vers={data['librarian_version']}")
-        pspace_class = getattr(holo.param_spaces, class_name, None)
+        # pspace_class = getattr(holo.param_spaces, class_name, None)
+        pspace_class = holo.librarian.param_spaces.get(class_name, None)
         # if it is not found, default to the current class/subclass
         if pspace_class is None:
             log.warning(f"pspace file {fname} has {class_name=}, not found in `holo.param_spaces`!")

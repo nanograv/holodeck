@@ -97,19 +97,6 @@ class _PS_Classic_Phenom(_Param_Space):
         return hard
 
 
-class PS_Test(_PS_Classic_Phenom):
-    """Simple test parameter space in 2D.
-    """
-
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
-        super().__init__(
-            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
-
-            mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
-            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
-        )
-
-
 class PS_Classic_Phenom_Uniform(_PS_Classic_Phenom):
     """Classic 5D phenomenological, uniform parameter space used in 15yr analysis.
 
@@ -286,4 +273,26 @@ class PS_Classic_GWOnly_Astro_Extended(_PS_Classic_GWOnly):
             mmb_plaw=PD_Normal(+1.2, 0.2),
             mmb_scatter_dex=PD_Normal(+0.32, 0.15),
         )
+
+
+class PS_Test(_PS_Classic_Phenom):
+    """Simple test parameter space in 2D.
+    """
+
+    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+        super().__init__(
+            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+
+            mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
+            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+        )
+
+
+_param_spaces = {
+    "PS_Test": PS_Test,
+    "PS_Classic_Phenom_Uniform": PS_Classic_Phenom_Uniform,
+    "PS_Classic_Phenom_Astro_Extended": PS_Classic_Phenom_Astro_Extended,
+    "PS_Classic_GWOnly_Uniform": PS_Classic_GWOnly_Uniform,
+    "PS_Classic_GWOnly_Astro_Extended": PS_Classic_GWOnly_Astro_Extended,
+}
 
