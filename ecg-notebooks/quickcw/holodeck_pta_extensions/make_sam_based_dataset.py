@@ -6,6 +6,8 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 
+import sys
+sys.path.append('/Users/emigardiner/GWs/libstempo/libstempo')
 import libstempo.toasim as LT
 import libstempo.plot as LP
 
