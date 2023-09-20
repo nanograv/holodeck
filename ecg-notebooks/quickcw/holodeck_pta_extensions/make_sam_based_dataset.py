@@ -34,17 +34,17 @@ savedir = f"/Users/emigardiner/GWs/holodeck/output/holodeck_extension_15yr_stuff
 
 #path to par files used for the dataset
 # parpath = '../stripped_pars_15yr_v1p1/'
-parpath = '../../../output/holodeck_extension_15yr_stuff/stripped_pars_15yr_v1p1/'
+parpath = '/Users/emigardiner/GWs/holodeck/output/holodeck_extension_15yr_stuff/stripped_pars_15yr_v1p1/'
 
 
 #path to json file with pulsar summary data made a la Atro4Cast
 # summary_data_json = '../psr_sumdata_15yr_v1p1.json'
-summary_data_json = '../../../output/holodeck_extension_15yr_stuff/psr_sumdata_15yr_v1p1.json'
+summary_data_json = '/Users/emigardiner/GWs/holodeck/output/holodeck_extension_15yr_stuff/psr_sumdata_15yr_v1p1.json'
 
 
 #path to json with RN values
 # rn_json = '../v1p1_all_dict.json'
-rn_json = '../../../output/holodeck_extension_15yr_stuff/v1p1_all_dict.json'
+rn_json = '/Users/emigardiner/GWs/holodeck/output/holodeck_extension_15yr_stuff/v1p1_all_dict.json'
 
 #observational timespan and minimum time resolution
 #used to set lower and upper boundary on frequency for simulating binaries
@@ -101,9 +101,15 @@ for i, p in enumerate(parfiles):
     
     t = np.array(psr_sumdata[psrname]['toas']) / 86400.0
     toaerrs = np.array(psr_sumdata[psrname]['toaerrs']) / 1e-6
-    
+    print(type(toaerrs[0]))
+    print(f"{type(t[0])=}")
+   
     fake_pulsar = LT.fakepulsar(p,obstimes=t,toaerr=toaerrs)#, flags='-pta PPTA')
+    print(f"{type(fake_pulsar.toas().min())=}")
+    # fake_pulsar.toas = fake_pulsar.toas.astype(np.float64)
+    # print(f"{type(fake_pulsar.toas().min())=}")
     psrs.append(fake_pulsar)
+
 
 
 ####################################################################################
