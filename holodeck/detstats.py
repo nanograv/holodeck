@@ -2083,7 +2083,7 @@ def detfrac_of_reals(dp_ss, dp_bg, thresh=DEF_THRESH):
 
 
 def expval_of_ss(gamma_ssi,):
-    """ Calculate the expected number of single source detections, across all realization
+    """ Calculate the expected number of single source detections, across all frequencies.
 
     Parameters
     ----------
@@ -2093,7 +2093,7 @@ def expval_of_ss(gamma_ssi,):
     Returns
     -------
     ev_ss : (R,S)
-        Expected number of single source detection (dp_ss>thresh) for each strain and sky realizations.
+        Expected (fractional) number of single source detection for each strain and sky realizations.
     
     """
     # print(f"{gamma_ssi.shape=}, {[*gamma_ssi.shape]}")
@@ -3368,7 +3368,7 @@ def build_noise_arrays(
         gw_only=False, red2white=None, red_gamma=None, 
         nloudest=10, bgl=1, save_temp=True,
         gsc_flag=False, dsc_flag=False, divide_flag=False, nexcl=0,
-        var_hard_time=None,
+        var_hard_time=None, 
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/noise',):
 
     data, params, dsdat = get_data(target,
@@ -3377,6 +3377,7 @@ def build_noise_arrays(
         gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag,
         var_hard_time=var_hard_time)
     fobs_cents = data[0]['fobs_cents']
+    nfreqs=len(fobs_cents)
     cad = 1.0/(2.0*fobs_cents[-1])
 
     sigmas = []
@@ -3390,15 +3391,22 @@ def build_noise_arrays(
         sigmas.append(dsdat[ii]['sigmas']) # R,
         hc_ss.append(dat['hc_ss'])
         hc_bg.append(dat['hc_bg']) 
-        dp_ssi = dsdat[ii]['gamma_ssi'] # F,R,S,L
-        _dp_max = np.max(dp_ssi, axis=(0,3)) # R,S
-        dp_ssi[dp_ssi==_dp_max[np.newaxis,:,:,np.newaxis]] = 0
-        _dp_2nd = np.max(dp_ssi, axis=(0,3)) # R,S
-        dp_max.append(_dp_max)
-        dp_2nd.append(_dp_2nd)
 
+        dp_ssi = dsdat[ii]['gamma_ssi'] # F,R,S,L
         count_cws_01.append(np.sum(dp_ssi>0.01, axis=(0,3))) # from F,R,S,L to R,S
         count_cws_50.append(np.sum(dp_ssi>0.50, axis=(0,3)))
+
+        dp_ssi = np.swapaxes(dp_ssi, 1,3).reshape(nfreqs*nloudest, nreals*nskies) # F*L, R*S
+        argmax = np.argmax(dp_ssi, axis=0) # R*S
+        reals = np.arange(nreals*nskies) # R*S
+        _dp_max = dp_ssi[argmax, reals] # R*S
+
+        dp_ssi[argmax, reals] = 0
+        argmax = np.argmax(dp_ssi, axis=0) # R*S
+        _dp_2nd = dp_ssi[argmax, reals] # R*S
+
+        dp_max.append(_dp_max)
+        dp_2nd.append(_dp_2nd)
 
     sigmas = np.array(sigmas) # V, R
     hc_ss = np.array(hc_ss) # (V,F,R,L)
