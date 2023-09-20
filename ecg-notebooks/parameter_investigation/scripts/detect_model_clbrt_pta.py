@@ -244,6 +244,9 @@ def file_names(args):
     if args.nexcl > 0:
         save_dets_to_file += f'_nexcl{args.nexcl}'
 
+    if args.npsrs != 40:
+        save_dets_to_file += f'_p{args.npsrs}'
+
 
     if args.red2white is not None and args.red_gamma is not None:               # if using red noise with fixed red_gamma
         save_dets_to_file = save_dets_to_file+f'_r2w{args.red2white:.1e}_rg{args.red_gamma:.1f}'
