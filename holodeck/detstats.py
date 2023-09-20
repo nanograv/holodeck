@@ -3196,7 +3196,7 @@ def get_data(
         red_gamma = None, red2white=None, 
         gsc_flag=False,  dsc_flag=False, divide_flag=False, nexcl=0,
         gw_only=False, 
-        var_hard_time=None,
+        var_hard_time=None, npsrs=40,
 ):
     if gw_only:
         path = '/Users/emigardiner/GWs/holodeck/output/anatomy_7GW'
@@ -3236,6 +3236,9 @@ def get_data(
     if nexcl>0:
         dets_file += f'_nexcl{nexcl}'
 
+    if npsrs != 40:
+        dets_file += f'_p{npsrs}'
+
     if red2white is not None and red_gamma is not None:               # if using red noise with fixed red_gamma
         dets_file += f'_r2w{red2white:.1e}_rg{red_gamma:.1f}'
     else: 
@@ -3272,7 +3275,7 @@ def append_filename(filename='',
         gw_only=False, red_gamma = None, red2white=None, 
         nloudest = 10, bgl = 10, cv=None, 
         gsc_flag=False,  dsc_flag=False, divide_flag=False, nexcl=0,
-        var_hard_time=None,
+        var_hard_time=None, 
         
         ):
     
@@ -3313,14 +3316,14 @@ def build_ratio_arrays(
         gw_only=False, red2white=None, red_gamma=None, 
         nloudest=10, bgl=1, 
         gsc_flag=False, dsc_flag=False, divide_flag=False, nexcl=0,
-        var_hard_time=None, 
+        var_hard_time=None, npsrs=40,
         figpath = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/ratio',):
 
     data, params, dsdat = get_data(target,
         gw_only=gw_only, red2white=red2white, red_gamma=red_gamma,
         nloudest=nloudest, bgl=bgl, nexcl=nexcl,
         gsc_flag=gsc_flag, dsc_flag=dsc_flag, divide_flag=divide_flag,
-        var_hard_time=var_hard_time)
+        var_hard_time=var_hard_time, npsrs=npsrs)
     xx=[]
     yy=[]
     for pp, par in enumerate(params):
