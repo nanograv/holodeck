@@ -2102,6 +2102,26 @@ def expval_of_ss(gamma_ssi,):
     return ev_ss
     # df_bg[nn] = np.sum(dp_bg[nn]>thresh)/(nreals)
 
+def count_n_ss(gamma_ssi):
+    """ Calculate the number of random single source detections.
+
+    Parameters
+    ----------
+    gamma_ssi : (F,R,S,L) NDarray
+        Detection probability of each single source
+
+    Returns
+    -------
+    nn_ss : (R,S)
+        Number of random single source detections for each strain and sky realization.
+    
+    """
+
+    randoms = np.random.uniform(0,1, size=gamma_ssi.size).reshape(gamma_ssi.shape)
+    nn_ss = np.sum((gamma_ssi>randoms), axis=(0,3))
+    return nn_ss
+
+
 
 
 ############################# Plot Library #############################
@@ -3399,14 +3419,14 @@ def build_noise_arrays(
         count_cws_01.append(np.sum(dp_ssi>0.01, axis=(0,3))) # from F,R,S,L to R,S
         count_cws_50.append(np.sum(dp_ssi>0.50, axis=(0,3)))
 
-        dp_ssi = np.swapaxes(dp_ssi, 1,3).reshape(nfreqs*nloudest, nreals*nskies) # F*L, R*S
-        argmax = np.argmax(dp_ssi, axis=0) # R*S
-        reals = np.arange(nreals*nskies) # R*S
-        _dp_max = dp_ssi[argmax, reals] # R*S
+        dp_ssi = np.swapaxes(dp_ssi, 1,3).reshape(nfreqs*nloudest, nreals*nskies) # F*L, S*R
+        argmax = np.argmax(dp_ssi, axis=0) # S*R
+        reals = np.arange(nreals*nskies) # S*R
+        _dp_max = dp_ssi[argmax, reals] # S*R
 
         dp_ssi[argmax, reals] = 0
-        argmax = np.argmax(dp_ssi, axis=0) # R*S
-        _dp_2nd = dp_ssi[argmax, reals] # R*S
+        argmax = np.argmax(dp_ssi, axis=0) # S*R
+        _dp_2nd = dp_ssi[argmax, reals] # S*R
 
         dp_max.append(_dp_max)
         dp_2nd.append(_dp_2nd)
