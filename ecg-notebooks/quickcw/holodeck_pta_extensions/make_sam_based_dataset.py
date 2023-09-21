@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import sys
-sys.path.append('/Users/emigardiner/GWs/libstempo/libstempo')
+sys.path.append('/Users/emigardiner/GWs')
 import libstempo.toasim as LT
 import libstempo.plot as LP
 
