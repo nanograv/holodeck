@@ -64,7 +64,6 @@ class GW_Discrete(Grav_Waves):
         else:
             harm_range = [2]
 
-        nharms = len(harm_range)
         harms = np.zeros((nfreqs, nharms))
 
         freq_iter = enumerate(fobs_gw)
@@ -197,6 +196,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], \
                                    data_harms['sepa'][valid], frst_orb=frst_orb,\
                                    dfdt_mdot=evo.dfdt_mdot)
+
     _lambda_fact = utils.lambda_factor_dlnf(frst_orb, dfdt, redz, dcom=dcom) / box_vol
     num_binaries = _lambda_fact * dlnf
 
