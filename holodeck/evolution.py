@@ -135,7 +135,7 @@ class Evolution:
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
 
-    def __init__(self, pop, hard, nsteps: int = 100, mods=None, debug: bool = False, acc=None):
+    def __init__(self, pop, hard, nsteps: int = 100, mods=None, debug: bool = False, acc=None, dfdt_mdot=False):
         """Initialize a new Evolution instance.
 
         Parameters
@@ -158,6 +158,7 @@ class Evolution:
         self._nsteps = nsteps                 #: number of integration steps for each binary
         self._mods = mods                     #: modifiers to be applied after evolution is completed
         self._acc = acc
+        self.dfdt_mdot = dfdt_mdot #include frequency evolution from mdot
 
         # Store hardening instances as a list
         if not np.iterable(hard):
@@ -833,6 +834,27 @@ class Evolution:
             ecc_r = self.eccen[:, left] + de
             ecc_r = np.clip(ecc_r, 0.0, 1.0 - _MAX_ECCEN_ONE_MINUS)
             self.eccen[:, right] = ecc_r
+        
+        # ------- NOTE: need to take a first guess at the mass in the next step HERE ----
+        # This is to account for the increased hardening rate (gw hardening specifically) due to mass increase
+        if self._acc is not None:
+            """ An instance of the accretion class has been supplied,
+                and binary masses are evolved through accretion
+                First, get total accretion rates """
+
+            mdot_t = self._acc.mdot_total(self, step)
+            """ A preferential accretion model is called to divide up
+                total accretion rates into primary and secondary accretion rates """
+            self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_t, self, step)
+            """ Accreted mass is calculated and added to primary and secondary masses """
+            if self._acc.evol_mass:
+                #this switch helps to separate out accretion effects from other cbd effects
+                self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:,step-1,0]
+                self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:,step-1,1]
+            else:
+                self.mass[:, step, 0] = self.mass[:, step-1, 0]
+                self.mass[:, step, 1] = self.mass[:, step-1, 1]
+        # THIS ALSO NEEDS TO BE AT THE END OF take_next_step TO ACCOUNT FOR MASS INCREASE WITH THE CORRECT TIMESTEP
 
         # Update lookback time based on duration of this step
         tlook = self.tlook[:, left] - dt
@@ -894,6 +916,7 @@ class Evolution:
                     log.exception(err)
                     raise ValueError(err)
 
+        # ---- HERE UPDATE THE MASS DUE TO ACCRETION, NOW WITH THE FINAL TIMESTEP ------
         if self._acc is not None:
             """ An instance of the accretion class has been supplied,
                 and binary masses are evolved through accretion
