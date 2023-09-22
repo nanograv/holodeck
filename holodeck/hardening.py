@@ -414,6 +414,11 @@ class Sesana_Scattering(_Hardening):
         eccen = np.atleast_1d(eccen) if eccen is not None else None
         mtot, mrat = utils.mtmr_from_m1m2(mass)
 
+        if np.any(mrat>1):
+            import sys
+            sys.terminate("mrat>1 in stellar scattering.")
+
+
 
         mbulge = self._mmbulge.mbulge_from_mbh(mtot, scatter=False)
         vdisp = self._msigma.vdisp_from_mbh(mtot, scatter=False)
@@ -578,7 +583,7 @@ class Dynamical_Friction_NFW(_Hardening):
         mhalo = self._smhm.halo_mass(mstar, redz, clip=True)
 
         # ---- Get effective mass of inspiraling secondary
-        m2 = mass[:, 1]
+        m2 = mass.min(axis=-1)
         mstar_sec = self._mmbulge.mstar_from_mbh(m2, scatter=False)
         # model tidal-stripping of secondary's bulge (see: [Kelley2017a]_ Eq.6)
         time_dyn = self._NFW.time_dynamical(sepa, mhalo, redz)
@@ -698,7 +703,14 @@ class Dynamical_Friction_NFW(_Hardening):
 
         # --- Attenuation for separations less than the loss-cone Radius
         # [BBR1980] Eq.2
-        atten_lc = np.power(m2/m1, 1.75) * nstar * np.power(rbnd/rstar, 6.75) * (rlc / sepa)
+        #find where m1 and m2 are switched
+        inds_wrongq = (m2/m1)>1
+        q_fixed = m2/m1 
+        q_fixed[inds_wrongq] = 1./(q_fixed[inds_wrongq])
+        #then calculate attenuation coefficient with correct mass ratio
+        atten_lc = np.power(q_fixed, 1.75) * nstar * np.power(rbnd/rstar, 6.75) * (rlc / sepa)
+        
+        #atten_lc = np.power(m2/m1, 1.75) * nstar * np.power(rbnd/rstar, 6.75) * (rlc / sepa)
         atten_lc = np.maximum(atten_lc, 1.0)
         # use an exponential turn-on at larger radii
         cut = np.exp(-sepa/rlc)
