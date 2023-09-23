@@ -2155,47 +2155,5 @@ def resample_loudest(hc_ss, hc_bg, nloudest):
     return new_hc_ss, new_hc_bg
 
 
-###################################################
-############ DETECTION STATISTICS #################
-###################################################
-
-
-def threshold_hc():
-    """
-    Rosado+ 2015, SNR calculation
-    S := cross correlation between pulsars 
-    S = \int_{-T/2}^{T/2} dt \int dt' s_i(t) s_j(t') Q(t,t')
-    where T is the observation time, s_i(t) and s_j(t) are the data 
-    from two different pulsars, Q(t,t') is a filter function.
-
-    S_T := pre-defined detection threshold
-    """
-
-    return 0
-
-
-def ss_occurence_rate(hc_ss, S_T):
-    """
-    Parameters:
-    ------------
-    hc_ss : (F, R) NDarray of scalars
-        characteristic strain of single sources 
-    S_T : float
-        threshold strain? 
-
-    """
-    return 0
-
-def bg_occurence_rate():
-    """ 
-    According to Rosado+ 2015
-    Universe may contain GWB if S >= S_T
-    """
-
-def false_alarm_probability():
-    """
-    TODO
-    """
-    return 0
 
 
