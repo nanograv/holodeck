@@ -3800,3 +3800,26 @@ def get_favg_arrays(
     file.close()
 
     return xx, yy_log, sd_log
+
+
+def get_dp_arrays(
+    target, nvars=21, nreals=500, nskies=100, shape=None, debug=False, 
+    red=False, cv='midclbrt', gw_only=False, bgl=1,  
+    ):
+
+    path = '/Users/emigardiner/GWs/holodeck/output/anatomy_redz/figdata/dpboth'   
+    filename = path+f'/dp_arrays_{target}_cv{cv}'
+    if bgl != 10:
+        filename += f"_bgl{bgl}"
+    if gw_only:
+        filename = filename+'_gw'
+    filename = filename + '.npz'
+
+    file = np.load(filename)
+    if debug: print(f"{filename}\n{file.files}")
+    xx = file['xx_params']
+    yy_ss = file['yy_ss']
+    ev_ss = file['ev_ss']
+    yy_bg = file['yy_bg']
+    file.close()
+    return xx, yy_ss, ev_ss, yy_bg
