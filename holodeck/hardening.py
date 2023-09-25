@@ -222,7 +222,7 @@ class CBD_Torques(_Hardening):
 
     CONSISTENT = None
 
-    def __init__(self, f_edd = 0.10, subpc = True):
+    def __init__(self, f_edd=0.10, subpc=True, nosoftening=True):
         """Construct a CBD-Torque instance.
 
         Parameters
@@ -232,6 +232,7 @@ class CBD_Torques(_Hardening):
 
         self.f_edd = f_edd
         self.subpc = subpc
+        self.nosoftening = nosoftening
 
         return
 
@@ -271,8 +272,10 @@ class CBD_Torques(_Hardening):
         dadt, dedt = self._dadt_dedt(mass, sepa, eccen, mdot)
 
         """ CURRENTLY WE CANNOT USE +ve dadt VALUES, SO WE SET THEM TO 0 """
-        inds_dadt_pos = dadt > 0
-        dadt[inds_dadt_pos] = 0.0
+        if self.nosoftening:
+            inds_dadt_pos = dadt > 0.0
+            dadt[inds_dadt_pos] = 0.0
+
         inds_dadt_nan = np.isnan(dadt)
         dadt[inds_dadt_nan] = 0.0
 
@@ -620,7 +623,7 @@ class Dynamical_Friction_NFW(_Hardening):
         # Hardening rate cannot be larger than orbital/virial velocity
         clip = (np.fabs(dadt) > velo)
         if np.any(clip):
-            log.info(f"clipping {utils.frac_str(clip)} `dadt` values to vcirc")
+            log.debug(f"clipping {utils.frac_str(clip)} dynamical friction `dadt` values to vcirc")
             dadt[clip] = - velo[clip]
 
         return dadt, dedt
@@ -705,11 +708,11 @@ class Dynamical_Friction_NFW(_Hardening):
         # [BBR1980] Eq.2
         #find where m1 and m2 are switched
         inds_wrongq = (m2/m1)>1
-        q_fixed = m2/m1 
+        q_fixed = m2/m1
         q_fixed[inds_wrongq] = 1./(q_fixed[inds_wrongq])
         #then calculate attenuation coefficient with correct mass ratio
         atten_lc = np.power(q_fixed, 1.75) * nstar * np.power(rbnd/rstar, 6.75) * (rlc / sepa)
-        
+
         #atten_lc = np.power(m2/m1, 1.75) * nstar * np.power(rbnd/rstar, 6.75) * (rlc / sepa)
         atten_lc = np.maximum(atten_lc, 1.0)
         # use an exponential turn-on at larger radii
