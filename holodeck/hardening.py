@@ -503,6 +503,9 @@ class Dynamical_Friction_NFW(_Hardening):
             If False: calculate R-bound using a velocity dispersion (constant in radius, from `gbh` instance).
 
         """
+        if not attenuate:
+            log.warning("WARNING: `{attenuate=}` should be used with CAUTION --- NON-PHYSICAL RESULTS!")
+
         self._mmbulge = holo.relations.get_mmbulge_relation(mmbulge)
         self._msigma = holo.relations.get_msigma_relation(msigma)
         self._smhm = holo.relations.get_stellar_mass_halo_mass_relation(smhm)
