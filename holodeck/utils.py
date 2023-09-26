@@ -1531,6 +1531,12 @@ def m1m2_from_mtmr(mt: npt.ArrayLike, mr: npt.ArrayLike) -> npt.ArrayLike:
     return np.array([m1, m2])
 
 
+def m1m2_ordered(m1, m2):
+    if m1 >= m2:
+        return m1, m2
+    return m2, m1
+
+
 def frst_from_fobs(fobs, redz):
     """Calculate rest-frame frequency from observed frequency and redshift.
 

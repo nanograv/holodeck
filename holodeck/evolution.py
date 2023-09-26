@@ -77,7 +77,7 @@ import kalepy as kale
 
 import holodeck as holo
 from holodeck import utils, cosmo, log
-from holodeck.constants import PC
+from holodeck.constants import PC, YR, GYR, MSOL
 from holodeck.hardening import _Hardening
 # from holodeck import accretion
 
@@ -134,8 +134,10 @@ class Evolution:
     _LIN_INTERP_PARS = ['eccen', 'scafa', 'tlook', 'dadt', 'dedt']
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
+    _NSTEPS = 1000
+    _TIME_STEP_MAX = 0.1 * GYR
 
-    def __init__(self, pop, hard, nsteps: int = 100, mods=None, debug: bool = False, acc=None, dfdt_mdot=False):
+    def __init__(self, pop, hard, mods=None, debug: bool = False, acc=None, dfdt_mdot=False):
         """Initialize a new Evolution instance.
 
         Parameters
@@ -155,10 +157,12 @@ class Evolution:
         # --- Store basic parameters to instance
         self._pop = pop                       #: initial binary population instance
         self._debug = debug                   #: debug flag for performing extra diagnostics and output
-        self._nsteps = nsteps                 #: number of integration steps for each binary
+        # self._nsteps = nsteps                 #: number of integration steps for each binary
+        # nsteps = self._NSTEPS
         self._mods = mods                     #: modifiers to be applied after evolution is completed
         self._acc = acc
         self.dfdt_mdot = dfdt_mdot #include frequency evolution from mdot
+        self._size = pop.size
 
         # Store hardening instances as a list
         if not np.iterable(hard):
@@ -175,6 +179,7 @@ class Evolution:
             good = isinstance(hh, _Hardening) or issubclass(hh, _Hardening)
             if not good:
                 err = f"hardening instance is {hh}, must be subclass of `{_Hardening}`!"
+                err += " NOTE: sometimes jupyter notebooks must be restarted to avoid this error.  🤷🏻‍♂️"
                 log.exception(err)
                 raise TypeError(err)
 
@@ -182,26 +187,35 @@ class Evolution:
         for par in self._STORE_FROM_POP:
             setattr(self, par, getattr(pop, par))
 
-        size = pop.size
-        shape = (size, nsteps)
-        self._shape = shape
+        # size = pop.size
+        # shape = (size, nsteps)
+        # self._shape = shape
 
+        redz = cosmo.a_to_z(pop.scafa)
+        tlook = cosmo.z_to_tlbk(redz)
+        self._sepa_init = pop.sepa
+        self._mass_init = pop.mass
+        self._scafa_init = pop.scafa
+        self._tlook_init = tlook
         if pop.eccen is not None:
-            eccen = np.zeros(shape)
-            dedt = np.zeros(shape)
+            self._eccen_init = pop.eccen
         else:
-            eccen = None
-            dedt = None
+            self._eccen_init = None
 
-        # ---- Initialize empty arrays for tracking binary evolution
-        self.scafa = np.zeros(shape)           #: scale-factor of the universe, set to 1.0 after z=0
-        self.tlook = np.zeros(shape)           #: lookback time [sec], NOTE: negative after redshift zero
-        self.sepa = np.zeros(shape)            #: semi-major axis (separation) [cm]
-        self.mass = np.zeros(shape + (2,))     #: mass of BHs [g], 0-primary, 1-secondary
-        self.mdot = np.zeros(shape + (2,))     #: accretion rate onto each component of binary [g/s]
-        self.dadt = np.zeros(shape)            #: hardening rate in separation [cm/s]
-        self.eccen = eccen                     #: eccentricity [], `None` if not being evolved
-        self.dedt = dedt                       #: eccen evolution rate [1/s], `None` if not evolved
+        self._rad_isco = utils.rad_isco(*pop.mass.T)
+
+        # if self._debug:    # nocov
+        #     for ii, hard in enumerate(self._hard):
+        #         # Store individual hardening rates
+        #         setattr(self, f"_dadt_{ii}", np.zeros_like(self.dadt))
+        #         setattr(self, f"_dedt_{ii}", np.zeros_like(self.dadt))
+
+        # ---- Initialize hardening rate at first step
+        # dadt_init, dedt_init = self._hardening_rate(step=0)
+
+        # self.dadt[:, 0] = dadt_init
+        # if (pop.eccen is not None):
+        #     self.dedt[:, 0] = dedt_init
 
         # Derived and internal parameters
         self._freq_orb_rest = None
@@ -213,37 +227,167 @@ class Evolution:
     # ==== API and Core Functions
 
     def evolve(self, progress=False):
-        """Evolve binary population from initial separation until coalescence in discrete steps.
+        nbinaries = self._size
+        nsteps = self._NSTEPS * nbinaries
+        MAX_BIN_STEPS = 1e3
+        CFL = 0.5
 
-        Each binary has a fixed number of 'steps' from initial separation until coalescence.  The
-        role of the `evolve()` method is to determine the amount of time each step takes, based on
-        the 'hardening rate' (in separation and possible eccentricity i.e. $da/dt$ and $de/dt$).
-        The hardening rate is calculated from the stored :class:`_Hardening` instances in the
-        iterable :attr:`Evolution._hard` attribute.
+        self.sepa = np.zeros(nsteps)
+        self.dadt = np.zeros(nsteps)
+        self.mass = np.zeros((nsteps, 2))
+        self.redz = np.zeros(nsteps)
+        self.tlook = np.zeros(nsteps)
 
-        When :meth:`Evolution.evolve()` is called, the 0th step is initialized separately, using
-        the :meth:`Evolution._init_step_zero()` method, and then each step is integrated by calling
-        the :meth:`Evolution._take_next_step()` method.  Once all steps are completed, the
-        :meth:`Evolution._finalize()` method is called, where any stored modifiers are applied.
+        if self._eccen_init is not None:
+            self.eccen = np.zeros(nsteps)
+            self.dedt = np.zeros(nsteps)
+        else:
+            self.eccen = None
+            self.dedt = None
 
-        Parameters
-        ----------
-        progress : bool,
-            Show progress-bar using `tqdm` package.
+        if self._acc is not None:
+            self.mdot = np.zeros((nsteps, 2))
+        else:
+            self.mdot = None
 
-        """
-        # ---- Initialize Integration Step Zero
-        self._init_step_zero()
+        arr_size = nsteps
+        last_index = np.zeros(nbinaries, dtype=int)
+        idx = 0
+        left = 0
+        right = 0
+        for bin in utils.tqdm(range(nbinaries)):
+            # print(f"\n----Starting {bin=} at {idx=} ({left=}, {right=})----")
 
-        # ---- Iterate through all integration steps
-        size, nsteps = self.shape
-        steps_list = range(1, nsteps)
-        steps_list = utils.tqdm(steps_list, desc="evolving binaries") if progress else steps_list
-        for step in steps_list:
-            self._take_next_step(step)
+            risco = self._rad_isco[bin]
 
-        # ---- Finalize
-        self._finalize()
+            # ---- initialize first step
+
+            self.sepa[idx] = self._sepa_init[bin]
+            self.mass[idx, :] = self._mass_init[bin, :]
+            self.tlook[idx] = self._tlook_init[bin]
+            self.redz[idx] = cosmo.tlbk_to_z(self.tlook[idx])
+            if self.eccen is not None:
+                self.eccen[idx] = self._eccen_init[bin]
+            if self._acc is not None:
+                self.mdot
+
+            my_steps = 0
+
+            # ---- Integrate until coalescence or redshift zero
+
+            while (self.sepa[idx] > risco) and (self.tlook[idx] > 0.0) and (self.redz[idx] > 1e-3):
+
+                left = idx
+                idx += 1
+                right = idx
+                my_steps += 1
+
+                # print(f"\n{bin=}, step={my_steps} | {left} ==> {right}")
+                # print(f"mass={self.mass[left, 0]/MSOL:.4e}, {self.mass[left, 1]/MSOL:.4e}")
+                # print(f"sepa={self.sepa[left]/PC:.4e}, eccen={self.eccen[left]:.4e}")
+                # print(f"look={self.tlook[left]/GYR:.8e}")
+                # print(f"redz={self.redz[left]:.8e}")
+                if my_steps > MAX_BIN_STEPS:
+                    raise RuntimeError(f"Failed to finish evolution after {my_steps} steps for binary {bin}!")
+
+                # - expand arrays as needed
+
+                if right >= arr_size:
+                    self.sepa = np.concatenate([self.sepa, np.zeros(nsteps)], axis=0)
+                    self.dadt = np.concatenate([self.dadt, np.zeros(nsteps)], axis=0)
+                    self.mass = np.concatenate([self.mass, np.zeros((nsteps, 2))], axis=0)
+                    self.redz = np.concatenate([self.redz, np.zeros(nsteps)], axis=0)
+                    self.tlook = np.concatenate([self.tlook, np.zeros(nsteps)], axis=0)
+                    if self.eccen is not None:
+                        self.eccen = np.concatenate([self.eccen, np.zeros(nsteps)], axis=0)
+                        self.dedt = np.concatenate([self.dedt, np.zeros(nsteps)], axis=0)
+
+                    arr_size += nsteps
+                    print(f"Expanded arrays {(arr_size//nsteps-1):04d} times to {arr_size:.2e}")
+
+                # - get evolution rates on left-edge (starting point)
+
+                dadt_l, dedt_l, mdot_l = self._hardening_rate(bin, left, store_debug=False)
+
+                # - determine timestep
+                # print("left  = ", dadt_l, dedt_l, mdot_l)
+                dt_l_list = self._get_timestep_from_rates(left, dadt_l, dedt_l, mdot_l, CFL)
+                # print(dt_l)
+                # msg = ", ".join([f"{dd:.4e}" for dd in dt_l])
+                # print(f"dt: {msg}")
+                dt_l = np.min(dt_l_list + [self.tlook[left], self._TIME_STEP_MAX])
+                # print(f"{dt_l/YR=:.4e}")
+
+                # - guess right-edge
+
+                self.sepa[right] = self.sepa[left] + dadt_l * dt_l
+                if self.eccen is not None:
+                    self.eccen[right] = self.eccen[left] + dedt_l * dt_l
+                # if there is no accretion, then mdot is zero
+                self.mass[right, :] = self.mass[left] + mdot_l * dt_l
+                self.tlook[right] = self.tlook[left] - dt_l
+                self.redz[right] = cosmo.tlbk_to_z(self.tlook[right])
+
+                # - guess right-edge evolution rates
+                # print("right: ", self.sepa[right], self.eccen[right], self.mass[right])
+
+                dadt_r, dedt_r, mdot_r = self._hardening_rate(bin, right, store_debug=False)
+                # print("right = ", dadt_l, dedt_l, mdot_l)
+                dt_r_list = self._get_timestep_from_rates(right, dadt_r, dedt_r, mdot_r, CFL)
+                # msg = ", ".join([f"{dd:.4e}" for dd in dt_r])
+                # print(f"dt: {msg}")
+                dt_r = np.min(dt_r_list + [self.tlook[left], self._TIME_STEP_MAX])
+                # print(f"{dt_r/YR=:.4e}")
+
+                # - take average evolution rate
+
+                dadt = 0.5 * (dadt_l + dadt_r)
+                if self.eccen is not None:
+                    dedt = 0.5 * (dedt_l + dedt_r)
+                mdot = 0.5 * (mdot_l + mdot_r)
+                dt = np.min([dt_l, dt_r])
+                # print(f"{dt/YR=:.4e}")
+                if dt <= 0.0 or ~np.isfinite(dt):
+                    print(f"{dt_l=}, {dt_r=}")
+                    print(f"{dt_l_list=}")
+                    print(f"{dt_r_list=}")
+                    raise RuntimeError(f"Next timestep is invalid!  {dt=}")
+
+                # - increment
+
+                self.sepa[right] = self.sepa[left] + dadt * dt
+                if self.eccen is not None:
+                    self.eccen[right] = self.eccen[left] + dedt * dt
+                # if there is no accretion, then mdot is zero
+                self.mass[right, :] = self.mass[left] + mdot * dt
+                self.tlook[right] = self.tlook[left] - dt
+                self.redz[right] = cosmo.tlbk_to_z(self.tlook[right])
+
+                self.dadt[right] = dadt
+                self.mdot[right] = mdot
+                if self.eccen is not None:
+                    self.dedt[right] = dedt
+
+            # print(f"\n====Finished binary {bin} after {my_steps}, {idx=}====\n")
+            last_index[bin] = right
+            idx += 1
+            # if bin > 3:
+            #     break
+
+        self._last_index = last_index
+        assert np.all(self.sepa[self._last_index] == self._sepa_init)
+        assert np.all(self.mass[self._last_index] == self._mass_init)
+        end = last_index[-1] + 1
+        self.sepa = self.sepa[:end]
+        self.mass = self.mass[:end]
+        self.tlook = self.tlook[:end]
+        self.redz = self.redz[:end]
+        self.dadt = self.dadt[:end]
+        self.mdot = self.mdot[:end]
+        if self.eccen is not None:
+            self.eccen = self.eccen[:end]
+            self.dedt = self.dedt[:end]
+
         return
 
     def modify(self, mods=None):
@@ -741,55 +885,6 @@ class Evolution:
 
     # ==== Internal Methods
 
-    def _init_step_zero(self):
-        """Set the initial conditions of the binaries at the 0th step.
-
-        Transfers attributes from the stored :class:`holodeck.population._Population_Discrete`
-        instance to the 0th index of the evolution arrays.  The attributes are [`sepa`, `scafa`,
-        `mass`, and optionally `eccen`].  The hardening model is also used to calculate the 0th
-        hardening rates `dadt` and `dedt`.  The initial lookback time, `tlook` is also set.
-
-        """
-        pop = self._pop
-        size, nsteps = self.shape
-
-        # ---- Initialize basic parameters
-
-        # Initialize ALL separations ranging from initial to mutual-ISCO, for each binary
-        rad_isco = utils.rad_isco(*pop.mass.T)
-        # (2, N)
-        sepa = np.log10([pop.sepa, rad_isco])
-        # Get log-space range of separations for each of N ==> (N, S), for S steps
-        sepa = np.apply_along_axis(lambda xx: np.logspace(*xx, nsteps), 0, sepa).T
-        self.sepa[:, :] = sepa
-        if (pop.eccen is not None):
-            self.eccen[:, 0] = pop.eccen
-
-        self.scafa[:, 0] = pop.scafa
-        redz = cosmo.a_to_z(pop.scafa)
-        tlook = cosmo.z_to_tlbk(redz)
-        self.tlook[:, 0] = tlook
-        # `pop.mass` has shape (N, 2), broadcast to (N, S, 2) for `S` steps
-        # self.mass[:, :, :] = pop.mass[:, np.newaxis, :]
-        self.mass[:, 0, :] = pop.mass
-        # HERE INITIAL MASSES ARE COPIED FOR EVERY STEP
-        self.mass[:, :, :] = self.mass[:, 0, np.newaxis, :]
-
-        if self._debug:    # nocov
-            for ii, hard in enumerate(self._hard):
-                # Store individual hardening rates
-                setattr(self, f"_dadt_{ii}", np.zeros_like(self.dadt))
-                setattr(self, f"_dedt_{ii}", np.zeros_like(self.dadt))
-
-        # ---- Initialize hardening rate at first step
-        dadt_init, dedt_init = self._hardening_rate(step=0)
-
-        self.dadt[:, 0] = dadt_init
-        if (pop.eccen is not None):
-            self.dedt[:, 0] = dedt_init
-
-        return
-
     def _take_next_step(self, step):
         """Integrate the binary population forward (to smaller separations) by one step.
 
@@ -834,7 +929,7 @@ class Evolution:
             ecc_r = self.eccen[:, left] + de
             ecc_r = np.clip(ecc_r, 0.0, 1.0 - _MAX_ECCEN_ONE_MINUS)
             self.eccen[:, right] = ecc_r
-        
+
         # ------- NOTE: need to take a first guess at the mass in the next step HERE ----
         # This is to account for the increased hardening rate (gw hardening specifically) due to mass increase
         if self._acc is not None:
@@ -937,7 +1032,7 @@ class Evolution:
 
         return
 
-    def _hardening_rate(self, step, store_debug=True):
+    def _hardening_rate(self, bin, step, store_debug=False):
         """Calculate the net hardening rate for the given integration step.
 
         The hardening rates (:class:`_Hardening` subclasses) stored in the :attr:`Evolution._hard`
@@ -963,45 +1058,24 @@ class Evolution:
             In this case, the shape is (N,) where N is the number of binaries.
 
         """
-        dadt = np.zeros(self.shape[0])
-        dedt = None if self.eccen is None else np.zeros_like(dadt)
-
+        dadt = 0.0
+        dedt = None if (self.eccen is None) else 0.0
         for ii, hard in enumerate(self._hard):
-            _hard_dadt, _ecc = hard.dadt_dedt(self, step)
-            dadt[:] += _hard_dadt
-            if self._debug:    # nocov
-                log.debug(f"{step} hard={hard} : dadt = {utils.stats(_hard_dadt)}")
-                # Store individual hardening rates
-                if store_debug:
-                    getattr(self, f"_dadt_{ii}")[:, step] = _hard_dadt[...]
-                # Raise error on invalid entries
-                bads = ~np.isfinite(_hard_dadt) | (_hard_dadt > 0.0)
-                if np.any(bads):
-                    log.error(f"{step} hard={hard} : dadt = {utils.stats(_hard_dadt)}")
-                    err = f"invalid `dadt` for hard={hard}  (bads: {utils.frac_str(bads)})!"
-                    log.exception(err)
-                    log.error(f"BAD dadt = {_hard_dadt[bads]}")
-                    log.error(f"BAD sepa = {self.sepa[bads, step]}")
-                    log.error(f"BAD mass = {self.sepa[bads, step]}")
-                    raise ValueError(err)
+            _hard_dadt, _hard_dedt = hard.dadt_dedt(self, bin, step)
+            # print(ii, hard, _hard_dadt, _hard_dedt)
+            # print(f"\t{self.sepa[step]/_hard_dadt/YR=:.8e}")
+            dadt += _hard_dadt
 
-            if (self.eccen is not None):
-                if _ecc is None:
-                    log.warning(f"`Evolution.eccen` is not None, but `dedt` is None!  {step} {hard}")
-                    continue
-                dedt[:] += _ecc
-                if self._debug:    # nocov
-                    log.debug(f"{step} hard={hard} : dedt = {utils.stats(_ecc)}")
-                    # Raise error on invalid entries
-                    if not np.all(np.isfinite(_ecc)):
-                        err = f"invalid `dedt` for hard={hard}!"
-                        log.exception(err)
-                        raise ValueError(err)
-                    # Store individual hardening rates
-                    if store_debug:
-                        getattr(self, f"_dedt_{ii}")[:, step] = _ecc[...]
+            if (dedt is not None):
+                dedt += _hard_dedt
 
-        return dadt, dedt
+        if self._acc is not None:
+            _mdot_tot = self._acc.mdot_total(self, bin, step)
+            mdot = self._acc.pref_acc(_mdot_tot, self, bin, step)
+        else:
+            mdot = 0.0
+
+        return dadt, dedt, mdot
 
     def _check(self):
         """Perform basic diagnostics on parameter validity after evolution.
@@ -1121,3 +1195,24 @@ class Evolution:
         if self._evolved is not True:
             raise RuntimeError("This instance has not been evolved yet!")
         return
+
+    def _get_timestep_from_rates(self, step, dadt, dedt, mdot, CFL):
+        dt_dadt = CFL * self.sepa[step] / np.fabs(dadt)
+
+        if self.eccen is not None:
+            dt_dedt = CFL * self.eccen[step] / np.fabs(dedt)
+        else:
+            dt_dedt = np.inf
+
+        if self._acc is not None:
+            dt_mdot = CFL * np.min(self.mass[step, :] / mdot)
+        else:
+            dt_mdot = np.inf
+
+        dt = [dt_dadt, dt_dedt, dt_mdot]
+        if np.any(np.isnan(dt)):
+            print(f"BAD DT in `_get_timestep_from_rates()`!")
+            print(f"{dt_dadt=} | {self.sepa[step]=} {dadt=}")
+            print(f"{dt_dedt=} | {self.eccen[step]=} {dedt=}")
+            print(f"{dt_mdot=} | {self.mass[step]=} {mdot=}")
+        return dt
