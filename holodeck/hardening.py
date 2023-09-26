@@ -214,7 +214,7 @@ class CBD_Torques(_Hardening):
 
     CONSISTENT = None
 
-    def __init__(self, f_edd=0.10, subpc=True, nosoftening=True):
+    def __init__(self, f_edd=0.10, subpc=True, allow_softening=False):
         """Construct a CBD-Torque instance.
 
         Parameters
@@ -224,7 +224,7 @@ class CBD_Torques(_Hardening):
 
         self.f_edd = f_edd
         self.subpc = subpc
-        self.nosoftening = nosoftening
+        self.allow_softening = allow_softening
 
         return
 
@@ -258,7 +258,7 @@ class CBD_Torques(_Hardening):
         dadt, dedt = self._dadt_dedt(mass, sepa, eccen, mdot)
 
         """ CURRENTLY WE CANNOT USE +ve dadt VALUES, SO WE SET THEM TO 0 """
-        if self.nosoftening and (dadt > 0.0):
+        if (not self.allow_softening) and (dadt > 0.0):
             # inds_dadt_pos = dadt > 0.0
             # dadt[inds_dadt_pos] = 0.0
             dadt = 0.0
