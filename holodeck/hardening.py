@@ -70,16 +70,8 @@ class _Hardening(abc.ABC):
     CONSISTENT = None
 
     @abc.abstractmethod
-    def dadt_dedt(self, evo, step, *args, **kwargs):
+    def dadt_dedt(self, evo, bin, step, *args, **kwargs):
         pass
-
-    def dadt(self, *args, **kwargs):
-        rv_dadt, _dedt = self.dadt_dedt(*args, **kwargs)
-        return rv_dadt
-
-    def dedt(self, *args, **kwargs):
-        _dadt, rv_dedt = self.dadt_dedt(*args, **kwargs)
-        return rv_dedt
 
 
 class Hard_GW(_Hardening):
@@ -89,7 +81,7 @@ class Hard_GW(_Hardening):
     CONSISTENT = False
 
     @staticmethod
-    def dadt_dedt(evo, step):
+    def dadt_dedt(evo, bin, step):
         """Calculate GW binary evolution (hardening rate) in semi-major-axis and eccentricity.
 
         Parameters
@@ -108,9 +100,9 @@ class Hard_GW(_Hardening):
             Hardening rate in eccentricity, returns negative value, units [1/s].
 
         """
-        m1, m2 = evo.mass[:, step, :].T    # (Binaries, Steps, 2) ==> (2, Binaries)
-        sepa = evo.sepa[:, step]
-        eccen = evo.eccen[:, step] if (evo.eccen is not None) else None
+        m1, m2 = evo.mass[step, :]
+        sepa = evo.sepa[step]
+        eccen = evo.eccen[step] if (evo.eccen is not None) else None
         dadt = utils.gw_hardening_rate_dadt(m1, m2, sepa, eccen=eccen)
 
         if eccen is None:
@@ -236,7 +228,7 @@ class CBD_Torques(_Hardening):
 
         return
 
-    def dadt_dedt(self, evo, step):
+    def dadt_dedt(self, evo, bin, idx):
         """Circumbinary Disk Torque hardening rate.
 
         Parameters
@@ -254,30 +246,27 @@ class CBD_Torques(_Hardening):
             Binary rate-of-change of eccentricity in units of [1/sec].
 
         """
-        mass = evo.mass[:, step, :]
-        sepa = evo.sepa[:, step]
-        eccen = evo.eccen[:, step] if evo.eccen is not None else None
+        mass = evo.mass[idx, :]
+        sepa = evo.sepa[idx]
+        eccen = evo.eccen[idx] if (evo.eccen is not None) else None
 
-        if evo._acc is None:
-            """ If no accretion modules is supplied, use an Eddington fraction for now """
-            total_mass = mass[:,0] + mass[:,1]
-            accretion_instance = holo.accretion.Accretion(f_edd = self.f_edd, subpc=self.subpc)
-            mdot = accretion_instance.mdot_total(evo, step)
-        if evo._acc is not None:
-            """ An instance of the accretion class has been supplied,
-                and binary masses are evolved through accretion
-                Get total accretion rates """
-            mdot = evo._acc.mdot_total(evo, step)
+        """ An instance of the accretion class has been supplied,
+            and binary masses are evolved through accretion
+            Get total accretion rates """
+        mdot = evo._acc.mdot_total(evo, bin, idx)
 
         dadt, dedt = self._dadt_dedt(mass, sepa, eccen, mdot)
 
         """ CURRENTLY WE CANNOT USE +ve dadt VALUES, SO WE SET THEM TO 0 """
-        if self.nosoftening:
-            inds_dadt_pos = dadt > 0.0
-            dadt[inds_dadt_pos] = 0.0
+        if self.nosoftening and (dadt > 0.0):
+            # inds_dadt_pos = dadt > 0.0
+            # dadt[inds_dadt_pos] = 0.0
+            dadt = 0.0
 
-        inds_dadt_nan = np.isnan(dadt)
-        dadt[inds_dadt_nan] = 0.0
+        if np.isnan(dadt):
+            dadt = 0.0
+        # inds_dadt_nan = np.isnan(dadt)
+        # dadt[inds_dadt_nan] = 0.0
 
         return dadt, dedt
 
@@ -302,19 +291,21 @@ class CBD_Torques(_Hardening):
             If eccentricity is not being evolved (i.e. `eccen==None`) then `None` is returned.
 
         """
-        mass = np.atleast_2d(mass)
-        mtot = mass[:,0] + mass[:,1]
-        """ MASS RATIO """
-        m1 = mass[:, 0]
-        m2 = mass[:, 1]
-        mrat = m2/m1
+        # mass = np.atleast_2d(mass)
+        # mtot = mass[:,0] + mass[:,1]
+        # """ MASS RATIO """
+        # m1 = mass[:, 0]
+        # m2 = mass[:, 1]
+        # mrat = m2/m1
+        m1, m2 = [mass[0], mass[1]] if mass[0] >= mass[1] else [mass[1], mass[0]]
+        mtot, mrat = utils.mtmr_from_m1m2(mass)
         """ secondary and primary can swap indices. need to account for that and reverse the mass ratio """
-        inds_rev = mrat > 1
-        mrat[inds_rev] = 1./mrat[inds_rev]
+        # inds_rev = mrat > 1
+        # mrat[inds_rev] = 1./mrat[inds_rev]
         """ SEPARATION """
-        sepa = np.atleast_1d(sepa)
+        # sepa = np.atleast_1d(sepa)
         """ ECCENTRICITY """
-        eccen = np.atleast_1d(eccen) if eccen is not None else None
+        # eccen = np.atleast_1d(eccen) if eccen is not None else None
 
         semimajor_axis = sepa #for now? we don't resolve the orbit in time (ever?) so this approximation should do?
 
@@ -367,7 +358,7 @@ class Sesana_Scattering(_Hardening):
         self._shm06 = _SHM06()
         return
 
-    def dadt_dedt(self, evo, step):
+    def dadt_dedt(self, evo, bin, idx):
         """Stellar scattering hardening rate.
 
         Parameters
@@ -385,9 +376,9 @@ class Sesana_Scattering(_Hardening):
             Binary rate-of-change of eccentricity in units of [1/sec].
 
         """
-        mass = evo.mass[:, step, :]
-        sepa = evo.sepa[:, step]
-        eccen = evo.eccen[:, step] if evo.eccen is not None else None
+        mass = evo.mass[idx, :]
+        sepa = evo.sepa[idx]
+        eccen = evo.eccen[idx] if evo.eccen is not None else None
         dadt, dedt = self._dadt_dedt(mass, sepa, eccen)
         return dadt, dedt
 
@@ -412,27 +403,29 @@ class Sesana_Scattering(_Hardening):
             If eccentricity is not being evolved (i.e. `eccen==None`) then `None` is returned.
 
         """
-        mass = np.atleast_2d(mass)
-        sepa = np.atleast_1d(sepa)
-        eccen = np.atleast_1d(eccen) if eccen is not None else None
+        # mass = np.atleast_2d(mass)
+        # sepa = np.atleast_1d(sepa)
+        # eccen = np.atleast_1d(eccen) if eccen is not None else None
+        assert np.size(mass) == 2
+        if mass[0] < mass[1]:
+            mass = mass[::-1]
+        m1, secondary_mass = mass
         mtot, mrat = utils.mtmr_from_m1m2(mass)
 
         if np.any(mrat>1):
             import sys
             sys.terminate("mrat>1 in stellar scattering.")
 
-
-
         mbulge = self._mmbulge.mbulge_from_mbh(mtot, scatter=False)
         vdisp = self._msigma.vdisp_from_mbh(mtot, scatter=False)
         dens = _density_at_influence_radius_dehnen(mtot, mbulge, self._gamma_dehnen)
 
         """ Make sure that mass ratio is always < 1, and find primary/secondary masses """
-        mass_ratio_test = mass[:, 1]/mass[:, 0]
-        inds_mrat_1 = mass_ratio_test>1
-        secondary_mass = np.zeros(np.shape(mass[:, 1]))
-        secondary_mass[inds_mrat_1] = mass[:, 0][inds_mrat_1]
-        secondary_mass[~inds_mrat_1]  = mass[:, 1][~inds_mrat_1]
+        # mass_ratio_test = mass[:, 1]/mass[:, 0]
+        # inds_mrat_1 = mass_ratio_test>1
+        # secondary_mass = np.zeros(np.shape(mass[:, 1]))
+        # secondary_mass[inds_mrat_1] = mass[:, 0][inds_mrat_1]
+        # secondary_mass[~inds_mrat_1]  = mass[:, 1][~inds_mrat_1]
         #bug fix below: previously used mass[:,1] as secondary mass, this is not always true
         rhard = _Quinlan1996.radius_hardening(secondary_mass, vdisp)
         hh = self._shm06.H(mrat, sepa/rhard)
@@ -504,7 +497,7 @@ class Dynamical_Friction_NFW(_Hardening):
 
         """
         if not attenuate:
-            log.warning("WARNING: `{attenuate=}` should be used with CAUTION --- NON-PHYSICAL RESULTS!")
+            log.warning("WARNING: `{attenuate=}` no-attenuation should be used with CAUTION --- NON-PHYSICAL RESULTS!")
 
         self._mmbulge = holo.relations.get_mmbulge_relation(mmbulge)
         self._msigma = holo.relations.get_msigma_relation(msigma)
@@ -517,7 +510,7 @@ class Dynamical_Friction_NFW(_Hardening):
         self._time_dynamical = None
         return
 
-    def dadt_dedt(self, evo, step, attenuate=None):
+    def dadt_dedt(self, evo, bin, idx, attenuate=None):
         """Calculate DF hardening rate given `Evolution` instance, and an integration `step`.
 
         Parameters
@@ -539,14 +532,15 @@ class Dynamical_Friction_NFW(_Hardening):
         if attenuate is None:
             attenuate = self._attenuate
 
-        mass = evo.mass[:, step, :]
-        sepa = evo.sepa[:, step]
-        eccen = evo.eccen[:, step] if evo.eccen is not None else None
-        dt = evo.tlook[:, 0] - evo.tlook[:, step]   # positive time-duration since 'formation'
+        mass = evo.mass[idx, :]
+        sepa = evo.sepa[idx]
+        eccen = evo.eccen[idx] if (evo.eccen is not None) else None
+        dt = evo._tlook_init[bin] - evo.tlook[idx]   # positive time-duration since 'formation'
         # NOTE `scafa` is nan for systems "after" redshift zero (i.e. do not merge before redz=0)
-        redz = np.zeros_like(sepa)
-        val = (evo.scafa[:, step] > 0.0)
-        redz[val] = cosmo.a_to_z(evo.scafa[val, step])
+        # redz = np.zeros_like(sepa)
+        # val = (evo.scafa[idx] > 0.0)
+        # redz[val] = cosmo.a_to_z(evo.scafa[val, step])
+        redz = evo.redz[idx]
 
         dadt, dedt = self._dadt_dedt(mass, sepa, redz, dt, eccen, attenuate)
 
@@ -579,13 +573,16 @@ class Dynamical_Friction_NFW(_Hardening):
             `None` is returned if the input `eccen` is None.
 
         """
-        assert np.shape(mass)[-1] == 2 and np.ndim(mass) <= 2
-        mass = np.atleast_2d(mass)
-        redz = np.atleast_1d(redz)
+        # assert np.shape(mass)[-1] == 2 and np.ndim(mass) <= 2
+        # mass = np.atleast_2d(mass)
+        # redz = np.atleast_1d(redz)
+        assert np.shape(mass) == (2,)
+        m1, m2 = utils.m1m2_ordered(*mass)
+        mtot = m1 + m2
 
         # Get Host DM-Halo mass
         # assume galaxies are merged, and total stellar mass is given from Mstar-Mbh of total MBH mass
-        mstar = self._mmbulge.mstar_from_mbh(mass.sum(axis=-1), scatter=False)
+        mstar = self._mmbulge.mstar_from_mbh(mtot, scatter=False)
         mhalo = self._smhm.halo_mass(mstar, redz, clip=True)
 
         # ---- Get effective mass of inspiraling secondary
@@ -596,8 +593,8 @@ class Dynamical_Friction_NFW(_Hardening):
         tfrac = dt / (time_dyn * self._TIDAL_STRIPPING_DYNAMICAL_TIMES)
         power_index = np.clip(1.0 - tfrac, 0.0, 1.0)
         meff = m2 * np.power((m2 + mstar_sec)/m2, power_index)
-        log.debug(f"DF tfrac = {utils.stats(tfrac)}")
-        log.debug(f"DF meff/m2 = {utils.stats(meff/m2)} [Msol]")
+        # log.debug(f"DF tfrac = {utils.stats(tfrac)}")
+        # log.debug(f"DF meff/m2 = {utils.stats(meff/m2)} [Msol]")
 
         # ---- Get local density
         # set minimum radius to be a factor times influence-radius
@@ -606,10 +603,10 @@ class Dynamical_Friction_NFW(_Hardening):
         dens = self._NFW.density(dens_rads, mhalo, redz)
 
         # ---- Get velocity of secondary MBH
-        mt, mr = utils.mtmr_from_m1m2(mass)
+        mt, mr = utils.mtmr_from_m1m2(m1, m2)
         vhalo = self._NFW.velocity_circular(sepa, mhalo, redz)
-        vorb = utils.velocity_orbital(mt, mr, sepa=sepa)[:, 1]  # secondary velocity
-        velo = np.sqrt(vhalo**2 + vorb**2)
+        _, vorb_sec = utils.velocity_orbital(mt, mr, sepa=sepa)
+        velo = np.sqrt(vhalo**2 + vorb_sec**2)
 
         # ---- Calculate hardening rate
         # dvdt is negative [cm/s]
@@ -620,14 +617,17 @@ class Dynamical_Friction_NFW(_Hardening):
 
         # ---- Apply 'attenuation' following [BBR1980]_ to account for stellar-scattering / loss-cone effects
         if attenuate:
-            atten = self._attenuation_BBR1980(sepa, mass, mstar)
+            atten = self._attenuation_BBR1980(sepa, m1, m2, mstar)
             dadt = dadt / atten
 
         # Hardening rate cannot be larger than orbital/virial velocity
-        clip = (np.fabs(dadt) > velo)
-        if np.any(clip):
-            log.debug(f"clipping {utils.frac_str(clip)} dynamical friction `dadt` values to vcirc")
-            dadt[clip] = - velo[clip]
+        # clip = (np.fabs(dadt) > velo)
+        # if np.any(clip):
+        #     log.debug(f"clipping {utils.frac_str(clip)} dynamical friction `dadt` values to vcirc")
+        #     dadt[clip] = - velo[clip]
+        if dadt < -velo:
+            log.debug(f"clipping dynamical friction `dadt` values to vcirc ({dadt=:.8e} ==> {velo:.8e})")
+            dadt = - velo
 
         return dadt, dedt
 
@@ -653,7 +653,7 @@ class Dynamical_Friction_NFW(_Hardening):
         dvdt = - 2*np.pi * mass_sec_eff * dens * self._coulomb * np.square(NWTG / velo)
         return dvdt
 
-    def _attenuation_BBR1980(self, sepa, m1m2, mstar):
+    def _attenuation_BBR1980(self, sepa, m1, m2, mstar):
         """Calculate attentuation factor following [BBR1980]_ prescription.
 
         Characteristic radii are currently calculated using hard-coded Dehnen stellar-density profiles, and a fixed
@@ -680,7 +680,6 @@ class Dynamical_Friction_NFW(_Hardening):
 
         """
 
-        m1, m2 = m1m2.T
         mbh = m1 + m2
 
         # characteristic stellar radius in [cm]
@@ -710,9 +709,11 @@ class Dynamical_Friction_NFW(_Hardening):
         # --- Attenuation for separations less than the loss-cone Radius
         # [BBR1980] Eq.2
         #find where m1 and m2 are switched
-        inds_wrongq = (m2/m1)>1
+        # inds_wrongq = (m2/m1)>1
         q_fixed = m2/m1
-        q_fixed[inds_wrongq] = 1./(q_fixed[inds_wrongq])
+        if np.any(q_fixed > 1.0):
+            raise
+        # q_fixed[inds_wrongq] = 1./(q_fixed[inds_wrongq])
         #then calculate attenuation coefficient with correct mass ratio
         atten_lc = np.power(q_fixed, 1.75) * nstar * np.power(rbnd/rstar, 6.75) * (rlc / sepa)
 
@@ -941,7 +942,7 @@ class Fixed_Time_2PL(_Hardening):
 
     # ====     Hardening Rate Methods    ====
 
-    def dadt_dedt(self, evo, step):
+    def dadt_dedt(self, evo, bin, step):
         """Calculate hardening rate at the given integration `step`, for the given population.
 
         Parameters
@@ -960,20 +961,12 @@ class Fixed_Time_2PL(_Hardening):
             `None` is returned if the input `eccen` is None.
 
         """
-        mass = evo.mass[:, step, :]
-        sepa = evo.sepa[:, step]
+        mass = evo.mass[step, :]
+        sepa = evo.sepa[step]
         mt, mr = utils.mtmr_from_m1m2(mass)
         dadt, _dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_inner, self._gamma_outer)
         dedt = None if evo.eccen is None else np.zeros_like(dadt)
         return dadt, dedt
-
-    def dadt(self, mt, mr, sepa):
-        dadt, _dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_inner, self._gamma_outer)
-        return dadt
-
-    def dedt(self, mt, mr, sepa):
-        _dadt, dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_inner, self._gamma_outer)
-        return dedt
 
     @classmethod
     def _dadt_dedt(cls, mtot, mrat, sepa, norm, rchar, gamma_inner, gamma_outer):
@@ -1483,7 +1476,7 @@ class Fixed_Time_2PL_SAM(_Hardening):
         )
         return msg
 
-    def dadt_dedt(self, evo, step, *args, **kwargs):
+    def dadt_dedt(self, evo, bin, step, *args, **kwargs):
         raise NotImplementedError()
 
     def dadt(self, mtot, mrat, sepa, norm=None):
