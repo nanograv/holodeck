@@ -168,6 +168,7 @@ class Evolution:
         if not np.iterable(hard):
             hard = [hard, ]
         self._hard = hard
+        self._nhards = len(hard)
 
         # Make sure types look right
         if not isinstance(pop, holo.population._Population_Discrete):
@@ -226,21 +227,22 @@ class Evolution:
 
     # ==== API and Core Functions
 
-    def evolve(self, progress=False):
+    def evolve(self, progress=False, break_after=None):
         nbinaries = self._size
         nsteps = self._NSTEPS * nbinaries
+        nhards = self._nhards
         MAX_BIN_STEPS = 1e3
         CFL = 0.5
 
         self.sepa = np.zeros(nsteps)
-        self.dadt = np.zeros(nsteps)
+        self.dadt = np.zeros((nsteps, nhards))
         self.mass = np.zeros((nsteps, 2))
         self.redz = np.zeros(nsteps)
         self.tlook = np.zeros(nsteps)
 
         if self._eccen_init is not None:
             self.eccen = np.zeros(nsteps)
-            self.dedt = np.zeros(nsteps)
+            self.dedt = np.zeros_like(self.dadt)
         else:
             self.eccen = None
             self.dedt = None
@@ -255,7 +257,15 @@ class Evolution:
         idx = 0
         left = 0
         right = 0
+        dedt_l = None
+        dedt_r = None
+        dedt = None
         for bin in utils.tqdm(range(nbinaries)):
+
+            if (break_after is not None) and (bin > break_after):
+                print("BREAK 12412351324")
+                break
+
             # print(f"\n----Starting {bin=} at {idx=} ({left=}, {right=})----")
 
             risco = self._rad_isco[bin]
@@ -273,14 +283,15 @@ class Evolution:
 
             my_steps = 0
 
+            left = idx
+            dadt_l_list, dedt_l_list, mdot_l = self._hardening_rate(bin, left, store_debug=False)
+
             # ---- Integrate until coalescence or redshift zero
 
-            while (self.sepa[idx] > risco) and (self.tlook[idx] > 0.0) and (self.redz[idx] > 1e-3):
+            while (self.sepa[idx] > risco*1.001) and (self.tlook[idx] > 0.0) and (self.redz[idx] > 1e-3):
 
-                left = idx
                 idx += 1
                 right = idx
-                my_steps += 1
 
                 # print(f"\n{bin=}, step={my_steps} | {left} ==> {right}")
                 # print(f"mass={self.mass[left, 0]/MSOL:.4e}, {self.mass[left, 1]/MSOL:.4e}")
@@ -294,25 +305,25 @@ class Evolution:
 
                 if right >= arr_size:
                     self.sepa = np.concatenate([self.sepa, np.zeros(nsteps)], axis=0)
-                    self.dadt = np.concatenate([self.dadt, np.zeros(nsteps)], axis=0)
+                    self.dadt = np.concatenate([self.dadt, np.zeros((nsteps, nhards))], axis=0)
                     self.mass = np.concatenate([self.mass, np.zeros((nsteps, 2))], axis=0)
                     self.redz = np.concatenate([self.redz, np.zeros(nsteps)], axis=0)
                     self.tlook = np.concatenate([self.tlook, np.zeros(nsteps)], axis=0)
                     if self.eccen is not None:
                         self.eccen = np.concatenate([self.eccen, np.zeros(nsteps)], axis=0)
-                        self.dedt = np.concatenate([self.dedt, np.zeros(nsteps)], axis=0)
+                        self.dedt = np.concatenate([self.dedt, np.zeros((nsteps, nhards))], axis=0)
 
                     arr_size += nsteps
                     print(f"Expanded arrays {(arr_size//nsteps-1):04d} times to {arr_size:.2e}")
 
-                # - get evolution rates on left-edge (starting point)
-
-                dadt_l, dedt_l, mdot_l = self._hardening_rate(bin, left, store_debug=False)
-
                 # - determine timestep
                 # print("left  = ", dadt_l, dedt_l, mdot_l)
+                dadt_l = np.sum(dadt_l_list)
+                if self.eccen is not None:
+                    dedt_l = np.sum(dedt_l_list)
+
                 dt_l_list = self._get_timestep_from_rates(left, dadt_l, dedt_l, mdot_l, CFL)
-                # print(dt_l)
+                # print(dt_l_list)
                 # msg = ", ".join([f"{dd:.4e}" for dd in dt_l])
                 # print(f"dt: {msg}")
                 dt_l = np.min(dt_l_list + [self.tlook[left], self._TIME_STEP_MAX])
@@ -331,8 +342,11 @@ class Evolution:
                 # - guess right-edge evolution rates
                 # print("right: ", self.sepa[right], self.eccen[right], self.mass[right])
 
-                dadt_r, dedt_r, mdot_r = self._hardening_rate(bin, right, store_debug=False)
+                dadt_r_list, dedt_r_list, mdot_r = self._hardening_rate(bin, right, store_debug=False)
                 # print("right = ", dadt_l, dedt_l, mdot_l)
+                dadt_r = np.sum(dadt_r_list)
+                if self.eccen is not None:
+                    dedt_r = np.sum(dedt_r_list)
                 dt_r_list = self._get_timestep_from_rates(right, dadt_r, dedt_r, mdot_r, CFL)
                 # msg = ", ".join([f"{dd:.4e}" for dd in dt_r])
                 # print(f"dt: {msg}")
@@ -341,21 +355,29 @@ class Evolution:
 
                 # - take average evolution rate
 
-                dadt = 0.5 * (dadt_l + dadt_r)
+                dadt_list = 0.5 * (dadt_l_list + dadt_r_list)
+                dadt = np.sum(dadt_list)
                 if self.eccen is not None:
-                    dedt = 0.5 * (dedt_l + dedt_r)
+                    dedt_list = 0.5 * (dedt_l_list + dedt_r_list)
+                    dedt = np.sum(dedt_list)
                 mdot = 0.5 * (mdot_l + mdot_r)
                 dt = np.min([dt_l, dt_r])
                 # print(f"{dt/YR=:.4e}")
+
+                # - increment
+
+                self.sepa[right] = self.sepa[left] + dadt * dt
+                # Do not go past ISCO, if timestep is too large, reset to smaller value
+                if self.sepa[right] < risco:
+                    dt = (self.sepa[right] - self.sepa[left])/dadt
+                    self.sepa[right] = self.sepa[left] + dadt * dt
+
                 if dt <= 0.0 or ~np.isfinite(dt):
                     print(f"{dt_l=}, {dt_r=}")
                     print(f"{dt_l_list=}")
                     print(f"{dt_r_list=}")
                     raise RuntimeError(f"Next timestep is invalid!  {dt=}")
 
-                # - increment
-
-                self.sepa[right] = self.sepa[left] + dadt * dt
                 if self.eccen is not None:
                     self.eccen[right] = self.eccen[left] + dedt * dt
                 # if there is no accretion, then mdot is zero
@@ -363,20 +385,35 @@ class Evolution:
                 self.tlook[right] = self.tlook[left] - dt
                 self.redz[right] = cosmo.tlbk_to_z(self.tlook[right])
 
-                self.dadt[right] = dadt
+                if dadt > 0.0:
+                    print(f"{dadt=}")
+
+                self.dadt[right, :] = dadt_list
                 self.mdot[right] = mdot
                 if self.eccen is not None:
-                    self.dedt[right] = dedt
+                    self.dedt[right, :] = dedt_list
+
+                left = right
+                dadt_l_list = dadt_list
+                dedt_l_list = dedt_list
+                mdot_l = mdot
+                my_steps += 1
 
             # print(f"\n====Finished binary {bin} after {my_steps}, {idx=}====\n")
             last_index[bin] = right
             idx += 1
-            # if bin > 3:
-            #     break
 
+        # store the first and last indices for each binary, and make sure they look okay
+        first_index = np.concatenate([[0,], last_index[:-1]+1])
         self._last_index = last_index
-        assert np.all(self.sepa[self._last_index] == self._sepa_init)
-        assert np.all(self.mass[self._last_index] == self._mass_init)
+        self._first_index = first_index
+        # assert np.all(self.sepa[first_index] == self._sepa_init)
+        # minit = self._mass_init
+        # assert np.all(self.mass[self._last_index] == minit)
+        # mfinal = self.mass[self._last_index]
+        # assert np.all(mfinal >= minit)
+
+        # trim unused parts of initialized arrays
         end = last_index[-1] + 1
         self.sepa = self.sepa[:end]
         self.mass = self.mass[:end]
@@ -1058,16 +1095,12 @@ class Evolution:
             In this case, the shape is (N,) where N is the number of binaries.
 
         """
-        dadt = 0.0
-        dedt = None if (self.eccen is None) else 0.0
+        dadt = np.zeros(self._nhards)
+        dedt = None if (self.eccen is None) else np.zeros_like(dadt)
         for ii, hard in enumerate(self._hard):
-            _hard_dadt, _hard_dedt = hard.dadt_dedt(self, bin, step)
-            # print(ii, hard, _hard_dadt, _hard_dedt)
-            # print(f"\t{self.sepa[step]/_hard_dadt/YR=:.8e}")
-            dadt += _hard_dadt
-
+            dadt[ii], _hard_dedt = hard.dadt_dedt(self, bin, step)
             if (dedt is not None):
-                dedt += _hard_dedt
+                dedt[ii] = _hard_dedt
 
         if self._acc is not None:
             _mdot_tot = self._acc.mdot_total(self, bin, step)
@@ -1210,8 +1243,8 @@ class Evolution:
             dt_mdot = np.inf
 
         dt = [dt_dadt, dt_dedt, dt_mdot]
-        if np.any(np.isnan(dt)):
-            print(f"BAD DT in `_get_timestep_from_rates()`!")
+        if np.any(np.isnan(dt) | np.less(dt, 0.0)):
+            print("BAD DT in `_get_timestep_from_rates()`!")
             print(f"{dt_dadt=} | {self.sepa[step]=} {dadt=}")
             print(f"{dt_dedt=} | {self.eccen[step]=} {dedt=}")
             print(f"{dt_mdot=} | {self.mass[step]=} {mdot=}")
