@@ -353,7 +353,7 @@ cdef void _get_hardening_norm_2pwl(
 @cython.wraparound(False)
 @cython.nonecheck(False)
 @cython.cdivision(True)
-cdef double get_binary_lifetime_2pwl(double norm_log10, void *args):
+cdef double get_binary_lifetime_2pwl(double norm_log10, void *args) noexcept:
     cdef lifetime_2pwl_params *pars = <lifetime_2pwl_params *> args
 
     cdef double risco_log10 = log10(3.0 * MY_SCHW * pars.mt)
