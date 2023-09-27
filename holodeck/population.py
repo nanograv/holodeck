@@ -306,7 +306,7 @@ class Pop_Illustris(_Population_Discrete):
 
     """
 
-    def __init__(self, fname=None, **kwargs):
+    def __init__(self, select=None, fname=None, **kwargs):
         """Initialize a binary population using data in the given filename.
 
         Parameters
@@ -318,6 +318,8 @@ class Pop_Illustris(_Population_Discrete):
             Additional keyword-arguments passed to `super().__init__`.
 
         """
+        self._select = select
+
         if fname is None:
             fname = _DEF_ILLUSTRIS_FNAME
             fname = os.path.join(_PATH_DATA, fname)
@@ -350,6 +352,15 @@ class Pop_Illustris(_Population_Discrete):
         # Get the stellar mass, and take that as bulge mass
         self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :]   #: Stellar mass / stellar-bulge mass [grams]
         self.vdisp = data['SubhaloVelDisp']    #: Velocity dispersion of galaxy [?cm/s?]
+
+        if self._select is not None:
+            print(f"\n=====\nWARNING SELECTING ONLY {self._select} BINARIES FROM DATA\n=====\n")
+            names = ['sepa', 'mass', 'scafa', 'mbulge', 'vdisp']
+            for nam in names:
+                vals = getattr(self, nam)
+                vals = vals[:self._select]
+                setattr(self, nam, vals)
+
         return
 
 
