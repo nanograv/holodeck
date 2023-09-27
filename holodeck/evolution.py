@@ -232,7 +232,7 @@ class Evolution:
         nsteps = self._NSTEPS * nbinaries
         nhards = self._nhards
         MAX_BIN_STEPS = 1e3
-        CFL = 0.5
+        CFL = 0.1
 
         self.sepa = np.zeros(nsteps)
         self.dadt = np.zeros((nsteps, nhards))
@@ -372,6 +372,9 @@ class Evolution:
                     dt = (self.sepa[right] - self.sepa[left])/dadt
                     self.sepa[right] = self.sepa[left] + dadt * dt
 
+                if self.sepa[right] > self.sepa[left]:
+                    print(f"SOFTENING OCCURED FOR {bin=} {idx=} {my_steps=}")
+
                 if dt <= 0.0 or ~np.isfinite(dt):
                     print(f"{dt_l=}, {dt_r=}")
                     print(f"{dt_l_list=}")
@@ -407,11 +410,11 @@ class Evolution:
         first_index = np.concatenate([[0,], last_index[:-1]+1])
         self._last_index = last_index
         self._first_index = first_index
-        # assert np.all(self.sepa[first_index] == self._sepa_init)
-        # minit = self._mass_init
-        # assert np.all(self.mass[self._last_index] == minit)
-        # mfinal = self.mass[self._last_index]
-        # assert np.all(mfinal >= minit)
+        assert np.all(self.sepa[first_index] == self._sepa_init)
+        minit = self._mass_init
+        assert np.all(self.mass[first_index] == minit)
+        mfinal = self.mass[self._last_index]
+        assert np.all(mfinal >= minit)
 
         # trim unused parts of initialized arrays
         end = last_index[-1] + 1
