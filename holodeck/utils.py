@@ -1435,7 +1435,7 @@ def fit_turnover_psd(xx, yy, fref, init=[-16, -13/3, 0.3/YR, 2.5]):
 # =================================================================================================
 
 
-def dfdt_from_dadt(dadt, sepa, mtot=None, frst_orb=None, dfdt_mdot=False):
+def dfdt_from_dadt(dadt, sepa, mtot=None, frst_orb=None, mdot=None, dfdt_mdot=False):
     """Convert from hardening rate in separation to hardening rate in frequency.
 
     Parameters
@@ -1471,7 +1471,12 @@ def dfdt_from_dadt(dadt, sepa, mtot=None, frst_orb=None, dfdt_mdot=False):
     dfdt = - 1.5 * (frst_orb / sepa) * dadt
     if dfdt_mdot:
         #IMPLEMENT dfdt from accretion here!!!
-        pass
+        if mdot is None:
+            err = "mdot must be provided when calculating dfdt_mdot!"
+            log.exception(err)
+            raise ValueError(err)
+        dfdm = 1/(4*np.pi) * np.sqrt(NWTG/(sepa**3 * mtot))
+        dfdt += dfdm * mdot
 
     return dfdt, frst_orb
 
