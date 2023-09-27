@@ -313,7 +313,7 @@ class CBD_Torques(_Hardening):
         """ ECCENTRICITY """
         eccen = np.atleast_1d(eccen) if eccen is not None else None
 
-        semimajor_axis = sepa #for now? we don't resolve the orbit in time (ever?) so this approximation should do?
+        semimajor_axis = sepa 
 
         """ dadt and dedt from Siwek+23 are parameterized
             by the semimajor axis, mass and accretion rate
