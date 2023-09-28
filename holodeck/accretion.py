@@ -117,10 +117,6 @@ class Accretion:
             """ Indices where separation is less than or equal to a parsec """
             if evol.sepa[step] > PC:
                 mdot = 0.0
-        else:
-            """ Indices where separation is less than or equal to 100 kilo-parsec """
-            if evol.sepa[step] > 10**5 * PC:
-                mdot = 0.0
 
         return mdot
 
