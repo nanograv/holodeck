@@ -1194,10 +1194,13 @@ class New_Evolution:
             self.eccen = None
             self.dedt = None
 
-        if self._acc is not None:
-            self.mdot = np.zeros((nsteps, 2))
-        else:
-            self.mdot = None
+        #if self._acc is not None:
+        #initialize self.mdot regardless of whether self_acc is 
+        # supplied or not. 
+        #If there is no accretion, we just add mdot=0
+        self.mdot = np.zeros((nsteps, 2))
+        # else:
+        #     self.mdot = None
 
         arr_size = nsteps
         last_index = np.zeros(nbinaries, dtype=int)
@@ -1225,8 +1228,6 @@ class New_Evolution:
             self.redz[idx] = cosmo.tlbk_to_z(self.tlook[idx])
             if self.eccen is not None:
                 self.eccen[idx] = self._eccen_init[bin]
-            if self._acc is not None:
-                self.mdot
 
             my_steps = 0
 
