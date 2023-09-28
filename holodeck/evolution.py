@@ -78,7 +78,7 @@ import kalepy as kale
 import holodeck as holo
 import holodeck.discrete_cyutils
 from holodeck import utils, cosmo, log
-from holodeck.constants import PC, GYR, MSOL
+from holodeck.constants import PC, GYR, MSOL, YR
 from holodeck.hardening import _Hardening
 # from holodeck import accretion
 
@@ -1363,23 +1363,26 @@ class New_Evolution:
         if (params is not None) or (coal is not None) or (lin_interp is not None):
             raise NotImplementedError(f"{params=} {coal=} {lin_interp=} are not implemented in New_Evolution!")
 
+        if np.any(np.diff(targets) < 0.0):
+            raise RuntimeError("`targets` must be monotonically increasing!")
+
         vals = holodeck.discrete_cyutils.interp_at_fobs(self, targets)
-        bin, fobs_idx, m1, m2, redz, eccen, dadt, dedt = vals
+        bin, interp_idx, m1, m2, redz, eccen, dadt, dedt = vals
         mass = np.stack([m1, m2], axis=1)
-        # get the indices to sort first by fobs_idx (fobs), then by bin(ary)
-        idx = np.lexsort([bin, fobs_idx])
+        # get the indices to sort first by interp_idx (fobs), then by bin(ary)
+        idx = np.lexsort([bin, interp_idx])
         bin = bin[idx]
-        fobs_idx = fobs_idx[idx]
+        interp_idx = interp_idx[idx]
         mass = mass[idx]
         redz = redz[idx]
         eccen = eccen[idx]
         dadt = dadt[idx]
         dedt = dedt[idx]
-        fobs = targets[fobs_idx]
+        fobs = targets[interp_idx]
 
         vals = dict(
             mass=mass, redz=redz, eccen=eccen, dadt=dadt, dedt=dedt,
-            binary=bin, fobs_idx=fobs_idx, fobs=fobs
+            binary=bin, interp_idx=interp_idx, fobs=fobs
         )
         return vals
 
@@ -1420,3 +1423,136 @@ class New_Evolution:
             print(f"{dt_dedt=} | {self.eccen[step]=} {dedt=}")
             print(f"{dt_mdot=} | {self.mass[step]=} {mdot=}")
         return dt
+
+    def gwb(self, fobs, nharms=100):
+
+        if self._eccen_init is not None:
+            harm_range = np.arange(1, nharms+1)
+        else:
+            harm_range = np.asarray([2])
+            nharms = 1
+
+        # ---- Interpolate data to all harmonics of this frequency
+
+        fobs = np.atleast_1d(fobs)
+        nfreqs = fobs.size
+        assert fobs.ndim == 1
+        # get each harmonic of each frequency, (F, H)
+        fobs_orb = fobs[:, np.newaxis] / harm_range[np.newaxis, :]
+        # (F, H) ==> (F*H,)
+        print(f"{fobs_orb*YR=}")
+        fobs_orb = fobs_orb.flatten()
+        fobs_index = np.arange(nfreqs)[:, np.newaxis] * np.ones((nfreqs, nharms), dtype=int)
+        harm_index = np.arange(nharms)[np.newaxis, :] * np.ones((nfreqs, nharms), dtype=int)
+        print(f"{fobs_orb.shape=} {fobs_index.shape=} {harm_index.shape=}")
+        fobs_index = fobs_index.flatten()
+        harm_index = harm_index.flatten()
+        print(f"{fobs_index=}")
+        sort_fobs_harm = np.argsort(fobs_orb)
+        print(f"{sort_fobs_harm=}")
+        fobs_orb = fobs_orb[sort_fobs_harm]
+        fobs_index = fobs_index[sort_fobs_harm]
+        harm_index = harm_index[sort_fobs_harm]
+        print(f"{fobs_index=}")
+        print(f"{harm_index=}")
+
+        # interpolate binary evolution tracks to these frequencies
+        data_harms = self.at('fobs', fobs_orb)
+        data_harms['dcom'] = cosmo.z_to_dcom(data_harms['redz'])
+
+        gwb = holo.discrete_cyutils.gwb_from_harmonics_data(fobs, harm_range, fobs_index, harm_index, data_harms)
+        return gwb
+
+        # each entry in the dictionary is ordered first by frequency, then by binary.  So all of the matches to
+        # `fobs_orb[0]` are listed first in the arrays, then all of the matches to `fobs_orb[1]`, etc etc
+        #
+
+
+        # Only examine binaries reaching the given locations before redshift zero (other redz=inifinite)
+        # (N, H)
+        redz = data_harms['scafa']
+        redz = cosmo.a_to_z(redz)
+        valid = (redz > 0.0)
+        # There are 'V' valid == True elements of the (N, H) arrays, such that V <= N*H
+        # anytime an (N, H) ndarray is sliced by the `valid` ndarray, it results in a (V,) ndarray
+
+        # Broadcast harmonics numbers to correct shape, (N, H)
+        harms_2d = np.ones_like(redz, dtype=int) * harm_range[np.newaxis, :]
+
+        # ---- Handle Eccentricities and eccentricity distribution function
+
+        # `None`  or  ndarray shape (N, H)
+        eccen = data_harms['eccen']
+        # for circular binaries, we should only be consider the n=2 harmonic, and gne(n=2)=1.0
+        if eccen is None:
+            gne = 1
+            assert np.all(harms_2d == 2)
+
+        # If there are eccentricities, calculate the freq-dist-function
+        else:
+            # (V,) array [i.e. the `valid` slice of (N, H)]
+            harms = harms_2d[valid]
+            eccen = eccen[valid]
+            gne = utils.gw_freq_dist_func(harms, ee=eccen)
+
+            # Handle (near-)zero eccentricities manually
+            # when eccentricity is very low, set all harmonics to zero except for n=2
+
+            # Select the elements corresponding to the n=2 (circular) harmonic, to use later
+            # (N, H)
+            sel_n2 = np.zeros_like(redz, dtype=bool)
+            sel_n2[(harms_2d == 2)] = 1
+            # (V,)
+            sel_n2 = sel_n2[valid]
+
+            # Select near-zero eccentricities and set the gne values manually
+            sel_e0 = (eccen < 1e-12)
+            gne[sel_e0] = 0.0
+            gne[sel_n2 & sel_e0] = 1.0
+
+        # ---- Calculate GWB
+
+        frst_orb = utils.frst_from_fobs(fobs_orb, redz)
+        # Select only the valid elements, also converts to 1D, i.e. (N, H) ==> (V,)
+        redz = redz[valid]
+        frst_orb = frst_orb[valid]
+        # Calculate required parameters for valid binaries (V,)
+        dcom = cosmo.z_to_dcom(redz)
+
+        mchirp = data_harms['mass'][valid]
+        mchirp = utils.chirp_mass(*mchirp.T)
+        # Calculate strains from each source
+        hs2 = utils.gw_strain_source(mchirp, dcom, frst_orb)**2
+
+        dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], \
+                                    data_harms['sepa'][valid], frst_orb=frst_orb,\
+                                    dfdt_mdot=evo.dfdt_mdot)
+
+        _lambda_fact = utils.lambda_factor_dlnf(frst_orb, dfdt, redz, dcom=dcom) / box_vol
+        num_binaries = _lambda_fact * dlnf
+
+        shape = (num_binaries.size, nreals)
+        num_pois = poisson_as_needed(num_binaries[:, np.newaxis] * np.ones(shape))
+
+        # --- Calculate GW Signals
+        temp = hs2 * gne * (2.0 / harms)**2
+        both = np.sum(temp[:, np.newaxis] * num_pois / dlnf, axis=0)
+
+        # Calculate and return the expectation value hc^2 for each harmonic
+        # (N, H)
+        gwb_harms = np.zeros_like(harms_2d, dtype=float)
+        gwb_harms[valid] = temp * num_binaries / dlnf
+        # (N, H) ==> (H,)
+        gwb_harms = np.sum(gwb_harms, axis=0)
+
+        if np.any(num_pois > 0):
+            # Find the L loudest binaries in each realizations
+            loud = np.sort(temp[:, np.newaxis] * (num_pois > 0), axis=0)[::-1, :]
+            fore = loud[0, :]
+            loud = loud[:loudest, :]
+        else:
+            fore = np.zeros_like(both)
+            loud = np.zeros((loudest, nreals))
+
+        back = both - fore
+        return both, fore, back, loud, gwb_harms
