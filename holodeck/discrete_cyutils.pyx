@@ -14,13 +14,6 @@ from libc.math cimport pow, sqrt, abs, M_PI, NAN
 from holodeck import utils
 from holodeck.cyutils cimport interp_at_index, _interp_between_vals
 
-# cdef extern from "numpy/npy_common.h":
-#     ctypedef npy_intp
-
-# cdef extern from "numpy/arrayobject.h":
-# #     PyObject* PyArray_SimpleNewFromData(int nd, int* dims, int typenum, void* data)
-#     void PyArray_INCREF(cnp.ndarray arr)
-
 # int64 type
 DTYPE_LONG = np.int64
 NPY_DTYPE_LONG = cnp.NPY_INT64
