@@ -1103,38 +1103,16 @@ class Evolution:
 
 class New_Evolution:
 
-    # _EVO_PARS = ['mass', 'sepa', 'eccen', 'scafa', 'tlook', 'dadt', 'dedt']
-    # _LIN_INTERP_PARS = ['eccen', 'scafa', 'tlook', 'dadt', 'dedt']
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
     _NSTEPS = 1000
     _TIME_STEP_MAX = 0.1 * GYR
 
-    def __init__(self, pop, hard, mods=None, debug: bool = False, acc=None, dfdt_mdot=False):
-        """Initialize a new Evolution instance.
-
-        Parameters
-        ----------
-        pop : `population._Population_Discrete` instance,
-            Binary population with initial parameters of the binary from which to start evolution.
-        hard : `_Hardening` instance, or list of
-            Model for binary hardening used to evolve population's separation over time.
-        nsteps : int,
-            Number of steps between initial separations and coalescence for all binaries.
-        mods : None, or list of `utils._Modifier` subclasses,
-            NOTE: not fully implemented!
-        debug : bool,
-            Include verbose/debugging output information.
-
-        """
+    def __init__(self, pop, hard, mods=None, acc=None):
         # --- Store basic parameters to instance
         self._pop = pop                       #: initial binary population instance
-        self._debug = debug                   #: debug flag for performing extra diagnostics and output
-        # self._nsteps = nsteps                 #: number of integration steps for each binary
-        # nsteps = self._NSTEPS
         self._mods = mods                     #: modifiers to be applied after evolution is completed
         self._acc = acc
-        self.dfdt_mdot = dfdt_mdot #include frequency evolution from mdot
         self._size = pop.size
 
         # Store hardening instances as a list
@@ -1154,8 +1132,8 @@ class New_Evolution:
             if not good:
                 err = f"hardening instance is {hh}, must be subclass of `{_Hardening}`!"
                 err += " NOTE: sometimes jupyter notebooks must be restarted to avoid this error.  🤷🏻‍♂️"
-                log.exception(err)
-                raise TypeError(err)
+                log.warning(err)
+                # raise TypeError(err)
 
         # Store additional parameters
         for par in self._STORE_FROM_POP:
