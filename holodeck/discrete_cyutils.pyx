@@ -134,6 +134,11 @@ cdef void _interp_at_fobs(
     cdef double fobs_l, fobs_r
 
     for bin in range(nbins):
+        # if (bin > 0) and ((bin == nbins-1) or (bin % (nbins//10) == 0)):
+        #     printf("%ld, ", bin)
+        #     if bin == nbins-1:
+        #         printf("\n")
+
         # get the first and last index (both inclusive) for this binary
         beg = beg_index[bin]
         end = end_index[bin]
@@ -300,7 +305,7 @@ cdef void _interp_at_fobs(
 
             fobs_l = fobs_r
             left = right
-            last_direction = direction
+            # last_direction = direction
 
     data.final_size = out
     # downsize arrays to amount of space used
@@ -317,6 +322,8 @@ cdef void _interp_at_fobs(
     return
 
 
+@cython.nonecheck(False)
+@cython.cdivision(True)
 cdef double get_fobs(double sepa, double mass, double redz):
     cdef double fobs = KEPLER_CONST * sqrt(mass)/pow(sepa, 1.5)
     fobs /= (1.0 + redz)
