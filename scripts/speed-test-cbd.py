@@ -26,8 +26,8 @@ TARGET_FOBS = [
 ]
 
 
-bin, target, m1 = holodeck.discrete_cyutils.test__interp_at_fobs_1()
-print(bin.size, bin.dtype, m1.size, m1.dtype)
+bin, target, m1, m2, redz, eccen, dadt, dedt = holodeck.discrete_cyutils.test__interp_at_fobs_1()
+# print(bin.size, bin.dtype, m1.size, m1.dtype)
 print(bin)
 print(target)
 print(m1)
