@@ -12,7 +12,7 @@ from libc.stdlib cimport malloc, free, realloc
 from libc.math cimport pow, sqrt, abs, M_PI, NAN
 
 from holodeck import utils
-from holodeck.cyutils cimport interp_at_index, _interp_between_vals
+from holodeck.cyutils cimport interp_at_index, _interp_between_vals, gw_freq_dist_func__scalar_scalar
 
 # int64 type
 DTYPE_LONG = np.int64
@@ -26,6 +26,8 @@ ctypedef cnp.float64_t DTYPE_DOUBLE_t
 
 ctypedef cnp.npy_intp SIZE_t
 
+
+cdef double MIN_ECCEN_ZERO = 1.0e-4
 
 # ---- Define Constants
 
@@ -69,8 +71,8 @@ def interp_at_fobs(evo, fobs):
     cdef cnp.ndarray[DTYPE_LONG_t, ndim=1, mode="c"] bin = cnp.PyArray_SimpleNewFromData(
         1, &data.final_size, NPY_DTYPE_LONG, <void*>data.bin
     )
-    cdef cnp.ndarray[DTYPE_LONG_t, ndim=1, mode="c"] target = cnp.PyArray_SimpleNewFromData(
-        1, &data.final_size, NPY_DTYPE_LONG, <void*>data.target
+    cdef cnp.ndarray[DTYPE_LONG_t, ndim=1, mode="c"] interp_idx = cnp.PyArray_SimpleNewFromData(
+        1, &data.final_size, NPY_DTYPE_LONG, <void*>data.interp_idx
     )
     cdef cnp.ndarray[DTYPE_DOUBLE_t, ndim=1, mode="c"] m1 = cnp.PyArray_SimpleNewFromData(
         1, &data.final_size, NPY_DTYPE_DOUBLE, <void*>data.m1
@@ -91,7 +93,7 @@ def interp_at_fobs(evo, fobs):
         1, &data.final_size, NPY_DTYPE_DOUBLE, <void*>data.dedt
     )
 
-    return bin, target, m1, m2, redz, eccen, dadt, dedt
+    return bin, interp_idx, m1, m2, redz, eccen, dadt, dedt
 
 
 @cython.boundscheck(False)
@@ -120,7 +122,7 @@ cdef void _interp_at_fobs(
     cdef DTYPE_LONG_t arr_size_tot = arr_size
 
     data.bin = <DTYPE_LONG_t *>malloc(arr_size * sizeof(DTYPE_LONG_t))         # binary index number
-    data.target = <DTYPE_LONG_t *>malloc(arr_size * sizeof(DTYPE_LONG_t))         # target fobs index number
+    data.interp_idx = <DTYPE_LONG_t *>malloc(arr_size * sizeof(DTYPE_LONG_t))         # target fobs index number
     data.m1 = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
     data.m2 = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
     data.redz = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
@@ -164,7 +166,7 @@ cdef void _interp_at_fobs(
                 # printf("out+nfreqs=%ld+%ld=%ld >= %ld, resizing\n", out, nfreqs, out+nfreqs, arr_size_tot)
                 arr_size_tot += arr_size
                 data.bin = <DTYPE_LONG_t *>realloc(data.bin, arr_size_tot * sizeof(DTYPE_LONG_t))
-                data.target = <DTYPE_LONG_t *>realloc(data.target, arr_size_tot * sizeof(DTYPE_LONG_t))
+                data.interp_idx = <DTYPE_LONG_t *>realloc(data.interp_idx, arr_size_tot * sizeof(DTYPE_LONG_t))
                 data.m1 = <double *>realloc(data.m1, arr_size_tot * sizeof(double))
                 data.m2 = <double *>realloc(data.m2, arr_size_tot * sizeof(double))
                 data.redz = <double *>realloc(data.redz, arr_size_tot * sizeof(double))
@@ -204,7 +206,7 @@ cdef void _interp_at_fobs(
                         #! also interpolate individual hardening rates
                         # set output to show which binary and which target frequency this match corresponds to
                         data.bin[out] = bin
-                        data.target[out] = fi
+                        data.interp_idx[out] = fi
                         # interpolate desired values
                         data.m1[out] = _interp_between_vals(
                             target_fobs[fi], fobs_l, fobs_r, mass[left, 0], mass[right, 0]
@@ -264,7 +266,7 @@ cdef void _interp_at_fobs(
 
                         # set output to show which binary and which target frequency this match corresponds to
                         data.bin[out] = bin
-                        data.target[out] = fi
+                        data.interp_idx[out] = fi
                         # interpolate desired values
                         data.m1[out] = _interp_between_vals(
                             target_fobs[fi], fobs_l, fobs_r, mass[left, 0], mass[right, 0]
@@ -310,7 +312,7 @@ cdef void _interp_at_fobs(
     data.final_size = out
     # downsize arrays to amount of space used
     data.bin = <DTYPE_LONG_t *>realloc(data.bin, out * sizeof(DTYPE_LONG_t))
-    data.target = <DTYPE_LONG_t *>realloc(data.target, out * sizeof(DTYPE_LONG_t))
+    data.interp_idx = <DTYPE_LONG_t *>realloc(data.interp_idx, out * sizeof(DTYPE_LONG_t))
     data.m1 = <double *>realloc(data.m1, out * sizeof(double))
     data.m2 = <double *>realloc(data.m2, out * sizeof(double))
     data.redz = <double *>realloc(data.redz, out * sizeof(double))
@@ -331,8 +333,76 @@ cdef double get_fobs(double sepa, double mass, double redz):
 
 
 
+def gwb_from_harmonics_data(fobs_gw, harms, fobs_index, harm_index, data):
+    cdef np.ndarray[np.double_t, ndim=4] gwb = np.zeros((fobs_gw.size, harms.size))
+    _gwb_from_harmonics_data(
+        fobs_gw, harms, fobs_index, harm_index,
+        data['interp_idx'], data['eccen'], data['redz'], data['dcom'], data['dadt'],
+        gwb,
+    )
+    return gwb
+
+cdef double[:] _gwb_from_harmonics_data(
+    # input
+    double[:] fobs,    # GW observer-frame frequencies
+    DTYPE_LONG_t[:] harms,
+    DTYPE_LONG_t[:] fobs_idx,
+    DTYPE_LONG_t[:] harm_idx,
+    DTYPE_LONG_t[:] interp_idx,
+    double[:] eccen,
+    double[:] redz,
+    double[:] dcom,
+    double[:] dadt,
+    # output
+    double[:, :] gwb,
+):
+
+    cdef DTYPE_LONG_t nfreqs = len(fobs)
+    cdef DTYPE_LONG_t nfreqharms = len(harm_idx)
+    cdef DTYPE_LONG_t nvals = len(interp_idx)
+
+    cdef DTYPE_LONG_t ii, idx, fi, hi
+    cdef double gne, frst_orb
+
+    for ii in range(nvals):
+        # which target-frequency this entry corresponds to
+        idx = interp_idx[ii]
+        # which GW-frequency-index this corresponds to
+        fi = fobs_idx[idx]
+        # which harmonic-index this corresponds to
+        hi = harm_idx[idx]
+        # rest-frame orbital frequency
+        frst_orb = fobs[fi] * (1.0 + redz[ii]) / harms[hi]
+
+        if eccen[ii] < MIN_ECCEN_ZERO:
+            if harms[hi] == 2:
+                gne = 1.0
+            else:
+                gne = 0.0
+        else:
+            gne = gw_freq_dist_func__scalar_scalar(harms[hi], eccen[ii])
 
 
 
+        hs2 = utils.gw_strain_source(mchirp, dcom, frst_orb)**2
 
+        dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], \
+                                    data_harms['sepa'][valid], frst_orb=frst_orb,\
+                                    dfdt_mdot=evo.dfdt_mdot)
+
+        _lambda_fact = utils.lambda_factor_dlnf(frst_orb, dfdt, redz, dcom=dcom) / box_vol
+        num_binaries = _lambda_fact * dlnf
+
+        shape = (num_binaries.size, nreals)
+        num_pois = poisson_as_needed(num_binaries[:, np.newaxis] * np.ones(shape))
+
+        # --- Calculate GW Signals
+        temp = hs2 * gne * (2.0 / harms)**2
+        both = np.sum(temp[:, np.newaxis] * num_pois / dlnf, axis=0)
+
+
+        # gwb[fi, hi] = _
+
+
+    return
 
