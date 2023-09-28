@@ -10,7 +10,8 @@ Magdalena Siwek
 import os
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
-from holodeck import _PATH_DATA
+from holodeck import _PATH_DATA, utils
+
 
 class Accretion:
     """ Preferential Accretion prescription
@@ -48,7 +49,7 @@ class Accretion:
         eccen : float, optional
             Eccentricity value.
         subpc : boolean, optional
-        edd_lim : None, or numerical value. This limits the accretion to a factor edd_lim the Eddington limit. 
+        edd_lim : None, or numerical value. This limits the accretion to a factor edd_lim the Eddington limit.
 
         Other Parameters
         ----------------
@@ -91,37 +92,39 @@ class Accretion:
         >>> mass =
         >>> print(acc.mdot_eddington(mass))
         """
-        from holodeck.constants import SIGMA_T, MPRT, NWTG, MSOL, SPLC, EDDT
+        from holodeck.constants import SPLC, EDDT
 
         # medd = (4.*np.pi*NWTG*MPRT)/(eps*SPLC*SIGMA_T) * self.mtot
         medd = self.f_edd * (EDDT/(eps * SPLC**2)) * mass
         return(medd)
 
-    def mdot_total(self, evol, step):
+    def mdot_total(self, evol, bin, step):
         from holodeck.constants import PC
+
         if self.mdot_ext is not None:
             """ accretion rates have been supplied externally """
-            mdot = self.mdot_ext[:,step-1]
+            raise NotImplementedError("THIS HASNT BEEN UPDATED TO NEW TIME-BASED INTEGRATION!")
+            mdot = self.mdot_ext[:, step-1]
+
         else:
             """ Get accretion rates as a fraction (f_edd in self._acc) of the
                 Eddington limit from current BH masses """
-            total_bh_masses = np.sum(evol.mass[:, step-1, :], axis=1)
+            total_bh_masses = np.sum(evol.mass[step, :])
             mdot = self.mdot_eddington(total_bh_masses)
 
         """ Calculate individual accretion rates """
         if self.subpc:
             """ Indices where separation is less than or equal to a parsec """
-            ind_sepa = evol.sepa[:, step] <= PC
+            if evol.sepa[step] > PC:
+                mdot = 0.0
         else:
             """ Indices where separation is less than or equal to 100 kilo-parsec """
-            ind_sepa = evol.sepa[:, step] <= 10**5 * PC
+            if evol.sepa[step] > 10**5 * PC:
+                mdot = 0.0
 
-        """ Set total accretion rates to 0 when separation is larger than 1pc or 10kpc,
-            depending on subpc switch applied to accretion instance """
-        mdot[~ind_sepa] = 0
-        return(mdot)
+        return mdot
 
-    def pref_acc(self, mdot, evol, step):
+    def pref_acc(self, mdot, evol, bin, step):
         """
         Contains a variety of accretion models to choose from to calculate primary vs secondary
         accretion rates.
@@ -158,34 +161,37 @@ class Accretion:
         accessed.
 
         """
-        m1 = evol.mass[:, step - 1, 0]
-        m2 = evol.mass[:, step - 1, 1]
-        inds_m1_primary = m1 >= m2  # where first mass is actually primary
-        m1_sorted = np.zeros(np.shape(m1))
-        m1_sorted[inds_m1_primary] = m1[inds_m1_primary]
-        m1_sorted[~inds_m1_primary] = m2[~inds_m1_primary]
-        m1 = m1_sorted
+        # m1 = evol.mass[step, 0]
+        # m2 = evol.mass[step, 1]
+        m1, m2 = utils.m1m2_ordered(*evol.mass[step])
 
-        inds_m2_primary = m2 >= m1  # where second mass is actually primary
-        m2_sorted = np.zeros(np.shape(m2))
-        m2_sorted[inds_m2_primary] = m1[inds_m2_primary]
-        m2_sorted[~inds_m2_primary] = m2[~inds_m2_primary]
-        m2 = m2_sorted
+        # inds_m1_primary = m1 >= m2  # where first mass is actually primary
+        # m1_sorted = np.zeros(np.shape(m1))
+        # m1_sorted[inds_m1_primary] = m1[inds_m1_primary]
+        # m1_sorted[~inds_m1_primary] = m2[~inds_m1_primary]
+        # m1 = m1_sorted
+
+        # inds_m2_primary = m2 >= m1  # where second mass is actually primary
+        # m2_sorted = np.zeros(np.shape(m2))
+        # m2_sorted[inds_m2_primary] = m1[inds_m2_primary]
+        # m2_sorted[~inds_m2_primary] = m2[~inds_m2_primary]
+        # m2 = m2_sorted
 
         if self.accmod == 'Siwek22':
             # Calculate the mass ratio
             q_b = m2 / m1
             # secondary and primary may swap indices
             # need to account for that and reverse the mass ratio
-            inds_rev = q_b > 1
-            q_b[inds_rev] = 1./q_b[inds_rev]
+            # inds_rev = q_b > 1
+            # q_b[inds_rev] = 1./q_b[inds_rev]
             """if evol has an eccentricity distribution,
                we use it, if not, we set each eccentricity to
                the value specified in __init__ """
             if evol.eccen is not None:
-                e_b = evol.eccen[:, step-1]
+                e_b = evol.eccen[step]
             else:
-                e_b = self.eccen
+                e_b = None
+
             """ Now interpolate to get lambda at [q,e] """
             def lambda_qe_interp_2d(fp="data/preferential_accretion/siwek+22/", es=[0.0,0.2,0.4,0.6,0.8]):
                 all_lambdas = []
@@ -251,16 +257,22 @@ class Accretion:
         # After calculating the primary and secondary accretion rates,
         # they need to be placed at the correct index into `mdot_arr`, to
         # account for primary/secondary being at 0-th OR 1-st index
-        mdot_arr = np.zeros(np.shape(evol.mass[:, step-1, :]))
-        mdot_arr[:, 0][inds_m1_primary] = mdot_1[inds_m1_primary]
-        mdot_arr[:, 0][~inds_m1_primary] = mdot_2[~inds_m1_primary]
-        mdot_arr[:, 1][inds_m2_primary] = mdot_1[inds_m2_primary]
-        mdot_arr[:, 1][~inds_m2_primary] = mdot_2[~inds_m2_primary]
+        # mdot_arr = np.zeros(np.shape(evol.mass[:, step-1, :]))
+        # mdot_arr[:, 0][inds_m1_primary] = mdot_1[inds_m1_primary]
+        # mdot_arr[:, 0][~inds_m1_primary] = mdot_2[~inds_m1_primary]
+        # mdot_arr[:, 1][inds_m2_primary] = mdot_1[inds_m2_primary]
+        # mdot_arr[:, 1][~inds_m2_primary] = mdot_2[~inds_m2_primary]
+        if evol.mass[step, 0] >= evol.mass[step, 1]:
+            mdot_arr = [mdot_1, mdot_2]
+        else:
+            mdot_arr = [mdot_2, mdot_1]
+
+        return np.asarray(mdot_arr)
 
         #mdot_arr = np.array([mdot_1, mdot_2]).T
-        return(mdot_arr)
+        # return(mdot_arr)
 
         # Catch any weirdness if no model is selected.
-        if self.accmod is None:
-            raise TypeError("'None' value provided for accretion model." +
-                            "An accretion model is required.")
+        # if self.accmod is None:
+        #     raise TypeError("'None' value provided for accretion model." +
+        #                     "An accretion model is required.")

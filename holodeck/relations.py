@@ -1293,9 +1293,12 @@ class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
             log.error(err)
             extr = [utils.minmax(xx) for xx in [self._xx, self._yy]]
             for vv, nn, ee in zip(vals, ['log10(mstar/Msol)', 'redz'], extr):
-                log.error(f"{nn} (extrema = {ee}): {utils.stats(vv)}")
+                try:
+                    log.error(f"{nn} (extrema = {ee}): {utils.stats(vv)}")
+                except Exception:
+                    log.error(f"{nn} (extrema = {ee}): {vv}")
 
-            raise
+            raise err
 
         if squeeze:
             ynew = ynew.squeeze()
