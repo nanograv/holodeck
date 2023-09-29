@@ -834,6 +834,29 @@ class Evolution:
             ecc_r = self.eccen[:, left] + de
             ecc_r = np.clip(ecc_r, 0.0, 1.0 - _MAX_ECCEN_ONE_MINUS)
             self.eccen[:, right] = ecc_r
+        
+        # masses at right egde are updated with tentative timestep.
+        # this is crucial to ensure correct hardening rates, because up until now,
+        # masses at next step ('right') are INITIAL masses!!!
+        # at the end of this function, masses at step are eventually updated with the final timestep.
+        if self._acc is not None:
+            """ An instance of the accretion class has been supplied,
+                and binary masses are evolved through accretion
+                First, get total accretion rates """
+
+            mdot_t = self._acc.mdot_total(self, None, left)
+            """ A preferential accretion model is called to divide up
+                total accretion rates into primary and secondary accretion rates """
+            #set bin = None
+            self.mdot[:,left,:] = self._acc.pref_acc(mdot_t, self, None, left)
+            """ Accreted mass is calculated and added to primary and secondary masses """
+            if self._acc.evol_mass:
+                #this switch helps to separate out accretion effects from other cbd effects
+                self.mass[:, right, 0] = self.mass[:, left, 0] + dt * self.mdot[:,left,0]
+                self.mass[:, right, 1] = self.mass[:, left, 1] + dt * self.mdot[:,left,1]
+            else:
+                self.mass[:, right, 0] = self.mass[:, left, 0]
+                self.mass[:, right, 1] = self.mass[:, left, 1]
 
         # Update lookback time based on duration of this step
         tlook = self.tlook[:, left] - dt
@@ -900,10 +923,12 @@ class Evolution:
                 and binary masses are evolved through accretion
                 First, get total accretion rates """
 
-            mdot_t = self._acc.mdot_total(self, step)
+            #set bin = None
+            mdot_t = self._acc.mdot_total(self, None, step-1)
             """ A preferential accretion model is called to divide up
                 total accretion rates into primary and secondary accretion rates """
-            self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_t, self, step)
+            #set bin = None
+            self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_t, self, None, step-1)
             """ Accreted mass is calculated and added to primary and secondary masses """
             if self._acc.evol_mass:
                 #this switch helps to separate out accretion effects from other cbd effects
@@ -945,7 +970,10 @@ class Evolution:
         dedt = None if self.eccen is None else np.zeros_like(dadt)
 
         for ii, hard in enumerate(self._hard):
-            _hard_dadt, _ecc = hard.dadt_dedt(self, step)
+            # [MSS 2023/09/29]: New hard.dadt_dedt takes 
+            # 'bin' as well as 'step' argument, (see new evolution class)
+            # so we set bin = None here 
+            _hard_dadt, _ecc = hard.dadt_dedt(self, None, step)
             dadt[:] += _hard_dadt
             if self._debug:    # nocov
                 log.debug(f"{step} hard={hard} : dadt = {utils.stats(_hard_dadt)}")
@@ -955,6 +983,7 @@ class Evolution:
                 # Raise error on invalid entries
                 bads = ~np.isfinite(_hard_dadt) | (_hard_dadt > 0.0)
                 if np.any(bads):
+                    print("hard = ", hard)
                     log.error(f"{step} hard={hard} : dadt = {utils.stats(_hard_dadt)}")
                     err = f"invalid `dadt` for hard={hard}  (bads: {utils.frac_str(bads)})!"
                     log.exception(err)
