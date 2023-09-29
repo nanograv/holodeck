@@ -59,6 +59,7 @@ cdef struct ArrayData:
     double* m1
     double* m2
     double* redz
+    double* sepa
     double* eccen
     double* dadt
     double* dedt
@@ -94,6 +95,9 @@ def interp_at_fobs(evo, fobs):
     cdef cnp.ndarray[DTYPE_DOUBLE_t, ndim=1, mode="c"] redz = cnp.PyArray_SimpleNewFromData(
         1, &data.final_size, NPY_DTYPE_DOUBLE, <void*>data.redz
     )
+    cdef cnp.ndarray[DTYPE_DOUBLE_t, ndim=1, mode="c"] sepa = cnp.PyArray_SimpleNewFromData(
+        1, &data.final_size, NPY_DTYPE_DOUBLE, <void*>data.sepa
+    )
     cdef cnp.ndarray[DTYPE_DOUBLE_t, ndim=1, mode="c"] eccen = cnp.PyArray_SimpleNewFromData(
         1, &data.final_size, NPY_DTYPE_DOUBLE, <void*>data.eccen
     )
@@ -104,7 +108,7 @@ def interp_at_fobs(evo, fobs):
         1, &data.final_size, NPY_DTYPE_DOUBLE, <void*>data.dedt
     )
 
-    return bin, interp_idx, m1, m2, redz, eccen, dadt, dedt
+    return bin, interp_idx, m1, m2, redz, sepa, eccen, dadt, dedt
 
 
 @cython.boundscheck(False)
@@ -137,6 +141,7 @@ cdef void _interp_at_fobs(
     data.m1 = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
     data.m2 = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
     data.redz = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
+    data.sepa = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
     data.eccen = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
     data.dadt = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
     data.dedt = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
@@ -181,6 +186,7 @@ cdef void _interp_at_fobs(
                 data.m1 = <double *>realloc(data.m1, arr_size_tot * sizeof(double))
                 data.m2 = <double *>realloc(data.m2, arr_size_tot * sizeof(double))
                 data.redz = <double *>realloc(data.redz, arr_size_tot * sizeof(double))
+                data.sepa = <double *>realloc(data.sepa, arr_size_tot * sizeof(double))
                 data.eccen = <double *>realloc(data.eccen, arr_size_tot * sizeof(double))
                 data.dadt = <double *>realloc(data.dadt, arr_size_tot * sizeof(double))
                 data.dedt = <double *>realloc(data.dedt, arr_size_tot * sizeof(double))
@@ -229,6 +235,9 @@ cdef void _interp_at_fobs(
                         )
                         data.redz[out] = _interp_between_vals(
                             target_fobs[fi], fobs_l, fobs_r, redz[left], redz[right]
+                        )
+                        data.sepa[out] = _interp_between_vals(
+                            target_fobs[fi], fobs_l, fobs_r, sepa[left], sepa[right]
                         )
                         data.eccen[out] = _interp_between_vals(
                             target_fobs[fi], fobs_l, fobs_r, eccen[left], eccen[right]
@@ -290,6 +299,9 @@ cdef void _interp_at_fobs(
                         data.redz[out] = _interp_between_vals(
                             target_fobs[fi], fobs_l, fobs_r, redz[left], redz[right]
                         )
+                        data.sepa[out] = _interp_between_vals(
+                            target_fobs[fi], fobs_l, fobs_r, sepa[left], sepa[right]
+                        )
                         data.eccen[out] = _interp_between_vals(
                             target_fobs[fi], fobs_l, fobs_r, eccen[left], eccen[right]
                         )
@@ -327,6 +339,7 @@ cdef void _interp_at_fobs(
     data.m1 = <double *>realloc(data.m1, out * sizeof(double))
     data.m2 = <double *>realloc(data.m2, out * sizeof(double))
     data.redz = <double *>realloc(data.redz, out * sizeof(double))
+    data.sepa = <double *>realloc(data.sepa, out * sizeof(double))
     data.eccen = <double *>realloc(data.eccen, out * sizeof(double))
     data.dadt = <double *>realloc(data.dadt, out * sizeof(double))
     data.dedt = <double *>realloc(data.dedt, out * sizeof(double))
@@ -356,10 +369,10 @@ def gwb_from_harmonics_data(fobs_gw_edges, harms, fobs_index, harm_index, data, 
     return gwb
 
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
-@cython.nonecheck(False)
-@cython.cdivision(True)
+# @cython.boundscheck(False)
+# @cython.wraparound(False)
+# @cython.nonecheck(False)
+# @cython.cdivision(True)
 cdef void _gwb_from_harmonics_data(
     # input
     double[:] fobs_edges,    # GW observer-frame frequencies
@@ -398,6 +411,8 @@ cdef void _gwb_from_harmonics_data(
         fobs_cents[ii] = 0.5 * (fobs_edges[ii] + fobs_edges[ii+1])
         dlnf[ii] = log(fobs_edges[ii+1]) - log(fobs_edges[ii])
 
+    # printf("414\n")
+
     for ii in range(nvals):
         # which target-frequency this entry corresponds to
         idx = interp_idx[ii]
@@ -408,6 +423,8 @@ cdef void _gwb_from_harmonics_data(
         # rest-frame orbital frequency
         frst_orb = fobs_cents[fi] * (1.0 + redz[ii]) / harms[hi]
 
+        # printf("ii=%ld - %ld %ld - %e\n", idx, fi, hi, frst_orb*MY_YR)
+
         if eccen[ii] < MIN_ECCEN_ZERO:
             if harms[hi] == 2:
                 gne = 1.0
@@ -416,18 +433,32 @@ cdef void _gwb_from_harmonics_data(
         else:
             gne = gw_freq_dist_func__scalar_scalar(harms[hi], eccen[ii])
 
+        # printf("gne=%.4e\n", gne)
+        # printf("434\n")
+
         mc = utils._chirp_mass_m1m2(mass[ii, 0], mass[ii, 1])
         h2temp = utils._gw_strain_source(mc, dcom[ii], frst_orb)**2
 
-        dfdt, _ = utils._dfdt_from_dadt(
+        # printf("mc=%.4e, h2=%.4e\n", mc, h2temp)
+        # printf("439\n")
+
+        dfdt = utils._dfdt_from_dadt(
             dadt[ii], sepa[ii], frst_orb,
             # dfdt_mdot=evo.dfdt_mdot
         )
 
+        # printf("dfdt=%.4e\n", dfdt)
+        # printf("446\n")
+
         h2temp = h2temp * gne * pow(2.0 / harms[hi], 2)
+
+        # printf("h2temp=%.4e\n", h2temp)
+        # printf("450\n")
 
         lambda_factor = utils._lambda_factor_dlnf(frst_orb, dfdt, redz[ii], dcom[ii]) / box_vol_cm3
         num_binaries = lambda_factor * dlnf[fi]
+
+        # printf("lambda=%.4e, num_binaries=%.10e\n", lambda_factor, num_binaries)
 
         if num_binaries > POISSON_THRESHOLD:
             for rr in range(nreals):
@@ -437,6 +468,8 @@ cdef void _gwb_from_harmonics_data(
             for rr in range(nreals):
                 nb = <double>random_poisson(rng, num_binaries)
                 gwb[fi, hi, rr] += nb * h2temp / dlnf[fi]
+
+        # printf("460\n")
 
     free(fobs_cents)
 
