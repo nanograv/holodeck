@@ -1468,12 +1468,16 @@ def dfdt_from_dadt(dadt, sepa, mtot=None, frst_orb=None, dfdt_mdot=False):
         frst_orb = kepler_freq_from_sepa(mtot, sepa)
 
     # ADD ACCRETION CONTRIBUTION TO dfdf HERE!
-    dfdt = - 1.5 * (frst_orb / sepa) * dadt
-    if dfdt_mdot:
-        #IMPLEMENT dfdt from accretion here!!!
-        pass
+    dfdt = _dfdt_from_dadt(dadt, sepa, frst_orb)
+    # if dfdt_mdot:
+    #     #IMPLEMENT dfdt from accretion here!!!
+    #     pass
 
     return dfdt, frst_orb
+
+
+def _dfdt_from_dadt(dadt, sepa, frst_orb):
+    return - 1.5 * (frst_orb / sepa) * dadt
 
 
 def mtmr_from_m1m2(m1, m2=None):
@@ -1753,10 +1757,13 @@ def lambda_factor_dlnf(frst, dfdt, redz, dcom=None):
         The differential comoving volume of the universe per log interval of binary frequency.
 
     """
-    zp1 = redz + 1
     if dcom is None:
         dcom = cosmo.z_to_dcom(redz)
+    return _lambda_factor_dlnf(frst, dfdt, redz, dcom)
 
+
+def _lambda_factor_dlnf(frst, dfdt, redz, dcom):
+    zp1 = redz + 1
     # Volume-factor
     # this is `(dVc/dz) * (dz/dt)`,  units of [Mpc^3/s]
     vfac = 4.0 * np.pi * SPLC * zp1 * (dcom**2)
@@ -1821,7 +1828,12 @@ def chirp_mass(m1, m2=None):
     # (N, 2)  ==>  (N,), (N,)
     if m2 is None:
         m1, m2 = np.moveaxis(m1, -1, 0)
-    mc = np.power(m1 * m2, 3.0/5.0)/np.power(m1 + m2, 1.0/5.0)
+    mc = _chirp_mass_m1m2(m1, m2)
+    return mc
+
+
+def _chirp_mass_m1m2(m1, m2):
+    mc = np.power(m1 * m2, 3.0/5.0) / np.power(m1 + m2, 1.0/5.0)
     return mc
 
 
@@ -2131,8 +2143,11 @@ def gw_strain_source(mchirp, dcom, freq_rest_orb):
     """
     mchirp, dcom, freq_rest_orb = _array_args(mchirp, dcom, freq_rest_orb)
     # The factor of 2 below is to convert from orbital-frequency to GW-frequency
-    hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_rest_orb, 2/3) / dcom
-    return hs
+    return _gw_strain_source(mchirp, dcom, freq_rest_orb)
+
+
+def _gw_strain_source(mchirp, dcom, freq_rest_orb):
+    return _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_rest_orb, 2/3) / dcom
 
 
 def sep_to_merge_in_time(m1, m2, time):

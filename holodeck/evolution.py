@@ -1424,7 +1424,7 @@ class New_Evolution:
             print(f"{dt_mdot=} | {self.mass[step]=} {mdot=}")
         return dt
 
-    def gwb(self, fobs, nharms=100):
+    def gwb(self, fobs_edges, nreals=100, nharms=103):
 
         if self._eccen_init is not None:
             harm_range = np.arange(1, nharms+1)
@@ -1434,11 +1434,11 @@ class New_Evolution:
 
         # ---- Interpolate data to all harmonics of this frequency
 
-        fobs = np.atleast_1d(fobs)
-        nfreqs = fobs.size
-        assert fobs.ndim == 1
+        fobs_cents = 0.5 * (fobs_edges[:-1] + fobs_edges[1:])
+        nfreqs = fobs_cents.size
+        assert fobs_cents.ndim == 1
         # get each harmonic of each frequency, (F, H)
-        fobs_orb = fobs[:, np.newaxis] / harm_range[np.newaxis, :]
+        fobs_orb = fobs_cents[:, np.newaxis] / harm_range[np.newaxis, :]
         # (F, H) ==> (F*H,)
         print(f"{fobs_orb*YR=}")
         fobs_orb = fobs_orb.flatten()
@@ -1460,7 +1460,9 @@ class New_Evolution:
         data_harms = self.at('fobs', fobs_orb)
         data_harms['dcom'] = cosmo.z_to_dcom(data_harms['redz'])
 
-        gwb = holo.discrete_cyutils.gwb_from_harmonics_data(fobs, harm_range, fobs_index, harm_index, data_harms)
+        gwb = holo.discrete_cyutils.gwb_from_harmonics_data(
+            fobs_edges, harm_range, fobs_index, harm_index, data_harms, nreals, self._box_vol_cgs
+        )
         return gwb
 
         # each entry in the dictionary is ordered first by frequency, then by binary.  So all of the matches to

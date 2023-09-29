@@ -2,14 +2,19 @@
 """
 
 cimport cython
+from cpython.pycapsule cimport PyCapsule_GetPointer
+
 import numpy as np
 cimport numpy as cnp
 cnp.import_array()
+from numpy.random cimport bitgen_t
+from numpy.random import PCG64
+from numpy.random.c_distributions cimport random_poisson, random_normal
 
 from libc.stdio cimport printf
 from libc.stdlib cimport malloc, free, realloc
 # make sure to use c-native math functions instead of python/numpy
-from libc.math cimport pow, sqrt, abs, M_PI, NAN
+from libc.math cimport pow, sqrt, abs, M_PI, NAN, log
 
 from holodeck import utils
 from holodeck.cyutils cimport interp_at_index, _interp_between_vals, gw_freq_dist_func__scalar_scalar
@@ -26,8 +31,14 @@ ctypedef cnp.float64_t DTYPE_DOUBLE_t
 
 ctypedef cnp.npy_intp SIZE_t
 
+# cdef extern from "utils.py":
+#     double _chirp_mass_m1m2(double m1, double m2)
+#     double _gw_strain_source(double mchirp, double dcom, double freq_rest_orb)
+#     double _dfdt_from_dadt(double dadt, double sepa, double frst_orb)
+#     double _lambda_factor_dlnf(double frst, double dfdt, double redz, double dcom)
 
 cdef double MIN_ECCEN_ZERO = 1.0e-4
+cdef double POISSON_THRESHOLD = 1.0e8
 
 # ---- Define Constants
 
@@ -44,7 +55,7 @@ cdef double KEPLER_CONST = sqrt(MY_NWTG) / 2.0 / M_PI
 cdef struct ArrayData:
     SIZE_t final_size
     DTYPE_LONG_t* bin
-    DTYPE_LONG_t* target
+    DTYPE_LONG_t* interp_idx
     double* m1
     double* m2
     double* redz
@@ -333,36 +344,59 @@ cdef double get_fobs(double sepa, double mass, double redz):
 
 
 
-def gwb_from_harmonics_data(fobs_gw, harms, fobs_index, harm_index, data):
-    cdef np.ndarray[np.double_t, ndim=4] gwb = np.zeros((fobs_gw.size, harms.size))
+def gwb_from_harmonics_data(fobs_gw_edges, harms, fobs_index, harm_index, data, nreals, box_vol_cm3):
+    cdef int nfreqs = fobs_gw_edges.size - 1
+    cdef cnp.ndarray[cnp.double_t, ndim=3] gwb = np.zeros((nfreqs, harms.size, nreals))
     _gwb_from_harmonics_data(
-        fobs_gw, harms, fobs_index, harm_index,
-        data['interp_idx'], data['eccen'], data['redz'], data['dcom'], data['dadt'],
+        fobs_gw_edges, harms, fobs_index, harm_index, data['interp_idx'],
+        data['mass'], data['sepa'], data['eccen'], data['redz'], data['dcom'], data['dadt'],
+        nreals, box_vol_cm3,
         gwb,
     )
     return gwb
 
-cdef double[:] _gwb_from_harmonics_data(
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef void _gwb_from_harmonics_data(
     # input
-    double[:] fobs,    # GW observer-frame frequencies
+    double[:] fobs_edges,    # GW observer-frame frequencies
     DTYPE_LONG_t[:] harms,
     DTYPE_LONG_t[:] fobs_idx,
     DTYPE_LONG_t[:] harm_idx,
     DTYPE_LONG_t[:] interp_idx,
+    double[:, :] mass,
+    double[:] sepa,
     double[:] eccen,
     double[:] redz,
     double[:] dcom,
     double[:] dadt,
+    DTYPE_LONG_t nreals,
+    double box_vol_cm3,
     # output
-    double[:, :] gwb,
+    double[:, :, :] gwb,
 ):
 
-    cdef DTYPE_LONG_t nfreqs = len(fobs)
+    cdef DTYPE_LONG_t nfreqs = len(fobs_edges) - 1
     cdef DTYPE_LONG_t nfreqharms = len(harm_idx)
     cdef DTYPE_LONG_t nvals = len(interp_idx)
 
-    cdef DTYPE_LONG_t ii, idx, fi, hi
-    cdef double gne, frst_orb
+    cdef DTYPE_LONG_t ii, idx, fi, hi, rr
+    cdef double gne, frst_orb, mc, dfdt, lambda_factor, num_binaries, nb, h2temp
+
+    cdef bitgen_t *rng
+    cdef const char *capsule_name = "BitGenerator"
+    capsule = PCG64().capsule
+    # Cast the pointer
+    rng = <bitgen_t *> PyCapsule_GetPointer(capsule, capsule_name)
+
+    cdef double* fobs_cents = <double *>malloc(nfreqs * sizeof(double))
+    cdef double* dlnf = <double *>malloc(nfreqs * sizeof(double))
+    for ii in range(nfreqs):
+        fobs_cents[ii] = 0.5 * (fobs_edges[ii] + fobs_edges[ii+1])
+        dlnf[ii] = log(fobs_edges[ii+1]) - log(fobs_edges[ii])
 
     for ii in range(nvals):
         # which target-frequency this entry corresponds to
@@ -372,7 +406,7 @@ cdef double[:] _gwb_from_harmonics_data(
         # which harmonic-index this corresponds to
         hi = harm_idx[idx]
         # rest-frame orbital frequency
-        frst_orb = fobs[fi] * (1.0 + redz[ii]) / harms[hi]
+        frst_orb = fobs_cents[fi] * (1.0 + redz[ii]) / harms[hi]
 
         if eccen[ii] < MIN_ECCEN_ZERO:
             if harms[hi] == 2:
@@ -382,27 +416,29 @@ cdef double[:] _gwb_from_harmonics_data(
         else:
             gne = gw_freq_dist_func__scalar_scalar(harms[hi], eccen[ii])
 
+        mc = utils._chirp_mass_m1m2(mass[ii, 0], mass[ii, 1])
+        h2temp = utils._gw_strain_source(mc, dcom[ii], frst_orb)**2
 
+        dfdt, _ = utils._dfdt_from_dadt(
+            dadt[ii], sepa[ii], frst_orb,
+            # dfdt_mdot=evo.dfdt_mdot
+        )
 
-        hs2 = utils.gw_strain_source(mchirp, dcom, frst_orb)**2
+        h2temp = h2temp * gne * pow(2.0 / harms[hi], 2)
 
-        dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], \
-                                    data_harms['sepa'][valid], frst_orb=frst_orb,\
-                                    dfdt_mdot=evo.dfdt_mdot)
+        lambda_factor = utils._lambda_factor_dlnf(frst_orb, dfdt, redz[ii], dcom[ii]) / box_vol_cm3
+        num_binaries = lambda_factor * dlnf[fi]
 
-        _lambda_fact = utils.lambda_factor_dlnf(frst_orb, dfdt, redz, dcom=dcom) / box_vol
-        num_binaries = _lambda_fact * dlnf
+        if num_binaries > POISSON_THRESHOLD:
+            for rr in range(nreals):
+                nb = <double>random_normal(rng, num_binaries, sqrt(num_binaries))
+                gwb[fi, hi, rr] += nb * h2temp / dlnf[fi]
+        else:
+            for rr in range(nreals):
+                nb = <double>random_poisson(rng, num_binaries)
+                gwb[fi, hi, rr] += nb * h2temp / dlnf[fi]
 
-        shape = (num_binaries.size, nreals)
-        num_pois = poisson_as_needed(num_binaries[:, np.newaxis] * np.ones(shape))
-
-        # --- Calculate GW Signals
-        temp = hs2 * gne * (2.0 / harms)**2
-        both = np.sum(temp[:, np.newaxis] * num_pois / dlnf, axis=0)
-
-
-        # gwb[fi, hi] = _
-
+    free(fobs_cents)
 
     return
 
