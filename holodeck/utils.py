@@ -1537,9 +1537,23 @@ def m1m2_from_mtmr(mt: npt.ArrayLike, mr: npt.ArrayLike) -> npt.ArrayLike:
 
 
 def m1m2_ordered(m1, m2):
+    if hasattr(m1, "__len__") and hasattr(m2, "__len__"):
+        #m1 and m2 are both arrays, so we are using old evolution class
+        inds_m1_primary = m1 >= m2  # where first mass is actually primary
+        m1_sorted = np.zeros(np.shape(m1))
+        m1_sorted[inds_m1_primary] = m1[inds_m1_primary]
+        m1_sorted[~inds_m1_primary] = m2[~inds_m1_primary]
+        m1 = m1_sorted
+        inds_m2_primary = m2 >= m1  # where second mass is actually primary
+        m2_sorted = np.zeros(np.shape(m2))
+        m2_sorted[inds_m2_primary] = m1[inds_m2_primary]
+        m2_sorted[~inds_m2_primary] = m2[~inds_m2_primary]
+        m2 = m2_sorted
+        return m1.T, m2.T
     if m1 >= m2:
         return m1, m2
-    return m2, m1
+    else:
+        return m2, m1
 
 
 def frst_from_fobs(fobs, redz):
@@ -1711,8 +1725,10 @@ def velocity_orbital(mt, mr, per=None, sepa=None):
     v2 = np.power(NWTG*mt/sepa, 1.0/2.0) / (1 + mr)
     # v2 = np.power(2*np.pi*NWTG*mt/per, 1.0/3.0) / (1 + mr)
     v1 = v2 * mr
-    vels = np.moveaxis([v1, v2], 0, -1)
-    return vels
+    # vels = np.moveaxis([v1, v2], 0, -1)
+    # print("vels = ", vels)
+    # print("np.shape(vels) = ", np.shape(vels))
+    return v1,v2
 
 
 def _get_sepa_freq(mt, sepa, freq):
