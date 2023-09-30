@@ -136,7 +136,7 @@ class Evolution:
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
 
-    def __init__(self, pop, hard, nsteps: int = 100, mods=None, debug: bool = False, acc=None):
+    def __init__(self, pop, hard, nsteps=100, mods=None, debug=False, acc=None):
         """Initialize a new Evolution instance.
 
         Parameters
@@ -834,7 +834,7 @@ class Evolution:
             ecc_r = self.eccen[:, left] + de
             ecc_r = np.clip(ecc_r, 0.0, 1.0 - _MAX_ECCEN_ONE_MINUS)
             self.eccen[:, right] = ecc_r
-        
+
         # masses at right egde are updated with tentative timestep.
         # this is crucial to ensure correct hardening rates, because up until now,
         # masses at next step ('right') are INITIAL masses!!!
@@ -970,9 +970,9 @@ class Evolution:
         dedt = None if self.eccen is None else np.zeros_like(dadt)
 
         for ii, hard in enumerate(self._hard):
-            # [MSS 2023/09/29]: New hard.dadt_dedt takes 
+            # [MSS 2023/09/29]: New hard.dadt_dedt takes
             # 'bin' as well as 'step' argument, (see new evolution class)
-            # so we set bin = None here 
+            # so we set bin = None here
             _hard_dadt, _ecc = hard.dadt_dedt(self, None, step)
             dadt[:] += _hard_dadt
             if self._debug:    # nocov
@@ -1137,7 +1137,7 @@ class New_Evolution:
     _NSTEPS = 1000
     _TIME_STEP_MAX = 0.1 * GYR
 
-    def __init__(self, pop, hard, mods=None, acc=None):
+    def __init__(self, pop, hard, mods=None, acc=None, dfdt_mdot=False):
         # --- Store basic parameters to instance
         self._pop = pop                       #: initial binary population instance
         self._mods = mods                     #: modifiers to be applied after evolution is completed
@@ -1174,6 +1174,7 @@ class New_Evolution:
         self._mass_init = pop.mass
         self._scafa_init = pop.scafa
         self._tlook_init = tlook
+        self._dfdt_mdot = dfdt_mdot
         if pop.eccen is not None:
             self._eccen_init = pop.eccen
         else:
@@ -1202,8 +1203,8 @@ class New_Evolution:
             self.dedt = None
 
         #if self._acc is not None:
-        #initialize self.mdot regardless of whether self_acc is 
-        # supplied or not. 
+        #initialize self.mdot regardless of whether self_acc is
+        # supplied or not.
         #If there is no accretion, we just add mdot=0
         self.mdot = np.zeros((nsteps, 2))
         # else:
@@ -1455,13 +1456,16 @@ class New_Evolution:
             print(f"{dt_mdot=} | {self.mass[step]=} {mdot=}")
         return dt
 
-    def gwb(self, fobs_edges, nreals=100, nharms=103):
+    def gwb(self, fobs_edges, nreals=100, nharms=103, dfdt_mdot=None):
 
         if self._eccen_init is not None:
             harm_range = np.arange(1, nharms+1)
         else:
             harm_range = np.asarray([2])
             nharms = 1
+
+        if dfdt_mdot is None:
+            dfdt_mdot = self._dfdt_mdot
 
         # ---- Interpolate data to all harmonics of this frequency
 
@@ -1492,6 +1496,7 @@ class New_Evolution:
         data_harms['dcom'] = cosmo.z_to_dcom(data_harms['redz'])
 
         gwb = holo.discrete_cyutils.gwb_from_harmonics_data(
-            fobs_edges, harm_range, fobs_index, harm_index, data_harms, nreals, self._sample_volume,
+            fobs_edges, harm_range, fobs_index, harm_index, data_harms, nreals,
+            self._sample_volume, dfdt_mdot,
         )
         return gwb

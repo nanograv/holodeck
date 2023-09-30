@@ -31,12 +31,6 @@ ctypedef cnp.float64_t DTYPE_DOUBLE_t
 
 ctypedef cnp.npy_intp SIZE_t
 
-# cdef extern from "utils.py":
-#     double _chirp_mass_m1m2(double m1, double m2)
-#     double _gw_strain_source(double mchirp, double dcom, double freq_rest_orb)
-#     double _dfdt_from_dadt(double dadt, double sepa, double frst_orb)
-#     double _lambda_factor_dlnf(double frst, double dfdt, double redz, double dcom)
-
 cdef double MIN_ECCEN_ZERO = 1.0e-4
 cdef double POISSON_THRESHOLD = 1.0e8
 
@@ -357,22 +351,22 @@ cdef double get_fobs(double sepa, double mass, double redz):
 
 
 
-def gwb_from_harmonics_data(fobs_gw_edges, harms, fobs_index, harm_index, data, nreals, box_vol_cm3):
+def gwb_from_harmonics_data(fobs_gw_edges, harms, fobs_index, harm_index, data, nreals, box_vol_cm3, dfdt_mdot):
     cdef int nfreqs = fobs_gw_edges.size - 1
     cdef cnp.ndarray[cnp.double_t, ndim=3] gwb = np.zeros((nfreqs, harms.size, nreals))
     _gwb_from_harmonics_data(
         fobs_gw_edges, harms, fobs_index, harm_index, data['interp_idx'],
-        data['mass'], data['sepa'], data['eccen'], data['redz'], data['dcom'], data['dadt'],
-        nreals, box_vol_cm3,
+        data['mass'], data['sepa'], data['eccen'], data['redz'], data['dcom'], data['mdot'], data['dadt'],
+        nreals, box_vol_cm3, dfdt_mdot,
         gwb,
     )
     return gwb
 
 
-# @cython.boundscheck(False)
-# @cython.wraparound(False)
-# @cython.nonecheck(False)
-# @cython.cdivision(True)
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
 cdef void _gwb_from_harmonics_data(
     # input
     double[:] fobs_edges,    # GW observer-frame frequencies
@@ -386,8 +380,10 @@ cdef void _gwb_from_harmonics_data(
     double[:] redz,
     double[:] dcom,
     double[:] dadt,
+    double[:] mdot,
     DTYPE_LONG_t nreals,
     double box_vol_cm3,
+    bool dfdt_mdot,
     # output
     double[:, :, :] gwb,
 ):
@@ -446,6 +442,8 @@ cdef void _gwb_from_harmonics_data(
             dadt[ii], sepa[ii], frst_orb,
             # dfdt_mdot=evo.dfdt_mdot
         )
+        if dfdt_mdot:
+            dfdt += utils._dfdt_from_mdot(mdot[ii], sepa[ii], mass[ii, 0] + mass[ii, 1])
 
         # printf("dfdt=%.4e\n", dfdt)
         # printf("446\n")
