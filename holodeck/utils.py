@@ -39,6 +39,7 @@ _GW_DEDT_ECC_CONST = - 304 * np.power(NWTG, 3) / 15 / np.power(SPLC, 5)
 _GW_LUM_CONST = (32.0 / 5.0) * np.power(NWTG, 7.0/3.0) * np.power(SPLC, -5.0)
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
+_DFDM_CONST = np.sqrt(NWTG) / (4.0 * np.pi)
 
 
 class _Modifier(abc.ABC):
@@ -1467,22 +1468,27 @@ def dfdt_from_dadt(dadt, sepa, mtot=None, frst_orb=None, mdot=None, dfdt_mdot=Fa
     if frst_orb is None:
         frst_orb = kepler_freq_from_sepa(mtot, sepa)
 
-    # ADD ACCRETION CONTRIBUTION TO dfdf HERE!
-    dfdt = - 1.5 * (frst_orb / sepa) * dadt
+    dfdt = _dfdt_from_dadt(dadt, sepa, frst_orb)
+
+    # Accretion (i.e. dM/dt = mdot) contribution to df/dt
     if dfdt_mdot:
-        #IMPLEMENT dfdt from accretion here!!!
         if mdot is None:
             err = "mdot must be provided when calculating dfdt_mdot!"
             log.exception(err)
             raise ValueError(err)
-        dfdm = 1/(4*np.pi) * np.sqrt(NWTG/(sepa**3 * mtot))
-        dfdt += dfdm * mdot
+        dfdt_mdot = _dfdt_from_dmdt(mdot, sepa, mtot)
+        dfdt += dfdt_mdot
 
     return dfdt, frst_orb
 
 
 def _dfdt_from_dadt(dadt, sepa, frst_orb):
     return - 1.5 * (frst_orb / sepa) * dadt
+
+
+def _dfdt_from_dmdt(mdot, sepa, mtot):
+    dfdm = _DFDM_CONST / np.sqrt(mtot * sepa**3)
+    return dfdm * mdot
 
 
 def mtmr_from_m1m2(m1, m2=None):
