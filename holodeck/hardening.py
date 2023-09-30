@@ -100,9 +100,20 @@ class Hard_GW(_Hardening):
             Hardening rate in eccentricity, returns negative value, units [1/s].
 
         """
-        m1, m2 = evo.mass[step, :]
-        sepa = evo.sepa[step]
-        eccen = evo.eccen[step] if (evo.eccen is not None) else None
+        if bin == None:
+            # we are using old evolution class, supplying bin = None since we integrate all the 
+            # binaries at the same time at a given step
+            m1, m2 = evo.mass[:, step].T
+            sepa = evo.sepa[:, step]
+            eccen = evo.eccen[:, step] if (evo.eccen is not None) else None
+
+        else:
+            # in new evolution class, we give a binary index ('bin') since 
+            # we are looping over individual binaries
+            m1, m2 = evo.mass[step, :]
+            sepa = evo.sepa[step]
+            eccen = evo.eccen[step] if (evo.eccen is not None) else None
+        
         dadt = utils.gw_hardening_rate_dadt(m1, m2, sepa, eccen=eccen)
 
         if eccen is None:
@@ -246,9 +257,20 @@ class CBD_Torques(_Hardening):
             Binary rate-of-change of eccentricity in units of [1/sec].
 
         """
-        mass = evo.mass[idx, :]
-        sepa = evo.sepa[idx]
-        eccen = evo.eccen[idx] if (evo.eccen is not None) else None
+
+        if bin == None:
+            # we are using old evolution class, supplying bin = None since we integrate all the 
+            # binaries at the same time at a given step
+            mass = evo.mass[:, idx, :]
+            sepa = evo.sepa[:, idx]
+            eccen = evo.eccen[:, idx] if (evo.eccen is not None) else None
+
+        else:
+            # in new evolution class, we give a binary index ('bin') since 
+            # we are looping over individual binaries
+            mass = evo.mass[idx, :]
+            sepa = evo.sepa[idx]
+            eccen = evo.eccen[idx] if (evo.eccen is not None) else None
 
         """ An instance of the accretion class has been supplied,
             and binary masses are evolved through accretion
@@ -258,15 +280,18 @@ class CBD_Torques(_Hardening):
         dadt, dedt = self._dadt_dedt(mass, sepa, eccen, mdot)
 
         """ CURRENTLY WE CANNOT USE +ve dadt VALUES, SO WE SET THEM TO 0 """
-        if (not self.allow_softening) and (dadt > 0.0):
-            # inds_dadt_pos = dadt > 0.0
-            # dadt[inds_dadt_pos] = 0.0
-            dadt = 0.0
 
-        if np.isnan(dadt):
-            dadt = 0.0
-        # inds_dadt_nan = np.isnan(dadt)
-        # dadt[inds_dadt_nan] = 0.0
+        if bin == None:
+            if (not self.allow_softening) and np.any(dadt > 0.0):
+                inds_dadt_pos = dadt > 0.0
+                dadt[inds_dadt_pos] = 0.0
+            inds_dadt_nan = np.isnan(dadt)
+            dadt[inds_dadt_nan] = 0.0
+        else:
+            if (not self.allow_softening) and (dadt > 0.0):
+                dadt = 0.0
+            if np.isnan(dadt):
+                dadt = 0.0
 
         return dadt, dedt
 
@@ -297,7 +322,7 @@ class CBD_Torques(_Hardening):
         # m1 = mass[:, 0]
         # m2 = mass[:, 1]
         # mrat = m2/m1
-        m1, m2 = [mass[0], mass[1]] if mass[0] >= mass[1] else [mass[1], mass[0]]
+        #m1, m2 = [mass[0], mass[1]] if mass[0] >= mass[1] else [mass[1], mass[0]]
         mtot, mrat = utils.mtmr_from_m1m2(mass)
         """ secondary and primary can swap indices. need to account for that and reverse the mass ratio """
         # inds_rev = mrat > 1
@@ -307,7 +332,7 @@ class CBD_Torques(_Hardening):
         """ ECCENTRICITY """
         # eccen = np.atleast_1d(eccen) if eccen is not None else None
 
-        semimajor_axis = sepa #for now? we don't resolve the orbit in time (ever?) so this approximation should do?
+        semimajor_axis = sepa 
 
         """ dadt and dedt from Siwek+23 are parameterized
             by the semimajor axis, mass and accretion rate
@@ -376,9 +401,21 @@ class Sesana_Scattering(_Hardening):
             Binary rate-of-change of eccentricity in units of [1/sec].
 
         """
-        mass = evo.mass[idx, :]
-        sepa = evo.sepa[idx]
-        eccen = evo.eccen[idx] if evo.eccen is not None else None
+
+        if bin == None:
+            # we are using old evolution class, supplying bin = None since we integrate all the 
+            # binaries at the same time at a given step
+            mass = evo.mass[:, idx, :]
+            sepa = evo.sepa[:, idx]
+            eccen = evo.eccen[:, idx] if (evo.eccen is not None) else None
+
+        else:
+            # in new evolution class, we give a binary index ('bin') since 
+            # we are looping over individual binaries
+            mass = evo.mass[idx, :]
+            sepa = evo.sepa[idx]
+            eccen = evo.eccen[idx] if (evo.eccen is not None) else None
+        
         dadt, dedt = self._dadt_dedt(mass, sepa, eccen)
         return dadt, dedt
 
@@ -406,10 +443,15 @@ class Sesana_Scattering(_Hardening):
         # mass = np.atleast_2d(mass)
         # sepa = np.atleast_1d(sepa)
         # eccen = np.atleast_1d(eccen) if eccen is not None else None
-        assert np.size(mass) == 2
-        if mass[0] < mass[1]:
-            mass = mass[::-1]
-        m1, secondary_mass = mass
+        # assert np.size(mass) == 2
+        # if np.size(mass) == 2:
+        #     if mass[0] < mass[1]:
+        #         mass = mass[::-1]
+        #     m1, secondary_mass = mass
+        # else:
+        
+        m1,secondary_mass = utils.m1m2_ordered(mass.T[0], mass.T[1])
+
         mtot, mrat = utils.mtmr_from_m1m2(mass)
 
         if np.any(mrat>1):
@@ -532,15 +574,25 @@ class Dynamical_Friction_NFW(_Hardening):
         if attenuate is None:
             attenuate = self._attenuate
 
-        mass = evo.mass[idx, :]
-        sepa = evo.sepa[idx]
-        eccen = evo.eccen[idx] if (evo.eccen is not None) else None
-        dt = evo._tlook_init[bin] - evo.tlook[idx]   # positive time-duration since 'formation'
+        if bin is None:
+            mass = evo.mass[:, idx, :]
+            sepa = evo.sepa[:, idx]
+            eccen = evo.eccen[:, idx] if (evo.eccen is not None) else None
+            #initial lookback time at binary formation - current lookback time
+            dt = evo.tlook[:,0] - evo.tlook[:,idx]
+            redz = np.zeros_like(sepa)
+            val = (evo.scafa[:,idx] > 0.0)
+            redz[val] = cosmo.a_to_z(evo.scafa[val, idx])
+        else:
+            mass = evo.mass[idx, :]
+            sepa = evo.sepa[idx]
+            eccen = evo.eccen[idx] if (evo.eccen is not None) else None
+            dt = evo._tlook_init[bin] - evo.tlook[idx]   # positive time-duration since 'formation'
+            redz = evo.redz[idx]
         # NOTE `scafa` is nan for systems "after" redshift zero (i.e. do not merge before redz=0)
         # redz = np.zeros_like(sepa)
         # val = (evo.scafa[idx] > 0.0)
         # redz[val] = cosmo.a_to_z(evo.scafa[val, step])
-        redz = evo.redz[idx]
 
         dadt, dedt = self._dadt_dedt(mass, sepa, redz, dt, eccen, attenuate)
 
@@ -576,8 +628,9 @@ class Dynamical_Friction_NFW(_Hardening):
         # assert np.shape(mass)[-1] == 2 and np.ndim(mass) <= 2
         # mass = np.atleast_2d(mass)
         # redz = np.atleast_1d(redz)
-        assert np.shape(mass) == (2,)
-        m1, m2 = utils.m1m2_ordered(*mass)
+        # assert np.shape(mass) == (2,)
+        # m1, m2 = utils.m1m2_ordered(*mass)
+        m1,m2 = utils.m1m2_ordered(mass.T[0], mass.T[1])
         mtot = m1 + m2
 
         # Get Host DM-Halo mass
@@ -625,9 +678,17 @@ class Dynamical_Friction_NFW(_Hardening):
         # if np.any(clip):
         #     log.debug(f"clipping {utils.frac_str(clip)} dynamical friction `dadt` values to vcirc")
         #     dadt[clip] = - velo[clip]
-        if dadt < -velo:
-            log.debug(f"clipping dynamical friction `dadt` values to vcirc ({dadt=:.8e} ==> {velo:.8e})")
-            dadt = - velo
+        if hasattr(dadt, "__len__"):
+            #dadt is array
+            clip = (np.fabs(dadt) > velo)
+            if np.any(clip):
+                log.debug(f"clipping {utils.frac_str(clip)} dynamical friction `dadt` values to vcirc")
+                dadt[clip] = - velo[clip]
+        else:
+            #dadt is float
+            if dadt < -velo:
+                log.debug(f"clipping dynamical friction `dadt` values to vcirc ({dadt=:.8e} ==> {velo:.8e})")
+                dadt = - velo
 
         return dadt, dedt
 

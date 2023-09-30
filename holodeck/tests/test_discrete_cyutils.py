@@ -7,6 +7,12 @@ import holodeck.discrete_cyutils
 from holodeck import utils
 from holodeck.constants import YR, MSOL
 
+# function to check eccentricity evolution and make sure smaller
+# timesteps are taken when binary is close to equilibrium 
+# (see sign change in abdot around q=1, eb=0.4)
+def test_ecc_evol():
+    pass
+
 
 def test_interp_at_fobs_1():
     target_fobs = [
