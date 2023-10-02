@@ -16,29 +16,11 @@ ALLOW_SOFTENING = False
 ECCEN_INIT = 0.5
 F_EDD = 1.0
 
-TEST_NUM_BINS = 4
-SPEED_TEST = False
-INTERPOLATE = True
-TARGET_FOBS = [
-    1.0602e-6/YR,
-    0.167/YR, 0.168/YR, 0.3501/YR,
-    1.1802e2/YR
-]
+TEST_NUM_BINS = 10
 
 
-bin, target, m1, m2, redz, eccen, dadt, dedt = holodeck.discrete_cyutils.test__interp_at_fobs_1()
-# print(bin.size, bin.dtype, m1.size, m1.dtype)
-print(bin)
-print(target)
-print(m1)
-
-import sys
-sys.exit(0)
-
-
-if SPEED_TEST:
-    pr = cProfile.Profile()
-    pr.enable()
+pr = cProfile.Profile()
+pr.enable()
 
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
@@ -63,25 +45,19 @@ evo = holo.evolution.Evolution(pop, hards, debug=True, acc=acc)
 evo.evolve(break_after=TEST_NUM_BINS)
 
 
-if INTERPOLATE:
-    holodeck.discrete_cyutils.interp_at_fobs(evo, TARGET_FOBS)
-
-
-
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 
 
-if SPEED_TEST:
 
-    pr.disable()
+pr.disable()
 
-    with open('cprofile_cumtime.txt', 'w') as fout:
-        ps = pstats.Stats(pr, stream=fout)
-        ps.sort_stats('cumtime')
-        ps.print_stats()
+with open('cprofile_cumtime.txt', 'w') as fout:
+    ps = pstats.Stats(pr, stream=fout)
+    ps.sort_stats('cumtime')
+    ps.print_stats()
 
-    with open('cprofile_tottime.txt', 'w') as fout:
-        ps = pstats.Stats(pr, stream=fout)
-        ps.sort_stats('tottime')
-        ps.print_stats()
+with open('cprofile_tottime.txt', 'w') as fout:
+    ps = pstats.Stats(pr, stream=fout)
+    ps.sort_stats('tottime')
+    ps.print_stats()
