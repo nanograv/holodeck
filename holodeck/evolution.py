@@ -1436,8 +1436,8 @@ class New_Evolution:
         dt_dadt = CFL * self.sepa[step] / np.fabs(dadt)
 
         if self.eccen is not None:
-            ecc_cfl = 0.1 * CFL
-            dt_dedt = ecc_cfl * self.eccen[step] / np.fabs(dedt)
+            # ecc_cfl = 0.1 * CFL
+            dt_dedt = CFL * self.eccen[step] / np.fabs(dedt)
             
             # now make sure we are not 'overshooting' the equilibrium eccentricity
             # with current dedt value
