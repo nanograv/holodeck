@@ -64,6 +64,30 @@ class Accretion:
         self.edd_lim = edd_lim
         self.evol_mass = evol_mass
 
+        """ PRE-CALCULATE PREFERENTIAL ACCRETION FUNCTION """
+        if self.accmod == 'Siwek22':
+            """ interpolate to get lambda at [q,e] """
+            def lambda_qe_interp_2d(fp="data/preferential_accretion/siwek+22/", es=[0.0,0.2,0.4,0.6,0.8]):
+                all_lambdas = []
+                for e in es:
+                    fname = 'preferential_accretion/siwek+22/lambda_e=%.2f.txt' % e
+                    fname = os.path.join(_PATH_DATA, fname)
+                    lambda_e = np.loadtxt(fname)
+                    qs = lambda_e[:, 0]
+                    lambdas = lambda_e[:, 1]
+                    all_lambdas.append(lambdas)
+                # True values of q, e
+                x = qs
+                y = es
+                # Populate the true values of q, e in a meshgrid
+                X, Y = np.meshgrid(x, y)
+                Z = all_lambdas
+
+                return(RectBivariateSpline(np.array(x), np.array(y),
+                                           np.array(Z).T, kx=1, ky=1))
+            
+            self.swk_acc = lambda_qe_interp_2d()
+
     def mdot_eddington(self, mass, eps=0.1):
         """ Calculate the total accretion rate based on masses and a fraction of the Eddington limit.
 
@@ -173,12 +197,6 @@ class Accretion:
 
 
         if self.accmod == 'Siwek22':
-            # Calculate the mass ratio
-            q_b = m2 / m1
-            # secondary and primary may swap indices
-            # need to account for that and reverse the mass ratio
-            # inds_rev = q_b > 1
-            # q_b[inds_rev] = 1./q_b[inds_rev]
             """if evol has an eccentricity distribution,
                we use it, if not, we set each eccentricity to
                the value specified in __init__ """
@@ -187,29 +205,10 @@ class Accretion:
             else:
                 e_b = evol.eccen[step] if (evol.eccen is not None) else None
 
-            """ Now interpolate to get lambda at [q,e] """
-            def lambda_qe_interp_2d(fp="data/preferential_accretion/siwek+22/", es=[0.0,0.2,0.4,0.6,0.8]):
-                all_lambdas = []
-                for e in es:
-                    fname = 'preferential_accretion/siwek+22/lambda_e=%.2f.txt' % e
-                    fname = os.path.join(_PATH_DATA, fname)
-                    lambda_e = np.loadtxt(fname)
-                    qs = lambda_e[:, 0]
-                    lambdas = lambda_e[:, 1]
-                    all_lambdas.append(lambdas)
-                # True values of q, e
-                x = qs
-                y = es
-                # Populate the true values of q, e in a meshgrid
-                X, Y = np.meshgrid(x, y)
-                Z = all_lambdas
-
-                return(RectBivariateSpline(np.array(x), np.array(y),
-                                           np.array(Z).T, kx=1, ky=1))
-
-            lamb_interp = lambda_qe_interp_2d()
+            lamb_interp = self.swk_acc
             # Need to use RectBivariateSpline.ev to evaluate the interpolation
             # at points, allowing q_b and e_b to be in non-ascending order
+            q_b = m2 / m1
             lamb_qe = lamb_interp.ev(q_b, e_b)
             mdot_1 = 1./(np.array(lamb_qe) + 1.) * mdot
             mdot_2 = np.array(lamb_qe)/(np.array(lamb_qe) + 1.) * mdot
@@ -266,9 +265,26 @@ class Accretion:
             else:
                 mdot_arr = [mdot_2, mdot_1]
         
-        return np.asarray(mdot_arr)
-
         # Catch any case where no model is selected.
-        # if self.accmod is None:
-        #     raise TypeError("'None' value provided for accretion model." +
-        #                     "An accretion model is required.")
+        if self.accmod is None:
+            raise TypeError("'None' value provided for accretion model." +
+                            "An accretion model is required.")
+        
+        return np.asarray(mdot_arr)
+    
+    def ebeq(self, qb):
+        import pickle as pkl
+        fp_ebeq_pkl = 'cbd_torques/siwek+23/eb_eq_arr.pkl'
+        fp_ebeq_pkl = os.path.join(_PATH_DATA, fp_ebeq_pkl)
+        fp_ebeq = open(fp_ebeq_pkl, 'rb')
+        ebeq_dict = pkl.load(fp_ebeq)
+
+        all_qb = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+
+        all_ebeq = []
+
+        for q in all_qb: 
+            all_ebeq.append(ebeq_dict['q=%.2f_sum_grav_acc' %q])
+        
+        return(np.interp(qb, all_qb, all_ebeq))
+

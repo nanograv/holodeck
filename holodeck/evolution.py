@@ -1134,15 +1134,16 @@ class New_Evolution:
 
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
-    _NSTEPS = 1000
     _TIME_STEP_MAX = 0.1 * GYR
 
-    def __init__(self, pop, hard, mods=None, acc=None, dfdt_mdot=False):
+    def __init__(self, pop, hard, cfl = 0.1, nsteps=10000, mods=None, acc=None, dfdt_mdot=False):
         # --- Store basic parameters to instance
         self._pop = pop                       #: initial binary population instance
         self._mods = mods                     #: modifiers to be applied after evolution is completed
         self._acc = acc
         self._size = pop.size
+        self.cfl = cfl
+        self._NSTEPS = nsteps
 
         # Store hardening instances as a list
         if not np.iterable(hard):
@@ -1186,8 +1187,8 @@ class New_Evolution:
         nbinaries = self._size
         nsteps = self._NSTEPS * nbinaries
         nhards = self._nhards
-        MAX_BIN_STEPS = 1e3
-        CFL = 0.1
+        MAX_BIN_STEPS = 100*nsteps
+        CFL = self.cfl
 
         self.sepa = np.zeros(nsteps)
         self.dadt = np.zeros((nsteps, nhards))
@@ -1201,14 +1202,7 @@ class New_Evolution:
         else:
             self.eccen = None
             self.dedt = None
-
-        #if self._acc is not None:
-        #initialize self.mdot regardless of whether self_acc is
-        # supplied or not.
-        #If there is no accretion, we just add mdot=0
         self.mdot = np.zeros((nsteps, 2))
-        # else:
-        #     self.mdot = None
 
         arr_size = nsteps
         last_index = np.zeros(nbinaries, dtype=int)
@@ -1263,6 +1257,7 @@ class New_Evolution:
                     self.sepa = np.concatenate([self.sepa, np.zeros(nsteps)], axis=0)
                     self.dadt = np.concatenate([self.dadt, np.zeros((nsteps, nhards))], axis=0)
                     self.mass = np.concatenate([self.mass, np.zeros((nsteps, 2))], axis=0)
+                    self.mdot = np.concatenate([self.mdot, np.zeros((nsteps, 2))], axis=0)
                     self.redz = np.concatenate([self.redz, np.zeros(nsteps)], axis=0)
                     self.tlook = np.concatenate([self.tlook, np.zeros(nsteps)], axis=0)
                     if self.eccen is not None:
@@ -1290,6 +1285,7 @@ class New_Evolution:
                 self.sepa[right] = self.sepa[left] + dadt_l * dt_l
                 if self.eccen is not None:
                     self.eccen[right] = self.eccen[left] + dedt_l * dt_l
+                
                 # if there is no accretion, then mdot is zero
                 self.mass[right, :] = self.mass[left] + mdot_l * dt_l
                 self.tlook[right] = self.tlook[left] - dt_l
@@ -1328,8 +1324,8 @@ class New_Evolution:
                     dt = (self.sepa[right] - self.sepa[left])/dadt
                     self.sepa[right] = self.sepa[left] + dadt * dt
 
-                if self.sepa[right] > self.sepa[left]:
-                    print(f"SOFTENING OCCURED FOR {bin=} {idx=} {my_steps=}")
+                # if self.sepa[right] > self.sepa[left]:
+                #     print(f"SOFTENING OCCURED FOR {bin=} {idx=} {my_steps=}")
 
                 if dt <= 0.0 or ~np.isfinite(dt):
                     print(f"{dt_l=}, {dt_r=}")
@@ -1339,13 +1335,14 @@ class New_Evolution:
 
                 if self.eccen is not None:
                     self.eccen[right] = self.eccen[left] + dedt * dt
+                
                 # if there is no accretion, then mdot is zero
                 self.mass[right, :] = self.mass[left] + mdot * dt
                 self.tlook[right] = self.tlook[left] - dt
                 self.redz[right] = cosmo.tlbk_to_z(self.tlook[right])
 
-                if dadt > 0.0:
-                    print(f"{dadt=}")
+                # if dadt > 0.0:
+                #     print(f"{dadt=}")
 
                 self.dadt[right, :] = dadt_list
                 self.mdot[right] = mdot
@@ -1439,7 +1436,30 @@ class New_Evolution:
         dt_dadt = CFL * self.sepa[step] / np.fabs(dadt)
 
         if self.eccen is not None:
-            dt_dedt = CFL * self.eccen[step] / np.fabs(dedt)
+            ecc_cfl = 0.1 * CFL
+            dt_dedt = ecc_cfl * self.eccen[step] / np.fabs(dedt)
+            
+            # now make sure we are not 'overshooting' the equilibrium eccentricity
+            # with current dedt value
+            
+            # qb = self.mass[step, 0]/self.mass[step, 1]
+            # if qb > 1:
+            #     qb = 1./qb 
+            # # equilibrium eccentricity
+            # eb_eq = self._acc.ebeq(qb)
+
+            # dt_ebeq_lim = (eb_eq-self.eccen[step])/(dedt)
+
+            # #if dt_ebeq_lim is < 0, we are moving away from the equilibrium value 
+            # # and the above test does not matter.
+            # # However, if dt_ebeq_lim > 0, timestep should be limited 
+            # # so we do not exceed equilibrium eccentricity in this timestep.
+            
+            # if dt_ebeq_lim > 0:
+            #     print("dt_ebeq_lim = %.2e " %dt_ebeq_lim)
+            #     print("dt_dedt = %.2e " %dt_dedt)
+            #     dt_dedt = np.min([dt_ebeq_lim, dt_dedt])
+            
         else:
             dt_dedt = np.inf
 
