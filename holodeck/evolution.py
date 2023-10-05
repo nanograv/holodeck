@@ -1497,6 +1497,6 @@ class New_Evolution:
 
         gwb = holo.discrete_cyutils.gwb_from_harmonics_data(
             fobs_edges, harm_range, fobs_index, harm_index, data_harms, nreals,
-            self._sample_volume, dfdt_mdot,
+            self._sample_volume, int(dfdt_mdot),
         )
         return gwb
