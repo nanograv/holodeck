@@ -237,6 +237,9 @@ class CBD_Torques(_Hardening):
         self.subpc = subpc
         self.allow_softening = allow_softening
 
+        """ STORE instance of _Siwek2023 with interpolated dadt and dedt functions here """
+        self.SWK23 = _Siwek2023()
+
         return
 
     def dadt_dedt(self, evo, bin, idx):
@@ -342,10 +345,9 @@ class CBD_Torques(_Hardening):
             [dedt] = 1/s
             which depend on the physical scale
             and accretion rate of the system """
-        dadt = _Siwek2023.dadt(mrat, eccen) * semimajor_axis * (mdot/mtot)
+        dadt = self.SWK23.dadt(mrat, eccen) * semimajor_axis * (mdot/mtot)
         if eccen is not None:
-            dedt =  _Siwek2023.dedt(mrat, eccen) * (mdot/mtot)
-
+            dedt =  self.SWK23.dedt(mrat, eccen) * (mdot/mtot)
         else:
             dedt = np.zeros_like(sepa)
 
@@ -1780,8 +1782,9 @@ class _Siwek2023:
         and contain \dot{e} and \dot{a} as a function of q,e
     """
 
-    @staticmethod
-    def dadt(mrat, eccen):
+    def __init__(self):
+        """ STORE dadt AND dedt DATA FROM SIWEK+23b """
+
         """Binary hardening rate from circumbinary disk torques.
 
         [Siwek2023]_ Table 2
@@ -1813,11 +1816,8 @@ class _Siwek2023:
                 mean_abdot_arr[i][j] = mean_ebdot_abdot[this_key_ab]
 
         dadt_qe_interp = RectBivariateSpline(np.array(all_qs), np.array(all_es), np.array(mean_abdot_arr), kx = 1, ky = 1)
-        dadt = dadt_qe_interp.ev(mrat, eccen)
-        return dadt
+        self.dadt_interp = dadt_qe_interp
 
-    @staticmethod
-    def dedt(mrat, eccen):
         """Binary eccentricity rate of change from circumbinary disk torques.
 
         [Siwek2023]_ Table 3
@@ -1849,7 +1849,16 @@ class _Siwek2023:
                 mean_ebdot_arr[i][j] = mean_ebdot_abdot[this_key_eb]
 
         dedt_qe_interp = RectBivariateSpline(np.array(all_qs), np.array(all_es), np.array(mean_ebdot_arr), kx = 1, ky = 1)
-        dedt = dedt_qe_interp.ev(mrat, eccen)
+
+        self.dedt_interp = dedt_qe_interp
+
+
+    def dadt(self, mrat, eccen):
+        dadt = self.dadt_interp.ev(mrat, eccen)
+        return dadt
+
+    def dedt(self, mrat, eccen):
+        dedt = self.dedt_interp.ev(mrat, eccen)
         return dedt
 
 
