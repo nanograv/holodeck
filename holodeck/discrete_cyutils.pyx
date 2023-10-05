@@ -383,7 +383,7 @@ cdef void _gwb_from_harmonics_data(
     double[:] mdot,
     DTYPE_LONG_t nreals,
     double box_vol_cm3,
-    bool dfdt_mdot,
+    int dfdt_mdot,
     # output
     double[:, :, :] gwb,
 ):
@@ -442,7 +442,7 @@ cdef void _gwb_from_harmonics_data(
             dadt[ii], sepa[ii], frst_orb,
             # dfdt_mdot=evo.dfdt_mdot
         )
-        if dfdt_mdot:
+        if dfdt_mdot == 1:
             dfdt += utils._dfdt_from_mdot(mdot[ii], sepa[ii], mass[ii, 0] + mass[ii, 1])
 
         # printf("dfdt=%.4e\n", dfdt)
