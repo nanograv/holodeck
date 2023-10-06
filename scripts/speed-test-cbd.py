@@ -16,7 +16,7 @@ ALLOW_SOFTENING = False
 ECCEN_INIT = 0.5
 F_EDD = 1.0
 
-TEST_NUM_BINS = 10
+TEST_NUM_BINS = 100
 
 
 pr = cProfile.Profile()
@@ -41,7 +41,7 @@ acc = holo.accretion.Accretion(
     accmod='Siwek22', f_edd=F_EDD, subpc=True, evol_mass=True, edd_lim=1.0,
 )
 
-evo = holo.evolution.Evolution(pop, hards, debug=True, acc=acc)
+evo = holo.evolution.New_Evolution(pop, hards, acc=acc)
 evo.evolve(break_after=TEST_NUM_BINS)
 
 
