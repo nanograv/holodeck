@@ -379,7 +379,7 @@ def gwb_from_harmonics_data(fobs_gw_edges, harms, fobs_index, harm_index, data, 
     cdef cnp.ndarray[cnp.double_t, ndim=3] gwb = np.zeros((nfreqs, harms.size, nreals))
     _gwb_from_harmonics_data(
         fobs_gw_edges, harms, fobs_index, harm_index, data['interp_idx'],
-        data['mass'], data['sepa'], data['eccen'], data['redz'], data['dcom'], data['mdot'], data['dadt'],
+        data['mass'], data['mdot'], data['sepa'], data['eccen'], data['redz'], data['dcom'], data['dadt'],
         nreals, box_vol_cm3, dfdt_mdot,
         gwb,
     )
@@ -398,12 +398,12 @@ cdef void _gwb_from_harmonics_data(
     DTYPE_LONG_t[:] harm_idx,
     DTYPE_LONG_t[:] interp_idx,
     double[:, :] mass,
+    double[:, :] mdot,
     double[:] sepa,
     double[:] eccen,
     double[:] redz,
     double[:] dcom,
     double[:] dadt,
-    double[:] mdot,
     DTYPE_LONG_t nreals,
     double box_vol_cm3,
     int dfdt_mdot,
