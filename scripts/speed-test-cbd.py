@@ -16,7 +16,7 @@ ALLOW_SOFTENING = False
 ECCEN_INIT = 0.5
 F_EDD = 1.0
 
-TEST_NUM_BINS = 100
+TEST_NUM_BINS = 10
 
 
 pr = cProfile.Profile()
@@ -43,6 +43,10 @@ acc = holo.accretion.Accretion(
 
 evo = holo.evolution.New_Evolution(pop, hards, acc=acc)
 evo.evolve(break_after=TEST_NUM_BINS)
+
+fobs_cents, fobs_edges = holo.utils.pta_freqs()
+
+gwb = evo.gwb(fobs_edges, dfdt_mdot=True)
 
 
 # ------------------------------------------------------------------------------

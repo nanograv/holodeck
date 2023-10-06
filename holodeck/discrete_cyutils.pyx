@@ -412,7 +412,7 @@ cdef void _gwb_from_harmonics_data(
 ):
 
     cdef DTYPE_LONG_t nfreqs = len(fobs_edges) - 1
-    cdef DTYPE_LONG_t nfreqharms = len(harm_idx)
+    # cdef DTYPE_LONG_t nfreqharms = len(harm_idx)
     cdef DTYPE_LONG_t nvals = len(interp_idx)
 
     cdef DTYPE_LONG_t ii, idx, fi, hi, rr
@@ -466,7 +466,7 @@ cdef void _gwb_from_harmonics_data(
             # dfdt_mdot=evo.dfdt_mdot
         )
         if dfdt_mdot == 1:
-            dfdt += utils._dfdt_from_mdot(mdot[ii], sepa[ii], mass[ii, 0] + mass[ii, 1])
+            dfdt += utils._dfdt_from_dmdt(mdot[ii, 0] + mdot[ii, 1], sepa[ii], mass[ii, 0] + mass[ii, 1])
 
         # printf("dfdt=%.4e\n", dfdt)
         # printf("446\n")
