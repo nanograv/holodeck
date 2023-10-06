@@ -52,6 +52,8 @@ cdef struct ArrayData:
     DTYPE_LONG_t* interp_idx
     double* m1
     double* m2
+    double* mdot1
+    double* mdot2
     double* redz
     double* sepa
     double* eccen
@@ -70,7 +72,7 @@ def interp_at_fobs(evo, fobs):
     cdef ArrayData data
     _interp_at_fobs(
         evo._first_index, evo._last_index, fobs,
-        evo.sepa, evo.eccen, evo.redz, dadt_tot, dedt_tot, evo.mass,
+        evo.sepa, evo.eccen, evo.redz, dadt_tot, dedt_tot, evo.mass, evo.mdot,
         &data
     )
 
@@ -85,6 +87,12 @@ def interp_at_fobs(evo, fobs):
     )
     cdef cnp.ndarray[DTYPE_DOUBLE_t, ndim=1, mode="c"] m2 = cnp.PyArray_SimpleNewFromData(
         1, &data.final_size, NPY_DTYPE_DOUBLE, <void*>data.m2
+    )
+    cdef cnp.ndarray[DTYPE_DOUBLE_t, ndim=1, mode="c"] mdot1 = cnp.PyArray_SimpleNewFromData(
+        1, &data.final_size, NPY_DTYPE_DOUBLE, <void*>data.mdot1
+    )
+    cdef cnp.ndarray[DTYPE_DOUBLE_t, ndim=1, mode="c"] mdot2 = cnp.PyArray_SimpleNewFromData(
+        1, &data.final_size, NPY_DTYPE_DOUBLE, <void*>data.mdot2
     )
     cdef cnp.ndarray[DTYPE_DOUBLE_t, ndim=1, mode="c"] redz = cnp.PyArray_SimpleNewFromData(
         1, &data.final_size, NPY_DTYPE_DOUBLE, <void*>data.redz
@@ -102,7 +110,7 @@ def interp_at_fobs(evo, fobs):
         1, &data.final_size, NPY_DTYPE_DOUBLE, <void*>data.dedt
     )
 
-    return bin, interp_idx, m1, m2, redz, sepa, eccen, dadt, dedt
+    return bin, interp_idx, m1, m2, mdot1, mdot2, redz, sepa, eccen, dadt, dedt
 
 
 @cython.boundscheck(False)
@@ -119,6 +127,7 @@ cdef void _interp_at_fobs(
     double[:] dadt,
     double[:] dedt,
     double[:, :] mass,
+    double[:, :] mdot,
     ArrayData* data,
 ):
 
@@ -132,13 +141,15 @@ cdef void _interp_at_fobs(
 
     data.bin = <DTYPE_LONG_t *>malloc(arr_size * sizeof(DTYPE_LONG_t))         # binary index number
     data.interp_idx = <DTYPE_LONG_t *>malloc(arr_size * sizeof(DTYPE_LONG_t))         # target fobs index number
-    data.m1 = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
-    data.m2 = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
-    data.redz = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
-    data.sepa = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
-    data.eccen = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
-    data.dadt = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
-    data.dedt = <double *>malloc(arr_size * sizeof(double))         # target fobs index number
+    data.m1 = <double *>malloc(arr_size * sizeof(double))
+    data.m2 = <double *>malloc(arr_size * sizeof(double))
+    data.mdot1 = <double *>malloc(arr_size * sizeof(double))
+    data.mdot2 = <double *>malloc(arr_size * sizeof(double))
+    data.redz = <double *>malloc(arr_size * sizeof(double))
+    data.sepa = <double *>malloc(arr_size * sizeof(double))
+    data.eccen = <double *>malloc(arr_size * sizeof(double))
+    data.dadt = <double *>malloc(arr_size * sizeof(double))
+    data.dedt = <double *>malloc(arr_size * sizeof(double))
 
     cdef DTYPE_LONG_t bin, left, right, fi, idx, direction, last_direction
     cdef DTYPE_LONG_t out = 0
@@ -179,6 +190,8 @@ cdef void _interp_at_fobs(
                 data.interp_idx = <DTYPE_LONG_t *>realloc(data.interp_idx, arr_size_tot * sizeof(DTYPE_LONG_t))
                 data.m1 = <double *>realloc(data.m1, arr_size_tot * sizeof(double))
                 data.m2 = <double *>realloc(data.m2, arr_size_tot * sizeof(double))
+                data.mdot1 = <double *>realloc(data.mdot1, arr_size_tot * sizeof(double))
+                data.mdot2 = <double *>realloc(data.mdot2, arr_size_tot * sizeof(double))
                 data.redz = <double *>realloc(data.redz, arr_size_tot * sizeof(double))
                 data.sepa = <double *>realloc(data.sepa, arr_size_tot * sizeof(double))
                 data.eccen = <double *>realloc(data.eccen, arr_size_tot * sizeof(double))
@@ -222,10 +235,14 @@ cdef void _interp_at_fobs(
                         data.m1[out] = _interp_between_vals(
                             target_fobs[fi], fobs_l, fobs_r, mass[left, 0], mass[right, 0]
                         )
-                        # printf("\t%.4e %.4e %.4e\n", fobs_l*MY_YR, target_fobs[fi]*MY_YR, fobs_r*MY_YR)
-                        # printf("\t%.4e %.4e %.4e\n", mass[left, 0]/MY_MSOL, data.m1[out]/MY_MSOL, mass[right, 0]/MY_MSOL)
                         data.m2[out] = _interp_between_vals(
                             target_fobs[fi], fobs_l, fobs_r, mass[left, 1], mass[right, 1]
+                        )
+                        data.mdot1[out] = _interp_between_vals(
+                            target_fobs[fi], fobs_l, fobs_r, mdot[left, 0], mdot[right, 0]
+                        )
+                        data.mdot2[out] = _interp_between_vals(
+                            target_fobs[fi], fobs_l, fobs_r, mdot[left, 1], mdot[right, 1]
                         )
                         data.redz[out] = _interp_between_vals(
                             target_fobs[fi], fobs_l, fobs_r, redz[left], redz[right]
@@ -285,10 +302,14 @@ cdef void _interp_at_fobs(
                         data.m1[out] = _interp_between_vals(
                             target_fobs[fi], fobs_l, fobs_r, mass[left, 0], mass[right, 0]
                         )
-                        # printf("\t%.4e %.4e %.4e\n", mass[left, 0]/MY_MSOL, data.m1[out]/MY_MSOL, mass[right, 0]/MY_MSOL)
-                        # printf("\t%.4e %.4e %.4e\n", fobs_l*MY_YR, target_fobs[fi]*MY_YR, fobs_r*MY_YR)
                         data.m2[out] = _interp_between_vals(
                             target_fobs[fi], fobs_l, fobs_r, mass[left, 1], mass[right, 1]
+                        )
+                        data.mdot1[out] = _interp_between_vals(
+                            target_fobs[fi], fobs_l, fobs_r, mdot[left, 0], mdot[right, 0]
+                        )
+                        data.mdot2[out] = _interp_between_vals(
+                            target_fobs[fi], fobs_l, fobs_r, mdot[left, 1], mdot[right, 1]
                         )
                         data.redz[out] = _interp_between_vals(
                             target_fobs[fi], fobs_l, fobs_r, redz[left], redz[right]
@@ -332,6 +353,8 @@ cdef void _interp_at_fobs(
     data.interp_idx = <DTYPE_LONG_t *>realloc(data.interp_idx, out * sizeof(DTYPE_LONG_t))
     data.m1 = <double *>realloc(data.m1, out * sizeof(double))
     data.m2 = <double *>realloc(data.m2, out * sizeof(double))
+    data.mdot1 = <double *>realloc(data.mdot1, out * sizeof(double))
+    data.mdot2 = <double *>realloc(data.mdot2, out * sizeof(double))
     data.redz = <double *>realloc(data.redz, out * sizeof(double))
     data.sepa = <double *>realloc(data.sepa, out * sizeof(double))
     data.eccen = <double *>realloc(data.eccen, out * sizeof(double))
