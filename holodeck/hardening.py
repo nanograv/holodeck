@@ -573,32 +573,38 @@ class Dynamical_Friction_NFW(_Hardening):
             `None` is returned if the input `eccen` is None.
 
         """
+
         if attenuate is None:
             attenuate = self._attenuate
 
-        if bin is None:
-            mass = evo.mass[:, idx, :]
-            sepa = evo.sepa[:, idx]
-            eccen = evo.eccen[:, idx] if (evo.eccen is not None) else None
-            #initial lookback time at binary formation - current lookback time
-            dt = evo.tlook[:,0] - evo.tlook[:,idx]
-            redz = np.zeros_like(sepa)
-            val = (evo.scafa[:,idx] > 0.0)
-            redz[val] = cosmo.a_to_z(evo.scafa[val, idx])
+        
+        if bin is not None and evo.sepa[idx] <= 10*PC:
+            dadt = 0
+            dedt = 0
+            return dadt, dedt
         else:
-            mass = evo.mass[idx, :]
-            sepa = evo.sepa[idx]
-            eccen = evo.eccen[idx] if (evo.eccen is not None) else None
-            dt = evo._tlook_init[bin] - evo.tlook[idx]   # positive time-duration since 'formation'
-            redz = evo.redz[idx]
-        # NOTE `scafa` is nan for systems "after" redshift zero (i.e. do not merge before redz=0)
-        # redz = np.zeros_like(sepa)
-        # val = (evo.scafa[idx] > 0.0)
-        # redz[val] = cosmo.a_to_z(evo.scafa[val, step])
+            if bin is None:
+                mass = evo.mass[:, idx, :]
+                sepa = evo.sepa[:, idx]
+                eccen = evo.eccen[:, idx] if (evo.eccen is not None) else None
+                #initial lookback time at binary formation - current lookback time
+                dt = evo.tlook[:,0] - evo.tlook[:,idx]
+                redz = np.zeros_like(sepa)
+                val = (evo.scafa[:,idx] > 0.0)
+                redz[val] = cosmo.a_to_z(evo.scafa[val, idx])
+            else:
+                mass = evo.mass[idx, :]
+                sepa = evo.sepa[idx]
+                eccen = evo.eccen[idx] if (evo.eccen is not None) else None
+                dt = evo._tlook_init[bin] - evo.tlook[idx]   # positive time-duration since 'formation'
+                redz = evo.redz[idx]
+            # NOTE `scafa` is nan for systems "after" redshift zero (i.e. do not merge before redz=0)
+            # redz = np.zeros_like(sepa)
+            # val = (evo.scafa[idx] > 0.0)
+            # redz[val] = cosmo.a_to_z(evo.scafa[val, step])
 
-        dadt, dedt = self._dadt_dedt(mass, sepa, redz, dt, eccen, attenuate)
-
-        return dadt, dedt
+            dadt, dedt = self._dadt_dedt(mass, sepa, redz, dt, eccen, attenuate)
+            return dadt, dedt
 
     def _dadt_dedt(self, mass, sepa, redz, dt, eccen, attenuate):
         """Calculate DF hardening rate given physical quantities.
@@ -1660,6 +1666,16 @@ class _SHM06:
         self._init_k()
         return
 
+    def get_closest(self, table, val_table, val):
+        if hasattr(val, "__len__"):
+            closest_ind = []
+            for val_i in val:
+                closest_ind_i = np.absolute(val_table-val_i).argmin()
+                closest_ind.append(closest_ind_i)
+        else:
+            closest_ind = np.absolute(val_table-val).argmin()
+        return table[closest_ind]
+
     def H(self, mrat, sepa_rhard):
         """Hardening rate efficiency parameter.
 
@@ -1676,6 +1692,12 @@ class _SHM06:
             Hardening parameter.
 
         """
+        # closest_H_a0 = self.get_closest(self._H_a0_table, self.h_mass_ratios_table, mrat)
+        # closest_H_A = self.get_closest(self._H_A_table, self.h_mass_ratios_table, mrat)
+        # closest_H_g = self.get_closest(self._H_g_table, self.h_mass_ratios_table, mrat)
+        # xx = sepa_rhard / closest_H_a0
+        # hh = closest_H_A * np.power(1.0 + xx, closest_H_g)
+
         xx = sepa_rhard / self._H_a0(mrat)
         hh = self._H_A(mrat) * np.power(1.0 + xx, self._H_g(mrat))
         hh = np.clip(hh, *self._bound_H)
@@ -1769,6 +1791,11 @@ class _SHM06:
         self._H_A = sp.interpolate.interp1d(h_mass_ratios, h_A, kind='linear', fill_value='extrapolate')
         self._H_a0 = sp.interpolate.interp1d(h_mass_ratios, h_a0, kind='linear', fill_value='extrapolate')
         self._H_g = sp.interpolate.interp1d(h_mass_ratios, h_g, kind='linear', fill_value='extrapolate')
+
+        # self.h_mass_ratios_table = np.logspace(-5,0,1000000)
+        # self._H_A_table = self._H_A(self.h_mass_ratios_table)
+        # self._H_a0_table = self._H_a0(self.h_mass_ratios_table)
+        # self._H_g_table = self._H_g(self.h_mass_ratios_table)
         return
 
 
