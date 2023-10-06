@@ -1274,9 +1274,6 @@ class New_Evolution:
                     dedt_l = np.sum(dedt_l_list)
 
                 dt_l_list = self._get_timestep_from_rates(left, dadt_l, dedt_l, mdot_l, CFL)
-                # print(dt_l_list)
-                # msg = ", ".join([f"{dd:.4e}" for dd in dt_l])
-                # print(f"dt: {msg}")
                 dt_l = np.min(dt_l_list + [self.tlook[left], self._TIME_STEP_MAX])
                 # print(f"{dt_l/YR=:.4e}")
 
@@ -1285,7 +1282,7 @@ class New_Evolution:
                 self.sepa[right] = self.sepa[left] + dadt_l * dt_l
                 if self.eccen is not None:
                     self.eccen[right] = self.eccen[left] + dedt_l * dt_l
-                
+
                 # if there is no accretion, then mdot is zero
                 self.mass[right, :] = self.mass[left] + mdot_l * dt_l
                 self.tlook[right] = self.tlook[left] - dt_l
@@ -1335,7 +1332,7 @@ class New_Evolution:
 
                 if self.eccen is not None:
                     self.eccen[right] = self.eccen[left] + dedt * dt
-                
+
                 # if there is no accretion, then mdot is zero
                 self.mass[right, :] = self.mass[left] + mdot * dt
                 self.tlook[right] = self.tlook[left] - dt
@@ -1395,13 +1392,15 @@ class New_Evolution:
             raise RuntimeError("`targets` must be monotonically increasing!")
 
         vals = holodeck.discrete_cyutils.interp_at_fobs(self, targets)
-        bin, interp_idx, m1, m2, redz, sepa, eccen, dadt, dedt = vals
+        bin, interp_idx, m1, m2, mdot1, mdot2, redz, sepa, eccen, dadt, dedt = vals
         mass = np.stack([m1, m2], axis=1)
+        mdot = np.stack([mdot1, mdot2], axis=1)
         # get the indices to sort first by interp_idx (fobs), then by bin(ary)
         idx = np.lexsort([bin, interp_idx])
         bin = bin[idx]
         interp_idx = interp_idx[idx]
         mass = mass[idx]
+        mdot = mdot[idx]
         redz = redz[idx]
         sepa = sepa[idx]
         eccen = eccen[idx]
@@ -1410,7 +1409,7 @@ class New_Evolution:
         fobs = targets[interp_idx]
 
         vals = dict(
-            mass=mass, redz=redz, sepa=sepa, eccen=eccen, dadt=dadt, dedt=dedt,
+            mass=mass, mdot=mdot, redz=redz, sepa=sepa, eccen=eccen, dadt=dadt, dedt=dedt,
             binary=bin, interp_idx=interp_idx, fobs=fobs
         )
         return vals
@@ -1438,28 +1437,28 @@ class New_Evolution:
         if self.eccen is not None:
             ecc_cfl = 0.1 * CFL
             dt_dedt = ecc_cfl * self.eccen[step] / np.fabs(dedt)
-            
+
             # now make sure we are not 'overshooting' the equilibrium eccentricity
             # with current dedt value
-            
+
             # qb = self.mass[step, 0]/self.mass[step, 1]
             # if qb > 1:
-            #     qb = 1./qb 
+            #     qb = 1./qb
             # # equilibrium eccentricity
             # eb_eq = self._acc.ebeq(qb)
 
             # dt_ebeq_lim = (eb_eq-self.eccen[step])/(dedt)
 
-            # #if dt_ebeq_lim is < 0, we are moving away from the equilibrium value 
+            # #if dt_ebeq_lim is < 0, we are moving away from the equilibrium value
             # # and the above test does not matter.
-            # # However, if dt_ebeq_lim > 0, timestep should be limited 
+            # # However, if dt_ebeq_lim > 0, timestep should be limited
             # # so we do not exceed equilibrium eccentricity in this timestep.
-            
+
             # if dt_ebeq_lim > 0:
             #     print("dt_ebeq_lim = %.2e " %dt_ebeq_lim)
             #     print("dt_dedt = %.2e " %dt_dedt)
             #     dt_dedt = np.min([dt_ebeq_lim, dt_dedt])
-            
+
         else:
             dt_dedt = np.inf
 
