@@ -864,7 +864,8 @@ class Klypin_2016:
         # if hasattr(redz, "__len__"):
         #     yy = np.power(10.0, cls._lin_interp_c0(xx))
         # else:
-        yy = cls.get_closest(cls._lin_interp_c0_table, xx)
+        # yy = cls.get_closest(cls._lin_interp_c0_table, xx)
+        yy = np.power(10.0, cls._lin_interp_c0(xx))
         return yy
 
     @classmethod
@@ -873,7 +874,8 @@ class Klypin_2016:
         # if hasattr(redz, "__len__"):
         #     yy = np.power(10.0, cls._lin_interp_gamma(xx))
         # else:
-        yy = cls.get_closest(cls._lin_interp_gamma_table, xx)
+        # yy = cls.get_closest(cls._lin_interp_gamma_table, xx)
+        yy = np.power(10.0, cls._lin_interp_gamma(xx))
         return yy
 
     @classmethod
@@ -882,7 +884,8 @@ class Klypin_2016:
         # if hasattr(redz, "__len__"):
         #     yy = np.power(10.0, cls._lin_interp_mass0(xx))
         # else:
-        yy = cls.get_closest(cls._lin_interp_mass0_table, xx)
+        # yy = cls.get_closest(cls._lin_interp_mass0_table, xx)
+        yy = np.power(10.0, cls._lin_interp_mass0(xx))
         return yy
 
     @classmethod
@@ -1107,8 +1110,8 @@ class NFW(_Density_Profile):
         # Critical over-density
         delta_c = (200/3) * (conc**3) / log_c_term
         # NFW density (*not* the density at the characteristic-radius)
-        # rho_s = cosmo.critical_density(redz).cgs.value * delta_c
-        rho_s = NFW.get_closest(NFW.crit_dens, redz) * delta_c
+        rho_s = cosmo.critical_density(redz).cgs.value * delta_c
+        # rho_s = NFW.get_closest(NFW.crit_dens, redz) * delta_c
         # scale-radius
         rs = mhalo / (4*np.pi*rho_s*log_c_term)
         rs = np.power(rs, 1.0/3.0)
