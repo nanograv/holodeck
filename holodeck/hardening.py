@@ -577,34 +577,34 @@ class Dynamical_Friction_NFW(_Hardening):
         if attenuate is None:
             attenuate = self._attenuate
 
-        
-        if bin is not None and evo.sepa[idx] <= 10*PC:
+        # in new_evolution, df hardening can be expensive
+        # so we skip df when separations are below a parsec
+        if bin is not None and evo.sepa[idx] <= 1*PC:
             dadt = 0
             dedt = 0
             return dadt, dedt
+        if bin is None:
+            mass = evo.mass[:, idx, :]
+            sepa = evo.sepa[:, idx]
+            eccen = evo.eccen[:, idx] if (evo.eccen is not None) else None
+            #initial lookback time at binary formation - current lookback time
+            dt = evo.tlook[:,0] - evo.tlook[:,idx]
+            redz = np.zeros_like(sepa)
+            val = (evo.scafa[:,idx] > 0.0)
+            redz[val] = cosmo.a_to_z(evo.scafa[val, idx])
         else:
-            if bin is None:
-                mass = evo.mass[:, idx, :]
-                sepa = evo.sepa[:, idx]
-                eccen = evo.eccen[:, idx] if (evo.eccen is not None) else None
-                #initial lookback time at binary formation - current lookback time
-                dt = evo.tlook[:,0] - evo.tlook[:,idx]
-                redz = np.zeros_like(sepa)
-                val = (evo.scafa[:,idx] > 0.0)
-                redz[val] = cosmo.a_to_z(evo.scafa[val, idx])
-            else:
-                mass = evo.mass[idx, :]
-                sepa = evo.sepa[idx]
-                eccen = evo.eccen[idx] if (evo.eccen is not None) else None
-                dt = evo._tlook_init[bin] - evo.tlook[idx]   # positive time-duration since 'formation'
-                redz = evo.redz[idx]
-            # NOTE `scafa` is nan for systems "after" redshift zero (i.e. do not merge before redz=0)
-            # redz = np.zeros_like(sepa)
-            # val = (evo.scafa[idx] > 0.0)
-            # redz[val] = cosmo.a_to_z(evo.scafa[val, step])
+            mass = evo.mass[idx, :]
+            sepa = evo.sepa[idx]
+            eccen = evo.eccen[idx] if (evo.eccen is not None) else None
+            dt = evo._tlook_init[bin] - evo.tlook[idx]   # positive time-duration since 'formation'
+            redz = evo.redz[idx]
+        # NOTE `scafa` is nan for systems "after" redshift zero (i.e. do not merge before redz=0)
+        # redz = np.zeros_like(sepa)
+        # val = (evo.scafa[idx] > 0.0)
+        # redz[val] = cosmo.a_to_z(evo.scafa[val, step])
 
-            dadt, dedt = self._dadt_dedt(mass, sepa, redz, dt, eccen, attenuate)
-            return dadt, dedt
+        dadt, dedt = self._dadt_dedt(mass, sepa, redz, dt, eccen, attenuate)
+        return dadt, dedt
 
     def _dadt_dedt(self, mass, sepa, redz, dt, eccen, attenuate):
         """Calculate DF hardening rate given physical quantities.
