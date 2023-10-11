@@ -838,54 +838,60 @@ class Klypin_2016:
     _lin_interp_table_xx = np.log10(1+zz)
 
     """ c0 table"""
-    _lin_interp_c0_table = _lin_interp_c0(_lin_interp_table_xx)
+    _lin_interp_c0_table = np.power(10.0, _lin_interp_c0(_lin_interp_table_xx))
 
     """ gamma table"""
-    _lin_interp_gamma_table = _lin_interp_gamma(_lin_interp_table_xx)
+    _lin_interp_gamma_table = np.power(10.0, _lin_interp_gamma(_lin_interp_table_xx))
 
     """ mass0 """
-    _lin_interp_mass0_table = _lin_interp_mass0(_lin_interp_table_xx)
+    _lin_interp_mass0_table = np.power(10.0, _lin_interp_mass0(_lin_interp_table_xx))
 
     """ HELPER FUNCTION TO FIND CLOSEST VALUE IN ARRAY """
     @classmethod
-    def get_closest(cls, table, val):
+    def get_closest(cls, table, table_val, val):
         if hasattr(val, "__len__"):
             closest_ind = []
             for val_i in val:
-                closest_ind_i = np.absolute(table-val_i).argmin()
+                closest_ind_i = np.absolute(table_val-val_i).argmin()
                 closest_ind.append(closest_ind_i)
         else:
-            closest_ind = np.absolute(table-val).argmin()
+            closest_ind = np.absolute(table_val-val).argmin()
         return table[closest_ind]
 
     @classmethod
     def _c0(cls, redz):
         xx = np.log10(1 + redz)
-        # if hasattr(redz, "__len__"):
-        #     yy = np.power(10.0, cls._lin_interp_c0(xx))
-        # else:
-        # yy = cls.get_closest(cls._lin_interp_c0_table, xx)
-        yy = np.power(10.0, cls._lin_interp_c0(xx))
+        if hasattr(redz, "__len__"):
+            yy = np.power(10.0, cls._lin_interp_c0(xx))
+        else:
+            yy = cls.get_closest(cls._lin_interp_c0_table, cls._lin_interp_table_xx, xx)
+        # yy = np.power(10.0, cls._lin_interp_c0(xx))
         return yy
 
     @classmethod
     def _gamma(cls, redz):
         xx = np.log10(1 + redz)
-        # if hasattr(redz, "__len__"):
-        #     yy = np.power(10.0, cls._lin_interp_gamma(xx))
-        # else:
-        # yy = cls.get_closest(cls._lin_interp_gamma_table, xx)
-        yy = np.power(10.0, cls._lin_interp_gamma(xx))
+        if hasattr(redz, "__len__"):
+            yy = np.power(10.0, cls._lin_interp_gamma(xx))
+        else:
+            yy = cls.get_closest(cls._lin_interp_gamma_table, cls._lin_interp_table_xx, xx)
+        #yy = np.power(10.0, cls._lin_interp_gamma(xx))
+        # print("cls._lin_interp_gamma_table = ", cls._lin_interp_gamma_table)
+        # print("cls._lin_interp_table_xx = ", cls._lin_interp_table_xx)
+        # print("xx = ", xx)
+        # print("yy_test = ", yy_test)
+        # print("yy = ", yy)
+        # exit()
         return yy
 
     @classmethod
     def _mass0(cls, redz):
         xx = np.log10(1 + redz)
-        # if hasattr(redz, "__len__"):
-        #     yy = np.power(10.0, cls._lin_interp_mass0(xx))
-        # else:
-        # yy = cls.get_closest(cls._lin_interp_mass0_table, xx)
-        yy = np.power(10.0, cls._lin_interp_mass0(xx))
+        if hasattr(redz, "__len__"):
+            yy = np.power(10.0, cls._lin_interp_mass0(xx))
+        else:
+            yy = cls.get_closest(cls._lin_interp_mass0_table, cls._lin_interp_table_xx, xx)
+        # yy = np.power(10.0, cls._lin_interp_mass0(xx))
         return yy
 
     @classmethod
