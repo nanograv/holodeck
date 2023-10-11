@@ -1519,3 +1519,148 @@ class New_Evolution:
             self._sample_volume, int(dfdt_mdot),
         )
         return gwb
+    
+    def sample_universe(self, fobs_orb_edges, down_sample=None, dfdt_mdot=False):
+        """Construct a full universe of binaries based on resampling this population.
+
+        Parameters
+        ----------
+        fobs : array_like,
+            Observer-frame *orbital*-frequencies at which to sample population. Units of [1/sec].
+        down_sample : None or float,
+            Factor by which to downsample the resulting population.
+            For example, `10.0` will produce 10x fewer output binaries.
+
+        Returns
+        -------
+        names : list[str], size (7,)
+            Names of the returned data arrays in `samples`.
+        samples : np.ndarray, shape (7, S)
+            Sampled binary data.  For each binary samples S, 7 parameters are returned:
+            ['mtot', 'mrat', 'redz', 'fobs', 'eccen', 'dadt', 'dedt']
+            (these are listed in the `names` returned value.)
+            NOTE: `fobs` is *observer*-frame *orbital*-frequencies.
+            These values correspond to all of the binaries in an observer's Universe
+            (i.e. light-cone), within the given frequency bins.  The number of samples `S` is
+            roughly the sum of the `weights` --- but the specific number is drawn from a Poisson
+            distribution around the sum of the `weights`.
+        vals : (7,) list of (V,) ndarrays or float
+            Binary parameters (log10 of parameters specified in the `names` return values) at each
+            frequency bin.  Binaries not reaching the target frequency bins before redshift zero,
+            or before coalescing, are not returned.  Thus the number of values `V` may be less than
+            F*N for F frequency bins and N binaries.
+        weights : (V,) ndarray of float
+            The weight of each binary-frequency sample.  i.e. number of observer-universe binaries
+            corresponding to this binary in the simulation, at the target frequency.
+
+        To-Do
+        -----
+        * This should sample in volume instead of `redz`, see how it's done in sam module.
+
+        """
+
+        # these are `log10(values)` where values are in CGS units
+        # names = ['mtot', 'mrat', 'redz', 'fobs', 'eccen', 'dadt', 'dedt']
+        names, vals, weights = self._sample_universe__at_values_weights(fobs_orb_edges, dfdt_mdot=dfdt_mdot)
+
+        samples = self._sample_universe__resample(fobs_orb_edges, vals, weights, down_sample)
+
+        # Convert back to normal-space
+        samples = np.asarray([10.0 ** ss for ss in samples])
+        vals = np.asarray([10.0 ** vv for vv in vals])
+        # but then take log10 of eccentricity, dadt and dedt again, 
+        # because we don't take the log10 of eccen,dadt and dedt initially.
+        # this is because kale.resample() in _sample_universe__resample returns NaNs when using log10(eccen)
+        for v_ind in [4,5,6]:
+            vals[v_ind] = np.log10(vals[v_ind]) #because we don't take log10 of eccen, dadt and dedt before interpolating
+            samples[v_ind] = np.log10(samples[v_ind]) #because we don't take log10 of eccen, dadt and dedt before interpolating
+        return names, samples, vals, weights
+
+    def _sample_universe__at_values_weights(self, fobs_orb_edges, dfdt_mdot=False):
+        """Interpolate binary histories to target frequency bins, obtaining parameters and weights.
+
+        The `weights` correspond to the number of binaries in an observer's Universe (light-cone)
+        corresponding to each simulated binary sample.
+
+        Arguments
+        ---------
+        fobs_orb_edges : (F+1,) arraylike
+            Edges of target frequency bins to sample population.  These are observer-frame orbital
+            frequencies.  Binaries are interpolated to frequency bin centers, calculated from the
+            midpoints of the provided bin edges.
+
+        Returns
+        -------
+        names : (7,) list of str,
+            Names of the returned binary parameters (i.e. each array in `vals`).
+        vals : (7,) list of (V,) ndarrays or float
+            Binary parameters (log10 of parameters specified in the `names` return values) at each
+            frequency bin.  Binaries not reaching the target frequency bins before redshift zero,
+            or before coalescing, are not returned.  Thus the number of values `V` may be less than
+            F*N for F frequency bins and N binaries.
+        weights : (V,) ndarray of float
+            The weight of each binary-frequency sample.  i.e. number of observer-universe binaries
+            corresponding to this binary in the simulation, at the target frequency.
+
+        """
+
+        fobs_orb_cents_bins = kale.utils.midpoints(fobs_orb_edges, log=False)
+
+        # Interpolate binaries to given frequencies
+        data_fobs = self.at('fobs', fobs_orb_cents_bins)
+        
+        #get observed and rest frequencies of binaries
+        fobs_orb_cents = data_fobs['fobs']
+        frst_orb_cents = utils.frst_from_fobs(fobs_orb_cents, data_fobs['redz'])
+        m1, m2 = np.moveaxis(data_fobs['mass'], -1, 0)
+        mt, mr = utils.mtmr_from_m1m2(m1, m2)
+        mdot = np.sum(data_fobs['mdot'], axis=-1)
+        dcom = cosmo.z_to_dcom(data_fobs['redz'])
+
+        dfdt, _ = utils.dfdt_from_dadt(data_fobs['dadt'], data_fobs['sepa'], \
+                                        frst_orb=frst_orb_cents,\
+                                        mdot = data_fobs['mdot'], \
+                                        dfdt_mdot=dfdt_mdot)
+        
+        _lambda_factor = utils.lambda_factor_dlnf(frst_orb_cents, dfdt, \
+                                data_fobs['redz'], dcom=dcom) / self._sample_volume
+
+        # use numpy digitize to find dlnf
+        bin_inds = np.digitize(fobs_orb_cents, fobs_orb_edges, right=False)
+        dlnf_all = np.diff(np.log(fobs_orb_edges))
+        dlnf = dlnf_all[bin_inds-1]
+
+        #calculate number of binaries 
+        num_binaries = _lambda_factor * dlnf
+        weights = num_binaries
+
+        # Convert to log-space, except for eccen, dadt and dedt
+        vals = [np.log10(mt), np.log10(mr), np.log10(data_fobs['redz']), \
+                np.log10(fobs_orb_cents), data_fobs['eccen'], \
+                data_fobs['dadt'], data_fobs['dedt']]
+
+        #the order of these variables matters, look at end of sample_universe() function where we take log10(eccen)
+        names = ['mtot', 'mrat', 'redz', 'fobs', 'eccen', 'dadt', 'dedt']
+
+        return names, vals, weights
+
+    def _sample_universe__resample(self, fobs_orb_edges, vals, weights, down_sample):
+        # down-sample weights to decrease the number of sample points
+        prev_sum = weights.sum()
+        log.info(f"Total weights (number of binaries in the universe): {prev_sum:.8e}")
+        if down_sample is not None:
+            weights = weights / down_sample
+            next_sum = weights.sum()
+            msg = f"downsampling artificially: down_sample={down_sample:g} :: total: {prev_sum:.4e}==>{next_sum:.4e}"
+            log.warning(msg)
+
+        # TODO/FIX: Consider sampling in comoving-volume instead of redz (like in sam.py)
+        #           can also return dcom instead of redz for easier strain calculation
+        nsamp = np.random.poisson(weights.sum())
+        # eccentricity boundaries should be between [0,1]
+        reflect = [None, [None, 0.0], None, np.log10([fobs_orb_edges[0], fobs_orb_edges[-1]]), [0,1.0], None, None]
+        samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
+        num_samp = samples[0].size
+        log.debug(f"Sampled {num_samp:.8e} binaries in the universe")
+        return samples
+
