@@ -1625,10 +1625,9 @@ class New_Evolution:
         _lambda_factor = utils.lambda_factor_dlnf(frst_orb_cents, dfdt, \
                                 data_fobs['redz'], dcom=dcom) / self._sample_volume
 
-        # use numpy digitize to find dlnf
-        bin_inds = np.digitize(fobs_orb_cents, fobs_orb_edges, right=False)
+        # use interp_idx (bin index for fobs_orb_edges) to find dlnf
         dlnf_all = np.diff(np.log(fobs_orb_edges))
-        dlnf = dlnf_all[bin_inds-1]
+        dlnf = dlnf_all[data_fobs['interp_idx']-1]
 
         #calculate number of binaries 
         num_binaries = _lambda_factor * dlnf
