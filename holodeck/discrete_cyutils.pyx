@@ -430,8 +430,6 @@ cdef void _gwb_from_harmonics_data(
         fobs_cents[ii] = 0.5 * (fobs_edges[ii] + fobs_edges[ii+1])
         dlnf[ii] = log(fobs_edges[ii+1]) - log(fobs_edges[ii])
 
-    # printf("414\n")
-
     for ii in range(nvals):
         # which target-frequency this entry corresponds to
         idx = interp_idx[ii]
