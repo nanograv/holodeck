@@ -1476,7 +1476,11 @@ def dfdt_from_dadt(dadt, sepa, mtot=None, frst_orb=None, mdot=None, dfdt_mdot=Fa
             err = "mdot must be provided when calculating dfdt_mdot!"
             log.exception(err)
             raise ValueError(err)
-        dfdt_mdot = _dfdt_from_dmdt(mdot, sepa, mtot)
+        if mtot is None:
+            #get mtot from frst_orb
+            mtot = frst_orb**2 * sepa**3 * 4 * np.pi / (NWTG)
+        mdot_tot = np.sum(mdot,axis=-1)
+        dfdt_mdot = _dfdt_from_dmdt(mdot_tot, sepa, mtot)
         dfdt += dfdt_mdot
 
     return dfdt, frst_orb
