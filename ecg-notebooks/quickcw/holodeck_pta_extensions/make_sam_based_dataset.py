@@ -6,8 +6,6 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 
-import sys
-sys.path.append('/Users/emigardiner/GWs')
 import libstempo.toasim as LT
 import libstempo.plot as LP
 
@@ -18,6 +16,8 @@ from holodeck import log, cosmo, utils, plot
 from holodeck import extensions as holo_extensions
 import holodeck as holo
 
+### Test
+LT.print_source_test()
 
 ####################################################################################
 #
