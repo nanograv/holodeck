@@ -205,7 +205,7 @@ for rr in range(N_REAL):
         outlier_per_bin=1_000, seed=1994+rr)
     f_centers, free_spec, outlier_fo, outlier_hs, outlier_mc, outlier_dl, random_gwthetas, random_gwphis, random_phases, random_psis, random_incs = inj_return
     #save simulated dataset to tim files
-    real_dir = savedir+"real{0:03d}/".format(i)
+    real_dir = savedir+"real{0:03d}/".format(rr)
     os.mkdir(real_dir)
     
     np.savez(real_dir+"simulation_info.npz", free_spec=free_spec, f_centers=f_centers, F_bins=F_bins_edges,
