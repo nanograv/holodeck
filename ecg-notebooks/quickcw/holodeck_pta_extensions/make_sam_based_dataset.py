@@ -25,7 +25,7 @@ import holodeck as holo
 #
 ####################################################################################
 
-N_REAL = 3     # number of realizations to produce
+N_REAL = 30     # number of realizations to produce
 debug = True     # whether to print steps
 
 #path to directory where par and tim files will be saved
