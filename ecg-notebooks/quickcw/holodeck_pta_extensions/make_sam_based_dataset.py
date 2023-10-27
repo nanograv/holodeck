@@ -5,6 +5,8 @@ import json
 
 import numpy as np
 import matplotlib.pyplot as plt
+from datetime import datetime
+from tqdm import tqdm
 
 import libstempo.toasim as LT
 import libstempo.plot as LP
@@ -16,8 +18,9 @@ from holodeck import log, cosmo, utils, plot
 from holodeck import extensions as holo_extensions
 import holodeck as holo
 
-### Test
-# LT.print_source_test()
+### Time
+start = datetime.now()
+print(f'----- Starting at {start} -----')
 
 ####################################################################################
 #
@@ -132,15 +135,21 @@ realizer = holo_extensions.Realizer_SAM(
     pspace=PSPACE)
 
 
+
 ####################################################################################
 #
 # Do GWB + outlier injections over multiple realizations of the population and noise
 #
 ####################################################################################
 
+print(f'-- runtime: {datetime.now()-start}')
+print('realizing samples')
 names, real_samples, real_weights = realizer(nreals=N_REAL, clean=True)
-for rr in range(N_REAL):
-    print(f"--- Realization: {rr}")
+print(f'-- runtime: {datetime.now()-start}')
+
+for rr in tqdm(range(N_REAL)):
+    print(f"--- Realization: {rr}/{N_REAL}")
+    print(f'-- runtime: {datetime.now()-start}')
 
     #sample binary parameters from population
 
@@ -208,15 +217,18 @@ for rr in range(N_REAL):
     real_dir = savedir+"real{0:03d}/".format(rr)
     os.mkdir(real_dir)
     
+    print('Saving simulation info')
     np.savez(real_dir+"simulation_info.npz", free_spec=free_spec, f_centers=f_centers, F_bins=F_bins_edges,
                                              outlier_fo=outlier_fo, outlier_hs=outlier_hs,
                                              outlier_mc=outlier_mc, outlier_dl=outlier_dl,
                                              random_gwthetas=random_gwthetas, random_gwphis=random_gwphis,
                                              random_phases=random_phases, random_psis=random_psis, random_incs=random_incs)
 
+
+    print('Saving fake pulsar timfiles')
     for j in range(len(psrs)):
-        #print("CWs")
-        print(psrs[j].name)
+        # print("CWs")
+        # print(psrs[j].name)
         #no need to fit here since we fit after adding each signal
         psrs[j].fit()
         psrs[j].savetim(real_dir + 'fake_{0}.tim'.format(psrs[j].name))
@@ -227,3 +239,7 @@ for rr in range(N_REAL):
     #    LP.plotres(psr)
     #    plt.savefig(psr.name+"_injection_debug.png")
 
+end = datetime.now()
+print(f'----- Started at {start} -----')
+print(f'----- Ended at {end} -----')
+print(f'-- runtime: {end-start}')
