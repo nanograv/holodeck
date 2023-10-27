@@ -31,7 +31,7 @@ DMk = 4.15e3           # Units MHz^2 cm^3 pc sec
 
 #@profile
 def add_catalog_of_cws(psr, gwtheta_list, gwphi_list, mc_list, dist_list, fgw_list, phase0_list, psi_list, inc_list, pdist=1.0,
-                       pphase=None, psrTerm=True, evolve=True, phase_approx=False, tref=0, chunk_size=10_000_000):
+                       pphase=None, psrTerm=True, evolve=True, phase_approx=False, tref=0, chunk_size=10_000_000, debug=False):
     # pulsar location
     if 'RAJ' and 'DECJ' in psr.pars():
         ptheta = N.pi/2 - psr['DECJ'].val
@@ -57,11 +57,11 @@ def add_catalog_of_cws(psr, gwtheta_list, gwphi_list, mc_list, dist_list, fgw_li
     if mc_list.size>1_000:
         #print("parallel")
         N_chunk = int(N.ceil(mc_list.size/chunk_size))
-        print(N_chunk)
+        if debug: print(N_chunk)
         for jjj in range(N_chunk):
-            print(str(jjj) + " / " + str(N_chunk))
+            if debug: print(str(jjj) + " / " + str(N_chunk))
             idxs = range(jjj*chunk_size, min((jjj+1)*chunk_size,mc_list.size) )
-            print(idxs)
+            if debug: print(idxs)
             res = loop_over_CWs_parallel(phat.astype('float64'), toas.astype('float64'),
                                          gwtheta_list[idxs], gwphi_list[idxs], mc_list[idxs], dist_list[idxs],
                                          fgw_list[idxs], phase0_list[idxs], psi_list[idxs], inc_list[idxs],
