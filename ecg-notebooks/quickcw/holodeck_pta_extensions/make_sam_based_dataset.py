@@ -17,7 +17,7 @@ from holodeck import extensions as holo_extensions
 import holodeck as holo
 
 ### Test
-LT.print_source_test()
+# LT.print_source_test()
 
 ####################################################################################
 #
@@ -103,11 +103,11 @@ for i, p in enumerate(parfiles):
     
     t = np.array(psr_sumdata[psrname]['toas']) / 86400.0
     toaerrs = np.array(psr_sumdata[psrname]['toaerrs']) / 1e-6
-    print(type(toaerrs[0]))
-    print(f"{type(t[0])=}")
+    print("check1:", type(toaerrs[0]))
+    print(f"check2: {type(t[0])=}")
    
     fake_pulsar = LT.fakepulsar(p,obstimes=t,toaerr=toaerrs)#, flags='-pta PPTA')
-    print(f"{type(fake_pulsar.toas().min())=}")
+    print(f"check3: {type(fake_pulsar.toas().min())=}")
     # fake_pulsar.toas = fake_pulsar.toas.astype(np.float64)
     # print(f"{type(fake_pulsar.toas().min())=}")
     psrs.append(fake_pulsar)
