@@ -35,8 +35,8 @@ for par, tim in zip(parfiles, timfiles):
     psrs.append(psr)
 
 # pickle and save
-pkl_file = real_dir + f'fake_data_15yr_r{RR:03d}_of_{N_REAL:03d}_v01.pkl'
+pkl_file = real_dir + f'data_15yr_fake_r{RR:03d}_of_{N_REAL:03d}_v01.pkl'
 print(pkl_file)
-with open('file.pkl', 'wb') as file: 
+with open(pkl_file, 'wb') as file: 
     # A new file will be created 
-    pickle.dump(psrs, pkl_file) 
+    pickle.dump(psrs, file) 
