@@ -28,7 +28,8 @@ print(f'----- Starting at {start} -----')
 #
 ####################################################################################
 
-N_REAL = 30     # number of realizations to produce
+N_REAL = 2     # number of realizations to produce
+N_PARS = 5      # use fewer pulsars for debugging
 debug = True     # whether to print steps
 
 #path to directory where par and tim files will be saved
@@ -86,7 +87,8 @@ else:
 #get list of par files
 parfiles = sorted(glob.glob(parpath + '/*.par'))
 #reduce number of psrs for testing
-#parfiles = parfiles[:5]
+if N_PARS is not None:
+    parfiles = parfiles[:N_PARS]
 print(f"{len(parfiles)=}")
 print(f"{parfiles=}")
 
