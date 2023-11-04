@@ -2854,7 +2854,7 @@ def _red_amp_from_white_noise(cad, sigma, red2white, fref=1/YR):
                       red2white * _white_noise(cad, sigma)) 
     return red_amp
 
-def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs, 
+def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs, seed=None,
                       sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
                       phis=None, thetas=None, ret_sig = False, red_amp=None, red_gamma=None, red2white=None,
                       ss_noise=False):
@@ -2889,8 +2889,13 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs,
     cad = 1.0/(2.0*fobs[-1])
 
     # randomize pulsar positions
+    if seed is None:
+        seed = np.random.randint(99999) # get a random number
+        if debug: print(f"{seed=}")
+    np.random.seed(seed)
     if phis is None: phis = np.random.uniform(0, 2*np.pi, size = npsrs)
-    if thetas is None: thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    # if thetas is None: thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    if thetas is None: thetas = np.random.uniform(-np.pi/2, np.pi/2, size = npsrs)
     sigma = sigstart
     if red2white is not None:
         red_amp = _red_amp_from_white_noise(cad, sigma, red2white) 
