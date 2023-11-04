@@ -53,7 +53,7 @@ def healpix_map(hc_ss, hc_bg, nside=NSIDE, seed=None, ret_seed=False):
     np.random.seed(seed)   
 
     # spread background evenly across pixels in moll_hc
-    moll_hc = np.ones((nfreqs,nreals,npix)) * hc_bg[:,:,np.newaxis]**2/(npix/area) # (frequency, realization, pixel)
+    moll_hc = np.ones((nfreqs,nreals,npix)) * hc_bg[:,:,np.newaxis]**2/(npix*area) # (frequency, realization, pixel)
 
     # choose random pixels to place the single sources
     pix_ss = np.random.randint(0, npix-1, size=nfreqs*nreals*nloudest).reshape(nfreqs, nreals, nloudest)
