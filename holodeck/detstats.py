@@ -2886,11 +2886,11 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs, seed=None,
     # randomize pulsar positions
     if seed is None:
         seed = np.random.randint(99999) # get a random number
-        if debug: print(f"{seed=}")
+        # if debug: print(f"{seed=}")
     np.random.seed(seed)
     if phis is None: phis = np.random.uniform(0, 2*np.pi, size = npsrs)
     if thetas is None: thetas = np.random.uniform(0, np.pi, size = npsrs)
-    
+
     sigma = sigstart
     if red2white is not None:
         red_amp = _red_amp_from_white_noise(cad, sigma, red2white) 
