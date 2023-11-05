@@ -1770,7 +1770,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
     # build PTA
     if debug: print('Building pulsar timing array.')
     phis = np.random.uniform(0, 2*np.pi, size = npsrs)
-    thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    thetas = np.random.uniform(0, np.pi, size = npsrs)
     # sigmas = np.ones_like(phis)*sigma
     if debug: print(f"{phis.shape=}, {thetas.shape=}, {dur=}, {cad=}, {sigma=}")
     psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
@@ -1929,7 +1929,7 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
     # build PTA pulsar positions
     if debug: print('Placing pulsar.')
     phis = np.random.uniform(0, 2*np.pi, size = npsrs)
-    thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    thetas = np.random.uniform(0, np.pi, size = npsrs)
     if debug: print(f"{phis.shape=}, {thetas.shape=}, {dur=}, {cad=}")
     # psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
     #                 phi=phis, theta=thetas)
@@ -2041,7 +2041,7 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
 def _build_pta(npsrs, sigma, dur, cad):
     # build PTA
     phis = np.random.uniform(0, 2*np.pi, size = npsrs)
-    thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    thetas = np.random.uniform(0, np.pi, size = npsrs)
     # sigmas = np.ones_like(phis)*sigma
     psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                     phi=phis, theta=thetas)
@@ -2320,7 +2320,7 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
     if debug: print('Building pulsar timing array.')
     psrs = _build_pta(npsrs, sigma, dur, cad)
     # phis = np.random.uniform(0, 2*np.pi, size = npsrs)
-    # thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    # thetas = np.random.uniform(0, np.pi, size = npsrs)
     # # sigmas = np.ones_like(phis)*sigma
     # psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
     #                 phi=phis, theta=thetas)
@@ -2659,7 +2659,7 @@ def detect_pspace_model_clbrt_ramp(fobs_cents, hc_ss, hc_bg, npsrs, nskies, sigm
 
     # get psrs 
     phis = np.random.uniform(0, 2*np.pi, size = npsrs)
-    thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    thetas = np.random.uniform(0, np.pi, size = npsrs)
     psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                     phi=phis, theta=thetas)
 
@@ -2804,7 +2804,7 @@ def _get_dpbg(hc_bg, npsrs, sigma, trials, fobs, dur, cad,):
     for ii in range(trials):
         # build PTA
         phis = np.random.uniform(0, 2*np.pi, size = npsrs)
-        thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+        thetas = np.random.uniform(0, np.pi, size = npsrs)
         psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                         phi=phis, theta=thetas)
         # calculate bg detprob of each realizations for the given PTA
@@ -2894,8 +2894,8 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs, seed=None,
         if debug: print(f"{seed=}")
     np.random.seed(seed)
     if phis is None: phis = np.random.uniform(0, 2*np.pi, size = npsrs)
-    # if thetas is None: thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
-    if thetas is None: thetas = np.random.uniform(-np.pi/2, np.pi/2, size = npsrs)
+    if thetas is None: thetas = np.random.uniform(0, np.pi, size = npsrs)
+    # if thetas is None: thetas = np.random.uniform(-np.pi/2, np.pi/2, size = npsrs)
     sigma = sigstart
     if red2white is not None:
         red_amp = _red_amp_from_white_noise(cad, sigma, red2white) 
@@ -3004,7 +3004,7 @@ def calibrate_one_pta_gsc(hc_bg, fobs, npsrs,
 
     # randomize pulsar positions
     if phis is None: phis = np.random.uniform(0, 2*np.pi, size = npsrs)
-    if thetas is None: thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
+    if thetas is None: thetas = np.random.uniform(0, np.pi, size = npsrs)
     sigma = sigstart
     if red2white is not None:
         red_amp = _white_noise(cad, sigma) * red2white
