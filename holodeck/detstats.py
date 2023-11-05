@@ -2319,11 +2319,6 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
     # build PTA
     if debug: print('Building pulsar timing array.')
     psrs = _build_pta(npsrs, sigma, dur, cad)
-    # phis = np.random.uniform(0, 2*np.pi, size = npsrs)
-    # thetas = np.random.uniform(0, np.pi, size = npsrs)
-    # # sigmas = np.ones_like(phis)*sigma
-    # psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
-    #                 phi=phis, theta=thetas)
 
     # Build ss skies
     if debug: print('Building ss skies.')
@@ -2895,7 +2890,7 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs, seed=None,
     np.random.seed(seed)
     if phis is None: phis = np.random.uniform(0, 2*np.pi, size = npsrs)
     if thetas is None: thetas = np.random.uniform(0, np.pi, size = npsrs)
-    # if thetas is None: thetas = np.random.uniform(-np.pi/2, np.pi/2, size = npsrs)
+    
     sigma = sigstart
     if red2white is not None:
         red_amp = _red_amp_from_white_noise(cad, sigma, red2white) 
