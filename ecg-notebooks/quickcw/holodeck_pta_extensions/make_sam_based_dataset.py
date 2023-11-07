@@ -29,11 +29,11 @@ print(f'----- Starting at {start} -----\n{date}')
 #
 ####################################################################################
 
-ILLUSTRIS_FLAG = True # whether to use Illustris or SAM for initial population
+ILLUSTRIS_FLAG = False # whether to use Illustris or SAM for initial population
 
 N_REAL = 3      # number of realizations to produce
-N_PSRS = 5      # use fewer pulsars for testing, otherwise set to None
-# N_PSRS = None
+# N_PSRS = 5      # use fewer pulsars for testing, otherwise set to None
+N_PSRS = None
 debug = True     # whether to print steps
 
 #path to directory where par and tim files will be saved
@@ -42,7 +42,10 @@ debug = True     # whether to print steps
 
 save_flag = 'pop' if ILLUSTRIS_FLAG else 'sam'
 savedir = f"/Users/emigardiner/GWs/holodeck/output/holodeck_extension_15yr_stuff/"
-savedir += f"{date}_{save_flag}_datasets_15yr_based_r{N_REAL:03d}_v01/"
+savedir += f"{date}_{save_flag}_datasets_15yr_based_r{N_REAL:03d}"
+if N_PSRS is not None:
+    savedir += f"_p{N_PSRS:02d}"
+savedir += f"_v01/"
 
 
 #path to par files used for the dataset

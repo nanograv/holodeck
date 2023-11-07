@@ -5,7 +5,7 @@ from enterprise.pulsar import Pulsar
 import pickle
 
 N_REAL = 2     # number of realizations to produce
-N_PARS = 5      # use fewer pulsars for debugging
+N_PSRS = 5      # use fewer pulsars for debugging
 RR = 0
 
 if RR >= N_REAL:
@@ -22,9 +22,9 @@ if os.path.exists(real_dir) is False:
 #get list of par files
 timfiles = sorted(glob.glob(real_dir + '/*.tim'))
 parfiles = sorted(glob.glob(save_dir + '/*.par'))
-if N_PARS is not None:
-    timfiles = timfiles[:N_PARS]
-    parfiles = parfiles[:N_PARS]
+if N_PSRS is not None:
+    timfiles = timfiles[:N_PSRS]
+    parfiles = parfiles[:N_PSRS]
 assert len(timfiles)==len(parfiles), "mismatch between number of par and tim files!"
 print(f"{timfiles=}\n{parfiles=}")
 
