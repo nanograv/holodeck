@@ -12,8 +12,9 @@ if RR >= N_REAL:
     err = f"realization index {RR=} too high for {N_REAL=}"
     raise ValueError(err)
 
-save_dir = f"/Users/emigardiner/GWs/holodeck/output/holodeck_extension_15yr_stuff/Test_sam_datasets_15yr_based_r{N_REAL:03d}_v01/"
-real_dir = save_dir+"real{0:03d}/".format(RR)
+save_dir = "/Users/emigardiner/GWs/holodeck/output/holodeck_extension_15yr_stuff/2023_11_06_sam_datasets_15yr_based_r003_v01"
+# save_dir = f"/Users/emigardiner/GWs/holodeck/output/holodeck_extension_15yr_stuff/Test_sam_datasets_15yr_based_r{N_REAL:03d}_v01/"
+real_dir = save_dir+"/real{0:03d}/".format(RR)
 if os.path.exists(real_dir) is False:
     err = f"{real_dir=} does not exist"
     raise ValueError(err)
