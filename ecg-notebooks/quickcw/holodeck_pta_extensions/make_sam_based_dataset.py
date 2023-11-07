@@ -28,8 +28,10 @@ print(f'----- Starting at {start} -----')
 #
 ####################################################################################
 
-N_REAL = 2     # number of realizations to produce
-N_PARS = 5      # use fewer pulsars for debugging
+ILLUSTRIS_FLAG = False # whether to use Illustris or SAM for initial population
+
+N_REAL = 2      # number of realizations to produce
+N_PSRS = 5      # use fewer pulsars for testimg
 debug = True     # whether to print steps
 
 #path to directory where par and tim files will be saved
@@ -59,10 +61,14 @@ T_obs = 16.03*YR
 # T_min = 1/24.0*YR
 
 # Choose binary population parameters
-# RESAMP = 2.0       # resample initial population for smoother statistics
-# TIME = 3.0 * GYR   # lifetime of systems between formation and coalescence
-# DENS = 2.0         # change the density of binaries in the universe by this factor
-# MAMP = 1e9 * MSOL  # normalization of the MBH-Galaxy mass relation
+
+# --- if using Illustris you'll need:
+RESAMP = 2.0       # resample initial population for smoother statistics
+TIME = 3.0 * GYR   # lifetime of systems between formation and coalescence
+DENS = 2.0         # change the density of binaries in the universe by this factor
+MAMP = 1e9 * MSOL  # normalization of the MBH-Galaxy mass relation
+
+# --- if using SAM you'll need:
 SHAPE = 40 #[90,70,70]
 PARAMS = {'hard_time': 2.3580737294474514, 
           'gsmf_phi0': -2.012540540307903, 
@@ -87,8 +93,8 @@ else:
 #get list of par files
 parfiles = sorted(glob.glob(parpath + '/*.par'))
 #reduce number of psrs for testing
-if N_PARS is not None:
-    parfiles = parfiles[:N_PARS]
+if N_PSRS is not None:
+    parfiles = parfiles[:N_PSRS]
 print(f"{len(parfiles)=}")
 print(f"{parfiles=}")
 
@@ -121,7 +127,7 @@ for i, p in enumerate(parfiles):
 
 ####################################################################################
 #
-# Generate SAM-based population
+# Generate Illustris-based or SAM-based population
 #
 ####################################################################################
 #set up frequency bin centers
@@ -132,9 +138,11 @@ print(f"{n_bins=}")
 
 # set up realizer object used to create realizations of a binary population for a specific model
 # (need to use orbital frequency instead of GW)
-realizer = holo_extensions.Realizer_SAM(
-    fobs_orb_edges=F_bins_edges/2.0, params=PARAMS,
-    pspace=PSPACE)
+if ILLUSTRIS_FLAG:
+    realizer = holo_extensions.Realizer(F_bin_centers/2, resample=RESAMP, lifetime=TIME, mamp=MAMP, dens=DENS)
+else:
+    realizer = holo_extensions.Realizer_SAM(
+        fobs_orb_edges=F_bins_edges/2.0, params=PARAMS, pspace=PSPACE)
 
 
 
@@ -144,39 +152,50 @@ realizer = holo_extensions.Realizer_SAM(
 #
 ####################################################################################
 
-print(f'-- runtime: {datetime.now()-start}')
-print('realizing samples')
-names, real_samples, real_weights = realizer(nreals=N_REAL, clean=True)
-print(f'-- runtime: {datetime.now()-start}')
+if ILLUSTRIS_FLAG is False:
+    print(f'-- runtime: {datetime.now()-start}')
+    print('realizing samples')
+    names, real_samples, real_weights = realizer(nreals=N_REAL, clean=True)
+    print(f'-- runtime: {datetime.now()-start}')
 
 for rr in tqdm(range(N_REAL)):
     print(f"--- Realization: {rr}/{N_REAL}")
     print(f'-- runtime: {datetime.now()-start}')
 
     #sample binary parameters from population
-
-    # nn, samples = realizer()
-    # nn, samples = realizer(down_sample=50) #optional downsampling for quick testing
-    samples = real_samples[rr]
-    print(f"{len(samples[0])=}")
+    if ILLUSTRIS_FLAG:
+        # nn, samples = realizer()
+        nn, samples = realizer(down_sample=50) #optional downsampling for quick testing
+        print(samples.shape)
+    else:
+        samples = real_samples[rr]
+        print(f"{len(samples[0])=}")
 
     units = [1.99e+33, 1, 3.17e-08]
 
-    #Mtots = samples[0,:]/units[0] #solar mass
-    Mtots = samples[0] #cgs
-    Mrats = samples[1]
-    # MCHs = utils.chirp_mass(*utils.m1m2_from_mtmr(Mtots, Mrats)) #cgs
 
-    REDZs = samples[2]/units[1] # dimensionless
+    if ILLUSTRIS_FLAG:
+        #Mtots = samples[0,:]/units[0] #solar mass
+        Mtots = 10**samples[0,:] #cgs
+        Mrats = 10**samples[1,:]
+        # MCHs = utils.chirp_mass(*utils.m1m2_from_mtmr(Mtots, Mrs)) #cgs
+        REDZs = 10**samples[2,:]/units[1]
+        FOs = 10**samples[3,:] #Hz
 
-    FOs = samples[3]  #Hz
+        #make weights array with ones (included so we can support non-unit weights)
+        weights = np.ones(FOs.size)
+    else:
+        Mtots = samples[0] #cgs
+        Mrats = samples[1]
+        REDZs = samples[2]/units[1] # dimensionless
+        FOs = samples[3]  #Hz
+        
+        weights = real_weights[rr] # np.ones(FOs.size)
 
     # print(f"MCHs: {MCHs.shape=}, {utils.stats(MCHs)}")
     print(f"REDZs: {REDZs.shape=}, {utils.stats(REDZs)}")
     print(f"FOs: {FOs.shape=}, {utils.stats(FOs)}")
 
-    #make weights array with ones (included so we can support non-unit weights)
-    weights = real_weights[rr] # np.ones(FOs.size)
 
     #make vals array containing total mass, mass ratio, redshift, and observer frame GW frequency for each binary
     vals = np.array([Mtots, Mrats, REDZs, FOs]) # should this not be Mchirps?
