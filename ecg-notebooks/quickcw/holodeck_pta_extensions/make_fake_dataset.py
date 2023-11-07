@@ -92,14 +92,15 @@ def main():
     N_REAL = args.nreals      # number of realizations to produce
     N_PSRS = args.npsrs      # use fewer pulsars for testing, otherwise set to None
     debug = args.debug     # whether to print steps
+    SHAPE = args.shape
+    print(f"{ILLUSTRIS_FLAG=}, {N_PSRS=}, {N_REAL=}, {N_PSRS=}, {SHAPE=}")
 
-    ### Set up paths
+    ### Set up directory paths
     path_dict = get_paths()
     parpath = path_dict['parpath']
     summary_data_json = path_dict['summary_data_json'] 
     rn_json = path_dict['rn_json']               
     save_dir = path_dict['save_dir']
-
 
     ### Set up directory where par and tim files will be saved
     save_flag = 'pop' if ILLUSTRIS_FLAG else 'sam'
@@ -129,7 +130,6 @@ def main():
     MAMP = 1e9 * MSOL  # normalization of the MBH-Galaxy mass relation
 
     # --- if using SAM you'll need:
-    SHAPE = args.shape
     # TODO add Pspace and params to argparse arguments
     PARAMS = {'hard_time': 2.3580737294474514, 
             'gsmf_phi0': -2.012540540307903, 
@@ -329,6 +329,7 @@ def main():
     if args.pkl_flag:
         print(f'Converting tim files to pkl file')
         import pickle
+        from enterprise.pulsar import Pulsar
         for rr in range(N_REAL):
             real_dir = save_dir+"real{0:03d}/".format(rr)
             #get list of par files
