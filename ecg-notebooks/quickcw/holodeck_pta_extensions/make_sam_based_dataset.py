@@ -29,7 +29,7 @@ print(f'----- Starting at {start} -----\n{date}')
 #
 ####################################################################################
 
-ILLUSTRIS_FLAG = False # whether to use Illustris or SAM for initial population
+ILLUSTRIS_FLAG = True # whether to use Illustris or SAM for initial population
 
 N_REAL = 3      # number of realizations to produce
 N_PSRS = 5      # use fewer pulsars for testing, otherwise set to None
