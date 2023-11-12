@@ -5,14 +5,14 @@ from enterprise.pulsar import Pulsar
 import pickle
 
 N_REAL = 2     # number of realizations to produce
-N_PSRS = 5      # use fewer pulsars for debugging
+N_PSRS = 40      # use fewer pulsars for debugging
 RR = 0
 
 if RR >= N_REAL:
     err = f"realization index {RR=} too high for {N_REAL=}"
     raise ValueError(err)
 
-save_dir = "/Users/emigardiner/GWs/holodeck/output/holodeck_extension_15yr_stuff/2023_11_06_sam_datasets_15yr_based_r003_v01"
+save_dir = "/Users/emigardiner/GWs/holodeck/output/holodeck_extension_15yr_stuff/2023_11_07_sam_datasets_15yr_based_r002_v01"
 # save_dir = f"/Users/emigardiner/GWs/holodeck/output/holodeck_extension_15yr_stuff/Test_sam_datasets_15yr_based_r{N_REAL:03d}_v01/"
 real_dir = save_dir+"/real{0:03d}/".format(RR)
 if os.path.exists(real_dir) is False:
@@ -36,7 +36,7 @@ for par, tim in zip(parfiles, timfiles):
     psrs.append(psr)
 
 # pickle and save
-pkl_file = real_dir + f'data_15yr_fake_r{RR:03d}_of_{N_REAL:03d}_v01.pkl'
+pkl_file = real_dir + f'data_15yr_fake_r{RR:03d}_of_{N_REAL:03d}_p{N_PSRS}_v01.pkl'
 print(pkl_file)
 with open(pkl_file, 'wb') as file: 
     # A new file will be created 

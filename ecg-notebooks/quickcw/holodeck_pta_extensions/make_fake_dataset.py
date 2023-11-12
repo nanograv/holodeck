@@ -356,10 +356,10 @@ def main():
                 pickle.dump(psrs, file) 
 
 
-    end = datetime.now()
-    print(f'----- Started at {start} -----')
-    print(f'----- Ended file pickling at {end} -----')
-    print(f'-- runtime: {end-start}')
+        end = datetime.now()
+        print(f'----- Started at {start} -----')
+        print(f'----- Ended file pickling at {end} -----')
+        print(f'-- runtime: {end-start}')
 
 if __name__ == "__main__":
     main()
