@@ -141,7 +141,7 @@ def main():
     # set up args
     args = _setup_argparse()
     print(f"NREALS = {args.nreals}, NSKIES = {args.nskies}, NPSRS = {args.npsrs}, target = {args.target}, NVARS={args.nvars}")
-    print(f"CV={args.calvar}, NLOUDEST={args.nloudest}, BGL={args.bg_nloudest}, {args.gsc_flag=}, {args.dsc_flag=}")
+    print(f"CV={args.calvar}, NLOUDEST={args.nloudest}, BGL={args.bg_nloudest}, {args.gsc_flag=}, {args.dsc_flag=}, {args.gw_only=}")
     
     # get file names based on arguments
     load_data_from_file, save_data_to_file, save_dets_to_file = file_names(args)
