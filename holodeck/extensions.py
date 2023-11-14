@@ -97,7 +97,7 @@ class Realizer_SAM:
         self._hard = hard
         self._fobs_orb_edges = fobs_orb_edges
 
-    def __call__(self, nreals=100, clean=False):
+    def __call__(self, nreals=100, clean=True):
         """ Calculate samples and weights for an entire semi-analytic population.
         
         Parameters
@@ -112,13 +112,13 @@ class Realizer_SAM:
         -------
         names : array of strings
             Names of the parameters returned in samples
-        samples : array of R or 4 NDarrays
+        samples : (array of length R) or (4 NDarrays)
             if clean: R arrays of 4 x N_clean NDarrays [R,] x [4,N_clean] for each realization
-            else: NDarrays for mass, ratio, redshift, and frequency [4,M*Q*Z*F]
+            else: NDarrays for mass, ratio, redshift, and frequency [4,M*Q*Z*F]. (Same for each realization)
         weights : array of R NDarrays 
             array of number of sources per sample bin for R
-            If clean, the shape is [R,] arrays of len N_clean for each realizations, with zero values removed.
-            Otherwise, the shape is [R, M*Q*Z*F]
+            if clean: the shape is [R,] arrays of len N_clean for each realizations, with zero values removed.
+            else: the shape is [R, M*Q*Z*F]
 
         """
 
