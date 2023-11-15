@@ -39,15 +39,11 @@ class GW_Discrete(Grav_Waves):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._box_vol_cgs = self._bin_evo._sample_volume
-
-        dlnf = np.diff(np.log(self.fobs_gw))
-        if not np.allclose(dlnf[0], dlnf):
-            log.exception("`GW_Discrete` will not work properly with unevenly sampled frequency (log-space)!")
-
         return
 
     def emit(self, eccen=None, stats=False, progress=True, nloudest=5):
         fobs_gw = self.fobs_gw
+        nfreqs = fobs_gw.size
         nharms = self.nharms
         nreals = self.nreals
         bin_evo = self._bin_evo
@@ -59,15 +55,17 @@ class GW_Discrete(Grav_Waves):
         if eccen not in [True, False]:
             raise ValueError("`eccen` '{}' is invalid!".format(eccen))
 
-        loudest = np.zeros((fobs_gw.size, nloudest, nreals))
-        fore = np.zeros((fobs_gw.size, nreals))
-        back = np.zeros((fobs_gw.size, nreals))
-        both = np.zeros((fobs_gw.size, nreals))
+        loudest = np.zeros((nfreqs, nloudest, nreals))
+        fore = np.zeros((nfreqs, nreals))
+        back = np.zeros((nfreqs, nreals))
+        both = np.zeros((nfreqs, nreals))
 
         if eccen:
             harm_range = range(1, nharms+1)
         else:
             harm_range = [2]
+
+        harms = np.zeros((nfreqs, nharms))
 
         freq_iter = enumerate(fobs_gw)
         freq_iter = utils.tqdm(freq_iter, total=len(fobs_gw), desc='GW frequencies') if progress else freq_iter
@@ -75,19 +73,21 @@ class GW_Discrete(Grav_Waves):
             lo = fobs_gw[0] if (ii == 0) else fobs_gw[ii-1]
             hi = fobs_gw[1] if (ii == 0) else fobs_gw[ii]
             dlnf = np.log(hi) - np.log(lo)
-            _both, _fore, _back, _loud = _gws_harmonics_at_evo_fobs(
+            _both, _fore, _back, _loud, _gwb_harms = _gws_harmonics_at_evo_fobs(
                 fogw, dlnf, bin_evo, harm_range, nreals, box_vol, loudest=nloudest
             )
             loudest[ii, :] = _loud
             both[ii, :] = _both
             fore[ii, :] = _fore
             back[ii, :] = _back
+            harms[ii, :] = _gwb_harms
 
         self.both = np.sqrt(both)
         self.fore = np.sqrt(fore)
         self.back = np.sqrt(back)
         self.strain = np.sqrt(back + fore)
         self.loudest = loudest
+        self.harms = harms
         return
 
 
@@ -186,6 +186,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
         realizations.
     loud : (L, R) ndarray,
         Strains of the `L` loudest binaries (L=`loudest` input parameter) for each realization.
+    gwb_harms : (H,)
 
     """
 
@@ -197,45 +198,63 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     data_harms = evo.at('fobs', fobs_orb, params=_CALC_MC_PARS)
 
     # Only examine binaries reaching the given locations before redshift zero (other redz=inifinite)
+    # (N, H)
     redz = data_harms['scafa']
     redz = cosmo.a_to_z(redz)
     valid = (redz > 0.0)
+    # There are 'V' valid == True elements of the (N, H) arrays, such that V <= N*H
+    # anytime an (N, H) ndarray is sliced by the `valid` ndarray, it results in a (V,) ndarray
 
-    # Broadcast harmonics numbers to correct shape
-    harms = np.ones_like(redz, dtype=int) * harm_range[np.newaxis, :]
+    # Broadcast harmonics numbers to correct shape, (N, H)
+    harms_2d = np.ones_like(redz, dtype=int) * harm_range[np.newaxis, :]
 
-    # If there are eccentricities, calculate the freq-dist-function
-    # shape (N, H)
+    # ---- Handle Eccentricities and eccentricity distribution function
+
+    # `None`  or  ndarray shape (N, H)
     eccen = data_harms['eccen']
+    # for circular binaries, we should only be consider the n=2 harmonic, and gne(n=2)=1.0
     if eccen is None:
         gne = 1
+        assert np.all(harms_2d == 2)
+
+    # If there are eccentricities, calculate the freq-dist-function
     else:
-        gne = utils.gw_freq_dist_func(harms[valid], ee=eccen[valid])
+        # (V,) array [i.e. the `valid` slice of (N, H)]
+        harms = harms_2d[valid]
+        eccen = eccen[valid]
+        gne = utils.gw_freq_dist_func(harms, ee=eccen)
+
+        # Handle (near-)zero eccentricities manually
+        # when eccentricity is very low, set all harmonics to zero except for n=2
+
         # Select the elements corresponding to the n=2 (circular) harmonic, to use later
+        # (N, H)
         sel_n2 = np.zeros_like(redz, dtype=bool)
-        sel_n2[(harms == 2)] = 1
+        sel_n2[(harms_2d == 2)] = 1
+        # (V,)
         sel_n2 = sel_n2[valid]
 
-        # BUG: FIX: NOTE: this fails for zero eccentricities (at times?)
-        # This is a reasonable, perhaps temporary, fix: when eccentricity is very low, set all
-        # harmonics to zero except for n=2
-        sel_e0 = (eccen[valid] < 1e-12)
+        # Select near-zero eccentricities and set the gne values manually
+        sel_e0 = (eccen < 1e-12)
         gne[sel_e0] = 0.0
         gne[sel_n2 & sel_e0] = 1.0
 
+    # ---- Calculate GWB
+
+    frst_orb = utils.frst_from_fobs(fobs_orb, redz)
     # Select only the valid elements, also converts to 1D, i.e. (N, H) ==> (V,)
-    harms = harms[valid]
     redz = redz[valid]
+    frst_orb = frst_orb[valid]
     # Calculate required parameters for valid binaries (V,)
     dcom = cosmo.z_to_dcom(redz)
-    frst_orb = utils.frst_from_fobs(fobs_gw, redz) / harms
+
     mchirp = data_harms['mass'][valid]
     mchirp = utils.chirp_mass(*mchirp.T)
     # Calculate strains from each source
     hs2 = utils.gw_strain_source(mchirp, dcom, frst_orb)**2
 
     dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], data_harms['sepa'][valid], frst_orb=frst_orb)
-    _lambda_fact = utils.lambda_factor_dlnf(frst_orb, dfdt, redz, dcom=None) / box_vol
+    _lambda_fact = utils.lambda_factor_dlnf(frst_orb, dfdt, redz, dcom=dcom) / box_vol
     num_binaries = _lambda_fact * dlnf
 
     shape = (num_binaries.size, nreals)
@@ -244,6 +263,13 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     # --- Calculate GW Signals
     temp = hs2 * gne * (2.0 / harms)**2
     both = np.sum(temp[:, np.newaxis] * num_pois / dlnf, axis=0)
+
+    # Calculate and return the expectation value hc^2 for each harmonic
+    # (N, H)
+    gwb_harms = np.zeros_like(harms_2d, dtype=float)
+    gwb_harms[valid] = temp * num_binaries / dlnf
+    # (N, H) ==> (H,)
+    gwb_harms = np.sum(gwb_harms, axis=0)
 
     if np.any(num_pois > 0):
         # Find the L loudest binaries in each realizations
@@ -255,7 +281,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
         loud = np.zeros((loudest, nreals))
 
     back = both - fore
-    return both, fore, back, loud
+    return both, fore, back, loud, gwb_harms
 
 
 def _gws_from_samples(vals, weights, fobs_gw_edges):
