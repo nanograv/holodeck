@@ -75,7 +75,7 @@ cython_modules = cythonize(
 # ---- Perform Setup ----
 
 setup(
-    name='holodeck',
+    name='holodeck-gw',
     author='NANOGrav',
     author_email='luke.kelley@nanograv.org',
     description=short_description,
