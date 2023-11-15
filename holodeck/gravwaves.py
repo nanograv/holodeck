@@ -147,6 +147,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
 
     # Broadcast harmonics numbers to correct shape, (N, H)
     harms_2d = np.ones_like(redz, dtype=int) * harm_range[np.newaxis, :]
+    harms_1d = harms_2d[valid]
 
     # ---- Handle Eccentricities and eccentricity distribution function
 
@@ -160,9 +161,8 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     # If there are eccentricities, calculate the freq-dist-function
     else:
         # (V,) array [i.e. the `valid` slice of (N, H)]
-        harms = harms_2d[valid]
         eccen = eccen[valid]
-        gne = utils.gw_freq_dist_func(harms, ee=eccen)
+        gne = utils.gw_freq_dist_func(harms_1d, ee=eccen)
 
         # Handle (near-)zero eccentricities manually
         # when eccentricity is very low, set all harmonics to zero except for n=2
@@ -201,7 +201,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     num_pois = poisson_as_needed(num_binaries[:, np.newaxis] * np.ones(shape))
 
     # --- Calculate GW Signals
-    temp = hs2 * gne * (2.0 / harms)**2
+    temp = hs2 * gne * (2.0 / harms_1d)**2
     both = np.sum(temp[:, np.newaxis] * num_pois / dlnf, axis=0)
 
     # Calculate and return the expectation value hc^2 for each harmonic
