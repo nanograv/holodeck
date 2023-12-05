@@ -435,6 +435,7 @@ class MMBulge_Redshift(MMBulge_Standard):
 
     TODO: make sure all of the inherited methods from `MMBulge_Standard` are appropriate for
           redshift dependencies!!  In particular, check `dmstar_dmbh`
+          check which redshifts need to be passed into this function. does not pass all cases as is
 
     """
 
