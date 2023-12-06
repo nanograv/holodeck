@@ -97,7 +97,7 @@ class Realizer_SAM:
         self._hard = hard
         self._fobs_orb_edges = fobs_orb_edges
 
-    def __call__(self, nreals=100, clean=True):
+    def __call__(self, nreals=100, clean=True, gwb_flag=False, ss_flag=False, nloudest=5):
         """ Calculate samples and weights for an entire semi-analytic population.
         
         Parameters
@@ -120,6 +120,8 @@ class Realizer_SAM:
             if clean: the shape is [R,] arrays of len N_clean for each realizations, with zero values removed.
             else: the shape is [R, M*Q*Z*F]
 
+        TODO: Add the option to calclate characteristic strain as well
+
         """
 
         sam = self._sam
@@ -138,6 +140,10 @@ class Realizer_SAM:
 
         edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
         number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num) # fractional number per bin
+        self._edges = edges
+        self._number = number
+        self._redz = redz
+        self._nreals = nreals
 
         samples = get_samples_from_edges(edges, redz, number.shape, flatten=True)
         names = ['mtot', 'mrat', 'redz', 'fobs']
@@ -162,7 +168,37 @@ class Realizer_SAM:
             weights = nonzero_weights
             samples = nonzero_samples
 
+        self._vals_names = names
+        self._binary_vals = samples
+        self._binary_weights = weights
+
         return names, samples, weights
+    
+    def char_strain(self, params_flag=False, nloudest=5):
+        """
+        Params
+        ------
+        params_flag : boolean
+            Whether or not to calculate binary properties
+        nloudest : integer
+            Number of loudest sources to extract
+
+
+        Returns
+        -------
+        hc_ss : [F,R,L] or None
+            Single source characteristic strain if ss_flag is true
+        hc_bg : [F,R]
+            Background characteristic strain if gwb_flag is true
+        """
+
+        rv = holo.single_sources.ss_gws_redz(
+            self._edges, self._redz, self._number, 
+            realize=self._nreals, loudest=nloudest, params=params_flag)
+        return rv
+
+
+
             
 
 def get_samples_from_edges(edges, redz, number_shape, flatten=True):
