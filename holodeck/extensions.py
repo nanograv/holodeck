@@ -120,7 +120,7 @@ class Realizer_SAM:
             if clean: the shape is [R,] arrays of len N_clean for each realizations, with zero values removed.
             else: the shape is [R, M*Q*Z*F]
 
-        TODO: Add the option to calclate characteristic strain as well
+        TODO: Check if this should be using final redshifts instead of initial
 
         """
 
