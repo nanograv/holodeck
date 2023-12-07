@@ -2870,12 +2870,14 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs, seed=None,
     -------
     psrs : hasasia.sim.pta object
         Calibrated PTA.
+    red_amp : float
+        Red noise amplitude
     sigmin : float
-        minimum of the final sigma range used, returned only if ret_sig=True
+        Minimum of the final sigma range used, returned only if ret_sig=True
     sigmax : float, returned only if ret_sig=True
-        maximum of the final sigma range used
+        Maximum of the final sigma range used
     sigma : float
-        final sigma, returned only if ret_sig=True
+        Final sigma, returned only if ret_sig=True
 
     """
 

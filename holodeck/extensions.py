@@ -175,7 +175,8 @@ class Realizer_SAM:
         return names, samples, weights
     
     def char_strain(self, params_flag=False, nloudest=5):
-        """
+        """ Calculate characteristic strain for the realized population of BBHs.
+
         Params
         ------
         params_flag : boolean
@@ -183,13 +184,20 @@ class Realizer_SAM:
         nloudest : integer
             Number of loudest sources to extract
 
-
         Returns
         -------
-        hc_ss : [F,R,L] or None
-            Single source characteristic strain if ss_flag is true
-        hc_bg : [F,R]
-            Background characteristic strain if gwb_flag is true
+        hc_ss : (F, R, L) NDarray of scalars
+            The characteristic strain of the L loudest single sources at each frequency.
+        hc_bg : (F, R) NDarray of scalars
+            Characteristic strain of the GWB.
+        sspar : (4, F, R, L) NDarray of scalars
+            Astrophysical parametes (total mass, mass ratio, initial redshift, final redshift) of each 
+            loud single sources, for each frequency and realization. 
+            Returned only if params = True.
+        bgpar : (7, F, R) NDarray of scalars
+            Average effective binary astrophysical parameters (total mass, mass ratio, initial redshift, 
+            final redshift, final comoving distances, final separation, final angular separation) for background sources at each frequency and realization, 
+            Returned only if params = True.
         """
 
         rv = holo.single_sources.ss_gws_redz(
