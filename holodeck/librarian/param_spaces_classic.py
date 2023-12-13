@@ -290,7 +290,7 @@ class PS_Test(_PS_Classic_Phenom):
 
 _param_spaces = {
     "PS_Test": PS_Test,
-    "PS_Classic_Phenom_Uniform": PS_Classic_Phenom_Uniform,
+    "PS_Classic_Phenom_Uniform": PS_Classic_Phenom_Uniform,    # PS_Uniform_09B
     "PS_Classic_Phenom_Astro_Extended": PS_Classic_Phenom_Astro_Extended,
     "PS_Classic_GWOnly_Uniform": PS_Classic_GWOnly_Uniform,
     "PS_Classic_GWOnly_Astro_Extended": PS_Classic_GWOnly_Astro_Extended,

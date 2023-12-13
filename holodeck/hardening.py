@@ -1431,6 +1431,9 @@ class Fixed_Time_2PL_SAM(_Hardening):
             Instance configured for the given binary population.
 
         """
+        import holodeck.sams  # noqa
+        import holodeck.sams.sam_cyutils  # noqa
+
         assert np.ndim(time) == 0
         assert np.ndim(rchar) == 0
         assert np.ndim(gamma_inner) == 0
@@ -1469,6 +1472,8 @@ class Fixed_Time_2PL_SAM(_Hardening):
         raise NotImplementedError()
 
     def dadt(self, mtot, mrat, sepa, norm=None):
+        import holodeck.sams.sam_cyutils   # noqa
+
         if norm is None:
             norm = self._norm
 

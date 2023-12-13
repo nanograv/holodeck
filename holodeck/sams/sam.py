@@ -48,7 +48,7 @@ import holodeck as holo
 from holodeck import cosmo, utils, log
 from holodeck.constants import SPLC, MSOL, MPC
 from holodeck import relations, single_sources
-from . import sam_cyutils
+# from . import sam_cyutils
 from holodeck.sams.comps import (
     _Galaxy_Pair_Fraction, _Galaxy_Stellar_Mass_Function, _Galaxy_Merger_Time, _Galaxy_Merger_Rate,
     GSMF_Schechter, GPF_Power_Law, GMT_Power_Law, GMR_Illustris
@@ -593,6 +593,7 @@ class Semi_Analytic_Model:
     def gwb_new(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100):
         """Calculate GWB using new cython implementation, 10x faster!
         """
+        from . import sam_cyutils
 
         assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
 
@@ -718,6 +719,7 @@ class Semi_Analytic_Model:
             for background sources at each frequency and realization,
             Returned only if params = True.
         """
+        from . import sam_cyutils
 
         if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
             err = (
