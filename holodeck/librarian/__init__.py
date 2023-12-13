@@ -25,6 +25,6 @@ from . import params        # noqa
 # )
 
 param_spaces = {}
-from . import param_spaces_classic  # noqa
-param_spaces.update(param_spaces_classic._param_spaces)
-del param_spaces_classic
+from . import param_spaces_classic as psc  # noqa
+param_spaces.update(psc._param_spaces)
+del psc
