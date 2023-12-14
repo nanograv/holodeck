@@ -618,7 +618,6 @@ class PM_Mass_Reset(_Population_Modifier):
         # store attributes
         self.mhost = mhost         #: Scaling relationship between host and MBH (`holo.relations._Host_Relation`)
         self._scatter = scatter    #: Bool determining whether resampled masses should include statistical scatter
-        self.redz = redz
         return
 
     def modify(self, pop):
