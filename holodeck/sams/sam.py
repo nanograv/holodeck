@@ -208,8 +208,8 @@ class Semi_Analytic_Model:
         args = [mbh_pri[..., np.newaxis], mbh_sec[..., np.newaxis], redz]
         # Convert to shape (M, Q, Z)
         mbh_pri, mbh_sec, redz = np.broadcast_arrays(*args)
-        mstar_pri = self._mmbulge.mstar_from_mbh(mbh_pri, redz=self.redz, scatter=False)
-        mstar_sec = self._mmbulge.mstar_from_mbh(mbh_sec, redz=self.redz, scatter=False)
+        mstar_pri = self._mmbulge.mstar_from_mbh(mbh_pri, redz=redz, scatter=False)
+        mstar_sec = self._mmbulge.mstar_from_mbh(mbh_sec, redz=redz, scatter=False)
 
         # q = m2 / m1
         mstar_rat = mstar_sec / mstar_pri
