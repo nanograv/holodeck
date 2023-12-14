@@ -191,7 +191,7 @@ class Semi_Analytic_Model:
             self._shape = tuple([len(ee) for ee in self.edges])
         return self._shape
 
-    def mass_stellar(self):
+    def mass_stellar(self, redz):
         """Calculate stellar masses for each MBH based on the M-MBulge relation.
 
         Returns
@@ -203,8 +203,22 @@ class Semi_Analytic_Model:
         # total-mass, mass-ratio ==> (M1, M2)
         masses = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
         # BH-masses to stellar-masses
-        masses = self._mmbulge.mstar_from_mbh(masses, scatter=False)
-        return masses
+        mbh_pri = masses[0]
+        mbh_sec = masses[1]
+        args = [mbh_pri[..., np.newaxis], mbh_sec[..., np.newaxis], redz]
+        # Convert to shape (M, Q, Z)
+        mbh_pri, mbh_sec, redz = np.broadcast_arrays(*args)
+        mstar_pri = self._mmbulge.mstar_from_mbh(mbh_pri, redz=self.redz, scatter=False)
+        mstar_sec = self._mmbulge.mstar_from_mbh(mbh_sec, redz=self.redz, scatter=False)
+
+        # q = m2 / m1
+        mstar_rat = mstar_sec / mstar_pri
+        # M = m1 + m2
+        mstar_tot = mstar_pri + mstar_sec
+        # args = [mstar_rat[..., np.newaxis]]
+        # # Convert to shape (M, Q, Z)
+        # mstar_rat = np.broadcast_arrays(*args)
+        return mstar_pri, mstar_rat, mstar_tot, redz
 
     @property
     def static_binary_density(self):
@@ -227,17 +241,9 @@ class Semi_Analytic_Model:
             log = self._log
 
             # ---- convert from MBH ===> mstar
-
-            # `mstar_tot` starts as the secondary mass, sorry
-            mstar_pri, mstar_tot = self.mass_stellar()
-            # q = m2 / m1
-            mstar_rat = mstar_tot / mstar_pri
-            # M = m1 + m2
-            mstar_tot = mstar_pri + mstar_tot
+            
             redz = self.redz[np.newaxis, np.newaxis, :]
-            args = [mstar_pri[..., np.newaxis], mstar_rat[..., np.newaxis], mstar_tot[..., np.newaxis], redz]
-            # Convert to shape (M, Q, Z)
-            mstar_pri, mstar_rat, mstar_tot, redz = np.broadcast_arrays(*args)
+            mstar_pri, mstar_rat, mstar_tot, redz = self.mass_stellar(redz=redz)
 
             # choose whether the primary mass, or total mass, is used in different calculations
             mass_gsmf = mstar_tot if GSMF_USES_MTOT else mstar_pri
@@ -649,11 +655,8 @@ class Semi_Analytic_Model:
         * There is no coalescence of binaries cutting them off at high-frequencies.
 
         """
-        mstar_pri, mstar_tot = self.mass_stellar()
-        # q = m2 / m1
-        mstar_rat = mstar_tot / mstar_pri
-        # M = m1 + m2
-        mstar_tot = mstar_pri + mstar_tot
+        redz = self.redz[np.newaxis, np.newaxis, :]
+        mstar_pri, mstar_rat, mstar_tot, redz = self.mass_stellar(redz=redz)
 
         # default to using `redz_prime` values if a GMT instance is stored
         if redz_prime is None:
@@ -664,12 +667,7 @@ class Semi_Analytic_Model:
             raise AttributeError(err)
 
         rz = self.redz
-        rz = rz[np.newaxis, np.newaxis, :]
         if redz_prime:
-            args = [mstar_pri[..., np.newaxis], mstar_rat[..., np.newaxis], mstar_tot[..., np.newaxis], rz]
-            # Convert to shape (M, Q, Z)
-            mstar_pri, mstar_rat, mstar_tot, rz = np.broadcast_arrays(*args)
-
             gmt_mass = mstar_tot if GMT_USES_MTOT else mstar_pri
             rz, _ = self._gmt.zprime(gmt_mass, mstar_rat, rz)
             print(f"{self} :: {utils.stats(rz)=}")
