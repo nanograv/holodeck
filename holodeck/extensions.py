@@ -97,7 +97,7 @@ class Realizer_SAM:
         self._hard = hard
         self._fobs_orb_edges = fobs_orb_edges
 
-    def __call__(self, nreals=100, clean=True, gwb_flag=False, ss_flag=False, nloudest=5):
+    def __call__(self, nreals=100, gwb_flag=False, ss_flag=False, nloudest=5):
         """ Calculate samples and weights for an entire semi-analytic population.
         
         Parameters
@@ -112,13 +112,12 @@ class Realizer_SAM:
         -------
         names : array of strings
             Names of the parameters returned in samples
-        samples : (array of length R) or (4 NDarrays)
-            if clean: R arrays of 4 x N_clean NDarrays [R,] x [4,N_clean] for each realization
-            else: NDarrays for mass, ratio, redshift, and frequency [4,M*Q*Z*F]. (Same for each realization)
-        weights : array of R NDarrays 
-            array of number of sources per sample bin for R
-            if clean: the shape is [R,] arrays of len N_clean for each realizations, with zero values removed.
-            else: the shape is [R, M*Q*Z*F]
+        samples : array of length R
+            R arrays of 4 x N_clean NDarrays [R,] x [4,N_clean] for each realization
+        weights : array of length R
+            array of number of sources per sample bin for R.
+            the shape is [R,] arrays of len N_clean for each realizations, with zero values 
+            and negative redshifts removed.
 
         TODO: Check if this should be using final redshifts instead of initial
 
@@ -150,23 +149,20 @@ class Realizer_SAM:
         number = number.flatten()
         shape = (number.size, nreals)
         weights = gravwaves.poisson_as_needed(number[..., np.newaxis] * np.ones(shape)).reshape(shape)
+ 
+        nonzero_samples = []
+        nonzero_weights = []
+        for rr in range(nreals):
+            nonzero = (weights[:,rr]!=0) & (samples[2]>0)
+            mtot = samples[0][nonzero]
+            mrat = samples[1][nonzero]
+            redz = samples[2][nonzero]
+            fobs = samples[3][nonzero]
+            nonzero_samples.append([mtot, mrat, redz, fobs])
+            nonzero_weights.append(weights[:,rr][nonzero])
 
-        
-
-        if clean:
-            nonzero_samples = []
-            nonzero_weights = []
-            for rr in range(nreals):
-                nonzero = weights[:,rr]!=0
-                mtot = samples[0][nonzero]
-                mrat = samples[1][nonzero]
-                redz = samples[2][nonzero]
-                fobs = samples[3][nonzero]
-                nonzero_samples.append([mtot, mrat, redz, fobs])
-                nonzero_weights.append(weights[:,rr][nonzero])
-    
-            weights = nonzero_weights
-            samples = nonzero_samples
+        weights = nonzero_weights
+        samples = nonzero_samples
 
         self._vals_names = names
         self._binary_vals = samples
