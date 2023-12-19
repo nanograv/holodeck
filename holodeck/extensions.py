@@ -134,7 +134,7 @@ class Realizer_SAM:
 
         # ---- Calculate number of binaries in each bin
 
-        redz, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
+        redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
             fobs_orb_cents, sam, hard, cosmo
         )
 
@@ -142,10 +142,10 @@ class Realizer_SAM:
         number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num) # fractional number per bin
         self._edges = edges
         self._number = number
-        self._redz = redz
+        self._redz_final = redz_final
         self._nreals = nreals
 
-        samples = get_samples_from_edges(edges, redz, number.shape, flatten=True)
+        samples = get_samples_from_edges(edges, redz_final, number.shape, flatten=True)
         names = ['mtot', 'mrat', 'redz', 'fobs']
         number = number.flatten()
         shape = (number.size, nreals)
@@ -201,7 +201,7 @@ class Realizer_SAM:
         """
 
         rv = holo.single_sources.ss_gws_redz(
-            self._edges, self._redz, self._number, 
+            self._edges, self._redz_final, self._number, 
             realize=self._nreals, loudest=nloudest, params=params_flag)
         return rv
 
@@ -215,7 +215,7 @@ def get_samples_from_edges(edges, redz, number_shape, flatten=True):
     Parameters
     ----------
     edges : array of [M+1,], [Q+1,], [Z+1,], and [F+1,] NDarrays
-        Edges for mtot, mrat, redz, fobs_orb_edges 
+        Edges for mtot, mrat, fobs_orb_edges 
     redz : [M+1, Q+1, Z+1, F+1] NDarray
         Final redshifts
     number_shape : array
