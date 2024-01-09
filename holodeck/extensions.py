@@ -171,7 +171,7 @@ class Realizer_SAM:
 
         return names, samples, weights
     
-    def char_strain(self, params_flag=False, nloudest=5):
+    def char_strain(self, nloudest=5):
         """ Calculate characteristic strain for the realized population of BBHs. Note this doesn't use the saved weights,
         but generates new ones. TODO: use the real weights
 
@@ -224,11 +224,6 @@ class Realizer_SAM:
         hc_ss = np.sqrt(hc2ss)
         hc_bg = np.sqrt(hc2bg)
         return hc_ss, hc_bg
-
-            rv = holo.single_sources.ss_gws_redz(
-                self._edges, self._redz_final, self._number, 
-                realize=self._nreals, loudest=nloudest, params=params_flag)
-            return rv
 
 
 
