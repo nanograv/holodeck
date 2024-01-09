@@ -171,7 +171,8 @@ class Realizer_SAM:
         return names, samples, weights
     
     def char_strain(self, params_flag=False, nloudest=5):
-        """ Calculate characteristic strain for the realized population of BBHs.
+        """ Calculate characteristic strain for the realized population of BBHs. Note this doesn't use the saved weights,
+        but generates new ones. TODO: use the real weights
 
         Params
         ------
