@@ -1540,7 +1540,7 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
 
 
 def loudest_hc_and_par_from_sorted_redz(
-    weights, h2fdf, nreals, nloudest,
+    number, h2fdf, nreals, nloudest,
     mt, mr, rz, redz_final, dcom_final, sepa, angs,
     msort, qsort, zsort, normal_threshold=1e10):
     """
@@ -1549,7 +1549,7 @@ def loudest_hc_and_par_from_sorted_redz(
 
     Parameters
     ------------------------
-    weights : [M, Q, Z, F] NDarray
+    number : [M, Q, Z, F] NDarray
         sampled number in each bin
     h2fdf : [M, Q, Z, F] NDarray
         Strain amplitude squared x frequency / frequency bin width for each bin.
@@ -1805,7 +1805,7 @@ def loudest_hc_from_weights(weights, h2fdf, nreals, nloudest, msort, qsort, zsor
     L = nloudest
     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
-    _loudest_hc_from_sorted(shape, weights, h2fdf, nreals, nloudest, 
+    _loudest_hc_from_weights(shape, weights, h2fdf, nreals, nloudest, 
                             msort, qsort, zsort,
                             hc2ss, hc2bg)
     return hc2ss, hc2bg
@@ -1814,8 +1814,8 @@ def loudest_hc_from_weights(weights, h2fdf, nreals, nloudest, msort, qsort, zsor
 @cython.wraparound(True)
 @cython.nonecheck(True)
 @cython.cdivision(True)
-cdef void _loudest_hc_from_sorted(long[:] shape, double[:,:,:,:,:] weights, double[:,:,:,:] h2fdf,
-            long nreals, long nloudest, long thresh,
+cdef void _loudest_hc_from_weights(long[:] shape, double[:,:,:,:,:] weights, double[:,:,:,:] h2fdf,
+            long nreals, long nloudest, 
             long[:] msort, long[:] qsort, long[:] zsort,
             double[:,:,:] hc2ss, double[:,:] hc2bg):
     """
