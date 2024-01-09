@@ -1269,6 +1269,7 @@ cdef void _loudest_hc_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, double[:
             double[:,:,:] hc2ss, double[:,:] hc2bg):
     """
     Calculates the characteristic strain from loud single sources and a background of all other sources.
+    NOTE: Does not use final redshift!
 
     Parameters
     ----------
@@ -1539,7 +1540,7 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
 
 
 def loudest_hc_and_par_from_sorted_redz(
-    number, h2fdf, nreals, nloudest,
+    weights, h2fdf, nreals, nloudest,
     mt, mr, rz, redz_final, dcom_final, sepa, angs,
     msort, qsort, zsort, normal_threshold=1e10):
     """
@@ -1548,8 +1549,8 @@ def loudest_hc_and_par_from_sorted_redz(
 
     Parameters
     ------------------------
-    number : [M, Q, Z, F] NDarray
-        number in each bin
+    weights : [M, Q, Z, F] NDarray
+        sampled number in each bin
     h2fdf : [M, Q, Z, F] NDarray
         Strain amplitude squared x frequency / frequency bin width for each bin.
     nreals
@@ -1767,6 +1768,118 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
             bgpar[6,ff,rr] = angs_bg/sum_bg # bg avg binary angular separation after hardening
 
 
+################### for extensions.py ####################
+
+def loudest_hc_from_weights(weights, h2fdf, nreals, nloudest, msort, qsort, zsort):
+    """
+    Calculates the characteristic strain from loud single sources and a background of all other sources.
+
+    Parameters
+    ------------------------
+    weights : [M, Q, Z, F, R] NDarray
+        number in each bin after sampling
+    h2fdf : [M, Q, Z, F] NDarray
+        Strain amplitude squared x frequency / frequency bin width for each bin.
+    nreals
+        Number of realizations.
+    nloudest
+        Number of loudest sources to separate in each frequency bin.
+    msort : (M*Q*Z,) 1Darray
+        M indices of each bin, sorted from largest to smallest h2fdf.
+    qsort : (M*Q*Z,) 1Darray
+        q indices of each bin, sorted from largest to smallest h2fdf.
+    zsort : (M*Q*Z,) 1Darray
+        z indices of each bin, sorted from largest to smallest h2fdf.
+
+    Returns
+    --------------------------
+    hc2ss : (F, R, L) Ndarray of scalars
+        Char strain squared of the loudest single sources.
+    hc2bg : (F, R) Ndarray of scalars
+        Char strain squared of the background.
+    """
+
+    cdef long[:] shape = np.array(weights.shape)
+    F = shape[3]
+    R = nreals
+    L = nloudest
+    cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
+    cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
+    _loudest_hc_from_sorted(shape, weights, h2fdf, nreals, nloudest, 
+                            msort, qsort, zsort,
+                            hc2ss, hc2bg)
+    return hc2ss, hc2bg
+
+@cython.boundscheck(True)
+@cython.wraparound(True)
+@cython.nonecheck(True)
+@cython.cdivision(True)
+cdef void _loudest_hc_from_sorted(long[:] shape, double[:,:,:,:,:] weights, double[:,:,:,:] h2fdf,
+            long nreals, long nloudest, long thresh,
+            long[:] msort, long[:] qsort, long[:] zsort,
+            double[:,:,:] hc2ss, double[:,:] hc2bg):
+    """
+    Calculates the characteristic strain from loud single sources and a background of all other sources.
+
+    Parameters
+    ----------
+    shape : long[:] array
+        Shape of number, [M, Q, Z, F, R].
+    weights : double[:,:,:,:,:] array
+        Number per bin after sampling.
+    h2fdf : double[:,:,:,:] array
+        Strain amplitude squared * f/Delta f for a single source in each bin.
+    nreals : int
+        Number of realizations.
+    nloudest : int
+        Number of loudest sources at each source.
+    msort : (M*Q*Z,) 1Darray
+        M indices of each bin, sorted from largest to smallest h2fdf.
+    qsort : (M*Q*Z,) 1Darray
+        q indices of each bin, sorted from largest to smallest h2fdf.
+    zsort : (M*Q*Z,) 1Darray
+        z indices of each bin, sorted from largest to smallest h2fdf.
+    hc2ss : double[:,:,:] array
+        (Memory address of) single source characteristic strain squared array.
+    hc2bg : double[:,:] array
+        (Memory address of) background characteristic strain squared array.
+
+    Returns
+    -------
+    void
+    updated via memory address: hc2ss, hc2bg, ssidx, bg_par
+    """
+
+    cdef int M = shape[0]
+    cdef int Q = shape[1]
+    cdef int Z = shape[2]
+    cdef int F = shape[3]
+    cdef int L = nloudest
+    cdef int R = nreals
+
+    cdef int mm, qq, zz, ff, rr, ll
+    cdef double num, sum
+
+    for rr in range(R):
+        for ff in range(F):
+            ll = 0 # track which index in the loudest list you're currently storing
+                     # start at 0 for the loudest of all.
+            sum = 0
+            for bb in range(M*Q*Z): #iterate through bins, loudest to quietest
+                mm = msort[bb]
+                qq = qsort[bb]
+                zz = zsort[bb]
+                num = weights[mm,qq,zz,ff,rr]
+                cur = h2fdf[mm,qq,zz,ff]
+                if (num<1):
+                    continue # to next loudest bin
+                while (ll < L) and (num > 0):
+                    hc2ss[ff,rr,ll] = cur
+                    num -= 1
+                    ll += 1
+                sum += num * cur
+
+            hc2bg[ff,rr] = sum
 
 
 def interp_2d(xnew, xold, yold, xlog=False, ylog=False, extrap=False):

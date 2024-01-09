@@ -149,7 +149,8 @@ class Realizer_SAM:
         number = number.flatten()
         shape = (number.size, nreals)
         weights = gravwaves.poisson_as_needed(number[..., np.newaxis] * np.ones(shape)).reshape(shape)
- 
+        self._all_weights = weights
+
         nonzero_samples = []
         nonzero_weights = []
         for rr in range(nreals):
@@ -197,10 +198,37 @@ class Realizer_SAM:
             Returned only if params = True.
         """
 
-        rv = holo.single_sources.ss_gws_redz(
-            self._edges, self._redz_final, self._number, 
-            realize=self._nreals, loudest=nloudest, params=params_flag)
-        return rv
+        # All other bin midpoints
+        mt = kale.utils.midpoints(self._edges[0]) #: total mass
+        mr = kale.utils.midpoints(self._edges[1]) #: mass ratio
+        rz = kale.utils.midpoints(self._edges[2]) #: initial redshift
+
+
+        # hsfdf = hsamp^2 * f/df # this is same as hc^2
+        h2fdf = gravwaves.char_strain_sq_from_bin_edges_redz(self._edges, self._redz_final)
+
+        # indices of bins sorted by h2fdf
+        indices = np.argsort(-h2fdf[...,0].flatten()) # just sort for first frequency
+        unraveled = np.array(np.unravel_index(indices, (len(mt),len(mr),len(rz))))
+        msort = unraveled[0,:]
+        qsort = unraveled[1,:]
+        zsort = unraveled[2,:]
+
+        # shape (number.size, nreals) = M*Q*Z*F, R -> (M,Q,Z,F,R) 
+        all_weights = self._all_weights.reshape(len(mt), len(mr), len(rz), len(self._fobs_orb_edges)-1, self._nreals) 
+
+        # For multiple realizations, using cython
+        # use cython to get h_c^2 for ss and bg
+        hc2ss, hc2bg = holo.cyutils.loudest_hc_from_weights(all_weights, h2fdf, self._nreals, 
+                                                            nloudest, msort, qsort, zsort)
+        hc_ss = np.sqrt(hc2ss)
+        hc_bg = np.sqrt(hc2bg)
+        return hc_ss, hc_bg
+
+            rv = holo.single_sources.ss_gws_redz(
+                self._edges, self._redz_final, self._number, 
+                realize=self._nreals, loudest=nloudest, params=params_flag)
+            return rv
 
 
 
