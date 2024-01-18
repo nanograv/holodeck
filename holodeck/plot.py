@@ -753,7 +753,7 @@ def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill=
 
     return (hh, gg)
 
-def draw_med_conf_color(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={}, 
+def draw_med_conf_color(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={},
                         filter=False, color=None, linestyle='-'):
     plot.setdefault('alpha', 0.75)
     fill.setdefault('alpha', 0.2)
