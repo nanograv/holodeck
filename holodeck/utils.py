@@ -1800,6 +1800,13 @@ def _lambda_factor_dlnf(frst, dfdt, redz, dcom):
     vfac = 4.0 * np.pi * SPLC * zp1 * (dcom**2)
     # Time-factor
     # this is `f / (df/dt) = dt/d ln(f)`,  units of [sec]
+    """ In some cases, dfdt < 0 due to CBD-driven orbital expansion. 
+        In such cases, we take the absolute value of
+        dfdt to account for the length of time the binary spends 
+        _in the current frequency bin_, 
+        regardless whether the frequency moves up towards a higher frequency bin
+        or down towards a lower frequency bin. """
+    dfdt[dfdt<0] = -1.*dfdt[dfdt<0]
     tfac = frst / dfdt
 
     # Calculate weighting
