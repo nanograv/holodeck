@@ -764,7 +764,8 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
 
 
 def nyquist_freqs(
-    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
+    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None,
+    lgspace: bool = False
 ) -> np.ndarray:
     """Calculate Nyquist frequencies for the given timing parameters.
 
@@ -778,6 +779,10 @@ def nyquist_freqs(
         Specification of minimum and maximum frequencies outside of which to remove values.
         `None` can be used in place of either boundary, e.g. [0.1, None] would mean removing
         frequencies below `0.1` (and not trimming values above a certain limit).
+    lgspace : bool,
+        Creates evenly log-spaced frequencies if True, evenly linear-spaced frequencies if 
+        False. Linear bin size is fmin, and number of log bins is int(fmax/fmin), such that
+        the number of bins is comparable in either case.     
 
     Returns
     -------
@@ -788,8 +793,12 @@ def nyquist_freqs(
     fmin = 1.0 / dur
     fmax = 1.0 / cad * 0.5
     # df = fmin / sample
-    df = fmin
-    freqs = np.arange(fmin, fmax + df/10.0, df)
+    if not lgspace:
+        df = fmin
+        freqs = np.arange(fmin, fmax + df/10.0, df)
+    else:
+        # evenly log-spaced bins:
+        freqs = np.logspace(np.log10(fmin), np.log10(fmax), int(fmax/fmin))
     if trim is not None:
         if np.shape(trim) != (2,):
             raise ValueError("`trim` (shape: {}) must be (2,) of float!".format(np.shape(trim)))
@@ -802,7 +811,8 @@ def nyquist_freqs(
 
 
 def nyquist_freqs_edges(
-    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
+    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None,
+    lgspace: bool = False
 ) -> np.ndarray:
     """Calculate Nyquist frequencies for the given timing parameters.
 
@@ -816,6 +826,10 @@ def nyquist_freqs_edges(
         Specification of minimum and maximum frequencies outside of which to remove values.
         `None` can be used in place of either boundary, e.g. [0.1, None] would mean removing
         frequencies below `0.1` (and not trimming values above a certain limit).
+    lgspace : bool,
+        Creates evenly log-spaced frequencies if True, evenly linear-spaced frequencies if 
+        False. Linear bin size is fmin, and number of log bins is int(fmax/fmin), such that
+        the number of bins is comparable in either case. 
 
     Returns
     -------
@@ -826,11 +840,19 @@ def nyquist_freqs_edges(
     fmin = 1.0 / dur
     fmax = 1.0 / cad * 0.5
     # df = fmin / sample
-    df = fmin    # bin width
-    freqs = np.arange(fmin, fmax + df/10.0, df)   # centers
-    freqs_edges = freqs - df/2.0    # shift to edges
-    freqs_edges = np.concatenate([freqs_edges, [fmax + df/2.0]])
-
+    if not lgspace:
+        df = fmin    # bin width
+        freqs = np.arange(fmin, fmax + df/10.0, df)   # centers
+        freqs_edges = freqs - df/2.0    # shift to edges
+        freqs_edges = np.concatenate([freqs_edges, [fmax + df/2.0]])
+    else:
+        # evenly log-spaced bins:
+        freqs = np.logspace(np.log10(fmin), np.log10(fmax), int(fmax/fmin))
+        lgdf = np.diff(np.log10(freqs))[0] # log bin width
+        lg_freqs_edges = np.log10(freqs) - lgdf/2.0 # shift to edges
+        lg_freqs_edges = np.concatenate([lg_freqs_edges, [lg_freqs_edges[-1] + lgdf]])
+        freqs_edges = 10.0**lg_freqs_edges    
+ 
     if trim is not None:
         if np.shape(trim) != (2,):
             raise ValueError("`trim` (shape: {}) must be (2,) of float!".format(np.shape(trim)))
