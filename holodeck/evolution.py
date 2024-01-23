@@ -1437,7 +1437,7 @@ class New_Evolution:
         if self.eccen is not None:
             # ecc_cfl = 0.1 * CFL
             dt_dedt = CFL * self.eccen[step] / np.fabs(dedt)
-            
+
             # now make sure we are not 'overshooting' the equilibrium eccentricity
             # with current dedt value
 
@@ -1519,7 +1519,7 @@ class New_Evolution:
             self._sample_volume, int(dfdt_mdot),
         )
         return gwb
-    
+
     def sample_universe(self, fobs_orb_edges, down_sample=None, dfdt_mdot=False):
         """Construct a full universe of binaries based on resampling this population.
 
@@ -1568,7 +1568,7 @@ class New_Evolution:
         # Convert back to normal-space
         samples = np.asarray([10.0 ** ss for ss in samples])
         vals = np.asarray([10.0 ** vv for vv in vals])
-        # but then take log10 of eccentricity, dadt and dedt again, 
+        # but then take log10 of eccentricity, dadt and dedt again,
         # because we don't take the log10 of eccen,dadt and dedt initially.
         # this is because kale.resample() in _sample_universe__resample returns NaNs when using log10(eccen)
         for v_ind in [4,5,6]:
@@ -1608,7 +1608,7 @@ class New_Evolution:
 
         # Interpolate binaries to given frequencies
         data_fobs = self.at('fobs', fobs_orb_cents_bins)
-        
+
         #get observed and rest frequencies of binaries
         fobs_orb_cents = data_fobs['fobs']
         frst_orb_cents = utils.frst_from_fobs(fobs_orb_cents, data_fobs['redz'])
@@ -1621,7 +1621,8 @@ class New_Evolution:
                                         frst_orb=frst_orb_cents,\
                                         mdot = data_fobs['mdot'], \
                                         dfdt_mdot=dfdt_mdot)
-        
+
+        # note that the `dfdt`` can be positive or negative, it is handled in `lambda_factor_dlnf`
         _lambda_factor = utils.lambda_factor_dlnf(frst_orb_cents, dfdt, \
                                 data_fobs['redz'], dcom=dcom) / self._sample_volume
 
@@ -1629,7 +1630,7 @@ class New_Evolution:
         dlnf_all = np.diff(np.log(fobs_orb_edges))
         dlnf = dlnf_all[data_fobs['interp_idx']-1]
 
-        #calculate number of binaries 
+        #calculate number of binaries
         num_binaries = _lambda_factor * dlnf
         weights = num_binaries
 
