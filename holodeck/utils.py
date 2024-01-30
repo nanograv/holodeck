@@ -18,7 +18,7 @@ import os
 import subprocess
 import warnings
 from pathlib import Path
-from typing import Optional, Tuple, Union, List, Callable, TypeVar, Any  # , TypeAlias  # , Sequence,
+from typing import Optional, Tuple, Union, List, # Callable, TypeVar, Any  # , TypeAlias  # , Sequence,
 
 # try:
 #     from typing import ParamSpec
@@ -1851,16 +1851,31 @@ def angs_from_sepa(sepa, dcom, redz):
     return angs
 
 
+def eddington_accretion(mass, eps=0.1):
+    """Eddington Accretion rate, $\\dot{M}_{Edd} = L_{Edd}/\\epsilon c^2$.
+
+    Arguments
+    ---------
+    mass : array_like of scalar
+        BH Mass.
+    eps : array_like of scalar
+        Efficiency parameter.
+
+    Returns
+    -------
+    mdot : array_like of scalar
+        Eddington accretion rate.
+
+    """
+    edd_lum = eddington_luminosity(mass, eps=eps)
+    # NOTE: no `epsilon` (efficiency) in this equation, because included in `eddington_luminosity`
+    mdot = edd_lum/np.square(SPLC)
+    return mdot
+
+
 def eddington_luminosity(mass, eps=0.1):
     ledd = EDDT * mass / eps
     return ledd
-
-
-def eddington_accretion(mass, eps=0.1):
-    edd_lum = eddington_luminosity(mass, eps=eps)
-    mdot = edd_lum / np.square(SPLC)
-    return mdot
-
 
 
 # =================================================================================================
