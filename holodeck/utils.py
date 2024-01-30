@@ -18,12 +18,12 @@ import os
 import subprocess
 import warnings
 from pathlib import Path
-from typing import Optional, Tuple, Union, List, Callable, TypeVar, Any, TypeAlias  # , Sequence,
+from typing import Optional, Tuple, Union, List, Callable, TypeVar, Any  # , TypeAlias  # , Sequence,
 
-try:
-    from typing import ParamSpec
-except ImportError:
-    from typing_extensions import ParamSpec
+# try:
+#     from typing import ParamSpec
+# except ImportError:
+#     from typing_extensions import ParamSpec
 
 import h5py
 import numba
@@ -73,21 +73,22 @@ class _Modifier(abc.ABC):
         pass
 
 
-T = TypeVar('T')
-P = ParamSpec('P')
-WrappedFuncDeco: TypeAlias = Callable[[Callable[P, T]], Callable[P, T]]
+# T = TypeVar('T')
+# P = ParamSpec('P')
+# WrappedFuncDeco: TypeAlias = Callable[[Callable[P, T]], Callable[P, T]]
+# WrappedFuncDeco: 'TypeAlias' = Tuple[float, float]
 
-def copy_docstring(copy_func: Callable[..., Any]) -> WrappedFuncDeco[P, T]:
-    """Copies the doc string of the given function to the wrapped function.
+# def copy_docstring(copy_func: Callable[..., Any]) -> WrappedFuncDeco[P, T]:
+#     """Copies the doc string of the given function to the wrapped function.
 
-    see: https://stackoverflow.com/a/68901244/230468
-    """
+#     see: https://stackoverflow.com/a/68901244/230468
+#     """
 
-    def wrapped(func: Callable[P, T]) -> Callable[P, T]:
-        func.__doc__ = copy_func.__doc__
-        return func
+#     def wrapped(func: Callable[P, T]) -> Callable[P, T]:
+#         func.__doc__ = copy_func.__doc__
+#         return func
 
-    return wrapped
+#     return wrapped
 
 
 # =================================================================================================
@@ -834,6 +835,35 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
 
 
 def pta_freqs(dur=16.03*YR, num=40, cad=None):
+    """Get Fourier frequency bin specifications for the given parameters.
+
+    Arguments
+    ---------
+    dur : float,
+        Total observing duration, which determines the minimum sensitive frequency, ``1/dur``.
+        Typically `dur` should be given in units of [sec], such that the returned frequencies are
+        in units of [1/sec] = [Hz]
+    num : int,
+        Number of frequency bins.  If `cad` is not None, then the number of frequency bins is
+        determined by `cad` and the `num` value is disregarded.
+    cad : float or `None`,
+        Cadence of observations, which determines the maximum sensitive frequency (i.e. the Nyquist
+        frequency).  If `cad` is not given, then `num` frequency bins are constructed.
+
+    Returns
+    -------
+    cents : (F,) ndarray
+        Bin-center frequencies for `F` bins.  The frequency bin centers are at:
+        ``F_i = (i + 1.5) / dur`` for i between 0 and `num-1`.
+        The number of frequency bins, `F` is the argument `num`,
+        or determined by `cad` if it is given.
+    edges : (F+1,) ndarray
+        Bin-edge frequencies for `F` bins, i.e. `F+1` bin edges.  The frequency bin edges are at:
+        ``F_i = (i + 1) / dur`` for i between 0 and `num`.
+        The number of frequency bins, `F` is the argument `num`,
+        or determined by `cad` if it is given.
+
+    """
     fmin = 1.0 / dur
     if cad is not None:
         num = dur / (2.0 * cad)
@@ -2387,5 +2417,21 @@ def _get_subclass_instance(value, default, superclass):
         raise ValueError(err)
 
     return value
+
+
+#! DEPRECATED
+def nyquist_freqs(dur, cad):
+    """DEPRECATED.  Use `holodeck.utils.pta_freqs` instead.
+    """
+    msg = ""
+    old_name = "nyquist_freqs"
+    new_name = "pta_freqs"
+    _frame = inspect.currentframe().f_back
+    file_name = inspect.getfile(_frame.f_code)
+    fline = _frame.f_lineno
+    msg = f"{file_name}({fline}):{old_name} ==> {new_name}" + (len(msg) > 0) * " | " + msg
+    warnings.warn_explicit(msg, category=DeprecationWarning, filename=file_name, lineno=fline)
+    log.warning(f"DEPRECATION: {msg}", exc_info=True)
+    return pta_freqs(dur=dur, num=None, cad=cad)[0]
 
 

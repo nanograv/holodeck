@@ -145,7 +145,7 @@ class LISA:
         sel = (hc > sens_at_ff)
         return sel
 
-    @utils.copy_docstring(is_above_hc_curve)
+    # @utils.copy_docstring(is_above_hc_curve)
     def __call__(self, ff, hc):
         return self.is_above_hc_curve(ff, hc)
 
