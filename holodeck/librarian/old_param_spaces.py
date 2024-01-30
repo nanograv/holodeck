@@ -2,8 +2,8 @@
 """
 
 import holodeck as holo
-from holodeck.constants import PC, GYR, MSOL
-from holodeck.librarian import (
+from holodeck.constants import PC, GYR
+from holodeck.librarian.params import (
     _Param_Space, PD_Uniform, PD_Piecewise_Uniform_Density,
     PD_Normal,
     # PD_Uniform_Log,
@@ -591,7 +591,7 @@ class PS_Uniform_07B(PS_Generic_2):
             log, nsamples, sam_shape, seed,
             hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
             gsmf_phi0=PD_Uniform(-3.5, -1.5),
-            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]``
             mmb_mamp_log10=PD_Uniform(+7.6, +9.0),   # [log10(Msol)]
             mmb_scatter_dex=PD_Uniform(+0.0, +0.9),
         )

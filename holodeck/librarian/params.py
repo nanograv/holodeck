@@ -277,11 +277,11 @@ class _Param_Space(abc.ABC):
 
     @property
     def nsamples(self):
-        return self.shape[0]
+        return self.lib_shape[0]
 
     @property
     def npars(self):
-        return self.shape[1]
+        return self.lib_shape[1]
 
     def model_for_sample_number(self, samp_num, sam_shape=None):
         if sam_shape is None:
