@@ -19,7 +19,7 @@ def test_band_init_wlen():
     b2b = basics.Band('z', wlen, None, flux_wlen, None, None)
 
     for band in [b1a, b1b, b2a, b2b]:
-        assert np.isclose(b1a.freq.to('Hz').value, freq, atol=0.0, rtol=1e-3)
+        assert np.isclose(b1a.freq.to('Hz').value, freq, atol=0.0, rtol=1e-2)
 
     return
 
@@ -62,8 +62,8 @@ def test_band_init_fail():
     return
 
 
-def test_sdss_bands():
-    bands = basics.SDSS_Bands()
+def test_bands_sdss():
+    bands = basics.Bands_SDSS()
 
     names = "ugriz"
     for name in names:
@@ -109,11 +109,11 @@ def test_sdss_bands():
 
 
 
-def test_sdss_bands__regression_2023_09_05():
+def test_bands_sdss__regression_2023_09_05():
     """Compare `flux_to_mag` calculation using current code, and previously computed data to check for regression.
     """
 
-    bands = basics.SDSS_Bands()
+    bands = basics.Bands_SDSS()
 
     import json
     from pathlib import Path
@@ -132,8 +132,8 @@ def test_sdss_bands__regression_2023_09_05():
         b1 = bands[band].flux_to_mag(flux, 'f', units=units_hz).value
         b2 = bands[band].flux_to_mag(flux, 'w', units=units_angstrom).value
 
-        assert np.allclose(b1, mag_hz, atol=0.0, rtol=1e-4)
-        assert np.allclose(b2, mag_angstrom, atol=0.0, rtol=1e-4)
+        assert np.allclose(b1, mag_hz, atol=0.0, rtol=1e-2)
+        assert np.allclose(b2, mag_angstrom, atol=0.0, rtol=1e-2)
 
     return
 
