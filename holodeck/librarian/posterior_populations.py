@@ -99,7 +99,9 @@ def main(args=None):
     # ---- Construct population and derived properties
 
     # Build populations with holodeck
-    data, classes = load_population_for_pars(args, pars)
+    data, classes = load_population_for_pars(
+        pars, pta_dur=args.tdur*YR, nfreqs=args.nfreqs, nreals=args.nreals, nloudest=args.nloudest,
+    )
 
     # ---- Save to output file
 
@@ -168,18 +170,24 @@ def setup_argparse(*args, **kwargs):
     return args
 
 
-def load_population_for_pars(args, pars):
+def load_population_for_pars(pars, pta_dur=TDUR, nfreqs=NFREQS, nreals=NREALS, nloudest=NLOUDEST):
     """Construct a holodeck population.
 
     Arguments
     ---------
-    args : argparse.Namespace
-        Arguments for constructing the population and calculating properties.
-        Typically `args` should be loaded using the `setup_argparse` function.
     pars : dict
         Binary population parameters for the appropriate parameter space `PSPACE`.
         Typically the `pars` should be loaded using either the `sample_pars_from_chains` or the
         `get_maxlike_pars_from_chains` function.
+    pta_dur : scalar [seconds]
+        Duration of PTA observations, used to determine Fourier frequency bins.
+        Bin centers are at frequencies ``f_i = (i+1) / pta_dur``
+    nfreqs : int
+        Number of frequency bins.
+    nreals : int
+        Number of realizations to construct.
+    nloudest : int
+        Number of loudest binaries to calculate, per frequency bin.
 
     Returns
     -------
@@ -218,9 +226,7 @@ def load_population_for_pars(args, pars):
     # Load SAM and hardening model for desired parameters
     sam, hard = PSPACE.model_for_params(pars)
 
-    fobs_orb_cents, fobs_orb_edges = holo.utils.pta_freqs(args.tdur*YR, args.nfreqs)
-    # fobs_gw_edges = fobs_orb_edges * 2.0
-    # fobs_gw_cents = fobs_orb_cents * 2.0
+    fobs_orb_cents, fobs_orb_edges = holo.utils.pta_freqs(pta_dur, nfreqs)
 
     # calculate (differential) number of binaries
     redz_final, diff_num = holo.sams.sam_cyutils.dynamic_binary_number_at_fobs(
@@ -233,7 +239,7 @@ def load_population_for_pars(args, pars):
 
     vals = holo.single_sources.ss_gws_redz(
         edges, redz_final, number,
-        realize=args.nreals, loudest=args.nloudest, params=True,
+        realize=nreals, loudest=nloudest, params=True,
     )
 
     # `sspar` parameters are (total mass, mass ratio, initial redshift, final redshift)
