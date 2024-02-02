@@ -16,7 +16,15 @@ Example:
                                    |     |-------------------> 30 frequency bins
                                    |-------------------------> 20 years observing baseline = 1/(20yr) lowest frequency
 
+To-Do
+-----
+* Improve handling of data path.
+* Improve handling/specification of parameter space.
+    * Allow changes to be passed in through API and or CL
+    * Make each particular 15yr dataset specify its own parameter space (these need to match up anyway!)
+
 """
+
 import argparse
 from pathlib import Path
 import numpy as np
@@ -33,6 +41,8 @@ NREALS = 103
 NLOUDEST = 10
 
 # Path to chains, fitting holodeck populations to data, giving parameter posteriors
+# This is the `15yr_astro_data` currently stored on google drive:
+# https://drive.google.com/drive/u/1/folders/1wFy_go_l8pznO9D-a2i2wFHe06xuOe5B
 PATH_DATA = Path(
     "/Users/lzkelley/Programs/nanograv/15yr_astro_data/"
     "phenom/ceffyl_chains/astroprior_hdall/"
@@ -42,8 +52,7 @@ PATH_DATA = Path(
 PSPACE = holo.librarian.param_spaces_classic.PS_Classic_Phenom_Uniform
 
 # Path to save output data
-PATH_OUTPUT = Path(__file__).parent.joinpath("output")
-assert PATH_OUTPUT.is_dir(), f"{PATH_OUTPUT=} does not exist!"
+PATH_OUTPUT = Path(holo._PATH_OUTPUT).resolve().joinpath("15yr_pops")
 
 
 def main(args=None):
@@ -57,15 +66,17 @@ def main(args=None):
         args = setup_argparse()
 
     # load chains (i.e. parameter posterior distributions)
-    chains = load_chains(PATH_DATA)
+    # chains = load_chains(PATH_DATA)
 
     # select parameters for this population
     if args.maxlike:
         pkey = "ML"
-        pars = get_maxlike_pars_from_chains(chains)
+        # pars = get_maxlike_pars_from_chains(chains)
+        pars = get_maxlike_pars_from_chains()
     else:
         pkey = "draw"
-        pars = sample_chains(chains)
+        # pars = sample_pars_from_chains(chains)
+        pars = sample_pars_from_chains()
 
     # construct output filename
     output = Path(args.output).resolve()
@@ -78,7 +89,9 @@ def main(args=None):
         if not fname.exists():
             break
         if (num > 0) and args.maxlike and (ml_warning is False):
-            holo.log.warning("")
+            err = "Maximum likelihood population with these paramters already exists!  {fname}"
+            holo.log.error(err)
+            raise RuntimeError(err)
 
     else:
         raise RuntimeError(f"Could not find a filename that doesn't exist!  e.g. {fname}")
@@ -86,7 +99,7 @@ def main(args=None):
     # ---- Construct population and derived properties
 
     # Build populations with holodeck
-    data = load_population_for_pars(args, pars)
+    data, classes = load_population_for_pars(args, pars)
 
     # ---- Save to output file
 
@@ -165,7 +178,7 @@ def load_population_for_pars(args, pars):
         Typically `args` should be loaded using the `setup_argparse` function.
     pars : dict
         Binary population parameters for the appropriate parameter space `PSPACE`.
-        Typically the `pars` should be loaded using either the `sample_chains` or the
+        Typically the `pars` should be loaded using either the `sample_pars_from_chains` or the
         `get_maxlike_pars_from_chains` function.
 
     Returns
@@ -231,7 +244,12 @@ def load_population_for_pars(args, pars):
         mtot_edges=edges[0], mrat_edges=edges[1], redz_edges=edges[2], fobs_orb_edges=edges[3],
     )
 
-    return data
+    classes = dict(
+        sam=sam,
+        hard=hard,
+    )
+
+    return data, classes
 
 
 def load_chains(path_data):
@@ -272,7 +290,7 @@ def load_chains(path_data):
     return data
 
 
-def sample_chains(chains):
+def sample_pars_from_chains(chains=None):
     """Sample randomly from the given chains (i.e. parameter posteriors).
 
     Arguments
@@ -291,13 +309,16 @@ def sample_chains(chains):
             'mmb_mamp_log10', 'mmb_scatter_dex', 'hard_gamma_inner'],
 
     """
+    if chains is None:
+        chains = load_chains(PATH_DATA)
+
     nlinks = list(chains.values())[0].size
     idx = np.random.choice(nlinks)
     pars = {key: value[idx] for key, value in chains.items()}
     return pars
 
 
-def get_maxlike_pars_from_chains(chains):
+def get_maxlike_pars_from_chains(chains=None):
     """Load the maximum-likelihood (ML) parameters from the given chains (i.e. parameter posteriors).
 
     KDEs from `kalepy` are used to construct the ML parameters.
@@ -319,6 +340,8 @@ def get_maxlike_pars_from_chains(chains):
 
     """
     import kalepy as kale
+    if chains is None:
+        chains = load_chains(PATH_DATA)
 
     # Get maximum likelihood parameters (estimate using KDE)
     mlpars = {}
