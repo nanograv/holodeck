@@ -34,7 +34,7 @@ In general, `holodeck` calculations proceed in three stages:
 """
 
 __author__ = "NANOGrav"
-__copyright__ = "Copyright (c) 2023 NANOGrav"
+__copyright__ = "Copyright (c) 2024 NANOGrav"
 __license__ = "MIT"
 
 import os
