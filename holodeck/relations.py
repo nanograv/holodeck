@@ -269,8 +269,7 @@ class MMBulge_Standard(_MMBulge_Relation):
     def mbh_from_host(self, pop, scatter=None) -> ArrayLike:
         host = self.get_host_properties(pop)
         mbulge = host['mbulge']
-        redz=pop.redz
-        return self.mbh_from_mbulge(mbulge, redz=redz, scatter=scatter)
+        return self.mbh_from_mbulge(mbulge, redz=None, scatter=scatter)
 
     def mbh_from_mbulge(self, mbulge, redz=None, scatter=None):
         """Convert from stellar-bulge mass to black-hole mass.
@@ -458,7 +457,7 @@ class MMBulge_Redshift(MMBulge_Standard):
         self._zplaw = zplaw
         return
 
-    def mbh_from_host(self, pop, redz, scatter):
+    def mbh_from_host(self, pop, scatter):
         host = self.get_host_properties(pop, copy=False)
         mbulge = host['mbulge']    # shape (N, 2)
         redz = host['redz']        # shape (N,)
