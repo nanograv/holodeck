@@ -266,12 +266,13 @@ class MMBulge_Standard(_MMBulge_Relation):
     def bulge_mass_frac(self, mstar):
         return self._bulge_mfrac
 
-    def mbh_from_host(self, pop, redz=1, scatter=None) -> ArrayLike:
+    def mbh_from_host(self, pop, scatter=None) -> ArrayLike:
         host = self.get_host_properties(pop)
         mbulge = host['mbulge']
+        redz=pop.redz
         return self.mbh_from_mbulge(mbulge, redz=redz, scatter=scatter)
 
-    def mbh_from_mbulge(self, mbulge, redz=1, scatter=None):
+    def mbh_from_mbulge(self, mbulge, redz=None, scatter=None):
         """Convert from stellar-bulge mass to black-hole mass.
 
         Parameters
@@ -292,7 +293,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         mbh = _log10_relation(mbulge, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
 
-    def mbulge_from_mbh(self, mbh, redz=1, scatter=None):
+    def mbulge_from_mbh(self, mbh, redz=None, scatter=None):
         """Convert from black-hole mass to stellar-bulge mass.
 
         Parameters
@@ -312,7 +313,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         mbulge = _log10_relation_reverse(mbh, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbulge
 
-    def mstar_from_mbulge(self, mbulge, redz=1):
+    def mstar_from_mbulge(self, mbulge, redz=None):
         """Convert from stellar bulge-mass to black-hole mass.
 
         Parameters
@@ -331,7 +332,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         """
         return mbulge / self._bulge_mfrac
 
-    def mbh_from_mstar(self, mstar, redz=1, scatter=None):
+    def mbh_from_mstar(self, mstar, redz=None, scatter=None):
         """Convert from total stellar mass to black-hole mass.
 
         Parameters
@@ -351,7 +352,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         mbulge = self.mbulge_from_mstar(mstar)
         return self.mbh_from_mbulge(mbulge, scatter)
 
-    def mstar_from_mbh(self, mbh, redz=1, scatter=None):
+    def mstar_from_mbh(self, mbh, redz=None, scatter=None):
         """Convert from black-hole mass to total stellar mass.
 
         Parameters
@@ -371,7 +372,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         mbulge = self.mbulge_from_mbh(mbh, redz=redz, scatter=scatter)
         return self.mstar_from_mbulge(mbulge)
 
-    def dmstar_dmbh(self, mstar, redz=1):
+    def dmstar_dmbh(self, mstar, redz=None):
         """Calculate the partial derivative of stellar mass versus BH mass :math:`d M_star / d M_bh`.
 
         .. math::
