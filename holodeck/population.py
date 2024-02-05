@@ -600,7 +600,7 @@ class PM_Mass_Reset(_Population_Modifier):
     """Reset the masses of a target population based on a given M-Host relation.
     """
 
-    def __init__(self, mhost, redz=1, scatter=True):
+    def __init__(self, mhost, scatter=True):
         """Initialize the modifier.
 
         Parameters
@@ -633,7 +633,7 @@ class PM_Mass_Reset(_Population_Modifier):
         # Store old version
         pop._mass = pop.mass
         # if `scatter` is `True`, then it is set to the value in `mhost.SCATTER_DEX`
-        pop.mass = self.mhost.mbh_from_host(pop, redz=pop.redz, scatter=scatter)
+        pop.mass = self.mhost.mbh_from_host(pop, scatter=scatter)
         return
 
 
