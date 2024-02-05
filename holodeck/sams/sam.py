@@ -191,7 +191,7 @@ class Semi_Analytic_Model:
             self._shape = tuple([len(ee) for ee in self.edges])
         return self._shape
 
-    def mass_stellar(self, redz):
+    def mass_stellar(self):
         """Calculate stellar masses for each MBH based on the M-MBulge relation.
 
         Returns
@@ -200,6 +200,7 @@ class Semi_Analytic_Model:
             Galaxy total stellar masses for all MBH. [0, :] is primary, [1, :] is secondary [grams].
 
         """
+        redz = self.redz[np.newaxis, np.newaxis, :]
         # total-mass, mass-ratio ==> (M1, M2)
         masses = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
         # BH-masses to stellar-masses
@@ -243,7 +244,7 @@ class Semi_Analytic_Model:
             # ---- convert from MBH ===> mstar
             
             redz = self.redz[np.newaxis, np.newaxis, :]
-            mstar_pri, mstar_rat, mstar_tot, redz = self.mass_stellar(redz=redz)
+            mstar_pri, mstar_rat, mstar_tot, redz = self.mass_stellar()
 
             # choose whether the primary mass, or total mass, is used in different calculations
             mass_gsmf = mstar_tot if GSMF_USES_MTOT else mstar_pri
@@ -656,7 +657,7 @@ class Semi_Analytic_Model:
 
         """
         redz = self.redz[np.newaxis, np.newaxis, :]
-        mstar_pri, mstar_rat, mstar_tot, redz = self.mass_stellar(redz=redz)
+        mstar_pri, mstar_rat, mstar_tot, redz = self.mass_stellar()
 
         # default to using `redz_prime` values if a GMT instance is stored
         if redz_prime is None:
