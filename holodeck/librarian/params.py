@@ -22,24 +22,22 @@ class _Param_Space(abc.ABC):
 
     Subclasses
     ----------
+    Parameter space subclasses only need to define arguments within the ``__init__`` functions::
 
-    ```
-    def __init__(self, log, nsamples, sam_shape, seed):
-        super(_Param_Space, self).__init__(
-            log, nsamples, sam_shape, seed,
-            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
-            gsmf_phi0=PD_Uniform(-3.5, -1.5),
-            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
-            mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
-            mmb_scatter=PD_Uniform(+0.0, +1.2),
-        )
-    ```
+        def __init__(self, log, nsamples, sam_shape, seed):
+            super(_Param_Space, self).__init__(
+                log, nsamples, sam_shape, seed,
+                hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+                gsmf_phi0=PD_Uniform(-3.5, -1.5),
+                gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
+                mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
+                mmb_scatter=PD_Uniform(+0.0, +1.2),
+            )
 
     """
 
     _SAVED_ATTRIBUTES = [
         "sam_shape", "param_names", "_uniform_samples", "param_samples",
-        # "_random_state"
     ]
 
     DEFAULTS = {}

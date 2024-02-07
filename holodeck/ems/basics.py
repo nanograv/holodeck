@@ -7,20 +7,6 @@ See also: https://ui.adsabs.harvard.edu/abs/2018ApJS..236...47W/abstract
 - VEGA/Johnson/Bessell: http://web.ipac.caltech.edu/staff/fmasci/home/astro_refs/magsystems.pdf
 - SDSS/AB/Fukugita: http://www.astronomy.ohio-state.edu/~martini/usefuldata.html
 
-
-    "u": {
-        "wlen":  * ap.units.angstrom,      # wavelength effective [Angstrom]
-        "bandwidth_wlen":  * ap.units.angstrom,   # bandwidth effective [Angstrom]
-        "AB": {
-            "flux_ref_wlen":  * _units_erg_s_cm2_angstrom,
-            "flux_ref_freq":  * ap.units.jansky,
-        },
-        "vega": {
-            "flux_ref_wlen":  * _units_erg_s_cm2_angstrom,
-            "flux_ref_freq":  * ap.units.jansky,
-        },
-    },
-
 """
 
 import numpy as np

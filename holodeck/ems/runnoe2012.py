@@ -77,7 +77,7 @@ class Runnoe2012:
         Arguments
         ---------
         band : str
-            Specification of which photometric band.  One of `Runnoe2012.names`:
+            Specification of which photometric band.  One of ``Runnoe2012.names``,
             {'5100', '3000', '1450', '2to10', '2to10rl', '2to10rq'}
         lbol : array_like, units of [erg/s]
             Bolometric luminosity.
@@ -86,9 +86,10 @@ class Runnoe2012:
         -------
         lband : array_like,
             Luminosity in photometric band.
-            * If `band` is one of the optical bands, return spectral luminosity,
+
+            - If `band` is one of the optical bands, return spectral luminosity,
               with units of [erg/s/Angstrom].
-            * If `band` is one of the x-ray bands, return luminosity across the band,
+            - If `band` is one of the x-ray bands, return luminosity across the band,
               with units of [erg/s].
 
         """
@@ -123,9 +124,10 @@ class Runnoe2012:
             {'5100', '3000', '1450', '2to10', '2to10rl', '2to10rq'}
         lband : array_like,
             Luminosity in photometric band.
-            * If `band_name` is one of the optical bands, `lband` must be spectral luminosity,
+
+            - If `band_name` is one of the optical bands, `lband` must be spectral luminosity,
               with units of [erg/s/Angstrom].
-            * If `band_name` is one of the x-ray bands, `lband` must be luminosity across the band,
+            - If `band_name` is one of the x-ray bands, `lband` must be luminosity across the band,
               with units of [erg/s].
 
         Returns
