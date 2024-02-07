@@ -38,3 +38,31 @@ exclude_patterns = []
 # html_theme = 'alabaster'
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
+
+
+# Define the configuration for sphinx-apidoc
+apidoc_module_dir = 'source/apidoc_modules'
+apidoc_output_dir = 'source'
+apidoc_excluded_paths = ['../holodeck/detstats.py', '../holodeck/anisotropy.py', '../holodeck/librarian/_librarian.py']
+apidoc_command_options = ' '.join([
+    '-e',  # Create separate files for each module
+    '-P',  # Include private modules
+    '-T',  # Include docstrings in the table of contents
+    '-f'   # Overwrite existing files
+])
+
+# Run sphinx-apidoc to generate the .rst files
+def run_apidoc(_):
+    from sphinx.ext.apidoc import main
+    argv = [
+        '-o', apidoc_module_dir,
+        '-M',
+        '-T',
+        '-f',
+        '../holodeck'
+    ]
+    main(argv)
+
+# Hook the sphinx-apidoc command into the Sphinx build process
+def setup(app):
+    app.connect('builder-inited', run_apidoc)
