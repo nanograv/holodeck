@@ -2,7 +2,6 @@
 holodeck
 ========
 
-
 |version| |build| |docs|
 
 .. |version|

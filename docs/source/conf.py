@@ -26,7 +26,7 @@ extensions = [
     'sphinx.ext.mathjax',
 ]
 
-templates_path = ['_templates']
+templates_path = []
 exclude_patterns = []
 
 
@@ -41,7 +41,6 @@ html_static_path = []
 
 # Define the configuration for sphinx-apidoc
 apidoc_module_dir = 'source/apidoc_modules'
-apidoc_output_dir = 'source'
 apidoc_excluded_paths = ['../holodeck/detstats.py', '../holodeck/anisotropy.py', '../holodeck/librarian/_librarian.py']
 apidoc_command_options = ' '.join([
     '-e',  # Create separate files for each module
@@ -54,11 +53,12 @@ apidoc_command_options = ' '.join([
 def run_apidoc(_):
     from sphinx.ext.apidoc import main
     argv = [
-        '-o', apidoc_module_dir,
         '-M',
         '-T',
         '-f',
-        '../holodeck'
+        '-o', apidoc_module_dir,
+        '../holodeck',
+        *apidoc_excluded_paths,
     ]
     main(argv)
 
