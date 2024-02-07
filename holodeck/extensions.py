@@ -7,7 +7,7 @@ from holodeck.constants import MSOL, GYR
 import holodeck.librarian
 import numpy as np
 import kalepy as kale
-from holodeck.sams import cyutils as sam_cyutils
+from holodeck.sams import sam_cyutils
 
 PSPACE = holo.librarian.param_spaces_classic.PS_Classic_Phenom_Uniform
 
