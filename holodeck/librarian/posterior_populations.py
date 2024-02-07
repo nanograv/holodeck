@@ -6,10 +6,9 @@ Usage
 -----
 See `python gen_holodeck_pop.py -h` for usage information.
 
-Example:
+Example::
 
     python gen_holodeck_pops.py -t 20 -f 30 -r 100 -l 10 -m
-
                                    |     |     |      |   |--> use maxmimum-likelihood values
                                    |     |     |      |------> 10 loudest binaries in each frequency bin
                                    |     |     |-------------> 100 realizations of populations
@@ -272,9 +271,11 @@ def load_chains(path_data):
     -------
     data : dict
         The values at each step of the MCMC chains for each parameters.
-        For example, the parameters may be:
+        For example, the parameters may be::
+
             ['hard_time', 'gsmf_phi0', 'gsmf_mchar0_log10',
-            'mmb_mamp_log10', 'mmb_scatter_dex', 'hard_gamma_inner'],
+            'mmb_mamp_log10', 'mmb_scatter_dex', 'hard_gamma_inner']
+
         in which case each of these will be an entry in the dictionary, where the values are an
         array of the steps in each of these parameters.
 
@@ -340,9 +341,10 @@ def get_maxlike_pars_from_chains(chains=None):
     pars : dict
         Maximum likelihood parameters drawn from the `chains`.
         This will be a single float value for each of the parameters in the holodeck parameter-space,
-        for example:
+        for example::
+
             ['hard_time', 'gsmf_phi0', 'gsmf_mchar0_log10',
-            'mmb_mamp_log10', 'mmb_scatter_dex', 'hard_gamma_inner'],
+            'mmb_mamp_log10', 'mmb_scatter_dex', 'hard_gamma_inner']
 
     """
     import kalepy as kale
