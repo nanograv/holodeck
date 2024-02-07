@@ -2,20 +2,6 @@
 holodeck
 ========
 
-|version| |build| |docs|
-
-.. |version|
-   image:: https://badge.fury.io/gh/nanograv%2Fholodeck.svg
-   target:: https://github.com/nanograv/holodeck
-
-.. |build|
-   image:: https://github.com/nanograv/holodeck/actions/workflows/unit-tests-ci.yaml/badge.svg
-   target:: https://github.com/nanograv/holodeck/actions/workflows/unit-tests-ci.yaml
-
-.. |docs|
-   image:: https://readthedocs.org/projects/holodeck-gw/badge/?version=main
-   target:: https://readthedocs.org/projects/holodeck-gw/
-
 **Massive Black-Hole Binary Population Synthesis for Gravitational Wave Calculations ≋●≋●≋**
 
 `holodeck on github <https://github.com/nanograv/holodeck>`_

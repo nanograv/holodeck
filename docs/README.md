@@ -1,6 +1,6 @@
 # Documents and Documentation
 
-The docs for this project are built with [Sphinx](http://www.sphinx-doc.org/en/master/).
+The docs for this project are built with `Sphinx <http://www.sphinx-doc.org/en/master/>`_, and hosted on `readthedocs <https://holodeck-gw.readthedocs.io/en/main/>`_.  The ``sphinx`` configuration is in the ``docs/source/conf.py`` file.
 
 
 ## Building Documentation
