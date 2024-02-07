@@ -6,40 +6,32 @@ To build cython library in-place:
 
 """
 
-from pathlib import Path
 from os.path import abspath, join
 from setuptools import setup, find_packages
 from setuptools.extension import Extension
 from Cython.Build import cythonize
 import numpy as np
 
-SETUP_PATH = Path(__file__).absolute().resolve().parent
-print(f"{SETUP_PATH=}")
-
 # ---- Prepare Meta-Data ----
 
 # NOTE: `short_description` gets first line of `__doc__` only (linebreaks not allowed by setuptools)
 short_description = __doc__.strip().split('\n')[0]
 
-fname_desc = SETUP_PATH.joinpath("README.md")
-with open(fname_desc, "r") as handle:
+with open(join('.', "README.md"), "r") as handle:
     long_description = handle.read()
 
-fname_reqs = SETUP_PATH.joinpath("requirements.txt")
-with open(fname_reqs, "r") as handle:
+with open(join('.', "requirements.txt"), "r") as handle:
     requirements = handle.read()
 
-fname_vers = SETUP_PATH.joinpath('./holodeck/version.txt')
-with open(fname_vers) as handle:
+with open(join('.', 'holodeck', 'version.txt')) as handle:
     version = handle.read().strip()
 
 
 # ---- Handle cython submodules ----
 
-fname_cyutils = SETUP_PATH.joinpath("holodeck", "cyutils.pyx")
 ext_cyutils = Extension(
     "holodeck.cyutils",    # specify the resulting name/location of compiled extension
-    sources=[str(fname_cyutils)],   # location of source code
+    sources=[join('.', 'holodeck', 'cyutils.pyx')],   # location of source code
     # define parameters external libraries
     include_dirs=[
         np.get_include()
@@ -55,10 +47,9 @@ ext_cyutils = Extension(
     extra_compile_args=['-Wno-unreachable-code-fallthrough', '-Wno-unused-function'],
 )
 
-fname_sam_cyutils = SETUP_PATH.joinpath("holodeck", "sams", "sam_cyutils.pyx")
 ext_sam_cyutils = Extension(
     "holodeck.sams.sam_cyutils",    # specify the resulting name/location of compiled extension
-    sources=[str(fname_sam_cyutils)],   # location of source code
+    sources=[join('.', 'holodeck', 'sams', 'sam_cyutils.pyx')],   # location of source code
     # define parameters external libraries
     include_dirs=[
         np.get_include()
