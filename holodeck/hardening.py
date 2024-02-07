@@ -1431,6 +1431,9 @@ class Fixed_Time_2PL_SAM(_Hardening):
             Instance configured for the given binary population.
 
         """
+        import holodeck.sams  # noqa
+        import holodeck.sams.sam_cyutils  # noqa
+
         assert np.ndim(time) == 0
         assert np.ndim(rchar) == 0
         assert np.ndim(gamma_inner) == 0
@@ -1439,7 +1442,7 @@ class Fixed_Time_2PL_SAM(_Hardening):
         shape = mtot.shape
         mt, mr = [mm.flatten() for mm in [mtot, mrat]]
 
-        norm_log10 = holo.sams.cyutils.find_2pwl_hardening_norm(
+        norm_log10 = holo.sams.sam_cyutils.find_2pwl_hardening_norm(
             time, mt, mr,
             sepa_init, rchar, gamma_inner, gamma_outer, num_steps,
         )
@@ -1469,6 +1472,8 @@ class Fixed_Time_2PL_SAM(_Hardening):
         raise NotImplementedError()
 
     def dadt(self, mtot, mrat, sepa, norm=None):
+        import holodeck.sams.sam_cyutils   # noqa
+
         if norm is None:
             norm = self._norm
 
@@ -1476,7 +1481,7 @@ class Fixed_Time_2PL_SAM(_Hardening):
         shape = args[0].shape
         args = [aa.flatten() for aa in args]
         mtot, mrat, sepa, norm = args
-        dadt_vals = holo.sams.cyutils.hard_func_2pwl_gw(
+        dadt_vals = holo.sams.sam_cyutils.hard_func_2pwl_gw(
             mtot, mrat, sepa, norm,                             # must all be 1darrays of matching size (X,)
             self._rchar, self._gamma_inner, self._gamma_outer   # must all be scalars
         )

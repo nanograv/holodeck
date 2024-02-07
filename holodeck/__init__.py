@@ -34,7 +34,7 @@ In general, `holodeck` calculations proceed in three stages:
 """
 
 __author__ = "NANOGrav"
-__copyright__ = "Copyright (c) 2023 NANOGrav"
+__copyright__ = "Copyright (c) 2024 NANOGrav"
 __license__ = "MIT"
 
 import os
@@ -85,11 +85,11 @@ del cosmopy
 
 from . import constants       # noqa
 from . import evolution       # noqa
-from . import gps             # noqa
+# from . import gps             # noqa
 from . import gravwaves       # noqa
 from . import hardening       # noqa
-from . import librarian       # noqa
-from . import param_spaces    # noqa
+# from . import librarian       # noqa
+# from . import param_spaces    # noqa
 from . import plot            # noqa
 from . import population      # noqa
 from . import relations       # noqa

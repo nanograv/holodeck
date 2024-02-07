@@ -4,7 +4,7 @@
 [![GitHub version](https://badge.fury.io/gh/nanograv%2Fholodeck.svg)](https://badge.fury.io/gh/nanograv%2Fholodeck)
 [![build](https://github.com/nanograv/holodeck/actions/workflows/unit-tests-ci.yaml/badge.svg)](https://github.com/nanograv/holodeck/actions/workflows/unit-tests-ci.yaml)
 [![codecov](https://codecov.io/gh/nanograv/holodeck/branch/main/graph/badge.svg?token=K63WQH3ED9)](https://codecov.io/gh/nanograv/holodeck)
-[![Documentation Status](https://readthedocs.org/projects/holodeck-gw/badge/?version=main)](https://holodeck-gw.readthedocs.io/en/main/?badge=main)
+[![Documentation Status](https://readthedocs.org/projects/holodeck-gw/badge/?version=main)](https://readthedocs.org/projects/holodeck-gw/)
 
 *Massive Black-Hole Binary Population Synthesis for Gravitational Wave Calculations ≋●≋●≋*
 
@@ -12,7 +12,7 @@ This package, which is actively under development, is aimed at providing a compr
 
 ## Installation
 
-The `holodeck` framework is currently under substantial, active development.  It will not be available on `pypi` (`pip`) or via `conda` install until it has stabilized.  Currently `holodeck` requires `python >= 3.8`, and tests are run on versions `3.8`, `3.9`, `3.10`.
+The `holodeck` framework is currently under substantial, active development.  It will not be available on `pypi` (`pip`) or via `conda` install until it has stabilized.  Currently `holodeck` requires `python >= 3.9`, and tests are run on versions `3.9`, `3.10`, `3.11`.
 
 The recommended installation for active development is to:
 

@@ -264,7 +264,7 @@ cdef struct sorter:
     double value
 
 
-cdef int sort_compare(const void *a, const void *b) nogil:
+cdef int sort_compare(const void *a, const void *b) noexcept nogil:
     """Comparison function used by the `qsort` builtin method to perform an array-sort by index.
 
     Parameters
@@ -1724,7 +1724,7 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
                 else:            # Poisson sample
                     num = <double>random_poisson(rng, num)
                 cur = h2fdf[mm,qq,zz,ff] # h^2 * f/df of current bin
-                
+
                 if (num < 1) or (cur == 0):
                     continue # to next loudest bin
                 while (ll < L) and (num > 0):

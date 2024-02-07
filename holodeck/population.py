@@ -334,6 +334,7 @@ class Pop_Illustris(_Population_Discrete):
         super()._init()
         fname = self._fname
         header, data = utils.load_hdf5(fname)
+        self._sample_volume_mpc3 = header['box_volume_mpc']            #: comoving-volume of sim [Mpc^3]
         self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3   #: comoving-volume of sim [cm^3]
 
         # Select the stellar radius
@@ -633,7 +634,7 @@ class PM_Mass_Reset(_Population_Modifier):
         # Store old version
         pop._mass = pop.mass
         # if `scatter` is `True`, then it is set to the value in `mhost.SCATTER_DEX`
-        pop.mass = self.mhost.mbh_from_host(pop, scatter)
+        pop.mass = self.mhost.mbh_from_host(pop, scatter=scatter)
         return
 
 

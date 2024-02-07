@@ -5,9 +5,13 @@ from typing import Any
 import holodeck as holo
 from holodeck import log, cosmo, gravwaves
 from holodeck.constants import MSOL, GYR
+import holodeck.librarian
 import numpy as np
 import kalepy as kale
-from holodeck.sams import cyutils as sam_cyutils
+from holodeck.sams import sam_cyutils
+
+PSPACE = holo.librarian.param_spaces_classic.PS_Classic_Phenom_Uniform
+
 
 
 class Realizer:
@@ -61,8 +65,9 @@ class Realizer:
 
 class Realizer_SAM:
     def __init__(
-            self, fobs_orb_edges, sam=None, hard=None, params=None, 
-            pspace=holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=None, seed=None)):
+            self, fobs_orb_edges, sam=None, hard=None, params=None,
+            pspace=PSPACE
+        ):
         """Construct a Realizer for a given semi-analytic model and hardening model,
         or build this model using params and a pspace.
 
@@ -76,11 +81,12 @@ class Realizer_SAM:
             Parameters for a given parameter space, if sam is not provided.
         pspace : _Param_Space object
             Parameter space.
-        
-            
+
+
         NOTE: To match the Realizer above I could initialize with weights and whatnot, then
         possibly use the same resample/downsample function.
         """
+        pspace = pspace()
 
         # check that ('sam' and 'hard') OR 'params' is provided
         if params is not None:
@@ -92,20 +98,20 @@ class Realizer_SAM:
             if sam is None or hard is None:
                 err = "'params' or ('sam' and 'hard') must be provided."
                 raise ValueError(err)
-            
+
         self._sam = sam
         self._hard = hard
         self._fobs_orb_edges = fobs_orb_edges
 
     def __call__(self, nreals=100, gwb_flag=False, ss_flag=False, nloudest=5):
         """ Calculate samples and weights for an entire semi-analytic population.
-        
+
         Parameters
         ----------
         nreals : int
             Number of realizations
         clean : boolean
-            Whether or not to make a samples array for every realization 
+            Whether or not to make a samples array for every realization
             and clean weights==zero bins from each array
 
         Returns
@@ -242,17 +248,17 @@ def get_samples_from_edges(edges, redz, number_shape, flatten=True):
         Shape [M,Q,Z,F]
     flatten : boolean
         Whether or not to flatten each sample array
-    
+
     Returns
     -------
     samples : array of 4 flattened [M*Q*Z*F,] NDarrays
-    
+
     """
-    
+
      # ---- Find bin center properties
     mtot = kale.utils.midpoints(edges[0]) #: total mass
     mrat = kale.utils.midpoints(edges[1]) #: mass ratio
-    fobs_orb_cents = kale.utils.midpoints(edges[3]) 
+    fobs_orb_cents = kale.utils.midpoints(edges[3])
     fobs = 2.0 * fobs_orb_cents           #: gw fobs
 
     for dd in range(3):
@@ -283,7 +289,7 @@ def get_samples_from_edges(edges, redz, number_shape, flatten=True):
     fobs = np.swapaxes(fobs, 0, 3) # M,Q,Z,F
 
     # check shapes again
-    if np.any([mtot.shape != number_shape, 
+    if np.any([mtot.shape != number_shape,
                 mrat.shape != number_shape,
                 redz.shape != number_shape,
                 fobs.shape != number_shape]):
@@ -299,7 +305,7 @@ def get_samples_from_edges(edges, redz, number_shape, flatten=True):
 
 
 def realizer_single_sources(params, nreals, nloudest, nfreqs=40, log10=False,
-               pspace = holo.param_spaces.PS_Uniform_09B(holo.log, nsamples=1, sam_shape=None, seed=None)):
+               pspace=PSPACE):
     """ Like Realizer but using single sources from a SAM instead of Illustris populations
 
     Parameters
@@ -318,14 +324,15 @@ def realizer_single_sources(params, nreals, nloudest, nfreqs=40, log10=False,
         mtot, mrat, redz, and fobs of each source in log space
 
     sspar is in shape [F,R,L]
-    
+
     """
+    pspace = pspace()
     fobs_cents, fobs_edges = holo.utils.pta_freqs(num=nfreqs)
-    
+
     sam, hard = pspace.model_for_params(params=params, sam_shape=None,)
     _, _, sspar, bgpar = sam.gwb(
         fobs_edges, hard=hard, nreals=nreals, nloudest=nloudest, params=True)
-    
+
     vals_names=['mtot', 'mrat', 'redz', 'fobs']
     fobs = np.repeat(fobs_cents, nreals*nloudest).reshape(nfreqs, nreals, nloudest)
     mtot = sspar[0] # g
@@ -336,7 +343,7 @@ def realizer_single_sources(params, nreals, nloudest, nfreqs=40, log10=False,
     for par in [mtot, mrat, redz, fobs]: # starts in shape F,R,L
         par = np.swapaxes(par, 0, 1) # R,F,L
         par = par.reshape(nreals, nfreqs*nloudest) # R, F*L
-        if log10:    
+        if log10:
             samples.append(np.log10(par))
         else:
             samples.append(par)
