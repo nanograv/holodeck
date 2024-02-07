@@ -41,7 +41,7 @@ html_static_path = []
 
 # Define the configuration for sphinx-apidoc
 apidoc_module_dir = 'source/apidoc_modules'
-apidoc_excluded_paths = ['../holodeck/detstats.py', '../holodeck/anisotropy.py', '../holodeck/librarian/_librarian.py']
+apidoc_excluded_paths = ['../holodeck/detstats.py', '../holodeck/anisotropy.py']
 apidoc_command_options = ' '.join([
     '-e',  # Create separate files for each module
     '-P',  # Include private modules
@@ -57,7 +57,7 @@ def run_apidoc(_):
         '-T',
         '-f',
         '-o', apidoc_module_dir,
-        '../holodeck',
+        '../../holodeck',
         *apidoc_excluded_paths,
     ]
     main(argv)
