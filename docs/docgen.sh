@@ -10,7 +10,6 @@
 
 # Filename for symlink to sphinx output html files
 # the path is relative to this script's working-directory (changed to, below)
-# SYMLINK_FILE="build/readthedocs.html"
 SYMLINK_FILE="readthedocs.html"
 
 # move to this file's directory (`holodeck/docs/`)
@@ -26,8 +25,10 @@ fi
 pip install -r requirements.txt
 # Cleanup previous material
 make clean
+rm -r ./source/apidoc_modules
 # Generate apidoc automatically created documentation
-sphinx-apidoc -e -P -T -f -o ./source/apidoc_modules ../holodeck
+# sphinx-apidoc: 'https://www.sphinx-doc.org/en/master/man/sphinx-apidoc.html'
+sphinx-apidoc -e -P -T -f -o ./source/apidoc_modules ../holodeck ../holodeck/detstats.py ../holodeck/anisotropy.py ../holodeck/librarian/_librarian.py
 # Run the normal sphinx build
 make html
 # create convenience symlink
