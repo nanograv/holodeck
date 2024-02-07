@@ -43,7 +43,7 @@ The ``holodeck`` framework is currently under substantial, active development.  
 
       pip install -r requirements-dev.txt
 
-3) Build the required c libraries from ``holodeck`` cython code::
+3) Build the required c libraries from ``holodeck`` ``cython`` code::
 
       cd holodeck; python setup.py build_ext -i
 
