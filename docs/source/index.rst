@@ -15,7 +15,7 @@ holodeck
 
 .. |docs|
    image:: https://readthedocs.org/projects/holodeck-gw/badge/?version=main
-   target:: https://holodeck-gw.readthedocs.io/en/main/?badge=main
+   target:: https://readthedocs.org/projects/holodeck-gw/
 
 **Massive Black-Hole Binary Population Synthesis for Gravitational Wave Calculations ≋●≋●≋**
 
