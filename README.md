@@ -12,7 +12,7 @@ This package, which is actively under development, is aimed at providing a compr
 
 ## Installation
 
-The `holodeck` framework is currently under substantial, active development.  It will not be available on `pypi` (`pip`) or via `conda` install until it has stabilized.  Currently `holodeck` requires `python >= 3.8`, and tests are run on versions `3.8`, `3.9`, `3.10`.
+The `holodeck` framework is currently under substantial, active development.  It will not be available on `pypi` (`pip`) or via `conda` install until it has stabilized.  Currently `holodeck` requires `python >= 3.9`, and tests are run on versions `3.9`, `3.10`, `3.11`.
 
 The recommended installation for active development is to:
 
