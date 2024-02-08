@@ -52,7 +52,6 @@ from scipy.interpolate import RectBivariateSpline
 import holodeck as holo
 from holodeck import utils, cosmo, log, _PATH_DATA
 from holodeck.constants import GYR, NWTG, PC, MSOL
-import holodeck.sam_cython
 
 #: number of influence radii to set minimum radius for dens calculation
 _MIN_DENS_RAD__INFL_RAD_MULT = 10.0
@@ -421,7 +420,7 @@ class Sesana_Scattering(_Hardening):
         dens = _density_at_influence_radius_dehnen(mtot, mbulge, self._gamma_dehnen)
 
         """ Make sure that mass ratio is always < 1, and find primary/secondary masses """
-        mass_ratio_test = mass[:, 1]/mass[:, 0] 
+        mass_ratio_test = mass[:, 1]/mass[:, 0]
         inds_mrat_1 = mass_ratio_test>1
         secondary_mass = np.zeros(np.shape(mass[:, 1]))
         secondary_mass[inds_mrat_1] = mass[:, 0][inds_mrat_1]
@@ -1432,6 +1431,9 @@ class Fixed_Time_2PL_SAM(_Hardening):
             Instance configured for the given binary population.
 
         """
+        import holodeck.sams  # noqa
+        import holodeck.sams.sam_cyutils  # noqa
+
         assert np.ndim(time) == 0
         assert np.ndim(rchar) == 0
         assert np.ndim(gamma_inner) == 0
@@ -1440,7 +1442,7 @@ class Fixed_Time_2PL_SAM(_Hardening):
         shape = mtot.shape
         mt, mr = [mm.flatten() for mm in [mtot, mrat]]
 
-        norm_log10 = holo.sam_cython.find_2pwl_hardening_norm(
+        norm_log10 = holo.sams.sam_cyutils.find_2pwl_hardening_norm(
             time, mt, mr,
             sepa_init, rchar, gamma_inner, gamma_outer, num_steps,
         )
@@ -1470,6 +1472,8 @@ class Fixed_Time_2PL_SAM(_Hardening):
         raise NotImplementedError()
 
     def dadt(self, mtot, mrat, sepa, norm=None):
+        import holodeck.sams.sam_cyutils   # noqa
+
         if norm is None:
             norm = self._norm
 
@@ -1477,7 +1481,7 @@ class Fixed_Time_2PL_SAM(_Hardening):
         shape = args[0].shape
         args = [aa.flatten() for aa in args]
         mtot, mrat, sepa, norm = args
-        dadt_vals = holo.sam_cython.hard_func_2pwl_gw(
+        dadt_vals = holo.sams.sam_cyutils.hard_func_2pwl_gw(
             mtot, mrat, sepa, norm,                             # must all be 1darrays of matching size (X,)
             self._rchar, self._gamma_inner, self._gamma_outer   # must all be scalars
         )

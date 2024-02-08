@@ -13,8 +13,8 @@ import matplotlib.cm as cm
 import kalepy as kale
 
 import holodeck as holo
-from holodeck import cosmo, utils, observations, log
-from holodeck.constants import MSOL, PC, YR
+from holodeck import utils, log
+from holodeck.constants import MSOL, YR
 
 FIGSIZE = 6
 FONTSIZE = 13
@@ -38,7 +38,7 @@ LABEL_GW_FREQUENCY_NHZ = r"GW Frequency $[\mathrm{nHz}]$"
 LABEL_SEPARATION_PC = r"Binary Separation $[\mathrm{pc}]$"
 LABEL_CHARACTERISTIC_STRAIN = r"GW Characteristic Strain"
 LABEL_HARDENING_TIME = r"Hardening Time $[\mathrm{Gyr}]$"
-
+LABEL_CLC0 = r"$C_\ell / C_0$"
 
 PARAM_KEYS = {
     'hard_time': r"phenom $\tau_f$",
@@ -56,6 +56,10 @@ PARAM_KEYS = {
     'mmb_plaw': r"MMB $\alpha_{\mu}$",
     'mmb_scatter_dex': r"MMB $\epsilon_{\mu}$",
 }
+
+LABEL_DPRATIO = r"$\langle N_\mathrm{SS} \rangle / \mathrm{DP}_\mathrm{BG}$"
+LABEL_EVSS = r"$\langle N_\mathrm{SS} \rangle$"
+LABEL_DPBG = r"$\mathrm{DP}_\mathrm{BG}$"
 
 COLORS_MPL = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
@@ -368,7 +372,7 @@ def _get_norm(data, midpoint=None, log=False):
     else:
         try:
             min, max = utils.minmax(data, filter=log)
-        except:
+        except Exception:
             err = f"Input `data` ({type(data)}) must be an integer, (2,) of scalar, or ndarray of scalar!"
             log.exception(err)
             raise ValueError(err)
@@ -499,7 +503,8 @@ def draw_ss_and_gwb(ax, xx, hc_ss, gwb, nsamp=10,
             if(ii==0):
                 label=bglabel
             else: label=None
-            ax.plot(xx, gwb[:, ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-')
+            cc = colors[ci] if color is None else color
+            ax.plot(xx, gwb[:, ii], color=cc, alpha=0.25, lw=1.0, ls='-')
             for ll in range(len(hc_ss[0,0])):
                 if(ll==0):
                     edgecolor='k'
@@ -508,7 +513,7 @@ def draw_ss_and_gwb(ax, xx, hc_ss, gwb, nsamp=10,
                 else:
                     edgecolor=None
                     label=None
-                ax.scatter(xx, hc_ss[:, ii, ll], color=colors[ci], alpha=0.25,
+                ax.scatter(xx, hc_ss[:, ii, ll], color=cc, alpha=0.25,
                            edgecolor=edgecolor, label=label)
             ci+=1
 
@@ -733,6 +738,49 @@ def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill=
     med, *conf = rv.T
     # plot median
     hh, = ax.plot(xx, med, **plot)
+
+    # Reshape confidence intervals to nice plotting shape
+    # 2*P, X ==> (P, 2, X)
+    conf = np.array(conf).reshape(len(percs), 2, xx.size)
+
+    kw = dict(color=hh.get_color())
+    kw.update(fill)
+    fill = kw
+
+    # plot each confidence interval
+    for lo, hi in conf:
+        gg = ax.fill_between(xx, lo, hi, **fill)
+
+    return (hh, gg)
+
+def draw_med_conf_color(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={},
+                        filter=False, color=None, linestyle='-'):
+    plot.setdefault('alpha', 0.75)
+    fill.setdefault('alpha', 0.2)
+    percs = np.atleast_1d(fracs)
+    assert np.all((0.0 <= percs) & (percs <= 1.0))
+
+    # center the target percentages into pairs around 50%, e.g.  68 ==> [16,84]
+    inter_percs = [[0.5-pp/2, 0.5+pp/2] for pp in percs]
+    # Add the median value (50%)
+    inter_percs = [0.5, ] + np.concatenate(inter_percs).tolist()
+    # Get percentiles; they go along the last axis
+    if filter:
+        rv = [
+            kale.utils.quantiles(vv[vv > 0.0], percs=inter_percs, weights=weights)
+            for vv in vals
+        ]
+        rv = np.asarray(rv)
+    else:
+        rv = kale.utils.quantiles(vals, percs=inter_percs, weights=weights, axis=-1)
+
+    med, *conf = rv.T
+
+    # plot median
+    if color is not None:
+        hh, = ax.plot(xx, med, color=color, linestyle=linestyle, **plot)
+    else:
+        hh, = ax.plot(xx, med, **plot)
 
     # Reshape confidence intervals to nice plotting shape
     # 2*P, X ==> (P, 2, X)
@@ -1412,6 +1460,17 @@ def _contour2d(ax, edges, hist, levels, outline=True, **kwargs):
 
     return edges, hist, cont
 
+
+def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
+    '''
+    https://stackoverflow.com/a/18926541
+    '''
+    if isinstance(cmap, str):
+        cmap = plt.get_cmap(cmap)
+    new_cmap = mpl.colors.LinearSegmentedColormap.from_list(
+        'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
+        cmap(np.linspace(minval, maxval, n)))
+    return new_cmap
 
 # =================================================================================================
 # ====    Below Needs Review / Cleaning    ====

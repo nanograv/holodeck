@@ -4,7 +4,7 @@
 [![GitHub version](https://badge.fury.io/gh/nanograv%2Fholodeck.svg)](https://badge.fury.io/gh/nanograv%2Fholodeck)
 [![build](https://github.com/nanograv/holodeck/actions/workflows/unit-tests-ci.yaml/badge.svg)](https://github.com/nanograv/holodeck/actions/workflows/unit-tests-ci.yaml)
 [![codecov](https://codecov.io/gh/nanograv/holodeck/branch/main/graph/badge.svg?token=K63WQH3ED9)](https://codecov.io/gh/nanograv/holodeck)
-[![Documentation Status](https://readthedocs.org/projects/holodeck-gw/badge/?version=main)](https://holodeck-gw.readthedocs.io/en/main/?badge=main)
+[![Documentation Status](https://readthedocs.org/projects/holodeck-gw/badge/?version=main)](https://readthedocs.org/projects/holodeck-gw/)
 
 *Massive Black-Hole Binary Population Synthesis for Gravitational Wave Calculations ≋●≋●≋*
 
@@ -12,7 +12,7 @@ This package, which is actively under development, is aimed at providing a compr
 
 ## Installation
 
-The `holodeck` framework is currently under substantial, active development.  It will not be available on `pypi` (`pip`) or via `conda` install until it has stabilized.  Currently `holodeck` requires `python >= 3.8`, and tests are run on versions `3.8`, `3.9`, `3.10`.
+The `holodeck` framework is currently under substantial, active development.  It will not be available on `pypi` (`pip`) or via `conda` install until it has stabilized.  Currently `holodeck` requires `python >= 3.9`, and tests are run on versions `3.9`, `3.10`, `3.11`.
 
 The recommended installation for active development is to:
 
@@ -23,6 +23,16 @@ The recommended installation for active development is to:
 4) Perform an development/editable local installation: `python setup.py develop`
 
 The 'editable' installation allows the code base to be modified, and have those changes take effect when using the `holodeck` module without having to rebuild/reinstall it.
+
+### MPI
+
+For some scripts (particularly for generating libraries), an MPI implementation is required (e.g. `openmpi`), along with the [`mpi4py` package](https://github.com/mpi4py/mpi4py).  This is not included as a requirement in the `requirements.txt` file as it significantly increases the installation complexity, and is not needed for many `holodeck` use cases.  If you need the additional functionality, try installing `mpi4py` and if needed an MPI implementation.
+
+To see if you have `mpi4py` installed, run `python -c 'import mpi4py; print(mpi4py.__version__)'` from a terminal.
+
+#### macos
+
+If you are using homebrew on macos, you should be able to simply run: `brew install mpi4py` which will [include the required openmpi implementation](https://mpi4py.readthedocs.io/en/latest/install.html#macos).  If you already have an MPI implementation installed, and you are using anaconda, you should be able to install the `mpy4py` python package with: `conda install mpi4py`.
 
 
 ## Quickstart
@@ -65,7 +75,7 @@ To install this package for just this repository:
 
 ## Copyright
 
-Copyright (c) 2022, NANOGrav
+Copyright (c) 2023, NANOGrav
 
 The `holodeck` package uses an [MIT license](./LICENSE).
 

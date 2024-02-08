@@ -334,6 +334,7 @@ class Pop_Illustris(_Population_Discrete):
         super()._init()
         fname = self._fname
         header, data = utils.load_hdf5(fname)
+        self._sample_volume_mpc3 = header['box_volume_mpc']            #: comoving-volume of sim [Mpc^3]
         self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3   #: comoving-volume of sim [cm^3]
 
         # Select the stellar radius
@@ -614,7 +615,7 @@ class PM_Mass_Reset(_Population_Modifier):
         """
         # if `mhost` is a class (not an instance), then instantiate it; make sure its a subclass
         # of `_Host_Relation`
-        mhost = utils._get_subclass_instance(mhost, None, holo.relations._Host_Relation)
+        mhost = utils.get_subclass_instance(mhost, None, holo.relations._Host_Relation)
         # store attributes
         self.mhost = mhost         #: Scaling relationship between host and MBH (`holo.relations._Host_Relation`)
         self._scatter = scatter    #: Bool determining whether resampled masses should include statistical scatter
@@ -633,7 +634,7 @@ class PM_Mass_Reset(_Population_Modifier):
         # Store old version
         pop._mass = pop.mass
         # if `scatter` is `True`, then it is set to the value in `mhost.SCATTER_DEX`
-        pop.mass = self.mhost.mbh_from_host(pop, scatter)
+        pop.mass = self.mhost.mbh_from_host(pop, scatter=scatter)
         return
 
 
