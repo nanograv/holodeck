@@ -1,12 +1,10 @@
 # Minimal makefile for Sphinx documentation
 #
 
-# You can set these variables from the command line.
-SPHINXOPTS    = -v -T -j auto
-# SPHINXOPTS    = -W --keep-going -n      # FAIL on errors, but finish build attempt; be nit-picky
-# SPHINXOPTS    = -W --keep-going      # FAIL on errors, but finish build attempt
-SPHINXBUILD   = sphinx-build
-SPHINXPROJ    = holodeck
+# You can set these variables from the command line, and also
+# from the environment for the first two.
+SPHINXOPTS    ?= -w sphinx.log -j 8
+SPHINXBUILD   ?= sphinx-build
 SOURCEDIR     = source
 BUILDDIR      = build
 

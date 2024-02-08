@@ -17,13 +17,13 @@ import numpy as np
 # NOTE: `short_description` gets first line of `__doc__` only (linebreaks not allowed by setuptools)
 short_description = __doc__.strip().split('\n')[0]
 
-with open("README.md", "r") as handle:
+with open(join('.', "README.md"), "r") as handle:
     long_description = handle.read()
 
-with open("requirements.txt", "r") as handle:
+with open(join('.', "requirements.txt"), "r") as handle:
     requirements = handle.read()
 
-with open('holodeck/version.txt') as handle:
+with open(join('.', 'holodeck', 'version.txt')) as handle:
     version = handle.read().strip()
 
 
@@ -47,9 +47,9 @@ ext_cyutils = Extension(
     extra_compile_args=['-Wno-unreachable-code-fallthrough', '-Wno-unused-function'],
 )
 
-ext_sam_cython = Extension(
-    "holodeck.sam_cython",    # specify the resulting name/location of compiled extension
-    sources=[join('.', 'holodeck', 'sam_cython.pyx')],   # location of source code
+ext_sam_cyutils = Extension(
+    "holodeck.sams.sam_cyutils",    # specify the resulting name/location of compiled extension
+    sources=[join('.', 'holodeck', 'sams', 'sam_cyutils.pyx')],   # location of source code
     # define parameters external libraries
     include_dirs=[
         np.get_include()
@@ -66,7 +66,7 @@ ext_sam_cython = Extension(
 )
 
 cython_modules = cythonize(
-    [ext_cyutils, ext_sam_cython],
+    [ext_cyutils, ext_sam_cyutils],
     compiler_directives={"language_level": "3"},
     annotate=True,   # create html output about cython files
 )
@@ -75,7 +75,7 @@ cython_modules = cythonize(
 # ---- Perform Setup ----
 
 setup(
-    name='holodeck',
+    name='holodeck-gw',
     author='NANOGrav',
     author_email='luke.kelley@nanograv.org',
     description=short_description,
@@ -100,7 +100,7 @@ setup(
 
     # Additional entries you may want simply uncomment the lines you want and fill in the data
     # url='http://www.my_package.com',  # Website
-    python_requires=">=3.8",          # Python version restrictions
+    python_requires=">=3.9",          # Python version restrictions
 
     ext_modules=cython_modules,
 )

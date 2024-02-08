@@ -18,7 +18,12 @@ import os
 import subprocess
 import warnings
 from pathlib import Path
-from typing import Optional, Tuple, Union, List  # , Sequence,
+from typing import Optional, Tuple, Union, List   #, Callable, TypeVar, Any  # , TypeAlias  # , Sequence,
+
+# try:
+#     from typing import ParamSpec
+# except ImportError:
+#     from typing_extensions import ParamSpec
 
 import h5py
 import numba
@@ -29,7 +34,7 @@ import scipy.stats    # noqa
 import scipy.special  # noqa
 
 from holodeck import log, cosmo
-from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC
+from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC, EDDT
 
 # [Sesana2004]_ Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
@@ -68,9 +73,51 @@ class _Modifier(abc.ABC):
         pass
 
 
+# T = TypeVar('T')
+# P = ParamSpec('P')
+# WrappedFuncDeco: TypeAlias = Callable[[Callable[P, T]], Callable[P, T]]
+# WrappedFuncDeco: 'TypeAlias' = Tuple[float, float]
+
+# def copy_docstring(copy_func: Callable[..., Any]) -> WrappedFuncDeco[P, T]:
+#     """Copies the doc string of the given function to the wrapped function.
+
+#     see: https://stackoverflow.com/a/68901244/230468
+#     """
+
+#     def wrapped(func: Callable[P, T]) -> Callable[P, T]:
+#         func.__doc__ = copy_func.__doc__
+#         return func
+
+#     return wrapped
+
+
 # =================================================================================================
 # ====    General Logistical    ====
 # =================================================================================================
+
+
+def deprecated_warn(msg, exc_info=True):
+    """Decorator for functions that will be deprecated, add warning, but still execute function.
+    """
+
+    def decorator(func):
+        nonlocal msg
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            nonlocal msg
+            old_name = func.__name__
+            _frame = inspect.currentframe().f_back
+            file_name = inspect.getfile(_frame.f_code)
+            fline = _frame.f_lineno
+            msg = f"{file_name}({fline}):{old_name} is deprecated!" + " | " + msg
+            warnings.warn_explicit(msg, category=DeprecationWarning, filename=file_name, lineno=fline)
+            log.warning(f"DEPRECATION: {msg}", exc_info=exc_info)
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 def deprecated_pass(new_func, msg="", exc_info=True):
@@ -173,7 +220,7 @@ def load_hdf5(fname, keys=None):
     return header, data
 
 
-def my_print(*args, **kwargs):
+def mpi_print(*args, **kwargs):
     return print(*args, flush=True, **kwargs)
 
 
@@ -270,7 +317,7 @@ def path_name_ending(path, ending):
     return fname
 
 
-def _get_subclass_instance(value, default, superclass):
+def get_subclass_instance(value, default, superclass, allow_none=False):
     """Convert the given `value` into a subclass instance.
 
     `None` ==> instance from `default` class
@@ -302,6 +349,10 @@ def _get_subclass_instance(value, default, superclass):
     # Set `value` to a default, if needed and it is given
     if (value is None) and (default is not None):
         value = default
+
+    # if `value` is not set, and there is no default, and `None` is allowed... just return None
+    if (value is None) and allow_none:
+        return value
 
     # If `value` is a class (constructor), then construct an instance from it
     if inspect.isclass(value):
@@ -472,8 +523,6 @@ def scatter_redistribute_densities(cents, dens, dist=None, scatter=None, axis=0)
     weights = _get_rolled_weights(log_cents, dist)
     dens_new = _scatter_with_weights(dens, weights, axis=0)
     return dens_new
-
-
 
 
 def eccen_func(cent: float, width: float, size: int) -> np.ndarray:
@@ -665,6 +714,12 @@ def midpoints(vals, axis=-1, log=False):
     return mm
 
 
+def midpoints_multiax(vals, axis, log=False):
+    for aa in axis:
+        vals = midpoints(vals, aa, log=log)
+    return vals
+
+
 def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
     """Find the minimum and maximum values in the given array.
 
@@ -779,83 +834,46 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
     return ynew
 
 
-def nyquist_freqs(
-    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
-) -> np.ndarray:
-    """Calculate Nyquist frequencies for the given timing parameters.
+def pta_freqs(dur=16.03*YR, num=40, cad=None):
+    """Get Fourier frequency bin specifications for the given parameters.
 
-    Parameters
-    ----------
+    Arguments
+    ---------
     dur : float,
-        Duration of observations
-    cad : float,
-        Cadence of observations
-    trim : (2,) or None,
-        Specification of minimum and maximum frequencies outside of which to remove values.
-        `None` can be used in place of either boundary, e.g. [0.1, None] would mean removing
-        frequencies below `0.1` (and not trimming values above a certain limit).
+        Total observing duration, which determines the minimum sensitive frequency, ``1/dur``.
+        Typically `dur` should be given in units of [sec], such that the returned frequencies are
+        in units of [1/sec] = [Hz]
+    num : int,
+        Number of frequency bins.  If `cad` is not None, then the number of frequency bins is
+        determined by `cad` and the `num` value is disregarded.
+    cad : float or `None`,
+        Cadence of observations, which determines the maximum sensitive frequency (i.e. the Nyquist
+        frequency).  If `cad` is not given, then `num` frequency bins are constructed.
 
     Returns
     -------
-    freqs : ndarray,
-        Nyquist frequencies
+    cents : (F,) ndarray
+        Bin-center frequencies for `F` bins.  The frequency bin centers are at:
+        ``F_i = (i + 1.5) / dur`` for i between 0 and `num-1`.
+        The number of frequency bins, `F` is the argument `num`,
+        or determined by `cad` if it is given.
+    edges : (F+1,) ndarray
+        Bin-edge frequencies for `F` bins, i.e. `F+1` bin edges.  The frequency bin edges are at:
+        ``F_i = (i + 1) / dur`` for i between 0 and `num`.
+        The number of frequency bins, `F` is the argument `num`,
+        or determined by `cad` if it is given.
 
     """
     fmin = 1.0 / dur
-    fmax = 1.0 / cad * 0.5
-    # df = fmin / sample
-    df = fmin
-    freqs = np.arange(fmin, fmax + df/10.0, df)
-    if trim is not None:
-        if np.shape(trim) != (2,):
-            raise ValueError("`trim` (shape: {}) must be (2,) of float!".format(np.shape(trim)))
-        if trim[0] is not None:
-            freqs = freqs[freqs > trim[0]]
-        if trim[1] is not None:
-            freqs = freqs[freqs < trim[1]]
+    if cad is not None:
+        num = dur / (2.0 * cad)
+        num = int(np.floor(num))
 
-    return freqs
+    cents = np.arange(1, num+2) * fmin
 
-
-def nyquist_freqs_edges(
-    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
-) -> np.ndarray:
-    """Calculate Nyquist frequencies for the given timing parameters.
-
-    Parameters
-    ----------
-    dur : float,
-        Duration of observations
-    cad : float,
-        Cadence of observations
-    trim : (2,) or None,
-        Specification of minimum and maximum frequencies outside of which to remove values.
-        `None` can be used in place of either boundary, e.g. [0.1, None] would mean removing
-        frequencies below `0.1` (and not trimming values above a certain limit).
-
-    Returns
-    -------
-    freqs : ndarray,
-        edges of Nyquist frequency bins
-
-    """
-    fmin = 1.0 / dur
-    fmax = 1.0 / cad * 0.5
-    # df = fmin / sample
-    df = fmin    # bin width
-    freqs = np.arange(fmin, fmax + df/10.0, df)   # centers
-    freqs_edges = freqs - df/2.0    # shift to edges
-    freqs_edges = np.concatenate([freqs_edges, [fmax + df/2.0]])
-
-    if trim is not None:
-        if np.shape(trim) != (2,):
-            raise ValueError("`trim` (shape: {}) must be (2,) of float!".format(np.shape(trim)))
-        if trim[0] is not None:
-            freqs_edges = freqs_edges[freqs_edges > trim[0]]
-        if trim[1] is not None:
-            freqs_edges = freqs_edges[freqs_edges < trim[1]]
-
-    return freqs_edges
+    edges = cents - fmin / 2.0
+    cents = cents[:-1]
+    return cents, edges
 
 
 def print_stats(stack=True, print_func=print, **kwargs):
@@ -1047,7 +1065,7 @@ def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = T
         Input to be integrated.
     xx : ArrayLike of scalar,
         The sample points corresponding to the `yy` values.
-        This must be either be shaped as
+        This must either be shaped as
         * the same number of dimensions as `yy`, with the same length along the `axis` dimension, or
         * 1D with length matching `yy[axis]`
     axis : int,
@@ -1665,6 +1683,26 @@ def rad_isco(m1, m2=0.0, factor=3.0):
     return factor * schwarzschild_radius(m1+m2)
 
 
+def frst_isco(m1, m2=0.0, **kwargs):
+    """Get rest-frame orbital frequency of ISCO orbit.
+
+    Arguments
+    ---------
+    m1 : array_like, units of [gram]
+        Total mass, or mass of the primary.  Added together with `m2` to get total mass.
+    m2 : array_like, units of [gram]  or  None
+        Mass of secondary, or None if `m1` is already total mass.
+
+    Returns
+    -------
+    fisco : array_like, units of [Hz]
+
+    """
+    risco = rad_isco(m1, m2, **kwargs)
+    fisco = kepler_freq_from_sepa(m1+m2, risco)
+    return fisco
+
+
 def redz_after(time, redz=None, age=None):
     """Calculate the redshift after the given amount of time has passed.
 
@@ -1812,6 +1850,32 @@ def angs_from_sepa(sepa, dcom, redz):
     angs = sepa / dang           # angular-separation [radians]
     return angs
 
+
+def eddington_accretion(mass, eps=0.1):
+    """Eddington Accretion rate, $\\dot{M}_{Edd} = L_{Edd}/\\epsilon c^2$.
+
+    Arguments
+    ---------
+    mass : array_like of scalar
+        BH Mass.
+    eps : array_like of scalar
+        Efficiency parameter.
+
+    Returns
+    -------
+    mdot : array_like of scalar
+        Eddington accretion rate.
+
+    """
+    edd_lum = eddington_luminosity(mass, eps=eps)
+    # NOTE: no `epsilon` (efficiency) in this equation, because included in `eddington_luminosity`
+    mdot = edd_lum/np.square(SPLC)
+    return mdot
+
+
+def eddington_luminosity(mass, eps=0.1):
+    ledd = EDDT * mass / eps
+    return ledd
 
 
 # =================================================================================================
@@ -2321,5 +2385,21 @@ def _array_args(*args):
 @deprecated_fail(scatter_redistribute_densities)
 def scatter_redistribute(cents, dist, dens, axis=0):
     pass
+
+
+#! DEPRECATED
+def nyquist_freqs(dur, cad):
+    """DEPRECATED.  Use `holodeck.utils.pta_freqs` instead.
+    """
+    msg = ""
+    old_name = "nyquist_freqs"
+    new_name = "pta_freqs"
+    _frame = inspect.currentframe().f_back
+    file_name = inspect.getfile(_frame.f_code)
+    fline = _frame.f_lineno
+    msg = f"{file_name}({fline}):{old_name} ==> {new_name}" + (len(msg) > 0) * " | " + msg
+    warnings.warn_explicit(msg, category=DeprecationWarning, filename=file_name, lineno=fline)
+    log.warning(f"DEPRECATION: {msg}", exc_info=True)
+    return pta_freqs(dur=dur, num=None, cad=cad)[0]
 
 
