@@ -11,6 +11,7 @@ This package is aimed at providing a comprehensive framework for MBH binary popu
 **This File:**
 
 .. contents:: :local:
+   :depth: 1
 
 
 Getting Started
@@ -97,7 +98,7 @@ Documents in this Guide
 .. toctree::
    :maxdepth: 2
 
-   getting_started/index
+   Getting Started <getting_started/index>
 
 .. toctree::
    :maxdepth: 1

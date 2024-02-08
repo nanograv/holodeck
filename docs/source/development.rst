@@ -2,6 +2,11 @@
 Development & Contributions
 ===========================
 
+**This File:**
+
+.. contents:: :local:
+   :depth: 1
+
 This project is being led by the `NANOGrav <http://nanograv.org/>`_ Astrophysics Working Group.  Details on contributions and the mandatory code of conduct can be found in `CONTRIBUTING.md <https://raw.githubusercontent.com/nanograv/holodeck/docs/CONTRIBUTING.md>`_.
 
 Contributions are welcome and encouraged, anywhere from new modules/customizations, to bug-fixes, to improved documentation and usage examples.  The git workflow is based around a ``main`` branch which is intended to be (relatively) stable and operational, and an actively developed ``dev`` branch.  New development should be performed in "feature" branches (made off of the ``dev`` branch), and then incorporated via pull-request (back into the ``dev`` branch).
@@ -9,7 +14,6 @@ Contributions are welcome and encouraged, anywhere from new modules/customizatio
 For active developers, please install the additional development package requirements::
 
    pip install -r requirements-dev.txt
-
 
 Formatting
 ----------
