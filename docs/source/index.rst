@@ -16,10 +16,10 @@ This package is aimed at providing a comprehensive framework for MBH binary popu
 Getting Started
 ===============
 
-| (1) Read/skim the :doc:`Getting Started <getting_started/index>` guide.
-| (2) Install ``holodeck`` following the `installation`_ instructions below, or in the `package README.md file <https://github.com/nanograv/holodeck/tree/main/README.md>`_.
+| (1) Read the ``holodeck`` :doc:`getting started <getting_started/index>` guide.
+| (2) Install ``holodeck`` following the `installation`_ instructions below.
 | (3) Explore the `package demonstration notebooks <https://github.com/nanograv/holodeck/tree/main/notebooks>`_.
-
+| (4) Read the `Development & Contributions <development>`_ guide.
 
 
 Installation
@@ -27,15 +27,15 @@ Installation
 
 The ``holodeck`` framework is currently under substantial, active development.  Recent versions will not generally be available with ``pip`` or ``conda`` install.  Currently ``holodeck`` requires ``python >= 3.9`` (tests are run on versions ``3.9``, ``3.10``, ``3.11``).  The recommended installation is:
 
-0) OPTIONAL but recommended: create and activate a new anaconda environment to isolate your build::
+1) OPTIONAL but recommended: create and activate a new anaconda environment to isolate your build::
 
       conda create --name holo311 python=3.11; conda activate holo311
 
-1) Clone the ``holodeck`` repository, and move into the repo directory::
+2) Clone the ``holodeck`` repository, and move into the repo directory::
 
       git clone https://github.com/nanograv/holodeck.git; cd holodeck
 
-2) Install the required external packages specified in the requirements file::
+3) Install the required external packages specified in the requirements file::
 
       pip install -r requirements.txt
 
@@ -43,11 +43,11 @@ The ``holodeck`` framework is currently under substantial, active development.  
 
       pip install -r requirements-dev.txt
 
-3) Build the required c libraries from ``holodeck`` ``cython`` code::
+4) Build the required c libraries from ``holodeck`` ``cython`` code::
 
       cd holodeck; python setup.py build_ext -i
 
-4) Perform a development/editable local installation::
+5) Perform a development/editable local installation::
 
       python setup.py develop
 
@@ -60,53 +60,6 @@ For some scripts (particularly for generating libraries), an MPI implementation 
 
 **macos users**: if you are using homebrew on macos, you should be able to simply run: ``brew install mpi4py`` which will `include the required openmpi implementation <https://mpi4py.readthedocs.io/en/latest/install.html#macos>`_.
 
-
-Development & Contributions
-===========================
-
-This project is being led by the `NANOGrav <http://nanograv.org/>`_ Astrophysics Working Group.  Details on contributions and the mandatory code of conduct can be found in `CONTRIBUTING.md <https://raw.githubusercontent.com/nanograv/holodeck/docs/CONTRIBUTING.md>`_.
-
-Contributions are welcome and encouraged, anywhere from new modules/customizations, to bug-fixes, to improved documentation and usage examples.  The git workflow is based around a ``main`` branch which is intended to be (relatively) stable and operational, and an actively developed ``dev`` branch.  New development should be performed in "feature" branches (made off of the ``dev`` branch), and then incorporated via pull-request (back into the ``dev`` branch).
-
-For active developers, please install the additional development package requirements::
-
-   pip install -r requirements-dev.txt
-
-
-Formatting
-----------
-
-New code should generally abide by `PEP8 formatting <https://peps.python.org/pep-0008/>`_, with `numpy-style docstrings <https://numpydoc.readthedocs.io/en/latest/format.html#>`_.  Exceptions are:
-
-* lines may be broken at either 100 or 120 columns
-
-Notebooks
----------
-
-Please strip all notebook outputs before commiting notebook changes.  The `nbstripout <https://github.com/kynan/nbstripout>`_ package is an excellent option to automatically strip all notebook output only in git commits (i.e. it doesn't change your notebooks in-place).  You can also use ``nbconvert`` to strip output in place::
-
-   jupyter nbconvert --clear-output --inplace <NOTEBOOK-NAME>.ipynb
-
-To install ``nbstripout`` for the ``holodeck`` git repository, make sure you're in the ``holodeck`` root directory and run:
-
-.. code-block:: bash
-
-  pip install --upgrade nbstripout    # install nbstripout
-  nbstripout --install                # install git hook in current repo only
-
-
-Test Suite
-----------
-
-**Before submitting a pull request, please run the test suite on your local machine.**
-
-Tests can be run by using ``$ pytest`` in the root holodeck directory.  Tests can also be run against all supported python versions and system configurations by using ``$ tox``.  ``tox`` creates anaconda environments for each supported python version, sets up the package and test suite, and then runs ``pytest`` to execute tests.
-
-Two types of unit-tests are generally used in ``holodeck``.
-
-(1) Simple functions and behaviors are included as normal unit-tests, e.g. in "holodeck/tests" and similar directories.  These are automatically run by ``pytest`` and ``tox``.
-
-(2) More complex functionality should be tested in notebooks (in "notebooks/") where they can also be used as demonstrations/tutorials for that behavior.  Certain notebooks are also converted into unit-test modules to be automatically run by ``pytest`` and ``tox``.  The python script `scripts/convert_notebook_tests.py <https://github.com/nanograv/holodeck/blob/main/scripts/convert_notebook_tests.py>`_ converts target notebooks into python scripts in the ``holodeck/tests/converted_notebooks`` directory, which are then run by ``pytest``.  The script `scripts/tester.sh <https://github.com/nanograv/holodeck/blob/main/scripts/tester.sh>`_ will run the conversion script and then run ``pytest``.  For help and usage information, run ``$ scripts/tester.sh -h``.
 
 
 Attribution & Referencing
@@ -138,8 +91,8 @@ A dedicated paper on ``holodeck`` is currently in preparation, but the package i
    }
 
 
-Full package documentation
-==========================
+Documents in this Guide
+=======================
 
 .. toctree::
    :maxdepth: 2
@@ -149,7 +102,9 @@ Full package documentation
 .. toctree::
    :maxdepth: 1
 
+   Definitions & Abbreviations <defs_abbrevs>
    Bibliography <biblio>
+   Development & Contributions <development>
 
 .. toctree::
    :maxdepth: 2
