@@ -57,7 +57,7 @@ def run_apidoc(_):
         '-T',
         '-f',
         '-o', apidoc_module_dir,
-        '../../holodeck',
+        '../holodeck',
         *apidoc_excluded_paths,
     ]
     main(argv)
