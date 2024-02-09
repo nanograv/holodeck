@@ -43,6 +43,8 @@ Populations
 
 The SAMs use simple, analytic components to calculate populations of binaries.  Holodeck calculates the number-density of MBH binaries, by calculating a number-density of galaxy-galaxy mergers, and then converting from galaxy properties to MBH properties by using an MBH-host relationship.
 
+The SAMs are initialized over a 3-dimensional parameter space of total MBH mass (:math:`M = m_1 + m_2`), MBH mass ratio (:math:`q = m_2 / m_1 \leq 1`), and redshift (:math:`z`).  The ``holodeck`` code typically refers to the number of bins in each of these dimensions as ``M``, ``Q``, and ``Z``; for example, the shape of the number-density of galaxy mergers will be ``(M, Q, Z)``.  Most calculations retrieve the number of binaries in the Universe at a given set of frequencies (or sometimes binary separations), so the returned values will be 4-dimensional with an additional axis with ``F`` frequency bins added.  For example, the number of binaries at a given set of frequencies will typically be arrays of shape ``(M, Q, Z, F)``.
+
 Galaxy Mergers
 ^^^^^^^^^^^^^^
 
@@ -53,8 +55,23 @@ Galaxy Mergers
    \frac{\partial^3 n_{\star\star}(M_\star, q_\star, z)}{\partial \log_{10} \! M_\star \, \partial q_\star \, \partial z}
    = \psi(m_{1,\star}) \, R_\star(M_\star, q_\star).
 
-Here, :math:`M_\star = m_{1,\star} + m_{2,\star}` is the total stellar mass of both galaxies, and :math:`q_\star = m_{2,\star} / m_{1,\star} \leq 1` is the stellar mass ratio. Often in the literature, the GMR is estimated as a galaxy pair fraction (GPF; :math:`P_\star`) divided by a galaxy merger timescale (GMT; :math:`T_\star`), i.e. :math:`R_\star \approx P_\star / T_\star`.  The GPF is typically an observationally-derived component, defined roughly as, :math:`P_\star(m_{1,\star}, q_\star) \equiv N_{\star\star}(m_{1,\star}, q_\star) / N_\star(m_{1,\star})`, i.e. the number of galaxy pairs in a given survey divided by the number of all galaxies in the parent sample.  Note that there are significant selection effects in determing the number of galaxy pairs, including cuts on galaxy brightness/mass, and especially on the separations :math:`a_0` and :math:`a_1` between which pairs can be identified robustly.  The GMT is typically derived from numerical simulations, and defined roughly as, :math:`T_\star(M_\star, q_\star) \equiv \int_{a_0}^{a_1} \left[da/dt\right]^{-1}_{\star\star} da`, i.e. the total time that the galaxy pair spends at separations between :math:`a_0` and :math:`a_1`.
+Here, :math:`M_\star = m_{1,\star} + m_{2,\star}` is the total stellar mass of both galaxies, and :math:`q_\star = m_{2,\star} / m_{1,\star} \leq 1` is the stellar mass ratio. Often in the literature, the GMR is estimated as a galaxy pair fraction (GPF; :math:`P_\star`) divided by a galaxy merger timescale (GMT; :math:`T_\star`), i.e. :math:`R_\star \approx P_\star / T_\star`.  The GPF is typically an observationally-derived component, defined roughly as, :math:`P_\star(m_{1,\star}, q_\star) \equiv N_{\star\star}(m_{1,\star}, q_\star) / N_\star(m_{1,\star})`, i.e. the number of galaxy pairs in a given survey divided by the number of all galaxies in the parent sample.  Note that there are significant selection effects in determining the number of galaxy pairs, including cuts on galaxy brightness/mass, and especially on the separations :math:`a_0` and :math:`a_1` between which pairs can be identified robustly.  The GMT is typically derived from numerical simulations, and defined roughly as, :math:`T_\star(M_\star, q_\star) \equiv \int_{a_0}^{a_1} \left[da/dt\right]^{-1}_{\star\star} da`, i.e. the total time that the galaxy pair spends at separations between :math:`a_0` and :math:`a_1`.  So we can also write:
 
+.. math::
+
+   \frac{\partial^3 n_{\star\star}(M_\star, q_\star, z)}{\partial \log_{10} \! M_\star \, \partial q_\star \, \partial z}
+   = \psi(m_{1,\star}) \, \frac{P_\star(m_{1,\star}, q_\star)}{T_\star(M_\star, q_\star)}.
+
+
+MBH Populations and MBH-Host Relations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+We now have a galaxy-galaxy merger rate, and we need to populate these galaxies with MBHs.  To do this, we need an MBH-host relationship, typically in the form of M-MBulge (:math:`m_\textrm{BH} = M_\mu(m_\textrm{bulge}, z)`; mass of the MBH, relative to the mass of the host galaxy).  Given this relationship, we can convert to MBH mergers as,
+
+.. math::
+
+   \frac{\partial^3 n(M, q, z)}{\partial \log_{10} \! M \, \partial q \, \partial}
+   = \frac{\partial^3 n_{\star\star}(M_\star, q_\star, z)}{\partial \log_{10} \! M_\star \, \partial q_\star \, \partial z} \frac{\partial M_\star}{\partial M} \frac{\partial q_\star}{\partial q} \bigg|_{m_1 = M_\mu(m_{1,\star}; m_2 = M_\mu(m_{2,\star))}.
 
 
 'Discrete' Illustris Populations
