@@ -52,13 +52,13 @@ html_static_path = []
 # Define the configuration for sphinx-apidoc
 apidoc_module_dir = 'source/apidoc_modules'
 apidoc_excluded_paths = ['../holodeck/detstats.py', '../holodeck/anisotropy.py']
-apidoc_command_options = ' '.join([
+apidoc_command_options = [
     '-M',  # put modules before submodules
     '-e',  # Create separate files for each module
     '-P',  # Include private modules
     '-T',  # Include docstrings in the table of contents
-    '-f'   # Overwrite existing files
-])
+    '-f',   # Overwrite existing files
+]
 
 # Run sphinx-apidoc to generate the .rst files
 def run_apidoc(_):
