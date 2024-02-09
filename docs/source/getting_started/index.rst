@@ -4,9 +4,6 @@ Getting Started
 
 .. raw:: latex
 
-   \input{macros.tex}
-
-
 
 .. contents:: File Contents
    :local:
