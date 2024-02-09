@@ -15,6 +15,8 @@ copyright = '2024, NANOGrav'
 author = 'NANOGrav'
 release = '1.2'
 
+# root_doc = "source/index"
+
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
@@ -50,7 +52,7 @@ html_static_path = []
 # -- Setup Sphinx's API-DOC --------------------------------------------------
 
 # Define the configuration for sphinx-apidoc
-apidoc_module_dir = 'source/apidoc_modules'
+apidoc_module_dir = './source/apidoc_modules'
 apidoc_excluded_paths = ['../holodeck/detstats.py', '../holodeck/anisotropy.py']
 apidoc_command_options = [
     '-M',  # put modules before submodules
@@ -69,7 +71,7 @@ def run_apidoc(_):
         # '-f',
         *apidoc_command_options,
         '-o', apidoc_module_dir,
-        '../../holodeck',
+        '../holodeck',
         *apidoc_excluded_paths,
     ]
     main(argv)

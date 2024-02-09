@@ -2,9 +2,6 @@
 Getting Started
 ===============
 
-.. raw:: latex
-
-
 .. contents:: File Contents
    :local:
    :depth: 1
@@ -66,12 +63,15 @@ Here, :math:`M_\star = m_{1,\star} + m_{2,\star}` is the total stellar mass of b
 MBH Populations and MBH-Host Relations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-We now have a galaxy-galaxy merger rate, and we need to populate these galaxies with MBHs.  To do this, we need an MBH-host relationship, typically in the form of M-MBulge (:math:`m_\textrm{BH} = M_\mu(m_\textrm{bulge}, z)`; mass of the MBH, relative to the mass of the host galaxy).  Given this relationship, we can convert to MBH mergers as,
+We now have a galaxy-galaxy merger rate, and we need to populate these galaxies with MBHs.  To do this, we need an MBH-host relationship, typically in the form of M-MBulge (:math:`m_\textrm{BH} = M_\mu(m_\textrm{bulge}, z)`; mass of the MBH, relative to the stellar-bulge mass of the host galaxy), and possibly a relationship between bulge mass and overall stellar-mass (i.e. :math:`m_\textrm{bulge} = m_\textrm{bulge}(m_\star)`).  Given this relationship, we can convert to MBH mergers as,
 
 .. math::
 
-   \frac{\partial^3 n(M, q, z)}{\partial \log_{10} \! M \, \partial q \, \partial}
-   = \frac{\partial^3 n_{\star\star}(M_\star, q_\star, z)}{\partial \log_{10} \! M_\star \, \partial q_\star \, \partial z} \frac{\partial M_\star}{\partial M} \frac{\partial q_\star}{\partial q} \bigg|_{m_1 = M_\mu(m_{1,\star}; m_2 = M_\mu(m_{2,\star))}.
+   \frac{\partial^3 n(M, q, z)}{\partial \log_{10} \! M \, \partial q \, \partial z}
+   = \frac{\partial^3 n_{\star\star}(M_\star, q_\star, z)}{\partial \log_{10} \! M_\star \, \partial q_\star \, \partial z}
+      \left[\frac{\partial M_\star}{\partial M}\right] \left[\frac{\partial q_\star}{\partial q} \right],
+
+where the masses must be evaluated at the appropriate locations: :math:`m_1 = M_\mu(m_{1,\star}) \, \& \, m_2 = M_\mu(m_{2,\star})`.
 
 
 'Discrete' Illustris Populations
