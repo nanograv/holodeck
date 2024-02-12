@@ -115,15 +115,13 @@ class Semi_Analytic_Model:
 
         gsmf = utils.get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
         mmbulge = utils.get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
-        # gpf = utils.get_subclass_instance(gpf, None, _Galaxy_Pair_Fraction)
-        # gmt = utils.get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
+        # if GMR is None, then we need both GMT and GPF
         if gmr is None:
-            # if GMR is None, then we need both GMT and GPF
             gmt = utils.get_subclass_instance(gmt, GMT_Power_Law, _Galaxy_Merger_Time)
             gpf = utils.get_subclass_instance(gpf, GPF_Power_Law, _Galaxy_Pair_Fraction)
+        # if GMR is given, GMT can still be used - for calculating stalling
         else:
             gmr = utils.get_subclass_instance(gmr, GMR_Illustris, _Galaxy_Merger_Rate)
-            # if GMR is given, GMT can still be used - for calculating GMT stalling
             gmt = utils.get_subclass_instance(gmt, None, _Galaxy_Merger_Time, allow_none=True)
             # if GMR is given, GPF is not used: make sure it is not given
             if (gpf is not None):
@@ -159,7 +157,7 @@ class Semi_Analytic_Model:
             if shape is not None:
                 if shape[ii] is not None:
                     par[2] = shape[ii]
-            params[ii] = np.logspace(*np.log10(par[:2]), par[2])
+            params[ii] = np.logspace(*np.log10(par[:2]), par[2]+1)
             log.debug(f"{name}: [{params[ii][0]}, {params[ii][-1]}] {params[ii].size}")
 
         mtot, mrat, redz = params
@@ -223,7 +221,7 @@ class Semi_Analytic_Model:
 
     @property
     def static_binary_density(self):
-        """The number-density of binaries in each bin, 'd^3 n / [dlog10M dq dz]' in units of [Mpc^-3].
+        """The number-density of binaries at each bin edge, 'd^3 n / [dlog10M dq dz]' in units of [Mpc^-3].
 
         This is calculated once and cached.
 
@@ -242,7 +240,7 @@ class Semi_Analytic_Model:
             log = self._log
 
             # ---- convert from MBH ===> mstar
-            
+
             redz = self.redz[np.newaxis, np.newaxis, :]
             mstar_pri, mstar_rat, mstar_tot, redz = self.mass_stellar()
 
