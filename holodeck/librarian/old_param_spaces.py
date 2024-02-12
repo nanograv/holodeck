@@ -1,13 +1,76 @@
 """
 """
 
+import numpy as np
+
 import holodeck as holo
+from holodeck import log
 from holodeck.constants import PC, GYR
 from holodeck.librarian.params import (
     _Param_Space, PD_Uniform, PD_Piecewise_Uniform_Density,
     PD_Normal,
     # PD_Uniform_Log,
 )
+
+
+# NOTE: this is stored in `old_param_spaces` instead of `hardening` because it only applied to
+#       these legacy param_spaces models.
+class Fixed_Time(holo.hardening.Fixed_Time_2PL):
+    """Legacy Version of `Fixed_Time` class such that outer power-law in time (a/dadt) is g1+g2+1.
+    """
+
+    def __init__(self, *args, **kwargs):
+        log.warning("class `Fixed_Time` has been deprecated!  Please use `Fixed_Time_2PL` with new parametrization!")
+
+        # Convert from old to new parameter names
+        replace_kwargs = [['gamma_sc', 'gamma_inner'], ['gamma_df', 'gamma_outer']]
+        for replace in replace_kwargs:
+            val = kwargs.pop(replace[0], None)
+            if replace[1] in kwargs:
+                err = f"Cannot accept kwargs for both {replace[0]} and {replace[1]}!"
+                log.exception(err)
+                raise ValueError(err)
+
+            if val is not None:
+                kwargs[replace[1]] = val
+
+        super().__init__(*args, **kwargs)
+        return
+
+    @classmethod
+    def function(cls, norm, xx, g1, g2):
+        """Hardening rate given the parameters for this hardening model.
+
+        The functional form is,
+
+        .. math::
+
+            \\dot{a} = - A * (1.0 + x)^{-g_2 - 1} / x^{g_1 - 1},
+
+        Where $A$ is an overall normalization, and x \\equiv a / r_\\mathrm{char}$ is the binary
+        separation scaled to a characteristic transition radius ($r_\\mathrm{char}$) between two
+        power-law indices $g_1$ and $g_2$.
+
+        Parameters
+        ----------
+        norm : array_like
+            Hardening rate normalization, units of [cm/s].
+        xx : array_like
+            Dimensionless binary separation, the semi-major axis in units of the characteristic
+            (i.e. transition) radius of the model `rchar`.
+        g1 : scalar
+            Power-law of hardening timescale in the stellar-scattering regime,
+            (small separations: r < rchar).
+        g2 : scalar
+            Power-law of hardening timescale in the dynamical-friction regime,
+            (large separations: r > rchar).
+
+        """
+        dadt = - norm * np.power(1.0 + xx, -g2-1) / np.power(xx, g1-1)
+        return dadt
+
+
+
 
 
 class PS_Generic_1(_Param_Space):
