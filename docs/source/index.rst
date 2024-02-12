@@ -13,6 +13,29 @@ This package is aimed at providing a comprehensive framework for MBH binary popu
 .. contents:: :local:
    :depth: 1
 
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Getting Started Guide
+
+   Introduction <getting_started/index>
+   Libraries <getting_started/libraries>
+   NANOGrav 15yr <getting_started/nanograv_15yr>
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+
+   Definitions & Abbreviations <defs_abbrevs>
+   Bibliography <biblio>
+   Development & Contributions <development>
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+
+   Full package documentation <apidoc_modules/holodeck>
+
 
 Getting Started
 ===============
@@ -90,27 +113,6 @@ A dedicated paper on ``holodeck`` is currently in preparation, but the package i
    primaryClass = {astro-ph.HE},
          adsurl = {https://ui.adsabs.harvard.edu/abs/2023ApJ...952L..37A},
    }
-
-
-Documents in this Guide
-=======================
-
-.. toctree::
-   :maxdepth: 2
-
-   Getting Started <getting_started/index>
-
-.. toctree::
-   :maxdepth: 1
-
-   Definitions & Abbreviations <defs_abbrevs>
-   Bibliography <biblio>
-   Development & Contributions <development>
-
-.. toctree::
-   :maxdepth: 2
-
-   Full package documentation <apidoc_modules/holodeck>
 
 
 Indices and tables
