@@ -2,9 +2,22 @@
 Getting Started
 ===============
 
-.. contents:: File Contents
+.. contents:: This File:
    :local:
    :depth: 1
+
+Getting Started Guide:
+
+.. .. toctree::
+..    :maxdepth: 2
+
+..    Introduction <self>
+
+.. .. toctree::
+..    :maxdepth: 2
+
+..    Building and Using Libraries <libraries>
+..    NANOGrav 15yr Astrophysics <nanograv_15yr>
 
 **Quick-links:**
 
@@ -27,9 +40,23 @@ The ``holodeck`` framework simulates populations of MBH binaries, and calculates
 
    Additional information can be very useful.  In particular, information about the host galaxy of the MBH pair can be used in the binary evolution calculation.
 
-(2) :ref:`Binary Evolution`: Evolve the binary population from their initial conditions (i.e. large separations) until they reach the regime of interest (i.e. small separations).  In the simplest models, binaries are assumed to coalesce instantaneously, and are assumed to evolve purely due to GW emission.  Note that these two assumptions are contradictory.  More complex, self-consistent evolution models are recommended.  These models typically involve interactions between MBH binaries and their host galaxies ('environmental' interactions).
+(2) :ref:`Binary Evolution`: Evolve the binary population from their initial conditions (i.e. large separations) until they reach the regime of interest (i.e. small separations).  In the simplest models, binaries are assumed to coalesce instantaneously, and are assumed to evolve purely due to GW emission.  Note that these two assumptions are contradictory.  More complex, self-consistent evolution models are recommended.  These models typically involve interactions between MBH binaries and their host galaxies ('environmental' interactions).  Note that the effects of binary evolution can be broken up into two distinct effects:
 
-(3) :ref:`Gravitational Waves`: From the population of MBH binaries at the separations (or frequencies) of interst, calculate the resulting GW signals.
+
+   (a) The redshift at which binaries reach the given frequencies (or separations) of interest, and similarly which binaries are able to reach those frequencies before redshift zero, and
+
+   (b) The rate of binary evolution at the given frequencies of interest.
+
+   Cases which treat (a) and (b) consistently, we refer to as 'self-consistent' binary evolution models.  Often this is not the case, for example assuming that (a) the redshift at which binaries reach all frequencies is identical and equal to the formation redshift (i.e. binaries merge 'instantaneously'); but also assuming that (b) binaries evolve due to GW emission alone.
+
+(3) :ref:`Gravitational Waves`: From the population of MBH binaries at the separations (or frequencies) of interest, calculate the resulting GW signals.  GW calculations can be done in many different ways, depending on what assumptions are made regarding:
+
+   (a) Discretization: whether binaries are treated as discrete objects, i.e. there can only be an integer number of binaries in a given frequency bin (this often relates to whether the number-density, or total-number of binaries is used in the calculation).  One can also consider the effects of cosmic variance in this category as well.
+
+   (b) Evolution: whether self-consistent models of binary evolution are considered, or if purely GW-driven evolution is assumed (see :ref:`Binary Evolution`).
+
+   (c) Eccentricity: whether binaries are restricted to circular orbits, or allowed to have eccentric evolution.  Eccentricity has multiple effects on binary evolution, mostly (i) by changing the rate of binary hardening, and (ii) by changing the GW frequencies corresponding to each orbital frequency.  Circular binaries emit GWs at only the :math:`n=2` harmonic of the orbital frequency, while eccentric binaries emit at all integer harmonics.
+
 
 Populations
 ===========
@@ -53,7 +80,7 @@ Galaxy Mergers
    \frac{\partial^3 n_{\star\star}(M_\star, q_\star, z)}{\partial \log_{10} \! M_\star \, \partial q_\star \, \partial z}
    = \psi(m_{1,\star}) \, R_\star(M_\star, q_\star).
 
-Here, :math:`M_\star = m_{1,\star} + m_{2,\star}` is the total stellar mass of both galaxies, and :math:`q_\star = m_{2,\star} / m_{1,\star} \leq 1` is the stellar mass ratio. Often in the literature, the GMR is estimated as a galaxy pair fraction (GPF; :math:`P_\star`) divided by a galaxy merger timescale (GMT; :math:`T_\star`), i.e. :math:`R_\star \approx P_\star / T_\star`.  The GPF is typically an observationally-derived component, defined roughly as, :math:`P_\star(m_{1,\star}, q_\star) \equiv N_{\star\star}(m_{1,\star}, q_\star) / N_\star(m_{1,\star})`, i.e. the number of galaxy pairs in a given survey divided by the number of all galaxies in the parent sample.  Note that there are significant selection effects in determining the number of galaxy pairs, including cuts on galaxy brightness/mass, and especially on the separations :math:`a_0` and :math:`a_1` between which pairs can be identified robustly.  The GMT is typically derived from numerical simulations, and defined roughly as, :math:`T_\star(M_\star, q_\star) \equiv \int_{a_0}^{a_1} \left[da/dt\right]^{-1}_{\star\star} da`, i.e. the total time that the galaxy pair spends at separations between :math:`a_0` and :math:`a_1`.  So we can also write:
+Here, :math:`M_\star = m_{1,\star} + m_{2,\star}` is the total stellar mass of both galaxies, and :math:`q_\star = m_{2,\star} / m_{1,\star} \leq 1` is the stellar mass ratio. Often in the literature, the GMR is estimated as a galaxy pair fraction (GPF; :math:`P_\star`) divided by a galaxy merger timescale (GMT; :math:`T_\star`), i.e. :math:`R_\star \approx P_\star / T_\star`.  The GPF is typically an observationally-derived component, defined roughly as, :math:`P_\star(m_{1,\star}, q_\star) \equiv N_{\star\star}(m_{1,\star}, q_\star) / N_\star(m_{1,\star})`, i.e. the number of galaxy pairs in a given survey divided by the number of all galaxies in the parent sample.  Note that there are significant selection effects in determining the number of galaxy pairs, including cuts on galaxy brightness/mass, and especially on the separations :math:`a_0` and :math:`a_1` between which pairs can be identified robustly.  The GMT is typically derived from numerical simulations, and defined roughly as, :math:`T_\star(M_\star, q_\star) \equiv \int_{a_0}^{a_1} \left[da/dt\right]^{-1}_{\star\star} da`, i.e. the total time that the galaxy pair spends at separations between :math:`a_0` and :math:`a_1`.  So we can also write:  
 
 .. math::
 
