@@ -1,32 +1,14 @@
-===============
-Getting Started
-===============
+==============================
+Getting Started: Introduction
+==============================
 
 .. contents:: This File:
    :local:
-   :depth: 1
-
-Getting Started Guide:
-
-.. .. toctree::
-..    :maxdepth: 2
-
-..    Introduction <self>
-
-.. .. toctree::
-..    :maxdepth: 2
-
-..    Building and Using Libraries <libraries>
-..    NANOGrav 15yr Astrophysics <nanograv_15yr>
-
-**Quick-links:**
-
-* :doc:`Definitions & Abbreviations <../defs_abbrevs>`
-
-* :doc:`Bibliography <../biblio>`
+   :depth: 2
 
 
-**Overview:**
+Overview
+========
 
 The ``holodeck`` framework simulates populations of MBH binaries, and calculates their GW signals.  In general, the calculation proceeds in three stages:
 
