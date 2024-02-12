@@ -31,12 +31,13 @@ The ``holodeck`` framework simulates populations of MBH binaries, and calculates
 
 (3) :ref:`Gravitational Waves`: From the population of MBH binaries at the separations (or frequencies) of interst, calculate the resulting GW signals.
 
-
 Populations
 ===========
 
-'Continuous' Semi-Analytic-Model (SAM) Populations
---------------------------------------------------
+Semi-Analytic Models (SAMs)
+---------------------------
+
+``holodeck`` SAMs are handled in the :doc:`holodeck.sams <../apidoc_modules/holodeck.sams>` module.  The core of the module is the :class:`~holodeck.sams.sam.Semi_Analytic_Model` class, in the: :doc:`holodeck.sams.sam <../apidoc_modules/holodeck.sams.sam>` submodule.
 
 The SAMs use simple, analytic components to calculate populations of binaries.  Holodeck calculates the number-density of MBH binaries, by calculating a number-density of galaxy-galaxy mergers, and then converting from galaxy properties to MBH properties by using an MBH-host relationship.
 
