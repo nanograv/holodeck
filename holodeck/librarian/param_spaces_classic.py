@@ -148,7 +148,6 @@ class PS_Classic_Phenom_Astro_Extended(_PS_Classic_Phenom):
         )
 
 
-
 class _PS_Classic_GWOnly(_Param_Space):
     """Base class for classic GW-Only parameter space used in 15yr analysis.
     """
