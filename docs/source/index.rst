@@ -41,6 +41,7 @@ This package is aimed at providing a comprehensive framework for MBH binary popu
    holodeck.librarian (module) <api_ref/holodeck.librarian>
    holodeck.accretion <api_ref/holodeck.accretion>
    holodeck.constants <api_ref/holodeck.constants>
+   holodeck.cyutils <api_ref/holodeck.cyutils>
    holodeck.evolution <api_ref/holodeck.evolution>
    holodeck.gravwaves <api_ref/holodeck.gravwaves>
    holodeck.hardening <api_ref/holodeck.hardening>
