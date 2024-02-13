@@ -15,8 +15,6 @@ copyright = '2024, NANOGrav'
 author = 'NANOGrav'
 release = '1.2'
 
-# root_doc = "source/index"
-
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
@@ -35,14 +33,6 @@ exclude_patterns = []
 
 mathjax_path = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'
 
-# mathjax3_config = {
-#     'tex': {
-#         # 'inlineMath': [['$', '$'],],
-#         'packages': {'[+]': ['ams', 'amsfonts', 'amssymb', 'amsmath']},
-#     },
-# }
-
-
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
@@ -52,32 +42,3 @@ html_static_path = []
 autodoc_default_options = {
     # "imported-members": True,
 }
-
-
-# -- Setup Sphinx's API-DOC --------------------------------------------------
-
-# Define the configuration for sphinx-apidoc
-# apidoc_module_dir = './source/apidoc_modules'
-# apidoc_excluded_paths = ['../holodeck/detstats.py', '../holodeck/anisotropy.py']
-# apidoc_command_options = [
-#     '-M',  # put module before submodules
-#     '-e',  # Create separate files for each module
-#     '-P',  # Include private modules
-#     '-T',  # Include docstrings in the table of contents
-#     # '-f',  # Overwrite existing files
-# ]
-
-# # Run sphinx-apidoc to generate the .rst files
-# def run_apidoc(_):
-#     from sphinx.ext.apidoc import main
-#     argv = [
-#         *apidoc_command_options,
-#         '-o', apidoc_module_dir,
-#         '../holodeck',
-#         *apidoc_excluded_paths,
-#     ]
-#     main(argv)
-
-# # Hook the sphinx-apidoc command into the Sphinx build process
-# def setup(app):
-#     app.connect('builder-inited', run_apidoc)
