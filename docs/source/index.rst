@@ -25,6 +25,7 @@ This package is aimed at providing a comprehensive framework for MBH binary popu
 .. toctree::
    :hidden:
    :maxdepth: 1
+   :caption: Documents
 
    Definitions & Abbreviations <defs_abbrevs>
    Bibliography <biblio>
@@ -33,8 +34,21 @@ This package is aimed at providing a comprehensive framework for MBH binary popu
 .. toctree::
    :hidden:
    :maxdepth: 2
+   :caption: Full Package Documentation
 
-   Full package documentation <apidoc_modules/holodeck>
+   holodeck <api_ref/holodeck>
+   holodeck.sams (module) <api_ref/holodeck.sams>
+   holodeck.librarian (module) <api_ref/holodeck.librarian>
+   holodeck.accretion <api_ref/holodeck.accretion>
+   holodeck.constants <api_ref/holodeck.constants>
+   holodeck.evolution <api_ref/holodeck.evolution>
+   holodeck.gravwaves <api_ref/holodeck.gravwaves>
+   holodeck.hardening <api_ref/holodeck.hardening>
+   holodeck.logger <api_ref/holodeck.logger>
+   holodeck.plot <api_ref/holodeck.plot>
+   holodeck.population <api_ref/holodeck.population>
+   holodeck.relations <api_ref/holodeck.relations>
+   holodeck.utils <api_ref/holodeck.utils>
 
 
 Getting Started
