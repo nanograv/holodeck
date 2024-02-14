@@ -3,4 +3,5 @@ holodeck API Reference
 ======================
 
 .. automodule:: holodeck
-   :members:
+    :members:
+    :private-members:

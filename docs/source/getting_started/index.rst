@@ -6,11 +6,12 @@ Getting Started: Introduction
    :local:
    :depth: 2
 
+.. include:: ../header.rst
 
 Overview
 ========
 
-The ``holodeck`` framework simulates populations of MBH binaries, and calculates their GW signals.  In general, the calculation proceeds in three stages:
+The |holodeck| framework simulates populations of MBH binaries, and calculates their GW signals.  In general, the calculation proceeds in three stages:
 
 (1) :ref:`Populations`: Construct an initial population of MBH 'binaries'.  This is typically done for pairs of MBHs when their galaxies merge (i.e. long before the two MBHs are actually a gravitationally-bound binary).  The initial populations must specify, for each binary:
 
@@ -23,7 +24,6 @@ The ``holodeck`` framework simulates populations of MBH binaries, and calculates
    Additional information can be very useful.  In particular, information about the host galaxy of the MBH pair can be used in the binary evolution calculation.
 
 (2) :ref:`Binary Evolution`: Evolve the binary population from their initial conditions (i.e. large separations) until they reach the regime of interest (i.e. small separations).  In the simplest models, binaries are assumed to coalesce instantaneously, and are assumed to evolve purely due to GW emission.  Note that these two assumptions are contradictory.  More complex, self-consistent evolution models are recommended.  These models typically involve interactions between MBH binaries and their host galaxies ('environmental' interactions).  Note that the effects of binary evolution can be broken up into two distinct effects:
-
 
    (a) The redshift at which binaries reach the given frequencies (or separations) of interest, and similarly which binaries are able to reach those frequencies before redshift zero, and
 
@@ -46,16 +46,16 @@ Populations
 Semi-Analytic Models (SAMs)
 ---------------------------
 
-``holodeck`` SAMs are handled in the :doc:`holodeck.sams <../apidoc_modules/holodeck.sams>` module.  The core of the module is the :class:`~holodeck.sams.sam.Semi_Analytic_Model` class, in the: :doc:`holodeck.sams.sam <../apidoc_modules/holodeck.sams.sam>` submodule.
+|holodeck| SAMs are handled in the :py:mod:`holodeck.sams` module.  The core of the module is the |sam_class| class, in the: :py:mod:`holodeck.sams.sam` file.
 
-The SAMs use simple, analytic components to calculate populations of binaries.  Holodeck calculates the number-density of MBH binaries, by calculating a number-density of galaxy-galaxy mergers, and then converting from galaxy properties to MBH properties by using an MBH-host relationship.
+The SAMs use simple, analytic components to calculate populations of binaries.  The |sam_class| handles and stores these components which themselves are defined in the :py:mod:`holodeck.sams.comps` file.  Holodeck calculates the number-density of MBH binaries, by calculating a number-density of galaxy-galaxy mergers, and then converting from galaxy properties to MBH properties by using an MBH-host relationship.
 
-The SAMs are initialized over a 3-dimensional parameter space of total MBH mass (:math:`M = m_1 + m_2`), MBH mass ratio (:math:`q = m_2 / m_1 \leq 1`), and redshift (:math:`z`).  The ``holodeck`` code typically refers to the number of bins in each of these dimensions as ``M``, ``Q``, and ``Z``; for example, the shape of the number-density of galaxy mergers will be ``(M, Q, Z)``.  Most calculations retrieve the number of binaries in the Universe at a given set of frequencies (or sometimes binary separations), so the returned values will be 4-dimensional with an additional axis with ``F`` frequency bins added.  For example, the number of binaries at a given set of frequencies will typically be arrays of shape ``(M, Q, Z, F)``.
+The SAMs are initialized over a 3-dimensional parameter space of total MBH mass (:math:`M = m_1 + m_2`), MBH mass ratio (:math:`q = m_2 / m_1 \leq 1`), and redshift (:math:`z`).  The |holodeck| code typically refers to the number of bins in each of these dimensions as ``M``, ``Q``, and ``Z``; for example, the shape of the number-density of galaxy mergers will be ``(M, Q, Z)``.  Most calculations retrieve the number of binaries in the Universe at a given set of frequencies (or sometimes binary separations), so the returned values will be 4-dimensional with an additional axis with ``F`` frequency bins added.  For example, the number of binaries at a given set of frequencies will typically be arrays of shape ``(M, Q, Z, F)``.
 
 Galaxy Mergers
 ^^^^^^^^^^^^^^
 
-``holodeck`` SAMs always start with a Galaxy Stellar-Mass Function (GSMF) that determines how many galaxies there are as a function of stellar mass, :math:`\psi(m_\star) \equiv \partial n_\star / \partial \log_{10} \! m_\star`, where :math:`n_\star` is the comoving number density of galaxies.  We then have to add a galaxy merger rate (GMR), :math:`R_\star(M_\star, q_\star) \equiv (1/n_\star) \partial^2 n_{\star\star} / \partial q_\star \, \partial t`, to find the number density of galaxy-pairs:
+|holodeck| SAMs always start with a Galaxy Stellar-Mass Function (GSMF) that determines how many galaxies there are as a function of stellar mass, :math:`\psi(m_\star) \equiv \partial n_\star / \partial \log_{10} \! m_\star`, where :math:`n_\star` is the comoving number density of galaxies.  We then have to add a galaxy merger rate (GMR), :math:`R_\star(M_\star, q_\star) \equiv (1/n_\star) \partial^2 n_{\star\star} / \partial q_\star \, \partial t`, to find the number density of galaxy-pairs:
 
 .. math::
 
@@ -68,6 +68,15 @@ Here, :math:`M_\star = m_{1,\star} + m_{2,\star}` is the total stellar mass of b
 
    \frac{\partial^3 n_{\star\star}(M_\star, q_\star, z)}{\partial \log_{10} \! M_\star \, \partial q_\star \, \partial z}
    = \psi(m_{1,\star}) \, \frac{P_\star(m_{1,\star}, q_\star)}{T_\star(M_\star, q_\star)}.
+
+**Implementation:**  Each component (GSMF, GMR, GPF, GMT) is implemented by constructing a class that inherits from the appropriate base classes:
+
+* GSMF: :py:class:`~holodeck.sams.comps._Galaxy_Stellar_Mass_Function`, for example the  :py:class:`~holodeck.sams.comps.GSMF_Schechter` class.
+* GMR: :py:class:`~holodeck.sams.comps._Galaxy_Merger_Rate`, for example the  :py:class:`~holodeck.sams.comps.GMR_Illustris` class.
+* GPF: :py:class:`~holodeck.sams.comps._Galaxy_Pair_Fraction`, for example the  :py:class:`~holodeck.sams.comps.GPF_Power_Law` class.
+* GMT: :py:class:`~holodeck.sams.comps._Galaxy_Merger_Time`, for example the  :py:class:`~holodeck.sams.comps.GMT_Power_Law` class.
+
+The classes need to expose a ``__call__`` method (i.e. the class instances themselves are callable) which accepts the appropriate arguments and returns the particular distribution.
 
 
 MBH Populations and MBH-Host Relations
@@ -83,6 +92,8 @@ We now have a galaxy-galaxy merger rate, and we need to populate these galaxies 
 
 where the masses must be evaluated at the appropriate locations: :math:`m_1 = M_\mu(m_{1,\star}) \, \& \, m_2 = M_\mu(m_{2,\star})`.
 
+**Implementation:** M-MBulge relationships are implemented as subclasses inheriting from the :py:class:`holodeck.relations._MMBulge_Relation` class (defined in the :py:mod:`holodeck.relations` file), for example the :py:class:`holodeck.relations.MMBulge_KH2013` class.  Subclasses must implement a number of methods to allow for conversion between stellar bulge-mass and MBH mass.
+
 
 'Discrete' Illustris Populations
 --------------------------------
@@ -94,12 +105,3 @@ Binary Evolution
 
 Gravitational Waves
 ===================
-
-
-.. References
-.. ==========
-
-.. * [BBR1980]_ Begelman, Blandford & Rees 1980.
-.. * [Chen2019]_ Chen, Sesana, Conselice 2019.
-.. * [Kelley2017a]_ Kelley, Blecha, and Hernquist (2017)
-.. * [Sesana2008]_ Sesana, Veccio, & Colacino 2008.
