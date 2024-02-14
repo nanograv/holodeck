@@ -1,4 +1,9 @@
-"""Holodeck - Semi-Analytic Models
+"""holodeck - Semi-Analytic Models (SAMs)
+
+The `holodeck` SAMS construct MBH binary populations using simple semi-analytic and/or
+semi-empirical relationships.  For more information, see the :doc:`SAMs getting-started guide
+<../getting_started/index>`.
+
 """
 
 from . import sam

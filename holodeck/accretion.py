@@ -11,6 +11,7 @@ import os
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
 from holodeck import _PATH_DATA
+from holodeck.constants import SPLC, EDDT
 
 
 class Accretion:
@@ -32,6 +33,7 @@ class Accretion:
     :meth:`pref_acc(mdot, evol, step)`
         Contains a variety of accretion models to choose from to calculate
         primary vs secondary accretion rates.
+
     """
 
     def __init__(self, accmod='Basic', f_edd=0.01, mdot_ext=None, eccen=0.0,
@@ -62,7 +64,7 @@ class Accretion:
         self.subpc = subpc
 
     def mdot_eddington(self, mass, eps=0.1):
-        """ Calculate the total accretion rate based on masses and a fraction of the Eddington limit.
+        """Calculate the total accretion rate based on masses and a fraction of the Eddington limit.
 
         Parameters
         ----------
@@ -81,16 +83,15 @@ class Accretion:
         Notes
         -----
         The limiting Eddington accretion rate is defined as:
-        .. math:: \dot{M}_{\mathsf{Edd}} = \frac{4 \pi GM m_p}{\epsilon c \sigma_{\mathsf{T}}
+        .. math:: `\dot{M}_{\mathsf{Edd}} = \frac{4 \pi GM m_p}{\epsilon c \sigma_{\mathsf{T}}`
 
         Examples
         --------
         >>> acc = Accretion()
         >>> mass =
         >>> print(acc.mdot_eddington(mass))
-        """
-        from holodeck.constants import SIGMA_T, MPRT, NWTG, MSOL, SPLC, EDDT
 
+        """
         # medd = (4.*np.pi*NWTG*MPRT)/(eps*SPLC*SIGMA_T) * self.mtot
         medd = self.f_edd * (EDDT/(eps * SPLC**2)) * mass
         return(medd)
@@ -147,7 +148,7 @@ class Accretion:
 
         See Also
         --------
-        :meth: `Evolution._take_next_step()` : Relationship
+        :meth:`Evolution._take_next_step()` : Relationship
 
         Notes
         -----

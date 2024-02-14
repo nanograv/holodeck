@@ -1,4 +1,8 @@
-"""
+"""Library generation interface.
+
+This file can be run from the command-line to generate holodeck libraries, and provides some API
+methods for quick/easy generation of simulations.
+
 """
 
 import argparse
@@ -132,7 +136,7 @@ def main():   # noqa : ignore complexity warning
     log.info(f"beginning tasks at {beg}")
     failures = 0
 
-    # ---- iterate over each processors jobs
+    # ---- iterate over each processors' jobs
 
     for par_num in iterator:
 
@@ -170,7 +174,7 @@ def main():   # noqa : ignore complexity warning
 
 
 def run_sam_at_pspace_num(args, space, pnum):
-    """Run strain calculations for sample-parameter `pnum` in the `space` parameter-space.
+    """Run simulation for sample-parameter `pnum` in the `space` parameter-space.
 
     Arguments
     ---------
@@ -249,6 +253,16 @@ def run_model(
     log=None,
 ):
     """Run the given modeling, storing requested data
+
+    Arguments
+    ---------
+    sam
+    hard
+
+    Returns
+    -------
+    data : dict
+
     """
 
     data = {}
@@ -312,7 +326,7 @@ def run_model(
 
 
 def _calc_model_details(edges, redz_final, number):
-    """
+    """Calculate derived properties from the given populations.
 
     Parameters
     ----------
@@ -322,6 +336,13 @@ def _calc_model_details(edges, redz_final, number):
         Redshift final (redshift at the given frequencies).
     number : (M-1, Q-1, Z-1, F)
         Absolute number of binaries in the given bin (dimensionless).
+
+    Returns
+    -------
+    gwb_pars
+    num_pars
+    gwb_mtot_redz_final
+    num_mtot_redz_final
 
     """
 
@@ -406,6 +427,15 @@ def _calc_model_details(edges, redz_final, number):
 
 
 def _setup_argparse(comm, *args, **kwargs):
+    """Setup the argument-parser for command-line usage.
+
+    Arguments
+    ---------
+    comm : MPI
+    *args : arguments
+    **kwargs : keyword arguments
+
+    """
     assert comm.rank == 0
 
     parser = argparse.ArgumentParser()
@@ -518,6 +548,18 @@ def _setup_argparse(comm, *args, **kwargs):
 
 
 def _setup_log(comm, args):
+    """Setup up the logging module logger for output messaging.
+
+    Arguemnts
+    ---------
+    comm
+    args
+
+    Returns
+    -------
+    log : ``logging.Logger`` instance
+
+    """
     beg = datetime.now()
 
     # ---- setup name of log file
@@ -559,6 +601,8 @@ def _setup_log(comm, args):
 
 
 def make_plots(args, data, sim_fname):
+    """Generate diagnostic plots from the given simulation data and save to file.
+    """
     import matplotlib.pyplot as plt
     log = args.log
     log.info("generating characteristic strain/psd plots")
@@ -594,6 +638,9 @@ def make_plots(args, data, sim_fname):
 
 
 def make_gwb_plot(fobs, gwb, fit_data):
+    """Generate a GWB plot from the given data.
+
+    """
     # fig = holo.plot.plot_gwb(fobs, gwb)
     psd = holo.utils.char_strain_to_psd(fobs[:, np.newaxis], gwb)
     fig = holo.plot.plot_gwb(fobs, psd)
@@ -687,7 +734,7 @@ def make_ss_plot(fobs, hc_ss, hc_bg, fit_data):
 
 
 def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar):
-    """ Plot total mass, mass ratio, initial d_c, final d_c
+    """Plot total mass, mass ratio, initial d_c, final d_c
 
     """
     # fig = holo.plot.plot_gwb(fobs, gwb)

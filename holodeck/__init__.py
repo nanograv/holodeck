@@ -46,7 +46,8 @@ __all__ = ["log", "cosmo"]
 
 
 class Parameters:
-    # These are WMAP9 parameters, see [WMAP9], Table 3, WMAP+BAO+H0
+    """These are WMAP9 parameters, see: [WMAP9]_, Table 3, WMAP+BAO+H0
+    """
     Omega0 = 0.2880                #: Matter density parameter "Om0"
     OmegaBaryon = 0.0472           #: Baryon density parameter "Ob0"
     HubbleParam = 0.6933           #: Hubble Parameter as H0/[100 km/s/Mpc], i.e. 0.69 instead of 69

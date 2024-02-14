@@ -2,26 +2,26 @@
 
 To-Do
 -----
-*   Dynamical_Friction_NFW
-    *   Allow stellar-density profiles to also be specified (instead of using a hard-coded
-        Dehnen profile)
-    *   Generalize calculation of stellar characteristic radius.  Make self-consistent with
-        stellar-profile, and user-specifiable.
-*   Evolution
-    *   `_sample_universe()` : sample in comoving-volume instead of redshift
-*   Sesana_Scattering
-    *   Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
-        and flexible.  Currently hard-coded to Dehnen profile estimate.
-*   _SHM06
-    *   Interpolants of hardening parameters return 1D arrays.
-*   Fixed_Time
-    *   Handle `rchar` better with respect to interpolation.  Currently not an interpolation
-        variable, which restricts it's usage.
-    *   This class should be separated into a generic `_Fixed_Time` class that can use any
-        functional form, and then a 2-power-law functional form that requires a specified
-        normalization.  When they're combined, it will produce the same effect.  Another good
-        functional form to implement would be GW + log-uniform hardening time, the same as the
-        current phenomenological model but with both power-laws set to 0.
+* Dynamical_Friction_NFW
+    * Allow stellar-density profiles to also be specified (instead of using a hard-coded
+      Dehnen profile)
+    * Generalize calculation of stellar characteristic radius.  Make self-consistent with
+      stellar-profile, and user-specifiable.
+* Evolution
+    * `_sample_universe()` : sample in comoving-volume instead of redshift
+* Sesana_Scattering
+    * Allow stellar-density profile (or otherwise the binding-radius) to be user-specified
+      and flexible.  Currently hard-coded to Dehnen profile estimate.
+* _SHM06
+    * Interpolants of hardening parameters return 1D arrays.
+* Fixed_Time
+    * Handle `rchar` better with respect to interpolation.  Currently not an interpolation
+      variable, which restricts it's usage.
+    * This class should be separated into a generic `_Fixed_Time` class that can use any
+      functional form, and then a 2-power-law functional form that requires a specified
+      normalization.  When they're combined, it will produce the same effect.  Another good
+      functional form to implement would be GW + log-uniform hardening time, the same as the
+      current phenomenological model but with both power-laws set to 0.
 
 References
 ----------
@@ -31,7 +31,7 @@ References
 * [Quinlan1996]_ Quinlan 1996.
 * [Sesana2006]_ Sesana, Haardt & Madau et al. 2006.
 * [Sesana2010]_ Sesana 2010.
-* [Siwek2023]_ Siwek+ 2023
+* [Siwek2023]_ Siwek+2023
 
 """
 
@@ -40,7 +40,6 @@ from __future__ import annotations
 import abc
 import json
 import os
-# from typing import Union, TypeVar  # , Callable, Iterator
 import warnings
 
 import numpy as np
@@ -711,30 +710,35 @@ class Dynamical_Friction_NFW(_Hardening):
 
 
 class Fixed_Time_2PL(_Hardening):
-    """Provide a binary hardening rate such that the total lifetime matches a given value.
+    r"""Provide a binary hardening rate such that the total lifetime matches a given value.
 
     This class uses a phenomenological functional form (defined in :meth:`Fixed_Time.function`) to
     model the hardening rate ($da/dt$) of binaries.  The functional form is,
 
     .. math::
-        \\dot{a} = - A * (1.0 + x)^{-g_2 - 1} / x^{g_1 - 1},
+        \dot{a} = - A * (1.0 + x)^{-g_2 - 1} / x^{g_1 - 1},
 
-    where :math:`x \\equiv a / r_\\mathrm{char}` is the binary separation scaled to a characteristic
-    transition radius (:math:`r_\\mathrm{char}`) between two power-law indices $g_1$ and $g_2$.  There is
+    where :math:`x \equiv a / r_\mathrm{char}` is the binary separation scaled to a characteristic
+    transition radius (:math:`r_\mathrm{char}`) between two power-law indices $g_1$ and $g_2$.  There is
     also an overall normalization $A$ that is calculated to yield the desired binary lifetimes.
 
     NOTE/BUG: the actual binary lifetimes tend to be 1-5% shorter than the requested value.
 
     The normalization for each binary, to produce the desired lifetime, is calculated as follows:
-    (1) A set of random test binary parameters are chosen.
-    (2) The normalization constants are determined, using least-squares optimization, to yield the
-        desired lifetime.
-    (3) Interpolants are constructed to interpolate between the test binary parameters.
-    (4) The interpolants are called on the provided binary parameters, to calculate the
-        interpolated normalization constants to reach the desired lifetimes.
+
+        (1) A set of random test binary parameters are chosen.
+
+        (2) The normalization constants are determined, using least-squares optimization, to yield the
+            desired lifetime.
+
+        (3) Interpolants are constructed to interpolate between the test binary parameters.
+
+        (4) The interpolants are called on the provided binary parameters, to calculate the
+            interpolated normalization constants to reach the desired lifetimes.
 
     Construction/Initialization: note that in addition to the standard :meth:`Fixed_Time.__init__`
     constructor, there are two additional constructors are provided:
+
     *   :meth:`Fixed_Time.from_pop` - accept a :class:`holodeck.population._Discrete_Population`,
     *   :meth:`Fixed_Time.from_sam` - accept a :class:`holodeck.sam.Semi_Analytic_Model`.
 
@@ -758,10 +762,12 @@ class Fixed_Time_2PL(_Hardening):
         ----------
         time : float,  callable  or  array_like
             Total merger time of binaries, units of [sec], specifiable in the following ways:
+
             *   float : uniform merger time for all binaries
             *   callable : function `time(mtot, mrat, redz)` which returns the total merger time
             *   array_like : (N,) matching the shape of `mtot` (etc) giving the merger time for
                 each binary
+
         mtot : array_like
             Binary total-mass [gram].
         mrat : array_like
@@ -777,10 +783,10 @@ class Fixed_Time_2PL(_Hardening):
             *   callable : function `rchar(mtot, mrat, redz)` which returns the radius
         gamma_inner : scalar
             Power-law of hardening timescale in the stellar-scattering regime,
-            (small separations: r < rchar), at times referred to internally as `g1`.
+            (small separations: $r < rchar$), at times referred to internally as `g1`.
         gamma_outer : scalar
             Power-law of hardening timescale in the dynamical-friction regime
-            (large separations: r > rchar), at times referred to internally as `g2`.
+            (large separations: $r > rchar$), at times referred to internally as `g2`.
 
         """
         self._progress = progress
@@ -874,10 +880,12 @@ class Fixed_Time_2PL(_Hardening):
             Input population, from which to use masses, redshifts and separations.
         time : float,  callable  or  array_like
             Total merger time of binaries, units of [sec], specifiable in the following ways:
+
             *   float : uniform merger time for all binaries
             *   callable : function `time(mtot, mrat, redz)` which returns the total merger time
             *   array_like : (N,) matching the shape of `mtot` (etc) giving the merger time for
                 each binary
+
         **kwargs : dict
             Additional keyword-argument pairs passed to the `Fixed_Time` initialization method.
 
@@ -899,15 +907,19 @@ class Fixed_Time_2PL(_Hardening):
             Input population, from which to use masses, redshifts and separations.
         time : float,  callable  or  array_like
             Total merger time of binaries, units of [sec], specifiable in the following ways:
+
             *   float : uniform merger time for all binaries
             *   callable : function `time(mtot, mrat, redz)` which returns the total merger time
             *   array_like : (N,) matching the shape of `mtot` (etc) giving the merger time for
                 each binary
+
         sepa_init : float  or  array_like
             Initial binary separation.  Units of [cm].
+
             *   float : initial separation applied to all binaries,
             *   array_like : initial separations for all binaries, shaped (N,) matching the number
                 binaries.
+
         **kwargs : dict
             Additional keyword-argument pairs passed to the `Fixed_Time` initialization method.
 
@@ -966,7 +978,7 @@ class Fixed_Time_2PL(_Hardening):
         mtot : array_like
             Binary total-mass [gram].
         mrat : array_like
-            Binary mass-ratio $q \equiv m_2 / m_1 \leq 1$.
+            Binary mass-ratio :math:`q \equiv m_2 / m_1 \leq 1`.
         redz : array_like
             Redshift.
         sepa : array_like
@@ -1002,7 +1014,7 @@ class Fixed_Time_2PL(_Hardening):
 
     @classmethod
     def function(cls, norm, xx, gamma_inner, gamma_outer):
-        """Hardening rate given the parameters for this hardening model.
+        r"""Hardening rate given the parameters for this hardening model.
 
         The functional form is,
 
@@ -1010,8 +1022,8 @@ class Fixed_Time_2PL(_Hardening):
 
             \dot{a} = - A * (1.0 + x)^{-g_out + g_in} / x^{g_in - 1},
 
-        Where $A$ is an overall normalization, and x \\equiv a / r_\\mathrm{char}$ is the binary
-        separation scaled to a characteristic transition radius ($r_\\mathrm{char}$) between two
+        Where $A$ is an overall normalization, and :math:`x = a / r_\textrm{char}` is the binary
+        separation scaled to a characteristic transition radius (:math:`r_\textrm{char}`) between two
         power-law indices $g_inner$ and $g_outer$.
 
         Parameters
@@ -1348,61 +1360,6 @@ class Fixed_Time_2PL(_Hardening):
         # tt = np.sum(tt, axis=-1)
 
         return tt
-
-
-class Fixed_Time(Fixed_Time_2PL):
-    """Legacy Version of `Fixed_Time` class such that outer power-law in time (a/dadt) is g1+g2+1.
-    """
-
-    def __init__(self, *args, **kwargs):
-        log.warning("class `Fixed_Time` has been deprecated!  Please use `Fixed_Time_2PL` with new parametrization!")
-
-        # Convert from old to new parameter names
-        replace_kwargs = [['gamma_sc', 'gamma_inner'], ['gamma_df', 'gamma_outer']]
-        for replace in replace_kwargs:
-            val = kwargs.pop(replace[0], None)
-            if replace[1] in kwargs:
-                err = f"Cannot accept kwargs for both {replace[0]} and {replace[1]}!"
-                log.exception(err)
-                raise ValueError(err)
-
-            if val is not None:
-                kwargs[replace[1]] = val
-
-        super().__init__(*args, **kwargs)
-        return
-
-    @classmethod
-    def function(cls, norm, xx, g1, g2):
-        """Hardening rate given the parameters for this hardening model.
-
-        The functional form is,
-
-        .. math::
-
-            \\dot{a} = - A * (1.0 + x)^{-g_2 - 1} / x^{g_1 - 1},
-
-        Where $A$ is an overall normalization, and x \\equiv a / r_\\mathrm{char}$ is the binary
-        separation scaled to a characteristic transition radius ($r_\\mathrm{char}$) between two
-        power-law indices $g_1$ and $g_2$.
-
-        Parameters
-        ----------
-        norm : array_like
-            Hardening rate normalization, units of [cm/s].
-        xx : array_like
-            Dimensionless binary separation, the semi-major axis in units of the characteristic
-            (i.e. transition) radius of the model `rchar`.
-        g1 : scalar
-            Power-law of hardening timescale in the stellar-scattering regime,
-            (small separations: r < rchar).
-        g2 : scalar
-            Power-law of hardening timescale in the dynamical-friction regime,
-            (large separations: r > rchar).
-
-        """
-        dadt = - norm * np.power(1.0 + xx, -g2-1) / np.power(xx, g1-1)
-        return dadt
 
 
 class Fixed_Time_2PL_SAM(_Hardening):
