@@ -1,4 +1,4 @@
-"""'Classic' parameter spaces used in the 15yr analysis.
+"""'Classic' parameter spaces used in the NANOGrav 15yr analysis.
 """
 
 import holodeck as holo
@@ -146,7 +146,6 @@ class PS_Classic_Phenom_Astro_Extended(_PS_Classic_Phenom):
             mmb_plaw=PD_Normal(+1.2, 0.2),
             mmb_scatter_dex=PD_Normal(+0.32, 0.15),
         )
-
 
 
 class _PS_Classic_GWOnly(_Param_Space):

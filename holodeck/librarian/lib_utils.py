@@ -12,16 +12,16 @@ import holodeck.librarian
 
 
 def load_pspace_from_path(log, path, space_class=None):
-    """Load a _Param_Space instance from the saved file in the given directory.
+    """Load a `_Param_Space` instance from the saved file in the given directory.
 
     Parameters
     ----------
     path : str or pathlib.Path
         Path to directory containing save file.
-        A single file matching "*.pspace.npz" is required in that directory.
+        A single file matching `*.pspace.npz` is required in that directory.
         NOTE: the specific glob pattern is specified by `holodeck.librarian.PSPACE_FILE_SUFFIX` e.g. '.pspace.npz'
-    space_class : _Param_Space subclass
-        Class with which to call the `from_save()` method to load a new _Param_Space instance.
+    space_class : `_Param_Space` subclass
+        Class with which to call the `from_save()` method to load a new `_Param_Space` instance.
 
     Returns
     -------

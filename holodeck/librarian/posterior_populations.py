@@ -191,7 +191,8 @@ def load_population_for_pars(pars, pta_dur=TDUR, nfreqs=NFREQS, nreals=NREALS, n
     Returns
     -------
     data : dict
-        Binary population and derived properties.
+        Binary population and derived properties.  Entries:
+
         * `number` : ndarray (M, Q, Z, F)
           Number of binaries in the Universe in each bin.
           The bins are total mass (M), mass ratio (Q), redshift (Z), and frequency (F).
@@ -311,7 +312,8 @@ def sample_pars_from_chains(chains=None):
     pars : dict
         Randomly selected parameters drawn from the `chains`.
         This will be a single float value for each of the parameters in the holodeck parameter-space,
-        for example:
+        for example::
+
             ['hard_time', 'gsmf_phi0', 'gsmf_mchar0_log10',
             'mmb_mamp_log10', 'mmb_scatter_dex', 'hard_gamma_inner'],
 
@@ -359,7 +361,6 @@ def get_maxlike_pars_from_chains(chains=None):
         idx = np.argmax(yy)
         xmax = xx[idx]
         mlpars[name] = xmax
-        # print(f"{name:>30s}: {xmax:+5.2f}")
 
     return mlpars
 

@@ -1,4 +1,4 @@
-"""Holodeck's Librarian submodule: handle library generation and management.
+"""Holodeck's Librarian module: handle library generation and management.
 
 """
 

@@ -115,15 +115,13 @@ class Semi_Analytic_Model:
 
         gsmf = utils.get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
         mmbulge = utils.get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
-        # gpf = utils.get_subclass_instance(gpf, None, _Galaxy_Pair_Fraction)
-        # gmt = utils.get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
+        # if GMR is None, then we need both GMT and GPF
         if gmr is None:
-            # if GMR is None, then we need both GMT and GPF
             gmt = utils.get_subclass_instance(gmt, GMT_Power_Law, _Galaxy_Merger_Time)
             gpf = utils.get_subclass_instance(gpf, GPF_Power_Law, _Galaxy_Pair_Fraction)
+        # if GMR is given, GMT can still be used - for calculating stalling
         else:
             gmr = utils.get_subclass_instance(gmr, GMR_Illustris, _Galaxy_Merger_Rate)
-            # if GMR is given, GMT can still be used - for calculating GMT stalling
             gmt = utils.get_subclass_instance(gmt, None, _Galaxy_Merger_Time, allow_none=True)
             # if GMR is given, GPF is not used: make sure it is not given
             if (gpf is not None):
@@ -159,7 +157,7 @@ class Semi_Analytic_Model:
             if shape is not None:
                 if shape[ii] is not None:
                     par[2] = shape[ii]
-            params[ii] = np.logspace(*np.log10(par[:2]), par[2])
+            params[ii] = np.logspace(*np.log10(par[:2]), par[2]+1)
             log.debug(f"{name}: [{params[ii][0]}, {params[ii][-1]}] {params[ii].size}")
 
         mtot, mrat, redz = params
@@ -223,7 +221,7 @@ class Semi_Analytic_Model:
 
     @property
     def static_binary_density(self):
-        """The number-density of binaries in each bin, 'd^3 n / [dlog10M dq dz]' in units of [Mpc^-3].
+        """The number-density of binaries at each bin edge, 'd^3 n / [dlog10M dq dz]' in units of [Mpc^-3].
 
         This is calculated once and cached.
 
@@ -242,7 +240,7 @@ class Semi_Analytic_Model:
             log = self._log
 
             # ---- convert from MBH ===> mstar
-            
+
             redz = self.redz[np.newaxis, np.newaxis, :]
             mstar_pri, mstar_rat, mstar_tot, redz = self.mass_stellar()
 
@@ -701,7 +699,6 @@ class Semi_Analytic_Model:
         params : Boolean
             Whether or not to return astrophysical parameters of the binaries.
 
-
         Returns
         -------
         hc_ss : (F, R, L) NDarray of scalars
@@ -717,6 +714,7 @@ class Semi_Analytic_Model:
             final redshift, final comoving distance, final separation, final angular separation)
             for background sources at each frequency and realization,
             Returned only if params = True.
+
         """
         from . import sam_cyutils
 
@@ -772,13 +770,15 @@ class Semi_Analytic_Model:
         Returns
         -------
         redz_final : (M, Q, Z)
-            Redshift of binary coalescence.
-            NOTE: binaries stalling before redshift zero, have values set to `-1.0`.
+            Redshift of binary coalescence.  Binaries stalling before `z=0`, have values set to
+            `-1.0`.
         rate : ndarray
             Rate of coalescence events in each bin, in units of [1/sec].
             The shape and meaning depends on the value of the `integrate` flag:
+
             * if `integrate == True`,
               then the returned values is ``dN/dt``, with shape (M-1, Q-1, Z-1)
+
             * if `integrate == False`,
               then the returned values is ``dN/[dlog10M dq dz dt]``, with shape (M, Q, Z)
 
@@ -1111,11 +1111,14 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
     """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
 
     The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
-    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.
-          A 2nd-order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
+
+    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.  A 2nd
+          order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
           In-between, a 1st-order interpolant is used if `linear_interp_backup` is True.
-    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2) to
-          account for scatter.
+
+    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2)
+          to account for scatter.
+
     * (3) The new density distribution is interpolated back to the original (mtot, mrat) grid.
 
     Parameters

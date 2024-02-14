@@ -1,10 +1,9 @@
 """Semi-Analytic Model - Components
 
-
 References
 ----------
 * [Sesana2008]_ Sesana, Vecchio, Colacino 2008.
-* [Rodriguez-Gomez+2015]_  Rodriguez-Gomez, Genel, Vogelsberger, et al. 2015
+* [Rodriguez-Gomez2015]_  Rodriguez-Gomez, Genel, Vogelsberger, et al. 2015
     The merger rate of galaxies in the Illustris simulation: a comparison with observations and semi-empirical models
     https://ui.adsabs.harvard.edu/abs/2015MNRAS.449...49R/abstract
 * [Chen2019]_ Chen, Sesana, Conselice 2019.
@@ -123,7 +122,7 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
     def __call__(self, mstar, redz):
         r"""Return the number-density of galaxies at a given stellar mass.
 
-        See: [Chen2019] Eq.8
+        See: [Chen2019]_ Eq.8
 
         Parameters
         ----------
@@ -250,7 +249,7 @@ class _Galaxy_Merger_Rate(abc.ABC):
 class GMR_Power_Law(_Galaxy_Merger_Rate):
     """Galaxy Merger Rate - based on multiple power-laws.
 
-    See [Rodriguez-Gomez+2015], Table 1.
+    See [Rodriguez-Gomez2015]_, Table 1.
     "merger rate as a function of descendant stellar mass M_star, progenitor stellar mass ratio mu_star"
 
     """
@@ -356,7 +355,7 @@ class GMR_Power_Law(_Galaxy_Merger_Rate):
 class GMR_Illustris(GMR_Power_Law):
     """Galaxy Merger Rate - based on fits to Illustris cosmological simulations.
 
-    See [Rodriguez-Gomez+2015], Table 1.
+    See [Rodriguez-Gomez2015]_, Table 1.
     "merger rate as a function of descendant stellar mass M_star, progenitor stellar mass ratio mu_star"
 
     """
