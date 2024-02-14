@@ -58,10 +58,6 @@ Notes
       The changes should be made in-place (i.e. without returning a new copy of the population
       instance).
 
-To-Do
------
-
-
 References
 ----------
 * [Genel2014]_ Genel et al. (2014)

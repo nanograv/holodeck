@@ -699,7 +699,6 @@ class Semi_Analytic_Model:
         params : Boolean
             Whether or not to return astrophysical parameters of the binaries.
 
-
         Returns
         -------
         hc_ss : (F, R, L) NDarray of scalars
@@ -715,6 +714,7 @@ class Semi_Analytic_Model:
             final redshift, final comoving distance, final separation, final angular separation)
             for background sources at each frequency and realization,
             Returned only if params = True.
+
         """
         from . import sam_cyutils
 
@@ -770,13 +770,15 @@ class Semi_Analytic_Model:
         Returns
         -------
         redz_final : (M, Q, Z)
-            Redshift of binary coalescence.
-            NOTE: binaries stalling before redshift zero, have values set to `-1.0`.
+            Redshift of binary coalescence.  Binaries stalling before `z=0`, have values set to
+            `-1.0`.
         rate : ndarray
             Rate of coalescence events in each bin, in units of [1/sec].
             The shape and meaning depends on the value of the `integrate` flag:
+
             * if `integrate == True`,
               then the returned values is ``dN/dt``, with shape (M-1, Q-1, Z-1)
+
             * if `integrate == False`,
               then the returned values is ``dN/[dlog10M dq dz dt]``, with shape (M, Q, Z)
 
@@ -1109,11 +1111,14 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
     """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
 
     The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
-    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.
-          A 2nd-order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
+
+    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.  A 2nd
+          order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
           In-between, a 1st-order interpolant is used if `linear_interp_backup` is True.
-    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2) to
-          account for scatter.
+
+    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2)
+          to account for scatter.
+
     * (3) The new density distribution is interpolated back to the original (mtot, mrat) grid.
 
     Parameters

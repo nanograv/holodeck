@@ -1,4 +1,4 @@
-"""'Classic' parameter spaces used in the 15yr analysis.
+"""'Classic' parameter spaces used in the NANOGrav 15yr analysis.
 """
 
 import holodeck as holo
