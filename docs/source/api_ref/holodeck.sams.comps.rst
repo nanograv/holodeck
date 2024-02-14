@@ -1,6 +1,7 @@
-==============
-holodeck.comps
-==============
+===================
+holodeck.sams.comps
+===================
 
-.. automodule:: holodeck.comps
+.. automodule:: holodeck.sams.comps
     :members:
+    :private-members:
