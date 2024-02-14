@@ -277,10 +277,13 @@ class Evolution:
         argument.
 
         The behavior of this function is broken into three sub-functions, that are only used here:
+
         * :meth:`Evolution._at__inputs` : parse the input arguments.
+
         * :meth:`Evolution._at__index_frac` : find the indices in the evolutionary tracks bounding
           the target interpolation locations, and also the fractional distance to interpolate
           between them.
+
         * :meth:`Evolution._at__interpolate_array` : actually interpolate each parameter to a
           the target location.
 
@@ -289,9 +292,11 @@ class Evolution:
         xpar : str, in ['fobs', 'sepa']
             String specifying the variable of interpolation.
         targets : array_like,
-            Locations to interpolate to.
+            Locations to interpolate to:
+
             * if ``xpar == sepa`` : binary separation, units of [cm],
             * if ``xpar == fobs`` : binary orbital freq, observer-frame, units of [1/sec],
+
         params : None or (list of str)
             Names of the parameters that should be interpolated.
             If `None`, defaults to :attr:`Evolution._EVO_PARS` attribute.
@@ -300,6 +305,7 @@ class Evolution:
             Interpolated values for other binaries are set to `np.nan`.
         lin_interp : None or bool,
             Interpolate parameters in linear space.
+
             * True : all parameters interpolated in lin-lin space.
             * False: all parameters interpolated in log-log space.
             * None : parameters are interpolated in log-log space, unless they're included in the
@@ -321,7 +327,7 @@ class Evolution:
         * Interpolation is 1st-order in log-log space in general, but properties which are in the
           `_LIN_INTERP_PARS` array are interpolated at 1st-order in lin-lin space.  Parameters
           which can be negative should be interpolated in linear space.  Passing a boolean for the
-          `lin_interp` parameter will override the behavior (see `Parameters`_ above).
+          `lin_interp` parameter will override the behavior (see `Parameters` above).
 
         """
         # parse/sanitize input arguments

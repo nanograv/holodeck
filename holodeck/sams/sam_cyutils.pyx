@@ -120,16 +120,19 @@ def integrate_differential_number_3dx1d(edges, dnum):
     mtot is integrated over `log10(mtot)` and frequency is integrated over `ln(f)`.
 
     Note on array shapes:
-    input  `dnum` is shaped (M, Q, Z, F)
-    input  `edges` must be (4,) of array_like of lengths:  M, Q, Z, F+1
-    output `numb` is shaped (M-1, Q-1, Z-1, F)
+
+    * input  `dnum` is shaped (M, Q, Z, F)
+    * input  `edges` must be (4,) of array_like of lengths:  M, Q, Z, F+1
+    * output `numb` is shaped (M-1, Q-1, Z-1, F)
 
     Arguments
     ---------
     edges : (4,) array_like  w/ lengths M, Q, Z, F+1
-        Grid edges of `mtot`, `mrat`, `redz`, and `freq`
-        NOTE: `mtot` should be passed as regular `mtot`, NOT log10(mtot)
-              `freq` should be passed as regular `freq`, NOT    ln(freq)
+        Grid edges of `mtot`, `mrat`, `redz`, and `freq`.  NOTE:
+
+        * `mtot` should be passed as regular `mtot`, NOT log10(mtot)
+        * `freq` should be passed as regular `freq`, NOT    ln(freq)
+
     dnum : (M, Q, Z, F)
         Differential number of binaries, dN/[dlog10M dq qz dlnf] where 'N' is in units of dimensionless number.
 

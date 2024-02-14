@@ -1881,8 +1881,7 @@ cdef int _gamma_of_rho_interp(
 
 
 def snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
-    """ Calculate single source SNR
-
+    """Calculate single source SNR.
 
     Parameters
     ----------
@@ -1894,14 +1893,14 @@ def snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
         Antenna pattern function for each pulsar.
     iotas : (F,S,L) NDarray
         Inclination, used to calculate:
-        a_pol = 1 + np.cos(iotas) **2
-        b_pol = -2 * np.cos(iotas)
+        :math:`a_pol = 1 + np.cos(iotas)^2`
+        :math:`b_pol = -2 np.cos(iotas)`
     dur : scalar
         Duration of observations.
     Phi_0 : (F,S,L) NDarray
         Initial GW phase
     S_i : (P,F,R,L) NDarray
-        Total noise of each pulsar wrt detection of each single source, in s^3
+        Total noise of each pulsar wrt detection of each single source, in $s^3$.
     freqs : (F,) 1Darray
         Observed frequency bin centers.
 
@@ -2028,7 +2027,7 @@ def Sh_rest(hc_ss, hc_bg, freqs, nexcl):
     freqs : (F,) 1Darray
         Frequency bin centers.
     nexcl : int
-        Number of loudest single sources to exclude from hc_rest noise, in addition 
+        Number of loudest single sources to exclude from hc_rest noise, in addition
         to the source in question.
 
     Returns
@@ -2061,7 +2060,7 @@ cdef void _Sh_rest(
     freqs : (F,) 1Darray
         Frequency bin centers.
     nexcl : int
-        Number of loudest single sources to exclude from hc_rest noise, in addition 
+        Number of loudest single sources to exclude from hc_rest noise, in addition
         to the source in question.
 
     Returns
@@ -2086,7 +2085,7 @@ cdef void _Sh_rest(
                     if (ii != ll): # check it's not our current source
                     # if current is in top N_excl, must be (N_excl+1)th or above
                     # if current is >= top N_excl, must be (N_excl)th or above
-                        if ((ll < nexcl) and (ii > nexcl)) or ((ll >= nexcl) and (ii > nexcl-1)): 
+                        if ((ll < nexcl) and (ii > nexcl)) or ((ll >= nexcl) and (ii > nexcl-1)):
                             Sh_ss += pow(hc_ss[ff,rr,ii], 2.0) / pow(freq, 3.0) / (12*pow(M_PI, 2.0))
                             count += 1
                 Sh_bg = pow(hc_bg[ff,rr], 2.0) / pow(freq, 3.0) / (12*pow(M_PI, 2.0))
@@ -2094,6 +2093,6 @@ cdef void _Sh_rest(
                 if count != (nloudest - nexcl - 1):
                     err = (f"ERROR in calculate Sh_rest! count of sources={count}")
                     print(err)
-                
+
 
 
