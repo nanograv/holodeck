@@ -53,3 +53,10 @@ html_static_path = []
 autodoc_default_options = {
     # "imported-members": True,
 }
+
+autodoc_default_flags = [
+    'members',
+    'special-members',
+    'private-members',
+    'undoc-members',
+]
