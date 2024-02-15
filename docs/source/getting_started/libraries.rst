@@ -23,10 +23,12 @@ Parameter Spaces
 
 Parameter spaces must subclass :py:class:`~holodeck.librarian.params._Param_Space`, and provide 4 elements:
 
-(1) A class attribute called ``DEFAULTS`` which is a ``dict`` of default parameter values for all of the parameters needed by the initialization methods.
+(0) OPTIONAL/Recommended: A class attribute called ``DEFAULTS`` which is a ``dict`` of default parameter values for all of the parameters needed by the initialization methods.  **This is strongly recommended to ensure that parameters are set consistently, but setting them explicitly.**
 
-(2) An ``_init_sam()`` function that is a ``classmethod``, which takes the input parameters, and then constructs and returns a |sam_class| instance.
+(2) An ``_init_sam()`` a ``classmethod`` function that takes the input parameters, and then constructs and returns a |sam_class| instance.
 
-(2) An ``_init_hard()`` function that is a ``classmethod``, which takes the input parameters, and then constructs and returns a |hard_class| instance.
+(2) An ``_init_hard()`` a ``classmethod`` function that takes the input parameters, and then constructs and returns a |hard_class| instance.
 
 (4) An ``__init__()`` method that passes all required parameter distributions (:py:class:`~holodeck.librarian.params._Param_Dist` subclasses) to the super-class ``__init__()`` method.
+
+Public parameter spaces should also be 'registered' to the :data:`holodeck.librarian.param_spaces_dict` dictionary.  See :mod:`holodeck.librarian`.
