@@ -6,12 +6,12 @@ from holodeck.constants import PC, GYR
 from holodeck.librarian.params import _Param_Space, PD_Uniform, PD_Normal
 
 
-__all__ = [
-    "PS_Classic_Phenom_Uniform",
-    "PS_Classic_Phenom_Astro_Extended",
-    "PS_Classic_GWOnly_Uniform",
-    "PS_Classic_GWOnly_Astro_Extended",
-]
+# __all__ = [
+#     "PS_Classic_Phenom_Uniform",
+#     "PS_Classic_Phenom_Astro_Extended",
+#     "PS_Classic_GWOnly_Uniform",
+#     "PS_Classic_GWOnly_Astro_Extended",
+# ]
 
 
 class _PS_Classic_Phenom(_Param_Space):
@@ -287,7 +287,7 @@ class PS_Test(_PS_Classic_Phenom):
         )
 
 
-_param_spaces = {
+_param_spaces_dict = {
     "PS_Test": PS_Test,
     "PS_Classic_Phenom_Uniform": PS_Classic_Phenom_Uniform,    # PS_Uniform_09B
     "PS_Classic_Phenom_Astro_Extended": PS_Classic_Phenom_Astro_Extended,

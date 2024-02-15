@@ -20,8 +20,6 @@ class _Param_Space(abc.ABC):
 
     Libraries are generated over some parameter space defined by which parameters are being varied.
 
-    Subclasses
-    ----------
     Parameter space subclasses only need to define arguments within the ``__init__`` functions::
 
         def __init__(self, log, nsamples, sam_shape, seed):
@@ -295,8 +293,8 @@ class _Param_Space(abc.ABC):
 
         params = {}
         for ii, pname in enumerate(self.param_names):
-            vv = vals[ii]    # desired fractional parameter value [0.0, 1.0]
-            ss = self._dists[ii](vv)    # convert to actual parameter values
+            vv = vals[ii]                # desired fractional parameter value [0.0, 1.0]
+            ss = self._dists[ii](vv)     # convert to actual parameter values
             params[pname] = ss           # store to dictionary
 
         return params
