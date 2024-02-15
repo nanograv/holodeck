@@ -10,27 +10,11 @@ import scipy.stats
 
 import holodeck as holo
 
-RENAMED_PARAMS = {
-    "gsmf_phi0": "gsmf_phi0_log10"
-}
-
 
 class _Param_Space(abc.ABC):
     """Base class for generating holodeck libraries.  Defines the parameter space and settings.
 
     Libraries are generated over some parameter space defined by which parameters are being varied.
-
-    Parameter space subclasses only need to define arguments within the ``__init__`` functions::
-
-        def __init__(self, log, nsamples, sam_shape, seed):
-            super(_Param_Space, self).__init__(
-                log, nsamples, sam_shape, seed,
-                hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
-                gsmf_phi0=PD_Uniform(-3.5, -1.5),
-                gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
-                mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
-                mmb_scatter=PD_Uniform(+0.0, +1.2),
-            )
 
     """
 
@@ -40,10 +24,36 @@ class _Param_Space(abc.ABC):
 
     DEFAULTS = {}
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None, **param_kwargs):
+    def __init__(self, log, nsamples=None, sam_shape=None, seed=None, random_state=None, **param_kwargs):
+        """Construct a parameter-space instance.
+
+        Arguments
+        ---------
+        log : ``logging.Logger`` instance
+        nsamples : int or ``None``
+            Number of samples to draw from the parameter-space.
+        sam_shape : int or (3,) of int or ``None``
+            Shape of the SAM grid (see :class:`~holodeck.sams.sam.Semi_Analytic_Model`).
+        seed : int or None,
+            Seed for the ``numpy`` random number generator.  Better to use ``random_state``.
+        random_state : tuple,
+            A tuple describing the state of the ``numpy`` random number generator.
+        param_kwargs : dict
+            Key-value pairs specifying the parameters for this model.  Each key must be the name of
+            the parameter, and each value must be a :class:`~holodeck.librarian.params._Param_Dist`
+            subclass instance with the desired distribution.
+
+        Returns
+        -------
+        None
+
+        """
         log.debug(f"seed = {seed}")
-        np.random.seed(seed)
-        random_state = np.random.get_state()
+        if random_state is None:
+            np.random.seed(seed)
+            random_state = np.random.get_state()
+        else:
+            np.random.set_state(random_state)
 
         param_names = list(param_kwargs.keys())
         ndims = len(param_names)
@@ -57,18 +67,6 @@ class _Param_Space(abc.ABC):
                 log.exception(err)
                 raise ValueError(err)
 
-            ''' #! LZK: deprecating this 2023-08-31, not sure why it was needed
-            # NOTE: this is a hacky check to see if `val` inherits from `_Param_Dist`
-            #       it does this just by checking the string names, but it should generally work.
-            #       The motivation is to make this work more easily for changing classes and modules.
-            mro = val.__class__.__mro__
-            mro = [mm.__name__ for mm in mro]
-            if _Param_Dist.__name__ not in mro:
-                err = f"{nam}: {val} is not a `_Param_Dist` object!"
-                log.exception(err)
-                raise ValueError(err)
-            '''
-
             dists.append(val)
 
         if (nsamples is None) or (ndims == 0):
@@ -77,9 +75,9 @@ class _Param_Space(abc.ABC):
             param_samples = None
         else:
             # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
-            lhs = sp.stats.qmc.LatinHypercube(d=ndims, centered=False, strength=1, seed=seed)
+            lhc = sp.stats.qmc.LatinHypercube(d=ndims, centered=False, strength=1, seed=seed)
             # (S, D) - samples, dimensions
-            uniform_samples = lhs.random(n=nsamples)
+            uniform_samples = lhc.random(n=nsamples)
             param_samples = np.zeros_like(uniform_samples)
 
             for ii, dist in enumerate(dists):
@@ -96,7 +94,7 @@ class _Param_Space(abc.ABC):
         return
 
     @classmethod
-    def model_for_params(cls, params, sam_shape=None, new_def_params={}):
+    def model_for_params(cls, params, sam_shape=None):
         """Construct a model (SAM and hardening instances) from the given parameters.
 
         Arguments
@@ -105,52 +103,18 @@ class _Param_Space(abc.ABC):
             Key-value pairs for sam/hardening parameters.  Each item much match expected parameters
             that are set in the `defaults` dictionary.
         sam_shape : None  or  int  or  (3,) int
-        new_def_params : dict
-            Key-value pairs to override default parameters.  This should be used for subclassing,
-            so that this entire method does not need to be re-written.
-            For example, to set a new default value, use something like:
-            `super().model_for_params(params, sam_shape=sam_shape, new_def_params=dict(hard_rchar=1*PC))`
 
         Returns
         -------
-        sam : `holodeck.sam.Semi_Analytic_Model` instance
-        hard : `holodeck.hardening._Hardening` instance
+        sam : :class:`holodeck.sam.Semi_Analytic_Model` instance
+        hard : :class:`holodeck.hardening._Hardening` instance
 
         """
 
         # ---- Update default parameters with input parameters
 
         settings = cls.DEFAULTS.copy()
-
-        # if len(params) < 1:
-        #     err = "No `params` included in call to `model_for_params`!"
-        #     raise ValueError(err)
-
-        # Update default parameters specified in sub-classes
-
-        for kk, vv in new_def_params.items():
-            if kk not in settings:
-                err = f"`new_def_params` has key '{kk}' not found in settings!  ({settings.keys()})!"
-                raise ValueError(err)
-            settings[kk] = vv
-
-        # Update parameters passes in using the `params` dict, typically from LHC sampling
-
         for name, value in params.items():
-            # fix deprecated parameter names
-            if name in RENAMED_PARAMS:
-                new_name = RENAMED_PARAMS[name]
-                msg = f"Parameter name deprecated: '{name}' ==> '{new_name}'"
-                print(msg)
-                name = new_name
-
-            if name not in settings:
-                err = f"`params` has key '{name}' not found in settings!  ({settings.keys()})!"
-                raise ValueError(err)
-            if name in new_def_params:
-                err = f"`params` has key '{name}' which is also in `new_def_params`!  ({new_def_params.keys()})!"
-                raise ValueError(err)
-
             settings[name] = value
 
         # ---- Construct SAM and hardening model
@@ -287,6 +251,30 @@ class _Param_Space(abc.ABC):
         return self.model_for_params(params, sam_shape)
 
     def _normalized_params(self, vals):
+        """Convert input values (uniform/linear) into parameters from the stored distributions.
+
+        For example, if this parameter space has 2 dimensions, where the distributions are:
+
+        0. 'value_a' is a uniform parameter from [-1.0, 1.0], and
+        1. 'value_b' normal with mean 10.0 and stdev 1.0
+
+        Then input values of ``[0.75, 0.5]`` are mapped to parameters ``[0.5, 10.0]``, which will be
+        returned as ``{value_a: 0.5, value_b: 10.0}``.
+
+        Arguments
+        ---------
+        vals : (P,) iterable of float,
+            A list/iterable of `P` float values, matching the number of parameters (i.e. dimensions)
+            in this parameter space.  Each value is passed to the corresponding distribution for
+            that parameter.
+
+        Returns
+        -------
+        params : dict,
+            The resulting parameters in the form of key-value pairs where the keys are the parameter
+            names, and the values are drawn from the correspinding distributions.
+
+        """
         if np.ndim(vals) == 0:
             vals = self.npars * [vals]
         assert len(vals) == self.npars
@@ -299,38 +287,17 @@ class _Param_Space(abc.ABC):
 
         return params
 
-    def model_for_normalized_params(self, vals, **kwargs):
-        """Construct a model from this space by specifying fractional parameter values [0.0, 1.0].
-
-        Arguments
-        ---------
-        vals : (P,) array_like  or  scalar
-            Specification for each of `P` parameters varied in the parameter-space.  Each `vals` gives the
-            location in uniform space between [0.0, 1.0] that will be converted to the parameter values
-            based on the mapping the corresponding _Param_Dist instances (stored in `space._dists`).
-            For example, if the 0th parameter uses a PD_Uniform_Log distribution, then a `vals` of 0.5
-            for that parameter will correspond to half-way in log-space of the range of parameter values.
-            If a scalar value is given, then it is used for each of the `P` parameters in the space.
-
-        Returns
-        -------
-        sam : `holodeck.sam.Semi_Analytic_Model` instance
-        hard : `holodeck.hardening._Hardening` instance
-
-        """
-        self._log.warning(
-            "`model_for_normalized_params() is deprecated, use "
-            "space.model_for_params(space.normalized_params(vals)) instead."
-        )
-        params = self._normalized_params(vals)
-        kwargs.setdefault('sam_shape', self.sam_shape)
-        return self.model_for_params(params, **kwargs)
-
 
 class _Param_Dist(abc.ABC):
-    """Parameter Distribution classes for use in Latin HyperCube sampling.
+    """Parameter Distribution base-class for use in Latin HyperCube sampling.
 
-    These classes are passed uniform random variables, and return the desired distributions of parameters.
+    These classes are passed uniform random variables between [0.0, 1.0], and return parameters
+    from the desired distribution.
+
+    Subclasses are required to implement the ``_dist_func()`` function which accepts a float value
+    from [0.0, 1.0] and returns the appropriate corresponding parameter, drawn from the desired
+    distribution.  In practice, ``_dist_func()`` is usually the inverse cumulative-distribution for
+    the desired distribution function.
 
     """
 
@@ -346,13 +313,13 @@ class _Param_Dist(abc.ABC):
             rv = np.clip(rv, *self._clip)
         return rv
 
-    @property
-    def extrema(self):
-        return self(np.asarray([0.0, 1.0]))
-
     @abc.abstractmethod
     def _dist_func(self, *args, **kwargs):
         pass
+
+    @property
+    def extrema(self):
+        return self(np.asarray([0.0, 1.0]))
 
 
 class PD_Uniform(_Param_Dist):
@@ -361,7 +328,6 @@ class PD_Uniform(_Param_Dist):
         super().__init__(**kwargs)
         self._lo = lo
         self._hi = hi
-        # self._dist_func = lambda xx: self._lo + (self._hi - self._lo) * xx
         return
 
     def _dist_func(self, xx):
@@ -376,7 +342,6 @@ class PD_Uniform_Log(_Param_Dist):
         assert lo > 0.0 and hi > 0.0
         self._lo = np.log10(lo)
         self._hi = np.log10(hi)
-        # self._dist_func = lambda xx: np.power(10.0, self._lo + (self._hi - self._lo) * xx)
         return
 
     def _dist_func(self, xx):
