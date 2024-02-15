@@ -6,8 +6,8 @@ from holodeck.constants import GYR, PC, MSOL
 from holodeck.librarian.params import _Param_Space, PD_Uniform
 
 
-class PS_New_Test(_Param_Space):
-    """Base class for classic phenomenological parameter space used in 15yr analysis.
+class PS_Double_Schechter_Rate(_Param_Space):
+    """
     """
 
     DEFAULTS = dict(
@@ -102,6 +102,6 @@ class PS_New_Test(_Param_Space):
 
 
 _param_spaces_dict = {
-    'PS_New_Test': PS_New_Test,
+    'PS_New_Test': PS_Double_Schechter_Rate,
 }
 
