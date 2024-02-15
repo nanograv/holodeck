@@ -16,6 +16,10 @@ FNAME_SIM_FILE = "sam-lib__p{pnum:06d}.npz"
 PSPACE_FILE_SUFFIX = ".pspace.npz"
 
 from . import params        # noqa
+from . params import (      # noqa
+    _Param_Space, _Param_Dist,
+    PD_Uniform, PD_Normal,
+)
 
 param_spaces_dict = {}    #: Registry of standard parameter-spaces
 from . import param_spaces_classic as psc_temp  # noqa
