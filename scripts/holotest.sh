@@ -27,7 +27,7 @@ function help()
 {
     echo "Setup and run 'holodeck' tests."
     echo
-    echo "Syntax: tester.sh [-h|v|d|b] [FILES/DIRS...]"
+    echo "Syntax: holotest.sh [-h|v|d|b] [FILES/DIRS...]"
     echo
     echo "options:"
     echo "h   (help)    print this Help."
@@ -78,7 +78,7 @@ else
     PATH_TESTS="${DIR_PACKAGE}/${TESTS_NAME}";
 fi
 
-if ${VERBOSE}; then echo "==== holodeck tester.sh ===="; fi
+if ${VERBOSE}; then echo "==== holotest.sh - holodeck tests ===="; fi
 if ${DRY}; then echo "DRYRUN"; fi
 if ${VERBOSE}; then echo ""; fi
 
