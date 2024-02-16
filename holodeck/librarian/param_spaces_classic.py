@@ -1,10 +1,10 @@
 """'Classic' parameter spaces used in the NANOGrav 15yr analysis.
 """
 
-import holodeck as holo
+# import holodeck as holo
 from holodeck.constants import PC, GYR
 from holodeck.librarian.params import _Param_Space, PD_Uniform, PD_Normal
-
+from holodeck import sams, hardening, relations
 
 # __all__ = [
 #     "PS_Classic_Phenom_Uniform",
@@ -51,7 +51,7 @@ class _PS_Classic_Phenom(_Param_Space):
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
-        gsmf = holo.sams.GSMF_Schechter(
+        gsmf = sams.GSMF_Schechter(
             phi0=params['gsmf_phi0_log10'],
             phiz=params['gsmf_phiz'],
             mchar0_log10=params['gsmf_mchar0_log10'],
@@ -59,26 +59,26 @@ class _PS_Classic_Phenom(_Param_Space):
             alpha0=params['gsmf_alpha0'],
             alphaz=params['gsmf_alphaz'],
         )
-        gpf = holo.sams.GPF_Power_Law(
+        gpf = sams.GPF_Power_Law(
             frac_norm_allq=params['gpf_frac_norm_allq'],
             malpha=params['gpf_malpha'],
             qgamma=params['gpf_qgamma'],
             zbeta=params['gpf_zbeta'],
             max_frac=params['gpf_max_frac'],
         )
-        gmt = holo.sams.GMT_Power_Law(
+        gmt = sams.GMT_Power_Law(
             time_norm=params['gmt_norm']*GYR,
             malpha=params['gmt_malpha'],
             qgamma=params['gmt_qgamma'],
             zbeta=params['gmt_zbeta'],
         )
-        mmbulge = holo.relations.MMBulge_KH2013(
+        mmbulge = relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
         )
 
-        sam = holo.sams.Semi_Analytic_Model(
+        sam = sams.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
             shape=sam_shape,
         )
@@ -86,7 +86,7 @@ class _PS_Classic_Phenom(_Param_Space):
 
     @classmethod
     def _init_hard(cls, sam, params):
-        hard = holo.hardening.Fixed_Time_2PL_SAM(
+        hard = hardening.Fixed_Time_2PL_SAM(
             sam,
             params['hard_time']*GYR,
             sepa_init=params['hard_sepa_init']*PC,
@@ -189,7 +189,7 @@ class _PS_Classic_GWOnly(_Param_Space):
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
-        gsmf = holo.sams.GSMF_Schechter(
+        gsmf = sams.GSMF_Schechter(
             phi0=params['gsmf_phi0'],
             phiz=params['gsmf_phiz'],
             mchar0_log10=params['gsmf_mchar0_log10'],
@@ -197,26 +197,26 @@ class _PS_Classic_GWOnly(_Param_Space):
             alpha0=params['gsmf_alpha0'],
             alphaz=params['gsmf_alphaz'],
         )
-        gpf = holo.sams.GPF_Power_Law(
+        gpf = sams.GPF_Power_Law(
             frac_norm_allq=params['gpf_frac_norm_allq'],
             malpha=params['gpf_malpha'],
             qgamma=params['gpf_qgamma'],
             zbeta=params['gpf_zbeta'],
             max_frac=params['gpf_max_frac'],
         )
-        gmt = holo.sams.GMT_Power_Law(
+        gmt = sams.GMT_Power_Law(
             time_norm=params['gmt_norm']*GYR,
             malpha=params['gmt_malpha'],
             qgamma=params['gmt_qgamma'],
             zbeta=params['gmt_zbeta'],
         )
-        mmbulge = holo.relations.MMBulge_KH2013(
+        mmbulge = relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
         )
 
-        sam = holo.sams.Semi_Analytic_Model(
+        sam = sams.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
             shape=sam_shape,
         )
@@ -224,7 +224,7 @@ class _PS_Classic_GWOnly(_Param_Space):
 
     @classmethod
     def _init_hard(cls, sam, params):
-        hard = holo.hardening.Hard_GW()
+        hard = hardening.Hard_GW()
         return hard
 
 

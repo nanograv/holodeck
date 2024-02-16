@@ -469,7 +469,7 @@ class MMBulge_Redshift(MMBulge_Standard):
         # NOTE: this will work for (N,) ==> (N,)    or   (N,) ==> (N,X)
         try:
             redz = np.broadcast_to(redz, mbulge.T.shape).T
-        except:
+        except TypeError:
             redz = redz
         zmamp = self._mamp * (1.0 + redz)**self._zplaw
         mbh = _log10_relation(mbulge, zmamp, self._mplaw, scatter_dex, x0=self._mref)
