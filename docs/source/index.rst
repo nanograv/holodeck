@@ -2,7 +2,15 @@
 holodeck
 ========
 
+.. include:: ../header.rst
+
 **Massive Black-Hole Binary Population Synthesis for Gravitational Wave Calculations ≋●≋●≋**
+
+.. image:: /../media/holodeck_logo.png
+  :width: 260
+  :alt: holodeck (NANOGrav AstroWG) logo
+  :target: https://github.com/nanograv/holodeck
+  :align: right
 
 `holodeck on github <https://github.com/nanograv/holodeck>`_
 
@@ -66,15 +74,20 @@ Installation
 
 The ``holodeck`` framework is currently under substantial, active development.  Recent versions will not generally be available with ``pip`` or ``conda`` install.  Currently ``holodeck`` requires ``python >= 3.9`` (tests are run on versions ``3.9``, ``3.10``, ``3.11``).  The recommended installation is:
 
-1) OPTIONAL but recommended: create and activate a new anaconda environment to isolate your build::
+0) OPTIONAL & recommended: create and activate a new **anaconda** environment to isolate your build::
 
       conda create --name holo311 python=3.11; conda activate holo311
 
-2) Clone the ``holodeck`` repository, and move into the repo directory::
+   Note that you will need to activate this environment every time you want to use holodeck.  If you're not familiar with **anaconda**, take a look at their official `Getting started guide <https://conda.io/projects/conda/en/latest/user-guide/getting-started.html#managing-python>`_.  To use your anaconda environment with jupyter notebooks, make sure to add this environment to your ipython kernels::
+
+      conda install -c conda-forge ipykernel
+      python -m ipykernel install --user --name=holo311
+
+1) Clone the ``holodeck`` repository, and move into the repo directory::
 
       git clone https://github.com/nanograv/holodeck.git; cd holodeck
 
-3) Install the required external packages specified in the requirements file::
+2) Install the required external packages specified in the requirements file::
 
       pip install -r requirements.txt
 
@@ -82,15 +95,15 @@ The ``holodeck`` framework is currently under substantial, active development.  
 
       pip install -r requirements-dev.txt
 
-4) Build the required c libraries from ``holodeck`` ``cython`` code::
+3) Build the required c libraries from ``holodeck`` ``cython`` code::
 
-      cd holodeck; python setup.py build_ext -i
+      python setup.py build_ext -i
 
-5) Perform a development/editable local installation::
+4) Perform a development/editable local installation::
 
       python setup.py develop
 
-The 'editable' installation allows the code base to be modified, and have those changes take effect when using the ``holodeck`` module without having to rebuild/reinstall it.  Note that any chances to the cython library files do still require a rebuild by running steps (3) and (4) above.
+The 'editable' installation allows the code base to be modified, and have those changes take effect when using the ``holodeck`` module without having to rebuild/reinstall it.  Note that any changes to the cython library files do still require a rebuild by running steps (3) and (4) above.
 
 MPI
 ---
