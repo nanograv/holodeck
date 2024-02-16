@@ -75,7 +75,7 @@ class _Param_Space(abc.ABC):
             param_samples = None
         else:
             # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
-            lhc = sp.stats.qmc.LatinHypercube(d=ndims, centered=False, strength=1, seed=seed)
+            lhc = sp.stats.qmc.LatinHypercube(d=ndims, strength=1, seed=seed)
             # (S, D) - samples, dimensions
             uniform_samples = lhc.random(n=nsamples)
             param_samples = np.zeros_like(uniform_samples)
