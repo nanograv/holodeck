@@ -7,6 +7,7 @@ holodeck.librarian module
     :private-members:
     :undoc-members:
     :show-inheritance:
+    :member-order: bysource
 
 .. toctree::
     :maxdepth: 1

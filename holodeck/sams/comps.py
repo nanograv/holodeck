@@ -1,5 +1,15 @@
 """Semi-Analytic Model - Components
 
+This module provides the key building blocks for the holodeck SAMs.  In particular, the:
+
+* Galaxy Stellar-Mass Function (GSMF) : number-density of galaxies as a function of stellar mass;
+* Galaxy Merger Rate (GMR) : rate of galaxy mergers per galaxy;
+* Galaxy Pair Fraction (GPF) : fraction of galaxy pairs, relative to all galaxies;
+* Galaxy Merger Time (GMT) : duration over which galaxy pairs are observable as pairs.
+
+For more information see the :mod:`holodeck.sams` module, or the :doc:`SAMs getting-started guide
+<../getting_started/index>`.
+
 References
 ----------
 * [Sesana2008]_ Sesana, Vecchio, Colacino 2008.
@@ -100,7 +110,7 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
 class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
     r"""Single Schechter Function - Galaxy Stellar Mass Function.
 
-    This is density per unit log10-interval of stellar mass, i.e. $Phi = dn / d\\log_{10}(M)$
+    This is density per unit log10-interval of stellar mass, i.e. $\Phi = dn / d\log_{10}(M)$
 
     See: [Chen2019]_ Eq.9 and enclosing section.
 
@@ -163,14 +173,73 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
 
 
 class _GSMF_Single_Schechter(_Galaxy_Stellar_Mass_Function):
+    r"""Schechter function, with parameters as quadratics with respect to redshift.
+
+    Parameterization follows [Leja2020]_ and is primarily for use in the
+    :class:`GSMF_Double_Schechter` class.  From [Leja2020]_ Eq.14:
+
+    .. math::
+
+        \frac{\partial n}{\partial \log_{10} \! M} =
+            \ln(10) \phi \left(\frac{M}{M_\star}\right)^{\alpha+1} \exp[-M/M_\star].
+
+    The power-law index $\alpha$ is a scalar value, while the reference mass $M_\star$, and the
+    normalization $\phi$ are defined as quadratics with respect to redshift:
+
+    .. math::
+
+        \log_{10}(\phi) & = a_0 + a_1 z + a_2 z^2, \\
+        \log_{10}(M_\star) & = b_0 + b_1 z + b_2 z^2.
+
+    Class instances are callable, see :meth:`__call__`, and return galaxy number densities in units
+    of $[\mathrm{Mpc}^{-3} \, \mathrm{dex}^{-1}]$.
+
+    """
 
     def __init__(self, log10_phi_terms, log10_mstar_terms, alpha):
-        self._log10_phi_terms = log10_phi_terms
-        self._log10_mstar_terms = log10_mstar_terms
-        self._alpha = alpha
+        r"""Initialize a Schechter function GSMF.
+
+        Arguments
+        ---------
+        log10_phi_terms : (3,) of float
+            Three terms determining the redshift behavior of
+            $\log_{10}(\phi / \mathrm{Mpc}^{-3} \mathrm{dex}^{-1})$, the normalization in units of
+            $[\mathrm{Mpc}^{-3} \, \mathrm{dex}^{-1}]$.
+        log10_mstar_terms : (3,) of float
+            Three terms determining the redshift behavior of $\log_{10}(M_\star/M_\odot)$, the
+            characteristic mass, in units of solar masses.
+        alpha : float
+            Power-law index for GSMF in terms of $dN/dM$, even though the function is written in
+            terms of $dn/d \log_{10} \! M$.
+
+        Returns
+        -------
+        None
+
+        """
+        self._log10_phi_terms = log10_phi_terms      #: these are the $a_i$ terms in the defintion.
+        self._log10_mstar_terms = log10_mstar_terms  #: these are the $b_i$ terms.
+        self._alpha = alpha                          #: power-law index
         return
 
     def __call__(self, mstar, redz):
+        r"""Evaluate this GSMF instance at the target stellar-mass(es) and redshift(s).
+
+        Arguments
+        ---------
+        mstar : array_like of float
+            Stellar mass(es), in units of $[M_\odot]$, at which to evaluate the GSMF.
+            Must be broadcastable against ``redz``.
+        redz : array_like of float
+            Redshift(s) at which to evaluate the GSMF.  Must be broadcastable against ``mstar``.
+
+        Returns
+        -------
+        rv : float  or  array_like of float
+            Number density of galaxies, $dn/d \log_{10} \! M$, in units of
+            $[\mathrm{Mpc}^{-3} \, \mathrm{dex}^{-1}]$.
+
+        """
         phi = self._phi_func(redz)
         mchar = self._mstar_func(redz)
         alpha = self._alpha
@@ -179,17 +248,44 @@ class _GSMF_Single_Schechter(_Galaxy_Stellar_Mass_Function):
         return rv
 
     def _phi_func(self, redz):
+        """Evaluate the GSMF normalization (phi) at the given redshift(s).
+        """
         cc = self._log10_phi_terms
         phi = np.power(10.0, cc[0] + cc[1] * redz + cc[2] * redz**2)
         return phi
 
     def _mstar_func(self, redz):
+        r"""Evaluate the GSMF characteristic mass ($M_\star$) at the given redshift(s).
+        """
         cc = self._log10_mstar_terms
         mstar = MSOL * np.power(10.0, cc[0] + cc[1] * redz + cc[2] * redz**2)
         return mstar
 
 
 class GSMF_Double_Schechter(_Galaxy_Stellar_Mass_Function):
+    r"""Sum of two Schechter functions, each parameterized as quadratics in redshift.
+
+    For each Schechter Function (:class:`_GSMF_Single_Schechter`), the normalizations ($\phi$) and
+    characteristic masses ($M_\star$) are parameterized as quadratics with respect to redshift.
+
+    Each Schechter function is parameterized as,
+
+    .. math::
+
+        \frac{\partial n}{\partial \log_{10} \! M} & =
+            \ln(10) \, \phi \cdot \left(\frac{M}{M_\star}\right)^{\alpha+1} \exp[-M/M_\star], \\
+        \log_{10}(\phi) & = a_0 + a_1 z + a_2 z^2, \\
+        \log_{10}(M_\star) & = b_0 + b_1 z + b_2 z^2.
+
+    The parameters for $\phi$ and $\alpha$ are different for the two functions, while the parameters
+    for $M_\star$ are shared (i.e. the same characteristic mass is used for both).  Default
+    parameters are the best fits from [Leja2020]_.  With uncertainties, these are::
+
+        phi_1:  [ -2.383 ± 0.027,  -0.264 ± 0.071,  -0.107 ± 0.030],
+        phi_2:  [ -2.818 ± 0.050,  -0.368 ± 0.070,  +0.046 ± 0.020],
+        M_star: [+10.767 ± 0.026,  +0.124 ± 0.045,  -0.033 ± 0.015].
+
+    """
 
     def __init__(
         self,

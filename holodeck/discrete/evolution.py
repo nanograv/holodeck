@@ -73,11 +73,12 @@ from __future__ import annotations
 
 import numpy as np
 
-import kalepy as kale
+# import kalepy as kale
 
-import holodeck as holo
+# import holodeck as holo
 from holodeck import utils, cosmo, log
-from holodeck.constants import PC
+from holodeck.discrete import population
+# from holodeck.constants import PC
 from holodeck.hardening import _Hardening
 # from holodeck import accretion
 
@@ -165,8 +166,8 @@ class Evolution:
         self._hard = hard
 
         # Make sure types look right
-        if not isinstance(pop, holo.population._Population_Discrete):
-            err = f"`pop` is {pop}, must be subclass of `holo.population._Population_Discrete`!"
+        if not isinstance(pop, population._Population_Discrete):
+            err = f"`pop` is {pop}, must be subclass of `population._Population_Discrete`!"
             log.exception(err)
             raise TypeError(err)
 
@@ -673,7 +674,7 @@ class Evolution:
             corresponding to this binary in the simulation, at the target frequency.
 
         """
-        fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges, log=False)
+        fobs_orb_cents = utils.midpoints(fobs_orb_edges, log=False)
         dlnf = np.diff(np.log(fobs_orb_edges))
 
         # Interpolate binaries to given frequencies; these are the needed parameters
@@ -713,6 +714,7 @@ class Evolution:
         return names, vals, weights
 
     def _sample_universe__resample(self, fobs_orb_edges, vals, weights, down_sample):
+        import kalepy as kale
         # down-sample weights to decrease the number of sample points
         prev_sum = weights.sum()
         log.info(f"Total weights (number of binaries in the universe): {prev_sum:.8e}")
