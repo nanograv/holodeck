@@ -8,7 +8,7 @@ import scipy.stats
 import pytest
 
 import holodeck as holo
-import holodeck.population
+from holodeck.discrete import population
 import holodeck.relations
 from holodeck.constants import MSOL, PC
 
@@ -26,7 +26,7 @@ def test_pop_illustris_basic():
 
     """
     print("test_pop_illustris_basic()")
-    pop = holo.population.Pop_Illustris()
+    pop = population.Pop_Illustris()
 
     keys = ['mbulge', 'vdisp', 'mass', 'scafa', 'sepa', 'redz']
     ranges = [[1e7, 1e13], [10, 600], [1e5, 3e10], [0.0, 1.0], [1e3, 3e5], [0.0, 10.0]]
@@ -44,7 +44,7 @@ def test_pop_illustris_basic():
     """`Pop_Illustris` should raise an error if passed a non-existent file
     """
     with pytest.raises(FileNotFoundError):
-        pop = holo.population.Pop_Illustris(fname='does_not_exist')
+        pop = population.Pop_Illustris(fname='does_not_exist')
 
     return
 
@@ -55,14 +55,14 @@ def test_valid_population_subclass():
     """
 
     # ---- Initializing a subclass that does *not* override `_init()` should fail
-    class Bad_1(holo.population._Population_Discrete):
+    class Bad_1(population._Population_Discrete):
         pass
 
     with pytest.raises(TypeError):
         Bad_1()
 
     # ---- Initializing a subclass that *does* override `_init()` and sets attributes should succeed
-    class Good_1(holo.population._Population_Discrete):
+    class Good_1(population._Population_Discrete):
         def _init(self):
             self.mass = np.zeros((10, 2))
             self.sepa = np.zeros(10)
@@ -73,14 +73,14 @@ def test_valid_population_subclass():
 
     # ---- Initializing a subclass that overrides `_init()`, but does not set attributers should fail
     # because `sepa` is not set, `_size` will be `None` which will raise a `ValueError` in `_check()`
-    class Bad_2(holo.population._Population_Discrete):
+    class Bad_2(population._Population_Discrete):
         def _init(self):
             return
 
     with pytest.raises(ValueError):
         Bad_2()
 
-    class Bad_3(holo.population._Population_Discrete):
+    class Bad_3(population._Population_Discrete):
         def _init(self):
             self.mass = np.zeros((10, 2))
             self.scafa = np.zeros(10)
@@ -103,7 +103,7 @@ def test_valid_pop_mod_init():
 
     """PM subclasses should raise errors when not overriding `modify`
     """
-    class PM_Bad_1(holo.population._Population_Modifier):
+    class PM_Bad_1(population._Population_Modifier):
         pass
 
     with pytest.raises(TypeError):
@@ -111,7 +111,7 @@ def test_valid_pop_mod_init():
 
     """PM subclasses should raise errors when not overriding `modify`
     """
-    class PM_Good_1(holo.population._Population_Modifier):
+    class PM_Good_1(population._Population_Modifier):
         def modify(self):   # nocov
             pass
 
@@ -128,38 +128,38 @@ def test_eccentricity_illustris_basics():
     # ---- No Arguments
 
     # Apply in constructor
-    pm_ecc = holo.population.PM_Eccentricity()
-    pop = holo.population.Pop_Illustris(mods=pm_ecc)
+    pm_ecc = population.PM_Eccentricity()
+    pop = population.Pop_Illustris(mods=pm_ecc)
     assert pop.eccen.size == pop.size
     assert np.all((pop.eccen >= 0.0) & (pop.eccen <= 1.0))
 
     # Apply after initialization
-    pop = holo.population.Pop_Illustris()
+    pop = population.Pop_Illustris()
     pop.modify(pm_ecc)
     assert pop.eccen.size == pop.size
     assert np.all((pop.eccen >= 0.0) & (pop.eccen <= 1.0))
 
     # ---- Valid arguments iterable of shape (2,)
-    pm_ecc = holo.population.PM_Eccentricity(np.random.uniform(0.0, 100, 2))
-    pm_ecc = holo.population.PM_Eccentricity([1.0, 2.0])
-    pm_ecc = holo.population.PM_Eccentricity((1.0, 2.0))
-    pm_ecc = holo.population.PM_Eccentricity(np.array([1.0, 2.0]))
+    pm_ecc = population.PM_Eccentricity(np.random.uniform(0.0, 100, 2))
+    pm_ecc = population.PM_Eccentricity([1.0, 2.0])
+    pm_ecc = population.PM_Eccentricity((1.0, 2.0))
+    pm_ecc = population.PM_Eccentricity(np.array([1.0, 2.0]))
 
     # ---- Invalid arguments NOT iterable of shape (2,)
     with pytest.raises(ValueError):
-        pm_ecc = holo.population.PM_Eccentricity(None)
+        pm_ecc = population.PM_Eccentricity(None)
 
     with pytest.raises(ValueError):
-        pm_ecc = holo.population.PM_Eccentricity(2.0)
+        pm_ecc = population.PM_Eccentricity(2.0)
 
     with pytest.raises(ValueError):
-        pm_ecc = holo.population.PM_Eccentricity([2.0])
+        pm_ecc = population.PM_Eccentricity([2.0])
 
     with pytest.raises(ValueError):
-        pm_ecc = holo.population.PM_Eccentricity([2.0, 3.0, 4.0])
+        pm_ecc = population.PM_Eccentricity([2.0, 3.0, 4.0])
 
     with pytest.raises(ValueError):
-        pm_ecc = holo.population.PM_Eccentricity(np.array([[1.0, 2.0]]))
+        pm_ecc = population.PM_Eccentricity(np.array([[1.0, 2.0]]))
 
     return
 
@@ -178,8 +178,8 @@ def test_eccentricity_illustris_trends():
         # store the average eccentricity for each cent parameter
         aves = []
         for cent in cent_list:
-            pm_ecc = holo.population.PM_Eccentricity((cent, wid))
-            pop = holo.population.Pop_Illustris(mods=pm_ecc)
+            pm_ecc = population.PM_Eccentricity((cent, wid))
+            pop = population.Pop_Illustris(mods=pm_ecc)
             xx = pop.eccen
 
             aves.append(np.mean(xx))
@@ -198,8 +198,8 @@ def test_eccentricity_illustris_trends():
         # store the stdev for each width parameter
         stdevs = []
         for wid in wids_list:
-            pm_ecc = holo.population.PM_Eccentricity((cent, wid))
-            pop = holo.population.Pop_Illustris(mods=pm_ecc)
+            pm_ecc = population.PM_Eccentricity((cent, wid))
+            pop = population.Pop_Illustris(mods=pm_ecc)
             xx = pop.eccen
             stdevs.append(np.std(xx))
 
@@ -221,7 +221,7 @@ def test_resample_basic():
     old_size = None
     for ii, resamp in enumerate(np.random.randint(6, 10, TRIES)):
         print(ii, f"resamp = {resamp}")
-        pop = holo.population.Pop_Illustris()
+        pop = population.Pop_Illustris()
 
         if old_size is None:
             old_size = pop.size
@@ -241,7 +241,7 @@ def test_resample_basic():
         else:
             assert pop.size == old_size
 
-        mod_resamp = holo.population.PM_Resample(resample=resamp)
+        mod_resamp = population.PM_Resample(resample=resamp)
         pop.modify(mod_resamp)
 
         # Make sure the new size of the population is correct
@@ -273,9 +273,9 @@ def test_resample_basic():
 
 def test_mass_reset():
     print("test_mass_reset()")
-    pop = holo.population.Pop_Illustris()
+    pop = population.Pop_Illustris()
     mmbulge_relation = holo.relations.MMBulge_MM2013()
-    mod_MM2013 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=False)
+    mod_MM2013 = population.PM_Mass_Reset(mmbulge_relation, scatter=False)
 
     mass_bef = pop.mass
     host = pop
@@ -292,7 +292,7 @@ def test_mass_reset():
     TOL_STD = 1.5 * sp.stats.norm.ppf(1.0 - 1.0 / pop.mass.size)
     print(f"TOL={TOL_STD}")
     mmbulge_relation = holo.relations.MMBulge_MM2013(scatter_dex=SCATTER)
-    mod_MM2013 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=True)
+    mod_MM2013 = population.PM_Mass_Reset(mmbulge_relation, scatter=True)
     pop.modify(mod_MM2013)
     mass_scatter = pop.mass
     aa = np.log10(mass_aft/MSOL)
