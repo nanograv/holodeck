@@ -1,7 +1,7 @@
 """Binary evolution hardening submodules.
 
-To-Do
------
+To-Do (Hardening)
+-----------------
 * Dynamical_Friction_NFW
     * Allow stellar-density profiles to also be specified (instead of using a hard-coded
       Dehnen profile)
@@ -14,7 +14,7 @@ To-Do
       and flexible.  Currently hard-coded to Dehnen profile estimate.
 * _SHM06
     * Interpolants of hardening parameters return 1D arrays.
-* Fixed_Time
+* Fixed_Time_2PL
     * Handle `rchar` better with respect to interpolation.  Currently not an interpolation
       variable, which restricts it's usage.
     * This class should be separated into a generic `_Fixed_Time` class that can use any
@@ -258,7 +258,7 @@ class CBD_Torques(_Hardening):
 
         if evo._acc is None:
             """ If no accretion modules is supplied, use an Eddington fraction for now """
-            total_mass = mass[:,0] + mass[:,1]
+            # total_mass = mass[:,0] + mass[:,1]
             accretion_instance = holo.accretion.Accretion(f_edd = self.f_edd, subpc=self.subpc)
             mdot = accretion_instance.mdot_total(evo, step)
         if evo._acc is not None:
@@ -722,19 +722,17 @@ class Fixed_Time_2PL(_Hardening):
     transition radius (:math:`r_\mathrm{char}`) between two power-law indices $g_1$ and $g_2$.  There is
     also an overall normalization $A$ that is calculated to yield the desired binary lifetimes.
 
-    NOTE/BUG: the actual binary lifetimes tend to be 1-5% shorter than the requested value.
-
     The normalization for each binary, to produce the desired lifetime, is calculated as follows:
 
-        (1) A set of random test binary parameters are chosen.
+    (1) A set of random test binary parameters are chosen.
 
-        (2) The normalization constants are determined, using least-squares optimization, to yield the
-            desired lifetime.
+    (2) The normalization constants are determined, using least-squares optimization, to yield the
+        desired lifetime.
 
-        (3) Interpolants are constructed to interpolate between the test binary parameters.
+    (3) Interpolants are constructed to interpolate between the test binary parameters.
 
-        (4) The interpolants are called on the provided binary parameters, to calculate the
-            interpolated normalization constants to reach the desired lifetimes.
+    (4) The interpolants are called on the provided binary parameters, to calculate the
+        interpolated normalization constants to reach the desired lifetimes.
 
     Construction/Initialization: note that in addition to the standard :meth:`Fixed_Time.__init__`
     constructor, there are two additional constructors are provided:
@@ -971,7 +969,7 @@ class Fixed_Time_2PL(_Hardening):
 
     @classmethod
     def _dadt_dedt(cls, mtot, mrat, sepa, norm, rchar, gamma_inner, gamma_outer):
-        """Calculate hardening rate for the given raw parameters.
+        r"""Calculate hardening rate for the given raw parameters.
 
         Parameters
         ----------
@@ -989,9 +987,9 @@ class Fixed_Time_2PL(_Hardening):
             Characteristic transition radius between the two power-law indices of the hardening
             rate model, units of [cm].
         gamma_inner : scalar
-            Power-law of hardening timescale in the inner regime (small separations: r < rchar).
+            Power-law of hardening timescale in the inner regime (small separations: ``r < rchar``).
         gamma_outer : scalar
-            Power-law of hardening timescale in the outer regime (large separations: r > rchar).
+            Power-law of hardening timescale in the outer regime (large separations: ``r > rchar``).
 
         Returns
         -------
@@ -1294,7 +1292,7 @@ class Fixed_Time_2PL(_Hardening):
 
     @classmethod
     def _time_total(cls, norm, mt, mr, rchar, gamma_inner, gamma_outer, sepa_init, num=123):
-        """For the given parameters, integrate the binary evolution to find total lifetime.
+        r"""For the given parameters, integrate the binary evolution to find total lifetime.
 
         Parameters
         ----------
@@ -1661,13 +1659,14 @@ class _SHM06:
 
 
 class _Siwek2023:
-    """ Hardening rates from circumbinary disk simulations as in [Siwek2023]_.
+    r"""Hardening rates from circumbinary disk simulations as in [Siwek2023]_.
 
-        Mass ratios and eccentricities must be provided.
+    Mass ratios and eccentricities must be provided.
 
-        The lookup tables (in form of a dictionary) are located here:
-        data/cbd_torques/siwek+23/ebdot_abdot_tmin3000Pb_tmax10000Pb.pkl
-        and contain \dot{e} and \dot{a} as a function of q,e
+    The lookup tables (in form of a dictionary) are located here:
+    data/cbd_torques/siwek+23/ebdot_abdot_tmin3000Pb_tmax10000Pb.pkl
+    and contain $\dot{e}$ and $\dot{a}$ as a function of q,e
+
     """
 
     @staticmethod
@@ -1692,17 +1691,17 @@ class _Siwek2023:
         fp_mean_ebdot_abdot = open(fp_dadt_dedt_pkl, 'rb')
         mean_ebdot_abdot = pkl.load(fp_mean_ebdot_abdot)
         all_es = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8]
-        all_qs = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+        all_qs = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
         torque_contribution = 'sum_grav_acc'
 
         mean_abdot_arr = np.zeros((len(all_qs),len(all_es)))
-        mean_ebdot_arr = np.zeros((len(all_qs),len(all_es)))
+        # mean_ebdot_arr = np.zeros((len(all_qs),len(all_es)))
         for i,q in enumerate(all_qs):
             for j,e in enumerate(all_es):
                 this_key_ab = 'e=%.2f_q=%.2f_ab_dot_ab_%s' %(e,q,torque_contribution)
                 mean_abdot_arr[i][j] = mean_ebdot_abdot[this_key_ab]
 
-        dadt_qe_interp = RectBivariateSpline(np.array(all_qs), np.array(all_es), np.array(mean_abdot_arr), kx = 1, ky = 1)
+        dadt_qe_interp = RectBivariateSpline(np.array(all_qs), np.array(all_es), np.array(mean_abdot_arr), kx=1, ky=1)
         dadt = dadt_qe_interp.ev(mrat, eccen)
         return dadt
 
@@ -1729,16 +1728,16 @@ class _Siwek2023:
         fp_mean_ebdot_abdot = open(fp_dadt_dedt_pkl, 'rb')
         mean_ebdot_abdot = pkl.load(fp_mean_ebdot_abdot)
         all_es = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8]
-        all_qs = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+        all_qs = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
         torque_contribution = 'sum_grav_acc'
 
         mean_ebdot_arr = np.zeros((len(all_qs),len(all_es)))
-        for i,q in enumerate(all_qs):
-            for j,e in enumerate(all_es):
-                this_key_eb = 'e=%.2f_q=%.2f_eb_dot_%s' %(e,q,torque_contribution)
+        for i, q in enumerate(all_qs):
+            for j, e in enumerate(all_es):
+                this_key_eb = 'e=%.2f_q=%.2f_eb_dot_%s' %(e, q, torque_contribution)
                 mean_ebdot_arr[i][j] = mean_ebdot_abdot[this_key_eb]
 
-        dedt_qe_interp = RectBivariateSpline(np.array(all_qs), np.array(all_es), np.array(mean_ebdot_arr), kx = 1, ky = 1)
+        dedt_qe_interp = RectBivariateSpline(np.array(all_qs), np.array(all_es), np.array(mean_ebdot_arr), kx=1, ky=1)
         dedt = dedt_qe_interp.ev(mrat, eccen)
         return dedt
 
