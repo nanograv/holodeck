@@ -49,7 +49,7 @@ import pickle as pkl
 from scipy.interpolate import RectBivariateSpline
 
 import holodeck as holo
-from holodeck import utils, cosmo, log, _PATH_DATA
+from holodeck import utils, cosmo, log, _PATH_DATA, relations
 from holodeck.constants import GYR, NWTG, PC, MSOL
 
 #: number of influence radii to set minimum radius for dens calculation
@@ -357,8 +357,8 @@ class Sesana_Scattering(_Hardening):
             If `None` a default relationship is used.
 
         """
-        self._mmbulge = holo.relations.get_mmbulge_relation(mmbulge)
-        self._msigma = holo.relations.get_msigma_relation(msigma)
+        self._mmbulge = relations.get_mmbulge_relation(mmbulge)
+        self._msigma = relations.get_msigma_relation(msigma)
         self._gamma_dehnen = gamma_dehnen
         self._shm06 = _SHM06()
         return
@@ -494,14 +494,14 @@ class Dynamical_Friction_NFW(_Hardening):
             If False: calculate R-bound using a velocity dispersion (constant in radius, from `gbh` instance).
 
         """
-        self._mmbulge = holo.relations.get_mmbulge_relation(mmbulge)
-        self._msigma = holo.relations.get_msigma_relation(msigma)
-        self._smhm = holo.relations.get_stellar_mass_halo_mass_relation(smhm)
+        self._mmbulge = relations.get_mmbulge_relation(mmbulge)
+        self._msigma = relations.get_msigma_relation(msigma)
+        self._smhm = relations.get_stellar_mass_halo_mass_relation(smhm)
         self._coulomb = coulomb
         self._attenuate = attenuate
         self._rbound_from_density = rbound_from_density
 
-        self._NFW = holo.relations.NFW
+        self._NFW = relations.NFW
         self._time_dynamical = None
         return
 
