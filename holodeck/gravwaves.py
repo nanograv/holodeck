@@ -13,7 +13,7 @@ import numpy as np
 import kalepy as kale
 
 import holodeck as holo
-from holodeck import utils, cosmo, log
+from holodeck import utils, cosmo, log, hardening
 from holodeck.constants import SPLC, NWTG, MPC
 
 
@@ -433,7 +433,7 @@ def gws_from_sampled_strains(fobs_gw_edges, fo, hs, weights):
     return gwf_freqs, gwfore, gwback
 
 
-def sampled_gws_from_sam(sam, fobs_gw, hard=holo.hardening.Hard_GW, **kwargs):
+def sampled_gws_from_sam(sam, fobs_gw, hard=hardening.Hard_GW, **kwargs):
     """Sample the given binary population between the target frequencies, and calculate GW signals.
 
     NOTE: the input `fobs` are interpretted as bin edges, and GW signals are calculate within the

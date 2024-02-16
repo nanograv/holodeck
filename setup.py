@@ -103,4 +103,8 @@ setup(
     python_requires=">=3.9",          # Python version restrictions
 
     ext_modules=cython_modules,
+
+    entry_points = {
+        "console_scripts": ['holodeck_lib_gen = holodeck.librarian.gen_lib:main'],
+    },
 )

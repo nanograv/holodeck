@@ -34,7 +34,7 @@ import scipy.stats    # noqa
 import scipy.special  # noqa
 
 from holodeck import log, cosmo
-from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC, EDDT
+from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, EDDT
 
 # [Sesana2004]_ Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
@@ -241,7 +241,7 @@ def python_environment():
             return 'jupyter'
         if 'terminal' in ipy_str:
             return 'ipython'
-    except:
+    except:   # noqa
         return 'terminal'
 
     raise RuntimeError(f"unexpected result from `get_ipython()`: '{ipy_str}'!")

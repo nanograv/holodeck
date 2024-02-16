@@ -13,5 +13,5 @@ This folder contains scripts for the holodeck package, primarily for generating 
   * Generate a full universe population of binaries using Illustris based populations.
 * `pop_sam.py`
   * Generate a full universe population of binaries using the SAM based populations.
-* `tester.sh`
+* `holotest.sh`
   * Convenience script for running unit tests.  This script will convert holodeck notebooks into test modules (in `tests/converted_notebooks/`), and then run `pytest` on both the standard unit tests and also the converted notebooks.  NOTE: the `tox.ini` setup is also configured to have the same basic effect.

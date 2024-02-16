@@ -1,7 +1,15 @@
 """Library generation interface.
 
-This file can be run from the command-line to generate holodeck libraries, and provides some API
-methods for quick/easy generation of simulations.
+This file can be run from the command-line to generate holodeck libraries, and also provides some
+API methods for quick/easy generation of simulations.  In general, these methods are designed to
+run simulations for populations constructed from parameter-spaces (i.e.
+:class:`~holodeck.librarian.params._Param_Space` subclasses).
+
+This script can be run by executing::
+
+    python -m holodeck.librarian.gen_lib <ARGS>
+
+Run ``python -m holodeck.librarian.gen_lib -h`` for usage information.
 
 """
 
@@ -33,6 +41,35 @@ FILES_COPY_TO_OUTPUT = []
 
 
 def main():   # noqa : ignore complexity warning
+    """Parent method for generating libraries from the command-line.
+
+    This function requires ``mpi4py`` for parallelization.
+
+    This method does the following:
+
+    (1) Loads arguments from the command-line (``args``, via :func:`_setup_argparse()`).
+
+        (a) The ``output`` directory is created as needed, along with the ``sims/`` and ``logs/``
+            subdirectories in which the simulation datafiles and log output files are saved.
+
+    (2) Sets up a ``logging.Logger`` instance for each processor.
+    (3) Constructs the parameter space specified by ``args.param_space``.  If this run is being
+        resumed, then the param-space is loaded from an existing save file in the output directory.
+    (4) Samples from the parameter space are allocated to all processors.
+    (5) Each processor iterates over it's allocated parameters, calculates populations, saves them
+        to files in the output directories.  This is handled in :func:`run_sam_at_pspace_num()`.
+    (6) All of the individual simulation files are combined using
+        :func:`holodeck.librarian.combine.sam_lib_combine()`.
+
+    Arguments
+    ---------
+    None
+
+    Returns
+    -------
+    None
+
+    """
 
     # ---- load mpi4py module
 
@@ -49,7 +86,7 @@ def main():   # noqa : ignore complexity warning
     # ---- setup arguments / settings, loggers, and outputs
 
     if comm.rank == 0:
-        args = _setup_argparse(comm)
+        args = _setup_argparse()
     else:
         args = None
 
@@ -81,11 +118,15 @@ def main():   # noqa : ignore complexity warning
             # - `PS_Test` : if `PS_Test` is a class loaded in `librarian`
             # - `file_name.PS_Test` : as long as `file_name` is a module within `librarian`
             space_name = args.param_space.split(".")
-            space_class = holo.librarian
-            for class_name in space_name:
-                space_class = getattr(space_class, class_name)
+            if len(space_name) > 1:
+                space_class = holo.librarian
+                for class_name in space_name:
+                    space_class = getattr(space_class, class_name)
+            else:
+                space_class = holo.librarian.param_spaces_dict[space_name[0]]
+
         except Exception as err:
-            log.error(f"Failed to load '{args.param_space}' from holo.librarian!")
+            log.error(f"Failed to load parameter space '{args.param_space}' !")
             log.error("Make sure the class is defined, and imported into the `librarian` module.")
             log.error(err)
             raise err
@@ -148,7 +189,7 @@ def main():   # noqa : ignore complexity warning
         msg = ", ".join(msg)
         log.info(msg)
 
-        rv = run_sam_at_pspace_num(args, space, par_num)
+        rv, _sim_fname = run_sam_at_pspace_num(args, space, par_num)
         if rv is False:
             failures += 1
 
@@ -174,22 +215,36 @@ def main():   # noqa : ignore complexity warning
 
 
 def run_sam_at_pspace_num(args, space, pnum):
-    """Run simulation for sample-parameter `pnum` in the `space` parameter-space.
+    """Run a given simulation (index number ``pnum``) in the ``space`` parameter-space.
+
+    This function performs the following:
+
+    (1) Constructs the appropriate filename for this simulation, and checks if it already exist.  If
+        the file exists and the ``args.recreate`` option is not specified, the function returns
+        ``True``, otherwise the function runs this simulation.
+    (2) Calls ``space.model_for_sample_number`` to generate the semi-analytic model and hardening
+        instances; see the :func:`holodeck.librarian.params._Param_Space.model_for_sample_number()`
+        function.
+    (3) Calculates populations and GW signatures from the SAM and hardening model using
+        :func:`run_model()`, and saves the results to an output file.
+    (4) Optionally: some diagnostic plots are created in the :func:`make_plots()` function.
 
     Arguments
     ---------
-    args : `argparse.ArgumentParser` instance
+    args : ``argparse.ArgumentParser`` instance
         Arguments from the `gen_lib_sams.py` script.
         NOTE: this should be improved.
-    space : _Param_Space instance
-        Parameter space from which to load `sam` and `hard` instances.
+    space : :class:`holodeck.librarian.params._Param_space` instance
+        Parameter space from which to construct populations.
     pnum : int
-        Which parameter-sample from `space` should be run.
+        Which parameter-sample from ``space`` should be run.
 
     Returns
     -------
     rv : bool
-        True if this simulation was successfully run.
+        ``True`` if this simulation was successfully run, ``False`` otherwise.
+    sim_fname : ``pathlib.Path`` instance
+        Path of the simulation save file.
 
     """
     log = args.log
@@ -205,7 +260,7 @@ def run_sam_at_pspace_num(args, space, pnum):
         log.info(f"File {sim_fname} already exists.  {args.recreate=}")
         # skip existing files unless we specifically want to recreate them
         if not args.recreate:
-            return True
+            return True, sim_fname
 
     # ---- run Model
 
@@ -243,7 +298,7 @@ def run_sam_at_pspace_num(args, space, pnum):
             log.exception("Failed to make strain plot!")
             log.exception(err)
 
-    return rv
+    return rv, sim_fname
 
 
 def run_model(
@@ -252,18 +307,68 @@ def run_model(
     gwb_flag=True, details_flag=False, singles_flag=False, params_flag=False,
     log=None,
 ):
-    """Run the given modeling, storing requested data
+    """Run the given SAM and hardening model to construct a binary population and GW signatures.
 
     Arguments
     ---------
-    sam
-    hard
+    sam : :class:`holodeck.sams.sam.Semi_Analytic_Model` instance,
+    hard : :class:`holodeck.hardening._Hardening` subclass instance,
+    pta_dur : float, [seconds]
+        Duration of PTA observations in seconds, used to determine Nyquist frequency basis at which
+        GW signatures are calculated.
+    nfreqs : int
+        Number of Nyquist frequency bins at which to calculate GW signatures.
+    nreals : int
+        Number of 'realizations' (populations drawn from Poisson distributions) to construct.
+    nloudest : int
+        Number of loudest binaries to consider in each frequency bin.  These are the highest GW
+        strain binaries in each frequency bin, for which the individual source strains are
+        calculated.
+    gwb_flag
+    details_flag
+    singles_flag
+    params_flag
+    log : ``logging.Logger`` instance
 
     Returns
     -------
     data : dict
+        The population and GW data calculated from the simulation.  The dictionary elements are:
+
+        * ``fobs_cents`` : Nyquist frequency bin centers, in units of [seconds].
+        * ``fobs_edges`` : Nyquist frequency bin edgeds, in units of [seconds].
+
+        * If ``details_flag == True``:
+
+            * ``static_binary_density`` :
+            * ``number`` :
+            * ``redz_final`` :
+            * ``gwb_params`` :
+            * ``num_params`` :
+            * ``gwb_mtot_redz_final`` :
+            * ``num_mtot_redz_final`` :
+
+        * If ``params_flag == True``:
+
+            * ``sspar`` :
+            * ``bgpar`` :
+
+        * If ``singles_flag == True``:
+
+            * ``hc_ss`` :
+            * ``hc_bg`` :
+
+        * If ``gwb_flag == True``:
+
+            * ``gwb`` :
 
     """
+
+    if not any([gwb_flag, details_flag, singles_flag, params_flag]):
+        err = f"No flags set!  {gwb_flag=} {details_flag=} {singles_flag=} {params_flag=}"
+        if log is not None:
+            log.exception(err)
+        raise RuntimeError(err)
 
     data = {}
 
@@ -426,17 +531,15 @@ def _calc_model_details(edges, redz_final, number):
     return gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final
 
 
-def _setup_argparse(comm, *args, **kwargs):
+def _setup_argparse(*args, **kwargs):
     """Setup the argument-parser for command-line usage.
 
     Arguments
     ---------
-    comm : MPI
     *args : arguments
     **kwargs : keyword arguments
 
     """
-    assert comm.rank == 0
 
     parser = argparse.ArgumentParser()
     parser.add_argument('param_space', type=str,
@@ -482,7 +585,8 @@ def _setup_argparse(comm, *args, **kwargs):
     # parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
     #                     help='verbose output [INFO]')
 
-    args = parser.parse_args(*args, **kwargs)
+    namespace = argparse.Namespace(**kwargs)
+    args = parser.parse_args(*args, namespace=namespace)
 
     # ---- check / sanitize arguments
 

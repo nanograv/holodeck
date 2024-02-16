@@ -1,6 +1,7 @@
 discrete_illustris
 discrete_hardening_models
 host-relations
+librarian
 relations
 semi-analytic-models
 single-cws_demo

@@ -7,7 +7,8 @@ holodeck.sams (Semi-Analytic Models) module
     :private-members:
     :undoc-members:
     :show-inheritance:
-    
+    :member-order: bysource
+
 .. toctree::
     :maxdepth: 2
 
