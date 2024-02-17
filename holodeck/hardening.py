@@ -712,7 +712,7 @@ class Dynamical_Friction_NFW(_Hardening):
 class Fixed_Time_2PL(_Hardening):
     r"""Provide a binary hardening rate such that the total lifetime matches a given value.
 
-    This class uses a phenomenological functional form (defined in :meth:`Fixed_Time.function`) to
+    This class uses a phenomenological functional form (defined in :meth:`Fixed_Time_2PL.function`) to
     model the hardening rate ($da/dt$) of binaries.  The functional form is,
 
     .. math::
@@ -734,11 +734,11 @@ class Fixed_Time_2PL(_Hardening):
     (4) The interpolants are called on the provided binary parameters, to calculate the
         interpolated normalization constants to reach the desired lifetimes.
 
-    Construction/Initialization: note that in addition to the standard :meth:`Fixed_Time.__init__`
+    Construction/Initialization: note that in addition to the standard :meth:`Fixed_Time_2PL.__init__`
     constructor, there are two additional constructors are provided:
 
-    *   :meth:`Fixed_Time.from_pop` - accept a :class:`holodeck.population._Discrete_Population`,
-    *   :meth:`Fixed_Time.from_sam` - accept a :class:`holodeck.sam.Semi_Analytic_Model`.
+    *   :meth:`Fixed_Time_2PL.from_pop` - accept a :class:`holodeck.population._Discrete_Population`,
+    *   :meth:`Fixed_Time_2PL.from_sam` - accept a :class:`holodeck.sam.Semi_Analytic_Model`.
 
     #! Using a callable for `rchar` probably doesnt work - `_calculate_norm_interpolant` looks like
     #! it only accepts a scalar value.
@@ -754,7 +754,7 @@ class Fixed_Time_2PL(_Hardening):
     def __init__(self, time, mtot, mrat, redz, sepa_init,
                  rchar=100.0*PC, gamma_inner=-1.0, gamma_outer=+1.5,
                  progress=False, interpolate_norm=False):
-        """Initialize `Fixed_Time` instance for the given binary properties and function parameters.
+        """Initialize `Fixed_Time_2PL` instance for the given binary properties and function parameters.
 
         Parameters
         ----------
@@ -870,7 +870,7 @@ class Fixed_Time_2PL(_Hardening):
 
     @classmethod
     def from_pop(cls, pop, time, **kwargs):
-        """Initialize a `Fixed_Time` instance using a provided `_Discrete_Population` instance.
+        """Initialize a `Fixed_Time_2PL` instance using a provided `_Discrete_Population` instance.
 
         Parameters
         ----------
@@ -885,11 +885,11 @@ class Fixed_Time_2PL(_Hardening):
                 each binary
 
         **kwargs : dict
-            Additional keyword-argument pairs passed to the `Fixed_Time` initialization method.
+            Additional keyword-argument pairs passed to the `Fixed_Time_2PL` initialization method.
 
         Returns
         -------
-        `Fixed_Time`
+        `Fixed_Time_2PL`
             Instance configured for the given binary population.
 
         """
@@ -897,7 +897,7 @@ class Fixed_Time_2PL(_Hardening):
 
     @classmethod
     def from_sam(cls, sam, time, sepa_init=1e4*PC, **kwargs):
-        """Initialize a `Fixed_Time` instance using a provided `Semi_Analytic_Model` instance.
+        """Initialize a `Fixed_Time_2PL` instance using a provided `Semi_Analytic_Model` instance.
 
         Parameters
         ----------
@@ -919,11 +919,11 @@ class Fixed_Time_2PL(_Hardening):
                 binaries.
 
         **kwargs : dict
-            Additional keyword-argument pairs passed to the `Fixed_Time` initialization method.
+            Additional keyword-argument pairs passed to the `Fixed_Time_2PL` initialization method.
 
         Returns
         -------
-        `Fixed_Time`
+        `Fixed_Time_2PL`
             Instance configured for the given binary population.
 
         """
@@ -1184,7 +1184,7 @@ class Fixed_Time_2PL(_Hardening):
         """Calculate normalizations in 'chunks' of the input arrays, to obtain the target lifetime.
 
         Calculates normalizations for groups of parameters of size `chunk` at a time.  Loops over
-        these chunks until all inputs have been processed.  Calls :meth:`Fixed_Time._get_norm` to
+        these chunks until all inputs have been processed.  Calls :meth:`Fixed_Time_2PL._get_norm` to
         calculate the normalization for each chunk.
 
         Parameters
@@ -1192,7 +1192,7 @@ class Fixed_Time_2PL(_Hardening):
         target_time : (N,) np.ndarray
             Target binary lifetimes, units of [sec].
         *args : list[np.ndarray]
-            The parameters eventually passed to :meth:`Fixed_Time._time_total`, to get the total
+            The parameters eventually passed to :meth:`Fixed_Time_2PL._time_total`, to get the total
             lifetime.  The normalization parameter is varied until the `_time_total` return value
             matches the target input lifetime.
         guess : float
@@ -1248,7 +1248,7 @@ class Fixed_Time_2PL(_Hardening):
         target_time : (N,) np.ndarray
             Target binary lifetimes, units of [sec].
         *args : list[np.ndarray]
-            The parameters eventually passed to :meth:`Fixed_Time._time_total`, to get the total
+            The parameters eventually passed to :meth:`Fixed_Time_2PL._time_total`, to get the total
             lifetime.  The normalization parameter is varied until the `_time_total` return value
             matches the target input lifetime.
         guess : float
@@ -1277,9 +1277,9 @@ class Fixed_Time_2PL(_Hardening):
             warnings.simplefilter("ignore")
             norm = sp.optimize.newton(lambda xx: integ(xx) - target_time, g1, maxiter=200, tol=1e-6)
             err = (integ(norm) - target_time) / target_time
-            log.debug(f"Fixed_Time._get_norm() : errors = {utils.stats(err)}")
+            log.debug(f"Fixed_Time_2PL._get_norm() : errors = {utils.stats(err)}")
             if np.any(err > max_err):
-                fail = f"Errors in Fixed_Time norm exceed allowed: {utils.stats(err)} vs. {max_err})"
+                fail = f"Errors in `Fixed_Time_2PL` norm exceed allowed: {utils.stats(err)} vs. {max_err})"
                 log.exception(fail)
                 raise ValueError(fail)
 
@@ -1361,13 +1361,13 @@ class Fixed_Time_2PL(_Hardening):
 
 
 class Fixed_Time_2PL_SAM(_Hardening):
-    """Provide a binary hardening rate such that the total lifetime matches a given value.
+    """SAM-Optimized version of `Fixed_Time_2PL`: binary evolution for a fixed total lifetime.
     """
 
     CONSISTENT = True
 
     def __init__(self, sam, time, sepa_init=1.0e3*PC, rchar=10.0*PC, gamma_inner=-1.0, gamma_outer=+1.5, num_steps=300):
-        """Initialize a `Fixed_Time` instance using a provided `Semi_Analytic_Model` instance.
+        """Initialize a `Fixed_Time_2PL_SAM` instance using a provided `Semi_Analytic_Model` instance.
 
         Parameters
         ----------
@@ -1378,11 +1378,11 @@ class Fixed_Time_2PL_SAM(_Hardening):
         sepa_init : float,
             Initial binary separation.  Units of [cm].
         **kwargs : dict
-            Additional keyword-argument pairs passed to the `Fixed_Time` initialization method.
+            Additional keyword-argument pairs passed to the `Fixed_Time_2PL_SAM` initialization method.
 
         Returns
         -------
-        `Fixed_Time`
+        `Fixed_Time_2PL_SAM`
             Instance configured for the given binary population.
 
         """
