@@ -236,8 +236,9 @@ class PS_Classic_GWOnly_Uniform(_PS_Classic_GWOnly):
     """
 
     def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
-        super().__init__(
-            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+        # super(_PS_Classic_GWOnly, self).__init__(
+        _Param_Space.__init__(
+            self, log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
 
             gsmf_phi0=PD_Uniform(-3.5, -1.5),
             gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
@@ -254,8 +255,9 @@ class PS_Classic_GWOnly_Astro_Extended(_PS_Classic_GWOnly):
     """
 
     def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
-        super().__init__(
-            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+        # super().__init__(
+        _Param_Space.__init__(
+            self, log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
 
             # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
             gsmf_phi0=PD_Normal(-2.56, 0.4),
@@ -279,8 +281,9 @@ class PS_Test(_PS_Classic_Phenom):
     """
 
     def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
-        super().__init__(
-            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+        # super().__init__(
+        _Param_Space.__init__(
+            self, log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
 
             mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
             hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
