@@ -227,8 +227,8 @@ class _GSMF_Single_Schechter(_Galaxy_Stellar_Mass_Function):
 
         Arguments
         ---------
-        mstar : array_like of float
-            Stellar mass(es), in units of $[M_\odot]$, at which to evaluate the GSMF.
+        mstar : array_like of float, [Msol]
+            Stellar mass(es), in units of [gram], at which to evaluate the GSMF.
             Must be broadcastable against ``redz``.
         redz : array_like of float
             Redshift(s) at which to evaluate the GSMF.  Must be broadcastable against ``mstar``.
@@ -249,6 +249,17 @@ class _GSMF_Single_Schechter(_Galaxy_Stellar_Mass_Function):
 
     def _phi_func(self, redz):
         """Evaluate the GSMF normalization (phi) at the given redshift(s).
+
+        Arguments
+        ---------
+        redz : array_like of float,
+            Redshift(s) at which to calculate the GSMF normalization.
+
+        Returns
+        -------
+        phi : array_like of float, [Mpc^-3 dex^-1]
+            Number density normalization.
+
         """
         cc = self._log10_phi_terms
         phi = np.power(10.0, cc[0] + cc[1] * redz + cc[2] * redz**2)
@@ -281,27 +292,38 @@ class GSMF_Double_Schechter(_Galaxy_Stellar_Mass_Function):
     for $M_\star$ are shared (i.e. the same characteristic mass is used for both).  Default
     parameters are the best fits from [Leja2020]_.  With uncertainties, these are::
 
-        phi_1:  [ -2.383 ± 0.027,  -0.264 ± 0.071,  -0.107 ± 0.030],
-        phi_2:  [ -2.818 ± 0.050,  -0.368 ± 0.070,  +0.046 ± 0.020],
-        M_star: [+10.767 ± 0.026,  +0.124 ± 0.045,  -0.033 ± 0.015].
+        log10(phi_1):  [ -2.383 ± 0.027,  -0.264 ± 0.071,  -0.107 ± 0.030],
+        log10(phi_2):  [ -2.818 ± 0.050,  -0.368 ± 0.070,  +0.046 ± 0.020],
+        log10(M_star): [+10.767 ± 0.026,  +0.124 ± 0.045,  -0.033 ± 0.015].
 
     """
 
     def __init__(
         self,
-        phi1=[-2.383, -0.264, -0.107],
-        phi2=[-2.818, -0.368, +0.046],
-        mstar=[+10.767, +0.124, -0.033],
+        log10_phi1=[-2.383, -0.264, -0.107],
+        log10_phi2=[-2.818, -0.368, +0.046],
+        log10_mstar=[+10.767, +0.124, -0.033],
         alpha1=-0.28,
         alpha2=-1.48
     ):
-        gsmf_one = _GSMF_Single_Schechter(log10_phi_terms=phi1, log10_mstar_terms=mstar, alpha=alpha1)
-        gsmf_two = _GSMF_Single_Schechter(log10_phi_terms=phi2, log10_mstar_terms=mstar, alpha=alpha2)
+        gsmf_one = _GSMF_Single_Schechter(log10_phi_terms=log10_phi1, log10_mstar_terms=log10_mstar, alpha=alpha1)
+        gsmf_two = _GSMF_Single_Schechter(log10_phi_terms=log10_phi2, log10_mstar_terms=log10_mstar, alpha=alpha2)
         self._gsmf_one = gsmf_one
         self._gsmf_two = gsmf_two
         return
 
     def __call__(self, mstar, redz):
+        """Evaluate the double Schechter function at the given stellar masses [Msol] and redshifts.
+
+        Arguments
+        ---------
+        mstar : array_like of float, [Msol]
+            Galaxy stellar masses at which to evaluate the GSMF.  Units of solar-masses.  Must be
+            broadcastable against ``redz``.
+        redz : array_like of float,
+            Redshift(s) at which to evaluate the GSMF.  Must be broadcastable against ``mstar``.
+
+        """
         vals = self._gsmf_one(mstar, redz)
         vals += self._gsmf_two(mstar, redz)
         return vals
@@ -311,7 +333,21 @@ class GSMF_Double_Schechter(_Galaxy_Stellar_Mass_Function):
 
 
 class _Galaxy_Merger_Rate(abc.ABC):
-    """Galaxy Merger Rate base class, used to model merger rates of galaxy pairs.
+    r"""Galaxy Merger Rate base class, used to model merger rates of galaxy pairs.
+
+    NOTE: the definition of mass is ambiguous, i.e. whether it is the primary mass, the
+    combined system mass, the descendent mass, etc.
+
+    :class:`_Galaxy_Merger_Rate` instances are callable, returning the specific galaxy merger-rate
+    (i.e. the rate per galaxy), per unit mass-ratio, i.e.
+
+    .. math::
+
+        R = \frac{\partial N_\mathrm{mergers}(M_\star, q_\star, z)}{\partial q_\star \, \partial t}.
+
+    Typically the mass $M_\star$ is taken to be that of the descendent (roughly the combined mass
+    of the two galaxies), and the mass ratio is $q_\star \equiv M_{2,\star} / M_{1,\star} \leq 1.0$.
+
     """
 
     @abc.abstractmethod
@@ -320,14 +356,12 @@ class _Galaxy_Merger_Rate(abc.ABC):
 
     @abc.abstractmethod
     def __call__(self, mass, mrat, redz):
-        """Return the galaxy merger rate for the given parameters.
+        r"""Return the galaxy merger rate for the given parameters.
 
         Parameters
         ----------
         mass : (N,) array_like[scalar]
             Mass of the system, units of [grams].
-            NOTE: the definition of mass is ambiguous, i.e. whether it is the primary mass, or the
-            combined system mass.
         mrat : scalar or ndarray,
             Mass-ratio of the system (m2/m1 <= 1.0), dimensionless.
         redz : scalar or ndarray,
@@ -336,120 +370,15 @@ class _Galaxy_Merger_Rate(abc.ABC):
         Returns
         -------
         rv : scalar or ndarray,
-            Galaxy merger rate, in units of [1/sec].
+            Galaxy merger rate, per unit mass-ratio, in units of [1/sec], i.e.
+            $\partial N / \partial q_\star \, \partial t$
 
         """
         return
 
 
-class GMR_Power_Law(_Galaxy_Merger_Rate):
+class GMR_Illustris(_Galaxy_Merger_Rate):
     """Galaxy Merger Rate - based on multiple power-laws.
-
-    See [Rodriguez-Gomez2015]_, Table 1.
-    "merger rate as a function of descendant stellar mass M_star, progenitor stellar mass ratio mu_star"
-
-    """
-
-    def __init__(self,
-                 norm0_log10=None,
-                 normz=None,
-                 malpha0=None,
-                 malphaz=None,
-                 mdelta0=None,
-                 mdeltaz=None,
-                 qgamma0=None,
-                 qgammaz=None,
-                 ):
-
-        if norm0_log10 is None:
-            norm0_log10 = -2.2287        # -2.2287 ± 0.0045    [log10(A*Gyr)]  A0 in [RG15]
-        if normz is None:
-            # normz = +2.4644,           # +2.4644 ± 0.0128    eta in [RG15]
-            normz = 0.0
-        if malpha0 is None:
-            malpha0 = +0.2241            # +0.2241 ± 0.0038    alpha0 in [RG15]
-        if malphaz is None:
-            # malphaz = -1.1759,         # -1.1759 ± 0.0316    alpha1 in [RG15]
-            malphaz = 0.0
-        if mdelta0 is None:
-            mdelta0 = +0.7668            # +0.7668 ± 0.0202    delta0 in [RG15]
-        if mdeltaz is None:
-            # mdeltaz = -0.4695,         # -0.4695 ± 0.0440    delta1 in [RG15]
-            mdeltaz = 0.0
-        if qgamma0 is None:
-            qgamma0 = -1.2595            # -1.2595 ± 0.0026    beta0 in [RG15]
-        if qgammaz is None:
-            # qgammaz = +0.0611,         # +0.0611 ± 0.0021    beta1 in [RG15]
-            qgammaz = 0.0
-
-        self._norm0 = (10.0 ** norm0_log10) / GYR              # [1/sec]
-        self._normz = normz
-
-        self._malpha0 = malpha0
-        self._malphaz = malphaz
-        self._mdelta0 = mdelta0
-        self._mdeltaz = mdeltaz
-        self._qgamma0 = qgamma0
-        self._qgammaz = qgammaz
-
-        self._mref_delta = 2.0e11 * MSOL   # fixed value
-        self._mref = 1.0e10 * MSOL   # fixed value
-        return
-
-    def _get_norm(self, redz):
-        norm = self._norm0 * np.power(1.0 + redz, self._normz)
-        return norm
-
-    def _get_malpha(self, redz):
-        malpha = self._malpha0 * np.power(1.0 + redz, self._malphaz)
-        return malpha
-
-    def _get_mdelta(self, redz):
-        mdelta = self._mdelta0 * np.power(1.0 + redz, self._mdeltaz)
-        return mdelta
-
-    def _get_qgamma(self, redz, mtot):
-        """
-        NOTE: `mtot` is needed as an argument as it is used by subclass `GMR_Illustris(GMR_Power_Law)`
-        """
-        qgamma = self._qgamma0 * np.power(1.0 + redz, self._qgammaz)
-        return qgamma
-
-    def __call__(self, mtot, mrat, redz):
-        """Return the galaxy merger rate for the given parameters.
-
-        Parameters
-        ----------
-        mtot : (N,) array_like[scalar]
-            Total mass of the system, units of [grams].
-        mrat : (N,) array_like[scalar]
-            Mass ratio of each binary.
-        redz : (N,) array_like[scalar]
-            Redshifts of each binary.
-
-        Returns
-        -------
-        rate : array_like
-            Merger rate in [1/sec].
-
-        """
-        norm = self._get_norm(redz)
-        malpha = self._get_malpha(redz)
-        mdelta = self._get_mdelta(redz)
-        # NOTE: `mtot` is not used here, in `GMR_Power_Law`, but is used in subclass `GMR_Illustris`
-        qgamma = self._get_qgamma(redz, mtot)
-
-        xx = (mtot/self._mref)
-        mt = np.power(xx, malpha)
-        mp1t = np.power(1.0 + (mt/self._mref_delta), mdelta)
-        qt = np.power(mrat, qgamma)
-
-        rate = norm * mt * mp1t * qt
-        return rate
-
-
-class GMR_Illustris(GMR_Power_Law):
-    """Galaxy Merger Rate - based on fits to Illustris cosmological simulations.
 
     See [Rodriguez-Gomez2015]_, Table 1.
     "merger rate as a function of descendant stellar mass M_star, progenitor stellar mass ratio mu_star"
@@ -487,24 +416,69 @@ class GMR_Illustris(GMR_Power_Law):
         if qgammam is None:
             qgammam = -0.0477          # -0.0477 ± 0.0013    gamma in [RG15]
 
-        super().__init__(
-            norm0_log10=norm0_log10,
-            normz=normz,
-            malpha0=malpha0,
-            malphaz=malphaz,
-            mdelta0=mdelta0,
-            mdeltaz=mdeltaz,
-            qgamma0=qgamma0,
-            qgammaz=qgammaz,
-        )
+        self._norm0 = (10.0 ** norm0_log10) / GYR              # [1/sec]
+        self._normz = normz
 
+        self._malpha0 = malpha0
+        self._malphaz = malphaz
+        self._mdelta0 = mdelta0
+        self._mdeltaz = mdeltaz
+        self._qgamma0 = qgamma0
+        self._qgammaz = qgammaz
         self._qgammam = qgammam
+
+        self._mref_delta = 2.0e11 * MSOL   # fixed value
+        self._mref = 1.0e10 * MSOL   # fixed value
         return
+
+    def _get_norm(self, redz):
+        norm = self._norm0 * np.power(1.0 + redz, self._normz)
+        return norm
+
+    def _get_malpha(self, redz):
+        malpha = self._malpha0 * np.power(1.0 + redz, self._malphaz)
+        return malpha
+
+    def _get_mdelta(self, redz):
+        mdelta = self._mdelta0 * np.power(1.0 + redz, self._mdeltaz)
+        return mdelta
 
     def _get_qgamma(self, redz, mtot):
         qgamma = self._qgamma0 * np.power(1.0 + redz, self._qgammaz)
         qgamma = qgamma + self._qgammam * np.log10(mtot/self._mref)
         return qgamma
+
+    def __call__(self, mtot, mrat, redz):
+        """Return the galaxy merger rate for the given parameters.
+
+        Parameters
+        ----------
+        mtot : (N,) array_like[scalar]
+            Total mass of the system, units of [grams].
+        mrat : (N,) array_like[scalar]
+            Mass ratio of each binary.
+        redz : (N,) array_like[scalar]
+            Redshifts of each binary.
+
+        Returns
+        -------
+        rate : array_like
+            Merger rate in [1/sec].
+
+        """
+        norm = self._get_norm(redz)
+        malpha = self._get_malpha(redz)
+        mdelta = self._get_mdelta(redz)
+        qgamma = self._get_qgamma(redz, mtot)
+
+        xx = (mtot/self._mref)
+        mt = np.power(xx, malpha)
+        yy = mtot/self._mref_delta
+        mp1t = np.power(1.0 + yy, mdelta)
+        qt = np.power(mrat, qgamma)
+
+        rate = norm * mt * mp1t * qt
+        return rate
 
 
 # ----    Galaxy Pair Fraction    ----
