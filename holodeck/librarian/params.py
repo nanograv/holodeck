@@ -298,6 +298,19 @@ class _Param_Space(abc.ABC):
 
         return params
 
+    def default_params(self):
+        """Return a parameter dictionary with default values for each parameter.
+
+        Returns
+        -------
+        params : dict,
+            Key-value pairs where each key is the parameter name, and the value is the default value
+            returned from the :class:`_Param_Dist` subclass.
+
+        """
+        params = {param.name: param.default for param in self._parameters}
+        return params
+
 
 class _Param_Dist(abc.ABC):
     """Parameter Distribution base-class for use in Latin HyperCube sampling.
