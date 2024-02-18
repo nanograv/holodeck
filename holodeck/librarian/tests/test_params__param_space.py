@@ -23,12 +23,15 @@ class PS_Test_Wout_Defaults(_Param_Space):
     """
 
     def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
+            PD_Uniform("mmb_mamp_log10", *MMB_MAMP_LOG10_EXTR),   # [log10(Msol)]
+            PD_Uniform("gsmf_phi0_log10", *GSMF_PHI0_LOG10_EXTR),
+        ]
         super().__init__(
-            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
-
-            mmb_mamp_log10=PD_Uniform(*MMB_MAMP_LOG10_EXTR),   # [log10(Msol)]
-            gsmf_phi0_log10=PD_Uniform(*GSMF_PHI0_LOG10_EXTR),
+            parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
         )
+        return
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
@@ -82,12 +85,15 @@ class PS_Test_With_Defaults(_Param_Space):
     )
 
     def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
+            PD_Uniform("mmb_mamp_log10", *MMB_MAMP_LOG10_EXTR),   # [log10(Msol)]
+            PD_Uniform("gsmf_phi0_log10", *GSMF_PHI0_LOG10_EXTR),
+        ]
         super().__init__(
-            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
-
-            mmb_mamp_log10=PD_Uniform(*MMB_MAMP_LOG10_EXTR),   # [log10(Msol)]
-            gsmf_phi0_log10=PD_Uniform(*GSMF_PHI0_LOG10_EXTR),
+            parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
         )
+        return
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
@@ -138,9 +144,9 @@ def _run_pspace_no_nsamples(Param_Space_Class):
     assert pspace.param_samples is None, f"{pspace.param_samples=} should be `None`!"
 
     # Make sure there are two parameters
-    assert pspace.npars == 2, f"Expeted 2 parameters, but found `{pspace.npars=}`"
-    assert len(pspace._dists) == 2, f"Expeted {len(pspace._dists)=} to equal 2!"
-    assert len(pspace.param_names) == 2, f"Expeted {len(pspace.param_names)=} to equal 2!"
+    assert pspace.npars == 2, f"Expected 2 parameters, but found `{pspace.npars=}`"
+    assert len(pspace._parameters) == 2, f"Expected {len(pspace._parameters)=} to equal 2!"
+    assert len(pspace.param_names) == 2, f"Expected {len(pspace.param_names)=} to equal 2!"
     for ii, (pn, test) in enumerate(zip(pspace.param_names, ['mmb_mamp_log10', 'gsmf_phi0_log10'])):
         assert pn == test, f"Parameter name {ii} = '{pn}' does not match input '{test}'!"
 
@@ -167,7 +173,7 @@ def _run_pspace_nsamples(Param_Space_Class):
 
     # Make sure there are two parameters
     assert pspace.npars == 2, f"Expeted 2 parameters, but found `{pspace.npars=}`"
-    assert len(pspace._dists) == 2, f"Expeted {len(pspace._dists)=} to equal 2!"
+    assert len(pspace._parameters) == 2, f"Expeted {len(pspace._parameters)=} to equal 2!"
     assert len(pspace.param_names) == 2, f"Expeted {len(pspace.param_names)=} to equal 2!"
     for ii, (pn, test) in enumerate(zip(pspace.param_names, ['mmb_mamp_log10', 'gsmf_phi0_log10'])):
         assert pn == test, f"Parameter name {ii} = '{pn}' does not match input '{test}'!"

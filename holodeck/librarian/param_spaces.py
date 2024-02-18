@@ -2,7 +2,7 @@
 """
 
 import holodeck as holo
-from holodeck.constants import GYR, PC, MSOL
+from holodeck.constants import GYR, PC
 from holodeck.librarian.params import _Param_Space, PD_Uniform
 
 
@@ -17,24 +17,29 @@ class PS_Double_Schechter_Rate(_Param_Space):
         hard_gamma_inner=-1.0,
         hard_gamma_outer=+2.5,
 
-        # Parameters are based on `sam-parameters.ipynb` fit to [Tomczak+2014]
-        gsmf_phi0_log10=-2.77,
-        gsmf_phiz=-0.6,
-        gsmf_mchar0_log10=11.24,
-        gsmf_mcharz=0.11,
-        gsmf_alpha0=-1.21,
-        gsmf_alphaz=-0.03,
+        # Galaxy stellar-mass Function (GSMF_Double_Schechter)
+        # Parameters are based on `double-schechter.ipynb` conversions from [Leja2020]_
+        gsmf_log10_phi_one_z0=-2.383,    # - 2.383 ± 0.028
+        gsmf_log10_phi_one_z1=-0.264,    # - 0.264 ± 0.072
+        gsmf_log10_phi_one_z2=-0.107,    # - 0.107 ± 0.031
+        gsmf_log10_phi_two_z0=-2.818,    # - 2.818 ± 0.050
+        gsmf_log10_phi_two_z1=-0.368,    # - 0.368 ± 0.070
+        gsmf_log10_phi_two_z2=+0.046,    # + 0.046 ± 0.020
+        gsmf_log10_mstar_z0=+10.767,     # +10.767 ± 0.026
+        gsmf_log10_mstar_z1=+0.124,      # + 0.124 ± 0.045
+        gsmf_log10_mstar_z2=-0.033,      # - 0.033 ± 0.015
+        gsmf_alpha_one=-0.28,            # - 0.280 ± 0.070
+        gsmf_alpha_two=-1.48,            # - 1.480 ± 0.150
 
-        gpf_frac_norm_allq=0.025,
-        gpf_malpha=0.0,
-        gpf_qgamma=0.0,
-        gpf_zbeta=1.0,
-        gpf_max_frac=1.0,
-
-        gmt_norm=0.5,           # [Gyr]
-        gmt_malpha=0.0,
-        gmt_qgamma=-1.0,        # Boylan-Kolchin+2008
-        gmt_zbeta=-0.5,
+        gmr_norm0_log10 = -2.2287,       # -2.2287 ± 0.0045    A0 [log10(A*Gyr)]
+        gmr_normz = +2.4644,             # +2.4644 ± 0.0128    eta
+        gmr_malpha0 = +0.2241,           # +0.2241 ± 0.0038    alpha0
+        gmr_malphaz = -1.1759,           # -1.1759 ± 0.0316    alpha1
+        gmr_mdelta0 = +0.7668,           # +0.7668 ± 0.0202    delta0
+        gmr_mdeltaz = -0.4695,           # -0.4695 ± 0.0440    delta1
+        gmr_qgamma0 = -1.2595,           # -1.2595 ± 0.0026    beta0
+        gmr_qgammaz = +0.0611,           # +0.0611 ± 0.0021    beta1
+        gmr_qgammam = -0.0477,           # -0.0477 ± 0.0013    gamma
 
         mmb_mamp_log10=8.69,
         mmb_plaw=1.10,          # average MM2013 and KH2013
@@ -55,27 +60,42 @@ class PS_Double_Schechter_Rate(_Param_Space):
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
+        log10_phi_one = [
+            params['gsmf_log10_phi_one_z0'],
+            params['gsmf_log10_phi_one_z1'],
+            params['gsmf_log10_phi_one_z2'],
+        ]
+        log10_phi_two = [
+            params['gsmf_log10_phi_two_z0'],
+            params['gsmf_log10_phi_two_z1'],
+            params['gsmf_log10_phi_two_z2'],
+        ]
+        log10_mstar = [
+            params['gsmf_log10_mstar_z0'],
+            params['gsmf_log10_mstar_z1'],
+            params['gsmf_log10_mstar_z2'],
+        ]
         gsmf = holo.sams.GSMF_Schechter(
-            phi0=params['gsmf_phi0_log10'],
-            phiz=params['gsmf_phiz'],
-            mchar0_log10=params['gsmf_mchar0_log10'],
-            mcharz=params['gsmf_mcharz'],
-            alpha0=params['gsmf_alpha0'],
-            alphaz=params['gsmf_alphaz'],
+            log10_phi1=log10_phi_one,
+            log10_phi2=log10_phi_two,
+            log10_mstar=log10_mstar,
+            alpha1=params['gsmf_alpha_one'],
+            alpha2=params['gsmf_alpha_two'],
         )
-        gpf = holo.sams.GPF_Power_Law(
-            frac_norm_allq=params['gpf_frac_norm_allq'],
-            malpha=params['gpf_malpha'],
-            qgamma=params['gpf_qgamma'],
-            zbeta=params['gpf_zbeta'],
-            max_frac=params['gpf_max_frac'],
+
+        # Illustris Galaxy Merger Rate
+        gmr = holo.sams.GMR_Illustris(
+            norm0_log10=params['gmr_norm0_log10'],
+            normz=params['gmr_normz'],
+            malpha0=params['gmr_malpha0'],
+            malphaz=params['gmr_malphaz'],
+            mdelta0=params['gmr_mdelta0'],
+            mdeltaz=params['gmr_mdeltaz'],
+            qgamma0=params['gmr_qgamma0'],
+            qgammaz=params['gmr_qgammaz'],
+            qgammam=params['gmr_qgammam'],
         )
-        gmt = holo.sams.GMT_Power_Law(
-            time_norm=params['gmt_norm']*GYR,
-            malpha=params['gmt_malpha'],
-            qgamma=params['gmt_qgamma'],
-            zbeta=params['gmt_zbeta'],
-        )
+
         mmbulge = holo.relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
@@ -83,8 +103,7 @@ class PS_Double_Schechter_Rate(_Param_Space):
         )
 
         sam = holo.sams.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
-            shape=sam_shape,
+            gsmf=gsmf, gmr=gmr, mmbulge=mmbulge, shape=sam_shape,
         )
         return sam
 
@@ -102,6 +121,6 @@ class PS_Double_Schechter_Rate(_Param_Space):
 
 
 _param_spaces_dict = {
-    'PS_New_Test': PS_Double_Schechter_Rate,
+    # 'PS_New_Test': PS_Double_Schechter_Rate,
 }
 

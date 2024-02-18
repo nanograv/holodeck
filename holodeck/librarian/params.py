@@ -24,12 +24,13 @@ class _Param_Space(abc.ABC):
 
     DEFAULTS = {}
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None, random_state=None, **param_kwargs):
+    def __init__(self, parameters, log=None, nsamples=None, sam_shape=None, seed=None, random_state=None):
         """Construct a parameter-space instance.
 
         Arguments
         ---------
-        log : ``logging.Logger`` instance
+        parameters : list of `_Param_Dist` subclasses
+        log : ``logging.Logger`` instance  or  ``None``
         nsamples : int or ``None``
             Number of samples to draw from the parameter-space.
         sam_shape : int or (3,) of int or ``None``
@@ -48,6 +49,8 @@ class _Param_Space(abc.ABC):
         None
 
         """
+        if log is None:
+            log = holo.log
         log.debug(f"seed = {seed}")
         if random_state is None:
             np.random.seed(seed)
@@ -55,41 +58,49 @@ class _Param_Space(abc.ABC):
         else:
             np.random.set_state(random_state)
 
-        param_names = list(param_kwargs.keys())
-        ndims = len(param_names)
+        try:
+            npars = len(parameters)
+            assert npars > 0
+        except (TypeError, AssertionError) as err:
+            msg = "`parameters` must be a list of `_Param_Dist` subclasses!"
+            log.exception(msg)
+            log.exception(err)
+            raise err
 
-        dists = []
-        for name in param_names:
-            val = param_kwargs[name]
+        param_names = [param.name for param in parameters]
 
-            if not isinstance(val, _Param_Dist):
-                err = f"{name}: {val} is not a `_Param_Dist` object!"
+        param_names = []
+        for param in parameters:
+            name = param.name
+            param_names.append(name)
+
+            if not isinstance(param, _Param_Dist):
+                err = f"{name}: {param} is not a `_Param_Dist` object!"
                 log.exception(err)
                 raise ValueError(err)
 
-            dists.append(val)
-
-        if (nsamples is None) or (ndims == 0):
-            log.warning(f"{self}: {nsamples=} {ndims=} - cannot generate parameter samples.")
+        if (nsamples is None) or (npars == 0):
+            log.warning(f"{self}: {nsamples=} {npars=} - cannot generate parameter samples.")
             uniform_samples = None
             param_samples = None
         else:
             # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
-            lhc = sp.stats.qmc.LatinHypercube(d=ndims, strength=1, seed=seed)
+            lhc = sp.stats.qmc.LatinHypercube(d=npars, strength=1, seed=seed)
             # (S, D) - samples, dimensions
             uniform_samples = lhc.random(n=nsamples)
             param_samples = np.zeros_like(uniform_samples)
 
-            for ii, dist in enumerate(dists):
-                param_samples[:, ii] = dist(uniform_samples[:, ii])
+            for ii, param in enumerate(parameters):
+                param_samples[:, ii] = param(uniform_samples[:, ii])
 
         self._log = log
+        self._npars = npars
         self._seed = seed
         self._random_state = random_state
         self.sam_shape = sam_shape
         self.param_names = param_names
         self.param_samples = param_samples
-        self._dists = dists
+        self._parameters = parameters
         self._uniform_samples = uniform_samples
         return
 
@@ -224,7 +235,7 @@ class _Param_Space(abc.ABC):
 
     @property
     def extrema(self):
-        extr = [dd.extrema for dd in self._dists]
+        extr = [dd.extrema for dd in self._parameters]
         return np.asarray(extr)
 
     @property
@@ -241,7 +252,7 @@ class _Param_Space(abc.ABC):
 
     @property
     def npars(self):
-        return self.lib_shape[1]
+        return self._npars
 
     def model_for_sample_number(self, samp_num, sam_shape=None):
         if sam_shape is None:
@@ -250,7 +261,7 @@ class _Param_Space(abc.ABC):
         self._log.debug(f"params {samp_num} :: {params}")
         return self.model_for_params(params, sam_shape)
 
-    def _normalized_params(self, vals):
+    def normalized_params(self, vals):
         """Convert input values (uniform/linear) into parameters from the stored distributions.
 
         For example, if this parameter space has 2 dimensions, where the distributions are:
@@ -281,9 +292,9 @@ class _Param_Space(abc.ABC):
 
         params = {}
         for ii, pname in enumerate(self.param_names):
-            vv = vals[ii]                # desired fractional parameter value [0.0, 1.0]
-            ss = self._dists[ii](vv)     # convert to actual parameter values
-            params[pname] = ss           # store to dictionary
+            vv = vals[ii]                     # desired fractional parameter value [0.0, 1.0]
+            ss = self._parameters[ii](vv)     # convert to actual parameter values
+            params[pname] = ss                # store to dictionary
 
         return params
 
@@ -301,10 +312,12 @@ class _Param_Dist(abc.ABC):
 
     """
 
-    def __init__(self, clip=None):
+    def __init__(self, name, default=None, clip=None):
         if clip is not None:
             assert len(clip) == 2
         self._clip = clip
+        self._name = name
+        self._default = default
         return
 
     def __call__(self, xx):
@@ -321,11 +334,28 @@ class _Param_Dist(abc.ABC):
     def extrema(self):
         return self(np.asarray([0.0, 1.0]))
 
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def default(self):
+        """Return the default parameter value.
+
+        If a fixed value was set, it will be returned.  Otherwise the parameter value for a random
+        uniform input value of 0.5 will be returned.
+
+        """
+        if self._default is not None:
+            return self._default
+
+        return self(0.5)
+
 
 class PD_Uniform(_Param_Dist):
 
-    def __init__(self, lo, hi, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, name, lo, hi, **kwargs):
+        super().__init__(name, **kwargs)
         self._lo = lo
         self._hi = hi
         return
@@ -337,15 +367,15 @@ class PD_Uniform(_Param_Dist):
 
 class PD_Uniform_Log(_Param_Dist):
 
-    def __init__(self, lo, hi, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, name, lo, hi, **kwargs):
+        super().__init__(name, **kwargs)
         assert lo > 0.0 and hi > 0.0
-        self._lo = np.log10(lo)
-        self._hi = np.log10(hi)
+        self._lo_log10 = np.log10(lo)
+        self._hi_log10 = np.log10(hi)
         return
 
     def _dist_func(self, xx):
-        yy = np.power(10.0, self._lo + (self._hi - self._lo) * xx)
+        yy = np.power(10.0, self._lo_log10 + (self._hi_log10 - self._lo_log10) * xx)
         return yy
 
 
@@ -356,7 +386,7 @@ class PD_Normal(_Param_Dist):
 
     """
 
-    def __init__(self, mean, stdev, clip=None, **kwargs):
+    def __init__(self, name, mean, stdev, clip=None, **kwargs):
         """
 
         Arguments
@@ -364,7 +394,7 @@ class PD_Normal(_Param_Dist):
 
         """
         assert stdev > 0.0
-        super().__init__(clip=clip, **kwargs)
+        super().__init__(name, clip=clip, **kwargs)
         self._mean = mean
         self._stdev = stdev
         self._frozen_dist = sp.stats.norm(loc=mean, scale=stdev)
@@ -377,7 +407,7 @@ class PD_Normal(_Param_Dist):
 
 class PD_Lin_Log(_Param_Dist):
 
-    def __init__(self, lo, hi, crit, lofrac, **kwargs):
+    def __init__(self, name, lo, hi, crit, lofrac, **kwargs):
         """Distribute linearly below a cutoff, and then logarithmically above.
 
         Parameters
@@ -392,7 +422,7 @@ class PD_Lin_Log(_Param_Dist):
             Fraction of mass below the cutoff.
 
         """
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._lo = lo
         self._hi = hi
         self._crit = crit
@@ -423,7 +453,7 @@ class PD_Lin_Log(_Param_Dist):
 
 class PD_Log_Lin(_Param_Dist):
 
-    def __init__(self, lo, hi, crit, lofrac, **kwargs):
+    def __init__(self, name, lo, hi, crit, lofrac, **kwargs):
         """Distribute logarithmically below a cutoff, and then linearly above.
 
         Parameters
@@ -438,7 +468,7 @@ class PD_Log_Lin(_Param_Dist):
             Fraction of mass below the cutoff.
 
         """
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._lo = lo
         self._hi = hi
         self._crit = crit
@@ -470,8 +500,8 @@ class PD_Log_Lin(_Param_Dist):
 
 class PD_Piecewise_Uniform_Mass(_Param_Dist):
 
-    def __init__(self, edges, weights, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, name, edges, weights, **kwargs):
+        super().__init__(name, **kwargs)
         edges = np.asarray(edges)
         self._edges = edges
         weights = np.asarray(weights)
@@ -501,10 +531,10 @@ class PD_Piecewise_Uniform_Mass(_Param_Dist):
 
 class PD_Piecewise_Uniform_Density(PD_Piecewise_Uniform_Mass):
 
-    def __init__(self, edges, densities, **kwargs):
+    def __init__(self, name, edges, densities, **kwargs):
         dx = np.diff(edges)
         weights = dx * np.asarray(densities)
-        super().__init__(edges, weights)
+        super().__init__(name, edges, weights)
         return
 
 
