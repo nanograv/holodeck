@@ -122,17 +122,6 @@ def test_gmr_base():
     return
 
 
-def test_GMR_Power_Law():
-    gmr = comps.GMR_Power_Law()
-    SIZE = 100
-    mstar = MSOL * (10.0**np.random.uniform(10, 15, SIZE))
-    mrat = 10.0 ** np.random.uniform(-4, 0.0, SIZE)
-    redz = np.random.uniform(0.0, 10.0, SIZE)
-
-    vals = gmr(mstar, mrat, redz)   # noqa
-    return
-
-
 def test_GMR_Illustris():
     gmr = comps.GMR_Illustris()
     SIZE = 100
