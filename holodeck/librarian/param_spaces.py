@@ -3,17 +3,21 @@
 
 import holodeck as holo
 from holodeck.constants import GYR, PC
-from holodeck.librarian.params import _Param_Space, PD_Uniform
+from holodeck.librarian.libraries import _Param_Space, PD_Uniform
 
 
-class PS_Double_Schechter_Rate(_Param_Space):
-    """
+class _PS_Astro_Strong(_Param_Space):
+    """SAM Model with strongly astrophysically-motivated parameters.
+
+    This model uses a double-Schechter GSMF, an Illustris-derived galaxy merger rate, a Kormendy+Ho
+    M-MBulge relationship, and a phenomenology binary evolution model.
+
     """
 
     DEFAULTS = dict(
         hard_time=3.0,          # [Gyr]
         hard_sepa_init=1e4,     # [pc]
-        hard_rchar=100.0,       # [pc]
+        hard_rchar=10.0,       # [pc]
         hard_gamma_inner=-1.0,
         hard_gamma_outer=+2.5,
 
@@ -41,22 +45,11 @@ class PS_Double_Schechter_Rate(_Param_Space):
         gmr_qgammaz = +0.0611,           # +0.0611 ± 0.0021    beta1
         gmr_qgammam = -0.0477,           # -0.0477 ± 0.0013    gamma
 
-        mmb_mamp_log10=8.69,
-        mmb_plaw=1.10,          # average MM2013 and KH2013
-        mmb_scatter_dex=0.3,
+        # From [KH2013]_
+        mmb_mamp=0.49e9,        # 0.49e9 + 0.06 - 0.05  [Msol]
+        mmb_plaw=1.17,          # 1.17 ± 0.08
+        mmb_scatter_dex=0.28,
     )
-
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
-        super().__init__(
-            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
-
-            gsmf_phi0_log10=PD_Uniform(-3.5, -1.5),
-            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
-            mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
-            mmb_scatter_dex=PD_Uniform(+0.0, +1.2),
-            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
-            hard_gamma_inner=PD_Uniform(-1.5, +0.0),
-        )
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
@@ -97,7 +90,7 @@ class PS_Double_Schechter_Rate(_Param_Space):
         )
 
         mmbulge = holo.relations.MMBulge_KH2013(
-            mamp_log10=params['mmb_mamp_log10'],
+            mamp=params['mmb_mamp'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
         )
@@ -120,7 +113,20 @@ class PS_Double_Schechter_Rate(_Param_Space):
         return hard
 
 
+class PS_Astro_Strong_Hard_Only(_PS_Astro_Strong):
+
+    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
+            PD_Uniform("hard_time", 0.1, 11.0, default=3.0),   # [Gyr]
+            PD_Uniform("hard_gamma_inner", -1.5, +0.0, default=-1.0),
+        ]
+        _Param_Space.__init__(
+            parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+        )
+        return
+
 _param_spaces_dict = {
-    # 'PS_New_Test': PS_Double_Schechter_Rate,
+    'PS_Astro_Strong_Hard_Only': PS_Astro_Strong_Hard_Only,
 }
 

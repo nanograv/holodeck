@@ -3,7 +3,7 @@
 This file can be run from the command-line to generate holodeck libraries, and also provides some
 API methods for quick/easy generation of simulations.  In general, these methods are designed to
 run simulations for populations constructed from parameter-spaces (i.e.
-:class:`~holodeck.librarian.params._Param_Space` subclasses).
+:class:`~holodeck.librarian.libraries._Param_Space` subclasses).
 
 This script can be run by executing::
 
@@ -29,7 +29,7 @@ from holodeck.constants import YR
 import holodeck.librarian
 import holodeck.librarian.combine
 from holodeck.librarian import (
-    lib_utils,
+    libraries,
     DEF_NUM_FBINS, DEF_NUM_LOUDEST, DEF_NUM_REALS, DEF_PTA_DUR,
 )
 from holodeck.sams import sam_cyutils
@@ -223,8 +223,8 @@ def run_sam_at_pspace_num(args, space, pnum):
         the file exists and the ``args.recreate`` option is not specified, the function returns
         ``True``, otherwise the function runs this simulation.
     (2) Calls ``space.model_for_sample_number`` to generate the semi-analytic model and hardening
-        instances; see the :func:`holodeck.librarian.params._Param_Space.model_for_sample_number()`
-        function.
+        instances; see the function
+        :func:`holodeck.librarian.libraries._Param_Space.model_for_sample_number()`.
     (3) Calculates populations and GW signatures from the SAM and hardening model using
         :func:`run_model()`, and saves the results to an output file.
     (4) Optionally: some diagnostic plots are created in the :func:`make_plots()` function.
@@ -234,7 +234,7 @@ def run_sam_at_pspace_num(args, space, pnum):
     args : ``argparse.ArgumentParser`` instance
         Arguments from the `gen_lib_sams.py` script.
         NOTE: this should be improved.
-    space : :class:`holodeck.librarian.params._Param_space` instance
+    space : :class:`holodeck.librarian.libraries._Param_space` instance
         Parameter space from which to construct populations.
     pnum : int
         Which parameter-sample from ``space`` should be run.
@@ -251,7 +251,7 @@ def run_sam_at_pspace_num(args, space, pnum):
 
     # ---- get output filename for this simulation, check if already exists
 
-    sim_fname = lib_utils._get_sim_fname(args.output_sims, pnum)
+    sim_fname = libraries._get_sim_fname(args.output_sims, pnum)
 
     beg = datetime.now()
     log.info(f"{pnum=} :: {sim_fname=} beginning at {beg}")

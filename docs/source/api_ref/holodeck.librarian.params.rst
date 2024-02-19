@@ -1,7 +1,7 @@
-=========================
-holodeck.librarian.params
-=========================
+============================
+holodeck.librarian.libraries
+============================
 
-.. automodule:: holodeck.librarian.params
+.. automodule:: holodeck.librarian.libraries
     :members:
     :private-members:

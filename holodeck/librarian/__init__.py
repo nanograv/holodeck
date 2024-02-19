@@ -4,10 +4,10 @@ Holodeck 'libraries' are collections of simulations in which a certain set of pa
 producing different populations and/or GW signatures at each sampled parameter value.  Libraries are
 run from the same parameter-space and using the same hyper parameters.  Libraries are constructed
 using a 'parameter space' class that organizes the different simulations.  The base-class is
-:class:`~holodeck.librarian.params._Param_Space` (defined in the :mod:`holodeck.librarian.params`
+:class:`~holodeck.librarian.libraries._Param_Space` (defined in the :mod:`holodeck.librarian.libraries`
 file).  The parameter-space subclasses are given a number of different parameters to be varied.
-Each parameter is implemented as a subclass of :py:class:`~holodeck.librarian.params._Param_Dist`,
-for example the :py:class:`~holodeck.librarian.params.PD_Uniform` class that implements a uniform
+Each parameter is implemented as a subclass of :py:class:`~holodeck.librarian.libraries._Param_Dist`,
+for example the :py:class:`~holodeck.librarian.libraries.PD_Uniform` class that implements a uniform
 distribution.
 
 For more information, see the :doc:`'libraries' page in the getting-started guide
@@ -28,8 +28,8 @@ FITS_NBINS_TURN = [5, 10, 15]
 FNAME_SIM_FILE = "sam-lib__p{pnum:06d}.npz"
 PSPACE_FILE_SUFFIX = ".pspace.npz"
 
-from . import params        # noqa
-from . params import (      # noqa
+# from . import libraries        # noqa
+from . libraries import (      # noqa
     _Param_Space, _Param_Dist,
     PD_Uniform, PD_Normal,
 )

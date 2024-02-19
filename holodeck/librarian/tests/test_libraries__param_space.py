@@ -1,4 +1,4 @@
-"""Test holodeck/librarian/params.py: the parameter space base class, and parameter distributions.
+"""Test holodeck/librarian/libraries.py: the parameter space base class, and parameter distributions.
 """
 
 import numpy as np
@@ -9,7 +9,7 @@ import holodeck as holo
 
 from holodeck import sams, relations, hardening, librarian
 from holodeck.constants import GYR
-from holodeck.librarian.params import (
+from holodeck.librarian.libraries import (
     _Param_Space, PD_Uniform,
 
 )
