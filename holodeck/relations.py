@@ -836,22 +836,66 @@ class Klypin_2016:
     _lin_interp_gamma = _interp(_zz, np.log10(_gamma))
     _lin_interp_mass0 = _interp(_zz, np.log10(_mass0)+np.log10(1e12 * MSOL / cosmo.h))
 
+    """ CREATE TABLES WITH PRE-CALCULATED VALUES FOR c0, gamma, mass0 
+        THIS IS TO REDUCE RUNTIME BY CALLING INTERPOLATION FUNCTION ONLY ONCE """
+    zz = np.logspace(-3,1,10000)
+    _lin_interp_table_xx = np.log10(1+zz)
+
+    """ c0 table"""
+    _lin_interp_c0_table = np.power(10.0, _lin_interp_c0(_lin_interp_table_xx))
+
+    """ gamma table"""
+    _lin_interp_gamma_table = np.power(10.0, _lin_interp_gamma(_lin_interp_table_xx))
+
+    """ mass0 """
+    _lin_interp_mass0_table = np.power(10.0, _lin_interp_mass0(_lin_interp_table_xx))
+
+    """ HELPER FUNCTION TO FIND CLOSEST VALUE IN ARRAY """
+    @classmethod
+    def get_closest(cls, table, table_val, val):
+        if hasattr(val, "__len__"):
+            closest_ind = []
+            for val_i in val:
+                closest_ind_i = np.absolute(table_val-val_i).argmin()
+                closest_ind.append(closest_ind_i)
+        else:
+            closest_ind = np.absolute(table_val-val).argmin()
+        return table[closest_ind]
+
     @classmethod
     def _c0(cls, redz):
         xx = np.log10(1 + redz)
-        yy = np.power(10.0, cls._lin_interp_c0(xx))
+        if hasattr(redz, "__len__"):
+            yy = np.power(10.0, cls._lin_interp_c0(xx))
+        else:
+            yy = cls.get_closest(cls._lin_interp_c0_table, cls._lin_interp_table_xx, xx)
+        # yy = np.power(10.0, cls._lin_interp_c0(xx))
         return yy
 
     @classmethod
     def _gamma(cls, redz):
         xx = np.log10(1 + redz)
-        yy = np.power(10.0, cls._lin_interp_gamma(xx))
+        if hasattr(redz, "__len__"):
+            yy = np.power(10.0, cls._lin_interp_gamma(xx))
+        else:
+            yy = cls.get_closest(cls._lin_interp_gamma_table, cls._lin_interp_table_xx, xx)
+        #yy = np.power(10.0, cls._lin_interp_gamma(xx))
+        # print("cls._lin_interp_gamma_table = ", cls._lin_interp_gamma_table)
+        # print("cls._lin_interp_table_xx = ", cls._lin_interp_table_xx)
+        # print("xx = ", xx)
+        # print("yy_test = ", yy_test)
+        # print("yy = ", yy)
+        # exit()
         return yy
 
     @classmethod
     def _mass0(cls, redz):
         xx = np.log10(1 + redz)
-        yy = np.power(10.0, cls._lin_interp_mass0(xx))
+        if hasattr(redz, "__len__"):
+            yy = np.power(10.0, cls._lin_interp_mass0(xx))
+        else:
+            yy = cls.get_closest(cls._lin_interp_mass0_table, cls._lin_interp_table_xx, xx)
+        # yy = np.power(10.0, cls._lin_interp_mass0(xx))
         return yy
 
     @classmethod
@@ -970,6 +1014,23 @@ class _Density_Profile(abc.ABC):
 class NFW(_Density_Profile):
     """Navarro, Frank & White dark-matter density profile from [NFW1997]_.
     """
+    redz_interp = np.logspace(-3,1,10000)
+    crit_dens = cosmo.critical_density(redz_interp).cgs.value
+
+    @staticmethod
+    def get_closest(table, val):
+        # if isinstance(val, float):
+        #     closest_ind = np.absolute(table-val).argmin()
+        # if isinstance(val, np.ndarray):
+        #     print("type(val) = ", type(val))
+        #     print("val = ", val)
+        #     closest_ind = []
+        #     for val_i in val:
+        #         closest_ind_i = np.absolute(table-val_i).argmin()
+        #         closest_ind.append(closest_ind_i)
+        # else:
+        closest_ind = np.absolute(table-val).argmin()
+        return table[closest_ind]
 
     @staticmethod
     def density(rads: ArrayLike, mhalo: ArrayLike, redz: ArrayLike) -> ArrayLike:
@@ -1060,6 +1121,7 @@ class NFW(_Density_Profile):
         delta_c = (200/3) * (conc**3) / log_c_term
         # NFW density (*not* the density at the characteristic-radius)
         rho_s = cosmo.critical_density(redz).cgs.value * delta_c
+        # rho_s = NFW.get_closest(NFW.crit_dens, redz) * delta_c
         # scale-radius
         rs = mhalo / (4*np.pi*rho_s*log_c_term)
         rs = np.power(rs, 1.0/3.0)
@@ -1297,9 +1359,12 @@ class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
             log.error(err)
             extr = [utils.minmax(xx) for xx in [self._xx, self._yy]]
             for vv, nn, ee in zip(vals, ['log10(mstar/Msol)', 'redz'], extr):
-                log.error(f"{nn} (extrema = {ee}): {utils.stats(vv)}")
+                try:
+                    log.error(f"{nn} (extrema = {ee}): {utils.stats(vv)}")
+                except Exception:
+                    log.error(f"{nn} (extrema = {ee}): {vv}")
 
-            raise
+            raise err
 
         if squeeze:
             ynew = ynew.squeeze()

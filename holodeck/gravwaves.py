@@ -17,7 +17,7 @@ from holodeck import utils, cosmo, log, hardening
 from holodeck.constants import SPLC, NWTG, MPC
 
 
-_CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen']
+_CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen', 'mdot']
 
 
 class Grav_Waves:
@@ -253,7 +253,13 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     # Calculate strains from each source
     hs2 = utils.gw_strain_source(mchirp, dcom, frst_orb)**2
 
-    dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], data_harms['sepa'][valid], frst_orb=frst_orb)
+    dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], \
+                                   data_harms['sepa'][valid], \
+                                   mtot = data_harms['mass'][valid].sum(axis=-1),\
+                                   frst_orb=frst_orb,\
+                                   mdot = data_harms['mdot'][valid].sum(axis=-1), \
+                                   dfdt_mdot=evo.dfdt_mdot)
+
     _lambda_fact = utils.lambda_factor_dlnf(frst_orb, dfdt, redz, dcom=dcom) / box_vol
     num_binaries = _lambda_fact * dlnf
 

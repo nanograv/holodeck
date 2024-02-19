@@ -44,6 +44,7 @@ _GW_DEDT_ECC_CONST = - 304 * np.power(NWTG, 3) / 15 / np.power(SPLC, 5)
 _GW_LUM_CONST = (32.0 / 5.0) * np.power(NWTG, 7.0/3.0) * np.power(SPLC, -5.0)
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
+_DFDM_CONST = np.sqrt(NWTG) / (4.0 * np.pi)
 
 
 class _Modifier(abc.ABC):
@@ -1081,7 +1082,9 @@ def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = T
     if np.ndim(xx) == 1:
         pass
     elif np.ndim(xx) == np.ndim(yy):
-        xx = xx[axis]
+        # this used to be a bug ...
+        # xx = xx[axis]
+        pass
     else:
         err = f"Bad shape for `xx` (xx.shape={np.shape(xx)}, yy.shape={np.shape(yy)})!"
         log.error(err)
@@ -1485,7 +1488,7 @@ def fit_turnover_psd(xx, yy, fref, init=[-16, -13/3, 0.3/YR, 2.5]):
 # =================================================================================================
 
 
-def dfdt_from_dadt(dadt, sepa, mtot=None, frst_orb=None):
+def dfdt_from_dadt(dadt, sepa, mtot=None, frst_orb=None, mdot=None, dfdt_mdot=False):
     """Convert from hardening rate in separation to hardening rate in frequency.
 
     Parameters
@@ -1517,8 +1520,31 @@ def dfdt_from_dadt(dadt, sepa, mtot=None, frst_orb=None):
     if frst_orb is None:
         frst_orb = kepler_freq_from_sepa(mtot, sepa)
 
-    dfdt = - 1.5 * (frst_orb / sepa) * dadt
+    dfdt = _dfdt_from_dadt(dadt, sepa, frst_orb)
+
+    # Accretion (i.e. dM/dt = mdot) contribution to df/dt
+    if dfdt_mdot:
+        if mdot is None:
+            err = "mdot must be provided when calculating dfdt_mdot!"
+            log.exception(err)
+            raise ValueError(err)
+        if mtot is None:
+            #get mtot from frst_orb
+            mtot = frst_orb**2 * sepa**3 * 4 * np.pi / (NWTG)
+        mdot_tot = np.sum(mdot,axis=-1)
+        dfdt_mdot = _dfdt_from_dmdt(mdot_tot, sepa, mtot)
+        dfdt += dfdt_mdot
+
     return dfdt, frst_orb
+
+
+def _dfdt_from_dadt(dadt, sepa, frst_orb):
+    return - 1.5 * (frst_orb / sepa) * dadt
+
+
+def _dfdt_from_dmdt(mdot, sepa, mtot):
+    dfdm = _DFDM_CONST / np.sqrt(mtot * sepa**3)
+    return dfdm * mdot
 
 
 def mtmr_from_m1m2(m1, m2=None):
@@ -1574,6 +1600,26 @@ def m1m2_from_mtmr(mt: npt.ArrayLike, mr: npt.ArrayLike) -> npt.ArrayLike:
     m1 = mt/(1.0 + mr)
     m2 = mt - m1
     return np.array([m1, m2])
+
+
+def m1m2_ordered(m1, m2):
+    if hasattr(m1, "__len__") and hasattr(m2, "__len__"):
+        #m1 and m2 are both arrays, so we are using old evolution class
+        inds_m1_primary = m1 >= m2  # where first mass is actually primary
+        m1_sorted = np.zeros(np.shape(m1))
+        m1_sorted[inds_m1_primary] = m1[inds_m1_primary]
+        m1_sorted[~inds_m1_primary] = m2[~inds_m1_primary]
+        m1 = m1_sorted
+        inds_m2_primary = m2 >= m1  # where second mass is actually primary
+        m2_sorted = np.zeros(np.shape(m2))
+        m2_sorted[inds_m2_primary] = m1[inds_m2_primary]
+        m2_sorted[~inds_m2_primary] = m2[~inds_m2_primary]
+        m2 = m2_sorted
+        return m1.T, m2.T
+    if m1 >= m2:
+        return m1, m2
+    else:
+        return m2, m1
 
 
 def frst_from_fobs(fobs, redz):
@@ -1765,8 +1811,10 @@ def velocity_orbital(mt, mr, per=None, sepa=None):
     v2 = np.power(NWTG*mt/sepa, 1.0/2.0) / (1 + mr)
     # v2 = np.power(2*np.pi*NWTG*mt/per, 1.0/3.0) / (1 + mr)
     v1 = v2 * mr
-    vels = np.moveaxis([v1, v2], 0, -1)
-    return vels
+    # vels = np.moveaxis([v1, v2], 0, -1)
+    # print("vels = ", vels)
+    # print("np.shape(vels) = ", np.shape(vels))
+    return v1,v2
 
 
 def _get_sepa_freq(mt, sepa, freq):
@@ -1790,7 +1838,7 @@ def lambda_factor_dlnf(frst, dfdt, redz, dcom=None):
     For each binary, calculate the factor: $$\\Lambda \\equiv (dVc/dz) * (dz/dt) * [dt/dln(f)]$$,
     which has units of [Mpc^3].  When multiplied by a number-density [Mpc^-3], it gives the number
     of binaries in the Universe *per log-frequency interval*.  This value must still be multiplied
-    by $\\Delta \\ln(f)$ to get a number of binaries across a frequency in.
+    by $\\Delta \\ln(f)$ to get a number of binaries across a frequency bin.
 
     Parameters
     ----------
@@ -1812,15 +1860,30 @@ def lambda_factor_dlnf(frst, dfdt, redz, dcom=None):
         The differential comoving volume of the universe per log interval of binary frequency.
 
     """
-    zp1 = redz + 1
     if dcom is None:
         dcom = cosmo.z_to_dcom(redz)
+    return _lambda_factor_dlnf(frst, dfdt, redz, dcom)
 
+
+def _lambda_factor_dlnf(frst, dfdt, redz, dcom):
+    zp1 = redz + 1
     # Volume-factor
     # this is `(dVc/dz) * (dz/dt)`,  units of [Mpc^3/s]
     vfac = 4.0 * np.pi * SPLC * zp1 * (dcom**2)
     # Time-factor
     # this is `f / (df/dt) = dt/d ln(f)`,  units of [sec]
+    """ In some cases, dfdt < 0 due to CBD-driven orbital expansion. 
+        In such cases, we take the absolute value of
+        dfdt to account for the length of time the binary spends 
+        _in the current frequency bin_, 
+        regardless whether the frequency moves up towards a higher frequency bin
+        or down towards a lower frequency bin. """
+    if isinstance(dfdt, float):
+        if dfdt < 0:
+            dfdt *= -1
+    else:
+        dfdt[dfdt<0] = -1.*dfdt[dfdt<0]
+    
     tfac = frst / dfdt
 
     # Calculate weighting
@@ -1906,7 +1969,12 @@ def chirp_mass(m1, m2=None):
     # (N, 2)  ==>  (N,), (N,)
     if m2 is None:
         m1, m2 = np.moveaxis(m1, -1, 0)
-    mc = np.power(m1 * m2, 3.0/5.0)/np.power(m1 + m2, 1.0/5.0)
+    mc = _chirp_mass_m1m2(m1, m2)
+    return mc
+
+
+def _chirp_mass_m1m2(m1, m2):
+    mc = np.power(m1 * m2, 3.0/5.0) / np.power(m1 + m2, 1.0/5.0)
     return mc
 
 
@@ -2018,9 +2086,9 @@ def gw_dade(sepa, eccen):
     Parameters
     ----------
     sepa : array_like
-        Binary semi-major axis (separation) [grams].
+        Binary semi-major axis (separation) [cm].
     eccen : array_like
-        Binary eccentricity [grams].
+        Binary eccentricity.
 
     Returns
     -------
@@ -2216,8 +2284,11 @@ def gw_strain_source(mchirp, dcom, freq_rest_orb):
     """
     mchirp, dcom, freq_rest_orb = _array_args(mchirp, dcom, freq_rest_orb)
     # The factor of 2 below is to convert from orbital-frequency to GW-frequency
-    hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_rest_orb, 2/3) / dcom
-    return hs
+    return _gw_strain_source(mchirp, dcom, freq_rest_orb)
+
+
+def _gw_strain_source(mchirp, dcom, freq_rest_orb):
+    return _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_rest_orb, 2/3) / dcom
 
 
 def sep_to_merge_in_time(m1, m2, time):
