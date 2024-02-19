@@ -592,7 +592,7 @@ class Evolution:
 
         return ynew
 
-    def sample_universe(self, fobs_orb_edges, down_sample=None):
+    def sample_universe(self, fobs_orb_edges, dfdt_mdot=False, down_sample=None):
         """Construct a full universe of binaries based on resampling this population.
 
         Parameters
@@ -1621,6 +1621,9 @@ class New_Evolution:
                                         frst_orb=frst_orb_cents,\
                                         mdot = data_fobs['mdot'], \
                                         dfdt_mdot=dfdt_mdot)
+        
+        if np.any(dfdt<0):
+            print("There are dfdt<0")
         
         _lambda_factor = utils.lambda_factor_dlnf(frst_orb_cents, dfdt, \
                                 data_fobs['redz'], dcom=dcom) / self._sample_volume
