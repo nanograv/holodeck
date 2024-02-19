@@ -777,7 +777,8 @@ class Evolution:
                 setattr(self, f"_dedt_{ii}", np.zeros_like(self.dadt))
 
         # ---- Initialize hardening rate at first step
-        dadt_init, dedt_init = self._hardening_rate(step=0)
+        step0 = 0
+        dadt_init, dedt_init = self._hardening_rate(step0)
 
         self.dadt[:, 0] = dadt_init
         if (pop.eccen is not None):
