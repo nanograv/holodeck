@@ -1,6 +1,8 @@
 """
 """
 
+import numpy as np
+
 import holodeck as holo
 from holodeck import librarian
 
@@ -11,11 +13,14 @@ def _run_param_space(param_space_class):
     pspace = param_space_class(holo.log, nsamples=NSAMPLES, sam_shape=SAM_SHAPE)
     sam, hard = pspace.model_for_sample_number(0)
     # Make sure model runs
-    import holodeck.librarian.gen_lib  # noqa
-    data = librarian.gen_lib.run_model(sam, hard, singles_flag=True)
+    import holodeck.librarian.libraries  # noqa
+    data = librarian.libraries.run_model(sam, hard, singles_flag=True, details_flag=True)
     assert data is not None, "After `run_model` returned data is None!"
-    for key in ['fobs_cents', 'fobs_edges', 'hc_ss', 'hc_bg', 'gwb']:
-        assert key in data, f"After `run_model` returned data does not have key {key}!  ({data.keys()=})"
+    check_keys = ['fobs_cents', 'fobs_edges', 'hc_ss', 'hc_bg', 'gwb', 'static_binary_density', 'number']
+    for key in check_keys:
+        assert key in data, f"After `run_model` returned data does not have key '{key}'!  ({data.keys()=})"
+        vals = data[key]
+        assert np.any(vals > 0.0), f"After `run_model`, no positive values found for key '{key}'!"
 
     return
 

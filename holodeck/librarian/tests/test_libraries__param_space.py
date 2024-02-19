@@ -203,8 +203,8 @@ def _check_sam_hard(sam, hard, sam_shape):
     assert isinstance(hard, hardening.Hard_GW)
 
     # Make sure model runs
-    import holodeck.librarian.gen_lib  # noqa
-    data = librarian.gen_lib.run_model(sam, hard)
+    import holodeck.librarian.libraries  # noqa
+    data = librarian.libraries.run_model(sam, hard)
     assert data is not None
 
     return
