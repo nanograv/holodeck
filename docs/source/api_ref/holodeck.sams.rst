@@ -12,6 +12,6 @@ holodeck.sams (Semi-Analytic Models) module
 .. toctree::
     :maxdepth: 2
 
-    holodeck.sams.comps
+    holodeck.sams.components
     holodeck.sams.sam
     holodeck.sams.sam_cyutils
