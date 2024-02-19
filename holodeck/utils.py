@@ -1806,7 +1806,12 @@ def _lambda_factor_dlnf(frst, dfdt, redz, dcom):
         _in the current frequency bin_, 
         regardless whether the frequency moves up towards a higher frequency bin
         or down towards a lower frequency bin. """
-    dfdt[dfdt<0] = -1.*dfdt[dfdt<0]
+    if isinstance(dfdt, float):
+        if dfdt < 0:
+            dfdt *= -1
+    else:
+        dfdt[dfdt<0] = -1.*dfdt[dfdt<0]
+    
     tfac = frst / dfdt
 
     # Calculate weighting
