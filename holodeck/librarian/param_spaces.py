@@ -68,7 +68,7 @@ class _PS_Astro_Strong(_Param_Space):
             params['gsmf_log10_mstar_z1'],
             params['gsmf_log10_mstar_z2'],
         ]
-        gsmf = holo.sams.GSMF_Schechter(
+        gsmf = holo.sams.GSMF_Double_Schechter(
             log10_phi1=log10_phi_one,
             log10_phi2=log10_phi_two,
             log10_mstar=log10_mstar,
@@ -121,7 +121,7 @@ class PS_Astro_Strong_Hard_Only(_PS_Astro_Strong):
             PD_Uniform("hard_gamma_inner", -1.5, +0.0, default=-1.0),
         ]
         _Param_Space.__init__(
-            parameters,
+            self, parameters,
             log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
         )
         return
