@@ -226,7 +226,7 @@ def run_sam_at_pspace_num(args, space, pnum):
         instances; see the function
         :func:`holodeck.librarian.libraries._Param_Space.model_for_sample_number()`.
     (3) Calculates populations and GW signatures from the SAM and hardening model using
-        :func:`run_model()`, and saves the results to an output file.
+        :func:`holodeck.librarian.libraries.run_model()`, and saves the results to an output file.
     (4) Optionally: some diagnostic plots are created in the :func:`make_plots()` function.
 
     Arguments
