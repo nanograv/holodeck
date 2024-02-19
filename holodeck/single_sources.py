@@ -2,14 +2,11 @@
 
 """
 
-from importlib import reload
-
-
 import logging
 import warnings
 import numpy as np
 # import astropy as ap
-import matplotlib as mpl
+# import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
@@ -18,8 +15,9 @@ import kalepy as kale # noqa
 # import kalepy.plot
 
 import holodeck as holo
-from holodeck import cosmo, utils, plot, cyutils, gravwaves
-from holodeck.constants import MSOL, PC, YR, MPC, GYR
+import holodeck.cyutils
+from holodeck import cosmo, utils, plot, gravwaves
+from holodeck.constants import MSOL, PC, YR, MPC
 
 # Silence annoying numpy errors
 np.seterr(divide='ignore', invalid='ignore', over='ignore')
@@ -29,16 +27,18 @@ log = holo.log
 log.setLevel(logging.INFO)
 
 par_names = np.array(['mtot', 'mrat', 'redz_init', 'redz_final', 'dcom_final', 'sepa_final', 'angs_final'])
-par_labels = np.array(['Total Mass $M$ ($M_\odot$)', 'Mass Ratio $q$', 'Initial Redshift $z_i$', 'Final Redshift $z_f$', 
+par_labels = np.array(['Total Mass $M$ ($M_\odot$)', 'Mass Ratio $q$', 'Initial Redshift $z_i$', 'Final Redshift $z_f$',
                    'Final Comoving Distance $d_c$ (Mpc)', 'Final Separation (pc)', 'Final Angular Separation (rad)'])
 par_units = np.array([1/MSOL, 1, 1, 1, 1/MPC,  1/PC, 1])
+
 
 ###################################################
 ############## STRAIN CALCULATIONS ################
 ###################################################
 
+
 def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
-       
+
     """ Calculate strain from the loudest single sources and background.
 
 
@@ -58,7 +58,7 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
         Specification of how many discrete realizations to construct.
     loudest : int
         Number of loudest single sources to separate from background.
-    
+
 
     Returns
     -------
@@ -67,15 +67,15 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
     hc_bg : (F, R) NDarray of scalars
         Characteristic strain of the GWB.
     sspar : (4, F, R, L) NDarray of scalars
-        Astrophysical parametes (total mass, mass ratio, initial redshift, final redshift) of each 
-        loud single sources, for each frequency and realization. 
+        Astrophysical parametes (total mass, mass ratio, initial redshift, final redshift) of each
+        loud single sources, for each frequency and realization.
         Returned only if params = True.
     bgpar : (7, F, R) NDarray of scalars
-        Average effective binary astrophysical parameters (total mass, mass ratio, initial redshift, 
-        final redshift, final comoving distances, final separation, final angular separation) for background sources at each frequency and realization, 
+        Average effective binary astrophysical parameters (total mass, mass ratio, initial redshift,
+        final redshift, final comoving distances, final separation, final angular separation) for background sources at each frequency and realization,
         Returned only if params = True.
     """
- 
+
     # All other bin midpoints
     mt = kale.utils.midpoints(edges[0]) #: total mass
     mr = kale.utils.midpoints(edges[1]) #: mass ratio
@@ -96,8 +96,6 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
                 err = np.sum(np.logical_and(redz<0, redz!=-1))
                 err = f"{err} redz < 0 and !=-1 found in redz, in ss_gws_redz()"
                 raise ValueError(err)
-    
-    print('passed redz check at the beginning of ss_gws_redz()')
 
     # For multiple realizations, using cython
     if(utils.isinteger(realize)):
@@ -158,10 +156,10 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
                 err = f"check 1: {err} out of {sspar[3].size} sspar[3] are negative and not -1 in sings.ss_gws_redz()"
                 raise ValueError(err)
 
-            
+
             # return
             return hc_ss, hc_bg, sspar, bgpar
-            
+
         else:
             # use cython to get h_c^2 for ss and bg
             hc2ss, hc2bg = holo.cyutils.loudest_hc_from_sorted(number, h2fdf, realize, loudest,
@@ -169,7 +167,7 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
             hc_ss = np.sqrt(hc2ss)
             hc_bg = np.sqrt(hc2bg)
             return hc_ss, hc_bg
-    
+
     # OTHERWISE
     else:
         raise Exception("`realize` ({}) must be an integer!")
@@ -177,7 +175,7 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
 
 # version for running libraries
 def ss_gws(edges, number, realize, loudest = 1, params = False):
-       
+
     """ Calculate strain from the loudest single sources and background.
 
 
@@ -194,7 +192,7 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
         Specification of how many discrete realizations to construct.
     loudest : int
         Number of loudest single sources to separate from background.
-    
+
 
     Returns
     -------
@@ -203,12 +201,12 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
     hc_bg : (F, R) NDarray of scalars
         Characteristic strain of the GWB.
     sspar : (3, F, R, L) NDarray of scalars
-        Astrophysical parametes of each loud single sources, 
-        for each frequency and realization. 
+        Astrophysical parametes of each loud single sources,
+        for each frequency and realization.
         Returned only if params = True.
     bgpar : (3, F, R) NDarray of scalars
         Average effective binary astrophysical parameters for background
-        sources at each frequency and realization, 
+        sources at each frequency and realization,
         Returned only if params = True.
     """
 
@@ -224,22 +222,22 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
     rz = kale.utils.midpoints(edges[2]) #: redshift
 
 
-    # --- Chirp Masses --- in shape (M, Q) 
+    # --- Chirp Masses --- in shape (M, Q)
     cmass = utils.chirp_mass_mtmr(mt[:,np.newaxis], mr[np.newaxis,:])
 
     # --- Comoving Distances --- in shape (Z)
     cdist = holo.cosmo.comoving_distance(rz).cgs.value
 
-    # --- Rest Frame Frequencies --- in shape (Z, F) 
+    # --- Rest Frame Frequencies --- in shape (Z, F)
     rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
 
-    # --- Source Strain Amplitude --- in shape (M, Q, Z, F) 
+    # --- Source Strain Amplitude --- in shape (M, Q, Z, F)
     hsamp = utils.gw_strain_source(cmass[:,:,np.newaxis,np.newaxis],
                                    cdist[np.newaxis,np.newaxis,:,np.newaxis],
                                    rfreq[np.newaxis,np.newaxis,:,:])
     # hsfdf = hsamp^2 * f/df
     h2fdf = hsamp**2 * (fc[np.newaxis, np.newaxis, np.newaxis,:]
-                    /df[np.newaxis, np.newaxis, np.newaxis,:]) 
+                    /df[np.newaxis, np.newaxis, np.newaxis,:])
     # indices of bins sorted by h2fdf
     indices = np.argsort(-h2fdf[...,0].flatten()) # just sort for first frequency
     unraveled = np.array(np.unravel_index(indices, (len(mt),len(mr),len(rz))))
@@ -263,7 +261,7 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
             # calulate parameters of single sources
             sspar = np.array([mt[ssidx[0,...]], mr[ssidx[1,...]], rz[ssidx[2,...]]])
             return hc_ss, hc_bg, sspar, bgpar
-            
+
         else:
             # use cython to get h_c^2 for ss and bg
             hc2ss, hc2bg = holo.cyutils.loudest_hc_from_sorted(number, h2fdf, realize, loudest,
@@ -271,7 +269,7 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
             hc_ss = np.sqrt(hc2ss)
             hc_bg = np.sqrt(hc2bg)
             return hc_ss, hc_bg
-    
+
     # OTHERWISE
     else:
         raise Exception("`realize` ({}) must be an integer!")
@@ -281,8 +279,8 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
 
 
 def loudest_by_cython(edges, number, realize, loudest, round = True, params = False):
-       
-    """ More efficient way to calculate strain from numbered 
+
+    """ More efficient way to calculate strain from numbered
     grid integrated
 
 
@@ -301,10 +299,10 @@ def loudest_by_cython(edges, number, realize, loudest, round = True, params = Fa
     loudest : int
         Number of loudest single sources to separate from background.
     round : bool
-        Specification of whether to discretize the sample if realize is False, 
-        by rounding number of binaries in each bin to integers. 
+        Specification of whether to discretize the sample if realize is False,
+        by rounding number of binaries in each bin to integers.
         Does nothing if realize is True.
-    
+
 
     Returns
     -------
@@ -313,12 +311,12 @@ def loudest_by_cython(edges, number, realize, loudest, round = True, params = Fa
     hc_bg : (F, R) NDarray of scalars
         Characteristic strain of the GWB.
     lspar : (3, F, R) NDarray of scalars
-        Average effective binary astrophysical parametes of the L loudest sources 
-        at each frequency, for each realization. 
+        Average effective binary astrophysical parametes of the L loudest sources
+        at each frequency, for each realization.
         Returned only if params = True.
     bgpar : (3, F, R) NDarray of scalars
         Average effective binary astrophysical parameters for background
-        sources at each frequency and realization, 
+        sources at each frequency and realization,
         Returned only if params = True.
     lsidx : (3, F, R, L) NDarray
         The M, q, and z indices of loudest single sources at each frequency of each realization.
@@ -338,23 +336,23 @@ def loudest_by_cython(edges, number, realize, loudest, round = True, params = Fa
     rz = kale.utils.midpoints(edges[2]) #: redshift
 
 
-    # --- Chirp Masses --- in shape (M, Q) 
+    # --- Chirp Masses --- in shape (M, Q)
     cmass = utils.chirp_mass_mtmr(mt[:,np.newaxis], mr[np.newaxis,:])
 
     # --- Comoving Distances --- in shape (Z)
     cdist = holo.cosmo.comoving_distance(rz).cgs.value
 
-    # --- Rest Frame Frequencies --- in shape (Z, F) 
+    # --- Rest Frame Frequencies --- in shape (Z, F)
     rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
 
-    # --- Source Strain Amplitude --- in shape (M, Q, Z, F) 
+    # --- Source Strain Amplitude --- in shape (M, Q, Z, F)
     hsamp = utils.gw_strain_source(cmass[:,:,np.newaxis,np.newaxis],
                                    cdist[np.newaxis,np.newaxis,:,np.newaxis],
                                    rfreq[np.newaxis,np.newaxis,:,:])
     # hsfdf = hsamp^2 * f/df
     h2fdf = hsamp**2 * (fc[np.newaxis, np.newaxis, np.newaxis,:]
-                    /df[np.newaxis, np.newaxis, np.newaxis,:]) 
-    
+                    /df[np.newaxis, np.newaxis, np.newaxis,:])
+
     # indices of bins sorted by h2fdf
     indices = np.argsort(-h2fdf[...,0].flatten()) # just sort for first frequency
     unraveled = np.array(np.unravel_index(indices, (len(mt),len(mr),len(rz))))
@@ -371,7 +369,7 @@ def loudest_by_cython(edges, number, realize, loudest, round = True, params = Fa
             hc_ls = np.sqrt(hc2ls)
             hc_bg = np.sqrt(hc2bg)
             return hc_ls, hc_bg, lspar, bgpar, lsidx
-            
+
         else:
             # use cython to get h_c^2 for ss and bg
             hc2ls, hc2bg = holo.cyutils.loudest_hc_from_sorted(number, h2fdf, realize, loudest,
@@ -379,7 +377,7 @@ def loudest_by_cython(edges, number, realize, loudest, round = True, params = Fa
             hc_ls = np.sqrt(hc2ls)
             hc_bg = np.sqrt(hc2bg)
             return hc_ls, hc_bg
-    
+
     # OTHERWISE
     else:
         raise Exception("`realize` ({}) must be an integer!")
@@ -387,8 +385,8 @@ def loudest_by_cython(edges, number, realize, loudest, round = True, params = Fa
 
 
 def ss_by_cdefs(edges, number, realize, round = True, params = False):
-       
-    """ More efficient way to calculate strain from numbered 
+
+    """ More efficient way to calculate strain from numbered
     grid integrated
 
 
@@ -406,10 +404,10 @@ def ss_by_cdefs(edges, number, realize, round = True, params = False):
         If a `bool` value, then whether or not to construct a realization.
         If a `int` value, then how many discrete realizations to construct.
     round : bool
-        Specification of whether to discretize the sample if realize is False, 
-        by rounding number of binaries in each bin to integers. 
+        Specification of whether to discretize the sample if realize is False,
+        by rounding number of binaries in each bin to integers.
         Does nothing if realize is True.
-    
+
 
     Returns
     -------
@@ -421,14 +419,14 @@ def ss_by_cdefs(edges, number, realize, round = True, params = False):
         just (F,) if realize = True or False.
     ssidx : (3, F, R) NDarray
         The indices of loudest single sources at each frequency of each realization
-        in the format: [[M indices], [q indices], [z indices], [f indices], [r indices]] 
+        in the format: [[M indices], [q indices], [z indices], [f indices], [r indices]]
         just (3,F,) if realize = True or False.
     hsamp : (M, Q, Z, F) NDarray
         Strain amplitude of a single source in every bin (regardless of if that bin
         actually has any sources.)
     bgpar : (3, F, R) NDarray of scalars
         Average effective binary astrophysical parameters for background
-        sources at each frequency and realization, returned only if 
+        sources at each frequency and realization, returned only if
         params = True.
     sspar : (3, F, R) NDarray of scalars
         Astrophysical parametes of single sources at each frequency
@@ -448,22 +446,22 @@ def ss_by_cdefs(edges, number, realize, round = True, params = False):
     rz = kale.utils.midpoints(edges[2]) #: redshift
 
 
-    # --- Chirp Masses --- in shape (M, Q) 
+    # --- Chirp Masses --- in shape (M, Q)
     cmass = utils.chirp_mass_mtmr(mt[:,np.newaxis], mr[np.newaxis,:])
 
     # --- Comoving Distances --- in shape (Z)
     cdist = holo.cosmo.comoving_distance(rz).cgs.value
 
-    # --- Rest Frame Frequencies --- in shape (Z, F) 
+    # --- Rest Frame Frequencies --- in shape (Z, F)
     rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
 
-    # --- Source Strain Amplitude --- in shape (M, Q, Z, F) 
+    # --- Source Strain Amplitude --- in shape (M, Q, Z, F)
     hsamp = utils.gw_strain_source(cmass[:,:,np.newaxis,np.newaxis],
                                    cdist[np.newaxis,np.newaxis,:,np.newaxis],
                                    rfreq[np.newaxis,np.newaxis,:,:])
     # hsfdf = hsamp^2 * f/df
     h2fdf = hsamp**2 * (fc[np.newaxis, np.newaxis, np.newaxis,:]
-                    /df[np.newaxis, np.newaxis, np.newaxis,:]) 
+                    /df[np.newaxis, np.newaxis, np.newaxis,:])
 
     # For multiple realizations, using cython
     if(utils.isinteger(realize)):
@@ -473,14 +471,14 @@ def ss_by_cdefs(edges, number, realize, round = True, params = False):
             hc_ss = np.sqrt(hc2ss)
             hc_bg = np.sqrt(hc2bg)
             return hc_bg, hc_ss, ssidx, hsamp, bgpar, sspar
-            
+
         else:
             # use cython to get h_c^2 for ss and bg
             hc2ss, hc2bg, ssidx = holo.cyutils.ss_bg_hc(number, h2fdf, realize)
             hc_ss = np.sqrt(hc2ss)
             hc_bg = np.sqrt(hc2bg)
             return hc_bg, hc_ss, ssidx, hsamp
-    
+
     # OTHERWISE
     elif(realize==False):
         if (round == True):
@@ -513,14 +511,14 @@ def ss_by_cdefs(edges, number, realize, round = True, params = False):
     ssidx = np.array(np.unravel_index(argmax, shape[:-1])) # unravel indices
     # print('ssidx', ssidx)
 
-    # --- Background Characteristic Strain --- in shape (F,) 
+    # --- Background Characteristic Strain --- in shape (F,)
     hc_bg = np.sqrt(np.sum(bgnum*h2fdf, axis=(0,1,2)))
     return hc_bg, hc_ss, ssidx, hsamp
 
 
 def ss_by_ndars(edges, number, realize, round = True):
-       
-    """ More efficient way to calculate strain from numbered 
+
+    """ More efficient way to calculate strain from numbered
     grid integrated
 
 
@@ -538,10 +536,10 @@ def ss_by_ndars(edges, number, realize, round = True):
         If a `bool` value, then whether or not to construct a realization.
         If a `int` value, then how many discrete realizations to construct.
     round : bool
-        Specification of whether to discretize the sample if realize is False, 
-        by rounding number of binaries in each bin to integers. 
+        Specification of whether to discretize the sample if realize is False,
+        by rounding number of binaries in each bin to integers.
         Does nothing if realize is True.
-    ss : bool 
+    ss : bool
         Whether or not to separate the loudest single source in each frequency bin.
     sum : bool
         Whether or not to sum the strain at a given frequency over all bins.
@@ -558,22 +556,22 @@ def ss_by_ndars(edges, number, realize, round = True):
     hc_ss : (F, R) ndarray of scalars
         The characteristic strain of the loudest single source at each frequency.
     hsamp : (M, Q, Z, F, R) ndarray
-        Strain amplitude of a single source in every bin (but equal to zero 
+        Strain amplitude of a single source in every bin (but equal to zero
         if the number in that bin is 0)
     ssidx : (5, F, R) ndarray
         The indices of loudest single sources at each frequency of each realization
-        in the format: [[M indices], [q indices], [z indices], [f indices], [r indices]] 
-    hsmax : (F, R) array of scalars 
+        in the format: [[M indices], [q indices], [z indices], [f indices], [r indices]]
+    hsmax : (F, R) array of scalars
         The maximum single source strain amplitude at each frequency.
     bgnum : (M, Q, Z, F, R) ndarray
         The number of binaries in each bin after the loudest single source
         at each frequency is subtracted out.
-    
 
-    In the unlikely scenario that there are two equal hsmaxes 
+
+    In the unlikely scenario that there are two equal hsmaxes
     (at same OR dif frequencies), ssidx calculation will go wrong
     Could avoid this by using argwhere for each f_idx column separately.
-    Or TODO implement some kind of check to see if any argwheres return multiple 
+    Or TODO implement some kind of check to see if any argwheres return multiple
     values for that hsmax and raises a warning/assertion error
 
     """
@@ -591,8 +589,8 @@ def ss_by_ndars(edges, number, realize, round = True):
 
 
     # --- Chirp Masses ---
-    # to get chirp mass in shape (M, Q) we need 
-    # mt in shape (M, 1) 
+    # to get chirp mass in shape (M, Q) we need
+    # mt in shape (M, 1)
     # mr in shape (1, Q)
     cmass = utils.chirp_mass_mtmr(mt[:,np.newaxis], mr[np.newaxis,:])
 
@@ -602,8 +600,8 @@ def ss_by_ndars(edges, number, realize, round = True):
     cdist = holo.cosmo.comoving_distance(rz).cgs.value
 
     # --- Rest Frame Frequencies ---
-    # to get rest freqs in shape (Z, F) we need 
-    # rz in shape (Z, 1) 
+    # to get rest freqs in shape (Z, F) we need
+    # rz in shape (Z, 1)
     # fc in shape (1, F)
     rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
 
@@ -634,18 +632,18 @@ def ss_by_ndars(edges, number, realize, round = True):
             bgnum = np.copy(number)[...,np.newaxis]
     elif(realize == True):
         R=1
-        bgnum = np.random.poisson(number[...,np.newaxis], 
+        bgnum = np.random.poisson(number[...,np.newaxis],
                                 size = (number.shape + (R,)))
         assert (np.all(bgnum%1 ==0)), 'non integer numbers found with realize=True'
     elif(utils.isinteger(realize)):
         R=realize
-        bgnum = np.random.poisson(number[...,np.newaxis], 
+        bgnum = np.random.poisson(number[...,np.newaxis],
                                 size = (number.shape + (R,)))
     else:
         print("`realize` ({}) must be one of {{True, False, integer}}!"\
-            .format(realize))   
+            .format(realize))
 
-    #### 1) Identify the loudest (max hs) single source in a bin with N>0 
+    #### 1) Identify the loudest (max hs) single source in a bin with N>0
     # NOTE this requires hsamp for every realization, might be slow/big
     # --- Bin Strain Amplitudes ---
     # to get hsamp in shape (M, Q, Z, F, R)
@@ -658,12 +656,12 @@ def ss_by_ndars(edges, number, realize, round = True):
     # to get max strain in shape (F) we need
     # hsamp in shape (M, Q, Z, F), search over first 3 axes
     hsmax = np.amax(hsamp, axis=(0,1,2)) #find max hs at each frequency
-    
+
 
     #### 2) Record the indices and strain of that single source
 
     # --- Indices of Loudest Bin ---
-    # Shape (5, F, R), 
+    # Shape (5, F, R),
     # where ssidx[:,F,R] = m, q, z, f, r indices for loudest source at F, R
     shape = hsamp.shape
     newshape = (shape[0]*shape[1]*shape[2], shape[3], shape[4])
@@ -692,7 +690,7 @@ def ss_by_ndars(edges, number, realize, round = True):
         raise Exception("hsamp <=0 found at hsmax")
     if np.any(hsmax<=0):
         raise Exception("hsmax <=0 found")
-   
+
     # print('bgnum stats:\n', holo.utils.stats(bgnum))
     # print('bgnum[hsamp==hsmax] stats:\n', holo.utils.stats(bgnum[(hsamp == hsmax)]))
     # print('ssidx\n', ssidx, ssidx.shape)
@@ -702,7 +700,7 @@ def ss_by_ndars(edges, number, realize, round = True):
     # print('bgnum[hsamp==hsmax] stats:\n', holo.utils.stats(bgnum[(hsamp == hsmax)]))
 
     assert np.all(bgnum>=0), f"bgnum contains negative values at: {np.where(bgnum<0)}"
-    
+
 
     #### 4) Calculate single source characteristic strain (hc)
 
@@ -714,18 +712,18 @@ def ss_by_ndars(edges, number, realize, round = True):
     hc_ss = np.sqrt(hsmax**2 * (fc[:,np.newaxis]/df[:,np.newaxis]))
 
 
-    
-    #### 5) Calculate the background with the new number 
- 
+
+    #### 5) Calculate the background with the new number
+
     # --- Background Characteristic Strain Squared ---
     # to get characteristic strain in shape (M, Q, Z, F, R) we need
     # hsamp in shape (M, Q, Z, F, R)
     # fc in shape (1, 1, 1, F, 1)
     hchar = hsamp**2 * (fc[np.newaxis, np.newaxis, np.newaxis,:,np.newaxis]
-                        /df[np.newaxis, np.newaxis, np.newaxis,:,np.newaxis])   
+                        /df[np.newaxis, np.newaxis, np.newaxis,:,np.newaxis])
     hchar *= bgnum
 
-        
+
 
     # --- Background Characteristic Strain  ---
     # hc_bg in shape (F, R)
@@ -735,8 +733,8 @@ def ss_by_ndars(edges, number, realize, round = True):
     return hc_bg, hc_ss, hsamp, ssidx, hsmax, bgnum
 
 def h2fdf(edges):
-       
-    """ More efficient way to calculate strain from numbered 
+
+    """ More efficient way to calculate strain from numbered
     grid integrated
 
 
@@ -746,7 +744,7 @@ def h2fdf(edges):
         A list containing the edges along each dimension.  The four dimensions correspond to
         total mass, mass ratio, redshift, and observer-frame orbital frequency.
         The length of each of the four arrays is M+1, Q+1, Z+1, F+1.
-        
+
 
     Returns
     -------
@@ -769,8 +767,8 @@ def h2fdf(edges):
 
 
     # --- Chirp Masses ---
-    # to get chirp mass in shape (M, Q) we need 
-    # mt in shape (M, 1) 
+    # to get chirp mass in shape (M, Q) we need
+    # mt in shape (M, 1)
     # mr in shape (1, Q)
     cmass = utils.chirp_mass_mtmr(mt[:,np.newaxis], mr[np.newaxis,:])
 
@@ -780,8 +778,8 @@ def h2fdf(edges):
     cdist = holo.cosmo.comoving_distance(rz).cgs.value
 
     # --- Rest Frame Frequencies ---
-    # to get rest freqs in shape (Z, F) we need 
-    # rz in shape (Z, 1) 
+    # to get rest freqs in shape (Z, F) we need
+    # rz in shape (Z, 1)
     # fc in shape (1, F)
     rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
 
@@ -800,7 +798,7 @@ def h2fdf(edges):
     # hc_ss = max hsfdf at each freq
     # hc_bg = sum(hsfdf * num in bin)
     h2fdf = hsamp**2 * (fc[np.newaxis, np.newaxis, np.newaxis,:]
-                        /df[np.newaxis, np.newaxis, np.newaxis,:]) 
+                        /df[np.newaxis, np.newaxis, np.newaxis,:])
     return h2fdf
 
 
@@ -813,7 +811,7 @@ def all_sspars(fobs_gw_cents, sspar):
     fobs_gw_cents : (F,) 1Darray of scalars
         Observed gw frequency bin centers.
     sspar : (4, F,R,L) NDarray
-        Single source parameters as calculated by ss_gws_redz(). 
+        Single source parameters as calculated by ss_gws_redz().
         Includes mtot, mrat, redz_init, redz_final.
 
     Returns
@@ -842,15 +840,15 @@ def parameters_from_indices(edges, ssidx):
     frequency given their indices and edges.
 
     Parameters
-    -----------    
+    -----------
     edges : (4,) list of 1darrays
         A list containing the edges along each dimension.  The four dimensions correspond to
         total mass, mass ratio, redshift, and observer-frame orbital frequency.
         The length of each of the four arrays is M+1, Q+1, Z+1, F+1.
     ssidx : (3, F, R) or (3,F) ndarray
         The indices of loudest single sources at each frequency of each realization
-        in the format: [[M indices], [q indices], [z indices], [f indices], [r indices]] 
-    
+        in the format: [[M indices], [q indices], [z indices], [f indices], [r indices]]
+
 
     Returns
     ----------
@@ -876,10 +874,10 @@ def parameters_from_indices(edges, ssidx):
 
     return m_arr, q_arr, z_arr, f_arr
 
-    
+
 def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
-       
-    """ Inefficient way to calculate strain from numbered 
+
+    """ Inefficient way to calculate strain from numbered
     grid integrated
 
     Parameters
@@ -896,8 +894,8 @@ def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
         If a `bool` value, then whether or not to construct a realization.
         If a `int` value, then how many discrete realizations to construct.
     round : bool
-        Specification of whether to discretize the sample if realize is False, 
-        by rounding number of binaries in each bin to integers. 
+        Specification of whether to discretize the sample if realize is False,
+        by rounding number of binaries in each bin to integers.
     print_test : bool
         Whether or not to print variable as they are calculated, for dev purposes.
 
@@ -906,27 +904,27 @@ def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
     -------
     hc_bg : (F, R) ndarray
         Characteristic strain of the GWB.
-        R=1 if realize is True or False, 
+        R=1 if realize is True or False,
         R=realize if realize is an integer
     hc_ss : (F, R) ndarray
         The characteristic strain of the loudest single source at each frequency,
         for each realization. (R=1 if realize is True or False, otherwise R=realize)
-    sspar : (F, 3, R) ndarray 
+    sspar : (F, 3, R) ndarray
         The parameters (M, q, and z) of the loudest single source at each frequency.
-    ssidx : (F, 3, R) ndarray 
+    ssidx : (F, 3, R) ndarray
         The indices (m_idx, q_idx, and z_idx) of the parameters of the loudest single
-        source's bin, at each frequency.    
-    maxhs : (F, R) ndarray 
+        source's bin, at each frequency.
+    maxhs : (F, R) ndarray
         The maximum single source strain amplitude at each frequency.
-    bgnum : (M, Q, Z, F, R) 
+    bgnum : (M, Q, Z, F, R)
         The number of binaries in each bin after the loudest single source
-        at each frequency is subtracted out. 
-        R=1 if realize is True or False, 
+        at each frequency is subtracted out.
+        R=1 if realize is True or False,
         R=realize if realize is an integer
 
     """
     if(print_test):
-        print('INPUTS: edges:', len(edges), '\n', edges, 
+        print('INPUTS: edges:', len(edges), '\n', edges,
         '\nINPUTS:number:', number.shape, '\n', number,'\n')
 
     # Frequency bin midpoints
@@ -939,7 +937,7 @@ def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
     mr = kale.utils.midpoints(edges[1]) #: mass ratio
     rz = kale.utils.midpoints(edges[2]) #: redshift
 
-    
+
 
     # new number array
     if(realize == False):
@@ -956,7 +954,7 @@ def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
     elif(utils.isinteger(realize)):
         reals = realize
         bgnum = np.empty(number.shape + (reals,))
-    else: 
+    else:
         raise Exception("`realize` ({}) must be one of {{True, False, integer}}!"\
                             .format(realize))
 
@@ -967,10 +965,10 @@ def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
     # (f, 3)
     # params of loudest bin with number>=1
     # shape (f,3,R) for 3 params
-    sspar = np.empty((len(fc), 3, reals)) 
+    sspar = np.empty((len(fc), 3, reals))
     # param indices of loudest bin with number>=1
     # shape (f,3,R) for 3 params
-    ssidx = np.empty((len(fc), 3, reals)) 
+    ssidx = np.empty((len(fc), 3, reals))
     # max hs at each frequency
     maxhs = np.zeros((len(fc), reals))
     # (max)  single source characteristic strain at each frequency
@@ -979,24 +977,24 @@ def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
 
     # --------------- Single Sources ------------------
     # 0) Round or realize so numbers are all integers
-    # 1) Identify the loudest (max hs) single source in a bin with N>0 
+    # 1) Identify the loudest (max hs) single source in a bin with N>0
     # 2) Record the parameters, parameter indices, and strain
     #  of that single source
-    # 3) Subtract 1 from the number in that source's bin, 
+    # 3) Subtract 1 from the number in that source's bin,
     # 4) Calculate single source characteristic strain (hc)
-    # 5) Calculate the background with the new number 
-    
+    # 5) Calculate the background with the new number
+
     for m_idx in range(len(mt)):
         for q_idx in range(len(mr)):
             cmass = holo.utils.chirp_mass_mtmr(mt[m_idx], mr[q_idx])
             for z_idx in range(len(rz)):
                 cdist = holo.cosmo.comoving_distance(rz[z_idx]).cgs.value
-                
+
                 # print M, q, z, M_c, d_c
                 if(print_test):
                     print('BIN mt=%.2e, mr=%.2e, rz=%.2e' %
                         (mt[m_idx], mr[q_idx], rz[z_idx]))
-                    print('\t m_c = %.2e, d_c = %.2e' 
+                    print('\t m_c = %.2e, d_c = %.2e'
                         % (cmass, cdist))
 
                 # check if loudest source in any bin
@@ -1004,18 +1002,18 @@ def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
                     rfreq = holo.utils.frst_from_fobs(fc[f_idx], rz[z_idx])
                     # hs of a source in that bin
                     hs_mqzf = utils.gw_strain_source(cmass, cdist, rfreq)
-                    
+
                     for r_idx in range(reals):
-                        # Poisson sample to get number in that bin if realizing 
+                        # Poisson sample to get number in that bin if realizing
                         # (otherwise it was already set above by copying or rounding.)
                         if(utils.isinteger(realize) or realize==True):
                             bgnum[m_idx, q_idx, z_idx, f_idx, r_idx] \
                                 = np.random.poisson(number[m_idx,q_idx,z_idx,f_idx])
                         # 1) IF LOUDEST
-                        # check if loudest hs at that 
+                        # check if loudest hs at that
                         # frequency and contains binaries
 
-                        if(hs_mqzf>maxhs[f_idx, r_idx] and 
+                        if(hs_mqzf>maxhs[f_idx, r_idx] and
                             bgnum[m_idx, q_idx, z_idx, f_idx, r_idx]>0):
                             if(bgnum[m_idx, q_idx, z_idx, f_idx, r_idx]<1):
                                 print('number<1 used', bgnum[m_idx, q_idx, z_idx, f_idx, r_idx])  #DELETE
@@ -1029,25 +1027,25 @@ def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
                             maxhs[f_idx,r_idx] = hs_mqzf
 
 
-    # 3) SUBTRACT 1 
+    # 3) SUBTRACT 1
     # from bin with loudest source at each frequency
     # can do this using the index of loudest, ssidx
     # recall ssidx has shape [3, F]
     # and = [(m_idx,q_idx,z_idx), fc],
     for f_idx in range(len(fc)):
         for r_idx in range(reals):
-            bgnum[int(ssidx[f_idx,0,r_idx]), int(ssidx[f_idx,1,r_idx]), int(ssidx[f_idx,2,r_idx]), 
-                f_idx, r_idx] -= 1 
+            bgnum[int(ssidx[f_idx,0,r_idx]), int(ssidx[f_idx,1,r_idx]), int(ssidx[f_idx,2,r_idx]),
+                f_idx, r_idx] -= 1
 
-            # 4) CALCULATE 
+            # 4) CALCULATE
             # single source characteristic strain
             hc_ss[f_idx, r_idx] = np.sqrt(maxhs[f_idx, r_idx]**2 * (fc[f_idx]/df[f_idx]))
-    
-    # CHECK no numbers should be <0 
-    if(np.any(bgnum<0)): 
+
+    # CHECK no numbers should be <0
+    if(np.any(bgnum<0)):
         error_index = np.where(bgnum<0)
-        print('number<0 found at (M,q,z,f) =', error_index)         
-        
+        print('number<0 found at (M,q,z,f) =', error_index)
+
 
     # 5)
     # ----------------- Calculate Background Strains --------------------
@@ -1064,37 +1062,37 @@ def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
                     hs_mqzf = utils.gw_strain_source(cmass, cdist, rfreq)
                     hc_dlnf = hs_mqzf**2 * (fc[f_idx]/df[f_idx])
                     for r_idx in range(reals):
-                        hc_bg[m_idx, q_idx, z_idx, f_idx, r_idx] = np.sqrt(hc_dlnf 
+                        hc_bg[m_idx, q_idx, z_idx, f_idx, r_idx] = np.sqrt(hc_dlnf
                                         * bgnum[m_idx, q_idx, z_idx, f_idx, r_idx])
 
     # sum over all bins at a given frequency and realization
     hc_bg = np.sqrt(np.sum(hc_bg**2, axis=(0, 1, 2)))
 
-    
+
     return hc_bg, hc_ss, sspar, ssidx, maxhs, bgnum
 
 
 def gws_by_ndars(edges, number, realize, round = True, sum = True, print_test = False):
-       
-    """ More efficient way to calculate strain from numbered 
+
+    """ More efficient way to calculate strain from numbered
     grid integrated
 
     Parameters
     ----------
     edges : (4,) list of 1darrays
-        A list containing the edges along each dimension.  The four dimensions 
-        correspond to total mass, mass ratio, redshift, and observer-frame orbital 
+        A list containing the edges along each dimension.  The four dimensions
+        correspond to total mass, mass ratio, redshift, and observer-frame orbital
         frequency. The length of each of the four arrays is M, Q, Z, F.
     number : (M, Q, Z, F) ndarray
-        The number of binaries in each bin of parameter space.  This is calculated 
+        The number of binaries in each bin of parameter space.  This is calculated
         by integrating `dnum` over each bin.
     realize : bool or int
         Specification of how to construct one or more discrete realizations.
         If a `bool` value, then whether or not to construct a realization.
         If an `int` value, then how many discrete realizations to construct.
     round : bool
-        Specification of whether to discretize the sample if realize is False, 
-        by rounding number of binaries in each bin to integers. This has no impact 
+        Specification of whether to discretize the sample if realize is False,
+        by rounding number of binaries in each bin to integers. This has no impact
         if realize is true.
         NOTE: should add a warning if round and realize are both True
     sum : bool
@@ -1116,7 +1114,7 @@ def gws_by_ndars(edges, number, realize, round = True, sum = True, print_test = 
     """
 
     if(print_test):
-        print('INPUTS: edges:', len(edges), # '\n', edges, 
+        print('INPUTS: edges:', len(edges), # '\n', edges,
         '\nINPUTS:number:', number.shape, '\n', number,'\n')
 
     # Frequency bin midpoints
@@ -1131,8 +1129,8 @@ def gws_by_ndars(edges, number, realize, round = True, sum = True, print_test = 
 
 
     # --- Chirp Masses ---
-    # to get chirp mass in shape (M, Q) we need 
-    # mt in shape (M, 1) 
+    # to get chirp mass in shape (M, Q) we need
+    # mt in shape (M, 1)
     # mr in shape (1, Q)
     cmass = utils.chirp_mass_mtmr(mt[:,np.newaxis], mr[np.newaxis,:])
     if(print_test):
@@ -1146,8 +1144,8 @@ def gws_by_ndars(edges, number, realize, round = True, sum = True, print_test = 
         print('cdist:', cdist.shape, '\n', cdist)
 
     # --- Rest Frame Frequencies ---
-    # to get rest freqs in shape (Z, F) we need 
-    # rz in shape (Z, 1) 
+    # to get rest freqs in shape (Z, F) we need
+    # rz in shape (Z, 1)
     # fc in shape (1, F)
     rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
     if(print_test):
@@ -1174,10 +1172,10 @@ def gws_by_ndars(edges, number, realize, round = True, sum = True, print_test = 
     # Sample:
     if(realize == False):
         # without sampling, want strain in shape (M, Q, Z, F)
-        if(round): 
-            # discretize by rounding number down to nearest integer 
-            hchar *= np.floor(number).astype(int) 
-        else: 
+        if(round):
+            # discretize by rounding number down to nearest integer
+            hchar *= np.floor(number).astype(int)
+        else:
             # keep non-integer values
             hchar *= number
 
@@ -1186,7 +1184,7 @@ def gws_by_ndars(edges, number, realize, round = True, sum = True, print_test = 
         hchar *= np.random.poisson(number)
 
     if(utils.isinteger(realize)):
-        # with R realizations, 
+        # with R realizations,
         # to get strain in shape (M, Q, Z, F, R) we need
         # hchar in shape(M, Q, Z, F, 1)
         # Poisson sample in shape (1, 1, 1, 1, R)
@@ -1210,8 +1208,8 @@ def gws_by_ndars(edges, number, realize, round = True, sum = True, print_test = 
 
 
 def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = False):
-       
-    """ More efficient way to calculate strain from numbered 
+
+    """ More efficient way to calculate strain from numbered
     grid integrated
 
 
@@ -1229,10 +1227,10 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
         If a `bool` value, then whether or not to construct a realization.
         If a `int` value, then how many discrete realizations to construct.
     round : bool
-        Specification of whether to discretize the sample if realize is False, 
-        by rounding number of binaries in each bin to integers. 
+        Specification of whether to discretize the sample if realize is False,
+        by rounding number of binaries in each bin to integers.
         Does nothing if realize is True.
-    ss : bool 
+    ss : bool
         Whether or not to separate the loudest single source in each frequency bin.
     sum : bool
         Whether or not to sum the strain at a given frequency over all bins.
@@ -1249,14 +1247,14 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
         realize = R: shape is  (F, R)
     hc_ss : (F,) array of scalars
         The characteristic strain of the loudest single source at each frequency.
-    ssidx : (F, 4) ndarray 
+    ssidx : (F, 4) ndarray
         The indices (m_idx, q_idx, z_idx, f_idx) of the parameters of the loudest single
-        source's bin, at each frequency such that 
+        source's bin, at each frequency such that
         ssidx[i,0] = m_idx of the ith frequency
         ssidx[i,1] = q_idx of the ith frequency
         ssidx[i,2] = z_idx of the ith frequency
         ssidx[i,3] = f_idx of the ith frequency = i
-    hsmax : (F) array of scalars 
+    hsmax : (F) array of scalars
         The maximum single source strain amplitude at each frequency.
     bgnum : (M, Q, Z, F) ndarray
         The number of binaries in each bin after the loudest single source
@@ -1265,12 +1263,12 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
         The indices of loudest single sources at each frequency in the
         format: [[M indices], [q indices], [z indices], [f indices]]
 
-        
 
-    Potential BUG: In the unlikely scenario that there are two equal hsmaxes 
+
+    Potential BUG: In the unlikely scenario that there are two equal hsmaxes
     (at same OR dif frequencies), ssidx calculation will go wrong
     Could avoid this by using argwhere for each f_idx column separately.
-    Or TODO implement some kind of check to see if any argwheres return multiple 
+    Or TODO implement some kind of check to see if any argwheres return multiple
     values for that hsmax and raises a warning/assertion error
 
 
@@ -1280,7 +1278,7 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
     """
 
     if(print_test):
-        print('INPUTS: edges:', len(edges), # '\n', edges, 
+        print('INPUTS: edges:', len(edges), # '\n', edges,
         '\nINPUTS:number:', number.shape, '\n', number,'\n')
 
     # Frequency bin midpoints
@@ -1295,8 +1293,8 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
 
 
     # --- Chirp Masses ---
-    # to get chirp mass in shape (M, Q) we need 
-    # mt in shape (M, 1) 
+    # to get chirp mass in shape (M, Q) we need
+    # mt in shape (M, 1)
     # mr in shape (1, Q)
     cmass = utils.chirp_mass_mtmr(mt[:,np.newaxis], mr[np.newaxis,:])
     if(print_test):
@@ -1310,8 +1308,8 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
         print('cdist:', cdist.shape, '\n', cdist)
 
     # --- Rest Frame Frequencies ---
-    # to get rest freqs in shape (Z, F) we need 
-    # rz in shape (Z, 1) 
+    # to get rest freqs in shape (Z, F) we need
+    # rz in shape (Z, 1)
     # fc in shape (1, F)
     rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
     if(print_test):
@@ -1345,7 +1343,7 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
         bgnum = np.random.poisson(number)
         assert (np.all(bgnum%1 ==0)), 'nonzero numbers found with realize=True'
 
-    #### 1) Identify the loudest (max hs) single source in a bin with N>0 
+    #### 1) Identify the loudest (max hs) single source in a bin with N>0
     hsamp[(bgnum==0)] = 0 #set hs=0 if number=0
     # hsamp[bgnum==0] = 0
 
@@ -1355,7 +1353,7 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
     # to get max strain in shape (F) we need
     # hsamp in shape (M, Q, Z, F), search over first 3 axes
     hsmax = np.amax(hsamp, axis=(0,1,2)) #find max hs at each frequency
-    
+
     #### 2) Record the indices and strain of that single source
 
     # --- Indices of Loudest Bin ---
@@ -1365,7 +1363,7 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
     #   ........
     #  [m_idx,q_idx,z_idx,F-2]]
     # no longer actually need this, but might be useful
-    ssidx = np.argwhere(hsamp==hsmax) 
+    ssidx = np.argwhere(hsamp==hsmax)
     ssidx = ssidx[ssidx[:,-1].argsort()]
 
     # --- Indices of Loudest Bin, New Method ---
@@ -1393,10 +1391,10 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
         raise Exception("hsamp <=0 found at hsmax")
     if np.any(hsmax<=0):
         raise Exception("hsmax <=0 found")
-   
+
     # print('bgnum stats:\n', holo.utils.stats(bgnum))
     # print('bgnum[hsamp==hsmax] stats:\n', holo.utils.stats(bgnum[(hsamp == hsmax)]))
-    bgnum[(hsamp == hsmax)]-=1 
+    bgnum[(hsamp == hsmax)]-=1
     # NOTE keep an eye out for if hsmax is not found anywhere in hsasmp
     # could change to bgnum(np.where(hsamp==hsmax) & (bgnum >0))-=1
     # print('\nafter subtraction')
@@ -1406,9 +1404,9 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
     assert np.all(bgnum>=0), f"bgnum contains negative values at: {np.where(bgnum<0)}"
     # if(np.any(bgnum<0)):   # alternate way to check for this error, and give index of neg number
     #         error_index = *np.where(bgnum<0)
-    #         print('number<0 found at [M's], [q's], [z's], [f's]) =', error_index)   
+    #         print('number<0 found at [M's], [q's], [z's], [f's]) =', error_index)
 
-    
+
 
     ### 4) Calculate single source characteristic strain (hc)
 
@@ -1422,24 +1420,24 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
     # --- Parameters of loudest source ---
     # NOTE: This would be useful to implement, or have separate function for
 
-    ### 5) Calculate the background with the new number 
- 
+    ### 5) Calculate the background with the new number
+
     # --- Background Characteristic Strain Squared ---
     # to get characteristic strain in shape (M, Q, Z, F) we need
     # hsamp in shape (M, Q, Z, F)
     # fc in shape (1, 1, 1, F)
     hchar = hsamp**2 * (fc[np.newaxis, np.newaxis, np.newaxis,:]
-                        /df[np.newaxis, np.newaxis, np.newaxis,:])   
+                        /df[np.newaxis, np.newaxis, np.newaxis,:])
     if (realize==False):
         hchar *= bgnum
     else:
-        raise Exception('realize not implemented yet') 
-        
+        raise Exception('realize not implemented yet')
+
 
     if(print_test):
         print('hchar', hchar.shape, '\n', hchar)
 
-    
+
     # sum over all bins at a given frequency
     hchar = np.sum(hchar, axis=(0, 1, 2))
     if(print_test):
@@ -1455,7 +1453,7 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
 ################### TESTING #######################
 ###################################################
 # These don't yet work independently, just here to hang on to.
-def max_test(hsmax, hsamp): 
+def max_test(hsmax, hsamp):
     # check hsmaxes are correct
     hsmax_hsamp_match = np.empty_like(hsmax)
     for f_idx in range(len(hsmax)):
@@ -1465,7 +1463,7 @@ def max_test(hsmax, hsamp):
     print('max_test passed')
 
 def ssidx_test(hsmax, hsamp, ssidx, print_test):
-    """ 
+    """
     Test ssidx in hsamp gives the same values as hsmax
 
     Parameters
@@ -1474,8 +1472,8 @@ def ssidx_test(hsmax, hsamp, ssidx, print_test):
         Maximum strain amplitude of a single source at each frequency.
     hsamp : (M, Q, Z, F,) ndarray of scalar
         Strain amplitude of a source in each bin
-    ssidx : (F, 4) ndarray 
-        
+    ssidx : (F, 4) ndarray
+
 
     """
     # check ssidx are correct and in frequency order
@@ -1490,7 +1488,7 @@ def ssidx_test(hsmax, hsamp, ssidx, print_test):
 
 
 def ssnew_test(hsmax, hsamp, ssnew, print_test):
-    """ 
+    """
     Test ssnew in hsamp gives the same values as hsmax
 
     Parameters
@@ -1499,24 +1497,24 @@ def ssnew_test(hsmax, hsamp, ssnew, print_test):
         Maximum strain amplitude of a single source at each frequency.
     hsamp : (M, Q, Z, F,) ndarray of scalar
         Strain amplitude of a source in each bin
-    ssnew : (4, F) ndarray 
-        
+    ssnew : (4, F) ndarray
+
 
     """
     maxes = hsamp[ssnew[0], ssnew[1], ssnew[2], ssnew[3]]
     if(print_test):
         print('maxes by hsamp[ssnew[0], ssnew[1], ssnew[2], ssnew[3]] are:',
         maxes)
-    
+
     assert np.all(maxes == hsmax), f"ssnew does not give correct hs maxes"
     print('ssnew test passes')
 
 
 
 def number_test(num, bgnum, fobs, exname='', plot_test=False):
-    ''' 
-    Plots num - bgnum, where number is the ndarray of 
-    integer number of sources in each bin, i.e. after 
+    '''
+    Plots num - bgnum, where number is the ndarray of
+    integer number of sources in each bin, i.e. after
     rounding or Poisson sampling
 
     Parameters
@@ -1525,7 +1523,7 @@ def number_test(num, bgnum, fobs, exname='', plot_test=False):
         integer numbers in each bin, i.e. after rounding or
         Poisson sampling
     bgnum : (M, Q, Z, F) array
-        number of background sources in each bin, 
+        number of background sources in each bin,
         after single source subtraction
     fobs : (F) array
         frequencies of each F, for ax titles
@@ -1537,9 +1535,9 @@ def number_test(num, bgnum, fobs, exname='', plot_test=False):
 
     Returns
     -----------
-    None 
-    
-    '''   
+    None
+
+    '''
     if np.all(num%1 == 0) != True: warnings.warn("num contains at least one non-integer value")
     difs = num - bgnum
     assert len(difs[np.where(difs>0)]) == len(difs[0,0,0,:]), "More than one bin per frequency found with a single source subtracted."
@@ -1564,13 +1562,13 @@ def number_test(num, bgnum, fobs, exname='', plot_test=False):
 def compare_to_loops_test(edges, number, hc_bg, hc_ss, hsmax, ssidx, bgnum):
     hc_bg_loop, hc_ss_loop, sspar_loop, ssidx_loop, maxhs_loop, number_bg_loop \
       = ss_by_loops(edges, number, realize=False, round=True, print_test=False)
-    
+
     # for i in range(len(ssidx)):
     #     assert np.all(ssidx[i, 0:3] == ssidx_loop[i,:]), \
     #         f"ssidx[{i}] by ndars does not match by loops"
     assert (np.all(bgnum == number_bg_loop)), "bgnum by ndars does not match by loops"
-    assert (np.all(hc_ss == hc_ss_loop)), "hc_ss by ndars does not match by loops"    
-    assert (np.all(hsmax == maxhs_loop)), "hsmax by ndars does not match by loops" 
+    assert (np.all(hc_ss == hc_ss_loop)), "hc_ss by ndars does not match by loops"
+    assert (np.all(hsmax == maxhs_loop)), "hsmax by ndars does not match by loops"
     assert (np.all(hsmax == maxhs_loop)), "hsmax by ndars does not match by loops"
     if (np.all(np.isclose(hc_bg, hc_bg_loop, atol=1e-20, rtol=1e-20)) !=True):
         print("hc_bg by ndars does not match by loops, using atol=1e-20, rtol=1e-20")
@@ -1583,13 +1581,13 @@ def quadratic_sum_test(hc_bg, hc_ss, hc_tt, print_test):
         "quadratic sum of hc_bg and hc_ss does not match hc_tt"
     if(print_test):
         print('percent error between (hc_bg^2+hc_ss^2) and hc_tt^2:', error)
-        print('differences between np.sqrt((hc_bg^2+hc_ss^2)) and hc_tt:', 
+        print('differences between np.sqrt((hc_bg^2+hc_ss^2)) and hc_tt:',
               np.sqrt(test) - hc_tt)
     print('quadratic sum test passed')
 
 
 
-def run_ndars_tests(edges,number, fobs, exname='', print_test=False, 
+def run_ndars_tests(edges,number, fobs, exname='', print_test=False,
                      loop_comparison = True):
     '''
     Call tests for some edges, number
@@ -1615,16 +1613,16 @@ def run_ndars_tests(edges,number, fobs, exname='', print_test=False,
     max_test(hsmax, hsamp)
 
     ssidx_test(hsmax, hsamp, ssidx, print_test)
-    
+
     # ssnew_test(hsmax, hsamp, ssnew, print_test)
 
     # rounded = np.floor(number).astype(np.int64)
     # number_test(rounded, bgnum, fobs, exname, plot_test=print_test)
-    
+
     if(loop_comparison): # optional because its faster without
         compare_to_loops_test(edges, number, hc_bg, hc_ss, hsmax, ssidx, bgnum)
 
-    hc_tt = gws_by_ndars(edges, number, realize=False, round = True, sum=True)  
+    hc_tt = gws_by_ndars(edges, number, realize=False, round = True, sum=True)
     quadratic_sum_test(hc_bg, hc_ss, hc_tt, print_test)
 
 
@@ -1640,9 +1638,9 @@ def run_ndars_tests(edges,number, fobs, exname='', print_test=False,
 ###################################################
 
 def example(dur, cad, mtot, mrat, redz, print_test):
-    ''' 
+    '''
     1) Choose the frequency bins at which to calculate the GWB, same as in semi-analytic-models.ipynb
-    2) Build Semi-Analytic-Model with super simple parameters 
+    2) Build Semi-Analytic-Model with super simple parameters
     3) Get SAM edges and numbers as in sam.gwb()
 
     Parameters
@@ -1679,25 +1677,25 @@ def example(dur, cad, mtot, mrat, redz, print_test):
         print(f"  between [{fobs[0]*YR:.2f}, {fobs[-1]*YR:.2f}] 1/yr")
         print(f"          [{fobs[0]*1e9:.2f}, {fobs[-1]*1e9:.2f}] nHz")
 
-    # 2) Build Semi-Analytic-Model with super simple parameters 
+    # 2) Build Semi-Analytic-Model with super simple parameters
     if(mtot==None or mrat==None or redz==None):
         print('using default mtot, mrat, and redz')
-        sam = holo.sam.Semi_Analytic_Model(ZERO_GMT_STALLED_SYSTEMS=True, 
+        sam = holo.sam.Semi_Analytic_Model(ZERO_GMT_STALLED_SYSTEMS=True,
                                            ZERO_DYNAMIC_STALLED_SYSTEMS=False)
     else:
         sam = holo.sam.Semi_Analytic_Model(mtot, mrat, redz,
-                                           ZERO_GMT_STALLED_SYSTEMS=True, 
+                                           ZERO_GMT_STALLED_SYSTEMS=True,
                                            ZERO_DYNAMIC_STALLED_SYSTEMS=False)
     if(print_test):
         print('edges:', sam.edges)
-    # get observed orbital frequency bin edges and centers 
+    # get observed orbital frequency bin edges and centers
     # from observed GW frequency bin edges
     fobs_orb_edges = fobs_edges / 2.0 # f_orb = f_GW/2
     fobs_orb_cents = kale.utils.midpoints(fobs_edges) / 2.0
 
     # 3) Get SAM edges and numbers as in sam.gwb()
     # dynamic_binary_number
-    
+
     # gets differential number of binaries per bin-vol per log freq interval
     edges, dnum = sam.dynamic_binary_number(holo.hardening.Hard_GW, fobs_orb=fobs_orb_cents, zero_stalled=False)
     edges[-1] = fobs_orb_edges
@@ -1710,7 +1708,7 @@ def example(dur, cad, mtot, mrat, redz, print_test):
 
 
 def example2(print_test = True, exname='Example 2'):
-    ''' 
+    '''
     Parameters
     ---------
     print_test : Bool
@@ -1724,19 +1722,19 @@ def example2(print_test = True, exname='Example 2'):
     fobs : (F) array
         observed frequency bin centers
     '''
-    
+
     dur = 5.0*YR/3.1557600
     cad = .5*YR/3.1455145557600
-    
+
     mtot=(1.0e6*MSOL/1.988409870698051, 1.0e8*MSOL/1.988409870698051, 3)
     mrat=(1e-1, 1.0, 2)
     redz=(1e-3, 1.0, 4)
-    
+
     edges, number, fobs = example(dur, cad, mtot, mrat, redz, print_test)
     return edges, number, fobs, exname
 
 def example3(print_test = True, exname = 'Example 3'):
-    ''' 
+    '''
     Parameters
     ---------
     print_test : Bool
@@ -1752,7 +1750,7 @@ def example3(print_test = True, exname = 'Example 3'):
     '''
     dur = 5.0*YR/3.1557600
     cad = .5*YR/3.1557600
-    
+
 
     mtot=(1.0e6*MSOL/1.988409870698051, 4.0e9*MSOL, 25)
     mrat=(1e-1, 1.0, 25)
@@ -1763,7 +1761,7 @@ def example3(print_test = True, exname = 'Example 3'):
 
 
 def example4(print_test = True, exname = 'Example 4'):
-    ''' 
+    '''
     Parameters
     ---------
     print_test : Bool
@@ -1783,13 +1781,13 @@ def example4(print_test = True, exname = 'Example 4'):
     mtot=(1.0e6*MSOL/1.988409870698051, (4.0e11*MSOL).astype(np.float64), 25)
     mrat=(1e-1, 1.0, 25)
     redz=(1e-3, 10.0, 25)
-    
+
     edges, number, fobs = example(dur, cad, mtot, mrat, redz, print_test)
     return edges, number, fobs, exname
 
 
 def example5(print_test = True, exname = 'Example 5'):
-    ''' 
+    '''
     Parameters
     ---------
     print_test : Bool
@@ -1807,8 +1805,8 @@ def example5(print_test = True, exname = 'Example 5'):
     cad = .2*YR
 
     # default mtot, mrat, redz
-    
-    edges, number, fobs = example(dur, cad, mtot=None, mrat=None, redz=None, 
+
+    edges, number, fobs = example(dur, cad, mtot=None, mrat=None, redz=None,
                                   print_test=print_test)
     return edges, number, fobs, exname
 
@@ -1818,8 +1816,8 @@ def example5(print_test = True, exname = 'Example 5'):
 ###################################################
 ################## PLOTTING #######################
 ###################################################
-def plot_medians(ax, xx, BG=None, SS=None, LABEL='', 
-                 BG_COLOR='k', BG_ERRORS = False, 
+def plot_medians(ax, xx, BG=None, SS=None, LABEL='',
+                 BG_COLOR='k', BG_ERRORS = False,
                  SS_COLOR='k', SS_ERRORS = True):
     """
     Parameters:
@@ -1833,7 +1831,7 @@ def plot_medians(ax, xx, BG=None, SS=None, LABEL='',
     """
     # plot median bg of samples
     if(BG is not None and BG_ERRORS == False):
-        ax.plot(xx, np.median(BG, axis=1), 
+        ax.plot(xx, np.median(BG, axis=1),
                 color=BG_COLOR, label=('bg median' + LABEL),
                 linewidth=3, linestyle='solid', alpha=0.8)
     elif(BG is not None and BG_ERRORS == True):
@@ -1843,11 +1841,11 @@ def plot_medians(ax, xx, BG=None, SS=None, LABEL='',
 
     # plot median ss of samples
     if(SS is not None and SS_ERRORS == False):
-        ax.scatter(xx, np.median(SS, axis=1), 
+        ax.scatter(xx, np.median(SS, axis=1),
                    color=SS_COLOR, label=('ss median'+LABEL),
                    marker ='*', s = 50, alpha=0.8)
     elif(SS is not None and SS_ERRORS == True):
-        ax.errorbar(xx, np.median(SS, axis=1), yerr=np.std(SS, axis=1), 
+        ax.errorbar(xx, np.median(SS, axis=1), yerr=np.std(SS, axis=1),
                     color=SS_COLOR, label=('ss median'+LABEL),
                     fmt='*', alpha=0.8, markersize=7, capsize=3)
 
@@ -1878,13 +1876,13 @@ def plot_BG(ax, xx, BG, LABEL, REALS=0, median=False, COLOR='b', rand=False):
         percs = pp / 2
         percs = [50 - percs, 50 + percs]
         ax.fill_between(xx, *np.percentile(BG, percs, axis=-1), alpha=0.25, color=COLOR)
-    # Plot `nsamp` random spectra 
-    
+    # Plot `nsamp` random spectra
+
     if (REALS is not None):
         if(rand):
             idx = np.random.choice(BG.shape[1], REALS, replace=False)
             ax.plot(xx, BG[:, idx], lw=1.0, alpha=0.5, color=COLOR, linestyle = 'dotted')
-        else: 
+        else:
             for rr in range(REALS):
                 ax.plot(xx, BG[:, rr], lw=1.0, alpha=0.5, color=COLOR, linestyle = 'dotted')
 
@@ -1892,8 +1890,8 @@ def plot_BG(ax, xx, BG, LABEL, REALS=0, median=False, COLOR='b', rand=False):
 
 def plot_samples(ax, xx, BG=None, SS=None, REALS=1, LABEL=''):
     """
-    Plot the background and/or single sources for the first 'REALS' 
-    number of realizations, with each color corresponding to a difference 
+    Plot the background and/or single sources for the first 'REALS'
+    number of realizations, with each color corresponding to a difference
     realization.
 
     Parameters
@@ -1921,7 +1919,7 @@ def plot_samples(ax, xx, BG=None, SS=None, REALS=1, LABEL=''):
                     edgecolor='k', alpha=0.5)
 
 def plot_std(ax, xx, BG, SS, COLOR='b', LABEL=''):
-    """ 
+    """
     Plot the standard deviations of the bg and ss characteristic strains.
 
     Parameters
@@ -1943,14 +1941,14 @@ def plot_std(ax, xx, BG, SS, COLOR='b', LABEL=''):
     std_ss = np.std(SS, axis=1)
     # med_ss = np.median(SS, axis=1)
 
-    ax.plot(xx, std_bg, lw=4.0, alpha=0.6, color=COLOR, 
+    ax.plot(xx, std_bg, lw=4.0, alpha=0.6, color=COLOR,
             label = 'bg stdev'+LABEL, marker='o', ms=10, linestyle = 'solid')
     ax.plot(xx, std_ss, lw=2.0, alpha=0.6, color=COLOR, markeredgecolor='k',
             label = 'ss stdev'+LABEL, marker='o', ms=10, linestyle='dotted')
     return std_bg, std_ss
-    
+
 def plot_IQR(ax, xx, BG=None, SS=None, COLOR='r', LABEL=''):
-    """ 
+    """
     Plot the IQR of the bg and ss characteristic strains.
 
     Parameters
@@ -1969,22 +1967,22 @@ def plot_IQR(ax, xx, BG=None, SS=None, COLOR='r', LABEL=''):
     if (BG is not None):
         Q75_bg, Q25_bg= np.percentile(BG, [75 ,25], axis=1)
         IQR_bg = Q75_bg-Q25_bg
-        ax.plot(xx, IQR_bg, lw=4.0, alpha=0.6, color=COLOR, 
+        ax.plot(xx, IQR_bg, lw=4.0, alpha=0.6, color=COLOR,
             label = 'bg stdev'+LABEL, marker='P', ms=10, linestyle = 'solid')
     if(SS is not None):
         Q75_ss, Q25_ss = np.percentile(SS, [75 ,25], axis=1)
         IQR_ss = Q75_ss-Q25_ss
         ax.plot(xx, IQR_ss, lw=2.0, alpha=0.6, color=COLOR, markeredgecolor='k',
-                label = 'ss stdev'+LABEL, marker='P', ms=10, linestyle='dotted')          
-    
+                label = 'ss stdev'+LABEL, marker='P', ms=10, linestyle='dotted')
+
 
 
 def plot_percentiles(ax, xx, BG=None, SS=None, LABEL='',
                      BG_COLOR='b', SS_COLOR='r',
                      BG_MARKER=None, SS_MARKER=None,
                      BG_LINESTYLE='solid', SS_LINESTYLE='solid'):
-    """ 
-    Plots 25th and 75th percentiles, and IQR region between 
+    """
+    Plots 25th and 75th percentiles, and IQR region between
     (50% confidence interval).
 
     Parameters
@@ -2004,33 +2002,33 @@ def plot_percentiles(ax, xx, BG=None, SS=None, LABEL='',
     if (BG is not None):
         Q75_bg, Q25_bg= np.percentile(BG, [75 ,25], axis=1)
         ax.plot(xx, Q25_bg, label = 'bg'+LABEL,
-                lw=2.0, alpha=.8, color=BG_COLOR, 
+                lw=2.0, alpha=.8, color=BG_COLOR,
                 marker = BG_MARKER, ms=5, linestyle = BG_LINESTYLE)
-        ax.plot(xx, Q75_bg, 
-                lw=2.0, alpha=.8, color=BG_COLOR, 
+        ax.plot(xx, Q75_bg,
+                lw=2.0, alpha=.8, color=BG_COLOR,
                 marker = BG_MARKER, ms=5, linestyle = BG_LINESTYLE)
         ax.fill_between(xx, Q25_bg, Q75_bg, alpha=0.2, color=BG_COLOR)
-      
+
     if(SS is not None):
         Q75_ss, Q25_ss = np.percentile(SS, [75 ,25], axis=1)
-        ax.plot(xx, Q25_ss, label = 'ss'+LABEL, 
-                lw=2.0, alpha=.8, color=SS_COLOR, 
+        ax.plot(xx, Q25_ss, label = 'ss'+LABEL,
+                lw=2.0, alpha=.8, color=SS_COLOR,
                 marker = SS_MARKER, ms=5, linestyle = SS_LINESTYLE)
-        ax.plot(xx, Q75_ss, 
-                lw=2.0, alpha=.8, color=SS_COLOR, 
+        ax.plot(xx, Q75_ss,
+                lw=2.0, alpha=.8, color=SS_COLOR,
                 marker = SS_MARKER, ms=5, linestyle = SS_LINESTYLE)
         ax.fill_between(xx, Q25_ss, Q75_ss, alpha=0.2, color=SS_COLOR)
-      
 
-def plot_params(axs, xx, REALS=1, LABEL='', grid=None, 
+
+def plot_params(axs, xx, REALS=1, LABEL='', grid=None,
                 BG_PARAMS=None, SS_PARAMS=None,
                 BG_MEDIAN=True, SS_MEDIAN=True,
                 BG_ERRORS=True, SS_ERRORS=True,
                 BG_COLOR='k', SS_COLOR='mediumorchid',
-                TITLES = np.array([['Total Mass $M/M_\odot$', 'Mass Ratio $q$'], 
+                TITLES = np.array([['Total Mass $M/M_\odot$', 'Mass Ratio $q$'],
                                    ['Redshift $z$', 'Characteristic Strain $h_c$']]),
                 XLABEL = 'Frequency $f_\mathrm{obs}$ (1/yr)',
-                SHOW_LEGEND = True):             
+                SHOW_LEGEND = True):
     """
     Plot mass, ratio, redshift, and strain in 4 separate subplots.
 
@@ -2060,9 +2058,9 @@ def plot_params(axs, xx, REALS=1, LABEL='', grid=None,
                 if(grid is not None):
                     for kk in range(len(grid[ii,jj])):
                         if(kk==0): edgelabel='edges'
-                        else: edgelabel=None 
+                        else: edgelabel=None
                         axs[ii,jj].axhline(grid[ii,jj][kk], color='k', alpha=0.6, lw=0.15, label=edgelabel)
-                
+
             if(BG_PARAMS is not None):
                 for rr in range(REALS):
                     if(rr==0): bglabel = 'bg'+LABEL
@@ -2076,43 +2074,43 @@ def plot_params(axs, xx, REALS=1, LABEL='', grid=None,
                     if(rr==0): sslabel = 'ss'+LABEL
                     else: sslabel = None
                     axs[ii,jj].scatter(xx, SS_PARAMS[ii,jj,:,rr], label=sslabel,
-                                        color=colors[rr], marker='o', s=80, 
+                                        color=colors[rr], marker='o', s=80,
                                         alpha=0.5)
-            
+
             # else: #strain
             #     if(BG_PARAMS is not None):
 
             #     if(SS_PARAMS is not None):
             #         for rr in range(REALS):
-            #             axs[ii,jj].scatter(xx, SS_PARAMS[ii,jj,:,rr], color=colors[rr], 
+            #             axs[ii,jj].scatter(xx, SS_PARAMS[ii,jj,:,rr], color=colors[rr],
             #                             marker='o', s=80, alpha=0.5)
-            # axs[ii,jj].errorbar(xx, np.mean(params[ii,jj], axis=1), 
+            # axs[ii,jj].errorbar(xx, np.mean(params[ii,jj], axis=1),
             #                 yerr = np.std(params[ii,jj], axis=1), label='mean',
             #                 fmt = 'o', color='darkmagenta', capsize=3, alpha=.8)
-            
+
             # ax.errorbar(xx, np.median(BG, axis=1), yerr=np.std(BG, axis=1),
             #         color=BG_COLOR, label=('bg median'+LABEL),
             #         fmt='-', linewidth=2, alpha=0.8, capsize=3)
 
             # # plot median ss of samples
             # if(SS is not None and SS_ERRORS == False):
-            #     ax.scatter(xx, np.median(SS, axis=1), 
+            #     ax.scatter(xx, np.median(SS, axis=1),
             #             color=SS_COLOR, label=('ss median'+LABEL),
             #             marker ='*', s = 50, alpha=0.8)
             # elif(SS is not None and SS_ERRORS == True):
-            #     ax.errorbar(xx, np.median(SS, axis=1), yerr=np.std(SS, axis=1), 
+            #     ax.errorbar(xx, np.median(SS, axis=1), yerr=np.std(SS, axis=1),
             #                 color=SS_COLOR, label=('ss median'+LABEL),
             #                 fmt='*', alpha=0.8, markersize=7, capsize=3)
 
-            
+
             if(BG_MEDIAN == True):
                 if(BG_ERRORS == True):
-                    axs[ii,jj].errorbar(xx, np.median(BG_PARAMS[ii,jj], axis=1), 
-                                        yerr=np.std(BG_PARAMS[ii,jj], axis=1), 
+                    axs[ii,jj].errorbar(xx, np.median(BG_PARAMS[ii,jj], axis=1),
+                                        yerr=np.std(BG_PARAMS[ii,jj], axis=1),
                                         color=BG_COLOR, label=('bg median' +LABEL),
                                         fmt='-', linewidth=2, alpha=0.8, capsize=3)
                 else:
-                    axs[ii,jj].plot(xx, np.median(BG_PARAMS[ii,jj], axis=1), 
+                    axs[ii,jj].plot(xx, np.median(BG_PARAMS[ii,jj], axis=1),
                                     color=BG_COLOR, label=('bg median'+LABEL),
                                     linewidth=2, alpha=0.8, linestyle='solid',)
             if(SS_MEDIAN == True):
@@ -2123,14 +2121,14 @@ def plot_params(axs, xx, REALS=1, LABEL='', grid=None,
                                        fmt='*', alpha=0.8, markersize=7, capsize=3,
                                        markeredgecolor='k', )
                 else:
-                    axs[ii,jj].scatter(xx, np.median(SS_PARAMS[ii,jj], axis=1), 
+                    axs[ii,jj].scatter(xx, np.median(SS_PARAMS[ii,jj], axis=1),
                                        color=SS_COLOR, label=('ss median'+LABEL),
-                                       marker='*', s=50, alpha=0.8, 
-                                       edgecolor='k', ) 
+                                       marker='*', s=50, alpha=0.8,
+                                       edgecolor='k', )
             axs[ii,jj].set_yscale('log')
             axs[ii,jj].set_xscale('log')
 
-            
+
 
             # axs[ii,jj].fill_between(grid[ii,jj][0], grid[ii,jj][-1])
 
@@ -2141,46 +2139,21 @@ def plot_params(axs, xx, REALS=1, LABEL='', grid=None,
             if(SHOW_LEGEND): axs[ii,jj].legend(loc='lower left')
 
 
-
 ###################################################
-############ DETECTION STATISTICS #################
+############ Utilities  #################
 ###################################################
 
+def resample_loudest(hc_ss, hc_bg, nloudest):
+    if nloudest > hc_ss.shape[-1]: # check for valid nloudest
+        err = f"{nloudest=} for detstats must be <= nloudest of hc data"
+        raise ValueError(err)
 
-def threshold_hc():
-    """
-    Rosado+ 2015, SNR calculation
-    S := cross correlation between pulsars 
-    S = \int_{-T/2}^{T/2} dt \int dt' s_i(t) s_j(t') Q(t,t')
-    where T is the observation time, s_i(t) and s_j(t) are the data 
-    from two different pulsars, Q(t,t') is a filter function.
+    # recalculate new hc_bg and hc_ss
+    new_hc_bg = np.sqrt(hc_bg**2 + np.sum(hc_ss[...,nloudest:-1]**2, axis=-1))
+    new_hc_ss = hc_ss[...,0:nloudest]
 
-    S_T := pre-defined detection threshold
-    """
-
-    return 0
+    return new_hc_ss, new_hc_bg
 
 
-def ss_occurence_rate(hc_ss, S_T):
-    """
-    Parameters:
-    ------------
-    hc_ss : (F, R) NDarray of scalars
-        characteristic strain of single sources 
-    S_T : float
-        threshold strain? 
 
-    """
-    return 0
 
-def bg_occurence_rate():
-    """ 
-    According to Rosado+ 2015
-    Universe may contain GWB if S >= S_T
-    """
-
-def false_alarm_probability():
-    """
-    TODO
-    """
-    return 0

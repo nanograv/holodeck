@@ -149,7 +149,30 @@ class Simple_SAM:
         return redz_prime
 
     def gwb_sam(self, fobs_gw, sam, dlog10=True, sum=True, redz_prime=True):
-        # NOTE: dlog10M performs MUCH better than dM
+        """GW background semi-analytic model
+
+        Parameters
+        ----------
+        fobs_gw : float
+            Observer-frame GW-frequency in units of [1/sec].  This is a single, float value.
+        sam : `Semi_Analytic_Model` instance
+            Binary population to sample
+        dlog10 : boolean, optional
+        sum : boolean, optional
+        redz_prime : boolean, optional
+            Galaxy-merger redshift
+
+        Returns
+        -------
+        gwb : (F,) ndarray
+            GW Background: the ideal characteristic strain of the GWB in each frequency bin.
+            Does not include the strain from the loudest binary in each bin (`gwf`).
+
+        Notes
+        -----
+        dlog_{10}M has higher performance than dM
+        """
+
         # mg, qg, rz = np.broadcast_arrays(self.mass_gal, self.mrat_gal, self.redz)
 
         mg = self.mass_gal[:, np.newaxis, np.newaxis]    # this is _primary_ galaxy

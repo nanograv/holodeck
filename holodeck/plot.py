@@ -13,8 +13,8 @@ import matplotlib.cm as cm
 import kalepy as kale
 
 import holodeck as holo
-from holodeck import cosmo, utils, observations, log
-from holodeck.constants import MSOL, PC, YR
+from holodeck import utils, log
+from holodeck.constants import MSOL, YR
 
 FIGSIZE = 6
 FONTSIZE = 13
@@ -38,7 +38,7 @@ LABEL_GW_FREQUENCY_NHZ = r"GW Frequency $[\mathrm{nHz}]$"
 LABEL_SEPARATION_PC = r"Binary Separation $[\mathrm{pc}]$"
 LABEL_CHARACTERISTIC_STRAIN = r"GW Characteristic Strain"
 LABEL_HARDENING_TIME = r"Hardening Time $[\mathrm{Gyr}]$"
-
+LABEL_CLC0 = r"$C_\ell / C_0$"
 
 PARAM_KEYS = {
     'hard_time': r"phenom $\tau_f$",
@@ -58,7 +58,8 @@ PARAM_KEYS = {
 }
 
 LABEL_DPRATIO = r"$\langle N_\mathrm{SS} \rangle / \mathrm{DP}_\mathrm{BG}$"
-LABEL_EVSS = r"$\langle N_\mathrm{SS} \rangle"
+LABEL_EVSS = r"$\langle N_\mathrm{SS} \rangle$"
+LABEL_DPBG = r"$\mathrm{DP}_\mathrm{BG}$"
 
 COLORS_MPL = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
@@ -371,7 +372,7 @@ def _get_norm(data, midpoint=None, log=False):
     else:
         try:
             min, max = utils.minmax(data, filter=log)
-        except:
+        except Exception:
             err = f"Input `data` ({type(data)}) must be an integer, (2,) of scalar, or ndarray of scalar!"
             log.exception(err)
             raise ValueError(err)
@@ -752,7 +753,8 @@ def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill=
 
     return (hh, gg)
 
-def draw_med_conf_color(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={}, filter=False, color=None):
+def draw_med_conf_color(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={},
+                        filter=False, color=None, linestyle='-'):
     plot.setdefault('alpha', 0.75)
     fill.setdefault('alpha', 0.2)
     percs = np.atleast_1d(fracs)
@@ -773,10 +775,10 @@ def draw_med_conf_color(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={},
         rv = kale.utils.quantiles(vals, percs=inter_percs, weights=weights, axis=-1)
 
     med, *conf = rv.T
-    
+
     # plot median
     if color is not None:
-        hh, = ax.plot(xx, med, color=color, **plot)
+        hh, = ax.plot(xx, med, color=color, linestyle=linestyle, **plot)
     else:
         hh, = ax.plot(xx, med, **plot)
 
@@ -1458,6 +1460,17 @@ def _contour2d(ax, edges, hist, levels, outline=True, **kwargs):
 
     return edges, hist, cont
 
+
+def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
+    '''
+    https://stackoverflow.com/a/18926541
+    '''
+    if isinstance(cmap, str):
+        cmap = plt.get_cmap(cmap)
+    new_cmap = mpl.colors.LinearSegmentedColormap.from_list(
+        'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
+        cmap(np.linspace(minval, maxval, n)))
+    return new_cmap
 
 # =================================================================================================
 # ====    Below Needs Review / Cleaning    ====
