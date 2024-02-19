@@ -56,7 +56,7 @@ jobs:
         path: ./dist/*.tar.gz
 
   pypi-publish:
-    needs: ['build_wheels, make_sdist']
+    needs: ['build_wheels', 'make_sdist']
     environment: 'publish'
 
     name: upload release to PyPI
