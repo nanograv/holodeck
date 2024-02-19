@@ -2,7 +2,7 @@
 """
 
 import holodeck as holo
-from holodeck.constants import GYR, PC
+from holodeck.constants import GYR, PC, MSOL
 from holodeck.librarian.libraries import _Param_Space, PD_Uniform
 
 
@@ -90,7 +90,7 @@ class _PS_Astro_Strong(_Param_Space):
         )
 
         mmbulge = holo.relations.MMBulge_KH2013(
-            mamp=params['mmb_mamp'],
+            mamp=params['mmb_mamp']*MSOL,
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
         )
