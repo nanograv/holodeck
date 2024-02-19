@@ -6,12 +6,11 @@ kalepy
 matplotlib
 numpy
 scipy
-# pydoe
+pydoe
 psutil
 tqdm
 cython<3.0.0
 schwimmbad
 emcee
 george
-# healpy
 # mpi4py

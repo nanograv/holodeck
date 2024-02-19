@@ -6,4 +6,3 @@ pytest-cov
 tox
 tox-conda
 memray
-matplotlib-label-lines
