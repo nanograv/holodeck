@@ -11,6 +11,11 @@ import scipy as sp
 import scipy.stats
 
 import holodeck as holo
+from holodeck import utils, cosmo
+from holodeck.constants import YR
+from holodeck.librarian import (
+    DEF_NUM_FBINS, DEF_NUM_LOUDEST, DEF_NUM_REALS, DEF_PTA_DUR,
+)
 
 
 class _Param_Space(abc.ABC):
@@ -107,8 +112,7 @@ class _Param_Space(abc.ABC):
         self._uniform_samples = uniform_samples
         return
 
-    @classmethod
-    def model_for_params(cls, params, sam_shape=None):
+    def model_for_params(self, params, sam_shape=None):
         """Construct a model (SAM and hardening instances) from the given parameters.
 
         Arguments
@@ -125,16 +129,19 @@ class _Param_Space(abc.ABC):
 
         """
 
+        if sam_shape is None:
+            sam_shape = self.sam_shape
+
         # ---- Update default parameters with input parameters
 
-        settings = cls.DEFAULTS.copy()
+        settings = self.DEFAULTS.copy()
         for name, value in params.items():
             settings[name] = value
 
         # ---- Construct SAM and hardening model
 
-        sam = cls._init_sam(sam_shape, settings)
-        hard = cls._init_hard(sam, settings)
+        sam = self._init_sam(sam_shape, settings)
+        hard = self._init_hard(sam, settings)
 
         return sam, hard
 
@@ -188,7 +195,7 @@ class _Param_Space(abc.ABC):
             **data,
         )
 
-        log.info(f"Saved to {fname} size {holo.utils.get_file_size(fname)}")
+        log.info(f"Saved to {fname} size {utils.get_file_size(fname)}")
         return fname
 
     @classmethod
@@ -213,10 +220,10 @@ class _Param_Space(abc.ABC):
         class_name = data['class_name'][()]
         log.debug(f"loaded: {class_name=}, vers={data['librarian_version']}")
         # pspace_class = getattr(holo.param_spaces, class_name, None)
-        pspace_class = holo.librarian.param_spaces.get(class_name, None)
+        pspace_class = holo.librarian.param_spaces_dict.get(class_name, None)
         # if it is not found, default to the current class/subclass
         if pspace_class is None:
-            log.warning(f"pspace file {fname} has {class_name=}, not found in `holo.param_spaces`!")
+            log.warning(f"pspace file {fname} has {class_name=}, not found in `holo.param_spaces_dict`!")
             pspace_class = cls
 
         # construct instance with dummy/temporary values (which will be overwritten)
@@ -258,8 +265,6 @@ class _Param_Space(abc.ABC):
         return self._npars
 
     def model_for_sample_number(self, samp_num, sam_shape=None):
-        if sam_shape is None:
-            sam_shape = self.sam_shape
         params = self.param_dict(samp_num)
         self._log.debug(f"params {samp_num} :: {params}")
         return self.model_for_params(params, sam_shape)
@@ -554,6 +559,238 @@ class PD_Piecewise_Uniform_Density(PD_Piecewise_Uniform_Mass):
         return
 
 
+def run_model(
+    sam, hard,
+    pta_dur=DEF_PTA_DUR, nfreqs=DEF_NUM_FBINS, nreals=DEF_NUM_REALS, nloudest=DEF_NUM_LOUDEST,
+    gwb_flag=True, singles_flag=True, details_flag=False, params_flag=False,
+    log=None,
+):
+    """Run the given SAM and hardening model to construct a binary population and GW signatures.
+
+    Arguments
+    ---------
+    sam : :class:`holodeck.sams.sam.Semi_Analytic_Model` instance,
+    hard : :class:`holodeck.hardening._Hardening` subclass instance,
+    pta_dur : float, [seconds]
+        Duration of PTA observations in seconds, used to determine Nyquist frequency basis at which
+        GW signatures are calculated.
+    nfreqs : int
+        Number of Nyquist frequency bins at which to calculate GW signatures.
+    nreals : int
+        Number of 'realizations' (populations drawn from Poisson distributions) to construct.
+    nloudest : int
+        Number of loudest binaries to consider in each frequency bin.  These are the highest GW
+        strain binaries in each frequency bin, for which the individual source strains are
+        calculated.
+    gwb_flag
+    details_flag
+    singles_flag
+    params_flag
+    log : ``logging.Logger`` instance
+
+    Returns
+    -------
+    data : dict
+        The population and GW data calculated from the simulation.  The dictionary elements are:
+
+        * ``fobs_cents`` : Nyquist frequency bin centers, in units of [seconds].
+        * ``fobs_edges`` : Nyquist frequency bin edgeds, in units of [seconds].
+
+        * If ``details_flag == True``:
+
+            * ``static_binary_density`` :
+            * ``number`` :
+            * ``redz_final`` :
+            * ``gwb_params`` :
+            * ``num_params`` :
+            * ``gwb_mtot_redz_final`` :
+            * ``num_mtot_redz_final`` :
+
+        * If ``params_flag == True``:
+
+            * ``sspar`` :
+            * ``bgpar`` :
+
+        * If ``singles_flag == True``:
+
+            * ``hc_ss`` :
+            * ``hc_bg`` :
+
+        * If ``gwb_flag == True``:
+
+            * ``gwb`` :
+
+    """
+
+    from holodeck.sams import sam_cyutils
+
+    if not any([gwb_flag, details_flag, singles_flag, params_flag]):
+        err = f"No flags set!  {gwb_flag=} {details_flag=} {singles_flag=} {params_flag=}"
+        if log is not None:
+            log.exception(err)
+        raise RuntimeError(err)
+
+    data = {}
+
+    fobs_cents, fobs_edges = utils.pta_freqs(dur=pta_dur*YR, num=nfreqs)
+    # convert from GW to orbital frequencies
+    fobs_orb_cents = fobs_cents / 2.0
+    fobs_orb_edges = fobs_edges / 2.0
+
+    data['fobs_cents'] = fobs_cents
+    data['fobs_edges'] = fobs_edges
+
+    if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
+        err = f"`holo.hardening.Fixed_Time_2PL_SAM` must be used here!  Not {hard}!"
+        if log is not None:
+            log.exception(err)
+        raise RuntimeError(err)
+
+    redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
+        fobs_orb_cents, sam, hard, cosmo
+    )
+    use_redz = redz_final
+    edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
+    number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
+    if details_flag:
+        data['static_binary_density'] = sam.static_binary_density
+        data['number'] = number
+        data['redz_final'] = redz_final
+
+        gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final = _calc_model_details(edges, redz_final, number)
+
+        data['gwb_params'] = gwb_pars
+        data['num_params'] = num_pars
+        data['gwb_mtot_redz_final'] = gwb_mtot_redz_final
+        data['num_mtot_redz_final'] = num_mtot_redz_final
+
+    # calculate single sources and/or binary parameters
+    if singles_flag or params_flag:
+        nloudest = nloudest if singles_flag else 1
+
+        vals = holo.single_sources.ss_gws_redz(
+            edges, use_redz, number, realize=nreals,
+            loudest=nloudest, params=params_flag,
+        )
+        if params_flag:
+            hc_ss, hc_bg, sspar, bgpar = vals
+            data['sspar'] = sspar
+            data['bgpar'] = bgpar
+        else:
+            hc_ss, hc_bg = vals
+
+        if singles_flag:
+            data['hc_ss'] = hc_ss
+            data['hc_bg'] = hc_bg
+
+    if gwb_flag:
+        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, nreals)
+        data['gwb'] = gwb
+
+    return data
+
+
+def _calc_model_details(edges, redz_final, number):
+    """Calculate derived properties from the given populations.
+
+    Parameters
+    ----------
+    edges : (4,) list of 1darrays
+        [mtot, mrat, redz, fobs_orb_edges] with shapes (M, Q, Z, F+1)
+    redz_final : (M,Q,Z,F)
+        Redshift final (redshift at the given frequencies).
+    number : (M-1, Q-1, Z-1, F)
+        Absolute number of binaries in the given bin (dimensionless).
+
+    Returns
+    -------
+    gwb_pars
+    num_pars
+    gwb_mtot_redz_final
+    num_mtot_redz_final
+
+    """
+
+    redz = edges[2]
+    nmbins = len(edges[0]) - 1
+    nzbins = len(redz) - 1
+    nfreqs = len(edges[3]) - 1
+    # (M-1, Q-1, Z-1, F) characteristic-strain squared for each bin
+    hc2 = holo.gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz_final)
+    # strain-squared weighted number of binaries
+    hc2_num = hc2 * number
+    # (F,) total GWB in each frequency bin
+    denom = np.sum(hc2_num, axis=(0, 1, 2))
+    gwb_pars = []
+    num_pars = []
+
+    # Iterate over the parameters to calculate weighted averaged of [mtot, mrat, redz]
+    for ii in range(3):
+        # Get the indices of the dimensions that we will be marginalizing (summing) over
+        # we'll also keep things in terms of redshift and frequency bins, so at most we marginalize
+        # over 0-mtot and 1-mrat
+        margins = [0, 1]
+        # if we're targeting mtot or mrat, then don't marginalize over that parameter
+        if ii in margins:
+            del margins[ii]
+        margins = tuple(margins)
+
+        # Get straight-squared weighted values (numerator, of the average)
+        numer = np.sum(hc2_num, axis=margins)
+        # divide by denominator to get average
+        tpar = numer / denom
+        gwb_pars.append(tpar)
+
+        # Get the total number of binaries
+        tpar = np.sum(number, axis=margins)
+        num_pars.append(tpar)
+
+    # ---- calculate redz_final based distributions
+
+    # get final-redshift at bin centers
+    rz = redz_final.copy()
+    for ii in range(3):
+        rz = utils.midpoints(rz, axis=ii)
+
+    gwb_mtot_redz_final = np.zeros((nmbins, nzbins, nfreqs))
+    num_mtot_redz_final = np.zeros((nmbins, nzbins, nfreqs))
+    gwb_rz = np.zeros((nzbins, nfreqs))
+    num_rz = np.zeros((nzbins, nfreqs))
+    for ii in range(nfreqs):
+        rz_flat = rz[:, :, :, ii].flatten()
+        # calculate GWB-weighted average final-redshift
+        numer, *_ = sp.stats.binned_statistic(
+            rz_flat, hc2_num[:, :, :, ii].flatten(), bins=redz, statistic='sum'
+        )
+        tpar = numer / denom[ii]
+        gwb_rz[:, ii] = tpar
+
+        # calculate average final-redshift (number weighted)
+        tpar, *_ = sp.stats.binned_statistic(
+            rz_flat, number[:, :, :, ii].flatten(), bins=redz, statistic='sum'
+        )
+        num_rz[:, ii] = tpar
+
+        # Get values vs. mtot for redz-final
+        for mm in range(nmbins):
+            rz_flat = rz[mm, :, :, ii].flatten()
+            numer, *_ = sp.stats.binned_statistic(
+                rz_flat, hc2_num[mm, :, :, ii].flatten(), bins=redz, statistic='sum'
+            )
+            tpar = numer / denom[ii]
+            gwb_mtot_redz_final[mm, :, ii] = tpar
+
+            tpar, *_ = sp.stats.binned_statistic(
+                rz_flat, number[mm, :, :, ii].flatten(), bins=redz, statistic='sum'
+            )
+            num_mtot_redz_final[mm, :, ii] = tpar
+
+    gwb_pars.append(gwb_rz)
+    num_pars.append(num_rz)
+
+    return gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final
+
+
 def load_pspace_from_path(log, path, space_class=None):
     """Load a `_Param_Space` instance from the saved file in the given directory.
 
@@ -595,7 +832,7 @@ def load_pspace_from_path(log, path, space_class=None):
     else:
         raise
 
-    # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces`
+    # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces_dict`
     if space_class is None:
         space_class = _get_space_class_from_space_fname(space_fname)
 
@@ -604,7 +841,7 @@ def load_pspace_from_path(log, path, space_class=None):
 
 
 def _get_space_class_from_space_fname(space_fname):
-    # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces`
+    # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces_dict`
     space_name = space_fname.name.split(".")[0]
     space_class = holo.librarian.param_spaces_dict[space_name]
     return space_class
