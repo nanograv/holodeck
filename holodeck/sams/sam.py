@@ -48,8 +48,7 @@ import holodeck as holo
 from holodeck import cosmo, utils, log
 from holodeck.constants import SPLC, MSOL, MPC
 from holodeck import relations, single_sources
-from . import cyutils as sam_cyutils
-from holodeck.sams.comps import (
+from holodeck.sams.components import (
     _Galaxy_Pair_Fraction, _Galaxy_Stellar_Mass_Function, _Galaxy_Merger_Time, _Galaxy_Merger_Rate,
     GSMF_Schechter, GPF_Power_Law, GMT_Power_Law, GMR_Illustris
 )
@@ -115,15 +114,13 @@ class Semi_Analytic_Model:
 
         gsmf = utils.get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
         mmbulge = utils.get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
-        # gpf = utils.get_subclass_instance(gpf, None, _Galaxy_Pair_Fraction)
-        # gmt = utils.get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
+        # if GMR is None, then we need both GMT and GPF
         if gmr is None:
-            # if GMR is None, then we need both GMT and GPF
             gmt = utils.get_subclass_instance(gmt, GMT_Power_Law, _Galaxy_Merger_Time)
             gpf = utils.get_subclass_instance(gpf, GPF_Power_Law, _Galaxy_Pair_Fraction)
+        # if GMR is given, GMT can still be used - for calculating stalling
         else:
             gmr = utils.get_subclass_instance(gmr, GMR_Illustris, _Galaxy_Merger_Rate)
-            # if GMR is given, GMT can still be used - for calculating GMT stalling
             gmt = utils.get_subclass_instance(gmt, None, _Galaxy_Merger_Time, allow_none=True)
             # if GMR is given, GPF is not used: make sure it is not given
             if (gpf is not None):
@@ -200,15 +197,30 @@ class Semi_Analytic_Model:
             Galaxy total stellar masses for all MBH. [0, :] is primary, [1, :] is secondary [grams].
 
         """
+        redz = self.redz[np.newaxis, np.newaxis, :]
         # total-mass, mass-ratio ==> (M1, M2)
         masses = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
         # BH-masses to stellar-masses
-        masses = self._mmbulge.mstar_from_mbh(masses, scatter=False)
-        return masses
+        mbh_pri = masses[0]
+        mbh_sec = masses[1]
+        args = [mbh_pri[..., np.newaxis], mbh_sec[..., np.newaxis], redz]
+        # Convert to shape (M, Q, Z)
+        mbh_pri, mbh_sec, redz = np.broadcast_arrays(*args)
+        mstar_pri = self._mmbulge.mstar_from_mbh(mbh_pri, redz=redz, scatter=False)
+        mstar_sec = self._mmbulge.mstar_from_mbh(mbh_sec, redz=redz, scatter=False)
+
+        # q = m2 / m1
+        mstar_rat = mstar_sec / mstar_pri
+        # M = m1 + m2
+        mstar_tot = mstar_pri + mstar_sec
+        # args = [mstar_rat[..., np.newaxis]]
+        # # Convert to shape (M, Q, Z)
+        # mstar_rat = np.broadcast_arrays(*args)
+        return mstar_pri, mstar_rat, mstar_tot, redz
 
     @property
     def static_binary_density(self):
-        """The number-density of binaries in each bin, 'd^3 n / [dlog10M dq dz]' in units of [Mpc^-3].
+        """The number-density of binaries at each bin edge, 'd^3 n / [dlog10M dq dz]' in units of [Mpc^-3].
 
         This is calculated once and cached.
 
@@ -228,16 +240,8 @@ class Semi_Analytic_Model:
 
             # ---- convert from MBH ===> mstar
 
-            # `mstar_tot` starts as the secondary mass, sorry
-            mstar_pri, mstar_tot = self.mass_stellar()
-            # q = m2 / m1
-            mstar_rat = mstar_tot / mstar_pri
-            # M = m1 + m2
-            mstar_tot = mstar_pri + mstar_tot
             redz = self.redz[np.newaxis, np.newaxis, :]
-            args = [mstar_pri[..., np.newaxis], mstar_rat[..., np.newaxis], mstar_tot[..., np.newaxis], redz]
-            # Convert to shape (M, Q, Z)
-            mstar_pri, mstar_rat, mstar_tot, redz = np.broadcast_arrays(*args)
+            mstar_pri, mstar_rat, mstar_tot, redz = self.mass_stellar()
 
             # choose whether the primary mass, or total mass, is used in different calculations
             mass_gsmf = mstar_tot if GSMF_USES_MTOT else mstar_pri
@@ -593,6 +597,7 @@ class Semi_Analytic_Model:
     def gwb_new(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100):
         """Calculate GWB using new cython implementation, 10x faster!
         """
+        from . import sam_cyutils
 
         assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
 
@@ -649,11 +654,8 @@ class Semi_Analytic_Model:
         * There is no coalescence of binaries cutting them off at high-frequencies.
 
         """
-        mstar_pri, mstar_tot = self.mass_stellar()
-        # q = m2 / m1
-        mstar_rat = mstar_tot / mstar_pri
-        # M = m1 + m2
-        mstar_tot = mstar_pri + mstar_tot
+        redz = self.redz[np.newaxis, np.newaxis, :]
+        mstar_pri, mstar_rat, mstar_tot, redz = self.mass_stellar()
 
         # default to using `redz_prime` values if a GMT instance is stored
         if redz_prime is None:
@@ -664,12 +666,7 @@ class Semi_Analytic_Model:
             raise AttributeError(err)
 
         rz = self.redz
-        rz = rz[np.newaxis, np.newaxis, :]
         if redz_prime:
-            args = [mstar_pri[..., np.newaxis], mstar_rat[..., np.newaxis], mstar_tot[..., np.newaxis], rz]
-            # Convert to shape (M, Q, Z)
-            mstar_pri, mstar_rat, mstar_tot, rz = np.broadcast_arrays(*args)
-
             gmt_mass = mstar_tot if GMT_USES_MTOT else mstar_pri
             rz, _ = self._gmt.zprime(gmt_mass, mstar_rat, rz)
             print(f"{self} :: {utils.stats(rz)=}")
@@ -701,7 +698,6 @@ class Semi_Analytic_Model:
         params : Boolean
             Whether or not to return astrophysical parameters of the binaries.
 
-
         Returns
         -------
         hc_ss : (F, R, L) NDarray of scalars
@@ -717,7 +713,9 @@ class Semi_Analytic_Model:
             final redshift, final comoving distance, final separation, final angular separation)
             for background sources at each frequency and realization,
             Returned only if params = True.
+
         """
+        from . import sam_cyutils
 
         if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
             err = (
@@ -757,6 +755,130 @@ class Semi_Analytic_Model:
             return hc_ss, hc_bg, sspar, bgpar
 
         return hc_ss, hc_bg
+
+    def rate_chirps(self, hard=None, integrate=True):
+        """Find the event rate of binary coalescences ('chirps').
+
+        Get the number of coalescence events per unit time, in units of [1/sec].
+
+        Parameters
+        ----------
+        hard : None  or  `_Hardening` subclass instance
+        integrate : bool
+
+        Returns
+        -------
+        redz_final : (M, Q, Z)
+            Redshift of binary coalescence.  Binaries stalling before `z=0`, have values set to
+            `-1.0`.
+        rate : ndarray
+            Rate of coalescence events in each bin, in units of [1/sec].
+            The shape and meaning depends on the value of the `integrate` flag:
+
+            * if `integrate == True`,
+              then the returned values is ``dN/dt``, with shape (M-1, Q-1, Z-1)
+
+            * if `integrate == False`,
+              then the returned values is ``dN/[dlog10M dq dz dt]``, with shape (M, Q, Z)
+
+        """
+        log = self._log
+
+        if hard is not None:
+            if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM,)):
+                err = "Only the `Fixed_Time` models, or no hardening, are supported for rate calculation!"
+                log.exception(err)
+                raise ValueError(err)
+
+        # get number density of binaries dn/[dlog10M dq dz] in units of [Mpc^-3]
+        # NOTE: `static_binary_density` must be called for `_gmt_time` to be set
+        ndens = self.static_binary_density
+
+        # ---- Get redshift of coalescence
+
+        # Find initialization times (Z,) in [sec]
+        time_init = cosmo.z_to_tage(self.redz)
+        # NOTE: `static_binary_density` must be called for `_gmt_time` to be set
+        # Galaxy Merger Time, time in [sec]  shape (M, Q, Z)
+        time_gmt = self._gmt_time
+        # if `sam` is using galaxy merger rate (GMR), then `gmt_time` will be `None`
+        if time_gmt is None:
+            log.info("`gmt_time` not calculated in SAM.  Setting to zeros.")
+            time_gmt = np.zeros(self.shape)
+
+        if hard is None:
+            time_life = 0.0
+        else:
+            # Target lifetime of fixed_time model, single scalar value in [sec]
+            time_life = hard._target_time
+
+        time_tot = time_init[np.newaxis, np.newaxis, :] + time_gmt + time_life
+        # when `time_tot` is greater than age of Universe, `redz_final` will be NaN
+        redz_final = cosmo.tage_to_z(time_tot)
+        # find bins where the binary coalesces before redshift zero (this includes checking that redz_final is not NaN)
+        valid = (redz_final > 0.0)
+        # set redshift final for stalled binaries to -1.0
+        redz_final[~valid] = -1.0
+
+        # ---- calculate coalescence properties
+
+        mt, mr, _ = np.meshgrid(self.mtot, self.mrat, None, indexing='ij')
+        m1, m2 = utils.m1m2_from_mtmr(mt, mr)
+        mc = utils.chirp_mass_mtmr(mt, mr)
+
+        # Place all binaries at the ISCO, find the corresponding frequency, strain, and characteristic strain
+        risco = utils.rad_isco(mt)
+        fisco_rst = utils.kepler_freq_from_sepa(mt, risco)
+        fisco = fisco_rst / (1.0 + redz_final)
+
+        dc = cosmo.z_to_dcom(redz_final)
+        hs = utils.gw_strain_source(mc, dc, fisco_rst)
+        dadt = utils.gw_hardening_rate_dadt(m1, m2, risco)
+        dfdt, _ = utils.dfdt_from_dadt(dadt, risco, mtot=mt, frst_orb=fisco_rst)
+
+        log.warning("!! assuming ncycles = f^2 / (dfdt) !!")
+        ncycles = fisco_rst**2 / dfdt
+
+        hc = np.sqrt(ncycles) * hs
+        fisco[~valid] = np.nan
+
+        # ---- calculate event rates
+
+        # (M, Q, Z)
+        rate = np.zeros(self.shape)
+        rz = redz_final[valid]
+        # get rest-frame dz/dt
+        dzdt = 1.0 / cosmo.dtdz(rz)
+        # get dVc/dz in units of [Mpc^3] to match `ndens` in units of [Mpc^-3]
+        dVcdz = cosmo.dVcdz(rz, cgs=False)
+
+        # factor of 1/1+z to convert from rest-frame to observer-frame time-interval
+        rate[valid] = ndens[valid] * dzdt * dVcdz / (1.0 + rz)
+
+        # integrate over each bin to go from ``dN/[dlog10M dq dz dt]`` to ``dN/dt``
+        if integrate:
+            rate = self._integrate_event_rate(rate)
+
+        return redz_final, rate, fisco, hc
+
+    def _integrate_event_rate(self, rate):
+        # (Z-1,)
+        dz = np.diff(self.redz)
+        # perform 'integration', but don't sum over redshift bins
+        # (M, Q, Z-1)
+        integ = 0.5 * (rate[:, :, :-1] + rate[:, :, 1:]) * dz
+
+        # ---- Integrate over mass and mass-ratio
+        # (M-1,)
+        dlogm = np.diff(np.log10(self.mtot))
+        # (Q-1,)
+        dq = np.diff(self.mrat)
+        # (M-1, Q, Z-1)
+        integ = 0.5 * (integ[:-1, :, :] + integ[1:, :, :]) * dlogm[:, np.newaxis, np.newaxis]
+        # (M-1, Q-1, Z-1)
+        integ = 0.5 * (integ[:, :-1, :] + integ[:, 1:, :]) * dq[np.newaxis, :, np.newaxis]
+
+        return integ
 
     def _ndens_gal(self, mass_gal, mrat_gal, redz):
         if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
@@ -988,11 +1110,14 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
     """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
 
     The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
-    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.
-          A 2nd-order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
+
+    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.  A 2nd
+          order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
           In-between, a 1st-order interpolant is used if `linear_interp_backup` is True.
-    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2) to
-          account for scatter.
+
+    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2)
+          to account for scatter.
+
     * (3) The new density distribution is interpolated back to the original (mtot, mrat) grid.
 
     Parameters

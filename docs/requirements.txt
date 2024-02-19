@@ -1,7 +1,6 @@
--r ../requirements-dev.txt
-ipykernel
-nbsphinx
-numpydoc
-sphinx-math-dollar
+sphinx
 sphinx-rtd-theme
-# sphinxcontrib-bibtex
+myst-parser
+# numpydoc
+sphinx-math-dollar
+# sphinxcontrib-bibtexho

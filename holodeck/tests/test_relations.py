@@ -8,8 +8,8 @@ import scipy as sp
 import scipy.stats
 
 import holodeck as holo
-import holodeck.relations
-import holodeck.population
+from holodeck import relations
+from holodeck.discrete import population
 from holodeck.constants import MSOL
 
 
@@ -134,32 +134,32 @@ def check_scatter_per_dex(mmbulge_relation, scatter_dex):
 
 
 def test_MM2013_scatter():
-    MM2013 = holo.relations.MMBulge_MM2013()
+    MM2013 = relations.MMBulge_MM2013()
     check_scatter_per_dex(MM2013, 0.34)
     return
 
 
 def test_KH2013_scatter():
-    KH2013 = holo.relations.MMBulge_KH2013()
+    KH2013 = relations.MMBulge_KH2013()
     check_scatter_per_dex(KH2013, 0.28)
     return
 
 
 def test_MM2013_basic():
-    MM2013 = holo.relations.MMBulge_MM2013()
+    MM2013 = relations.MMBulge_MM2013()
     check_relation(MM2013, mbh_from_mbulge_MM2013)
     return
 
 
 def test_KH2013_basic():
-    KH2013 = holo.relations.MMBulge_KH2013()
+    KH2013 = relations.MMBulge_KH2013()
     check_relation(KH2013, mbh_from_mbulge_KH2013)
     return
 
 
 def check_mass_reset(mmbulge_relation, truth_func):
-    pop = holo.population.Pop_Illustris()
-    mod_MM2013 = holo.population.PM_Mass_Reset(mmbulge_relation, scatter=False)
+    pop = population.Pop_Illustris()
+    mod_MM2013 = population.PM_Mass_Reset(mmbulge_relation, scatter=False)
     pop.modify(mod_MM2013)
     mass = pop.mass
 
@@ -173,7 +173,7 @@ def check_mass_reset(mmbulge_relation, truth_func):
 
 def test_mass_reset_MM2013():
     print("test_mass_reset_MM2013")
-    mmbulge_relation = holo.relations.MMBulge_MM2013()
+    mmbulge_relation = relations.MMBulge_MM2013()
     truth_func = mbh_from_mbulge_MM2013
     check_mass_reset(mmbulge_relation, truth_func)
     return
@@ -181,7 +181,7 @@ def test_mass_reset_MM2013():
 
 def test_mass_reset_KH2013():
     print("test_mass_reset_KH2013")
-    mmbulge_relation = holo.relations.MMBulge_KH2013()
+    mmbulge_relation = relations.MMBulge_KH2013()
     truth_func = mbh_from_mbulge_KH2013
     check_mass_reset(mmbulge_relation, truth_func)
     return
@@ -200,7 +200,7 @@ class Test_MMBulge_Standard:
 
         for arg in args:
             # Construct a relation using these arguments
-            relation = holo.relations.MMBulge_Standard(**arg)
+            relation = relations.MMBulge_Standard(**arg)
             # make sure arguments match stored values
             for kk, vv in arg.items():
                 tt = getattr(relation, f"_{kk}")
@@ -229,12 +229,12 @@ class Test_MMBulge_Standard:
 class Test_Behroozi_2013:
 
     def test_init(self):
-        holo.relations.Behroozi_2013()
+        relations.Behroozi_2013()
         return
 
     def test_basics(self):
         NUM = 1000
-        behr = holo.relations.Behroozi_2013()
+        behr = relations.Behroozi_2013()
 
         mstar = np.random.uniform(5, 12, NUM)
         mstar = MSOL * (10.0 ** mstar)

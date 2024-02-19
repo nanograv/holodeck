@@ -11,6 +11,7 @@ import os
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
 from holodeck import _PATH_DATA, utils
+from holodeck.constants import SPLC, EDDT
 
 
 class Accretion:
@@ -32,6 +33,7 @@ class Accretion:
     :meth:`pref_acc(mdot, evol, step)`
         Contains a variety of accretion models to choose from to calculate
         primary vs secondary accretion rates.
+
     """
 
     def __init__(self, accmod='Basic', f_edd=0.01, mdot_ext=None, eccen=0.0,
@@ -89,7 +91,7 @@ class Accretion:
             self.swk_acc = lambda_qe_interp_2d()
 
     def mdot_eddington(self, mass, eps=0.1):
-        """ Calculate the total accretion rate based on masses and a fraction of the Eddington limit.
+        """Calculate the total accretion rate based on masses and a fraction of the Eddington limit.
 
         Parameters
         ----------
@@ -108,13 +110,14 @@ class Accretion:
         Notes
         -----
         The limiting Eddington accretion rate is defined as:
-        .. math:: \dot{M}_{\mathsf{Edd}} = \frac{4 \pi GM m_p}{\epsilon c \sigma_{\mathsf{T}}
+        .. math:: `\dot{M}_{\mathsf{Edd}} = \frac{4 \pi GM m_p}{\epsilon c \sigma_{\mathsf{T}}`
 
         Examples
         --------
         >>> acc = Accretion()
         >>> mass =
         >>> print(acc.mdot_eddington(mass))
+
         """
         from holodeck.constants import SPLC, EDDT
 
@@ -181,7 +184,7 @@ class Accretion:
 
         See Also
         --------
-        :meth: `Evolution._take_next_step()` : Relationship
+        :meth:`Evolution._take_next_step()` : Relationship
 
         Notes
         -----
@@ -268,7 +271,6 @@ class Accretion:
         # Catch any case where no model is selected.
         if self.accmod is None:
             raise TypeError("'None' value provided for accretion model." +
-                            "An accretion model is required.")
         
         return np.asarray(mdot_arr)
     

@@ -266,12 +266,12 @@ class MMBulge_Standard(_MMBulge_Relation):
     def bulge_mass_frac(self, mstar):
         return self._bulge_mfrac
 
-    def mbh_from_host(self, pop, scatter) -> ArrayLike:
+    def mbh_from_host(self, pop, scatter=None) -> ArrayLike:
         host = self.get_host_properties(pop)
         mbulge = host['mbulge']
-        return self.mbh_from_mbulge(mbulge, scatter=scatter)
+        return self.mbh_from_mbulge(mbulge, redz=None, scatter=scatter)
 
-    def mbh_from_mbulge(self, mbulge, scatter):
+    def mbh_from_mbulge(self, mbulge, redz=None, scatter=None):
         """Convert from stellar-bulge mass to black-hole mass.
 
         Parameters
@@ -292,7 +292,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         mbh = _log10_relation(mbulge, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
 
-    def mbulge_from_mbh(self, mbh, scatter):
+    def mbulge_from_mbh(self, mbh, redz=None, scatter=None):
         """Convert from black-hole mass to stellar-bulge mass.
 
         Parameters
@@ -312,7 +312,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         mbulge = _log10_relation_reverse(mbh, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbulge
 
-    def mstar_from_mbulge(self, mbulge):
+    def mstar_from_mbulge(self, mbulge, redz=None):
         """Convert from stellar bulge-mass to black-hole mass.
 
         Parameters
@@ -331,7 +331,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         """
         return mbulge / self._bulge_mfrac
 
-    def mbh_from_mstar(self, mstar, scatter):
+    def mbh_from_mstar(self, mstar, redz=None, scatter=None):
         """Convert from total stellar mass to black-hole mass.
 
         Parameters
@@ -351,7 +351,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         mbulge = self.mbulge_from_mstar(mstar)
         return self.mbh_from_mbulge(mbulge, scatter)
 
-    def mstar_from_mbh(self, mbh, scatter):
+    def mstar_from_mbh(self, mbh, redz=None, scatter=None):
         """Convert from black-hole mass to total stellar mass.
 
         Parameters
@@ -368,10 +368,10 @@ class MMBulge_Standard(_MMBulge_Relation):
             Total stellar mass of host galaxy.  [grams]
 
         """
-        mbulge = self.mbulge_from_mbh(mbh, scatter)
+        mbulge = self.mbulge_from_mbh(mbh, redz=redz, scatter=scatter)
         return self.mstar_from_mbulge(mbulge)
 
-    def dmstar_dmbh(self, mstar):
+    def dmstar_dmbh(self, mstar, redz=None):
         """Calculate the partial derivative of stellar mass versus BH mass :math:`d M_star / d M_bh`.
 
         .. math::
@@ -392,7 +392,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         plaw = self._mplaw
         fbulge = self._bulge_mfrac
         mbulge = mstar * fbulge
-        mbh = self.mbh_from_mbulge(mbulge, scatter=False)
+        mbh = self.mbh_from_mbulge(mbulge, scatter=False, redz=redz)
         deriv = mstar / (plaw * mbh)
         return deriv
 
@@ -435,6 +435,7 @@ class MMBulge_Redshift(MMBulge_Standard):
 
     TODO: make sure all of the inherited methods from `MMBulge_Standard` are appropriate for
           redshift dependencies!!  In particular, check `dmstar_dmbh`
+          check which redshifts need to be passed into this function. does not pass all cases as is
 
     """
 
@@ -460,13 +461,16 @@ class MMBulge_Redshift(MMBulge_Standard):
         host = self.get_host_properties(pop, copy=False)
         mbulge = host['mbulge']    # shape (N, 2)
         redz = host['redz']        # shape (N,)
-        return self.mbh_from_mbulge(mbulge, redz, scatter=scatter)
+        return self.mbh_from_mbulge(mbulge, redz=redz, scatter=scatter)
 
     def mbh_from_mbulge(self, mbulge, redz, scatter):
         scatter_dex = self._scatter_dex if scatter else None
         # Broadcast `redz` to match shape of `mbulge`, if needed
         # NOTE: this will work for (N,) ==> (N,)    or   (N,) ==> (N,X)
-        redz = np.broadcast_to(redz, mbulge.T.shape).T
+        try:
+            redz = np.broadcast_to(redz, mbulge.T.shape).T
+        except TypeError:
+            redz = redz
         zmamp = self._mamp * (1.0 + redz)**self._zplaw
         mbh = _log10_relation(mbulge, zmamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
