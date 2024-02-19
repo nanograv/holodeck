@@ -151,7 +151,7 @@ cdef void _interp_at_fobs(
     data.dadt = <double *>malloc(arr_size * sizeof(double))
     data.dedt = <double *>malloc(arr_size * sizeof(double))
 
-    cdef DTYPE_LONG_t bin, left, right, fi, idx, direction, last_direction
+    cdef DTYPE_LONG_t bin, left, right, fi  # , idx, direction, last_direction
     cdef DTYPE_LONG_t out = 0
     cdef DTYPE_LONG_t beg, end
     cdef double fobs_l, fobs_r
@@ -168,8 +168,8 @@ cdef void _interp_at_fobs(
         # printf("\n---- bin %04ld [%04ld, %04ld]\n\n", bin, beg, end)
 
         # assume that we'll start out hardening (frequency increasing)
-        direction = +1
-        last_direction = +1
+        # direction = +1
+        # last_direction = +1
 
         # initialize to the first target frequency
         fi = 0
@@ -204,7 +204,7 @@ cdef void _interp_at_fobs(
 
             # we are moving to higher frequencies = hardening
             if fobs_l < fobs_r:
-                direction = +1
+                # direction = +1
 
                 # If we change directions, to decreasing in frequency, reset to the largest target frequency
                 #! I don't think this is necessary (?), but it definitely works keeping it...  [LZK:2023-09-26]
