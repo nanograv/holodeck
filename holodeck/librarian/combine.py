@@ -1,4 +1,8 @@
-"""
+"""Combine output files from individual simulation runs into a single library hdf5 file.
+
+This file can be executed as a script (see the :func:`main` function), and also provides an API
+method (:func:`sam_lib_combine`) for programatically combining libraries.
+
 """
 
 import argparse
@@ -10,11 +14,13 @@ import tqdm
 
 import holodeck as holo
 import holodeck.librarian
-from holodeck.librarian import lib_utils
-from holodeck.librarian.params import _Param_Space
+from holodeck.librarian import libraries
 
 
 def main():
+    """Command-line interface executable method for combining holodeck simulation files.
+    """
+
     log = holo.log
 
     try:
@@ -53,7 +59,7 @@ def main():
 
 
 def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only=False):
-    """
+    """Combine individual simulation files into a single library (hdf5) file.
 
     Arguments
     ---------
@@ -83,7 +89,7 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
 
     # ---- see if a combined library already exists
 
-    lib_path = lib_utils.get_sam_lib_fname(path_output, gwb_only)
+    lib_path = libraries.get_sam_lib_fname(path_output, gwb_only)
     if lib_path.exists():
         lvl = log.INFO if recreate else log.WARNING
         log.log(lvl, f"combined library already exists: {lib_path}")
@@ -113,7 +119,7 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
     '''
     if path_pspace is None:
         path_pspace = path_output
-    pspace, pspace_fname = lib_utils.load_pspace_from_path(log, path_pspace)
+    pspace, pspace_fname = libraries.load_pspace_from_path(log, path_pspace)
 
     log.info(f"loaded param space: {pspace} from '{pspace_fname}'")
     param_names = pspace.param_names
@@ -214,7 +220,7 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
 
     log.info(f"Checking {nsamp} files in {path_sims}")
     for ii in tqdm.trange(nsamp):
-        temp_fname = lib_utils._get_sim_fname(path_sims, ii)
+        temp_fname = libraries._get_sim_fname(path_sims, ii)
         if not temp_fname.exists():
             err = f"Missing at least file number {ii} out of {nsamp} files!  {temp_fname}"
             log.exception(err)
@@ -291,7 +297,7 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
     bad_files = np.zeros(nsamp, dtype=bool)     #: track which files contain UN-useable data
     msg = None
     for pnum in tqdm.trange(nsamp):
-        fname = lib_utils._get_sim_fname(path_sims, pnum)
+        fname = libraries._get_sim_fname(path_sims, pnum)
         temp = np.load(fname, allow_pickle=True)
         # When a processor fails for a given parameter, the output file is still created with the 'fail' key added
         if ('fail' in temp):

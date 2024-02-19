@@ -10,7 +10,7 @@ import tqdm
 
 import holodeck as holo
 import holodeck.librarian
-from holodeck.librarian import lib_utils, FITS_NBINS_PLAW, FITS_NBINS_TURN
+from holodeck.librarian import libraries, FITS_NBINS_PLAW, FITS_NBINS_TURN
 from holodeck.constants import YR
 
 
@@ -75,7 +75,7 @@ def fit_library_spectra(library_path, log, recreate=False):
 
         library_path = Path(library_path)
         if library_path.is_dir():
-            library_path = lib_utils.get_sam_lib_fname(library_path, gwb_only=False)
+            library_path = libraries.get_sam_lib_fname(library_path, gwb_only=False)
         if not library_path.exists() or not library_path.is_file():
             err = f"{library_path=} must point to an existing library file!"
             log.exception(err)
@@ -85,7 +85,7 @@ def fit_library_spectra(library_path, log, recreate=False):
 
         # ---- check for existing fits file
 
-        fits_path = lib_utils.get_fits_path(library_path)
+        fits_path = libraries.get_fits_path(library_path)
         return_flag = False
         if fits_path.exists():
             lvl = log.INFO if recreate else log.WARNING
