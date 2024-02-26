@@ -10,7 +10,7 @@ import numpy as np
 import kalepy as kale
 from holodeck.sams import sam_cyutils
 
-PSPACE = holo.librarian.param_spaces_classic.PS_Classic_Phenom_Uniform
+PSPACE = holo.librarian.param_spaces_classic.PS_Classic_Phenom_Uniform(log=holo.log)
 
 
 
@@ -86,7 +86,7 @@ class Realizer_SAM:
         NOTE: To match the Realizer above I could initialize with weights and whatnot, then
         possibly use the same resample/downsample function.
         """
-        pspace = pspace()
+        # pspace = pspace(log=holo.log)
 
         # check that ('sam' and 'hard') OR 'params' is provided
         if params is not None:
