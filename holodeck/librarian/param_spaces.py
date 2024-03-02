@@ -3,7 +3,7 @@
 
 import holodeck as holo
 from holodeck.constants import GYR, PC, MSOL
-from holodeck.librarian.libraries import _Param_Space, PD_Uniform
+from holodeck.librarian.libraries import _Param_Space, PD_Uniform, PD_Normal
 
 
 class _PS_Astro_Strong(_Param_Space):
@@ -21,7 +21,7 @@ class _PS_Astro_Strong(_Param_Space):
         hard_gamma_inner=-1.0,
         hard_gamma_outer=+2.5,
 
-        # Galaxy stellar-mass Function (GSMF_Double_Schechter)
+        # Galaxy stellar-mass Function (``GSMF_Double_Schechter``)
         # Parameters are based on `double-schechter.ipynb` conversions from [Leja2020]_
         gsmf_log10_phi_one_z0=-2.383,    # - 2.383 ± 0.028
         gsmf_log10_phi_one_z1=-0.264,    # - 0.264 ± 0.072
@@ -35,20 +35,23 @@ class _PS_Astro_Strong(_Param_Space):
         gsmf_alpha_one=-0.28,            # - 0.280 ± 0.070
         gsmf_alpha_two=-1.48,            # - 1.480 ± 0.150
 
-        gmr_norm0_log10 = -2.2287,       # -2.2287 ± 0.0045    A0 [log10(A*Gyr)]
-        gmr_normz = +2.4644,             # +2.4644 ± 0.0128    eta
-        gmr_malpha0 = +0.2241,           # +0.2241 ± 0.0038    alpha0
-        gmr_malphaz = -1.1759,           # -1.1759 ± 0.0316    alpha1
-        gmr_mdelta0 = +0.7668,           # +0.7668 ± 0.0202    delta0
-        gmr_mdeltaz = -0.4695,           # -0.4695 ± 0.0440    delta1
-        gmr_qgamma0 = -1.2595,           # -1.2595 ± 0.0026    beta0
-        gmr_qgammaz = +0.0611,           # +0.0611 ± 0.0021    beta1
-        gmr_qgammam = -0.0477,           # -0.0477 ± 0.0013    gamma
+        # Galaxy merger rate (``GMR_Illustris``)
+        # Parameters are taken directly from [Rodriguez-Gomez2015]_
+        gmr_norm0_log10=-2.2287,         # -2.2287 ± 0.0045    A0 [log10(A*Gyr)]
+        gmr_normz=+2.4644,               # +2.4644 ± 0.0128    eta
+        gmr_malpha0=+0.2241,             # +0.2241 ± 0.0038    alpha0
+        gmr_malphaz=-1.1759,             # -1.1759 ± 0.0316    alpha1
+        gmr_mdelta0=+0.7668,             # +0.7668 ± 0.0202    delta0
+        gmr_mdeltaz=-0.4695,             # -0.4695 ± 0.0440    delta1
+        gmr_qgamma0=-1.2595,             # -1.2595 ± 0.0026    beta0
+        gmr_qgammaz=+0.0611,             # +0.0611 ± 0.0021    beta1
+        gmr_qgammam=-0.0477,             # -0.0477 ± 0.0013    gamma
 
+        # M-MBulge Relationship (``MMBulge_KH2013``)
         # From [KH2013]_
-        mmb_mamp=0.49e9,        # 0.49e9 + 0.06 - 0.05  [Msol]
-        mmb_plaw=1.17,          # 1.17 ± 0.08
-        mmb_scatter_dex=0.28,
+        mmb_mamp=0.49e9,                 # 0.49e9 + 0.06 - 0.05  [Msol]
+        mmb_plaw=1.17,                   # 1.17 ± 0.08
+        mmb_scatter_dex=0.28,            # no uncertainties given
     )
 
     @classmethod
@@ -126,7 +129,51 @@ class PS_Astro_Strong_Hard_Only(_PS_Astro_Strong):
         )
         return
 
+
+class PS_Astro_Strong_All(_PS_Astro_Strong):
+
+    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
+            PD_Uniform("hard_time", 0.1, 11.0, default=3.0),   # [Gyr]
+            PD_Uniform("hard_gamma_inner", -1.5, +0.0, default=-1.0),
+
+            # GSMF
+            PD_Normal('gsmf_log10_phi_one_z0', -2.383, 0.028),    # - 2.383 ± 0.028
+            PD_Normal('gsmf_log10_phi_one_z1', -0.264, 0.072),    # - 0.264 ± 0.072
+            PD_Normal('gsmf_log10_phi_one_z2', -0.107, 0.031),    # - 0.107 ± 0.031
+            PD_Normal('gsmf_log10_phi_two_z0', -2.818, 0.050),    # - 2.818 ± 0.050
+            PD_Normal('gsmf_log10_phi_two_z1', -0.368, 0.070),    # - 0.368 ± 0.070
+            PD_Normal('gsmf_log10_phi_two_z2', +0.046, 0.020),    # + 0.046 ± 0.020
+            PD_Normal('gsmf_log10_mstar_z0', +10.767, 0.026),     # +10.767 ± 0.026
+            PD_Normal('gsmf_log10_mstar_z1', +0.124, 0.045),      # + 0.124 ± 0.045
+            PD_Normal('gsmf_log10_mstar_z2', -0.033, 0.015),      # - 0.033 ± 0.015
+            PD_Normal('gsmf_alpha_one', -0.28, 0.070),            # - 0.280 ± 0.070
+            PD_Normal('gsmf_alpha_two', -1.48, 0.150),            # - 1.480 ± 0.150
+
+            # GMR
+            PD_Normal('gmr_norm0_log10', -2.2287, 0.0045),        # -2.2287 ± 0.0045    A0 [log10(A*Gyr)]
+            PD_Normal('gmr_normz', +2.4644, 0.0128),              # +2.4644 ± 0.0128    eta
+            PD_Normal('gmr_malpha0', +0.2241, 0.0038),            # +0.2241 ± 0.0038    alpha0
+            PD_Normal('gmr_malphaz', -1.1759, 0.0316),            # -1.1759 ± 0.0316    alpha1
+            PD_Normal('gmr_mdelta0', +0.7668, 0.0202),            # +0.7668 ± 0.0202    delta0
+            PD_Normal('gmr_mdeltaz', -0.4695, 0.0440),            # -0.4695 ± 0.0440    delta1
+            PD_Normal('gmr_qgamma0', -1.2595, 0.0026),            # -1.2595 ± 0.0026    beta0
+            PD_Normal('gmr_qgammaz', +0.0611, 0.0021),            # +0.0611 ± 0.0021    beta1
+            PD_Normal('gmr_qgammam', -0.0477, 0.0013),            # -0.0477 ± 0.0013    gamma
+
+            # From [KH2013]_
+            PD_Normal('mmb_mamp', 0.49e9, 0.055),                 # 0.49e9 + 0.06 - 0.05  [Msol]
+            PD_Normal('mmb_plaw', 1.17, 0.08),                    # 1.17 ± 0.08
+        ]
+        _Param_Space.__init__(
+            self, parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+        )
+        return
+
+
 _param_spaces_dict = {
+    'PS_Astro_Strong_All': PS_Astro_Strong_All,
     'PS_Astro_Strong_Hard_Only': PS_Astro_Strong_Hard_Only,
 }
 
