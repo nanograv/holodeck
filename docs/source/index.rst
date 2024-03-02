@@ -14,7 +14,7 @@ holodeck
 
 `holodeck on github <https://github.com/nanograv/holodeck>`_
 
-This package is aimed at providing a comprehensive framework for MBH binary population synthesis.  The framework includes modules to perform population synthesis using a variety of methodologies from semi-analytic models, to cosmological hydrodynamic simulations, and even observationally-derived galaxy merger catalogs.
+This package provides a comprehensive framework for MBH binary population synthesis.  The framework includes modules to perform population synthesis using a variety of methodologies from semi-analytic models, to cosmological hydrodynamic simulations, and even observationally-derived galaxy merger catalogs.
 
 **This File:**
 
@@ -63,16 +63,17 @@ This package is aimed at providing a comprehensive framework for MBH binary popu
 Getting Started
 ===============
 
-| (1) Read the ``holodeck`` :doc:`getting started <getting_started/index>` guide.
-| (2) Install ``holodeck`` following the `installation`_ instructions below.
+| (1) Read the :doc:`getting started <getting_started/index>` guide.
+| (2) Install |holodeck| following the `installation`_ instructions below.
 | (3) Explore the `package demonstration notebooks <https://github.com/nanograv/holodeck/tree/main/notebooks>`_.
-| (4) Read the `Development & Contributions <development>`_ guide.
 
 
 Installation
 ============
 
-The ``holodeck`` framework is currently under substantial, active development.  Recent versions will not generally be available with ``pip`` or ``conda`` install.  Currently ``holodeck`` requires ``python >= 3.9`` (tests are run on versions ``3.9``, ``3.10``, ``3.11``).  The recommended installation is:
+The |holodeck| framework is currently under substantial, active development.  Stable versions are now available with ``pip install holodeck-gw`` (see `holodeck on pypi <https://pypi.org/project/holodeck-gw>`_).  However, recent versions and many development tools will not generally be available with ``pip`` or ``conda`` install.
+
+|holodeck| requires ``python >= 3.9`` (with support for: ``3.9, 3.10, 3.11``).  The recommended installation is:
 
 0) OPTIONAL & recommended: create and activate a new **anaconda** environment to isolate your build::
 
@@ -103,7 +104,7 @@ The ``holodeck`` framework is currently under substantial, active development.  
 
       python setup.py develop
 
-The 'editable' installation allows the code base to be modified, and have those changes take effect when using the ``holodeck`` module without having to rebuild/reinstall it.  Note that any changes to the cython library files do still require a rebuild by running steps (3) and (4) above.
+The 'editable' installation allows the code base to be modified, and have those changes take effect when using the ``holodeck`` module without having to rebuild/reinstall it.  Note that any changes to the ``cython`` library files do still require a rebuild by running steps (3) and (4) above.
 
 MPI
 ---

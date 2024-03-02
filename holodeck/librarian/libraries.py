@@ -401,17 +401,25 @@ class PD_Uniform_Log(_Param_Dist):
 
 
 class PD_Normal(_Param_Dist):
-    """
+    """Normal/Gaussian parameter distribution with given mean and standard-deviation.
 
     NOTE: use `clip` parameter to avoid extreme values.
 
     """
 
     def __init__(self, name, mean, stdev, clip=None, **kwargs):
-        """
+        """Initialize a `PD_Normal` instance.
 
         Arguments
         ---------
+        name : str
+            Name of the parameter being distributed.
+        mean : float
+            Mean / expectation value, center of normal distribution.
+        stdev : float
+            Standard deviation, width of normal distribution.
+        clip : `None`  or  (2,) of float
+            Bounds by which to restrict the resulting distribution.
 
         """
         assert stdev > 0.0
