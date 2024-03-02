@@ -332,12 +332,12 @@ def _setup_argparse(*args, **kwargs):
     parser.add_argument('-l', '--nloudest', action='store', dest='nloudest', type=int,
                         help='Number of loudest single sources', default=holo.librarian.DEF_NUM_LOUDEST)
 
-    # what do run
-    parser.add_argument('--gwb', action='store_true', dest="gwb_flag", default=False,
+    # what to run
+    parser.add_argument('--gwb', dest="gwb_flag", default=True, action=argparse.BooleanOptionalAction,
                         help="calculate and store the 'gwb' per se")
-    parser.add_argument('--ss', action='store_true', dest="ss_flag", default=False,
+    parser.add_argument('--ss', dest="ss_flag", default=True, action=argparse.BooleanOptionalAction,
                         help="calculate and store SS/CW sources and the BG separately")
-    parser.add_argument('--params', action='store_true', dest="params_flag", default=False,
+    parser.add_argument('--params', dest="params_flag", default=True, action=argparse.BooleanOptionalAction,
                         help="calculate and store SS/BG binary parameters [NOTE: requires `--ss`]")
 
     # how do run
