@@ -28,10 +28,10 @@ FITS_NBINS_TURN = [5, 10, 15]
 FNAME_SIM_FILE = "sam-lib__p{pnum:06d}.npz"
 PSPACE_FILE_SUFFIX = ".pspace.npz"
 
-# from . import libraries        # noqa
 from . libraries import (      # noqa
     _Param_Space, _Param_Dist,
     PD_Uniform, PD_Normal,
+    run_model,
 )
 
 param_spaces_dict = {}    #: Registry of standard parameter-spaces
