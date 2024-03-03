@@ -96,7 +96,7 @@ class PS_Classic_Phenom_Uniform(_PS_Classic_Phenom):
 
     """
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
         parameters = [
             PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
             PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
@@ -119,7 +119,7 @@ class PS_Classic_Phenom_Astro_Extended(_PS_Classic_Phenom):
 
     """
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
         parameters = [
             PD_Uniform("hard_time", 0.1, 11.0),   # [Gyr]
             PD_Uniform("hard_gamma_inner", -1.5, +0.5),
@@ -174,7 +174,7 @@ class _PS_Classic_GWOnly(_Param_Space):
         mmb_scatter_dex=0.3,
     )
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
         parameters = [
             PD_Uniform("gsmf_phi0", -3.5, -1.5),
             PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
@@ -235,7 +235,7 @@ class PS_Classic_GWOnly_Uniform(_PS_Classic_GWOnly):
 
     """
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
         parameters = [
             PD_Uniform("gsmf_phi0", -3.5, -1.5),
             PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
@@ -256,7 +256,7 @@ class PS_Classic_GWOnly_Astro_Extended(_PS_Classic_GWOnly):
 
     """
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
         parameters = [
             # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
             PD_Normal("gsmf_phi0", -2.56, 0.4),
@@ -284,7 +284,7 @@ class PS_Test(_PS_Classic_Phenom):
     """Simple test parameter space in 2D.
     """
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
 
         parameters = [
             PD_Uniform("mmb_mamp_log10", +7.5, +9.5),   # [log10(Msol)]
