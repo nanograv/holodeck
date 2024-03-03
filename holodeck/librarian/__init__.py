@@ -13,6 +13,30 @@ distribution.
 For more information, see the :doc:`'libraries' page in the getting-started guide
 <../getting_started/libraries>`.
 
+Notes
+-----
+The ``librarian`` module is composed of the following elements:
+
+* The core components of the holodeck libraries are defined in
+  :py:mod:`~holodeck.librarian.libraries`.  Constructing simulations from parameter spaces can be
+  performed using the relevant parameter spaces themselves (subclasses of
+  :py:class:`~holodeck.librarian.libraries._Param_Space`).
+
+* Parameter spaces are defined in the 'param_spaces' files, particularly:
+
+    * 'Classic' parameter spaces from the 15yr NANOGrav astrophysics analysis are in
+      :py:mod:`~holodeck.librarian.param_spaces_classic`.
+
+    * More recent parameter are in :py:mod:`~holodeck.librarian.param_spaces`.
+
+* Library generation functionality is in the :py:mod:`~holodeck.librarian.gen_lib` module.
+
+* Analytic fits to libraries can be performed using :py:mod:`~holodeck.librarian.fit_spectra`.
+
+* Drawing samples (sample populations) from libraries fit to particular constraints (for example,
+  the NANOGrav 15yr observations) is performed using the module
+  :py:mod:`~holodeck.librarian.posterior_populations`.
+
 """
 
 __version__ = "1.0"
