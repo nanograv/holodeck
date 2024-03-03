@@ -1,4 +1,30 @@
-"""
+"""Script and methods to fit simulated GWB spectra with analytic functions.
+
+Usage
+-----
+For usage information, run the script with the ``-h`` or ``--help`` arguments, i.e.::
+
+    python -m holodeck.librarian.fit_spectra -h
+
+Typically, the only argument required is the path to the folder containing the combined library
+file (``sam_lib.hdf5``).
+
+Notes
+-----
+As a script, this submodule runs in parallel, with the main processor loading a holodeck library
+(from a single, combined HDF5 file), and distributes simulations to the secondary processors.  The
+secondary processors then perform analytic fits to the GWB spectra.  What functional forms are fit,
+and using how many frequency bins, is easily adjustable.  Currently, the implemented functions are:
+
+* A power-law, with two parameters (amplitude and spectral index),
+* A power-law with turnover model, using four parameters: the normal amplitude and spectral index,
+  in addition to a break frequency, and a spectral index below the break frequency.
+
+A variety of numbers-of-frequency-bins are also fit, which are specified in the ``FITS_NBINS_PLAW``
+and ``FITS_NBINS_TURN`` variables.
+
+The methods used in this submodule are easily adaptable as API methods.
+
 """
 
 import argparse
@@ -53,7 +79,7 @@ def main():
 
 
 def fit_library_spectra(library_path, log, recreate=False):
-    """Calculate line fits to library spectra using MPI.
+    """Calculate analytic fits to library spectra using MPI.
     """
 
     # make sure MPI is working
@@ -318,3 +344,5 @@ def fit_spectra_turn(comm, freqs, psd, nbins_list=FITS_NBINS_TURN):
     return nbins_list, fits
 
 
+if __name__ == "__main__":
+    main()

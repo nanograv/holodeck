@@ -22,7 +22,7 @@ class PS_Test_Wout_Defaults(_Param_Space):
     """Simple test parameter space in 2D, NOT including default parameters (`DEFAULTS`).
     """
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
         parameters = [
             PD_Uniform("mmb_mamp_log10", *MMB_MAMP_LOG10_EXTR),   # [log10(Msol)]
             PD_Uniform("gsmf_phi0_log10", *GSMF_PHI0_LOG10_EXTR),
@@ -84,7 +84,7 @@ class PS_Test_With_Defaults(_Param_Space):
         mmb_scatter_dex=0.3,
     )
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
         parameters = [
             PD_Uniform("mmb_mamp_log10", *MMB_MAMP_LOG10_EXTR),   # [log10(Msol)]
             PD_Uniform("gsmf_phi0_log10", *GSMF_PHI0_LOG10_EXTR),
@@ -222,7 +222,7 @@ def test__ps_test_wout_defaults():
 
     # class (not instance) should also be able to generate model
     SAM_SHAPE = 11
-    sam, hard = pspace_class.model_for_params(params, sam_shape=SAM_SHAPE)
+    sam, hard = pspace_class().model_for_params(params, sam_shape=SAM_SHAPE)
     _check_sam_hard(sam, hard, SAM_SHAPE)
 
     return
@@ -239,7 +239,7 @@ def test__ps_test_with_defaults():
     )
 
     SAM_SHAPE = 11
-    sam, hard = pspace_class.model_for_params(params, sam_shape=SAM_SHAPE)
+    sam, hard = pspace_class().model_for_params(params, sam_shape=SAM_SHAPE)
     _check_sam_hard(sam, hard, SAM_SHAPE)
 
     return
