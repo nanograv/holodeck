@@ -1056,6 +1056,19 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
     return rv
 
 
+def std(vals, weights):
+    """Weighted standard deviation (stdev).
+
+    See: https://www.itl.nist.gov/div898/software/dataplot/refman2/ch2/weightsd.pdf
+    """
+    mm = np.count_nonzero(weights)
+    ave = np.sum(vals*weights) / np.sum(weights)
+    num = np.sum(weights * (vals - ave)**2)
+    den = np.sum(weights) * (mm - 1) / mm
+    std = np.sqrt(num/den)
+    return std
+
+
 def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = True):
     """Perform a cumulative integration along the given axis.
 
@@ -1343,7 +1356,33 @@ def _func_gaussian(xx, aa, mm, ss):
     return yy
 
 
-def fit_gaussian(xx, yy, guess=[1.0, 0.0, 1.0]):
+def fit_gaussian(xx, yy, guess=None):
+    """Fit a Gaussian/Normal distribution with the given initial guess of parameters.
+
+    Arguments
+    ---------
+    xx : array, (N,)
+    yy : array, (N,)
+    guess : None or (3,) array of float
+        Initial parameter values as starting point of fit.  The values correspond to:
+        [amplitude, mean, stdev].
+        If ``guess`` is None, then the maximum, mean, and stdev of the given values are used as a
+        starting point.
+
+    Return
+    ------
+    popt : (3,) array of float
+        Best fit parameters: [amplitude, mean, stdev]
+    pcov : (3, 3) array of float
+        Covariance matrix of best fit parameters.
+
+    """
+    if guess is None:
+        amp = np.max(yy)
+        mean = np.sum(xx * yy) / np.sum(yy)
+        stdev = std(xx, yy)
+        guess = [amp, mean, stdev]
+
     popt, pcov = sp.optimize.curve_fit(_func_gaussian, xx, yy, p0=guess, maxfev=10000)
     return popt, pcov
 
@@ -1867,14 +1906,13 @@ def eddington_accretion(mass, eps=0.1):
         Eddington accretion rate.
 
     """
-    edd_lum = eddington_luminosity(mass, eps=eps)
-    # NOTE: no `epsilon` (efficiency) in this equation, because included in `eddington_luminosity`
-    mdot = edd_lum/np.square(SPLC)
+    edd_lum = eddington_luminosity(mass)
+    mdot = edd_lum / eps / np.square(SPLC)
     return mdot
 
 
-def eddington_luminosity(mass, eps=0.1):
-    ledd = EDDT * mass / eps
+def eddington_luminosity(mass):
+    ledd = EDDT * mass
     return ledd
 
 
