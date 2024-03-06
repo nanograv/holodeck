@@ -17,6 +17,10 @@ from holodeck.librarian import (
     DEF_NUM_FBINS, DEF_NUM_LOUDEST, DEF_NUM_REALS, DEF_PTA_DUR,
 )
 
+PARAM_NAMES__ERROR = [
+    ["gsmf_phi0", "Use `gsmf_phi0_log10` instead!"],
+]
+
 
 class _Param_Space(abc.ABC):
     """Base class for generating holodeck libraries.  Defines the parameter space and settings.
@@ -87,6 +91,14 @@ class _Param_Space(abc.ABC):
                 log.exception(err)
                 raise ValueError(err)
 
+            # Check parameter names to make sure they're not on the error list
+            for pname, msg in PARAM_NAMES__ERROR:
+                if pname != name:
+                    continue
+                err = f"Found '{name}' in parameters: {msg}"
+                log.exception(err)
+                raise ValueError(err)
+
         if (nsamples is None) or (npars == 0):
             log.warning(f"{self}: {nsamples=} {npars=} - cannot generate parameter samples.")
             uniform_samples = None
@@ -136,6 +148,14 @@ class _Param_Space(abc.ABC):
 
         settings = self.DEFAULTS.copy()
         for name, value in params.items():
+            # Check parameter names to make sure they're not on the error list
+            for pname, msg in PARAM_NAMES__ERROR:
+                if pname != name:
+                    continue
+                err = f"Found '{name}' in parameters: {msg}"
+                self._log.exception(err)
+                raise ValueError(err)
+
             settings[name] = value
 
         # ---- Construct SAM and hardening model
