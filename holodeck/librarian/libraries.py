@@ -18,8 +18,12 @@ from holodeck.librarian import (
 )
 
 PARAM_NAMES__ERROR = [
-    ["gsmf_phi0", "Use `gsmf_phi0_log10` instead!"],
+    # ["gsmf_phi0", "Use `gsmf_phi0_log10` instead!"],
 ]
+
+PARAM_NAMES_REPLACE = {
+    "gsmf_phi0": ["gsmf_phi0_log10", None],
+}
 
 
 class _Param_Space(abc.ABC):
@@ -84,7 +88,6 @@ class _Param_Space(abc.ABC):
         param_names = []
         for param in parameters:
             name = param.name
-            param_names.append(name)
 
             if not isinstance(param, _Param_Dist):
                 err = f"{name}: {param} is not a `_Param_Dist` object!"
@@ -98,6 +101,24 @@ class _Param_Space(abc.ABC):
                 err = f"Found '{name}' in parameters: {msg}"
                 log.exception(err)
                 raise ValueError(err)
+
+            for pname, replace in PARAM_NAMES_REPLACE.items():
+                if pname != name:
+                    continue
+                new_name, new_func = replace
+                msg = f"Found '{name}' in parameters, should be '{new_name}'!"
+                log.error(msg)
+                # When there is no change in the parameter VALUES, we can just change the name
+                if new_func is None:
+                    name = new_name
+                    msg = f"Replacing '{name}' ==> '{new_name}'!"
+                    log.error(msg)
+                else:
+                    err = f"CANNOT replace '{name}' ==> '{new_name}'!"
+                    log.exception(err)
+                    raise ValueError(err)
+
+            param_names.append(name)
 
         if (nsamples is None) or (npars == 0):
             log.warning(f"{self}: {nsamples=} {npars=} - cannot generate parameter samples.")
@@ -148,6 +169,23 @@ class _Param_Space(abc.ABC):
 
         settings = self.DEFAULTS.copy()
         for name, value in params.items():
+
+            for pname, replace in PARAM_NAMES_REPLACE.items():
+                if pname != name:
+                    continue
+                new_name, new_func = replace
+                msg = f"Found '{name}' in parameters, should be '{new_name}'!"
+                self._log.error(msg)
+                name = new_name
+                if new_func is None:
+                    new_value = value
+                else:
+                    new_value = new_func(value)
+
+                msg = f"Replacing '{name}' ==> '{new_name}' ({value} ==> {new_value})!"
+                self._log.error(msg)
+                value = new_value
+
             # Check parameter names to make sure they're not on the error list
             for pname, msg in PARAM_NAMES__ERROR:
                 if pname != name:
