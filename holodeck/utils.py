@@ -585,10 +585,7 @@ def frac_str(vals, prec=2):
     return rv
 
 
-def interp(
-    xnew: npt.ArrayLike, xold: npt.ArrayLike, yold: npt.ArrayLike,
-    left: float = np.nan, right: float = np.nan, xlog: bool = True, ylog: bool = True,
-) -> npt.ArrayLike:
+def interp(xnew, xold, yold, left=np.nan, right=np.nan, xlog=True, ylog=True):
     """Linear interpolation of the given arguments in log/lin-log/lin space.
 
     Parameters
