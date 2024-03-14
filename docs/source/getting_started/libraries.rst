@@ -69,6 +69,8 @@ In the preceding example, a :py:class:`holodeck.librarian.param_spaces_classic.P
 
 A copy of the parameter-space instance itself (in this case an instance of :py:class:`~holodeck.librarian.param_spaces_classic.PS_Classic_Phenom_Uniform`) is saved as a numpy npz file to output directory also.  This allows for the library generation to be resumed if it is halted (or fails) part way through, and also ensures that the specifications for the parameter space are easily accessible.
 
+A more complicated job execution script which works for the SLURM job scheduler, is included in the file: `scripts/run_holodeck_lib_gen.sh <https://github.com/nanograv/holodeck/blob/dev/scripts/run_holodeck_lib_gen.sh>`.
+
 
 Analytic GWB Fits to Libraries
 ==============================
