@@ -180,7 +180,7 @@ class Band:
         self.flux_ref_wlen = ap.units.Quantity(ref_flux_wlen, UNITS_FLUX_WLEN)
         self.flux_ref_freq = ap.units.Quantity(flux_ref_freq, UNITS_FLUX_FREQ)
         self.bandwidth_freq = bandwidth_freq
-        self.bandwidth_freq = bandwidth_wlen
+        self.bandwidth_wlen = bandwidth_wlen
         return
 
     def __str__(self):

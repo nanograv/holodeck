@@ -127,7 +127,7 @@ These are provided here for easy copy-and-paste usage in other files.
     Gravitational Waves from Supermassive Black Hole Coalescence in a Hierarchical Galaxy Formation Model
     https://ui.adsabs.harvard.edu/abs/2004ApJ...615...19E/abstract
 
-.. [Genel2014] : Genel et al. (2014), MNRAS, 445, 1.
+.. [Genel2014] Genel et al. (2014), MNRAS, 445, 1.
    Introducing the Illustris project: the evolution of galaxy populations across cosmic time
    https://ui.adsabs.harvard.edu/abs/2014MNRAS.445..175G
 
@@ -138,6 +138,14 @@ These are provided here for easy copy-and-paste usage in other files.
 .. [WMAP9] Hinshaw, Larson, Komatsu et al. 2013. ApJS, 208, 2. (1212.5226).
     Nine-year Wilkinson Microwave Anisotropy Probe (WMAP) Observations: Cosmological Parameter Results.
     https://ui.adsabs.harvard.edu/abs/2013ApJS..208...19H/abstract
+
+.. [Heggie1975] Heggie (1975), MNRAS, 173,.
+   Binary evolution in stellar dynamics.
+   https://ui.adsabs.harvard.edu/abs/1975MNRAS.173..729H
+
+.. [Hills1975] Hills (1975), AJ, 80,.
+   Encounters between binary and single stars and their effect on the dynamical evolution of stellar systems.
+   https://ui.adsabs.harvard.edu/abs/1975AJ.....80..809H
 
 .. [Hogg1999] Hogg 1999.  arXiv. (astro-ph/9905116).
     Distance measures in cosmology.
