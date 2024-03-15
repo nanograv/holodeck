@@ -55,7 +55,7 @@ PSPACE_FILE_SUFFIX = ".pspace.npz"
 from . libraries import (      # noqa
     _Param_Space, _Param_Dist,
     PD_Uniform, PD_Normal,
-    run_model,
+    run_model, load_pspace_from_path,
 )
 
 param_spaces_dict = {}    #: Registry of standard parameter-spaces
