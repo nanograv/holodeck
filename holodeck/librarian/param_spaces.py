@@ -382,6 +382,9 @@ class PS_Astro_Strong_MMBulge(_PS_Astro_Strong):
 
 _param_spaces_dict = {
     'PS_Astro_Strong_All': PS_Astro_Strong_All,
-    'PS_Astro_Strong_Hard_Only': PS_Astro_Strong_Hard_Only,
+    'PS_Astro_Strong_Hard': PS_Astro_Strong_Hard,
+    'PS_Astro_Strong_GSMF': PS_Astro_Strong_GSMF,
+    'PS_Astro_Strong_GMR': PS_Astro_Strong_GMR,
+    'PS_Astro_Strong_MMBulge': PS_Astro_Strong_MMBulge,
 }
 
