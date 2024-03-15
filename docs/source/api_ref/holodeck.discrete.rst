@@ -2,8 +2,6 @@
 holodeck.discrete module
 ========================
 
-This module handles generating MBH binary populations using discrete samples of MBH binaries, typically from a cosmological simulation such as illustris.
-
 .. automodule:: holodeck.discrete
     :members:
     :private-members:

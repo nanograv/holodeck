@@ -127,7 +127,7 @@ These are provided here for easy copy-and-paste usage in other files.
     Gravitational Waves from Supermassive Black Hole Coalescence in a Hierarchical Galaxy Formation Model
     https://ui.adsabs.harvard.edu/abs/2004ApJ...615...19E/abstract
 
-.. [Genel2014] : Genel et al. (2014), MNRAS, 445, 1.
+.. [Genel2014] Genel et al. (2014), MNRAS, 445, 1.
    Introducing the Illustris project: the evolution of galaxy populations across cosmic time
    https://ui.adsabs.harvard.edu/abs/2014MNRAS.445..175G
 
