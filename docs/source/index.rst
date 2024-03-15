@@ -2,7 +2,7 @@
 holodeck
 ========
 
-.. include:: ../header.rst
+.. include:: header.rst
 
 **Massive Black-Hole Binary Population Synthesis for Gravitational Wave Calculations ≋●≋●≋**
 
