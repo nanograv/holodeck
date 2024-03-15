@@ -189,6 +189,16 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
                 h5.create_dataset('sspar', data=sspar)
                 h5.create_dataset('bgpar', data=bgpar)
         h5.attrs['param_names'] = np.array(param_names).astype('S')
+        # new in librarian-v1.1
+        h5.attrs['parameter_space_class_name'] = pspace.name
+        h5.attrs['holodeck_version'] = holo.__version__
+        # I'm not sure if this can/will throw errors, but don't let the combination fail if it does.
+        try:
+            git_hash = holo.utils.get_git_hash()
+        except:  # noqa
+            git_hash = "None"
+        h5.attrs['holodeck_git_hash'] = git_hash
+        h5.attrs['holodeck_librarian_version'] = holo.librarian.__version__
 
     log.warning(f"Saved to {lib_path}, size: {holo.utils.get_file_size(lib_path)}")
 
