@@ -139,6 +139,14 @@ These are provided here for easy copy-and-paste usage in other files.
     Nine-year Wilkinson Microwave Anisotropy Probe (WMAP) Observations: Cosmological Parameter Results.
     https://ui.adsabs.harvard.edu/abs/2013ApJS..208...19H/abstract
 
+.. [Heggie1975] Heggie (1975), MNRAS, 173,.
+   Binary evolution in stellar dynamics.
+   https://ui.adsabs.harvard.edu/abs/1975MNRAS.173..729H
+
+.. [Hills1975] Hills (1975), AJ, 80,.
+   Encounters between binary and single stars and their effect on the dynamical evolution of stellar systems.
+   https://ui.adsabs.harvard.edu/abs/1975AJ.....80..809H
+
 .. [Hogg1999] Hogg 1999.  arXiv. (astro-ph/9905116).
     Distance measures in cosmology.
     https://ui.adsabs.harvard.edu/abs/1999astro.ph..5116H
