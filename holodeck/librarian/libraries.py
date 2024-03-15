@@ -34,7 +34,7 @@ class _Param_Space(abc.ABC):
     """
 
     _SAVED_ATTRIBUTES = [
-        "sam_shape", "param_names", "_uniform_samples", "param_samples",
+        "sam_shape", "param_names", "_uniform_samples", "param_samples", "_nsamples", "_nparameters"
     ]
 
     DEFAULTS = {}
@@ -75,8 +75,8 @@ class _Param_Space(abc.ABC):
             np.random.set_state(random_state)
 
         try:
-            npars = len(parameters)
-            assert npars > 0
+            nparameters = len(parameters)
+            assert nparameters > 0
         except (TypeError, AssertionError) as err:
             msg = "`parameters` must be a list of `_Param_Dist` subclasses!"
             log.exception(msg)
@@ -120,13 +120,13 @@ class _Param_Space(abc.ABC):
 
             param_names.append(name)
 
-        if (nsamples is None) or (npars == 0):
-            log.warning(f"{self}: {nsamples=} {npars=} - cannot generate parameter samples.")
+        if (nsamples is None) or (nparameters == 0):
+            log.warning(f"{self}: {nsamples=} {nparameters=} - cannot generate parameter samples.")
             uniform_samples = None
             param_samples = None
         else:
             # if strength = 2, then n must be equal to p**2, with p prime, and d <= p + 1
-            lhc = sp.stats.qmc.LatinHypercube(d=npars, strength=1, seed=seed)
+            lhc = sp.stats.qmc.LatinHypercube(d=nparameters, strength=1, seed=seed)
             # (S, D) - samples, dimensions
             uniform_samples = lhc.random(n=nsamples)
             param_samples = np.zeros_like(uniform_samples)
@@ -135,7 +135,8 @@ class _Param_Space(abc.ABC):
                 param_samples[:, ii] = param(uniform_samples[:, ii])
 
         self._log = log
-        self._npars = npars
+        self._nparameters = nparameters
+        self._nsamples = nsamples
         self._seed = seed
         self._random_state = random_state
         self.sam_shape = sam_shape
@@ -216,7 +217,8 @@ class _Param_Space(abc.ABC):
     def save(self, path_output):
         """Save the generated samples and parameter-space info from this instance to an output file.
 
-        This data can then be loaded using the `_Param_Space.from_save` method.
+        This data can then be loaded using the ``_Param_Space.from_save`` method.
+        NOTE: existing save files with the same name will be overwritten!
 
         Arguments
         ---------
@@ -225,7 +227,7 @@ class _Param_Space(abc.ABC):
 
         Returns
         -------
-        fname : str
+        fname : ``pathlib.Path`` object
             Output path including filename in which this parameter-space was saved.
 
         """
@@ -286,15 +288,36 @@ class _Param_Space(abc.ABC):
             pspace_class = cls
 
         # construct instance with dummy/temporary values (which will be overwritten)
-        space = pspace_class(log=log)
-        if class_name != space.__class__.__name__:
-            err = "loaded class name '{class_name}' does not match this class name '{space.__name__}'!"
+        nsamples = data['param_samples'].shape[0]
+        nparameters = data['param_samples'].shape[1]
+        param_names = data['param_names']
+        space = pspace_class(nsamples=nsamples, log=log)
+        if class_name != space.name:
+            err = "loaded class name '{class_name}' does not match this class's name '{space.name}'!"
             log.warning(err)
-            # raise RuntimeError(err)
+        if not all([pname_load == pname_class for pname_load, pname_class in zip(param_names, space.param_names)]):
+            err = (
+                f"Mismatch between loaded parameter names ({param_names}) "
+                f"and class parameter names ({space.param_names})!"
+            )
+            log.exception(err)
+            raise RuntimeError(err)
 
         # Store loaded parameters into the parameter-space instance
         for key in space._SAVED_ATTRIBUTES:
-            setattr(space, key, data[key][()])
+            # Load from save data
+            try:
+                val = data[key][()]
+            # Handle special elements that may not be saved in older files
+            except KeyError:
+                if key == '_nsamples':
+                    val = nsamples
+                elif key == '_nparameters':
+                    val = nparameters
+                else:
+                    raise
+
+            setattr(space, key, val)
 
         return space
 
@@ -317,11 +340,11 @@ class _Param_Space(abc.ABC):
 
     @property
     def nsamples(self):
-        return self.lib_shape[0]
+        return self._nsamples
 
     @property
-    def npars(self):
-        return self._npars
+    def nparameters(self):
+        return self._nparameters
 
     def model_for_sample_number(self, samp_num, sam_shape=None):
         params = self.param_dict(samp_num)
@@ -354,8 +377,8 @@ class _Param_Space(abc.ABC):
 
         """
         if np.ndim(vals) == 0:
-            vals = self.npars * [vals]
-        assert len(vals) == self.npars
+            vals = self.nparameters * [vals]
+        assert len(vals) == self.nparameters
 
         params = {}
         for ii, pname in enumerate(self.param_names):
@@ -883,7 +906,7 @@ def load_pspace_from_path(path, space_class=None, log=None):
         File that `space` was loaded from.
 
     """
-    path = Path(path)
+    path = Path(path).absolute().resolve()
     if not path.exists():
         raise RuntimeError(f"path {path} does not exist!")
 
