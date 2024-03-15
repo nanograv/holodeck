@@ -48,8 +48,7 @@ import holodeck as holo
 from holodeck import cosmo, utils, log
 from holodeck.constants import SPLC, MSOL, MPC
 from holodeck import relations, single_sources
-# from . import sam_cyutils
-from holodeck.sams.comps import (
+from holodeck.sams.components import (
     _Galaxy_Pair_Fraction, _Galaxy_Stellar_Mass_Function, _Galaxy_Merger_Time, _Galaxy_Merger_Rate,
     GSMF_Schechter, GPF_Power_Law, GMT_Power_Law, GMR_Illustris
 )
@@ -157,7 +156,7 @@ class Semi_Analytic_Model:
             if shape is not None:
                 if shape[ii] is not None:
                     par[2] = shape[ii]
-            params[ii] = np.logspace(*np.log10(par[:2]), par[2]+1)
+            params[ii] = np.logspace(*np.log10(par[:2]), par[2])
             log.debug(f"{name}: [{params[ii][0]}, {params[ii][-1]}] {params[ii].size}")
 
         mtot, mrat, redz = params

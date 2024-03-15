@@ -48,7 +48,7 @@ Semi-Analytic Models (SAMs)
 
 |holodeck| SAMs are handled in the :py:mod:`holodeck.sams` module.  The core of the module is the |sam_class| class, in the: :py:mod:`holodeck.sams.sam` file.
 
-The SAMs use simple, analytic components to calculate populations of binaries.  The |sam_class| handles and stores these components which themselves are defined in the :py:mod:`holodeck.sams.comps` file.  Holodeck calculates the number-density of MBH binaries, by calculating a number-density of galaxy-galaxy mergers, and then converting from galaxy properties to MBH properties by using an MBH-host relationship.
+The SAMs use simple, analytic components to calculate populations of binaries.  The |sam_class| handles and stores these components which themselves are defined in the :py:mod:`holodeck.sams.components` file.  Holodeck calculates the number-density of MBH binaries, by calculating a number-density of galaxy-galaxy mergers, and then converting from galaxy properties to MBH properties by using an MBH-host relationship.
 
 The SAMs are initialized over a 3-dimensional parameter space of total MBH mass (:math:`M = m_1 + m_2`), MBH mass ratio (:math:`q = m_2 / m_1 \leq 1`), and redshift (:math:`z`).  The |holodeck| code typically refers to the number of bins in each of these dimensions as ``M``, ``Q``, and ``Z``; for example, the shape of the number-density of galaxy mergers will be ``(M, Q, Z)``.  Most calculations retrieve the number of binaries in the Universe at a given set of frequencies (or sometimes binary separations), so the returned values will be 4-dimensional with an additional axis with ``F`` frequency bins added.  For example, the number of binaries at a given set of frequencies will typically be arrays of shape ``(M, Q, Z, F)``.
 
@@ -71,10 +71,10 @@ Here, :math:`M_\star = m_{1,\star} + m_{2,\star}` is the total stellar mass of b
 
 **Implementation:**  Each component (GSMF, GMR, GPF, GMT) is implemented by constructing a class that inherits from the appropriate base classes:
 
-* GSMF: :py:class:`~holodeck.sams.comps._Galaxy_Stellar_Mass_Function`, for example the  :py:class:`~holodeck.sams.comps.GSMF_Schechter` class.
-* GMR: :py:class:`~holodeck.sams.comps._Galaxy_Merger_Rate`, for example the  :py:class:`~holodeck.sams.comps.GMR_Illustris` class.
-* GPF: :py:class:`~holodeck.sams.comps._Galaxy_Pair_Fraction`, for example the  :py:class:`~holodeck.sams.comps.GPF_Power_Law` class.
-* GMT: :py:class:`~holodeck.sams.comps._Galaxy_Merger_Time`, for example the  :py:class:`~holodeck.sams.comps.GMT_Power_Law` class.
+* GSMF: :py:class:`~holodeck.sams.components._Galaxy_Stellar_Mass_Function`, for example the  :py:class:`~holodeck.sams.components.GSMF_Schechter` class.
+* GMR: :py:class:`~holodeck.sams.components._Galaxy_Merger_Rate`, for example the  :py:class:`~holodeck.sams.components.GMR_Illustris` class.
+* GPF: :py:class:`~holodeck.sams.components._Galaxy_Pair_Fraction`, for example the  :py:class:`~holodeck.sams.components.GPF_Power_Law` class.
+* GMT: :py:class:`~holodeck.sams.components._Galaxy_Merger_Time`, for example the  :py:class:`~holodeck.sams.components.GMT_Power_Law` class.
 
 The classes need to expose a ``__call__`` method (i.e. the class instances themselves are callable) which accepts the appropriate arguments and returns the particular distribution.
 
