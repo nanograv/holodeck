@@ -257,8 +257,8 @@ class _Param_Space(abc.ABC):
         return fname
 
     @classmethod
-    def from_save(cls, fname, log):
-        """Create a new _Param_Space instance loaded from the given file.
+    def from_save(cls, fname, log=None):
+        """Create a new _Param_Space instance loaded from the given save file.
 
         Arguments
         ---------
@@ -267,9 +267,11 @@ class _Param_Space(abc.ABC):
 
         Returns
         -------
-        space : `_Param_Space` instance
+        space : `_Param_Space` subclass instance
 
         """
+        if log is None:
+            log = holo.log
         log.debug(f"loading parameter space from {fname}")
         data = np.load(fname, allow_pickle=True)
 
@@ -277,7 +279,6 @@ class _Param_Space(abc.ABC):
         # `holodeck.param_spaces` module
         class_name = data['class_name'][()]
         log.debug(f"loaded: {class_name=}, vers={data['librarian_version']}")
-        # pspace_class = getattr(holo.param_spaces, class_name, None)
         pspace_class = holo.librarian.param_spaces_dict.get(class_name, None)
         # if it is not found, default to the current class/subclass
         if pspace_class is None:
@@ -285,7 +286,7 @@ class _Param_Space(abc.ABC):
             pspace_class = cls
 
         # construct instance with dummy/temporary values (which will be overwritten)
-        space = pspace_class(log, 10, 10, None)
+        space = pspace_class(log=log)
         if class_name != space.__class__.__name__:
             err = "loaded class name '{class_name}' does not match this class name '{space.__name__}'!"
             log.warning(err)
@@ -857,8 +858,11 @@ def _calc_model_details(edges, redz_final, number):
     return gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final
 
 
-def load_pspace_from_path(log, path, space_class=None):
-    """Load a `_Param_Space` instance from the saved file in the given directory.
+def load_pspace_from_path(path, space_class=None, log=None):
+    """Load a `_Param_Space` subclass instance from the saved file in the given directory.
+
+    This function tries to determine the correct class based on the save file name, then uses that
+    class to load the save itself.
 
     Parameters
     ----------
@@ -866,12 +870,13 @@ def load_pspace_from_path(log, path, space_class=None):
         Path to directory containing save file.
         A single file matching `*.pspace.npz` is required in that directory.
         NOTE: the specific glob pattern is specified by `holodeck.librarian.PSPACE_FILE_SUFFIX` e.g. '.pspace.npz'
-    space_class : `_Param_Space` subclass
+    space_class : `_Param_Space` subclass  or  `None`
         Class with which to call the `from_save()` method to load a new `_Param_Space` instance.
+        If `None` is given, then the filename is used to try to determine the appropriate class.
+    log : `logging.Logger`
 
     Returns
     -------
-    log : `logging.Logger`
     space : `_Param_Space` subclass instance
         An instance of the `space_class` class.
     space_fname : pathlib.Path
@@ -902,7 +907,7 @@ def load_pspace_from_path(log, path, space_class=None):
     if space_class is None:
         space_class = _get_space_class_from_space_fname(space_fname)
 
-    space = space_class.from_save(space_fname, log)
+    space = space_class.from_save(space_fname, log=log)
     return space, space_fname
 
 
