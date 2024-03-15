@@ -1,47 +1,33 @@
-# Documents and Documentation
+Documents and Documentation
+===========================
 
 The docs for this project are built with `Sphinx <http://www.sphinx-doc.org/en/master/>`_, and hosted on `readthedocs <https://holodeck-gw.readthedocs.io/en/main/>`_.  The ``sphinx`` configuration is in the ``docs/source/conf.py`` file.
 
+readthedocs will update the online documentation on new tags.
 
-## Building Documentation
 
-1) Make sure the requirements are installed:
+Building Documentation Locally
+------------------------------
 
-    ```bash
+(1) Make sure the requirements are installed using one of the commands:
+
+.. code-block:: bash
+
     pip install docs/requirements.txt
-    ```
-
-    or
-
-    ```bash
+    # OR
     conda install --file docs/requirements.txt
-    ```
-
-2) Build the documentation
-
-    ```bash
-    ./docs/docgen.sh
-    ```
-
-The resulting documentation can be found in the `docs/build` directory, in particular the `docs/build/html/index.html` file.
-
-## Contents
-
-* build/
-  * This is the output directory for sphinx builds
-* references/
-  * PDF files of relevant reference material, mostly published papers
-* source/
-  * Source files for holodeck documentation.  This is a combination of manually and automatically generated files.  In general, manually created files should live in the `source/` root directory, while automatic files should be stored in subdirectories (e.g. `apidoc_modules`)
-* docgen.sh
-  * Script to run the sphinx document generation project
-* requirements.txt
-  * Requirements specific to documentation and the sphinx build.
 
 
-## Notes
+(2) Build the documentation
 
-* readthedocs will update the [online documentation](https://holodeck-gw.readthedocs.io/en/main/) on new branches and new tags.
-* `sphinx-apidoc` should be run automatically on readthedocs builds using the code in the bottom of the `conf.py` file.
-* Citations/References
-  * All citations should be defined in the `docs/source/biblio.rst` file.  In individual files that make citations, a smaller references section should be added that link to the `biblio.rst` entries.  If the citations are defined in both places, the links will not behave properly and there will be sphinx build errors.
+.. code-block:: bash
+
+    make html
+
+The resulting documentation can be found in the ``docs/build`` directory, in particular the ``docs/build/html/index.html`` file.  A symlink is also created in the local directory: ``docs/readthedocs.html``.
+
+
+Additional Notes
+----------------
+
+* **Citations/References**: All citations should be defined in the ``docs/source/biblio.rst`` file.  In individual files that make citations, a smaller references section should be added that link to the ``biblio.rst`` entries.  See the bottom of the ``docs/source/biblio.rst`` file for the formatting of references.  PDF copies of many important reference papers are inclues in the ``docs/references/`` subfolder.
