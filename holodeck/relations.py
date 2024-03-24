@@ -1,7 +1,7 @@
 """Empirical and phenomenological scaling relationships.
 
 This module defines numerous classes and accessor methods to implement scaling relationships between
-different empirical quantities, for example BH-Galaxy relations, or Stellar-Mass vs Halo-Mass
+different empirical quantities, for example BH--Galaxy relations, or Stellar-Mass vs Halo-Mass
 relations.  `abc` base classes are used to implement generic functionality, and define APIs while
 subclasses are left to perform specific implementations.  In general most classes implement both
 the forward and reverse versions of relationships (e.g. stellar-mass to halo-mass, and also
@@ -10,20 +10,26 @@ halo-mass to stellar-mass).  Reverse relationships are often interpolated over a
 Most of the relationships currently implemented are among three groups (and corresponding base
 classes):
 
-* **BH-Host Relations** (`_Host_Relation`): These produce mappings between host galaxy properties
+* **BH-Host Relations** (``_BH_Host_Relation``): These produce mappings between host galaxy properties
   (e.g. bulge mass) and the properties of their black holes (i.e. BH mass).
 
-  * **Mbh-Mbulge relations** ("M-Mbulge"; `_MMBulge_Relation`): mapping from host galaxy stellar
+  * **Mbh-Mbulge relations** ("M-Mbulge"; ``_MMBulge_Relation``): mapping from host galaxy stellar
     bulge mass to black-hole mass.
-  * **Mbh-Sigma relations** ("M-Sigma"; `_MSigma_Relation`): mapping from host galaxy velocity
+
+  * **Mbh-Sigma relations** ("M-Sigma"; ``_MSigma_Relation``): mapping from host galaxy velocity
     dispersion (sigma) to black-hole mass.
 
-* **Density Profiles** (`_Density_Profile`): matter density as a function of spherical radius.
-* **Stellar-Mass vs. Halo-Mass Relations** (`_StellarMass_HaloMass`): mapping from halo-mass to
+* **Density Profiles** (``_Density_Profile``): matter density as a function of spherical radius.
+
+* **Stellar-Mass vs. Halo-Mass Relations** (``_StellarMass_HaloMass``): mapping from halo-mass to
   stellar-mass.
 
-To-Do
+Notes
 -----
+
+
+Relations: To-Do
+----------------
 * Pass concentration-relation (or other method to calculate) to NFW classes on instantiation
 * For redshift-dependent extensions to relations, use multiple-inheritance instead of repeating
   attributes.
@@ -50,8 +56,33 @@ from holodeck import cosmo, utils, log
 from holodeck.constants import MSOL, NWTG, KMPERSEC
 
 
-class _Host_Relation(abc.ABC):
+# ---------------------------------------------
+# ----     Bulge-Fraction Relationships    ----
+# ---------------------------------------------
+
+
+class _Bulge_Frac(abc.ABC):
+    """Base class for calculating stellar-bulge mass fractions.
+    """
+
+    @abc.abstractmethod
+    def bulge_frac(mstar, redz=None, mhalo=None, **kwargs):
+        """Obtain the fraction of the galaxy stellar-mass contained in the stellar bulge.
+        """
+        return
+
+    def __call__(self, *args, **kwargs):
+        return self.bulge_frac(*args, **kwargs)
+
+
+class _BH_Host_Relation(abc.ABC):
     """Base class for general relationships between MBHs and their host galaxies.
+
+    This base-class is mostly organizational.  For **discrete** populations, it specifies the API
+    method ``get_host_properties`` which is a generic interface to derive BH masses from arbitrary
+    properties of host galaxies (e.g. velocity dispersion, bulge mass, etc).  This must be
+    implemented by the subclasses.  For **SAMs**, this base class provides no functionality.
+
     """
 
     _PROPERTIES = []    #: list of property names to retrieve from population instances.
@@ -97,12 +128,14 @@ class _Host_Relation(abc.ABC):
     def mbh_from_host(self, pop, *args, **kwargs) -> np.ndarray:
         """Convert from abstract host galaxy properties to blackhole mass.
 
-        The `pop` instance must contain the attributes required for this class's scaling relations.
-        The required properties are stored in this class's `_PROPERTIES` attribute.
+        This method is intended for discrete (e.g. illustris) based populations.
+
+        The ``pop`` instance must contain the attributes required for this class's scaling relations.
+        The required properties are stored in this class's ``_PROPERTIES`` attribute.
 
         Parameters
         ----------
-        pop : `_Discrete_Population`,
+        pop : ``_Discrete_Population``,
             Population instance having the attributes required by this particular scaling relation.
 
         Returns
@@ -119,8 +152,15 @@ class _Host_Relation(abc.ABC):
 # -----------------------------------------
 
 
-class _MMBulge_Relation(_Host_Relation):
+class _MMBulge_Relation(_BH_Host_Relation):
     """Base class for implementing Mbh--Mbulge relationships, between MBH and their host galaxies.
+
+    Typically there is an intermediate step of converting from the galaxy total stellar-mass into
+    a bulge mass, so these relations would more accurately be called Mbh-Mstar relationships.  For
+    **discrete** populations, derived classes must provide a BH mass for a given stellar/bulge mass.
+    For **SAMs** derived classes must additionally provide the partial derivatives of the black hole
+    mass (so that galaxy-galaxy number densities can be converted to MBH-MBH number densities).
+
     """
 
     _PROPERTIES = ['mbulge']
@@ -552,7 +592,7 @@ def get_mmbulge_relation(mmbulge: Union[_MMBulge_Relation, Type[_MMBulge_Relatio
 # ----------------------------------------
 
 
-class _MSigma_Relation(_Host_Relation):
+class _MSigma_Relation(_BH_Host_Relation):
     """Base class for 'M-Sigma relations' between BH mass and host velocity dispersion.
     """
 
