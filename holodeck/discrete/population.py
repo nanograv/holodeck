@@ -602,7 +602,7 @@ class PM_Mass_Reset(_Population_Modifier):
 
         Parameters
         ----------
-        mhost : class or instance of `holodeck.relations._Host_Relation`
+        mhost : class or instance of `holodeck.relations._BH_Host_Relation`
             The Mbh-MHost scaling relationship with which to reset population masses.
         scatter : bool, optional
             Include random scatter when resetting masses.
@@ -610,10 +610,10 @@ class PM_Mass_Reset(_Population_Modifier):
 
         """
         # if `mhost` is a class (not an instance), then instantiate it; make sure its a subclass
-        # of `_Host_Relation`
-        mhost = utils.get_subclass_instance(mhost, None, holo.relations._Host_Relation)
+        # of `_BH_Host_Relation`
+        mhost = utils.get_subclass_instance(mhost, None, holo.relations._BH_Host_Relation)
         # store attributes
-        self.mhost = mhost         #: Scaling relationship between host and MBH (`holo.relations._Host_Relation`)
+        self.mhost = mhost         #: Scaling relationship between host and MBH (`holo.relations._BH_Host_Relation`)
         self._scatter = scatter    #: Bool determining whether resampled masses should include statistical scatter
         return
 
