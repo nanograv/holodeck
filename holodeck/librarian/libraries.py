@@ -33,6 +33,8 @@ class _Param_Space(abc.ABC):
 
     """
 
+    __version__ = "0.0"
+
     _SAVED_ATTRIBUTES = [
         "sam_shape", "param_names", "_uniform_samples", "param_samples", "_nsamples", "_nparameters"
     ]
