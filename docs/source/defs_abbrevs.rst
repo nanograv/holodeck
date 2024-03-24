@@ -10,10 +10,14 @@ Abbreviations
 * **AGN**: Active Galactic Nucleus, an accreting massive black hole that produced observable EM emission (radio, optical, X-ray, etc).  Generally used synonymously with "Quasar" which is traditionally a very bright AGN, produced by an MBH accreting at a very high rate.
 * **BH**: Black Hole
 * **CBD**: Circum-Binary Disk, an accretion disk surrounding both components of a binary system.
+* **CSD**: Circum-Single Disk, an accretion disk surrounding a single component of a binary system.
 * **CW**: Continuous Wave, as in Continuous Wave GW source
 * **DF**: Dynamical Friction, the drag force experienced by a massive object moving in a gravitating background.
 * **EM**: Electromagnetic, traditional radiation produced by moving charges (from the radio to optical to gamma-ray).
 * **GR**: General relativity.
+* **GPF**: Galaxy Pair Fraction, the fraction of galaxies in galaxy pairs.
+* **GMR**: Galaxy Merger Rate, the specific rate of galaxy mergers (i.e. the rate of mergers per galaxy).
+* **GMT**: Galaxy Merger Time, the characteristic duration that a galaxy merger takes.  This is typically defined observationally, i.e. the duration of time over which a galaxy merger could be identified in an imaging survey.
 * **GSMF**: Galaxy Stellar-Mass Function, the number-density of galaxies as a function of their stellar mass.
 * **GW/GWB**: Gravitational Waves / Gravitational Wave Background
 * **ISCO**: Inner-most Stable Circular Orbit, the radius or location within which no object can maintain a stable orbit around a black hole.  The radius is dependent on the spin of the black hole, but equal to 3 times the Schwarzschild radius for a non-spinning ($a=0$) black hole.
