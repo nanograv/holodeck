@@ -51,11 +51,12 @@ This package provides a comprehensive framework for MBH binary population synthe
    holodeck.accretion <api_ref/holodeck.accretion>
    holodeck.constants <api_ref/holodeck.constants>
    holodeck.cyutils <api_ref/holodeck.cyutils>
+   holodeck.galaxy_profiles <api_ref/holodeck.galaxy_profiles>
    holodeck.gravwaves <api_ref/holodeck.gravwaves>
    holodeck.hardening <api_ref/holodeck.hardening>
    holodeck.logger <api_ref/holodeck.logger>
    holodeck.plot <api_ref/holodeck.plot>
-   holodeck.relations <api_ref/holodeck.relations>
+   holodeck.host_relations <api_ref/holodeck.host_relations>
    holodeck.utils <api_ref/holodeck.utils>
 
 
