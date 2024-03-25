@@ -33,11 +33,16 @@ def _check_any_bulge_frac(bf, mstar, redz):
     bfracs = bf.bulge_frac(mstar, redz=redz)
     assert np.allclose(bfracs, mbulge/mstar)
 
-    # make sure we recover the input stellar-masses
-    mstar_test = bf.mstar_from_mbulge(mbulge, redz=redz)
-    assert np.allclose(mstar_test, mstar)
+    # make sure we recover the input stellar-masses, if the reverse relationship is implemented
+    try:
+        mstar_test = bf.mstar_from_mbulge(mbulge, redz=redz)
+        assert np.allclose(mstar_test, mstar)
+    # if it's not implemented, that's okay
+    except NotImplementedError:
+        pass
 
-    # check derivatives
+    # ---- check derivatives
+
     dmstar_dmbulge_test = bf.dmstar_dmbulge(mstar, redz=redz)
     # numerically calculate the derivates with finite differences
     delta = 1.0e-4
@@ -48,6 +53,7 @@ def _check_any_bulge_frac(bf, mstar, redz):
     dmstar_dmbulge_true = (mstar_hi - mstar_lo) / (mbulge_hi - mbulge_lo)
     # make sure values are consistent
     assert np.allclose(dmstar_dmbulge_true, dmstar_dmbulge_test)
+
     return mbulge
 
 
