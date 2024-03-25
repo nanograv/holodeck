@@ -147,6 +147,11 @@ class BF_Constant(_Bulge_Frac):
         return 1.0 / self.bulge_frac()
 
 
+_bulge_frac_class_dict = {
+    "BF_Constant": BF_Constant,
+}
+
+
 # --------------------------------------
 # ----     BH-Host Relationships    ----
 # --------------------------------------
@@ -722,6 +727,16 @@ def get_mmbulge_relation(mmbulge: Union[_MMBulge_Relation, Type[_MMBulge_Relatio
 
     """
     return utils.get_subclass_instance(mmbulge, MMBulge_KH2013, _MMBulge_Relation)
+
+
+_mmbulge_relation_class_dict = {
+    "MMBulge_Standard": MMBulge_Standard,
+    "MMBulge_KH2013": MMBulge_KH2013,
+    "MMBulge_MM2013": MMBulge_MM2013,
+    "MMBulge_Redshift": MMBulge_Redshift,
+    "MMBulge_Redshift_MM2013": MMBulge_Redshift_MM2013,
+    "MMBulge_Redshift_KH2013": MMBulge_Redshift_KH2013,
+}
 
 
 # ----------------------------------------
