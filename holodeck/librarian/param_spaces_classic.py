@@ -3,7 +3,7 @@
 
 from holodeck.constants import PC, GYR
 from holodeck.librarian.libraries import _Param_Space, PD_Uniform, PD_Normal
-from holodeck import sams, hardening, relations
+from holodeck import sams, hardening, host_relations
 
 
 class _PS_Classic_Phenom(_Param_Space):
@@ -64,7 +64,7 @@ class _PS_Classic_Phenom(_Param_Space):
             qgamma=params['gmt_qgamma'],
             zbeta=params['gmt_zbeta'],
         )
-        mmbulge = relations.MMBulge_KH2013(
+        mmbulge = host_relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
@@ -210,7 +210,7 @@ class _PS_Classic_GWOnly(_Param_Space):
             qgamma=params['gmt_qgamma'],
             zbeta=params['gmt_zbeta'],
         )
-        mmbulge = relations.MMBulge_KH2013(
+        mmbulge = host_relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
