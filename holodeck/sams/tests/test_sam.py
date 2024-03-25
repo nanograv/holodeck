@@ -66,7 +66,7 @@ def test_sam_basics_gpf_gmt():
 
     # With MMBulge also
 
-    mmbulge = holo.relations.MMBulge_KH2013()
+    mmbulge = holo.host_relations.MMBulge_KH2013()
     sam = holo.sams.Semi_Analytic_Model(mmbulge=mmbulge, gpf=gpf, gmt=gmt, shape=SHAPE)
     _test_sam_basics(sam)
     return
@@ -85,7 +85,7 @@ def test_sam_basics_gmr():
     # With MMBulge and GMT also
 
     gmt = holo.sams.GMT_Power_Law()
-    mmbulge = holo.relations.MMBulge_KH2013()
+    mmbulge = holo.host_relations.MMBulge_KH2013()
     sam = holo.sams.Semi_Analytic_Model(mmbulge=mmbulge, gmr=gmr, gmt=gmt, shape=SHAPE)
     _test_sam_basics(sam)
 

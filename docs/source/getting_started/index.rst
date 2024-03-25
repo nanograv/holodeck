@@ -92,7 +92,7 @@ We now have a galaxy-galaxy merger rate, and we need to populate these galaxies 
 
 where the masses must be evaluated at the appropriate locations: :math:`m_1 = M_\mu(m_{1,\star}) \, \& \, m_2 = M_\mu(m_{2,\star})`.
 
-**Implementation:** M-MBulge relationships are implemented as subclasses inheriting from the :py:class:`holodeck.relations._MMBulge_Relation` class (defined in the :py:mod:`holodeck.relations` file), for example the :py:class:`holodeck.relations.MMBulge_KH2013` class.  Subclasses must implement a number of methods to allow for conversion between stellar bulge-mass and MBH mass.
+**Implementation:** M-MBulge relationships are implemented as subclasses inheriting from the :py:class:`holodeck.host_relations._MMBulge_Relation` class (defined in the :py:mod:`holodeck.host_relations` file), for example the :py:class:`holodeck.host_relations.MMBulge_KH2013` class.  Subclasses must implement a number of methods to allow for conversion between stellar bulge-mass and MBH mass.
 
 
 'Discrete' Illustris Populations

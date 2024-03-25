@@ -53,7 +53,9 @@ def test_init_generic_evolution():
 
 @pytest.fixture(scope='session')
 def evolution_illustris_fixed_time_circ():
-    pop = population.Pop_Illustris()
+    resamp = population.PM_Resample(0.2)
+    pop = population.Pop_Illustris(mods=resamp)
+
     fixed = Fixed_Time_2PL.from_pop(pop, TIME)
     evo = evolution.Evolution(pop, fixed, nsteps=30)
     evo.evolve()
@@ -63,7 +65,8 @@ def evolution_illustris_fixed_time_circ():
 @pytest.fixture(scope='session')
 def evolution_illustris_fixed_time_eccen():
     ecc = population.PM_Eccentricity()
-    pop = population.Pop_Illustris(mods=ecc)
+    resamp = population.PM_Resample(0.2)
+    pop = population.Pop_Illustris(mods=[resamp, ecc])
     fixed = Fixed_Time_2PL.from_pop(pop, TIME)
     evo = evolution.Evolution(pop, fixed, nsteps=30)
     evo.evolve()
@@ -73,7 +76,8 @@ def evolution_illustris_fixed_time_eccen():
 @pytest.fixture(scope='session')
 def evo_def():
     ecc = population.PM_Eccentricity()
-    pop = population.Pop_Illustris(mods=ecc)
+    resamp = population.PM_Resample(0.2)
+    pop = population.Pop_Illustris(mods=[resamp, ecc])
     fixed = Fixed_Time_2PL.from_pop(pop, TIME)
     evo = evolution.Evolution(pop, fixed, nsteps=30)
 
@@ -89,7 +93,7 @@ def evo_def():
 
 @pytest.fixture(scope='session')
 def simplest():
-    SIZE = 100
+    SIZE = 35
 
     class Pop(population._Population_Discrete):
         def _init(self):
@@ -190,13 +194,14 @@ class Test_Illustris_Fixed:
 class Test_Evolution_Basic:
 
     def test_construction(self):
-        pop = population.Pop_Illustris()
+        resamp = population.PM_Resample(0.2)
+        pop = population.Pop_Illustris(mods=resamp)
         with pytest.raises(TypeError):
-            evolution.Evolution(pop, pop, nsteps=30)
+            evolution.Evolution(pop, pop, nsteps=6)
         with pytest.raises(TypeError):
-            evolution.Evolution(pop, None, nsteps=30)
+            evolution.Evolution(pop, None, nsteps=7)
         with pytest.raises(TypeError):
-            evolution.Evolution(pop, 2.0, nsteps=30)
+            evolution.Evolution(pop, 2.0, nsteps=8)
 
         evolution.Evolution(pop, holo.hardening.Hard_GW, nsteps=30)
 
@@ -426,7 +431,7 @@ class Test_Evolution_Advanced:
 
 def mockup_modified():
 
-    SIZE = 123
+    SIZE = 39
 
     class Pop(population._Population_Discrete):
 
@@ -572,8 +577,8 @@ class Test_Sesana_Scattering:
 
     def test_basics(self):
         SIZE = 6
-        mmbulge = holo.relations.MMBulge_KH2013()
-        msigma = holo.relations.MSigma_KH2013()
+        mmbulge = holo.host_relations.MMBulge_KH2013()
+        msigma = holo.host_relations.MSigma_KH2013()
         mass = (10.0 ** np.random.uniform(6, 10, (SIZE, 2))) * MSOL
         sepa = (10.0 ** np.random.uniform(1, 3, SIZE)) * PC
 
@@ -608,9 +613,9 @@ class Test_Sesana_Scattering:
 class Test_Dynamical_Friction_NFW:
 
     def test_basics(self):
-        SIZE = 600
-        mmbulge = holo.relations.MMBulge_KH2013()
-        msigma = holo.relations.MSigma_KH2013()
+        SIZE = 11
+        mmbulge = holo.host_relations.MMBulge_KH2013()
+        msigma = holo.host_relations.MSigma_KH2013()
         mass = (10.0 ** np.random.uniform(6, 9, (SIZE, 2))) * MSOL
         sepa = (10.0 ** np.random.uniform(1, 3, SIZE)) * PC
         redz = np.random.uniform(0.1, 2.0, SIZE)

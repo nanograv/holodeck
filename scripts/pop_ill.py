@@ -10,7 +10,7 @@ import numpy as np
 
 import holodeck as holo
 import holodeck.sam
-import holodeck.relations
+import holodeck.host_relations
 import holodeck.evolution
 import holodeck.utils
 from holodeck.constants import YR, MSOL, GYR
@@ -70,7 +70,7 @@ def main():
     pop.modify(mod_resamp)
 
     # default mamp is  10.0 ** 8.46 = 2.884e8
-    mmbulge = holo.relations.MMBulge_MM2013(mamp=args.mamp*MSOL)
+    mmbulge = holo.host_relations.MMBulge_MM2013(mamp=args.mamp*MSOL)
     mod_MM2013 = holo.population.PM_Mass_Reset(mmbulge, scatter=True)
     pop.modify(mod_MM2013)
 
