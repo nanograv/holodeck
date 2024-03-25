@@ -342,7 +342,7 @@ class Pop_Illustris(_Population_Discrete):
             hubbleParam = 0.704
             print(f"Warning: manually converting 'box_volume_mpc' in old illustris data file"
                   +f" from Mpc/h to actual Mpc units (h={hubbleParam}).")
-            self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3 / hubbleParam
+            self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3 / hubbleParam**3
 
             # no cosmo params
             # box vol actually in Mpc/h
@@ -367,8 +367,9 @@ class Pop_Illustris(_Population_Discrete):
 
         else:
             # get comoving-volume of sim [cm^3/h]
-            self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3   
             hubbleParam = header['HubbleParam']
+            self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3 / (hubbleParam**2.0)
+            print(f"Warning: manually adding missing factor of h^-2 in new data files.")
             
             # Select the stellar radius
             part_names = header['part_names'].tolist()
@@ -379,13 +380,13 @@ class Pop_Illustris(_Population_Discrete):
             # scale-factor at time of 'merger' event in sim []
             # note that the first prog and next prog are usually but not always identified in the same snapshot,
             # we are taking the later of the two progenitor snapshot times in these case
-            print(data['SubhaloHalfmassRadType'].min(), data['SubhaloHalfmassRadType'].max())
+            #print(data['SubhaloHalfmassRadType'].min(), data['SubhaloHalfmassRadType'].max())
             gal_rads = data['SubhaloHalfmassRadType'] 
             gal_rads = gal_rads[:, :, st_idx]
-            print('st_idx=',st_idx)
-            print(gal_rads.min(),gal_rads.max(),gal_rads.shape)
+            #print('st_idx=',st_idx)
+            #print(gal_rads.min(),gal_rads.max(),gal_rads.shape)
             self.sepa = np.sum(gal_rads[:,:2], axis=-1)       #: Initial binary separation [cm]
-            print(self.sepa.min(), self.sepa.max())
+            #print(self.sepa.min(), self.sepa.max())
             self.scafa = np.array([ np.maximum(tFirstProg,tNextProg) for tFirstProg,tNextProg 
                                     in zip(data['time'][:,0],data['time'][:,1]) ]) 
             #: progenitor BH Masses in subhalo [grams]
@@ -395,7 +396,10 @@ class Pop_Illustris(_Population_Discrete):
             self.mbulge = data['SubhaloMassInRadType'][:, :, st_idx] 
             self.vdisp = data['SubhaloVelDisp'] * 1.0e5   #: Velocity dispersion of galaxy [?cm/s?]
 
-            
+        print(f"sample volume = {self._sample_volume/(1.0e6*PC)**3} [Mpc^3];"
+              f" vol^(1/3) = {(self._sample_volume)**(1.0/3.0)/(1.0e6*PC)} [Mpc]")
+        print(f"Read {self.mass.shape[0]} mergers from file.")
+        
         return
 
 
