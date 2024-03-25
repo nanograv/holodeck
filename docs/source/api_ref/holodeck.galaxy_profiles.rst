@@ -1,8 +1,8 @@
 ========================
-holodeck.sams.components
+holodeck.galaxy_profiles
 ========================
 
-.. automodule:: holodeck.sams.components
+.. automodule:: holodeck.galaxy_profiles
     :members:
     :private-members:
     :undoc-members:
