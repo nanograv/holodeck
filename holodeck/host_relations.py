@@ -59,6 +59,7 @@ __all__ = [
     "MMBulge_MM2013", "MMBulge_Redshift", "MMBulge_Redshift_MM2013", "MMBulge_Redshift_KH2013",
     "get_mmbulge_relation", "_MSigma_Relation", "MSigma_Standard", "MSigma_MM2013",
     "MSigma_KH2013", "get_msigma_relation",
+    "Guo_2010", "Behroozi_2013",
 ]
 
 # ---------------------------------------------
@@ -114,11 +115,11 @@ class BF_Constant(_Bulge_Frac):
 
     def __init__(self, bulge_frac=0.615):
         assert (0.0 < bulge_frac) and (bulge_frac <= 1.0)
-        self._bulge_frac = bulge_frac
+        self._bulge_mass_frac = bulge_frac
         return
 
     def bulge_frac(self, *args, **kwargs):
-        return self._bulge_frac
+        return self._bulge_mass_frac
 
     def mstar_from_mbulge(self, mbulge, redz=None, **kwargs):
         """Convert total stellar-mass to stellar bulge-mass.
