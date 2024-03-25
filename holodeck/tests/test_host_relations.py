@@ -214,8 +214,14 @@ class Test_MMBulge_Standard:
 
             # numerically calculate derivative   dmstar / dmbh
             mstar = MSTAR * (1.0 + np.array([-dm, +dm]))
-            mbulge = bfrac.bulge_frac() * mstar
+            # mbulge = bfrac.bulge_frac() * mstar
+            mbulge = bfrac.mbulge_from_mstar(mstar)
+            dmstar_dmbulge = (np.diff(mstar) / np.diff(mbulge))[0]
+            print(f"{dmstar_dmbulge=}  {bfrac.bulge_frac()=}")
+
             mbh = relation.mbh_from_mbulge(mbulge, scatter=False)
+            dmbh_dmbulge = np.diff(mbh) / np.diff(mbulge)
+            print(f"{dmbh_dmbulge=}  {bfrac.bulge_frac()=}")
             deriv = np.diff(mstar) / np.diff(mbh)
             deriv = deriv[0]
             # use analytic function in MMBulge_Standard relation

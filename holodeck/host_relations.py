@@ -287,13 +287,13 @@ class _MMBulge_Relation(_BH_Host_Relation):
         return
 
     @abc.abstractmethod
-    def dmstar_dmbh(self, mstar):
+    def dmbulge_dmbh(self, mbulge, redz=None):
         """The partial derivative of stellar mass versus black-hole mass.
 
         Parameters
         ----------
-        mstar : array_like,
-            Host stellar-mass.
+        mbulge : array_like, [g]
+            Host bulge stellar-mass.
 
         Returns
         -------
@@ -302,6 +302,32 @@ class _MMBulge_Relation(_BH_Host_Relation):
 
         """
         return
+
+    def dmstar_dmbh(self, mstar, redz=None, **bfkwargs):
+        """Calculate the partial derivative of stellar mass versus BH mass :math:`d M_star / d M_bh`.
+
+        .. math::
+            d M_star / d M_bh  =  [d M_star / d M_bulge] * [d M_bulge / d M_bh]
+
+        The dMbulge/dMbh component is calculated explicitly, while the dMstar/dMbulge component is
+        obtained from the ``bulge_frac`` instance.
+
+        Parameters
+        ----------
+        mstar : array_like, [g]
+            Total stellar mass of galaxy in units of grams.
+
+        Returns
+        -------
+        dmstar_dmbh : array_like,
+            Jacobian term.
+
+        """
+        dmstar_dmbulge = self._bulge_frac.dmstar_dmbulge(mstar, redz=redz, **bfkwargs)
+        mbulge = self._bulge_frac.mbulge_from_mstar(mstar, redz=redz)
+        dmbulge_dmbh = self.dmbulge_dmbh(mbulge, redz=redz)
+        dmstar_dmbh = dmstar_dmbulge * dmbulge_dmbh
+        return dmstar_dmbh
 
     def mbulge_from_mbh(self, *args, **kwargs):
         """Convert from black-hole mass to stellar-bulge mass.
@@ -464,20 +490,16 @@ class MMBulge_Standard(_MMBulge_Relation):
         mbh = _log10_relation(mbulge, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
 
-    def dmstar_dmbh(self, mstar, redz=None, **bfkwargs):
-        """Calculate the partial derivative of stellar mass versus BH mass :math:`d M_star / d M_bh`.
+    def dmbulge_dmbh(self, mbulge, redz=None, **bfkwargs):
+        """Calculate the partial derivative of bulge mass versus BH mass :math:`d M_bulge / d M_bh`.
 
         .. math::
-            d M_star / d M_bh  =  [d M_star / d M_bulge] * [d M_bulge / d M_bh]
-                               =  [d M_star / d M_bulge] * [M_bulge / (plaw * M_bh)]
-
-        The dMbulge/dMbh component is calculated explicitly, while the dMstar/dMbulge component is
-        obtained from the ``bulge_frac`` instance.
+            [d M_bulge / d M_bh] = [M_bulge / (plaw * M_bh)]
 
         Parameters
         ----------
-        mstar : array_like,
-            Total stellar mass of galaxy.  [grams]
+        mbulge : array_like, [g]
+            Bulge stellar mass of galaxy in units of grams.
 
         Returns
         -------
@@ -486,11 +508,8 @@ class MMBulge_Standard(_MMBulge_Relation):
 
         """
         plaw = self._mplaw
-        dms_dmb = self._bulge_frac.dmstar_dmbulge(mstar, redz=redz, **bfkwargs)
-        mbulge = self._bulge_frac.mbulge_from_mstar(mstar, redz=redz, **bfkwargs)
         mbh = self.mbh_from_mbulge(mbulge, redz=redz, scatter=False)
-        deriv = mstar / (plaw * mbh)
-        deriv *= dms_dmb
+        deriv = mbulge / (plaw * mbh)
         return deriv
 
     def mbulge_from_mbh(self, mbh, redz=None, scatter=None):
