@@ -7,7 +7,7 @@ import numpy as np
 import holodeck as holo
 # import pytest  # noqa
 
-from holodeck import sams, relations, hardening, librarian
+from holodeck import sams, host_relations, hardening, librarian
 from holodeck.constants import GYR
 from holodeck.librarian.libraries import (
     _Param_Space, PD_Uniform,
@@ -40,7 +40,7 @@ class PS_Test_Wout_Defaults(_Param_Space):
         )
         gpf = sams.GPF_Power_Law()
         gmt = sams.GMT_Power_Law()
-        mmbulge = relations.MMBulge_KH2013(
+        mmbulge = host_relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
         )
 
@@ -118,7 +118,7 @@ class PS_Test_With_Defaults(_Param_Space):
             qgamma=params['gmt_qgamma'],
             zbeta=params['gmt_zbeta'],
         )
-        mmbulge = relations.MMBulge_KH2013(
+        mmbulge = host_relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],

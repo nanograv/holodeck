@@ -49,7 +49,10 @@ import pickle as pkl
 from scipy.interpolate import RectBivariateSpline
 
 import holodeck as holo
-from holodeck import utils, cosmo, log, _PATH_DATA, relations
+from holodeck import utils, cosmo, log, _PATH_DATA, galaxy_profiles
+from holodeck.host_relations import (
+    get_stellar_mass_halo_mass_relation, get_mmbulge_relation, get_msigma_relation
+)
 from holodeck.constants import GYR, NWTG, PC, MSOL
 
 #: number of influence radii to set minimum radius for dens calculation
@@ -349,16 +352,16 @@ class Sesana_Scattering(_Hardening):
         gamma_dehnen : array_like
             Dehnen stellar-density profile inner power-law slope.
             Fiducial Dehnen inner density profile slope ``gamma=1.0`` is used in [Chen2017]_.
-        mmbulge : None or `holodeck.relations._MMBulge_Relation`
+        mmbulge : None or `holodeck.host_relations._MMBulge_Relation`
             Mbh-Mbulge relation to calculate stellar mass for a given BH mass.
             If `None` a default relationship is used.
-        msigma : None or `holodeck.relations._MSigma_Relation`
+        msigma : None or `holodeck.host_relations._MSigma_Relation`
             Mbh-Sigma relation to calculate stellar velocity dispersion for a given BH mass.
             If `None` a default relationship is used.
 
         """
-        self._mmbulge = relations.get_mmbulge_relation(mmbulge)
-        self._msigma = relations.get_msigma_relation(msigma)
+        self._mmbulge = get_mmbulge_relation(mmbulge)
+        self._msigma = get_msigma_relation(msigma)
         self._gamma_dehnen = gamma_dehnen
         self._shm06 = _SHM06()
         return
@@ -472,10 +475,10 @@ class Dynamical_Friction_NFW(_Hardening):
 
         Parameters
         ----------
-        mmbulge : None or `holodeck.relations._MMBulge_Relation`
+        mmbulge : None or `holodeck.host_relations._MMBulge_Relation`
             Mbh-Mbulge relation to calculate stellar mass for a given BH mass.
             If `None` a default relationship is used.
-        msigma : None or `holodeck.relations._MSigma_Relation`
+        msigma : None or `holodeck.host_relations._MSigma_Relation`
             Mbh-Sigma relation to calculate stellar velocity dispersion for a given BH mass.
             If `None` a default relationship is used.
         smhm : class, instance or None
@@ -494,14 +497,14 @@ class Dynamical_Friction_NFW(_Hardening):
             If False: calculate R-bound using a velocity dispersion (constant in radius, from `gbh` instance).
 
         """
-        self._mmbulge = relations.get_mmbulge_relation(mmbulge)
-        self._msigma = relations.get_msigma_relation(msigma)
-        self._smhm = relations.get_stellar_mass_halo_mass_relation(smhm)
+        self._mmbulge = get_mmbulge_relation(mmbulge)
+        self._msigma = get_msigma_relation(msigma)
+        self._smhm = get_stellar_mass_halo_mass_relation(smhm)
         self._coulomb = coulomb
         self._attenuate = attenuate
         self._rbound_from_density = rbound_from_density
 
-        self._NFW = relations.NFW
+        self._NFW = galaxy_profiles.NFW
         self._time_dynamical = None
         return
 
