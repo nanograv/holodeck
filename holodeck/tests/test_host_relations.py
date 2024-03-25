@@ -1,4 +1,4 @@
-"""Tests for `relations.py` holodeck submodule.
+"""Tests for `host_relations.py` holodeck submodule.
 
 
 """
@@ -8,7 +8,7 @@ import scipy as sp
 import scipy.stats
 
 import holodeck as holo
-from holodeck import relations
+from holodeck import host_relations
 from holodeck.discrete import population
 from holodeck.constants import MSOL
 
@@ -134,25 +134,25 @@ def check_scatter_per_dex(mmbulge_relation, scatter_dex):
 
 
 def test_MM2013_scatter():
-    MM2013 = relations.MMBulge_MM2013()
+    MM2013 = host_relations.MMBulge_MM2013()
     check_scatter_per_dex(MM2013, 0.34)
     return
 
 
 def test_KH2013_scatter():
-    KH2013 = relations.MMBulge_KH2013()
+    KH2013 = host_relations.MMBulge_KH2013()
     check_scatter_per_dex(KH2013, 0.28)
     return
 
 
 def test_MM2013_basic():
-    MM2013 = relations.MMBulge_MM2013()
+    MM2013 = host_relations.MMBulge_MM2013()
     check_relation(MM2013, mbh_from_mbulge_MM2013)
     return
 
 
 def test_KH2013_basic():
-    KH2013 = relations.MMBulge_KH2013()
+    KH2013 = host_relations.MMBulge_KH2013()
     check_relation(KH2013, mbh_from_mbulge_KH2013)
     return
 
@@ -173,7 +173,7 @@ def check_mass_reset(mmbulge_relation, truth_func):
 
 def test_mass_reset_MM2013():
     print("test_mass_reset_MM2013")
-    mmbulge_relation = relations.MMBulge_MM2013()
+    mmbulge_relation = host_relations.MMBulge_MM2013()
     truth_func = mbh_from_mbulge_MM2013
     check_mass_reset(mmbulge_relation, truth_func)
     return
@@ -181,7 +181,7 @@ def test_mass_reset_MM2013():
 
 def test_mass_reset_KH2013():
     print("test_mass_reset_KH2013")
-    mmbulge_relation = relations.MMBulge_KH2013()
+    mmbulge_relation = host_relations.MMBulge_KH2013()
     truth_func = mbh_from_mbulge_KH2013
     check_mass_reset(mmbulge_relation, truth_func)
     return
@@ -191,18 +191,20 @@ class Test_MMBulge_Standard:
 
     def test_dmstar_dmbh(self):
 
-        args = [
+        bfrac = host_relations.BF_Constant()
+
+        kwargs = [
             dict(),
             dict(mplaw=2.3),
             dict(mamp=1e4*MSOL, mplaw=2.3),
             dict(mamp=1e4*MSOL, mplaw=2.3, mref=1.0e9*MSOL),
         ]
 
-        for arg in args:
+        for kw in kwargs:
             # Construct a relation using these arguments
-            relation = relations.MMBulge_Standard(**arg)
+            relation = host_relations.MMBulge_Standard(bulge_frac=bfrac, **kw)
             # make sure arguments match stored values
-            for kk, vv in arg.items():
+            for kk, vv in kw.items():
                 tt = getattr(relation, f"_{kk}")
                 assert vv == tt, "Stored value ({tt:.8e}) does not match argument ({vv:.8e})!"
 
@@ -212,7 +214,7 @@ class Test_MMBulge_Standard:
 
             # numerically calculate derivative   dmstar / dmbh
             mstar = MSTAR * (1.0 + np.array([-dm, +dm]))
-            mbulge = relation._bulge_mfrac * mstar
+            mbulge = bfrac.bulge_frac() * mstar
             mbh = relation.mbh_from_mbulge(mbulge, scatter=False)
             deriv = np.diff(mstar) / np.diff(mbh)
             deriv = deriv[0]
@@ -220,7 +222,7 @@ class Test_MMBulge_Standard:
             test = relation.dmstar_dmbh(MSTAR)
 
             # make sure they're equal
-            err = f"MMBulge_Standard({arg}).dmstar_dmbh value ({test:.8e}) does not match truth ({deriv:.8e})!"
+            err = f"MMBulge_Standard({kw}).dmstar_dmbh value ({test:.8e}) does not match truth ({deriv:.8e})!"
             assert np.isclose(test, deriv), err
 
         return
@@ -229,12 +231,12 @@ class Test_MMBulge_Standard:
 class Test_Behroozi_2013:
 
     def test_init(self):
-        relations.Behroozi_2013()
+        host_relations.Behroozi_2013()
         return
 
     def test_basics(self):
         NUM = 1000
-        behr = relations.Behroozi_2013()
+        behr = host_relations.Behroozi_2013()
 
         mstar = np.random.uniform(5, 12, NUM)
         mstar = MSOL * (10.0 ** mstar)
