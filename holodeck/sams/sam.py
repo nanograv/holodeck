@@ -47,7 +47,7 @@ import kalepy as kale
 import holodeck as holo
 from holodeck import cosmo, utils, log
 from holodeck.constants import SPLC, MSOL, MPC
-from holodeck import relations, single_sources
+from holodeck import host_relations, single_sources
 from holodeck.sams.components import (
     _Galaxy_Pair_Fraction, _Galaxy_Stellar_Mass_Function, _Galaxy_Merger_Time, _Galaxy_Merger_Rate,
     GSMF_Schechter, GPF_Power_Law, GMT_Power_Law, GMR_Illustris
@@ -79,7 +79,7 @@ class Semi_Analytic_Model:
     def __init__(
         self, mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
         shape=None, log=None,
-        gsmf=GSMF_Schechter, mmbulge=relations.MMBulge_KH2013,
+        gsmf=GSMF_Schechter, mmbulge=host_relations.MMBulge_KH2013,
         gpf=None, gmt=None, gmr=None,
         **kwargs
     ):
@@ -113,7 +113,7 @@ class Semi_Analytic_Model:
         # ---- Process SAM components
 
         gsmf = utils.get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
-        mmbulge = utils.get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
+        mmbulge = utils.get_subclass_instance(mmbulge, None, host_relations._MMBulge_Relation)
         # if GMR is None, then we need both GMT and GPF
         if gmr is None:
             gmt = utils.get_subclass_instance(gmt, GMT_Power_Law, _Galaxy_Merger_Time)
@@ -129,7 +129,7 @@ class Semi_Analytic_Model:
                 raise ValueError(err)
 
         self._gsmf = gsmf             #: Galaxy Stellar-Mass Function (`_Galaxy_Stellar_Mass_Function` instance)
-        self._mmbulge = mmbulge       #: Mbh-Mbulge relation (`relations._MMBulge_Relation` instance)
+        self._mmbulge = mmbulge       #: Mbh-Mbulge relation (`host_relations._MMBulge_Relation` instance)
         self._gpf = gpf               #: Galaxy Pair Fraction (`_Galaxy_Pair_Fraction` instance)
         self._gmt = gmt               #: Galaxy Merger Time (`_Galaxy_Merger_Time` instance)
         self._gmr = gmr               #: Galaxy Merger Rate (`_Galaxy_Merger_Rate` instance)

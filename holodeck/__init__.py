@@ -93,9 +93,9 @@ from . import constants       # noqa
 # from . import param_spaces    # noqa
 # from . import plot            # noqa
 # from . import population      # noqa
-# from . import relations       # noqa
+# from . import host_relations  # noqa
 # from . import sams            # noqa
-# from . import librarian            # noqa
+# from . import librarian       # noqa
 from . import utils           # noqa
 
 # ---- Handle version
