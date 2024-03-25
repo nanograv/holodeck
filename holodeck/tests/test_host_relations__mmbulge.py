@@ -7,6 +7,8 @@ import numpy as np
 import scipy as sp
 import scipy.stats
 
+import pytest
+
 import holodeck as holo
 from holodeck import host_relations
 from holodeck.discrete import population
@@ -18,7 +20,64 @@ from holodeck.constants import MSOL
 # ==============================================================================
 
 
+@pytest.fixture(scope="session")
+def mbulge_redz(size=9):
+    mbulge = (10.0 ** np.random.uniform(7, 12, size)) * MSOL
+    redz = np.random.uniform(0.0, 10.0, size)
+    return mbulge, redz
+
+
+def _check_any_mmbulge_relation_with_mbulge(mmbulge, mass_bulge, redz):
+    print(f"{__file__}:_check_any_mmbulge_relation_with_mbulge() - {mmbulge}")
+
+    # # unpack pytest.fixture values
+    # mass_bulge, redz = mbulge_redz
+
+    # get black-hole masses
+    mbh = mmbulge.mbh_from_mbulge(mass_bulge, redz=redz, scatter=False)
+
+    # make sure MBH masses are less than bulge masses
+    assert not np.any(mbh > mass_bulge)
+
+    # make sure we recover the input bulge-masses, if the reverse relationship is implemented
+    try:
+        mbulge_test = mmbulge.mbulge_from_mbh(mbh, redz=redz, scatter=False)
+        assert np.allclose(mbulge_test, mass_bulge)
+    # if it's not implemented, that's okay
+    except NotImplementedError:
+        pass
+
+    # check derivatives
+    dmbulge_dmbh_test = mmbulge.dmbulge_dmbh(mass_bulge, redz=redz)
+    # numerically calculate the derivates with finite differences
+    delta = 1.0e-4
+    mass_bulge_lo = mass_bulge * (1.0 - delta)
+    mass_bulge_hi = mass_bulge * (1.0 + delta)
+    mbh_lo = mmbulge.mbh_from_mbulge(mass_bulge_lo, redz=redz, scatter=False)
+    mbh_hi = mmbulge.mbh_from_mbulge(mass_bulge_hi, redz=redz, scatter=False)
+    dmbulge_dmbh_true = (mass_bulge_hi - mass_bulge_lo) / (mbh_hi - mbh_lo)
+    # make sure values are consistent
+    assert np.allclose(dmbulge_dmbh_true, dmbulge_dmbh_test)
+
+    return mbh
+
+
+def test_all_mmbulge_relation_classes_with_mbulge(mbulge_redz):
+    print(f"{__file__}::test_all_bulge_frac_classes()")
+    for name, mmbulge_class in host_relations._mmbulge_relation_class_dict.items():
+        print(name, mmbulge_class)
+        mmbulge = mmbulge_class()
+        # unpack mstar and redz values from pytest.fixture
+        mass_bulge, redz = mbulge_redz
+
+        # perform basic checks
+        _check_any_mmbulge_relation_with_mbulge(mmbulge, mass_bulge, redz)
+
+    return
+
+
 def mbh_from_mbulge_MM2013(mbulge):
+    """This is a manually-coded version of the TRUE [MM2013]_ relation to use for comparisons."""
 
     ALPHA = 8.46
     BETA = 1.05
@@ -37,6 +96,7 @@ def mbh_from_mbulge_MM2013(mbulge):
 
 
 def mbh_from_mbulge_KH2013(mbulge):
+    """This is a manually-coded version of the TRUE [KH2013]_ relation to use for comparisons."""
 
     # [KH2013] Eq. 10
     AMP = 0.49 * (1e9 * MSOL)
