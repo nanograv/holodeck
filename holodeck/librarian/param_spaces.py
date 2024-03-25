@@ -122,7 +122,7 @@ class PS_Test(_Param_Space):
         # the M-Mbulge class itself is defined such that the normalization is in units of grams.
         # This is a very easy place to make mistakes, and so any/all units (and particularly unit
         # conversions) should be described carefully in docstrings.
-        mmbulge = holo.relations.MMBulge_KH2013(
+        mmbulge = holo.host_relations.MMBulge_KH2013(
             mamp=params['mmb_mamp']*MSOL,
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
@@ -239,7 +239,7 @@ class _PS_Astro_Strong(_Param_Space):
             qgammam=params['gmr_qgammam'],
         )
 
-        mmbulge = holo.relations.MMBulge_KH2013(
+        mmbulge = holo.host_relations.MMBulge_KH2013(
             mamp=params['mmb_mamp']*MSOL,
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],

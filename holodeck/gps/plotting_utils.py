@@ -47,7 +47,7 @@ def sam_hard(env_pars, shape=40):
     gsmf = holo.sam.GSMF_Schechter(phi0=env_pars["gsmf_phi0"])
     gpf = holo.sam.GPF_Power_Law()
     gmt = holo.sam.GMT_Power_Law()
-    mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
+    mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
     sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf,
                                        gpf=gpf,

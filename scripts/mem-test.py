@@ -34,7 +34,7 @@ holo.librarian._log_mem_usage(None)
 gsmf = holo.sam.GSMF_Schechter()               # Galaxy Stellar-Mass Function (GSMF)
 gpf = holo.sam.GPF_Power_Law()                 # Galaxy Pair Fraction         (GPF)
 gmt = holo.sam.GMT_Power_Law()                 # Galaxy Merger Time           (GMT)
-mmbulge = holo.relations.MMBulge_Standard()    # M-MBulge Relation            (MMB)
+mmbulge = holo.host_relations.MMBulge_Standard()    # M-MBulge Relation            (MMB)
 
 holo.librarian._log_mem_usage(None)
 

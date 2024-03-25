@@ -136,7 +136,7 @@ class Hard04(SamModel):
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
+        mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
         sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf,
                                            gpf=gpf,
@@ -202,7 +202,7 @@ class Eccen01(SamModel):
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law(zbeta=gpf_zbeta)
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
+        mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
         sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf,
                                            gpf=gpf,
@@ -263,7 +263,7 @@ class BigCirc01(SamModel):
         gmt = holo.sam.GMT_Power_Law(malpha=gmt_malpha,
                                      qgamma=gmt_qgamma,
                                      zbeta=gmt_zbeta)
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
+        mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
 
         sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf,
                                            gpf=gpf,
@@ -296,7 +296,7 @@ class PS_2Par_Circ_01(SamModel):
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013()
+        mmbulge = holo.host_relations.MMBulge_KH2013()
 
         sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf,
                                            gpf=gpf,
@@ -345,7 +345,7 @@ class PS_Circ_01(SamModel):
                                        alpha0=gsmf_alpha0)
         gpf = holo.sam.GPF_Power_Law(qgamma=gpf_qgamma, zbeta=gpf_zbeta)
         gmt = holo.sam.GMT_Power_Law(time_norm=gmt_norm, zbeta=gmt_zbeta)
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp,
+        mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp,
                                                 mplaw=mmb_plaw,
                                                 scatter_dex=mmb_scatter)
 
@@ -426,7 +426,7 @@ class Broad_Uniform_02B(SamModel):
             qgamma=gmt_qgamma,
             zbeta=gmt_zbeta,
         )
-        mmbulge = holo.relations.MMBulge_KH2013(
+        mmbulge = holo.host_relations.MMBulge_KH2013(
             mamp_log10=mmb_amp_log10,
             mplaw=mmb_plaw,
             scatter_dex=mmb_scatter,

@@ -382,9 +382,10 @@ class MMBulge_Standard(_MMBulge_Relation):
         self, mamp=None, mamp_log10=None, mplaw=None, mref=None, scatter_dex=None,
         bulge_frac=None, bulge_mfrac=None
     ):
+
         # ---- Determine and set bulge fraction
 
-        super(_MMBulge_Relation, self).__init__(bulge_frac=bulge_frac, bulge_mfrac=bulge_mfrac)
+        super().__init__(bulge_frac=bulge_frac, bulge_mfrac=bulge_mfrac)
 
         # ---- Determine normalization: set either ``mamp`` or ``mamp_log10``
 

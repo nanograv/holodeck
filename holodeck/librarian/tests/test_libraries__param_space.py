@@ -144,7 +144,7 @@ def _run_pspace_no_nsamples(Param_Space_Class):
     assert pspace.param_samples is None, f"{pspace.param_samples=} should be `None`!"
 
     # Make sure there are two parameters
-    assert pspace.npars == 2, f"Expected 2 parameters, but found `{pspace.npars=}`"
+    assert pspace.nparameters == 2, f"Expected 2 parameters, but found `{pspace.nparameters=}`"
     assert len(pspace._parameters) == 2, f"Expected {len(pspace._parameters)=} to equal 2!"
     assert len(pspace.param_names) == 2, f"Expected {len(pspace.param_names)=} to equal 2!"
     for ii, (pn, test) in enumerate(zip(pspace.param_names, ['mmb_mamp_log10', 'gsmf_phi0_log10'])):
@@ -172,7 +172,7 @@ def _run_pspace_nsamples(Param_Space_Class):
     assert np.all((0.0 < samps) & (samps < 1.0)), "`uniform_samples` are not between (0.0, 1.0)!  "
 
     # Make sure there are two parameters
-    assert pspace.npars == 2, f"Expeted 2 parameters, but found `{pspace.npars=}`"
+    assert pspace.nparameters == 2, f"Expeted 2 parameters, but found `{pspace.nparameters=}`"
     assert len(pspace._parameters) == 2, f"Expeted {len(pspace._parameters)=} to equal 2!"
     assert len(pspace.param_names) == 2, f"Expeted {len(pspace.param_names)=} to equal 2!"
     for ii, (pn, test) in enumerate(zip(pspace.param_names, ['mmb_mamp_log10', 'gsmf_phi0_log10'])):

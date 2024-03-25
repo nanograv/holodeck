@@ -12,7 +12,7 @@ components as arguments:
 (3) Galaxy Merger Time (GMT): gives the characteristic time duration for galaxy 'mergers' to occur.
     Implemented as subclasses of the :class:`_Galaxy_Merger_Time` subclass.
 (4) M_bh - M_bulge Relation (mmbulge): gives MBH properties for a given galaxy stellar-bulge mass.
-    Implemented as subcalsses of the :class:`holodeck.relations._MMBulge_Relation` subclass.
+    Implemented as subcalsses of the :class:`holodeck.host_relations._MMBulge_Relation` subclass.
 
 The :class:`Semi_Analytic_Model` class defines a grid in parameter space of total MBH mass ($M=M_1 + M_2$),
 MBH mass ratio ($q \\equiv M_1/M_2$), redshift ($z$), and at times binary separation
