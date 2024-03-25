@@ -21,6 +21,9 @@ import scipy as sp
 from holodeck import cosmo
 from holodeck.constants import MSOL, NWTG
 
+__all__ = [
+    "Klypin_2016", "NFW",
+]
 
 class Klypin_2016:
     """Class to calculate dark matter halo 'concentration' parameters based on [Klypin2016]_.
