@@ -147,8 +147,109 @@ class BF_Constant(_Bulge_Frac):
         return 1.0 / self.bulge_frac()
 
 
+class BF_Sigmoid(_Bulge_Frac):
+    r"""Sigmoid stellar-bulge mass fraction from minimum value to unity w.r.t. stellar mass.
+
+    No redshift dependence.
+    The functional form is:
+
+    .. math::
+        f_b (m < m_c) = f_l + (f_h - f_l) / (1.0 + ((m / m_c)^{-1} - 1.0)^k), \\
+        f_b (m \geq m_c) \equiv f_h.
+
+    Here, the characteristic total stellar mass is $m_c$.  At aymptotically low stellar masses
+    (i.e. $m \ll m_c$), the bulge fraction is $f_l$; and for high stellar masses ($m \geq m_c$),
+    the bulge fraction is $f_h$.  The parameter $k$ determines the 'steepness' of the sigmoid
+    function, where 1/k gives a characteristic 'width' of the transition in dex.  For example, if
+    $k = 1/2$ then the transition from $f_l$ to $f_h$ occurs over roughly $2$ decades of mass.
+
+    """
+
+    _INTERP_GRID_SIZE = 1000
+    _DERIV_DELTA = 1.0e-6
+
+    def __init__(self, bulge_frac_lo=0.5, bulge_frac_hi=1.0, mstar_char_log10=11.0, width_dex=1.0):
+        """
+        """
+        assert (0.0 < bulge_frac_lo) and (bulge_frac_lo <= 1.0), f"{bulge_frac_lo=} must be in (0.0, 1.0]!"
+        assert (0.0 < bulge_frac_hi) and (bulge_frac_hi <= 1.0), f"{bulge_frac_hi=} must be in (0.0, 1.0]!"
+        self._bulge_frac_lo = bulge_frac_lo
+        self._bulge_frac_hi = bulge_frac_hi
+        self._mstar_char = (10.0 ** mstar_char_log10) * MSOL
+        self._width_dex = width_dex
+
+        mc = self._mstar_char
+        xx = np.log10(mc)
+        xbreak1 = xx - 0.5*width_dex
+        xbreak2 = xx + 0.5
+        xlo = np.logspace(xx - 10.0, xbreak1, 100, endpoint=False)
+        xhi = np.logspace(xbreak2, xx + 10.0, 10)
+        ms = np.logspace(xbreak1, xbreak2, self._INTERP_GRID_SIZE, endpoint=False)
+        ms = np.concatenate([xlo, ms, xhi])
+        # ``xx`` is the stellar-mass = mstar
+        # ``yy`` is the bulge-mass = mbulge
+        mb = self.mbulge_from_mstar(ms)
+        dd = self._DERIV_DELTA
+        ms_lo = ms * (1.0 - dd/2.0)
+        ms_hi = ms * (1.0 + dd/2.0)
+        mb_lo = self.mbulge_from_mstar(ms_lo)
+        mb_hi = self.mbulge_from_mstar(ms_hi)
+        dms_dmb = (ms_hi - ms_lo) / (mb_hi - mb_lo)
+        # self._grid_mstar = ms
+        # self._grid_mbulge = mb
+        # self._grid_dmstar_dmbulge = dy_dx
+        self._interp_mstar_from_mbulge = sp.interpolate.interp1d(
+            mb, ms, kind='quadratic', fill_value='extrapolate'
+        )
+        self._interp_dmstar_dmbulge_from_mbulge = sp.interpolate.interp1d(
+            mb, dms_dmb, kind='quadratic', fill_value='extrapolate'
+        )
+        return
+
+    def bulge_frac(self, mstar, redz=None, **kwargs):
+        """
+        """
+        mm = mstar / self._mstar_char
+        steep = self._width_dex
+        flo = self._bulge_frac_lo
+        fhi = self._bulge_frac_hi
+
+        mm[mm > 1.0] = 1.0
+        frac = flo + (fhi - flo) / (1.0 + ((1.0 / mm) - 1.0)**steep)
+        frac[(mm >= 1.0) | (frac > fhi)] = fhi
+        return frac
+
+    def mstar_from_mbulge(self, mbulge, redz=None, **kwargs):
+        """Numerically calculate inverse Mbh-Mbulge relationship, with interpolation over a grid.
+        """
+        fhi = self._bulge_frac_hi
+        # start by assuming all stellar-masses (corresponding to mbulge) are above the char mass
+        mstar = np.ones_like(mbulge) * mbulge / fhi
+        # find the systems that are below the char mass, based on this assumption
+        sel = (mstar/self._mstar_char) < 1.0
+        print(f"{utils.frac_str(sel)=}")
+        # interpolate to numerically invert the function
+        # mstar[sel] = np.interp(mbulge[sel], self._grid_mbulge, self._grid_mstar)
+        mstar[sel] = self._interp_mstar_from_mbulge(mbulge[sel])
+        return mstar
+
+    def dmstar_dmbulge(self, mbulge, redz=None, **kwargs):
+        """Numerically calculate deriv using finite difference over a grid, then interpolation.
+        """
+        fhi = self._bulge_frac_hi
+        # start by assuming all stellar-masses (corresponding to mbulge) are above the char mass
+        dms_dmb = np.ones_like(mbulge) / fhi
+        # find the systems that are below the char mass, based on this assumption
+        sel = (mbulge/self._mstar_char) < fhi
+        # print(f"{utils.frac_str(sel)=}")
+        # interpolate to numerically invert the function
+        # dms_dmb[sel] = np.interp(mbulge[sel], self._grid_mbulge, self._grid_dmstar_dmbulge)
+        dms_dmb[sel] = self._interp_dmstar_dmbulge_from_mbulge(mbulge[sel])
+        return dms_dmb
+
 _bulge_frac_class_dict = {
     "BF_Constant": BF_Constant,
+    "BF_Sigmoid": BF_Sigmoid,
 }
 
 
@@ -243,17 +344,32 @@ class _MMBulge_Relation(_BH_Host_Relation):
     For **SAMs** derived classes must additionally provide the partial derivatives of the black hole
     mass (so that galaxy-galaxy number densities can be converted to MBH-MBH number densities).
 
-    API
-    ---
+    API / Subclass Implementation
+    -----------------------------
+    **Provided** - Functions provided directly by this base-class (``_MMBulge_Relation``).
+
+    * ``dmstar_dmbh`` : uses ``dmstar_dmbulge`` from the bulge-fraction instance, and the
+      ``dmbulge_dmbh`` method which must be provided by subclass implementations.
+
+    * ``mbh_from_mstar``: requires ``mbulge_from_mstar`` in the bulge-fraction instance.
+
     **Required** - for core functionality, all ``_MMBulge_Relation`` subclasses are required to
     implement the following methods:
-    * ``mbh_from_mbulge``
-    * ``dmstar_dmbh``
 
-    **Optional** - other functionality is not guaranteed, but depends on subclass implementations.
-    Specifically the following methods:
-    * ``mbulge_from_mbh``: may or may not be implemented directly.
-    * ``mbh_from_mstar``: requires ``mbulge_from_mstar`` in the bulge-fraction instance.
+    * ``mbh_from_mbulge`` : the core purpose/functionality of all subclasses.
+
+    * ``dmbulge_dmbh`` : required for calculating semi-analytic model populations.  More
+      specifically, the ``dmstar_dmbh`` method is required for SAMs, and that method in turn
+      requires ``dmbulge_dmbh`` to be implemented.
+
+    **Optional** - For extended functionality, ``_MMBulge_Relation`` subclasses may implement
+    additional functions, but it is not guaranteed/required.  Specifically the following methods:
+
+    * ``mbulge_from_mbh``: the inverse relationship.  Not necessarily calculable analytically.
+
+    **Dependent** - Implemented functionality that depends on 'Optional' API methods.
+
+    * ``mstar_from_mbh``: requires the ``mbulge_from_mbh`` method to be implemented.
 
     """
 
@@ -279,8 +395,60 @@ class _MMBulge_Relation(_BH_Host_Relation):
         self._bulge_frac = bulge_frac  #: ``_Bulge_Frac`` subclass instance to obtain bulge masses
         return
 
+    # ---- Provided API Methods (no additional implementation needed)
+
+    def dmstar_dmbh(self, mstar, redz=None, **bfkwargs):
+        """Calculate the partial derivative of stellar mass versus BH mass :math:`d M_star / d M_bh`.
+
+        .. math::
+            d M_star / d M_bh  =  [d M_star / d M_bulge] * [d M_bulge / d M_bh]
+
+        The dMbulge/dMbh component is calculated explicitly using ``self.ddmbulge_dmbh``, while the
+        dMstar/dMbulge component is obtained from the ``bulge_frac`` instance.
+
+        Parameters
+        ----------
+        mstar : array_like, [g]
+            Total stellar mass of galaxy in units of grams.
+
+        Returns
+        -------
+        dmstar_dmbh : array_like,
+            Jacobian term.
+
+        """
+        mbulge = self._bulge_frac.mbulge_from_mstar(mstar, redz=redz)
+        dmstar_dmbulge = self._bulge_frac.dmstar_dmbulge(mbulge, redz=redz, **bfkwargs)
+        dmbulge_dmbh = self.dmbulge_dmbh(mbulge, redz=redz)
+        dmstar_dmbh = dmstar_dmbulge * dmbulge_dmbh
+        return dmstar_dmbh
+
+    def mbh_from_mstar(self, mstar, redz=None, scatter=None):
+        """Calculate a black-hole mass from the given total stellar-mass.
+
+        NOTE: this function requires the ``mbulge_from_mstar`` function to be implemented by the
+              bulge-fraction instance (``self._bulge_frac``) that's being used.  This is not
+              guaranteed!
+
+        Arguments
+        ---------
+        mstar
+        redz
+        **kwargs
+
+        Returns
+        -------
+        mbh
+
+        """
+        mbulge = self._bulge_frac.mbulge_from_mstar(mstar, redz=redz)
+        mbh = self.mbh_from_mbulge(mbulge, redz=redz, scatter=scatter)
+        return mbh
+
+    # ---- Required API Methods (MUST be implementated in subclasses)
+
     @abc.abstractmethod
-    def mbh_from_mbulge(self, *args, **kwargs):
+    def mbh_from_mbulge(self, mbulge, redz=None, scatter=None, **kwargs):
         """Convert from stellar-bulge mass to black-hole mass.
 
         Returns
@@ -308,31 +476,7 @@ class _MMBulge_Relation(_BH_Host_Relation):
         """
         return
 
-    def dmstar_dmbh(self, mstar, redz=None, **bfkwargs):
-        """Calculate the partial derivative of stellar mass versus BH mass :math:`d M_star / d M_bh`.
-
-        .. math::
-            d M_star / d M_bh  =  [d M_star / d M_bulge] * [d M_bulge / d M_bh]
-
-        The dMbulge/dMbh component is calculated explicitly, while the dMstar/dMbulge component is
-        obtained from the ``bulge_frac`` instance.
-
-        Parameters
-        ----------
-        mstar : array_like, [g]
-            Total stellar mass of galaxy in units of grams.
-
-        Returns
-        -------
-        dmstar_dmbh : array_like,
-            Jacobian term.
-
-        """
-        dmstar_dmbulge = self._bulge_frac.dmstar_dmbulge(mstar, redz=redz, **bfkwargs)
-        mbulge = self._bulge_frac.mbulge_from_mstar(mstar, redz=redz)
-        dmbulge_dmbh = self.dmbulge_dmbh(mbulge, redz=redz)
-        dmstar_dmbh = dmstar_dmbulge * dmbulge_dmbh
-        return dmstar_dmbh
+    # ---- Optional API Methods (can be implemented in subclasses)
 
     def mbulge_from_mbh(self, *args, **kwargs):
         """Convert from black-hole mass to stellar-bulge mass.
@@ -345,27 +489,7 @@ class _MMBulge_Relation(_BH_Host_Relation):
         """
         raise NotImplementedError(f"``mbulge_from_mbh`` has not been implemented in {self}!")
 
-    def mbh_from_mstar(self, mstar, redz=None, **kwargs):
-        """Calculate a black-hole mass from the given total stellar-mass.
-
-        NOTE: this function requires the ``mbulge_from_mstar`` function to be implemented by the
-              bulge-fraction instance (``self._bulge_frac``) that's being used.  This is not
-              guaranteed!
-
-        Arguments
-        ---------
-        mstar
-        redz
-        **kwargs
-
-        Returns
-        -------
-        mbh
-
-        """
-        mbulge = self._bulge_frac.mbulge_from_mstar(mstar, redz=redz)
-        mbh = self.mbh_from_mbulge(mbulge)
-        return mbh
+    # --- Dependent API Methods (functional if certain 'Optional' API methods are provided)
 
     def mstar_from_mbh(self, mbh, redz=None, **kwargs):
         """Calculate a total stellar-mass from the given BH mass.
@@ -389,6 +513,7 @@ class _MMBulge_Relation(_BH_Host_Relation):
         mbulge = self.mbulge_from_mbh(mbh)
         mstar = self._bulge_frac.mstar_from_mbulge(mbulge, redz=redz)
         return mstar
+
 
 
 class MMBulge_Standard(_MMBulge_Relation):
@@ -537,26 +662,6 @@ class MMBulge_Standard(_MMBulge_Relation):
         mbulge = _log10_relation_reverse(mbh, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbulge
 
-    def mbh_from_mstar(self, mstar, redz=None, scatter=None, **kwargs):
-        """Convert from total stellar mass to black-hole mass.
-
-        Parameters
-        ----------
-        mstar : array_like,
-            Total stellar mass of host galaxy.  [grams]
-        scatter : bool,
-            Whether or not to include scatter in scaling relationship.
-            Uses `self._scatter_dex` attribute.
-
-        Returns
-        -------
-        mbh : array_like,
-            Mass of black hole.  [grams]
-
-        """
-        mbulge = self._bulge_frac.mbulge_from_mstar(mstar, redz=redz, **kwargs)
-        return self.mbh_from_mbulge(mbulge, redz=redz, scatter=scatter)
-
     def mstar_from_mbh(self, mbh, redz=None, scatter=None, **kwargs):
         """Convert from black-hole mass to total stellar mass.
 
@@ -662,22 +767,6 @@ class MMBulge_Redshift(MMBulge_Standard):
         zmamp = self._mamp * (1.0 + redz)**self._zplaw
         mbulge = _log10_relation_reverse(mbh, zmamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbulge
-
-    def mbh_from_mstar(self, mstar, redz, scatter):
-        mbulge = self.mbulge_from_mstar(mstar)
-        return self.mbh_from_mbulge(mbulge, redz, scatter)
-
-    def mstar_from_mbh(self, mbh, redz, scatter):
-        mbulge = self.mbulge_from_mbh(mbh, redz, scatter)
-        return self.mstar_from_mbulge(mbulge)
-
-    def dmstar_dmbh(self, mstar, redz):
-        plaw = self._mplaw
-        fbulge = self._bulge_mfrac
-        mbulge = mstar * fbulge
-        mbh = self.mbh_from_mbulge(mbulge, redz, scatter=False)
-        deriv = mbulge / (fbulge * plaw * mbh)
-        return deriv
 
 
 class MMBulge_Redshift_MM2013(MMBulge_Redshift):
