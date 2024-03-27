@@ -27,6 +27,13 @@ def mbulge_redz(size=9):
     return mbulge, redz
 
 
+@pytest.fixture(scope="session")
+def mstar_redz(size=9):
+    mbulge = (10.0 ** np.random.uniform(7, 12, size)) * MSOL
+    redz = np.random.uniform(0.0, 10.0, size)
+    return mbulge, redz
+
+
 def _check_any_mmbulge_relation_with_mbulge(mmbulge, mass_bulge, redz):
     print(f"{__file__}:_check_any_mmbulge_relation_with_mbulge() - {mmbulge}")
 
@@ -63,15 +70,94 @@ def _check_any_mmbulge_relation_with_mbulge(mmbulge, mass_bulge, redz):
 
 
 def test_all_mmbulge_relation_classes_with_mbulge(mbulge_redz):
-    print(f"{__file__}::test_all_bulge_frac_classes()")
+    print(f"{__file__}::test_all_mmbulge_relation_classes_with_mbulge()")
+
+    # unpack mstar and redz values from pytest.fixture
+    mass_bulge, redz = mbulge_redz
+
     for name, mmbulge_class in host_relations._mmbulge_relation_class_dict.items():
         print(name, mmbulge_class)
-        mmbulge = mmbulge_class()
-        # unpack mstar and redz values from pytest.fixture
-        mass_bulge, redz = mbulge_redz
 
+        # Use default instantiation
+        mmbulge = mmbulge_class()
         # perform basic checks
         _check_any_mmbulge_relation_with_mbulge(mmbulge, mass_bulge, redz)
+
+        # Use instantiation with custom bulge-fractions
+        for bf_name, bfrac_class in host_relations._bulge_frac_class_dict.items():
+            print(bf_name, bfrac_class)
+            bf = bfrac_class()
+            mmbulge = mmbulge_class(bulge_frac=bf)
+            # unpack mstar and redz values from pytest.fixture
+            mass_bulge, redz = mbulge_redz
+            # perform basic checks
+            _check_any_mmbulge_relation_with_mbulge(mmbulge, mass_bulge, redz)
+
+    return
+
+
+def _check_any_mmbulge_relation_with_mstar(mmbulge, mass_star, redz):
+    print(f"{__file__}:_check_any_mmbulge_relation_with_mstar() - {mmbulge}")
+
+    # get black-hole masses
+    mbh = mmbulge.mbh_from_mstar(mass_star, redz=redz, scatter=False)
+
+    # make sure MBH masses are less than bulge masses
+    assert not np.any(mbh > mass_star)
+
+    # make sure we recover the input bulge-masses, if the reverse relationship is implemented
+    try:
+        mstar_test = mmbulge.mstar_from_mbh(mbh, redz=redz, scatter=False)
+        print(f"{mstar_test=}")
+        print(f"{mass_star=}")
+        # The inverse relationship can use numerical fits / interpolation, so allow larger errors
+        assert np.allclose(mstar_test, mass_star, rtol=1e-2)
+    # if it's not implemented, that's okay
+    except NotImplementedError:
+        pass
+
+    # check derivatives
+    dmstar_dmbh_test = mmbulge.dmstar_dmbh(mass_star, redz=redz)
+    # numerically calculate the derivates with finite differences
+    delta = 1.0e-6
+    mass_star_hi = mass_star * (1.0 + delta)
+    mass_star_lo = mass_star * (1.0 - delta)
+    mbh_hi = mmbulge.mbh_from_mstar(mass_star_hi, redz=redz, scatter=False)
+    mbh_lo = mmbulge.mbh_from_mstar(mass_star_lo, redz=redz, scatter=False)
+    dmstar_dmbh_true = (mass_star_hi - mass_star_lo) / (mbh_hi - mbh_lo)
+    # make sure values are consistent
+    deriv_error = (dmstar_dmbh_test - dmstar_dmbh_true) / dmstar_dmbh_true
+    print(f"{dmstar_dmbh_true=}")
+    print(f"{dmstar_dmbh_test=}")
+    print(f"{deriv_error=}")
+    # The derivatives can use numerical fits / interpolation, so allow larger errors
+    assert np.allclose(dmstar_dmbh_true, dmstar_dmbh_test, rtol=1e-2)
+
+    return mbh
+
+
+def test_all_mmbulge_relation_classes_with_mstar(mstar_redz):
+    print(f"{__file__}::test_all_mmbulge_relation_classes_with_mstar()")
+
+    # unpack mstar and redz values from pytest.fixture
+    mass_star, redz = mstar_redz
+
+    for name, mmbulge_class in host_relations._mmbulge_relation_class_dict.items():
+        print(name, mmbulge_class)
+
+        # Use default instantiation
+        mmbulge = mmbulge_class()
+        # perform basic checks
+        _check_any_mmbulge_relation_with_mstar(mmbulge, mass_star, redz)
+
+        # Use instantiation with custom bulge-fractions
+        for bf_name, bfrac_class in host_relations._bulge_frac_class_dict.items():
+            print(bf_name, bfrac_class)
+            bf = bfrac_class()
+            mmbulge = mmbulge_class(bulge_frac=bf)
+
+            # perform basic checks
+            _check_any_mmbulge_relation_with_mstar(mmbulge, mass_star, redz)
 
     return
 
