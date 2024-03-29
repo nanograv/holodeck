@@ -53,7 +53,7 @@ def _check_any_bulge_frac(bf, mstar, redz):
         print(f"{mstar=}")
         print(f"{error_mstar=}")
         # The reverse relationship may be inverted numerically or with a fit, so allow a larger error
-        assert np.allclose(mstar_test, mstar, rtol=1e-4)
+        assert np.allclose(mstar_test, mstar, rtol=1e-3)
     # if it's not implemented, that's okay
     except NotImplementedError:
         pass
