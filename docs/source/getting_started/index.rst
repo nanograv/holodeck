@@ -95,8 +95,8 @@ where the masses must be evaluated at the appropriate locations: :math:`m_1 = M_
 **Implementation:** M-MBulge relationships are implemented as subclasses inheriting from the :py:class:`holodeck.host_relations._MMBulge_Relation` class (defined in the :py:mod:`holodeck.host_relations` file), for example the :py:class:`holodeck.host_relations.MMBulge_KH2013` class.  Subclasses must implement a number of methods to allow for conversion between stellar bulge-mass and MBH mass.
 
 
-'Discrete' Illustris Populations
---------------------------------
+'Discrete' Populations from cosmological hydrodynamic simulations (e.g. illustris)
+----------------------------------------------------------------------------------
 
 
 Binary Evolution
