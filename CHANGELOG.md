@@ -19,6 +19,10 @@
 
 ## Current
 
+
+
+## v1.5 - 2024/03/29
+
 * Deprecated `relations.py`.
     * **Material from this file has mostly been moved to `host_relations.py`**.  The components for galaxy/halo density/velocity profiles have been moved to `galaxy_profiles.py`.  Stellar-mass vs. halo-mass relations are still in `host_relations.py`.
     * All of the same material can temporarily still be accessed/imported from `relations.py`, and it will log/print a deprecation warning.
