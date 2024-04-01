@@ -985,6 +985,42 @@ def quantiles(
     return percs
 
 
+def random_power(extr, pdf_index, size=1):
+    """Draw from power-law PDF with the given extrema and index.
+
+    FIX/BUG : negative `extr` values break `pdf_index=-1` !!
+
+    Arguments
+    ---------
+    extr : array_like scalar
+        The minimum and maximum value of this array are used as extrema.
+    pdf_index : scalar
+        The power-law index of the PDF distribution to be drawn from.  Any real number is valid,
+        positive or negative.
+        NOTE: the `numpy.random.power` function uses the power-law index of the CDF, i.e. `g+1`
+    size : scalar
+        The number of points to draw (cast to int).
+    **kwags : dict pairs
+        Additional arguments passed to `zcode.math_core.minmax` with `extr`.
+
+    Returns
+    -------
+    rv : (N,) scalar
+        Array of random variables with N=`size` (default, size=1).
+
+    """
+
+    extr = minmax(extr)
+    if pdf_index == -1:
+        rv = 10**np.random.uniform(*np.log10(extr), size=int(size))
+    else:
+        rr = np.random.random(size=int(size))
+        gex = extr ** (pdf_index+1)
+        rv = (gex[0] + (gex[1] - gex[0])*rr) ** (1./(pdf_index+1))
+
+    return rv
+
+
 def rk4_step(func, x0, y0, dx, args=None, check_nan=0, check_nan_max=5):
     """Perform a single 4th-order Runge-Kutta integration step.
     """
