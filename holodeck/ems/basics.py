@@ -185,7 +185,7 @@ class Band:
 
     def __str__(self):
         rv = (
-            f"{self.name}:  w={self.wlen:.4e}, f={self.freq:.4e}  |  "
+            f"{self.name} band:  wlen={self.wlen:.4e}, freq={self.freq:.4e}  |  "
             f"F_w={self.flux_ref_wlen:.4e}, F_f={self.flux_ref_freq:.4e}"
         )
         return rv
