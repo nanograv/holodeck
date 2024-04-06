@@ -626,7 +626,6 @@ class MMBulge_Standard(_MMBulge_Relation):
 
     """
 
-    MASS_AMP = None
     MASS_AMP_LOG10 = 8.17   # log10(M/Msol)
     MASS_PLAW = 1.01
     MASS_REF = 1.0e11 * MSOL
@@ -634,29 +633,30 @@ class MMBulge_Standard(_MMBulge_Relation):
     BULGE_MASS_FRAC = 0.615   #: Default bulge mass as fraction of total stellar mass
 
     def __init__(
-        self, mamp=None, mamp_log10=None, mplaw=None, mref=None, scatter_dex=None,
-        bulge_frac=None, bulge_mfrac=None
+        self, mamp_log10=None, mplaw=None, mref=None, scatter_dex=None,
+        bulge_frac=None, bulge_mfrac=None, **kwargs,
     ):
+        """Initialize a :class:`MMBulge_Standard(_MMBulge_Relation)` class instance.
+
+        Arguments
+        ---------
+
+        """
+
+        # NOTE: manually catch deprecation [2024-04-06]
+        if 'mamp' in kwargs:
+            raise ValueError("The `mamp` parameter has been deprecated!  Use `mamp_log10`!")
 
         # ---- Determine and set bulge fraction
 
         super().__init__(bulge_frac=bulge_frac, bulge_mfrac=bulge_mfrac)
 
-        # ---- Determine normalization: set either ``mamp`` or ``mamp_log10``
+        # ---- Determine normalization
 
-        # make sure only one of the default parameters is set
-        if (self.MASS_AMP_LOG10 is not None) == (self.MASS_AMP is not None):
-            err = "One of `MASS_AMP_LOG10` _or_ `MASS_AMP` must be set!"
-            log.exception(err)
-            raise ValueError(err)
-
-        # if neither normalization is given, use default values (only one of defaults will be set)
-        if (mamp is None) and (mamp_log10 is None):
+        if (mamp_log10 is None):
             mamp_log10 = self.MASS_AMP_LOG10
-            mamp = self.MASS_AMP
 
-        # get ``mamp`` regardless of which normalization value is given
-        mamp, _ = utils._parse_val_log10_val_pars(mamp, mamp_log10, MSOL, 'mamp', only_one=True)
+        mamp = MSOL * np.power(10.0, mamp_log10)
 
         # ---- Determine other parameters and store to instance
 
@@ -667,12 +667,10 @@ class MMBulge_Standard(_MMBulge_Relation):
         if scatter_dex is None:
             scatter_dex = self.SCATTER_DEX
 
-        self._mamp = mamp     #: Mass-Amplitude [grams]
-        self._mplaw = mplaw   #: Mass Power-law index
-        self._mref = mref     #: Reference Mass (argument normalization)
+        self._mamp = mamp                   #: Mass-Amplitude [grams]
+        self._mplaw = mplaw                 #: Mass Power-law index
+        self._mref = mref                   #: Reference Mass (argument normalization)
         self._scatter_dex = scatter_dex
-
-        # self._bulge_frac    #: initialized in ``_MMBulge_Relation.__init__``
 
         return
 
@@ -778,8 +776,8 @@ class MMBulge_KH2013(MMBulge_Standard):
     Values taken from [KH2013]_ Eq.10.
 
     """
-    MASS_AMP = 0.49 * 1e9 * MSOL      # 0.49 + 0.06 - 0.05   in units of [Msol]
-    MASS_AMP_LOG10 = None
+    # MASS_AMP = 0.49 * 1e9 * MSOL      # 0.49 + 0.06 - 0.05   in units of [Msol]
+    MASS_AMP_LOG10 = 8.69
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.17                  # 1.17 ± 0.08
     SCATTER_DEX = 0.28                # scatter stdev in dex
@@ -791,7 +789,6 @@ class MMBulge_MM2013(MMBulge_Standard):
     [MM2013]_ Eq. 2, with values taken from Table 2 ("Dynamical masses", first row, "MPFITEXY")
 
     """
-    MASS_AMP = None
     MASS_AMP_LOG10 = 8.46    # 8.46 ± 0.08   in units of [Msol]
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.05                  # 1.05 ± 0.11
@@ -814,8 +811,8 @@ class MMBulge_Redshift(MMBulge_Standard):
 
     """
 
-    MASS_AMP = 3.0e8 * MSOL
-    MASS_AMP_LOG10 = None
+    # MASS_AMP = 3.0e8 * MSOL
+    MASS_AMP_LOG10 = 8.17
     MASS_PLAW = 1.0
     MASS_REF = 1.0e11 * MSOL
     SCATTER_DEX = 0.0
@@ -866,7 +863,6 @@ class MMBulge_Redshift_MM2013(MMBulge_Redshift):
 
     """
     MASS_AMP_LOG10 = 8.46    # 8.46 ± 0.08   in units of [Msol]
-    MASS_AMP = None
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.05                  # 1.05 ± 0.11
     SCATTER_DEX = 0.34
@@ -880,8 +876,8 @@ class MMBulge_Redshift_KH2013(MMBulge_Redshift):
 
     Values taken from [KH2013] Eq.10 (pg. 61 of PDF, "571" of ARAA)
     """
-    MASS_AMP = 0.49 * 1e9 * MSOL   # 0.49 + 0.06 - 0.05   in units of [Msol]
-    MASS_AMP_LOG10 = None
+    # MASS_AMP = 0.49 * 1e9 * MSOL   # 0.49 + 0.06 - 0.05   in units of [Msol]
+    MASS_AMP_LOG10 = 8.69
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.17                  # 1.17 ± 0.08
     SCATTER_DEX = 0.28

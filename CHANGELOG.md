@@ -19,6 +19,8 @@
 
 ## Current
 
+* DEPRECATIONS
+    * `host_relations.py`: remove the `mamp` parameter and `MASS_AMP` attributes in the MMBulge relationships, and use `mamp_log10` and `MASS_AMP_LOG10` exclusively.
 
 
 ## v1.5 - 2024/03/29
