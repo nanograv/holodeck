@@ -900,15 +900,8 @@ def quantile_filtered(values, percs, axis, func=np.isfinite):
     return np.apply_along_axis(lambda xx: np.percentile(np.asarray(xx)[func(xx)], percs*100), axis, values)
 
 
-def quantiles(
-    values: npt.ArrayLike,
-    percs: Optional[npt.ArrayLike] = None,
-    sigmas: Optional[npt.ArrayLike] = None,
-    weights: Optional[npt.ArrayLike] = None,
-    axis: Optional[int] = None,
-    values_sorted: bool = False,
-    filter: Optional[str] = None,
-) -> Union[np.ndarray, np.ma.masked_array]:
+def quantiles(values, percs=None, sigmas=None, weights=None, axis=None,
+              values_sorted=False, filter=None):
     """Compute weighted percentiles.
 
     NOTE: if `values` is a masked array, then only unmasked values are used!
