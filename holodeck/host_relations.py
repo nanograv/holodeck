@@ -142,26 +142,6 @@ class _Bulge_Frac(abc.ABC):
     # ---- Optional API Methods
 
     def mstar_from_mbulge(self, mbulge, redz=None, **kwargs):
-        raise NotImplementedError(f"``mstar_from_mbulge`` is not implemented in {self}!")
-
-
-class BF_Constant(_Bulge_Frac):
-    r"""Constant stellar-bulge mass fraction (for all stellar-masses, redshifts, etc).
-
-    The bulge mass is calculated as, $M_\textrm{bulge} = f_\textrm{bulge}  M_\textrm{star}$, where
-    the bulge mass fraction is $f_\textrm{bulge} \in (0.0, 1.0]$.
-
-    """
-
-    def __init__(self, bulge_frac=0.615):
-        assert (0.0 < bulge_frac) and (bulge_frac <= 1.0)
-        self._bulge_mass_frac = bulge_frac
-        return
-
-    def bulge_frac(self, *args, **kwargs):
-        return self._bulge_mass_frac
-
-    def mstar_from_mbulge(self, mbulge, redz=None, **kwargs):
         """Convert total stellar-mass to stellar-bulge mass.
 
         Arguments
@@ -180,6 +160,34 @@ class BF_Constant(_Bulge_Frac):
             Total stellar mass in units of grams.
 
         """
+        raise NotImplementedError(f"``mstar_from_mbulge`` is not implemented in {self}!")
+
+
+class BF_Constant(_Bulge_Frac):
+    r"""Constant stellar-bulge mass fraction (for all stellar-masses, redshifts, etc).
+
+    The bulge mass is calculated as, $M_\textrm{bulge} = f_\textrm{bulge}  M_\textrm{star}$, where
+    the bulge mass fraction is $f_\textrm{bulge} \in (0.0, 1.0]$.
+
+    """
+
+    def __init__(self, bulge_frac=0.69):
+        """Initialize a :class:`BF_Constant(_Bulge_Frac)` instance.
+
+        Arguments
+        ---------
+        bulge_frac : float, []
+            Mass fraction of the stellar bulge relative to the total stellar mass.  Unitless.
+
+        """
+        assert (0.0 < bulge_frac) and (bulge_frac <= 1.0)
+        self._bulge_mass_frac = bulge_frac
+        return
+
+    def bulge_frac(self, *args, **kwargs):
+        return self._bulge_mass_frac
+
+    def mstar_from_mbulge(self, mbulge, redz=None, **kwargs):
         mstar = mbulge / self.bulge_frac()
         return mstar
 
@@ -615,14 +623,16 @@ class _MMBulge_Relation(_BH_Host_Relation):
 
 
 class MMBulge_Standard(_MMBulge_Relation):
-    """Simple Mbh-Mbulge relation as a single power-law.
+    r"""Simple Mbh-Mbulge relation as a single power-law.
 
-    Notes
-    -----
-    * Single power-law relationship between BH mass and Stellar-bulge mass.
-      :math:`Mbh = M0 * (M_bulge/Mref)^plaw * 10^Normal(0, eps)`
-    * Constant bulge mass-fraction relative to total stellar mass.
-      :math:`M_bulge = f_bulge * M_star`
+    This Mbh-Mbulge relation implements a single power-law relationship between BH mass and
+    stellar-bulge mass:
+
+    .. math::
+        M_{bh} = M_0 * (M_{bulge}/M_{ref})^\gamma * 10^Normal(0, \epsilon)
+
+    See documemtation for :class:`_MMBulge_Relation` for more information.
+
 
     """
 
@@ -640,6 +650,19 @@ class MMBulge_Standard(_MMBulge_Relation):
 
         Arguments
         ---------
+        mamp_log10 : float  or  None
+            The normalization of the M-Mbulge relationship, in log10 of solar-masses.
+            This value gives the mass of blackholes for a bulge-mass equal to the reference mass
+            `mref`.
+        mplaw : float  or  None
+            The power-law index of the M-Mbulge relationship.  Unitless.
+        mref : float  or  None
+            Reference mass used for scaling stellar-bulge masses.
+        scatter_dex : float  or  None
+            The scatter in dex (i.e. orders of magnitude) in the M-Mbulge relationship.
+        bulge_frac : :class:`_Bulge_Fraction` subclass instance  or  None
+            The class instance for calculating bulge-fractions and converting from total
+            stellar-masses to stellar bulge-masses.
 
         """
 
@@ -675,43 +698,12 @@ class MMBulge_Standard(_MMBulge_Relation):
         return
 
     def mbh_from_host(self, pop, scatter=None):
-        """For 'discrete' populations, convert from host mbulge mass to MBH mass.
-
-        Arguments
-        ---------
-        pop : ``_Population_Discrete`` subclass instance
-            Discrete population including 'mbulge' host properties.
-        scatter : bool,
-            Whether or not to include scatter when converting to BH masses.
-
-        Returns
-        -------
-        mbh : array_like  [g]
-            Black hole masses in units of grams.
-
-        """
         host = self.get_host_properties(pop)
         mbulge = host['mbulge']
         mbh = self.mbh_from_mbulge(mbulge, redz=None, scatter=scatter)
         return mbh
 
     def mbh_from_mbulge(self, mbulge, redz=None, scatter=None):
-        """Convert from stellar-bulge mass to black-hole mass.
-
-        Parameters
-        ----------
-        mbulge : array_like,
-            Stellar bulge-mass of host galaxy.  [grams]
-        scatter : bool,
-            Whether or not to include scatter in scaling relationship.
-            Uses `self._scatter_dex` attribute.
-
-        Returns
-        -------
-        mbh : array_like,
-            Mass of black hole.  [grams]
-
-        """
         scatter_dex = self._scatter_dex if scatter else None
         mbh = _log10_relation(mbulge, self._mamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
