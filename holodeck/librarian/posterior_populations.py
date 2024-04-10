@@ -2,8 +2,8 @@
 
 See `holodeck-pops.ipynb` for example usage of this data.
 
-Usage
------
+Usage (posterior_populations.py)
+--------------------------------
 See `python gen_holodeck_pop.py -h` for usage information.
 
 Example::
@@ -15,8 +15,8 @@ Example::
                                    |     |-------------------> 30 frequency bins
                                    |-------------------------> 20 years observing baseline = 1/(20yr) lowest frequency
 
-To-Do
------
+To-Do (posterior_populations.py)
+--------------------------------
 * Improve handling of data path.
 * Improve handling/specification of parameter space.
     * Allow changes to be passed in through API and or CL
