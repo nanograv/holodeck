@@ -1341,7 +1341,7 @@ def _integrate_grid_differential_number(edges, dnum, freq=False):
 
     NOTE: the `edges` provided MUST all be in linear space, mass is converted to ``log10(M)``
     and frequency is converted to ``ln(f)``.
-    NOTE: the density `dnum` MUST correspond to `dn/ [dlog10(M) dq dz dln(f)]`
+    NOTE: the density `dnum` MUST correspond to `d^3 n / [dlog10(M) dq dz dln(f)]`
 
     Parameters
     ----------
