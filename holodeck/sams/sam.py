@@ -25,8 +25,8 @@ The step of going from a number-density of binaries in $(M, q, z)$ space, to als
 in $a$ or $f$ is subtle, as it requires modeling the binary evolution (i.e. hardening rate).
 
 
-To-Do
------
+To-Do (sam.py)
+--------------
 * Allow SAM class to take M-sigma in addition to M-Mbulge.
 
 References
@@ -66,35 +66,91 @@ GMT_USES_MTOT = False        #: the mass used in the GMT  is interpretted as M=m
 
 
 class Semi_Analytic_Model:
-    """Semi-Analytic Model of MBH Binary populations.
+    """Semi-Analytic Model (SAM) of MBH Binary populations.
 
-    Based on four components:
-    * Galaxy Stellar-Mass Function (GSMF): the distribution of galaxy masses
-    * Galaxy Pair Fraction (GPF): the probability of galaxies having a companion
-    * Galaxy Merger Time (GMT): the expected galaxy-merger timescale for a pair of galaxies
-    * M-MBulge relation: relation between host-galaxy (bulge-mass) and MBH (mass) properties
+    This class produces simulated MBH binary populations using idealized (semi-)analytic functions
+    starting from galaxy populations, to massive black holes, to merger rates.  Using SAMs, MBH
+    binary populations are calculated over a fixed, rectilinear grid of 3 or 4 dimensional
+    parameter-space.  The starting parameter space is total mass, mass ratio, and redshift; but
+    often the distribution of binaries are desired at particular orbital frequencies or separations,
+    which adds a dimension.  Some parameters are calculated at grid edges (e.g. binary number
+    densities), while others are calculated at grid centers (e.g. number of binaries in a universe).
+    Ultimately, what the SAM calculates in the number (or number-density) of binaries at each point
+    in this 3-4 dimensional parameter space.
+
+    Conceptually, three components are required to build SAMs.
+
+    (1) Galaxies and stellar-masses (i.e. how many galaxies there are as a function of stellar mass
+        and redshift).  This component is provided by the Galaxy Stellar-Mass Function (GSMF), which
+        are implemented as subclasses of the
+        :class:`holodeck.sams.components._Galaxy_Stellar_Mass_Function` base-class.
+
+    (2) Galaxy merger rates (GMRs; i.e. how often galaxies merge as a function of stellar mass, mass
+        ratio, and redshift.)  This component can be provided in two ways:
+
+        * Subclasses of :class:`holodeck.sams.components._Galaxy_Merger_Rate`, which provide merger
+          rates directly.
+
+        * Both a galaxy pair fraction (GPF; subclasses of
+          :class:`holodeck.sams.components._Galaxy_Pair_Fraction`) which give the fraction of
+          galaxies in the process of merger, and a galaxy merger time (GMT; subclasses of
+          :class:`_Galaxy_Merger_Time`) which gives the duration of time that galaxies spend in the
+          merger process.
+
+    (3) MBH-Host relationships which determine MBH properties for a given host galaxy.  Currently
+        these relationships are only fully implemented as Mbh-MBulge (MMBulge) relationships, which
+        are subclasses of :class:`holodeck.host_relations._MMBulge_Relation`.
 
     """
 
     def __init__(
-        self, mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
-        shape=None, log=None,
-        gsmf=GSMF_Schechter, mmbulge=host_relations.MMBulge_KH2013,
-        gpf=None, gmt=None, gmr=None,
+        self,
+        mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91),
+        mrat=(1e-3, 1.0, 81),
+        redz=(1e-3, 10.0, 101),
+        shape=None,
+        log=None,
+        gsmf=GSMF_Schechter,
+        gpf=None,
+        gmt=None,
+        gmr=None,
+        mmbulge=host_relations.MMBulge_KH2013,
         **kwargs
     ):
-        """Construct a new Semi_Analytic_Model instance.
+        """Construct a new ``Semi_Analytic_Model`` instance.
 
         Parameters
         ----------
-        mtot : list, optional
-        mrat : list, optional
-        redz : list, optional
-        shape : _type_, optional
-        gsmf : _type_, optional
-        gpf : _type_, optional
-        gmt : _type_, optional
-        mmbulge : _type_, optional
+        mtot : (3,) tuple
+            Specification for the domain of the grid in total-mass.
+            Three arguments must be included, the 0th giving the lower-limit [grams], the 1th
+            giving the upper-limit [grams], and the 2th giving the number of bin-edges (i.e. the
+            number-of-bins plus one).
+        mrat : (3,) tuple
+            Specification for the domain of the grid in mass-ratio.
+            Three arguments must be included, the 0th giving the lower-limit, the 1th giving the
+            upper-limit, and the 2th giving the number of bin-edges (i.e. the number-of-bins plus
+            one).
+        redz : (3,) tuple
+            Specification for the domain of the grid in redshift.
+            Three arguments must be included, the 0th giving the lower-limit, the 1th giving the
+            upper-limit, and the 2th giving the number of bin-edges (i.e. the number-of-bins plus
+            one).
+        shape : int  or  (3,) tuple
+            The shape of the grid in total-mass, mass-ratio, and redshift.  This argument specifies
+            the number of grid-edges in each dimension, and overrides the shape arguments of
+            ``mtot``, ``mrat``, and ``redz``.
+            * If a single `int` is given, then this is the shape applied to all dimensions.
+            * If a (3,) iterable of values is given, then each value specifies the size of the grid
+              in the corresponding dimension.  `None` values can be provided which indicate to use
+              the default sizes (provided by the ``mtot``, ``mrat``, and ``redz`` arguments.)  For
+              example, ``shape=(12, None, 14)`` would produce 12 grid edges in total mass, the
+              default number of grid edges in mass ratio, and 14 grid edges in redshit.
+        gsmf : None  or  :class:`_Galaxy_Stellar_Mass_Function` subclass instance
+        gpf : None  or  :class:`_Galaxy_Pair_Fraction` subclass instance
+        gmt : None  or  :class:`_Galaxy_Merger_Time` subclass instance
+        gmr : None  or  :class:`_Galaxy_Merger_Rate` subclass instance
+        mmbulge : None  or  :class:`_MMBulge_Relation` subclass instance
 
         """
         if log is None:
@@ -220,14 +276,22 @@ class Semi_Analytic_Model:
 
     @property
     def static_binary_density(self):
-        """The number-density of binaries at each bin edge, 'd^3 n / [dlog10M dq dz]' in units of [Mpc^-3].
+        r"""The number-density of binaries at the edges of the grid in mtot, mrat, redz.
 
-        This is calculated once and cached.
+        The 'number density' is a density both in terms of volume (i.e. number of binaries per unit
+        comoving-volume, $n = dN/dV_c$), and in terms of binary parameters (e.g. binaries per unit
+        of log10 mass, $d n /d \log_{10} M$).  Specifically, the values returned are:
+
+        .. math::
+            d^3 n / [d \log_{10} M  d q  d z]
+
+        For each :class:`Semi_Analytic_Model` instance, this value is calculated once and cached.
 
         Returns
         -------
-        density : (M, Q, Z) ndarray
-            Number density of binaries, per unit redshift, mass-ratio, and log10 of mass.  Units of [Mpc^-3].
+        density : (M, Q, Z) ndarray [$cMpc^{-3}$]
+            Number density of binaries, per unit redshift, mass-ratio, and log10 of mass.
+            The values are in units of inverse cubic, comoving-Mpc.
 
         Notes
         -----
