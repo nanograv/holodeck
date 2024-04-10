@@ -668,7 +668,13 @@ class MMBulge_Standard(_MMBulge_Relation):
 
         # NOTE: manually catch deprecation [2024-04-06]
         if 'mamp' in kwargs:
-            raise ValueError("The `mamp` parameter has been deprecated!  Use `mamp_log10`!")
+            warn = "The `mamp` parameter has been deprecated!  Use `mamp_log10`!"
+            log.warning(warn)
+            if mamp_log10 is not None:
+                err = "Both `mamp` (deprecated!) and `mamp_log10` have been given!  Cannot correct."
+                log.exception(err)
+                raise ValueError(err)
+            mamp_log10 = np.log10(kwargs.pop('mamp') / MSOL)
 
         # ---- Determine and set bulge fraction
 
@@ -694,6 +700,10 @@ class MMBulge_Standard(_MMBulge_Relation):
         self._mplaw = mplaw                 #: Mass Power-law index
         self._mref = mref                   #: Reference Mass (argument normalization)
         self._scatter_dex = scatter_dex
+
+        if len(kwargs) > 0:
+            warn = f"Unused parameters passed to {self}!  {kwargs=}"
+            log.warning(warn)
 
         return
 
