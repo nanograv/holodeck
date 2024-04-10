@@ -119,7 +119,7 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
     '''
     if path_pspace is None:
         path_pspace = path_output
-    pspace, pspace_fname = libraries.load_pspace_from_path(log, path_pspace)
+    pspace, pspace_fname = libraries.load_pspace_from_path(path_pspace, log=log)
 
     log.info(f"loaded param space: {pspace} from '{pspace_fname}'")
     param_names = pspace.param_names
