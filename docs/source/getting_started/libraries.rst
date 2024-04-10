@@ -9,8 +9,8 @@ Generating and Using Holodeck Libraries
    :depth: 1
 
 
-Overview
-========
+Libraries Overview
+==================
 
 |holodeck| 'libraries' are collections of simulations in which a certain set of parameters are varied, producing different populations and/or GW signatures at each sampled parameter value.  Libraries are run from the same parameter-space and using the same hyper parameters (for example, the functional form that is assumed for the galaxy stellar-mass function).  Libraries are constructed using the :py:mod:`~holodeck.librarian` module, with a 'parameter space' class that organizes the different simulations.  The base-class is called :py:class:`~holodeck.librarian.libraries._Param_Space` (defined in the :py:mod:`holodeck.librarian.libraries` file), and all parameter space classes inherit from this, and should typically be prefixed by ``PS_`` to denote that they are parameter spaces.  The parameter-space subclasses implement a number of parameters that are varied.  Each parameter is implemented as a subclass of :py:class:`~holodeck.librarian.libraries._Param_Dist`, for example the :py:class:`~holodeck.librarian.libraries.PD_Uniform` class that implements a uniform distribution.
 
