@@ -185,10 +185,13 @@ def mbh_from_mbulge_KH2013(mbulge):
     """This is a manually-coded version of the TRUE [KH2013]_ relation to use for comparisons."""
 
     # [KH2013] Eq. 10
-    AMP = 0.49 * (1e9 * MSOL)
+    # AMP = 0.49 * (1e9 * MSOL)
+    AMP_LOG10 = 8.69
     PLAW = 1.17
     # EPS = 0.28
     X0 = 1e11 * MSOL
+
+    AMP = (10.0 ** AMP_LOG10) * MSOL
 
     def func_KH2013(xx):
         yy = AMP * np.power(xx/X0, PLAW)
@@ -209,9 +212,11 @@ def check_relation(mmbulge_relation, truth_func):
     vals = mmbulge_relation.mbh_from_host(host, scatter=False)
     truth = truth_func(host.mbulge)
 
+    err = (vals - truth) / truth
     print(f"mbulge [grams] = {host.mbulge}")
     print(f"vals           = {vals}")
     print(f"truth          = {truth}")
+    print(f"errors         = {err}")
     assert np.allclose(vals, truth)
 
     # mbh ==> mbulge
