@@ -24,7 +24,6 @@ distribution, and to calculate GW signatures.
 The step of going from a number-density of binaries in $(M, q, z)$ space, to also the distribution
 in $a$ or $f$ is subtle, as it requires modeling the binary evolution (i.e. hardening rate).
 
-
 To-Do (sam.py)
 --------------
 * Allow SAM class to take M-sigma in addition to M-Mbulge.
@@ -94,8 +93,8 @@ class Semi_Analytic_Model:
         * Both a galaxy pair fraction (GPF; subclasses of
           :class:`holodeck.sams.components._Galaxy_Pair_Fraction`) which give the fraction of
           galaxies in the process of merger, and a galaxy merger time (GMT; subclasses of
-          :class:`_Galaxy_Merger_Time`) which gives the duration of time that galaxies spend in the
-          merger process.
+          :class:`holodeck.sams.components._Galaxy_Merger_Time`) which gives the duration of time
+          that galaxies spend in the merger process.
 
     (3) MBH-Host relationships which determine MBH properties for a given host galaxy.  Currently
         these relationships are only fully implemented as Mbh-MBulge (MMBulge) relationships, which
@@ -140,12 +139,15 @@ class Semi_Analytic_Model:
             The shape of the grid in total-mass, mass-ratio, and redshift.  This argument specifies
             the number of grid-edges in each dimension, and overrides the shape arguments of
             ``mtot``, ``mrat``, and ``redz``.
-            * If a single `int` is given, then this is the shape applied to all dimensions.
+
+            * If a single `int` is given, then this is the number of edges for all dimensions.
+
             * If a (3,) iterable of values is given, then each value specifies the size of the grid
               in the corresponding dimension.  `None` values can be provided which indicate to use
               the default sizes (provided by the ``mtot``, ``mrat``, and ``redz`` arguments.)  For
               example, ``shape=(12, None, 14)`` would produce 12 grid edges in total mass, the
               default number of grid edges in mass ratio, and 14 grid edges in redshit.
+
         gsmf : None  or  :class:`_Galaxy_Stellar_Mass_Function` subclass instance
         gpf : None  or  :class:`_Galaxy_Pair_Fraction` subclass instance
         gmt : None  or  :class:`_Galaxy_Merger_Time` subclass instance
@@ -394,14 +396,73 @@ class Semi_Analytic_Model:
 
         return self._density
 
-    def dynamic_binary_number_at_fobs(self, hard, fobs_orb, **kwargs):
+    def dynamic_binary_number_at_fobs(self, hard, fobs_orb, use_cython=True, **kwargs):
+        r"""Calculate the differential number of binaries in at each grid point, at each frequency.
 
-        if hard.CONSISTENT:
-            edges, dnum, redz_final = self._dynamic_binary_number_at_fobs_consistent(hard, fobs_orb, **kwargs)
+        The number of binaries is a differential over binary parameters (e.g. number of binaries
+        per unit of log10 mass, $d N /d \log_{10} M$).  Specifically, the values returned are:
+
+        .. math::
+            d^4 N / [d \log_{10} M  d q  d z d \ln f_{obs}]
+
+        The calculated number of binaries is obtained by converting the number-density (calculated
+        in :meth:`Semi_Analytic_Model.static_binary_density`) using the given binary hardening model
+        (`hard`) to evolve the binaries to the frequencies of interest.
+
+        To convert to the number of binaries (non-differential number), use the method
+        :func:`holodeck.utils.integrate_differential_number_3dx1d`.
+
+        Arguments
+        ---------
+        hard : :class:`holodeck.hardening._Hardening` subclass instance,
+            Binary evolution model used to evolve binaries to the target frequencies.
+        fobs_orb : (F,) array_like [1/s]
+            Observer-frame orbital frequencies at which to evaluate the differential number of
+            binaries, in units of inverse seconds.  Note that the number of binaries are evaluated
+            *at* these frequencies (not between them), so they act as bin centers, not bin edges.
+        use_cython : bool
+
+        Returns
+        -------
+        grid : (4,) list of ndarray
+            The locations of the parameter-space grid at which the differential number of binaries
+            is evaluated.  The elements are: {total mass, mass ratio, redshift, frequency}.
+            The total mass, mass ratio, and redshfit arrays correspond to grid edges, while the
+            frequency array is bin centers.  The frequency values are exactly the same as those
+            that are passed in with the ``fobs_orb`` variable.  The first three edges are the same
+            as the grid edges stored within the :class:`Semi_Analytic_Model` instance, i.e. the
+            attributes: :attr:`Semi_Analytic_Model.mtot`, :attr:`Semi_Analytic_Model.mrat`, and
+            :attr:`Semi_Analytic_Model.redz`.
+        dnum : (M, Q, Z, F) ndarray []
+            The differential number of binaries per unit 4-D parameter-space volume.  Unitless.
+        redz_final : (M, Q, Z, F) ndarray []
+            The redshift at which each grid point reaches the target frequencies.  This is distinct
+            from the :attr:`Semi_Analytic_Model.redz` parameter which gives the redshift at the time
+            of galaxy merger.  Unitless.
+
+        """
+
+        # Use the faster, cython implementation of the calculation
+        if use_cython:
+            # Import the cython module as needed
+            from . import sam_cyutils
+            # calculate dynamic binary number
+            redz_final, dnum = sam_cyutils.dynamic_binary_number_at_fobs(
+                fobs_orb, self, hard, cosmo
+            )
+            # provide the grid locations
+            grid = [self.mtot, self.mrat, self.redz, fobs_orb]
+
+        # Use the slower, but more readable python/numpy implementation of the calculation
         else:
-            edges, dnum, redz_final = self._dynamic_binary_number_at_fobs_inconsistent(hard, fobs_orb, **kwargs)
+            # Calculation for self-consistent binary evolution models
+            if hard.CONSISTENT:
+                grid, dnum, redz_final = self._dynamic_binary_number_at_fobs_consistent(hard, fobs_orb, **kwargs)
+            # Calculation for NOT self-consistent binary evolution models
+            else:
+                grid, dnum, redz_final = self._dynamic_binary_number_at_fobs_inconsistent(hard, fobs_orb, **kwargs)
 
-        return edges, dnum, redz_final
+        return grid, dnum, redz_final
 
     def _dynamic_binary_number_at_fobs_consistent(self, hard, fobs_orb, steps=200, details=False):
         """Get correct redshifts for full binary-number calculation.
@@ -419,7 +480,6 @@ class Semi_Analytic_Model:
 
         # shape: (M, Q, Z)
         dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
-
 
         # start from the hardening model's initial separation
         rmax = hard._sepa_init
