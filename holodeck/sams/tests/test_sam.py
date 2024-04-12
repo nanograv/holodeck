@@ -4,7 +4,8 @@
 import numpy as np
 
 import holodeck as holo
-# from holodeck.constants import MSOL, PC, YR
+from holodeck import utils
+from holodeck.constants import MSOL, PC, YR
 
 
 def _test_sam_basics(sam):
@@ -102,3 +103,60 @@ def test_sam_basics__gsmf_double_chechter():
     _test_sam_basics(sam)
 
     return
+
+
+# ===========================================
+# ====    Test: dynamic_binary_number    ====
+# ===========================================
+
+
+def test_dbn_gw_only():
+    """Test the dynamic_binary_number method using GW-only evolution.
+
+    (1) runs without error
+    (2) no redz_final values should be <= 0.0
+    (3) dnum values are consistent between cython and python
+    (4) redz_final values are consistent between cython and python
+
+    """
+
+    shape = (10, 11, 12)
+    sam = holo.sams.Semi_Analytic_Model(shape=shape)
+    hard_gw = holo.hardening.Hard_GW()
+
+    PTA_DUR = 20.0 * YR
+    NUM_FREQS = 9
+    fobs_gw_cents, fobs_gw_edges = holo.utils.pta_freqs(PTA_DUR, NUM_FREQS)
+    fobs_orb_cents = fobs_gw_cents / 2.0
+    # fobs_orb_edges = fobs_gw_edges / 2.0
+
+    # (1)
+
+    grid_py, dnum_py, redz_final_py = sam.dynamic_binary_number_at_fobs(hard_gw, fobs_orb_cents, use_cython=False)
+    grid_cy, dnum_cy, redz_final_cy = sam.dynamic_binary_number_at_fobs(hard_gw, fobs_orb_cents, use_cython=True)
+
+    # (2) no redz_final values should be after redshift zero (i.e. negative, '-1.0')
+
+    assert np.all(redz_final_py > 0.0), f"Found negative redshifts in python-version: {utils.stats(redz_final_py)=}"
+    assert np.all(redz_final_cy > 0.0), f"Found negative redshifts in cython-version: {utils.stats(redz_final_cy)=}"
+
+    # (3,) dnum consistent between cython- and python- versions of calculation
+
+    bads = ~np.isclose(dnum_py, dnum_cy)
+    if np.any(bads):
+        print(f"{utils.frac_str(bads)=}")
+        print(f"{utils.stats(dnum_py[bads])=}")
+        print(f"{utils.stats(dnum_cy[bads])=}")
+        assert not np.any(bads), f"Found {utils.frac_str(bads)} inconsistent `dnum` b/t python and cython calcs!"
+
+    # (4,) redz_final consistent between cython- and python- versions of calculation
+    bads = (~np.isclose(redz_final_py, redz_final_cy)) & (dnum_py > 0.0)
+    if np.any(bads):
+        print(f"{utils.frac_str(bads)=}")
+        print(f"{utils.stats(redz_final_py[bads])=}")
+        print(f"{utils.stats(redz_final_cy[bads])=}")
+        assert not np.any(bads), f"Found {utils.frac_str(bads)} inconsistent `redz_final` b/t python and cython calcs!"
+
+
+    return
+
