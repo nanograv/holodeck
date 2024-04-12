@@ -1042,7 +1042,7 @@ def rk4_step(func, x0, y0, dx, args=None, check_nan=0, check_nan_max=5):
     return x1, y1
 
 
-def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int = 2, weights=None) -> str:
+def stats(vals, percs=None, prec=2, weights=None) -> str:
     """Return a string giving quantiles of the given input data.
 
     Parameters
@@ -1065,8 +1065,8 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
 
     """
     try:
-        if len(vals) == 0:        # type: ignore
-            raise TypeError
+        if len(vals) == 0:        #### type: ignore
+            return "[]"
     except TypeError:
         raise TypeError(f"`vals` (shape={np.shape(vals)}) is not iterable!")
 
