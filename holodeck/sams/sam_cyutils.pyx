@@ -452,6 +452,7 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
         The differential number of binaries at each grid point.  Unitless.
 
     """
+
     nden = sam.static_binary_density
 
     shape = sam.shape + (fobs_orb.size,)
@@ -480,7 +481,8 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
 
     elif isinstance(hard, holo.hardening.Hard_GW) or issubclass(hard, holo.hardening.Hard_GW):
         redz_prime = sam._redz_prime
-        # if `sam` is using galaxy merger rate (GMR), then `redz_prime` will be `None`
+        # if `sam` doesn't use a galaxy merger time (GMT), then `redz_prime` will be `None`,
+        # set to initial redshift values instead
         if redz_prime is None:
             sam._log.info("`redz_prime` not calculated in SAM.  Setting to `redz` (initial) values.")
             redz_prime = sam.redz[np.newaxis, np.newaxis, :] * np.ones(sam.shape)
@@ -567,6 +569,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
         The differential number of binaries at each grid point.  Unitless.
 
     """
+
     cdef int n_mtot = mtot.size
     cdef int n_mrat = mrat.size
     cdef int n_redz = redz.size
@@ -849,6 +852,10 @@ cdef int _dynamic_binary_number_at_fobs_gw(
                     target_frst_orb = ftarget * (1.0 + rzp)
                     # if target frequency is above ISCO freq, then all future ones will be also, so: break
                     if target_frst_orb > frst_orb_isco:
+                        # but still fill in the final redshifts (redz_final)
+                        for fp in range(ff+1, n_freq):
+                            redz_final[ii, jj, kk, fp] = rzp
+
                         break
 
                     # get comoving distance
