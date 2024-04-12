@@ -19,6 +19,17 @@
 
 ## Current
 
+* DEFAULTS:
+    * Semi-Analytic Models
+        * New `Semi_Analytic_Models` instances now use galaxy merger-rates (instead of galaxy pair-fractions and merger-times) by default.  To use GPF+GMT SAMs, the user must pass in at least a GPF instance manually.
+
+* BUGS:
+    * Semi-Analytic Models
+        * `Semi_Analytic_Model._dynamic_binary_number_at_fobs_inconsistent` was not checking for systems that had already coalesced.  Only effected GW-only evolution using the python version of the calculation.
+
+
+## v1.5.2 - 2024/04/12
+
 * DEPRECATIONS
     * `host_relations.py`: remove the `mamp` parameter and `MASS_AMP` attributes in the MMBulge relationships, and use `mamp_log10` and `MASS_AMP_LOG10` exclusively.
 

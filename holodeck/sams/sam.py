@@ -172,25 +172,25 @@ class Semi_Analytic_Model:
 
         gsmf = utils.get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
         mmbulge = utils.get_subclass_instance(mmbulge, None, host_relations._MMBulge_Relation)
-        # if GMR is None, then we need both GMT and GPF
-        if gmr is None:
-            gmt = utils.get_subclass_instance(gmt, GMT_Power_Law, _Galaxy_Merger_Time)
-            gpf = utils.get_subclass_instance(gpf, GPF_Power_Law, _Galaxy_Pair_Fraction)
-        # if GMR is given, GMT can still be used - for calculating stalling
-        else:
+        if gpf is None:
+            log.info("No galaxy pair-fraction given, using galaxy merger-rate.")
             gmr = utils.get_subclass_instance(gmr, GMR_Illustris, _Galaxy_Merger_Rate)
             gmt = utils.get_subclass_instance(gmt, None, _Galaxy_Merger_Time, allow_none=True)
-            # if GMR is given, GPF is not used: make sure it is not given
-            if (gpf is not None):
-                err = f"When `GMR` ({gmr}) is provided, do not provide a GPF!"
+        else:
+            if gmr is not None:
+                err = "Can only use one of `gpf` and `gmr`!"
                 log.exception(err)
                 raise ValueError(err)
 
+            log.info("Galaxy pair-fraction provided, using galaxy pair-fraction and merger-time.")
+            gmt = utils.get_subclass_instance(gmt, GMT_Power_Law, _Galaxy_Merger_Time)
+            gpf = utils.get_subclass_instance(gpf, GPF_Power_Law, _Galaxy_Pair_Fraction)
+
         self._gsmf = gsmf             #: Galaxy Stellar-Mass Function (`_Galaxy_Stellar_Mass_Function` instance)
-        self._mmbulge = mmbulge       #: Mbh-Mbulge relation (`host_relations._MMBulge_Relation` instance)
+        self._gmr = gmr               #: Galaxy Merger Rate (`_Galaxy_Merger_Rate` instance)
         self._gpf = gpf               #: Galaxy Pair Fraction (`_Galaxy_Pair_Fraction` instance)
         self._gmt = gmt               #: Galaxy Merger Time (`_Galaxy_Merger_Time` instance)
-        self._gmr = gmr               #: Galaxy Merger Rate (`_Galaxy_Merger_Rate` instance)
+        self._mmbulge = mmbulge       #: Mbh-Mbulge relation (`host_relations._MMBulge_Relation` instance)
         log.debug(f"{gsmf=}, {gmr=}, {gpf=}, {gmt=}, {mmbulge=}")
 
         # ---- Create SAM grid edges
@@ -577,7 +577,13 @@ class Semi_Analytic_Model:
         shape = dens.shape
         new_shape = shape + (fobs_orb.size, )
 
-        rz = self._redz_prime[..., np.newaxis] * np.ones(new_shape)
+        # If a galaxy merger-time is being used, then `_redz_prime` gives the redshifts following
+        # galaxy merger.  NOTE: `_redz_prime` values past age of universe are set to `-1.0`.
+        # Use these as final redshifts if available, otherwise use the initial redshifts (`redz`).
+        if self._redz_prime is not None:
+            rz = self._redz_prime[..., np.newaxis] * np.ones(new_shape)
+        else:
+            rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis] * np.ones(new_shape)
         coal = (rz > 0.0)
 
         dc = cosmo.comoving_distance(rz[coal]).to('Mpc').value
@@ -585,27 +591,40 @@ class Semi_Analytic_Model:
             fobs_orb[np.newaxis, np.newaxis, np.newaxis, :], rz
         )
 
+        # (M,) ISCO separation
+        risco = utils.rad_isco(self.mtot)
+
         # (Z,) this is `(dVc/dz) * (dz/dt)` in units of [Mpc^3/s]
         cosmo_fact = 4 * np.pi * (SPLC/MPC) * np.square(dc) * (1.0 + rz[coal])
 
-        # # (M, Q) calculate chirp-mass
+        # broadcast to full shape, then take coalescing elements
+        # (M,) ==> (M, 1, 1, 1)
         mt = self.mtot[:, np.newaxis, np.newaxis, np.newaxis]
+        risco = risco[:, np.newaxis, np.newaxis, np.newaxis]
+        # (Q,) ==> (1, Q, 1, 1)
         mr = self.mrat[np.newaxis, :, np.newaxis, np.newaxis]
-        mt, mr = [(mm * np.ones(new_shape))[coal] for mm in [mt, mr]]
+        # These will now be 1D with shape (C,) for 'C' coalescing elements
+        mt, mr, fro, risco = [(mm * np.ones(new_shape))[coal] for mm in [mt, mr, frst_orb, risco]]
 
         # Convert from observer-frame orbital freq, to rest-frame orbital freq
-        sa = utils.kepler_sepa_from_freq(mt, frst_orb[coal])
-        # (X, M*Q*Z), hardening rate, negative values, units of [cm/sec]
+        sa = utils.kepler_sepa_from_freq(mt, fro)
+
+        # (C,), hardening rate, negative values, units of [cm/sec]
         args = [mt, mr, sa]
         dadt = hard.dadt(*args)
         # Calculate `tau = dt/dlnf_r = f_r / (df_r/dt)`
         # dfdt is positive (increasing frequency)
-        dfdt, _ = utils.dfdt_from_dadt(dadt, sa, frst_orb=frst_orb[coal])
-        tau = frst_orb[coal] / dfdt
+        dfdt, _ = utils.dfdt_from_dadt(dadt, sa, frst_orb=fro)
+        tau = fro / dfdt
 
-        # (M, Q, Z) units: [1/s] i.e. number per second
+        # (M, Q, Z, F) units: [1/s] i.e. number per second
         dnum = np.zeros(new_shape)
-        dnum[coal] = (dens[..., np.newaxis] * np.ones(new_shape))[coal] * cosmo_fact * tau
+
+        # Select only the binaries are separations larger than isco; this is a subset of `coal`
+        live = (sa > risco)
+        coal[coal] = coal[coal] & live
+
+        dnum[coal] = (dens[..., np.newaxis] * np.ones(new_shape))[coal] * cosmo_fact[live] * tau[live]
 
         return edges, dnum, rz
 
