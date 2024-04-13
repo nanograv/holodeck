@@ -209,11 +209,44 @@ class _Param_Space(abc.ABC):
     @classmethod
     @abc.abstractmethod
     def _init_sam(cls, sam_shape, params):
+        """Initialize a :class:`holodeck.sams.sam.Semi_Analytic_Model` instance with given params.
+
+        Arguments
+        ---------
+        sam_shape : None  or  int  or  (3,) tuple of int
+            Shape of the SAM grid (M, Q, Z).  If:
+            * `None` : use default values.
+            * int : apply this size to each dimension of the grid.
+            * (3,) of int : provide size for each dimension.
+        params : dict
+            Dictionary of parameters needed to initialize SAM model.
+
+        Returns
+        -------
+        sam : :class:`holodeck.sams.sam.Semi_Analytic_Model` instance,
+            Initialized SAM model instance.
+
+        """
         raise
 
     @classmethod
     @abc.abstractmethod
     def _init_hard(cls, sam, params):
+        """Initialize a :class:`holodeck.hardening._Hardening` subclass instance with given params.
+
+        Arguments
+        ---------
+        sam : :class:`holodeck.sams.sam.Semi_Analytic_Model` instance,
+            SAM model instance.
+        params : dict
+            Dictionary of parameters needed to initialize hardening model.
+
+        Returns
+        -------
+        hard : :class:`holodeck.hardening._Hardening` subclass instance,
+            Initialized hardening model instance.
+
+        """
         raise
 
     def save(self, path_output):
