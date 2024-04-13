@@ -227,8 +227,9 @@ class Semi_Analytic_Model:
         # These values are calculated as needed by the class when the corresponding methods are called
         self._density = None          #: Binary comoving number-density
         self._shape = None            #: Shape of the parameter-space domain (mtot, mrat, redz)
-        self._gmt_time = None         #: GMT timescale of galaxy mergers [sec]
         self._redz_prime = None       #: redshift following galaxy merger process
+        #: GMT timescale of galaxy mergers [sec], set in `static_binary_density`
+        self._gmt_time = None
 
         return
 
@@ -487,7 +488,7 @@ class Semi_Analytic_Model:
         rmin = utils.rad_isco(self.mtot)
         # Choose steps for each binary, log-spaced between rmin and rmax
         extr = np.log10([rmax * np.ones_like(rmin), rmin])     # (2,M,)
-        rads = np.linspace(0.0, 1.0, steps)[np.newaxis, :]     # (1,X)
+        rads = np.linspace(0.0, 1.0, steps+1)[np.newaxis, :]     # (1,X)
         # (M, S)  =  (M,1) * (1,S)
         rads = extr[0][:, np.newaxis] + (extr[1] - extr[0])[:, np.newaxis] * rads
         rads = 10.0 ** rads
@@ -503,29 +504,56 @@ class Semi_Analytic_Model:
 
         # (M, Q, S-1)
         # Integrate (inverse) hardening rates to calculate total lifetime to each separation
-        times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=-1, cumsum=True)
+
+        # times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=-1, cumsum=True)
+
+        times_evo = 2.0 * np.diff(rads, axis=-1) / (dadt_evo[..., 1:] + dadt_evo[..., :-1])
+        # for ss in range(steps):
+        #     print(f"py {ss:03d} : {rads[8, 0, ss]:.6e} ==> {rads[8, 0, ss+1]:.6e}  ==  {times_evo[8, 0, ss]:.6e}")
+        times_evo = np.cumsum(times_evo, axis=-1)
+        # add array of zero time-delays at starting point (i.e. before the first step)
+        # with same shape as a slice at a single step
+        zpad = np.zeros_like(times_evo[..., 0])
+        times_evo = np.concatenate([zpad[..., np.newaxis], times_evo], axis=-1)
+        # print(f"{times_evo[8, 0, :]=}")
+
         # Combine the binary-evolution time, with the galaxy-merger time
         # (M, Q, Z, S-1)
         rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis]
-        times_tot = times_evo[:, :, np.newaxis, :] + self._gmt_time[:, :, :, np.newaxis]
+        times_tot = times_evo[:, :, np.newaxis, :]
+        if self._gmt_time is not None:
+            times_tot += self._gmt_time[:, :, :, np.newaxis]
+
         redz_evo = utils.redz_after(times_tot, redz=rz)
+        # for ss in range(steps):
+        #     print(f"py {ss:03d} : t={times_evo[8, 0, ss]:.6e} z={redz_evo[8, 0, 11, ss]:.6e}")
 
         # convert from separations to rest-frame orbital frequencies
         # (M, Q, S)
         frst_orb_evo = utils.kepler_freq_from_sepa(mt, rads)
         # (M, Q, Z, S)
-        fobs_orb_evo = frst_orb_evo[:, :, np.newaxis, :] / (1.0 + rz)
+        fobs_orb_evo = frst_orb_evo[:, :, np.newaxis, :] / (1.0 + redz_evo)
 
         # ---- interpolate to target frequencies
         # `ndinterp` interpolates over 1th dimension
 
+        # print(f"{frst_orb_evo[8, 0, :]=}")
+        # print(f"{fobs_orb=}")
+        # print(f"{fobs_orb_evo[8, 0, 11, :]=}")
+        # print(f"{redz_evo[8, 0, 11, :]=}")
+
         # (M, Q, Z, S-1)  ==>  (M*Q*Z, S-1)
-        fobs_orb_evo, redz_evo = [mm.reshape(-1, steps-1) for mm in [fobs_orb_evo[:, :, :, 1:], redz_evo]]
+        fobs_orb_evo, redz_evo = [tt.reshape(-1, steps+1) for tt in [fobs_orb_evo, redz_evo]]
         # (M*Q*Z, X)
-        redz_final = utils.ndinterp(fobs_orb, fobs_orb_evo, redz_evo, xlog=True, ylog=False)
+        redz_final = utils.ndinterp(fobs_orb, fobs_orb_evo, redz_evo, xlog=False, ylog=False)
 
         # (M*Q*Z, X) ===> (M, Q, Z, X)
         redz_final = redz_final.reshape(self.shape + (fobs_orb.size,))
+        # _test_times = _test_times.reshape(self.shape + (fobs_orb.size,))
+
+        # print(f"{redz_final[8, 0, 11, :]=}")
+        # print(f"{_test_times[8, 0, 11, :]=}")
+
         coal = (redz_final > 0.0)
         frst_orb = fobs_orb * (1.0 + redz_final)
         frst_orb[frst_orb < 0.0] = 0.0
