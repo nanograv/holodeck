@@ -100,23 +100,6 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
 
     # ---- load parameter space from save file
 
-    '''
-    if path_pspace is None:
-        # look for parameter-space save files
-        regex = "*" + holo.librarian.PSPACE_FILE_SUFFIX   # "*.pspace.npz"
-        files = sorted(path_output.glob(regex))
-        num_files = len(files)
-        msg = f"found {num_files} pspace.npz files in {path_output}"
-        log.info(msg)
-        if num_files != 1:
-            log.exception(msg)
-            log.exception(f"{files=}")
-            log.exception(f"{regex=}")
-            raise RuntimeError(f"{msg}")
-        path_pspace = files[0]
-
-    pspace = _Param_Space.from_save(path_pspace, log)
-    '''
     if path_pspace is None:
         path_pspace = path_output
     pspace, pspace_fname = libraries.load_pspace_from_path(path_pspace, log=log)
@@ -201,6 +184,11 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
         h5.attrs['holodeck_librarian_version'] = holo.librarian.__version__
 
     log.warning(f"Saved to {lib_path}, size: {holo.utils.get_file_size(lib_path)}")
+
+    with h5py.File(lib_path, 'r') as h5:
+        assert np.all(h5['fobs_cents'][()] > 0.0)
+        if has_gwb:
+            log.info(f"Checking library file: {holo.utils.stats(gwb)=}")
 
     return lib_path
 
