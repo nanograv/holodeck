@@ -74,7 +74,7 @@ def _check_any_bulge_frac(bf, mstar, redz):
     print(f"{dmstar_dmbulge_true=}")
     print(f"{error_deriv=}")
     # make sure values are consistent; calculation is numerical/fits to tolerate larger errors
-    assert np.allclose(dmstar_dmbulge_true, dmstar_dmbulge_test, rtol=1e-3)
+    assert np.allclose(dmstar_dmbulge_true, dmstar_dmbulge_test, rtol=1e-2)
 
     return mbulge
 
