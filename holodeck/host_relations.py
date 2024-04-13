@@ -779,7 +779,7 @@ class MMBulge_KH2013(MMBulge_Standard):
 
     """
     # MASS_AMP = 0.49 * 1e9 * MSOL      # 0.49 + 0.06 - 0.05   in units of [Msol]
-    MASS_AMP_LOG10 = 8.69
+    MASS_AMP_LOG10 = 8.69             # 8.69 ± 0.05  [log10(M/Msol)]  approximate uncertainties!
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.17                  # 1.17 ± 0.08
     SCATTER_DEX = 0.28                # scatter stdev in dex
