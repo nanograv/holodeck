@@ -768,8 +768,9 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
 
     """
     # assert np.ndim(xx) == 1
-    assert np.ndim(xvals) == 2
-    assert np.shape(xvals) == np.shape(yvals)
+    err = f"Bad shapes!  {np.shape(xvals)=} {np.shape(yvals)=}"
+    assert np.ndim(xvals) == 2, err
+    assert np.shape(xvals) == np.shape(yvals), err
 
     xx = np.asarray(xx)
     xvals = np.asarray(xvals)
