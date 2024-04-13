@@ -1774,17 +1774,17 @@ def redz_after(time, redz=None, age=None):
 
     Parameters
     ----------
-    time : array_like in units of [sec]
-        Amount of time to pass.
-    redz : None or array_like,
-        Redshift of starting point after which `time` is added.
-    age : None or array_like, in units of [sec]
-        Age of the Universe at the starting point, after which `time` is added.
+    time : array_like, [s]
+        Amount of time to pass, in units of seconds.
+    redz : None  or  array_like, []
+        Redshift of starting point after which `time` is added.  Unitless.
+    age : None  or  array_like, [s]
+        Age of the Universe at the starting point, after which `time` is added.  Units of seconds.
 
     Returns
     -------
-    new_redz : array_like
-        Redshift of the Universe after the given amount of time.
+    new_redz : array_like, []
+        Redshift of the Universe after the given amount of time.  Unitless
 
     """
     if (redz is None) == (age is None):
