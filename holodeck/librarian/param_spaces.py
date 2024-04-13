@@ -158,7 +158,7 @@ class _PS_Astro_Strong(_Param_Space):
 
     """
 
-    __version__ = "0.1"
+    __version__ = "0.2"
 
     DEFAULTS = dict(
         # Hardening model (phenom 2PL)
@@ -199,6 +199,9 @@ class _PS_Astro_Strong(_Param_Space):
         mmb_mamp=0.49e9,                 # 0.49e9 + 0.06 - 0.05  [Msol]
         mmb_plaw=1.17,                   # 1.17 ± 0.08
         mmb_scatter_dex=0.28,            # no uncertainties given
+        # bulge fraction
+        bf_sigmoid_lo=0.4,
+        bf_sigmoid_hi=0.8,
     )
 
     @classmethod

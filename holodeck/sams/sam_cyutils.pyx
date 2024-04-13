@@ -144,9 +144,10 @@ def integrate_differential_number_3dx1d(edges, dnum):
 
     # each edge should have the same length as the corresponding dimension of `dnum`
     shape = [len(ee) for ee in edges]
+    err = f"Shape of edges={shape} does not match dnum={np.shape(dnum)}"
     # except the last edge (freq), where `dnum` should be 1-shorter
     shape[-1] -= 1
-    assert np.shape(dnum) == tuple(shape)
+    assert np.shape(dnum) == tuple(shape), err
     # the number will be shaped as one-less the size of each dimension of `dnum`
     new_shape = [sh-1 for sh in dnum.shape]
     # except for the last dimension (freq) which is the same shape
@@ -643,7 +644,11 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
                 )
 
                 # Find time to move from left- to right- edges:  dt = da / (da/dt)
+                # average da/dt on the left- and right- edges of the bin (i.e. trapezoid rule)
                 dt = 2.0 * (sepa_right - sepa_left) / (dadt_left + dadt_right)
+                # if ii == 8 and jj == 0:
+                #     printf("cy %03d : %.2e ==> %.2e  ==  %.2e\n", step, sepa_left, sepa_right, dt)
+
                 time_evo += dt
 
                 # ---- Iterate over starting redshift bins
@@ -657,8 +662,8 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
 
                     # if we pass the age of the universe, this binary has stalled, no further redshifts will work
                     # NOTE: if `gmt_time` decreases faster than redshift bins increase the universe age,
-                    #       then systems in later `redz` bins may no longer stall, so we still need to calculate them
-                    #       i.e. we can NOT use a `break` statement here
+                    #       then systems in later `redz` bins may no longer stall, so we still need to calculate them.
+                    #       i.e. we can NOT use a `break` statement here, must use `continue` statement.
                     if time_left > age_universe:
                         continue
 
@@ -683,6 +688,9 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
                     # NOTE: at this point `redz_right` could be negative, even though `redz_left` is definitely not
                     if redz_right < 0.0:
                         redz_right = 0.0
+
+                    # if ii == 8 and jj == 0 and kk == 11:
+                    #     printf("cy %03d : t=%.2e z=%.2e\n", step, time_right, redz_right)
 
                     # convert to frequencies
                     fobs_orb_left = frst_orb_left / (1.0 + redz_left)
@@ -723,6 +731,21 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
                         new_redz = interp_at_index(new_interp_idx, new_time, tage_interp_grid, redz_interp_grid)
                         # get comoving distance
                         dcom = interp_at_index(new_interp_idx, new_time, tage_interp_grid, dcom_interp_grid)
+
+                        # if (ii == 0) and (jj == 0) and (kk == 0):
+                        #     printf("cy f=%03d (step=%03d)\n", ff, step)
+                        #     printf(
+                        #         "fl=%.6e, f=%.6e, fr=%.6e ==> tl=%.6e, t=%.6e, tr=%.6e\n",
+                        #         fobs_orb_left, ftarget, fobs_orb_right,
+                        #         time_left, new_time, time_right
+                        #     )
+                        #     printf(
+                        #         "interp (%d) time: %.6e, %.6e, %.6e ==> z: %.6e, %.6e, %.6e\n",
+                        #         new_interp_idx,
+                        #         tage_interp_grid[new_interp_idx], new_time, tage_interp_grid[new_interp_idx+1],
+                        #         redz_interp_grid[new_interp_idx], new_redz, redz_interp_grid[new_interp_idx+1],
+                        #     )
+                        #     printf("======> z=%.6e\n", new_redz)
 
                         # Store redshift
                         redz_final[ii, jj, kk, ff] = new_redz
