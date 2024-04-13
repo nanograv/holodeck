@@ -79,7 +79,10 @@ log = logger.get_logger(__name__, logging.WARNING)       #: global root logger f
 
 # NOTE: Must load and initialize cosmology before importing other submodules!
 import cosmopy   # noqa
-cosmo = cosmopy.Cosmology(h=Parameters.HubbleParam, Om0=Parameters.Omega0, Ob0=Parameters.OmegaBaryon)
+cosmo = cosmopy.Cosmology(
+    h=Parameters.HubbleParam, Om0=Parameters.Omega0, Ob0=Parameters.OmegaBaryon,
+    size=200,
+)
 del cosmopy
 
 # ---- Import submodules
