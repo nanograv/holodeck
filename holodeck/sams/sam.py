@@ -466,12 +466,18 @@ class Semi_Analytic_Model:
         return grid, dnum, redz_final
 
     def _dynamic_binary_number_at_fobs_consistent(self, hard, fobs_orb, steps=200, details=False):
-        """Get correct redshifts for full binary-number calculation.
+        r"""Calculate the differential number of binaries in at each grid point, at each frequency.
 
-        Slower but more correct than old `dynamic_binary_number`.
-        Same as new cython implementation `sam_cyutils.dynamic_binary_number_at_fobs`, which is
-        more than 10x faster.
-        LZK 2023-05-11
+        See :meth:`dynamic_binary_number_at_fobs` for general information.
+
+        This is the python implementation for binary evolution (hardening) that is self-consistent,
+        i.e. evolution models that are able to evolve binaries from galaxy merger until the target
+        frequencies.
+
+        This function should produce the same results as the new cython implementation in:
+        :func:`holodeck.sams.sam_cyutils.dynamic_binary_number_at_fobs`, which is more than 10x
+        faster.  This python implementation is maintained for diagnostic purposes, and for
+        functionality when cython is not available.
 
         # BUG doesn't work for Fixed_Time_2PL
 
@@ -480,19 +486,27 @@ class Semi_Analytic_Model:
         edges = self.edges + [fobs_orb, ]
 
         # shape: (M, Q, Z)
-        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
+        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [cMpc^-3]
+
+        # ---- Choose the binary separations over which to integrate the binary evolution.
+
+        # Start at large separations (galaxy merger) and evolve to small separations (coalescense).
 
         # start from the hardening model's initial separation
         rmax = hard._sepa_init
-        # (M,) end at the ISCO
+        # end at the ISCO
+        # (M,)
         rmin = utils.rad_isco(self.mtot)
         # Choose steps for each binary, log-spaced between rmin and rmax
         extr = np.log10([rmax * np.ones_like(rmin), rmin])     # (2,M,)
-        rads = np.linspace(0.0, 1.0, steps+1)[np.newaxis, :]     # (1,X)
-        # (M, S)  =  (M,1) * (1,S)
+        rads = np.linspace(0.0, 1.0, steps+1)[np.newaxis, :]     # (1,S)
+        # (M, S)  <==  (M,1) * (1,S)
         rads = extr[0][:, np.newaxis] + (extr[1] - extr[0])[:, np.newaxis] * rads
         rads = 10.0 ** rads
 
+        # ---- Calculate binary hardening rate (da/dt) at each separation, for each grid point
+
+        # broadcast arrays to a consistent shape
         # (M, Q, S)
         mt, mr, rads, norm = np.broadcast_arrays(
             self.mtot[:, np.newaxis, np.newaxis],
@@ -500,33 +514,49 @@ class Semi_Analytic_Model:
             rads[:, np.newaxis, :],
             hard._norm[:, :, np.newaxis],
         )
+        # calculate hardening rate (negative values, in units of [cm/s])
         dadt_evo = hard.dadt(mt, mr, rads, norm=norm)
+
+        # ---- Integrate evolution
+        # to find times and redshifts at which binaries reach each separation
 
         # (M, Q, S-1)
         # Integrate (inverse) hardening rates to calculate total lifetime to each separation
+        times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=-1, cumsum=True)
+        # ~~~~ RIEMANN integration ~~~~
+        # times_evo = 2.0 * np.diff(rads, axis=-1) / (dadt_evo[..., 1:] + dadt_evo[..., :-1])
+        # times_evo = np.cumsum(times_evo, axis=-1)
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-        # times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=-1, cumsum=True)
-
-        times_evo = 2.0 * np.diff(rads, axis=-1) / (dadt_evo[..., 1:] + dadt_evo[..., :-1])
-        # for ss in range(steps):
-        #     print(f"py {ss:03d} : {rads[8, 0, ss]:.6e} ==> {rads[8, 0, ss+1]:.6e}  ==  {times_evo[8, 0, ss]:.6e}")
-        times_evo = np.cumsum(times_evo, axis=-1)
         # add array of zero time-delays at starting point (i.e. before the first step)
         # with same shape as a slice at a single step
         zpad = np.zeros_like(times_evo[..., 0])
         times_evo = np.concatenate([zpad[..., np.newaxis], times_evo], axis=-1)
-        # print(f"{times_evo[8, 0, :]=}")
 
-        # Combine the binary-evolution time, with the galaxy-merger time
-        # (M, Q, Z, S-1)
-        rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis]
-        times_tot = times_evo[:, :, np.newaxis, :]
+        # ---- Convert from time to redshift
+
+        # initial redshift (of galaxy merger)
+        rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis]    # (1, 1, Z, 1)
+
+        tlbk_init = cosmo.z_to_tlbk(rz)
+        tlbk = tlbk_init - times_evo[:, :, np.newaxis, :]
+        # Combine the binary-evolution time, with the galaxy-merger time (if it is defined)
         if self._gmt_time is not None:
-            times_tot += self._gmt_time[:, :, :, np.newaxis]
+            tlbk -= self._gmt_time[:, :, :, np.newaxis]
 
-        redz_evo = utils.redz_after(times_tot, redz=rz)
-        # for ss in range(steps):
-        #     print(f"py {ss:03d} : t={times_evo[8, 0, ss]:.6e} z={redz_evo[8, 0, 11, ss]:.6e}")
+        # (M, Q, Z, S)
+        redz_evo = cosmo.tlbk_to_z(tlbk)
+
+        #! age of the universe version of calculation is MUCH less accurate !#
+        # Use age-of-the-universe
+        # times_tot = times_evo[:, :, np.newaxis, :]
+        # # Combine the binary-evolution time, with the galaxy-merger time (if it is defined)
+        # if self._gmt_time is not None:
+        #     times_tot += self._gmt_time[:, :, :, np.newaxis]
+        # redz_evo = utils.redz_after(times_tot, redz=rz)
+        #! ---------------------------------------------------------------- !#
+
+        # ---- interpolate to target frequencies
 
         # convert from separations to rest-frame orbital frequencies
         # (M, Q, S)
@@ -534,25 +564,14 @@ class Semi_Analytic_Model:
         # (M, Q, Z, S)
         fobs_orb_evo = frst_orb_evo[:, :, np.newaxis, :] / (1.0 + redz_evo)
 
-        # ---- interpolate to target frequencies
-        # `ndinterp` interpolates over 1th dimension
-
-        # print(f"{frst_orb_evo[8, 0, :]=}")
-        # print(f"{fobs_orb=}")
-        # print(f"{fobs_orb_evo[8, 0, 11, :]=}")
-        # print(f"{redz_evo[8, 0, 11, :]=}")
-
-        # (M, Q, Z, S-1)  ==>  (M*Q*Z, S-1)
+        # (M, Q, Z, S)  ==>  (M*Q*Z, S)
         fobs_orb_evo, redz_evo = [tt.reshape(-1, steps+1) for tt in [fobs_orb_evo, redz_evo]]
+        # `ndinterp` interpolates over 1th dimension
         # (M*Q*Z, X)
-        redz_final = utils.ndinterp(fobs_orb, fobs_orb_evo, redz_evo, xlog=False, ylog=False)
+        redz_final = utils.ndinterp(fobs_orb, fobs_orb_evo, redz_evo, xlog=True, ylog=False)
 
-        # (M*Q*Z, X) ===> (M, Q, Z, X)
+        # (M, Q, Z, X)  <===  (M*Q*Z, X)
         redz_final = redz_final.reshape(self.shape + (fobs_orb.size,))
-        # _test_times = _test_times.reshape(self.shape + (fobs_orb.size,))
-
-        # print(f"{redz_final[8, 0, 11, :]=}")
-        # print(f"{_test_times[8, 0, 11, :]=}")
 
         coal = (redz_final > 0.0)
         frst_orb = fobs_orb * (1.0 + redz_final)
