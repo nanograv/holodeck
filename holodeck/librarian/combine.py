@@ -48,8 +48,15 @@ def main():
         '--gwb', action='store_true', default=False,
         help='only merge the key GWB data (no single source, or binary parameter data).'
     )
+    parser.add_argument(
+        '--verbose', '-v', action='store_true', default=False,
+        help="Verbose output in logger ('DEBUG' level)."
+    )
 
     args = parser.parse_args()
+    if args.verbose:
+        log.setLevel(log.DEBUG)
+
     log.debug(f"{args=}")
     path = Path(args.path)
 
@@ -235,6 +242,12 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
         temp = np.load(temp_fname)
         data_keys = list(temp.keys())
         log.debug(f"{ii=} {temp_fname.name=} {data_keys=}")
+
+        if 'fail' in data_keys:
+            err = f"File {ii=} is a failed simulation file.  {temp_fname=}"
+            log.error(err)
+            log.error(f"Error in file: {temp['fail']}")
+            continue
 
         if fobs_cents is None:
             _fobs = temp.get('fobs', None)
