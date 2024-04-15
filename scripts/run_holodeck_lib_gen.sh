@@ -9,11 +9,13 @@
 # The library generation is performed using the `holodeck.librarian.lib_gen` script.
 # When holodeck is installed, this is aliased to the command-line function `holodeck_lib_gen`.
 # The following two commands should be identical:
+#
 #     python -m holodeck.librarian.lib_gen  <ARGS>
 #     holodeck_lib_gen  <ARGS>
 #
 # The library generation script is parallelized using MPI (specifically mpi4py in python).
 # The actual run command can be very simple, for example:
+#
 #     mpirun -np 16 holodeck_lib_gen -n 64 -r 100 --gwb --ss --params PS_Classic_Phenom ./output/
 #
 # When running on a remote server with a job scheduler (e.g. SLURM), things can be a bit more
@@ -21,12 +23,15 @@
 # computer you can ignore these elements.
 #
 # Remember to use `nohup` and `&` to run in the background on remote server, so that it's not killed
-# when you logout.
+# when you logout, e.g.
+#
+#     nohup  mpirun -np 16 holodeck_lib_gen -n 64 -r 100 --gwb --ss --params PS_Classic_Phenom ./output/  &
 #
 # ------------------
 # Luke Zoltan Kelley
 # LZKelley@berkeley.edu
 # ==================================================================================================
+
 
 # ====    SLURM job scheduler configuration    ====
 # NOTE: SLURM uses a single '#' to denote its configuration.  Multiple '#' marks are ignored.
@@ -136,7 +141,7 @@ echo -e "Running mpirun $(date +'%Y-%m-%d|%H:%M:%S')\n"
 echo ""
 
 # this is the actual call to run holodeck
-mpirun -np $NTASKS  $COMMAND $SPACE $OUTPUT  -n $NSAMPS -r $NREALS -f $NFREQS $ARGS  1> $LOG_OUT 2> $LOG_ERR &
+mpirun -np $NTASKS  $COMMAND $SPACE $OUTPUT  -n $NSAMPS -r $NREALS -f $NFREQS $ARGS  1> $LOG_OUT 2> $LOG_ERR
 
 echo ""
 echo -e "Completed python script $(date +'%Y-%m-%d|%H:%M:%S')\n"
