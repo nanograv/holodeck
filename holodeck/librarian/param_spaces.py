@@ -283,6 +283,7 @@ class PS_Astro_Strong_All(_PS_Astro_Strong):
             # Hardening model (phenom 2PL)
             PD_Uniform("hard_time", 0.1, 11.0, default=3.0),   # [Gyr]
             PD_Uniform("hard_gamma_inner", -2.0, +0.0, default=-1.0),
+            PD_Uniform("hard_rchar", 2.0, 20.0, default=10.0),    # [pc]
 
             # GSMF
             PD_Normal('gsmf_log10_phi_one_z0', -2.383, 0.028),    # - 2.383 ± 0.028
@@ -332,6 +333,25 @@ class PS_Astro_Strong_Hard(_PS_Astro_Strong):
             # Hardening model (phenom 2PL)
             PD_Uniform("hard_time", 0.1, 11.0, default=3.0),   # [Gyr]
             PD_Uniform("hard_gamma_inner", -2.0, +0.0, default=-1.0),
+            PD_Uniform("hard_rchar", 2.0, 20.0, default=10.0),    # [pc]
+        ]
+        _Param_Space.__init__(
+            self, parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+        )
+        return
+
+
+class PS_Astro_Strong_Hard_All(_PS_Astro_Strong):
+
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
+            # Hardening model (phenom 2PL)
+            PD_Uniform("hard_time", 0.1, 11.0, default=3.0),   # [Gyr]
+            PD_Uniform("hard_gamma_inner", -2.0, +0.0, default=-1.0),
+            PD_Uniform("hard_rchar", 2.0, 20.0, default=10.0),    # [pc]
+            PD_Uniform_Log("hard_sepa_init", 1e3, 1e4, default=1e4),    # [pc]
+            PD_Uniform("hard_gamma_outer", 0.0, +2.5, default=0.0),
         ]
         _Param_Space.__init__(
             self, parameters,
@@ -424,6 +444,7 @@ class PS_Astro_Strong_MMBulge(_PS_Astro_Strong):
 _param_spaces_dict = {
     'PS_Astro_Strong_All': PS_Astro_Strong_All,
     'PS_Astro_Strong_Hard': PS_Astro_Strong_Hard,
+    'PS_Astro_Strong_Hard_All': PS_Astro_Strong_Hard_All,
     'PS_Astro_Strong_GSMF': PS_Astro_Strong_GSMF,
     'PS_Astro_Strong_GMR': PS_Astro_Strong_GMR,
     'PS_Astro_Strong_MMBulge_BFrac': PS_Astro_Strong_MMBulge_BFrac,
