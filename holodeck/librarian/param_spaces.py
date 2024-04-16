@@ -3,7 +3,7 @@
 
 import holodeck as holo
 from holodeck.constants import GYR, PC, MSOL
-from holodeck.librarian.libraries import _Param_Space, PD_Uniform, PD_Normal
+from holodeck.librarian.libraries import _Param_Space, PD_Uniform, PD_Normal, PD_Uniform_Log
 
 
 # Define a new Parameter-Space class by subclassing the base class:
@@ -447,7 +447,7 @@ _param_spaces_dict = {
     'PS_Astro_Strong_Hard_All': PS_Astro_Strong_Hard_All,
     'PS_Astro_Strong_GSMF': PS_Astro_Strong_GSMF,
     'PS_Astro_Strong_GMR': PS_Astro_Strong_GMR,
-    'PS_Astro_Strong_MMBulge_BFrac': PS_Astro_Strong_MMBulge_BFrac,
     'PS_Astro_Strong_MMBulge': PS_Astro_Strong_MMBulge,
+    'PS_Astro_Strong_MMBulge_BFrac': PS_Astro_Strong_MMBulge_BFrac,
 }
 
