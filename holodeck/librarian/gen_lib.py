@@ -3,13 +3,21 @@
 This file can be run from the command-line to generate holodeck libraries, and also provides some
 API methods for quick/easy generation of simulations.  In general, these methods are designed to
 run simulations for populations constructed from parameter-spaces (i.e.
-:class:`~holodeck.librarian.libraries._Param_Space` subclasses).
+:class:`~holodeck.librarian.libraries._Param_Space` subclasses).  This script is parallelized using
+``mpi4py``, but can also be run in serial.
 
 This script can be run by executing::
 
     python -m holodeck.librarian.gen_lib <ARGS>
 
 Run ``python -m holodeck.librarian.gen_lib -h`` for usage information.
+
+This script is also aliased to the console command, ``holodeck_lib_gen``.
+
+See https://holodeck-gw.readthedocs.io/en/main/getting_started/libraries.html for more information
+about generating holodeck libraries and using holodeck parameter-spaces in general.
+
+For an example job-submission script using slurm, see the ``scripts/run_holodeck_lib_gen.sh`` file.
 
 """
 
@@ -135,7 +143,7 @@ def main():   # noqa : ignore complexity warning
         if args.resume:
             # Load pspace object from previous save
             log.info(f"{args.resume=} attempting to load pspace {space_class=} from {args.output=}")
-            space, space_fname = holo.librarian.load_pspace_from_dir(log, args.output, space_class)
+            space, space_fname = holo.librarian.load_pspace_from_path(args.output, space_class=space_class, log=log)
             log.warning(f"resume={args.resume} :: Loaded param-space save from {space_fname}")
         else:
             space = space_class(log, args.nsamples, args.sam_shape, args.seed)
