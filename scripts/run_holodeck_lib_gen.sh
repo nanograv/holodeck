@@ -2,6 +2,7 @@
 # ==================================================================================================
 # Example job script to run holodeck library generation
 # -----------------------------------------------------
+# Last updated: 2024-04-15
 #
 # Excute this script on a personal computer using:   ``bash run_holodeck_lib_gen.sh``,
 # or on a server with slurm scheduler using:       ``sbatch run_holodeck_lib_gen.sh``.
@@ -17,6 +18,8 @@
 # The actual run command can be very simple, for example:
 #
 #     mpirun -np 16 holodeck_lib_gen -n 64 -r 100 --gwb --ss --params PS_Classic_Phenom ./output/
+#
+# At the simplest level, this script runs a command like the above, and provides some conveniences.
 #
 # When running on a remote server with a job scheduler (e.g. SLURM), things can be a bit more
 # complicated.  Example SLURM configuration is included below, but if you're running on a personal
