@@ -336,6 +336,15 @@ class _Param_Space(abc.ABC):
                 f"and class parameter names ({space.param_names})!"
             )
             log.exception(err)
+
+            for pn in param_names:
+                if pn not in space.param_names:
+                    log.exception(f"parameter name `{pn}` in loaded data is not in class param names!")
+
+            for pn in space.param_names:
+                if pn not in param_names:
+                    log.exception(f"parameter name `{pn}` in class param names is not in loaded parameter names!")
+
             raise RuntimeError(err)
 
         # Store loaded parameters into the parameter-space instance
