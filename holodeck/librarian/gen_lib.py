@@ -25,27 +25,26 @@ import argparse
 import sys
 from datetime import datetime
 from pathlib import Path
+import json
 import shutil
 
+
 import numpy as np
-# import scipy as sp
-# import scipy.stats
 
 import holodeck as holo
-# from holodeck import cosmo
 from holodeck.constants import YR
 import holodeck.librarian
 import holodeck.librarian.combine
 from holodeck.librarian import (
     libraries,
-    # DEF_NUM_FBINS, DEF_NUM_LOUDEST, DEF_NUM_REALS, DEF_PTA_DUR,
 )
-# from holodeck.sams import sam_cyutils
 
 MAX_FAILURES = 5
 
 # FILES_COPY_TO_OUTPUT = [__file__, holo.librarian.__file__, holo.param_spaces.__file__]
 FILES_COPY_TO_OUTPUT = []
+
+ARGS_CONFIG_FNAME = "config.json"
 
 
 def main():   # noqa : ignore complexity warning
@@ -144,7 +143,11 @@ def main():   # noqa : ignore complexity warning
             # Load pspace object from previous save
             log.info(f"{args.resume=} attempting to load pspace {space_class=} from {args.output=}")
             space, space_fname = holo.librarian.load_pspace_from_path(args.output, space_class=space_class, log=log)
-            log.warning(f"resume={args.resume} :: Loaded param-space save from {space_fname}")
+            # Load arguments/configuration from previous save
+            args, config_fname = _load_config(args.output, log)
+
+            log.warning(f"resume={args.resume} :: Loaded param-space   save from {space_fname}")
+            log.warning(f"resume={args.resume} :: Loaded configuration save from {config_fname}")
         else:
             space = space_class(log, args.nsamples, args.sam_shape, args.seed)
     else:
@@ -152,6 +155,10 @@ def main():   # noqa : ignore complexity warning
 
     # share parameter space across processes
     space = comm.bcast(space, root=0)
+    # If we've loaded a new `args`, then share to all processes from rank=0
+    if args.resume:
+        args = comm.bcast(args, root=0)
+        args.log = log
 
     log.info(
         f"param_space={args.param_space}, samples={args.nsamples}, sam_shape={args.sam_shape}, nreals={args.nreals}\n"
@@ -175,10 +182,13 @@ def main():   # noqa : ignore complexity warning
     indices = comm.scatter(indices, root=0)
     iterator = holo.utils.tqdm(indices) if (comm.rank == 0) else np.atleast_1d(indices)
 
-    # Save parameter space to output directory
+    # Save parameter space and args/configuration to output directory
     if (comm.rank == 0) and (not args.resume):
         space_fname = space.save(args.output)
         log.info(f"saved parameter space {space} to {space_fname}")
+
+        config_fname = _save_config(args)
+        log.info(f"saved configuration to {config_fname}")
 
     comm.barrier()
     beg = datetime.now()
@@ -380,10 +390,17 @@ def _setup_argparse(*args, **kwargs):
         raise RuntimeError("`--params` requires the `--ss` option!")
 
     if args.resume:
+        # Need an existing output directory to resume from
         if not output.exists() or not output.is_dir():
-            raise FileNotFoundError(f"`--resume` is active but output path does not exist! '{output}'")
+            err = f"`--resume` is active but output path does not exist! '{output}'"
+            raise FileNotFoundError(err)
 
-    #
+        # Don't resume if we're recreating (i.e. erasing existing files)
+        if args.recreate:
+            err = "`resume` and `recreate` cannot both be set to True!"
+            raise ValueError(err)
+
+    # run in test mode
     if args.TEST:
         msg = "==== WARNING: running in test mode, other settings being overridden! ===="
         print("\n" + "=" * len(msg))
@@ -427,6 +444,54 @@ def _setup_argparse(*args, **kwargs):
         args.output_plots = output_plots
 
     return args
+
+
+def _save_config(args):
+    fname = args.output.joinpath(ARGS_CONFIG_FNAME)
+
+    # Convert `args` parameters to serializable dictionary
+    config = {}
+    for kk, vv in args._get_kwargs():
+        # convert `Path` instances to strings
+        if isinstance(vv, Path):
+            vv = str(vv)
+        config[kk] = vv
+
+    # Add additional entries
+    config['holodeck_version'] = holo.__version__
+    config['holodeck_librarian_version'] = holo.librarian.__version__
+    config['holodeck_git_hash'] = holo.utils.get_git_hash()
+    config['created'] = str(datetime.now())
+
+    with open(fname, 'w') as out:
+        json.dump(config, out)
+
+    print(f"Saved to {fname} - {holo.utils.get_file_size(fname)}")
+
+    return fname
+
+
+def _load_config(path, log):
+    fname = Path(path).joinpath(ARGS_CONFIG_FNAME)
+
+    with open(fname, 'r') as inp:
+        config = json.load(inp)
+
+    log.info("Loaded configuration from {fname}")
+
+    pop_keys = [
+        'holodeck_version', 'holodeck_librarian_version', 'holodeck_git_hash', 'created'
+    ]
+    for pk in pop_keys:
+        val = config.pop(pk)
+        log.info(f"\t{pk}={val}")
+
+    pspace = config.pop('param_space')
+    output = config.pop('output')
+
+    args = _setup_argparse([pspace, output], **config)
+
+    return args, fname
 
 
 def _setup_log(comm, args):
