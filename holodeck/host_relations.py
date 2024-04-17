@@ -845,6 +845,8 @@ class MMBulge_Redshift(MMBulge_Standard):
             redz = np.broadcast_to(redz, mbulge.T.shape).T
         except TypeError:
             redz = redz
+        except ValueError:
+            redz = redz
         zmamp = self._mamp * (1.0 + redz)**self._zplaw
         mbh = _log10_relation(mbulge, zmamp, self._mplaw, scatter_dex, x0=self._mref)
         return mbh
