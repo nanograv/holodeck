@@ -358,7 +358,7 @@ class Semi_Analytic_Model:
             # ==> (dMstar-tot/dMbh-tot) = (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) / (dMstar-pri / dMstar-tot)
             #                           = (dMstar-pri / dMbh-pri) * (1 / (1+q_bh)) / (1 / (1+q_star))
             #                           = (dMstar-pri / dMbh-pri) * ((1+q_star) / (1+q_bh))
-            dmstar_dmbh_pri = self._mmbulge.dmstar_dmbh(mstar_pri)   # [unitless]
+            dmstar_dmbh_pri = self._mmbulge.dmstar_dmbh(mstar_pri, redz=redz)   # [unitless]
             qterm = (1.0 + mstar_rat) / (1.0 + self.mrat[np.newaxis, :, np.newaxis])
             dmstar_dmbh = dmstar_dmbh_pri * qterm
 
