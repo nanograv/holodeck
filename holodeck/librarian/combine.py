@@ -226,6 +226,8 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
     has_gwb = False
     has_ss = False
     has_params = False
+    # num_fail = 0
+    # num_good = 0
 
     log.info(f"Checking {nsamp} files in {path_sims}")
     for ii in tqdm.trange(nsamp):
