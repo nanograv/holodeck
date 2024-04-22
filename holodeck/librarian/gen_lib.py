@@ -39,12 +39,15 @@ from holodeck.librarian import (
     libraries,
 )
 
-MAX_FAILURES = 5
+#: maximum number of failed simulations before task terminates with error (`None`: no limit)
+MAX_FAILURES = None
 
 # FILES_COPY_TO_OUTPUT = [__file__, holo.librarian.__file__, holo.param_spaces.__file__]
 FILES_COPY_TO_OUTPUT = []
 
 ARGS_CONFIG_FNAME = "config.json"
+
+comm = None
 
 
 def main():   # noqa : ignore complexity warning
@@ -143,11 +146,11 @@ def main():   # noqa : ignore complexity warning
             # Load pspace object from previous save
             log.info(f"{args.resume=} attempting to load pspace {space_class=} from {args.output=}")
             space, space_fname = holo.librarian.load_pspace_from_path(args.output, space_class=space_class, log=log)
+            log.warning(f"Loaded param-space   save from {space_fname}")
             # Load arguments/configuration from previous save
             args, config_fname = _load_config(args.output, log)
-
-            log.warning(f"resume={args.resume} :: Loaded param-space   save from {space_fname}")
-            log.warning(f"resume={args.resume} :: Loaded configuration save from {config_fname}")
+            log.warning(f"Loaded configuration save from {config_fname}")
+            args.resume = True
         else:
             space = space_class(log, args.nsamples, args.sam_shape, args.seed)
     else:
@@ -194,6 +197,7 @@ def main():   # noqa : ignore complexity warning
     beg = datetime.now()
     log.info(f"beginning tasks at {beg}")
     failures = 0
+    num_done = 0
 
     # ---- iterate over each processors' jobs
 
@@ -208,14 +212,17 @@ def main():   # noqa : ignore complexity warning
         log.info(msg)
 
         rv, _sim_fname = run_sam_at_pspace_num(args, space, par_num)
+
         if rv is False:
             failures += 1
 
-        if failures > MAX_FAILURES:
+        if (MAX_FAILURES is not None) and (failures > MAX_FAILURES):
             log.error("\n\n")
             err = f"Failed {failures} times on rank:{comm.rank}!"
             log.exception(err)
             raise RuntimeError(err)
+
+        num_done += 1
 
     end = datetime.now()
     dur = (end - beg)
@@ -276,8 +283,13 @@ def run_sam_at_pspace_num(args, space, pnum):
 
     if sim_fname.exists():
         log.info(f"File {sim_fname} already exists.  {args.recreate=}")
+        temp = np.load(sim_fname)
+        data_keys = list(temp.keys())
+
+        if 'fail' in data_keys:
+            log.info("Existing file was a failure, re-attempting...")
         # skip existing files unless we specifically want to recreate them
-        if not args.recreate:
+        elif not args.recreate:
             return True, sim_fname
 
     # ---- run Model
@@ -447,14 +459,21 @@ def _setup_argparse(*args, **kwargs):
 
 
 def _save_config(args):
+    import logging
+
     fname = args.output.joinpath(ARGS_CONFIG_FNAME)
 
     # Convert `args` parameters to serializable dictionary
     config = {}
     for kk, vv in args._get_kwargs():
+        print(kk)
+        args.log.warning(f"{kk=} {vv=}")
         # convert `Path` instances to strings
         if isinstance(vv, Path):
             vv = str(vv)
+        # cannot store `logging.Logger` instances (`log`)
+        elif isinstance(vv, logging.Logger):
+            continue
         config[kk] = vv
 
     # Add additional entries
@@ -692,3 +711,13 @@ def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar):
 
 if __name__ == "__main__":
     main()
+
+    #! the below doesn't work for catching errors... maybe because of comm.barrier() calls?
+    # try:
+    #     main()
+    # except Exception as err:
+    #     print(f"Exception while running gen_lib.py::main() - '{err}'!")
+    #     if comm is not None:
+    #         comm.Abort()
+    #     raise
+    #! ----------
