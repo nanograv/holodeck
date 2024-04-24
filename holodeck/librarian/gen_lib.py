@@ -36,7 +36,7 @@ from holodeck.constants import YR
 import holodeck.librarian
 import holodeck.librarian.combine
 from holodeck.librarian import (
-    libraries,
+    libraries, ARGS_CONFIG_FNAME
 )
 
 #: maximum number of failed simulations before task terminates with error (`None`: no limit)
@@ -44,8 +44,6 @@ MAX_FAILURES = None
 
 # FILES_COPY_TO_OUTPUT = [__file__, holo.librarian.__file__, holo.param_spaces.__file__]
 FILES_COPY_TO_OUTPUT = []
-
-ARGS_CONFIG_FNAME = "config.json"
 
 comm = None
 
