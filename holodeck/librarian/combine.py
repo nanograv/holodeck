@@ -1,7 +1,12 @@
 """Combine output files from individual simulation runs into a single library hdf5 file.
 
 This file can be executed as a script (see the :func:`main` function), and also provides an API
-method (:func:`sam_lib_combine`) for programatically combining libraries.
+method (:func:`sam_lib_combine`) for programatically combining libraries.  When running as a script
+or independent program, it must be run serially (not in parallel).
+
+For command-line usage, run:
+
+    python -m holodeck.librarian.combine -h
 
 """
 
@@ -23,6 +28,8 @@ def main():
 
     log = holo.log
 
+    # ---- Make sure we're NOT running in parallel (MPI)
+
     try:
         from mpi4py import MPI
         comm = MPI.COMM_WORLD
@@ -33,6 +40,8 @@ def main():
         err = f"Cannot run `{__file__}::main()` with multiple processors!"
         log.exception(err)
         raise RuntimeError(err)
+
+    # ---- Setup and parse command-line arguments
 
     parser = argparse.ArgumentParser()
 
@@ -59,6 +68,8 @@ def main():
 
     log.debug(f"{args=}")
     path = Path(args.path)
+
+    # ---- Combine library files
 
     sam_lib_combine(path, log, recreate=args.recreate, gwb_only=args.gwb)
 
