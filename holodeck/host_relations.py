@@ -299,7 +299,6 @@ class BF_Sigmoid(_Bulge_Frac):
         mstar = np.ones_like(mbulge) * mbulge / fhi
         # find the systems that are below the char mass, based on this assumption
         sel = (mstar/self._mstar_char) < 1.0
-        print(f"{utils.frac_str(sel)=}")
         # interpolate to numerically invert the function
         # mstar[sel] = np.interp(mbulge[sel], self._grid_mbulge, self._grid_mstar)
         mstar[sel] = self._interp_mstar_from_mbulge(mbulge[sel])
