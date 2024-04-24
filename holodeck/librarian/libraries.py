@@ -267,7 +267,8 @@ class _Param_Space(abc.ABC):
 
         """
         log = self._log
-        my_name = self.__class__.__name__
+        class_name = self.__class__.__name__
+        class_vers = self.__version__
         vers = holo.librarian.__version__
 
         # make sure `path_output` is a directory, and that it exists
@@ -277,16 +278,16 @@ class _Param_Space(abc.ABC):
             log.exception(err)
             raise ValueError(err)
 
-        fname = f"{my_name}{holo.librarian.PSPACE_FILE_SUFFIX}"
+        fname = f"{class_name}{holo.librarian.PSPACE_FILE_SUFFIX}"
         fname = path_output.joinpath(fname)
-        log.debug(f"{my_name=} {vers=} {fname=}")
+        log.debug(f"{class_name=} {vers=} {fname=}")
 
         data = {}
         for key in self._SAVED_ATTRIBUTES:
             data[key] = getattr(self, key)
 
         np.savez(
-            fname, class_name=my_name, librarian_version=vers,
+            fname, class_name=class_name, class_vers=class_vers, librarian_version=vers,
             **data,
         )
 
@@ -926,7 +927,7 @@ def _calc_model_details(edges, redz_final, number):
 
 
 def load_pspace_from_path(path, space_class=None, log=None):
-    """Load a `_Param_Space` subclass instance from the saved file in the given directory.
+    """Load a ``_Param_Space`` subclass instance from a save file with the given path.
 
     This function tries to determine the correct class based on the save file name, then uses that
     class to load the save itself.
@@ -970,9 +971,21 @@ def load_pspace_from_path(path, space_class=None, log=None):
     else:
         raise
 
-    # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces_dict`
     if space_class is None:
-        space_class = _get_space_class_from_space_fname(space_fname)
+        try:
+            space_class = str(np.load(space_fname)['class_name'])
+            print(f"{space_class=}")
+            space_class = holo.librarian.param_spaces_dict[space_class]
+        except Exception as err:
+            if log is not None:
+                log.error(f"Could not load `class_name` from save file '{space_fname}'.")
+                log.error(str(err))
+            else:
+                print(f"Could not load `class_name` from save file '{space_fname}'.")
+                print(str(err))
+
+            # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces_dict`
+            space_class = _get_space_class_from_space_fname(space_fname)
 
     space = space_class.from_save(space_fname, log=log)
     return space, space_fname
