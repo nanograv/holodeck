@@ -28,7 +28,6 @@ from pathlib import Path
 import json
 import shutil
 
-
 import numpy as np
 
 import holodeck as holo
@@ -79,8 +78,8 @@ def main():   # noqa : ignore complexity warning
     except ModuleNotFoundError as err:
         comm = None
         holo.log.error(f"failed to load `mpi4py` in {__file__}: {err}")
-        holo.log.error("`mpi4py` may not be included in the standard `requirements.txt` file")
-        holo.log.error("Check if you have `mpi4py` installed, and if not, please install it")
+        holo.log.error("`mpi4py` may not be included in the standard `requirements.txt` file.")
+        holo.log.error("Check if you have `mpi4py` installed, and if not, please install it.")
         raise err
 
     # ---- setup arguments / settings, loggers, and outputs
@@ -124,13 +123,17 @@ def main():   # noqa : ignore complexity warning
             config_fname = _save_config(args)
             log.info(f"saved configuration to {config_fname}")
 
-        # Split and distribute index numbers to all processes
-        npars = args.nsamples
-        indices = range(npars)
-        indices = np.random.permutation(indices)
-        indices = np.array_split(indices, comm.size)
-        num_ind_per_proc = [len(ii) for ii in indices]
-        log.info(f"{npars=} cores={comm.size} || max runs per core = {np.max(num_ind_per_proc)}")
+        # Split simulations for all processes
+
+        if args.domain:
+            pass
+        #
+        else:
+            indices = range(args.nsamples)
+            indices = np.random.permutation(indices)
+            indices = np.array_split(indices, comm.size)
+            num_per = [len(ii) for ii in indices]
+            log.info(f"{args.nsamples=} cores={comm.size} || max sims per core = {np.max(num_per)}")
 
     else:
         space = None
@@ -172,7 +175,8 @@ def main():   # noqa : ignore complexity warning
         msg = ", ".join(msg)
         log.info(msg)
 
-        rv, _sim_fname = run_sam_at_pspace_num(args, space, par_num)
+        params = space.param_dict(par_num)
+        rv, _sim_fname = run_sam_at_pspace_params(args, space, par_num, params)
 
         if rv is False:
             failures += 1
@@ -200,17 +204,17 @@ def main():   # noqa : ignore complexity warning
     return
 
 
-def run_sam_at_pspace_num(args, space, pnum):
+def run_sam_at_pspace_params(args, space, pnum, params):
     """Run a given simulation (index number ``pnum``) in the ``space`` parameter-space.
 
     This function performs the following:
 
     (1) Constructs the appropriate filename for this simulation, and checks if it already exist.  If
-        the file exists and the ``args.recreate`` option is not specified, the function returns
+        the file exists and the ``args.recreate`` option is False, the function returns
         ``True``, otherwise the function runs this simulation.
-    (2) Calls ``space.model_for_sample_number`` to generate the semi-analytic model and hardening
+    (2) Calls ``space.model_for_params`` to generate the semi-analytic model and hardening
         instances; see the function
-        :func:`holodeck.librarian.libraries._Param_Space.model_for_sample_number()`.
+        :func:`holodeck.librarian.libraries._Param_Space.model_for_params()`.
     (3) Calculates populations and GW signatures from the SAM and hardening model using
         :func:`holodeck.librarian.libraries.run_model()`, and saves the results to an output file.
     (4) Optionally: some diagnostic plots are created in the :func:`make_plots()` function.
@@ -218,19 +222,27 @@ def run_sam_at_pspace_num(args, space, pnum):
     Arguments
     ---------
     args : ``argparse.ArgumentParser`` instance
-        Arguments from the `gen_lib_sams.py` script.
-        NOTE: this should be improved.
+        Arguments from the ``gen_lib_sams.py`` script.
     space : :class:`holodeck.librarian.libraries._Param_space` instance
         Parameter space from which to construct populations.
     pnum : int
         Which parameter-sample from ``space`` should be run.
+    params : dict
+        Parameters for this particular simulation.  Dictionary of key-value pairs obtained from
+        the parameter-space ``space`` and passed back to the parameter-space to produce a model.
 
     Returns
     -------
     rv : bool
         ``True`` if this simulation was successfully run, ``False`` otherwise.
+        NOTE: an output file is created in either case.  See ``Notes`` [1] below.
     sim_fname : ``pathlib.Path`` instance
         Path of the simulation save file.
+
+    Notes
+    -----
+    [1] When simulations are run, an output file is produced.  On caught failures, an output file is
+      produced that contains a single key: 'fail'.  This designates the file as a failure.
 
     """
     log = args.log
@@ -257,7 +269,7 @@ def run_sam_at_pspace_num(args, space, pnum):
 
     try:
         log.debug("Selecting `sam` and `hard` instances")
-        sam, hard = space.model_for_sample_number(pnum)
+        sam, hard = space.model_for_params(params)
 
         data = libraries.run_model(
             sam, hard,
@@ -271,6 +283,7 @@ def run_sam_at_pspace_num(args, space, pnum):
         log.exception(f"`run_model` FAILED on {pnum=}\n")
         log.exception(err)
         rv = False
+        # failed simulations get an output file with a single key: 'fail'
         data = dict(fail=str(err))
 
     # ---- save data to file
@@ -343,8 +356,9 @@ def _setup_argparse(*args, **kwargs):
     parser.add_argument('--TEST', action='store_true', default=False,
                         help='Run in test mode (NOTE: this resets other values)')
 
-    # parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
-    #                     help='verbose output [INFO]')
+    # metavar='LEVEL', type=int, default=20,
+    parser.add_argument('-v', '--verbose', metavar='LEVEL', type=int, nargs='?', const=20, default=30,
+                        help='verbose output level (DEBUG=10, INFO=20, WARNING=30).')
 
     namespace = argparse.Namespace(**kwargs)
     args = parser.parse_args(*args, namespace=namespace)
@@ -465,8 +479,6 @@ def _save_config(args):
     # Convert `args` parameters to serializable dictionary
     config = {}
     for kk, vv in args._get_kwargs():
-        print(kk)
-        args.log.warning(f"{kk=} {vv=}")
         # convert `Path` instances to strings
         if isinstance(vv, Path):
             vv = str(vv)
@@ -484,7 +496,7 @@ def _save_config(args):
     with open(fname, 'w') as out:
         json.dump(config, out)
 
-    print(f"Saved to {fname} - {holo.utils.get_file_size(fname)}")
+    args.log.warning(f"Saved to {fname} - {holo.utils.get_file_size(fname)}")
 
     return fname
 
@@ -549,14 +561,12 @@ def _setup_log(comm, args):
 
     # ---- setup logger
 
-    # log_lvl = holo.logger.INFO if args.verbose else holo.logger.WARNING
-    log_lvl = holo.logger.DEBUG
+    log_lvl = args.verbose if comm.rank == 0 else holo.logger.DEBUG
     tostr = sys.stdout if comm.rank == 0 else False
     log = holo.logger.get_logger(name=log_name, level_stream=log_lvl, tofile=fname, tostr=tostr)
     log.info(f"Output path: {output}")
     log.info(f"        log: {fname}")
     log.info(args)
-
     return log
 
 
