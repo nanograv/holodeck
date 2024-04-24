@@ -70,10 +70,22 @@ def get_logger(name='holodeck', level_stream=logging.WARNING, tostr=sys.stdout, 
         handler.setLevel(level_stream)
         logger.addHandler(handler)
 
+    # store these values for convenience
     for lvl in ['DEBUG', 'INFO', 'WARNING', 'ERROR']:
         setattr(logger, lvl, getattr(logging, lvl))
 
-    # Make sure that the `setLevel` command reaches the stream logger
-    logger.setLevel = lambda xx: logger.handlers[0].setLevel(xx)
+    # ---- Make sure that the `setLevel` command reaches the stream logger
+
+    # Construct a new function to replace 'setLevel'
+    def _set_level(self, lvl):
+        for handler in self.handlers:
+            if not isinstance(handler, logging.StreamHandler):
+                continue
+            handler.setLevel(lvl)
+
+        return
+
+    # replace `setLevel` function on the logger
+    logger.setLevel = _set_level.__get__(logger)
 
     return logger
