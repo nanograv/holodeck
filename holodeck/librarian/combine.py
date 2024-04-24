@@ -322,7 +322,7 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
         # When a processor fails for a given parameter, the output file is still created with the 'fail' key added
         if ('fail' in temp):
             msg = f"file {pnum=:06d} is a failure file, setting values to NaN ({fname})"
-            log.warning(msg)
+            log.info(msg)
             # set all parameters to NaN for failure files.  Note that this is distinct from gwb=0.0 which can be real.
             if gwb is not None:
                 gwb[pnum, :, :] = np.nan

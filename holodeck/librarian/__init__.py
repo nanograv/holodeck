@@ -39,7 +39,7 @@ The ``librarian`` module is composed of the following elements:
 
 """
 
-__version__ = "1.1"
+__version__ = "1.2"
 
 DEF_NUM_REALS = 100     #: Default number of realizations to construct in libraries.
 DEF_NUM_FBINS = 40      #: Default number of frequency bins at which to calculate GW signals.
@@ -51,6 +51,7 @@ FITS_NBINS_TURN = [5, 10, 15]
 
 FNAME_SIM_FILE = "sam-lib__p{pnum:06d}.npz"
 PSPACE_FILE_SUFFIX = ".pspace.npz"
+ARGS_CONFIG_FNAME = "config.json"
 
 from . libraries import (      # noqa
     _Param_Space, _Param_Dist,
