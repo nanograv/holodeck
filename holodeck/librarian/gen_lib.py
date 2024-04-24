@@ -71,14 +71,6 @@ def main():   # noqa : ignore complexity warning
     (6) All of the individual simulation files are combined using
         :func:`holodeck.librarian.combine.sam_lib_combine()`.
 
-    Arguments
-    ---------
-    None
-
-    Returns
-    -------
-    None
-
     """
 
     # ---- load mpi4py module
@@ -108,8 +100,12 @@ def main():   # noqa : ignore complexity warning
     args.log = log
 
     if comm.rank == 0:
-        copy_files = FILES_COPY_TO_OUTPUT
+
+        # get parameter-space class
+        space = _setup_param_space(args)
+
         # copy certain files to output directory
+        copy_files = FILES_COPY_TO_OUTPUT
         if (not args.resume) and (copy_files is not None):
             for fname in copy_files:
                 src_file = Path(fname)
@@ -117,47 +113,34 @@ def main():   # noqa : ignore complexity warning
                 shutil.copyfile(src_file, dst_file)
                 log.info(f"Copied {fname} to {dst_file}")
 
-    # ---- get parameter-space class
-
-    if comm.rank == 0:
-
-        # `param_space` attribute must match the name of one of the classes in `holodeck.librarian`
-        try:
-            # if a namespace is specified for the parameter space, recursively follow it
-            # i.e. this will work in two cases:
-            # - `PS_Test` : if `PS_Test` is a class loaded in `librarian`
-            # - `file_name.PS_Test` : as long as `file_name` is a module within `librarian`
-            space_name = args.param_space.split(".")
-            if len(space_name) > 1:
-                space_class = holo.librarian
-                for class_name in space_name:
-                    space_class = getattr(space_class, class_name)
-            else:
-                space_class = holo.librarian.param_spaces_dict[space_name[0]]
-
-        except Exception as err:
-            log.error(f"Failed to load parameter space '{args.param_space}' !")
-            log.error("Make sure the class is defined, and imported into the `librarian` module.")
-            log.error(err)
-            raise err
-
-        # instantiate the parameter space class
+        # Load arguments/configuration from previous save
         if args.resume:
-            # Load pspace object from previous save
-            log.info(f"{args.resume=} attempting to load pspace {space_class=} from {args.output=}")
-            space, space_fname = holo.librarian.load_pspace_from_path(args.output, space_class=space_class, log=log)
-            log.warning(f"Loaded param-space   save from {space_fname}")
-            # Load arguments/configuration from previous save
             args, config_fname = _load_config(args.output, log)
             log.warning(f"Loaded configuration save from {config_fname}")
             args.resume = True
+        # Save parameter space and args/configuration to output directory
         else:
-            space = space_class(log, args.nsamples, args.sam_shape, args.seed)
+            space_fname = space.save(args.output)
+            log.info(f"saved parameter space {space} to {space_fname}")
+
+            config_fname = _save_config(args)
+            log.info(f"saved configuration to {config_fname}")
+
+        # Split and distribute index numbers to all processes
+        npars = args.nsamples
+        indices = range(npars)
+        indices = np.random.permutation(indices)
+        indices = np.array_split(indices, comm.size)
+        num_ind_per_proc = [len(ii) for ii in indices]
+        log.info(f"{npars=} cores={comm.size} || max runs per core = {np.max(num_ind_per_proc)}")
+
     else:
         space = None
+        indices = None
 
     # share parameter space across processes
     space = comm.bcast(space, root=0)
+
     # If we've loaded a new `args`, then share to all processes from rank=0
     if args.resume:
         args = comm.bcast(args, root=0)
@@ -167,40 +150,20 @@ def main():   # noqa : ignore complexity warning
         f"param_space={args.param_space}, samples={args.nsamples}, sam_shape={args.sam_shape}, nreals={args.nreals}\n"
         f"nfreqs={args.nfreqs}, pta_dur={args.pta_dur} [yr]\n"
     )
-    comm.barrier()
 
     # ---- distribute jobs to processors
-
-    # Split and distribute index numbers to all processes
-    if comm.rank == 0:
-        npars = args.nsamples
-        indices = range(npars)
-        indices = np.random.permutation(indices)
-        indices = np.array_split(indices, comm.size)
-        num_ind_per_proc = [len(ii) for ii in indices]
-        log.info(f"{npars=} cores={comm.size} || max runs per core = {np.max(num_ind_per_proc)}")
-    else:
-        indices = None
 
     indices = comm.scatter(indices, root=0)
     iterator = holo.utils.tqdm(indices) if (comm.rank == 0) else np.atleast_1d(indices)
 
-    # Save parameter space and args/configuration to output directory
-    if (comm.rank == 0) and (not args.resume):
-        space_fname = space.save(args.output)
-        log.info(f"saved parameter space {space} to {space_fname}")
-
-        config_fname = _save_config(args)
-        log.info(f"saved configuration to {config_fname}")
-
     comm.barrier()
+
+    # ---- iterate over each processors' jobs
+
     beg = datetime.now()
     log.info(f"beginning tasks at {beg}")
     failures = 0
     num_done = 0
-
-    # ---- iterate over each processors' jobs
-
     for par_num in iterator:
 
         log.info(f"{comm.rank=} {par_num=}")
@@ -456,6 +419,44 @@ def _setup_argparse(*args, **kwargs):
         args.output_plots = output_plots
 
     return args
+
+
+def _setup_param_space(args):
+    log = args.log
+
+    # ---- Determine and load the parameter-space class
+
+    # `param_space` attribute must match the name of one of the classes in `holodeck.librarian`
+    try:
+        # if a namespace is specified for the parameter space, recursively follow it
+        # i.e. this will work in two cases:
+        # - `PS_Test` : if `PS_Test` is a class loaded in `librarian`
+        # - `file_name.PS_Test` : as long as `file_name` is a module within `librarian`
+        space_name = args.param_space.split(".")
+        if len(space_name) > 1:
+            space_class = holo.librarian
+            for class_name in space_name:
+                space_class = getattr(space_class, class_name)
+        else:
+            space_class = holo.librarian.param_spaces_dict[space_name[0]]
+
+    except Exception as err:
+        log.error(f"Failed to load parameter space '{args.param_space}' !")
+        log.error("Make sure the class is defined, and imported into the `librarian` module.")
+        log.error(err)
+        raise err
+
+    # ---- instantiate the parameter space class
+
+    if args.resume:
+        # Load pspace object from previous save
+        log.info(f"{args.resume=} attempting to load pspace {space_class=} from {args.output=}")
+        space, space_fname = holo.librarian.load_pspace_from_path(args.output, space_class=space_class, log=log)
+        log.warning(f"Loaded param-space   save from {space_fname}")
+    else:
+        space = space_class(log, args.nsamples, args.sam_shape, args.seed)
+
+    return space
 
 
 def _save_config(args):
