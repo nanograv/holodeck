@@ -280,7 +280,7 @@ def _find_sam_lib_in_path_tree(path, pattern=None):
         if (pattern is not None) and (pattern not in str(path)):
             return []
         # if we find the library file, return it
-        if path.name == "sam_lib.hdf5":
+        if path.name.endswith("sam_lib.hdf5"):
             return [path]
         return []
 
