@@ -35,7 +35,7 @@ from holodeck.constants import YR
 import holodeck.librarian
 import holodeck.librarian.combine
 from holodeck.librarian import (
-    libraries, ARGS_CONFIG_FNAME
+    libraries, ARGS_CONFIG_FNAME, PSPACE_DOMAIN_EXTREMA, DIRNAME_LIBRARY_SIMS, DIRNAME_DOMAIN_SIMS
 )
 
 #: maximum number of failed simulations before task terminates with error (`None`: no limit)
@@ -112,7 +112,7 @@ def main():   # noqa : ignore complexity warning
 
         # Load arguments/configuration from previous save
         if args.resume:
-            args, config_fname = _load_config(args.output, log)
+            args, config_fname = load_config_from_path(args.output, log)
             log.warning(f"Loaded configuration save from {config_fname}")
             args.resume = True
         # Save parameter space and args/configuration to output directory
@@ -123,24 +123,35 @@ def main():   # noqa : ignore complexity warning
             config_fname = _save_config(args)
             log.info(f"saved configuration to {config_fname}")
 
-        # Split simulations for all processes
+        # ---- Split simulations for all processes
 
+        # Domain: Vary only one parameter at a time to explore the domain
         if args.domain:
-            pass
-        #
+            log.info("Constructing domain-exploration indices")
+            # we will have `nsamples` in each of `nparameters`
+            domain_shape = (space.nparameters, args.nsamples)
+            indices = np.arange(np.product(domain_shape))
+            # indices = np.random.permutation(indices)
+            indices = np.array_split(indices, comm.size)
+        # Standard Library: vary all parameters together
         else:
+            log.info("Constructing library indices")
             indices = range(args.nsamples)
             indices = np.random.permutation(indices)
             indices = np.array_split(indices, comm.size)
-            num_per = [len(ii) for ii in indices]
-            log.info(f"{args.nsamples=} cores={comm.size} || max sims per core = {np.max(num_per)}")
+            domain_shape = None
+
+        num_per = [len(ii) for ii in indices]
+        log.info(f"{args.nsamples=} cores={comm.size} || max sims per core = {np.max(num_per)}")
 
     else:
         space = None
         indices = None
+        domain_shape = None
 
     # share parameter space across processes
     space = comm.bcast(space, root=0)
+    domain_shape = comm.bcast(domain_shape, root=0)
 
     # If we've loaded a new `args`, then share to all processes from rank=0
     if args.resume:
@@ -148,7 +159,8 @@ def main():   # noqa : ignore complexity warning
         args.log = log
 
     log.info(
-        f"param_space={args.param_space}, samples={args.nsamples}, sam_shape={args.sam_shape}, nreals={args.nreals}\n"
+        f"param_space={args.param_space}, parameters={space.nparameters}, samples={args.nsamples}\n"
+        f"sam_shape={args.sam_shape}, nreals={args.nreals}\n"
         f"nfreqs={args.nfreqs}, pta_dur={args.pta_dur} [yr]\n"
     )
 
@@ -165,18 +177,35 @@ def main():   # noqa : ignore complexity warning
     log.info(f"beginning tasks at {beg}")
     failures = 0
     num_done = 0
-    for par_num in iterator:
+    for sim_num in iterator:
+        log.info(f"{comm.rank=} {sim_num=}")
 
-        log.info(f"{comm.rank=} {par_num=}")
-        pdict = space.param_dict(par_num)
-        msg = []
-        for kk, vv in pdict.items():
-            msg.append(f"{kk}={vv:.4e}")
-        msg = ", ".join(msg)
-        log.info(msg)
+        # Domain: Vary only one parameter at a time to explore the domain
+        if args.domain:
+            param_num, samp_num = np.unravel_index(sim_num, domain_shape)
+            # start out with all default parameters (signified by `None` values)
+            norm_params = [None for ii in range(space.nparameters)]
+            # determine the extrema for this parameter.  If parameter-distribution is bounded, use
+            # full range.  If unbounded, use hardcoded values.
+            yext = space._parameters[param_num].extrema   #: this is the extrema of the range
+            xext = [0.0, 1.0]                             #: this is the extrema of the domain
+            for ii in range(2):
+                xext[ii] = xext[ii] if np.isfinite(yext[ii]) else PSPACE_DOMAIN_EXTREMA[ii]
+                assert (0.0 <= xext[ii]) and (xext[ii] <= 1.0)
+            # replace the parameter being varied with a fractional value based on the sample number
+            norm_params[param_num] = xext[0] + samp_num * np.diff(xext)[0] / (domain_shape[1] - 1)
+            params = space.normalized_params(norm_params)
 
-        params = space.param_dict(par_num)
-        rv, _sim_fname = run_sam_at_pspace_params(args, space, par_num, params)
+        # Library: vary all parameters together
+        else:
+            params = space.param_dict(sim_num)
+            msg = []
+            for kk, vv in params.items():
+                msg.append(f"{kk}={vv:.4e}")
+            msg = ", ".join(msg)
+            log.info(msg)
+
+        rv, _sim_fname = run_sam_at_pspace_params(args, space, sim_num, params)
 
         if rv is False:
             failures += 1
@@ -198,7 +227,7 @@ def main():   # noqa : ignore complexity warning
 
     if (comm.rank == 0):
         log.info("Concatenating outputs into single file")
-        holo.librarian.combine.sam_lib_combine(args.output, log)
+        holo.librarian.combine.sam_lib_combine(args.output, log, library=(not args.domain))
         log.info("Concatenation completed")
 
     return
@@ -249,7 +278,8 @@ def run_sam_at_pspace_params(args, space, pnum, params):
 
     # ---- get output filename for this simulation, check if already exists
 
-    sim_fname = libraries._get_sim_fname(args.output_sims, pnum)
+    library_flag = not args.domain
+    sim_fname = libraries._get_sim_fname(args.output_sims, pnum, library=library_flag)
 
     beg = datetime.now()
     log.info(f"{pnum=} :: {sim_fname=} beginning at {beg}")
@@ -343,8 +373,10 @@ def _setup_argparse(*args, **kwargs):
                         help="calculate and store SS/CW sources and the BG separately")
     parser.add_argument('--params', dest="params_flag", default=True, action=argparse.BooleanOptionalAction,
                         help="calculate and store SS/BG binary parameters [NOTE: requires `--ss`]")
+    parser.add_argument('--domain', default=False, action='store_true',
+                        help="instead of generating a standard library, explore each parameter.")
 
-    # how do run
+    # how to run
     parser.add_argument('--resume', action='store_true', default=False,
                         help='resume production of a library by loading previous parameter-space from output directory')
     parser.add_argument('--recreate', action='store_true', default=False,
@@ -417,7 +449,12 @@ def _setup_argparse(*args, **kwargs):
     holo.utils.mpi_print(f"output path: {output}")
     args.output = output
 
-    output_sims = output.joinpath("sims")
+    if args.domain:
+        sims_dirname = DIRNAME_DOMAIN_SIMS
+    else:
+        sims_dirname = DIRNAME_LIBRARY_SIMS
+
+    output_sims = output.joinpath(sims_dirname)
     output_sims.mkdir(parents=True, exist_ok=True)
     args.output_sims = output_sims
 
@@ -434,6 +471,12 @@ def _setup_argparse(*args, **kwargs):
 
 
 def _setup_param_space(args):
+    """Setup the parameter-space instance.
+
+    For normal runs, identify the parameter-space class and construct a new class instance.
+    For 'resume' runs, load a saved parameter-space instance.
+
+    """
     log = args.log
 
     # ---- Determine and load the parameter-space class
@@ -466,7 +509,9 @@ def _setup_param_space(args):
         space, space_fname = holo.librarian.load_pspace_from_path(args.output, space_class=space_class, log=log)
         log.warning(f"Loaded param-space   save from {space_fname}")
     else:
-        space = space_class(log, args.nsamples, args.sam_shape, args.seed)
+        # we don't use standard samples when constructing a parameter-space 'domain'
+        nsamples = None if args.domain else args.nsamples
+        space = space_class(log, nsamples, args.sam_shape, args.seed)
 
     return space
 
@@ -501,7 +546,7 @@ def _save_config(args):
     return fname
 
 
-def _load_config(path, log):
+def load_config_from_path(path, log):
     fname = Path(path).joinpath(ARGS_CONFIG_FNAME)
 
     with open(fname, 'r') as inp:

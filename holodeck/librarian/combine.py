@@ -19,7 +19,10 @@ import tqdm
 
 import holodeck as holo
 import holodeck.librarian
-from holodeck.librarian import libraries
+import holodeck.librarian.gen_lib
+from holodeck.librarian import (
+    libraries, DIRNAME_LIBRARY_SIMS, DIRNAME_DOMAIN_SIMS, DomainNotLibraryError
+)
 
 
 def main():
@@ -71,12 +74,19 @@ def main():
 
     # ---- Combine library files
 
-    sam_lib_combine(path, log, recreate=args.recreate, gwb_only=args.gwb)
+    for library in [True, False]:
+        try:
+            sam_lib_combine(path, log, recreate=args.recreate, gwb_only=args.gwb, library=library)
+        except DomainNotLibraryError as err:
+            pass
 
     return
 
 
-def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only=False):
+def sam_lib_combine(
+    path_output, log,
+    path_pspace=None, recreate=False, gwb_only=False, library=True
+):
     """Combine individual simulation files into a single library (hdf5) file.
 
     Arguments
@@ -91,6 +101,8 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
     path_pspace : str or None,
         Path to file containing _Param_Space subclass instance.
         If `None` then `path_output` is searched for a `_Param_Space` save file.
+    library : bool,
+        Combine simulations from a library, as opposed to simulations for 'domain' exploration.
 
     Returns
     -------
@@ -103,7 +115,10 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
 
     path_output = Path(path_output)
     log.info(f"Path output = {path_output}")
-    path_sims = path_output.joinpath('sims')
+    if library:
+        path_sims = path_output.joinpath(DIRNAME_LIBRARY_SIMS)
+    else:
+        path_sims = path_output.joinpath(DIRNAME_DOMAIN_SIMS)
 
     # ---- see if a combined library already exists
 
@@ -121,18 +136,34 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
     if path_pspace is None:
         path_pspace = path_output
     pspace, pspace_fname = libraries.load_pspace_from_path(path_pspace, log=log)
+    args, args_fname = holo.librarian.gen_lib.load_config_from_path(path_pspace, log=log)
 
     log.info(f"loaded param space: {pspace} from '{pspace_fname}'")
     param_names = pspace.param_names
     param_samples = pspace.param_samples
-    nsamp, ndim = param_samples.shape
-    log.debug(f"{nsamp=}, {ndim=}, {param_names=}")
+
+    if library:
+        if param_samples == None:   # noqa : use `== None` to match arrays
+            log.error(f"`library`={library} but `param_samples`={param_samples}`")
+            err = f"`library` is True, but {path_output} looks like it's a domain."
+            raise DomainNotLibraryError(err)
+
+        nsamp_all, ndim = param_samples.shape
+        log.debug(f"{nsamp_all=}, {ndim=}, {param_names=}")
+    else:
+        err = f"Expected 'domain' but `param_samples`={param_samples} is not `None`!"
+        assert param_samples == None, err   # noqa : use `== None` to match arrays
+        ndim = pspace.nparameters
+        # for 'domain' simulations, this is the number of samples in each dimension
+        nsamp_dim = args.nsamples
+        # get the total number of samples
+        nsamp_all = ndim * nsamp_dim
 
     # ---- make sure all files exist; get shape information from files
 
-    log.info(f"checking that all {nsamp} files exist")
+    log.info(f"checking that all {nsamp_all} files exist")
     fobs_cents, fobs_edges, nreals, nloudest, has_gwb, has_ss, has_params = _check_files_and_load_shapes(
-        log, path_sims, nsamp
+        log, path_sims, nsamp_all, library
     )
     nfreqs = fobs_cents.size
     log.debug(f"{nfreqs=}, {nreals=}, {nloudest=}")
@@ -150,28 +181,29 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
 
     # ---- load results from all files
 
-    gwb = np.zeros((nsamp, nfreqs, nreals)) if has_gwb else None
+    gwb = np.zeros((nsamp_all, nfreqs, nreals)) if has_gwb else None
 
     if (not gwb_only) and has_ss:
-        hc_ss = np.zeros((nsamp, nfreqs, nreals, nloudest))
-        hc_bg = np.zeros((nsamp, nfreqs, nreals))
+        hc_ss = np.zeros((nsamp_all, nfreqs, nreals, nloudest))
+        hc_bg = np.zeros((nsamp_all, nfreqs, nreals))
     else:
         hc_ss = None
         hc_bg = None
 
     if (not gwb_only) and has_params:
-        sspar = np.zeros((nsamp, 4, nfreqs, nreals, nloudest))
-        bgpar = np.zeros((nsamp, 7, nfreqs, nreals))
+        sspar = np.zeros((nsamp_all, 4, nfreqs, nreals, nloudest))
+        bgpar = np.zeros((nsamp_all, 7, nfreqs, nreals))
     else:
         sspar = None
         bgpar = None
 
     gwb, hc_ss, hc_bg, sspar, bgpar, bad_files = _load_library_from_all_files(
-        path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log,
+        path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log, library
     )
     if has_gwb:
         log.info(f"Loaded data from all library files | {holo.utils.stats(gwb)=}")
-    param_samples[bad_files] = np.nan
+    if library:
+        param_samples[bad_files] = np.nan
 
     # ---- Save to concatenated output file ----
 
@@ -179,14 +211,31 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
     with h5py.File(lib_path, 'w') as h5:
         h5.create_dataset('fobs_cents', data=fobs_cents)
         h5.create_dataset('fobs_edges', data=fobs_edges)
-        h5.create_dataset('sample_params', data=param_samples)
+        if param_samples is not None:
+            h5.create_dataset('sample_params', data=param_samples)
         if gwb is not None:
+            # if 'domain', reshape to include each dimension
+            if not library:
+                new_shape = (ndim, nsamp_dim) + gwb.shape[1:]
+                gwb = gwb.reshape(new_shape)
             h5.create_dataset('gwb', data=gwb)
         if not gwb_only:
             if has_ss:
+                # if 'domain', reshape to include each dimension
+                if not library:
+                    new_shape = (ndim, nsamp_dim) + hc_ss.shape[1:]
+                    hc_ss = hc_ss.reshape(new_shape)
+                    new_shape = (ndim, nsamp_dim) + hc_bg.shape[1:]
+                    hc_bg = hc_bg.reshape(new_shape)
                 h5.create_dataset('hc_ss', data=hc_ss)
                 h5.create_dataset('hc_bg', data=hc_bg)
             if has_params:
+                # if 'domain', reshape to include each dimension
+                if not library:
+                    new_shape = (ndim, nsamp_dim) + sspar.shape[1:]
+                    sspar = sspar.reshape(new_shape)
+                    new_shape = (ndim, nsamp_dim) + bgpar.shape[1:]
+                    bgpar = bgpar.reshape(new_shape)
                 h5.create_dataset('sspar', data=sspar)
                 h5.create_dataset('bgpar', data=bgpar)
         h5.attrs['param_names'] = np.array(param_names).astype('S')
@@ -211,16 +260,20 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
     return lib_path
 
 
-def _check_files_and_load_shapes(log, path_sims, nsamp):
+def _check_files_and_load_shapes(log, path_sims, nsamp, library):
     """Check that all `nsamp` files exist in the given path, and load info about array shapes.
 
     Arguments
     ---------
+    log : ``logging.Logger`` instance
+        Holodeck logger.
     path_sims : str
         Path in which individual simulation files can be found.
     nsamp : int
         Number of simulations/files that should be found.
         This should typically be loaded from the parameter-space object used to generate the library.
+    library : bool,
+        Whether this is a standard library or a 'domain' exploration.
 
     Returns
     -------
@@ -242,7 +295,7 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
 
     log.info(f"Checking {nsamp} files in {path_sims}")
     for ii in tqdm.trange(nsamp):
-        temp_fname = libraries._get_sim_fname(path_sims, ii)
+        temp_fname = libraries._get_sim_fname(path_sims, ii, library=library)
         if not temp_fname.exists():
             err = f"Missing at least file number {ii} out of {nsamp} files!  {temp_fname}"
             log.exception(err)
@@ -301,7 +354,7 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
     return fobs_cents, fobs_edges, nreals, nloudest, has_gwb, has_ss, has_params
 
 
-def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log):
+def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log, library):
     """Load data from all individual simulation files.
 
     Arguments
@@ -311,8 +364,14 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
     gwb : (S, F, R) ndarray
         Array in which to store GWB data from all of 'S' files.
         S: num-samples/simulations,  F: num-frequencies,  R: num-realizations.
-    log : `logging.Logger`
+    hc_ss
+    hc_bg
+    sspar
+    bgpar
+    log : ``logging.Logger``
         Logging instance.
+    library : bool
+        Whether this is a standard library or a domain exploration.
 
     """
     if hc_bg is not None:
@@ -328,7 +387,7 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
     bad_files = np.zeros(nsamp, dtype=bool)     #: track which files contain UN-useable data
     msg = None
     for pnum in tqdm.trange(nsamp):
-        fname = libraries._get_sim_fname(path_sims, pnum)
+        fname = libraries._get_sim_fname(path_sims, pnum, library=library)
         temp = np.load(fname, allow_pickle=True)
         # When a processor fails for a given parameter, the output file is still created with the 'fail' key added
         if ('fail' in temp):
