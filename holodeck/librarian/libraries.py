@@ -123,7 +123,7 @@ class _Param_Space(abc.ABC):
             param_names.append(name)
 
         if (nsamples is None) or (nparameters == 0):
-            log.warning(f"{self}: {nsamples=} {nparameters=} - cannot generate parameter samples.")
+            log.info(f"{self}: {nsamples=} {nparameters=} - cannot generate parameter samples.")
             uniform_samples = None
             param_samples = None
         else:
@@ -206,9 +206,9 @@ class _Param_Space(abc.ABC):
 
         return sam, hard
 
-    @classmethod
+    # @classmethod
     @abc.abstractmethod
-    def _init_sam(cls, sam_shape, params):
+    def _init_sam(self, sam_shape, params):
         """Initialize a :class:`holodeck.sams.sam.Semi_Analytic_Model` instance with given params.
 
         Arguments
@@ -229,9 +229,9 @@ class _Param_Space(abc.ABC):
         """
         raise
 
-    @classmethod
+    # @classmethod
     @abc.abstractmethod
-    def _init_hard(cls, sam, params):
+    def _init_hard(self, sam, params):
         """Initialize a :class:`holodeck.hardening._Hardening` subclass instance with given params.
 
         Arguments
@@ -324,8 +324,13 @@ class _Param_Space(abc.ABC):
             pspace_class = cls
 
         # construct instance with dummy/temporary values (which will be overwritten)
-        nsamples = data['param_samples'].shape[0]
-        nparameters = data['param_samples'].shape[1]
+        if data['param_samples'] == None:   # noqa : use ``== None`` to match arrays
+            nsamples = None
+            nparameters = None
+        else:
+            # print(f"{data['param_samples']=}")
+            nsamples = data['param_samples'].shape[0]
+            nparameters = data['param_samples'].shape[1]
         param_names = data['param_names']
         space = pspace_class(nsamples=nsamples, log=log)
         if class_name != space.name:
@@ -1005,8 +1010,13 @@ def _get_space_class_from_space_fname(space_fname):
     return space_class
 
 
-def _get_sim_fname(path, pnum):
-    temp = holo.librarian.FNAME_SIM_FILE.format(pnum=pnum)
+def _get_sim_fname(path, pnum, library=True):
+    if library:
+        temp = holo.librarian.FNAME_LIBRARY_SIM_FILE
+    else:
+        temp = holo.librarian.FNAME_DOMAIN_SIM_FILE
+
+    temp = temp.format(pnum=pnum)
     temp = path.joinpath(temp)
     return temp
 

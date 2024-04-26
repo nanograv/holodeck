@@ -49,9 +49,21 @@ DEF_PTA_DUR = 16.03     #: Default PTA duration which determines Nyquist frequen
 FITS_NBINS_PLAW = [3, 4, 5, 10, 15]
 FITS_NBINS_TURN = [5, 10, 15]
 
-FNAME_SIM_FILE = "sam-lib__p{pnum:06d}.npz"
+FNAME_LIBRARY_SIM_FILE = "library__p{pnum:06d}.npz"
+FNAME_DOMAIN_SIM_FILE = "domain__p{pnum:06d}.npz"
+DIRNAME_LIBRARY_SIMS = "library_sims"
+DIRNAME_DOMAIN_SIMS = "domain_sims"
 PSPACE_FILE_SUFFIX = ".pspace.npz"
 ARGS_CONFIG_FNAME = "config.json"
+
+#: When constructing parameter-space domains, go this far along each dimension when parameter is
+#  unbounded.
+PSPACE_DOMAIN_EXTREMA = [0.001, 0.999]
+
+class DomainNotLibraryError(Exception):
+    def __init__(self, message="This looks like a 'domain' not a 'library'!"):
+        # Call the base class constructor with the parameters it needs
+        super(DomainNotLibraryError, self).__init__(message)
 
 from . libraries import (      # noqa
     _Param_Space, _Param_Dist,
@@ -62,6 +74,7 @@ from . libraries import (      # noqa
 param_spaces_dict = {}    #: Registry of standard parameter-spaces
 from . import param_spaces_classic as psc_temp  # noqa
 param_spaces_dict.update(psc_temp._param_spaces_dict)
+del psc_temp
 from . import param_spaces as ps_temp  # noqa
 param_spaces_dict.update(ps_temp._param_spaces_dict)
-del psc_temp, ps_temp
+del ps_temp
