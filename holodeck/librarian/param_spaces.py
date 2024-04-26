@@ -129,7 +129,7 @@ class PS_Test(_Param_Space):
         )
 
         sam = holo.sams.Semi_Analytic_Model(
-            gsmf=gsmf, gmr=gmr, mmbulge=mmbulge, shape=sam_shape,
+            gsmf=gsmf, gmr=gmr, mmbulge=mmbulge, shape=sam_shape, log=self._log,
         )
         return sam
 
@@ -206,8 +206,7 @@ class _PS_Astro_Strong(_Param_Space):
         bf_width_dex=1.0,                # [dex]
     )
 
-    @classmethod
-    def _init_sam(cls, sam_shape, params):
+    def _init_sam(self, sam_shape, params):
         log10_phi_one = [
             params['gsmf_log10_phi_one_z0'],
             params['gsmf_log10_phi_one_z1'],
@@ -259,12 +258,11 @@ class _PS_Astro_Strong(_Param_Space):
         )
 
         sam = holo.sams.Semi_Analytic_Model(
-            gsmf=gsmf, gmr=gmr, mmbulge=mmbulge, shape=sam_shape,
+            gsmf=gsmf, gmr=gmr, mmbulge=mmbulge, shape=sam_shape, log=self._log,
         )
         return sam
 
-    @classmethod
-    def _init_hard(cls, sam, params):
+    def _init_hard(self, sam, params):
         hard = holo.hardening.Fixed_Time_2PL_SAM(
             sam,
             params['hard_time']*GYR,
@@ -315,7 +313,7 @@ class PS_Astro_Strong_All(_PS_Astro_Strong):
             PD_Normal('mmb_plaw', 1.17, 0.08),                    # 1.17 ± 0.08
             # Extra
             PD_Normal('mmb_scatter_dex', 0.28, 0.05),             # no uncertainties given
-            PD_Uniform('bf_frac_lo', 0.0, 0.4),
+            PD_Uniform('bf_frac_lo', 0.1, 0.4),
             PD_Uniform('bf_frac_hi', 0.6, 1.0),
             PD_Uniform('bf_width_dex', 0.5, 1.5),                 # [dex]
         ]
@@ -414,7 +412,7 @@ class PS_Astro_Strong_MMBulge_BFrac(_PS_Astro_Strong):
             PD_Normal('mmb_mamp_log10', 8.69, 0.05),              # 8.69 ± 0.05  [log10(M/Msol)]
             PD_Normal('mmb_plaw', 1.17, 0.08),                    # 1.17 ± 0.08
             PD_Normal('mmb_scatter_dex', 0.28, 0.05),             # no uncertainties given
-            PD_Uniform('bf_frac_lo', 0.0, 0.4),
+            PD_Uniform('bf_frac_lo', 0.1, 0.4),
             PD_Uniform('bf_frac_hi', 0.6, 1.0),
             PD_Uniform('bf_width_dex', 0.5, 1.5),                 # [dex]
         ]
