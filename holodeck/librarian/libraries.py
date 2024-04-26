@@ -973,7 +973,7 @@ def load_pspace_from_path(path, space_class=None, log=None):
 
     if space_class is None:
         try:
-            space_class = str(np.load(space_fname)['class_name'])
+            space_class = str(np.load(space_fname, allow_pickle=True)['class_name'])
             print(f"{space_class=}")
             space_class = holo.librarian.param_spaces_dict[space_class]
         except Exception as err:
