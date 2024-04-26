@@ -397,22 +397,23 @@ class _Param_Space(abc.ABC):
         return self.model_for_params(params, sam_shape)
 
     def normalized_params(self, vals):
-        """Convert input values (uniform/linear) into parameters from the stored distributions.
+        """Convert input values (uniform [0.0, 1.0]) into parameters from the stored distributions.
 
         For example, if this parameter space has 2 dimensions, where the distributions are:
 
         0. 'value_a' is a uniform parameter from [-1.0, 1.0], and
-        1. 'value_b' normal with mean 10.0 and stdev 1.0
+        1. 'value_b' is normally distributed with mean 10.0 and stdev 1.0
 
         Then input values of ``[0.75, 0.5]`` are mapped to parameters ``[0.5, 10.0]``, which will be
         returned as ``{value_a: 0.5, value_b: 10.0}``.
 
         Arguments
         ---------
-        vals : (P,) iterable of float,
-            A list/iterable of `P` float values, matching the number of parameters (i.e. dimensions)
-            in this parameter space.  Each value is passed to the corresponding distribution for
-            that parameter.
+        vals : (P,) iterable of (float or `None`),
+            A list/iterable of `P` values, matching the number of parameters (i.e. dimensions)
+            in this parameter space.  If a value is `None`, then the default value for that
+            parameter is obtained, otherwise the value is passed to the corresponding parameter
+            distribution.
 
         Returns
         -------
@@ -424,11 +425,17 @@ class _Param_Space(abc.ABC):
         if np.ndim(vals) == 0:
             vals = self.nparameters * [vals]
         assert len(vals) == self.nparameters
+        all_finite = np.all([(vv is None) or np.isfinite(vv) for vv in vals])
+        assert all_finite, f"Not all `vals` are finite!  {vals}"
 
         params = {}
         for ii, pname in enumerate(self.param_names):
-            vv = vals[ii]                     # desired fractional parameter value [0.0, 1.0]
-            ss = self._parameters[ii](vv)     # convert to actual parameter values
+            param = self._parameters[ii]      # this parameter distribution
+            vv = vals[ii]                     # fractional parameter value [0.0, 1.0] or `None`
+            if vv is None:
+                ss = param.default
+            else:
+                ss = param(vv)                # convert from fractional to actual values
             params[pname] = ss                # store to dictionary
 
         return params
