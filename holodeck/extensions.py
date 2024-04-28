@@ -30,7 +30,7 @@ class Realizer:
 
         if len(mmbulge_kwargs):
             log.info(f"Modifying population masses with params: {mmbulge_kwargs}")
-            mmbulge = holo.relations.MMBulge_KH2013(**mmbulge_kwargs)
+            mmbulge = holo.host_relations.MMBulge_KH2013(**mmbulge_kwargs)
             mod_mm13 = holo.population.PM_Mass_Reset(mmbulge, scatter=True)
             mt, _ = holo.utils.mtmr_from_m1m2(pop.mass)
             log.debug(f"mass bef = {holo.utils.stats(mt/MSOL)}")
@@ -38,7 +38,7 @@ class Realizer:
             mt, _ = holo.utils.mtmr_from_m1m2(pop.mass)
             log.debug(f"mass aft = {holo.utils.stats(mt/MSOL)}")
 
-        fixed = holo.hardening.Fixed_Time.from_pop(pop, lifetime)
+        fixed = holo.hardening.Fixed_Time_2PL.from_pop(pop, lifetime)
         evo = holo.evolution.Evolution(pop, fixed)
         evo.evolve()
 

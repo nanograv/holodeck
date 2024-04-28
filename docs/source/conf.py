@@ -5,7 +5,7 @@
 
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../../holodeck/'))
+sys.path.insert(0, os.path.abspath('../holodeck/'))
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -20,16 +20,29 @@ release = '1.2'
 
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',
     'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',
-    'sphinx.ext.duration',
     'sphinx.ext.mathjax',
+    'sphinx_math_dollar',
+    'sphinx.ext.autosectionlabel',
 ]
 
 templates_path = []
 exclude_patterns = []
 
+mathjax_path = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'
 
+mathjax3_config = {
+    'tex2jax': {
+        'inlineMath': [ ["\\(","\\)"] ],
+        'displayMath': [["\\[","\\]"] ],
+    },
+    "tex": {
+        "inlineMath": [['\\(', '\\)']],
+        "displayMath": [["\\[", "\\]"]],
+    }
+}
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
@@ -37,31 +50,13 @@ exclude_patterns = []
 html_theme = 'sphinx_rtd_theme'
 html_static_path = []
 
-# -- Setup Sphinx's API-DOC --------------------------------------------------
+autodoc_default_options = {
+    # "imported-members": True,
+}
 
-# Define the configuration for sphinx-apidoc
-apidoc_module_dir = 'source/apidoc_modules'
-apidoc_excluded_paths = ['../holodeck/detstats.py', '../holodeck/anisotropy.py']
-apidoc_command_options = ' '.join([
-    '-e',  # Create separate files for each module
-    '-P',  # Include private modules
-    '-T',  # Include docstrings in the table of contents
-    '-f'   # Overwrite existing files
-])
-
-# Run sphinx-apidoc to generate the .rst files
-def run_apidoc(_):
-    from sphinx.ext.apidoc import main
-    argv = [
-        '-M',
-        '-T',
-        '-f',
-        '-o', apidoc_module_dir,
-        '../../holodeck',
-        *apidoc_excluded_paths,
-    ]
-    main(argv)
-
-# Hook the sphinx-apidoc command into the Sphinx build process
-def setup(app):
-    app.connect('builder-inited', run_apidoc)
+autodoc_default_flags = [
+    'members',
+    'special-members',
+    'private-members',
+    'undoc-members',
+]

@@ -1,4 +1,8 @@
-"""
+"""Combine output files from individual simulation runs into a single library hdf5 file.
+
+This file can be executed as a script (see the :func:`main` function), and also provides an API
+method (:func:`sam_lib_combine`) for programatically combining libraries.
+
 """
 
 import argparse
@@ -10,11 +14,13 @@ import tqdm
 
 import holodeck as holo
 import holodeck.librarian
-from holodeck.librarian import lib_utils
-from holodeck.librarian.params import _Param_Space
+from holodeck.librarian import libraries
 
 
 def main():
+    """Command-line interface executable method for combining holodeck simulation files.
+    """
+
     log = holo.log
 
     try:
@@ -53,7 +59,7 @@ def main():
 
 
 def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only=False):
-    """
+    """Combine individual simulation files into a single library (hdf5) file.
 
     Arguments
     ---------
@@ -83,10 +89,10 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
 
     # ---- see if a combined library already exists
 
-    lib_path = lib_utils.get_sam_lib_fname(path_output, gwb_only)
+    lib_path = libraries.get_sam_lib_fname(path_output, gwb_only)
     if lib_path.exists():
         lvl = log.INFO if recreate else log.WARNING
-        log.log(lvl, f"combined library already exists: {lib_path}")
+        log.log(lvl, f"combined library already exists: {lib_path}, run with `-r` to recreate.")
         if not recreate:
             return
 
@@ -113,7 +119,7 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
     '''
     if path_pspace is None:
         path_pspace = path_output
-    pspace, pspace_fname = lib_utils.load_pspace_from_path(log, path_pspace)
+    pspace, pspace_fname = libraries.load_pspace_from_path(path_pspace, log=log)
 
     log.info(f"loaded param space: {pspace} from '{pspace_fname}'")
     param_names = pspace.param_names
@@ -124,8 +130,10 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
     # ---- make sure all files exist; get shape information from files
 
     log.info(f"checking that all {nsamp} files exist")
-    fobs, nreals, nloudest, has_gwb, has_ss, has_params = _check_files_and_load_shapes(log, path_sims, nsamp)
-    nfreqs = fobs.size
+    fobs_cents, fobs_edges, nreals, nloudest, has_gwb, has_ss, has_params = _check_files_and_load_shapes(
+        log, path_sims, nsamp
+    )
+    nfreqs = fobs_cents.size
     log.debug(f"{nfreqs=}, {nreals=}, {nloudest=}")
     log.debug(f"{has_gwb=}, {has_ss=}, {has_params=}")
 
@@ -134,8 +142,8 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
         log.exception(err)
         raise RuntimeError(err)
 
-    if (fobs is None) or (nreals is None):
-        err = f"After checking files, {fobs=} and {nreals=}!"
+    if (fobs_cents is None) or (nreals is None):
+        err = f"After checking files, {fobs_cents=} and {nreals=}!"
         log.exception(err)
         raise ValueError(err)
 
@@ -168,7 +176,8 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
 
     log.info(f"Writing collected data to file {lib_path}")
     with h5py.File(lib_path, 'w') as h5:
-        h5.create_dataset('fobs', data=fobs)
+        h5.create_dataset('fobs_cents', data=fobs_cents)
+        h5.create_dataset('fobs_edges', data=fobs_edges)
         h5.create_dataset('sample_params', data=param_samples)
         if gwb is not None:
             h5.create_dataset('gwb', data=gwb)
@@ -180,6 +189,16 @@ def sam_lib_combine(path_output, log, path_pspace=None, recreate=False, gwb_only
                 h5.create_dataset('sspar', data=sspar)
                 h5.create_dataset('bgpar', data=bgpar)
         h5.attrs['param_names'] = np.array(param_names).astype('S')
+        # new in librarian-v1.1
+        h5.attrs['parameter_space_class_name'] = pspace.name
+        h5.attrs['holodeck_version'] = holo.__version__
+        # I'm not sure if this can/will throw errors, but don't let the combination fail if it does.
+        try:
+            git_hash = holo.utils.get_git_hash()
+        except:  # noqa
+            git_hash = "None"
+        h5.attrs['holodeck_git_hash'] = git_hash
+        h5.attrs['holodeck_librarian_version'] = holo.librarian.__version__
 
     log.warning(f"Saved to {lib_path}, size: {holo.utils.get_file_size(lib_path)}")
 
@@ -205,7 +224,8 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
         Number of realizations in the output files.
 
     """
-    fobs = None
+    fobs_edges = None
+    fobs_cents = None
     nreals = None
     nloudest = None
     has_gwb = False
@@ -214,25 +234,28 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
 
     log.info(f"Checking {nsamp} files in {path_sims}")
     for ii in tqdm.trange(nsamp):
-        temp_fname = lib_utils._get_sim_fname(path_sims, ii)
+        temp_fname = libraries._get_sim_fname(path_sims, ii)
         if not temp_fname.exists():
             err = f"Missing at least file number {ii} out of {nsamp} files!  {temp_fname}"
             log.exception(err)
             raise ValueError(err)
 
         # if we've already loaded all of the necessary info, then move on to the next file
-        if (fobs is not None) and (nreals is not None) and (nloudest is not None):
+        if (fobs_cents is not None) and (nreals is not None) and (nloudest is not None):
             continue
 
         temp = np.load(temp_fname)
         data_keys = list(temp.keys())
         log.debug(f"{ii=} {temp_fname.name=} {data_keys=}")
 
-        if fobs is None:
-            fobs = temp.get('fobs', None)
-            if fobs is None:
-                fobs = temp['fobs_cents']
-            fobs =[()]
+        if fobs_cents is None:
+            _fobs = temp.get('fobs', None)
+            if _fobs is not None:
+                err = "Found `fobs` in data, expected only `fobs_cents` and `fobs_edges`!"
+                log.exception(err)
+                raise ValueError(err)
+            fobs_cents = temp['fobs_cents']
+            fobs_edges = temp['fobs_edges']
 
         if (not has_gwb) and ('gwb' in data_keys):
             has_gwb = True
@@ -261,7 +284,7 @@ def _check_files_and_load_shapes(log, path_sims, nsamp):
         if (nloudest is None) and ('hc_ss' in data_keys):
             nloudest = temp['hc_ss'].shape[-1]
 
-    return fobs, nreals, nloudest, has_gwb, has_ss, has_params
+    return fobs_cents, fobs_edges, nreals, nloudest, has_gwb, has_ss, has_params
 
 
 def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log):
@@ -291,7 +314,7 @@ def _load_library_from_all_files(path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, log
     bad_files = np.zeros(nsamp, dtype=bool)     #: track which files contain UN-useable data
     msg = None
     for pnum in tqdm.trange(nsamp):
-        fname = lib_utils._get_sim_fname(path_sims, pnum)
+        fname = libraries._get_sim_fname(path_sims, pnum)
         temp = np.load(fname, allow_pickle=True)
         # When a processor fails for a given parameter, the output file is still created with the 'fail' key added
         if ('fail' in temp):

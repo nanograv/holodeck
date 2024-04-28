@@ -34,7 +34,7 @@ import scipy.stats    # noqa
 import scipy.special  # noqa
 
 from holodeck import log, cosmo
-from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC, EDDT
+from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, EDDT
 
 # [Sesana2004]_ Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
@@ -241,7 +241,7 @@ def python_environment():
             return 'jupyter'
         if 'terminal' in ipy_str:
             return 'ipython'
-    except:
+    except:   # noqa
         return 'terminal'
 
     raise RuntimeError(f"unexpected result from `get_ipython()`: '{ipy_str}'!")
@@ -585,10 +585,7 @@ def frac_str(vals, prec=2):
     return rv
 
 
-def interp(
-    xnew: npt.ArrayLike, xold: npt.ArrayLike, yold: npt.ArrayLike,
-    left: float = np.nan, right: float = np.nan, xlog: bool = True, ylog: bool = True,
-) -> npt.ArrayLike:
+def interp(xnew, xold, yold, left=np.nan, right=np.nan, xlog=True, ylog=True):
     """Linear interpolation of the given arguments in log/lin-log/lin space.
 
     Parameters
@@ -903,15 +900,8 @@ def quantile_filtered(values, percs, axis, func=np.isfinite):
     return np.apply_along_axis(lambda xx: np.percentile(np.asarray(xx)[func(xx)], percs*100), axis, values)
 
 
-def quantiles(
-    values: npt.ArrayLike,
-    percs: Optional[npt.ArrayLike] = None,
-    sigmas: Optional[npt.ArrayLike] = None,
-    weights: Optional[npt.ArrayLike] = None,
-    axis: Optional[int] = None,
-    values_sorted: bool = False,
-    filter: Optional[str] = None,
-) -> Union[np.ndarray, np.ma.masked_array]:
+def quantiles(values, percs=None, sigmas=None, weights=None, axis=None,
+              values_sorted=False, filter=None):
     """Compute weighted percentiles.
 
     NOTE: if `values` is a masked array, then only unmasked values are used!
@@ -988,6 +978,42 @@ def quantiles(
     return percs
 
 
+def random_power(extr, pdf_index, size=1):
+    """Draw from power-law PDF with the given extrema and index.
+
+    FIX/BUG : negative `extr` values break `pdf_index=-1` !!
+
+    Arguments
+    ---------
+    extr : array_like scalar
+        The minimum and maximum value of this array are used as extrema.
+    pdf_index : scalar
+        The power-law index of the PDF distribution to be drawn from.  Any real number is valid,
+        positive or negative.
+        NOTE: the `numpy.random.power` function uses the power-law index of the CDF, i.e. `g+1`
+    size : scalar
+        The number of points to draw (cast to int).
+    **kwags : dict pairs
+        Additional arguments passed to `zcode.math_core.minmax` with `extr`.
+
+    Returns
+    -------
+    rv : (N,) scalar
+        Array of random variables with N=`size` (default, size=1).
+
+    """
+
+    extr = minmax(extr)
+    if pdf_index == -1:
+        rv = 10**np.random.uniform(*np.log10(extr), size=int(size))
+    else:
+        rr = np.random.random(size=int(size))
+        gex = extr ** (pdf_index+1)
+        rv = (gex[0] + (gex[1] - gex[0])*rr) ** (1./(pdf_index+1))
+
+    return rv
+
+
 def rk4_step(func, x0, y0, dx, args=None, check_nan=0, check_nan_max=5):
     """Perform a single 4th-order Runge-Kutta integration step.
     """
@@ -1054,6 +1080,19 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
     _rv = ["{val:.{prec}e}".format(prec=prec, val=ss) for ss in stats]
     rv = ", ".join(_rv)
     return rv
+
+
+def std(vals, weights):
+    """Weighted standard deviation (stdev).
+
+    See: https://www.itl.nist.gov/div898/software/dataplot/refman2/ch2/weightsd.pdf
+    """
+    mm = np.count_nonzero(weights)
+    ave = np.sum(vals*weights) / np.sum(weights)
+    num = np.sum(weights * (vals - ave)**2)
+    den = np.sum(weights) * (mm - 1) / mm
+    std = np.sqrt(num/den)
+    return std
 
 
 def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = True):
@@ -1343,7 +1382,33 @@ def _func_gaussian(xx, aa, mm, ss):
     return yy
 
 
-def fit_gaussian(xx, yy, guess=[1.0, 0.0, 1.0]):
+def fit_gaussian(xx, yy, guess=None):
+    """Fit a Gaussian/Normal distribution with the given initial guess of parameters.
+
+    Arguments
+    ---------
+    xx : array, (N,)
+    yy : array, (N,)
+    guess : None or (3,) array of float
+        Initial parameter values as starting point of fit.  The values correspond to:
+        [amplitude, mean, stdev].
+        If ``guess`` is None, then the maximum, mean, and stdev of the given values are used as a
+        starting point.
+
+    Return
+    ------
+    popt : (3,) array of float
+        Best fit parameters: [amplitude, mean, stdev]
+    pcov : (3, 3) array of float
+        Covariance matrix of best fit parameters.
+
+    """
+    if guess is None:
+        amp = np.max(yy)
+        mean = np.sum(xx * yy) / np.sum(yy)
+        stdev = std(xx, yy)
+        guess = [amp, mean, stdev]
+
     popt, pcov = sp.optimize.curve_fit(_func_gaussian, xx, yy, p0=guess, maxfev=10000)
     return popt, pcov
 
@@ -1867,14 +1932,13 @@ def eddington_accretion(mass, eps=0.1):
         Eddington accretion rate.
 
     """
-    edd_lum = eddington_luminosity(mass, eps=eps)
-    # NOTE: no `epsilon` (efficiency) in this equation, because included in `eddington_luminosity`
-    mdot = edd_lum/np.square(SPLC)
+    edd_lum = eddington_luminosity(mass)
+    mdot = edd_lum / eps / np.square(SPLC)
     return mdot
 
 
-def eddington_luminosity(mass, eps=0.1):
-    ledd = EDDT * mass / eps
+def eddington_luminosity(mass):
+    ledd = EDDT * mass
     return ledd
 
 

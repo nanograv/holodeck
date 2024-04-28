@@ -1,4 +1,16 @@
-"""
+"""Library generation interface.
+
+This file can be run from the command-line to generate holodeck libraries, and also provides some
+API methods for quick/easy generation of simulations.  In general, these methods are designed to
+run simulations for populations constructed from parameter-spaces (i.e.
+:class:`~holodeck.librarian.libraries._Param_Space` subclasses).
+
+This script can be run by executing::
+
+    python -m holodeck.librarian.gen_lib <ARGS>
+
+Run ``python -m holodeck.librarian.gen_lib -h`` for usage information.
+
 """
 
 import argparse
@@ -8,19 +20,19 @@ from pathlib import Path
 import shutil
 
 import numpy as np
-import scipy as sp
-import scipy.stats
+# import scipy as sp
+# import scipy.stats
 
 import holodeck as holo
-from holodeck import cosmo
+# from holodeck import cosmo
 from holodeck.constants import YR
 import holodeck.librarian
 import holodeck.librarian.combine
 from holodeck.librarian import (
-    lib_utils,
-    DEF_NUM_FBINS, DEF_NUM_LOUDEST, DEF_NUM_REALS, DEF_PTA_DUR,
+    libraries,
+    # DEF_NUM_FBINS, DEF_NUM_LOUDEST, DEF_NUM_REALS, DEF_PTA_DUR,
 )
-from holodeck.sams import sam_cyutils
+# from holodeck.sams import sam_cyutils
 
 MAX_FAILURES = 5
 
@@ -29,6 +41,35 @@ FILES_COPY_TO_OUTPUT = []
 
 
 def main():   # noqa : ignore complexity warning
+    """Parent method for generating libraries from the command-line.
+
+    This function requires ``mpi4py`` for parallelization.
+
+    This method does the following:
+
+    (1) Loads arguments from the command-line (``args``, via :func:`_setup_argparse()`).
+
+        (a) The ``output`` directory is created as needed, along with the ``sims/`` and ``logs/``
+            subdirectories in which the simulation datafiles and log output files are saved.
+
+    (2) Sets up a ``logging.Logger`` instance for each processor.
+    (3) Constructs the parameter space specified by ``args.param_space``.  If this run is being
+        resumed, then the param-space is loaded from an existing save file in the output directory.
+    (4) Samples from the parameter space are allocated to all processors.
+    (5) Each processor iterates over it's allocated parameters, calculates populations, saves them
+        to files in the output directories.  This is handled in :func:`run_sam_at_pspace_num()`.
+    (6) All of the individual simulation files are combined using
+        :func:`holodeck.librarian.combine.sam_lib_combine()`.
+
+    Arguments
+    ---------
+    None
+
+    Returns
+    -------
+    None
+
+    """
 
     # ---- load mpi4py module
 
@@ -45,7 +86,7 @@ def main():   # noqa : ignore complexity warning
     # ---- setup arguments / settings, loggers, and outputs
 
     if comm.rank == 0:
-        args = _setup_argparse(comm)
+        args = _setup_argparse()
     else:
         args = None
 
@@ -77,11 +118,15 @@ def main():   # noqa : ignore complexity warning
             # - `PS_Test` : if `PS_Test` is a class loaded in `librarian`
             # - `file_name.PS_Test` : as long as `file_name` is a module within `librarian`
             space_name = args.param_space.split(".")
-            space_class = holo.librarian
-            for class_name in space_name:
-                space_class = getattr(space_class, class_name)
+            if len(space_name) > 1:
+                space_class = holo.librarian
+                for class_name in space_name:
+                    space_class = getattr(space_class, class_name)
+            else:
+                space_class = holo.librarian.param_spaces_dict[space_name[0]]
+
         except Exception as err:
-            log.error(f"Failed to load '{args.param_space}' from holo.librarian!")
+            log.error(f"Failed to load parameter space '{args.param_space}' !")
             log.error("Make sure the class is defined, and imported into the `librarian` module.")
             log.error(err)
             raise err
@@ -132,7 +177,7 @@ def main():   # noqa : ignore complexity warning
     log.info(f"beginning tasks at {beg}")
     failures = 0
 
-    # ---- iterate over each processors jobs
+    # ---- iterate over each processors' jobs
 
     for par_num in iterator:
 
@@ -144,7 +189,7 @@ def main():   # noqa : ignore complexity warning
         msg = ", ".join(msg)
         log.info(msg)
 
-        rv = run_sam_at_pspace_num(args, space, par_num)
+        rv, _sim_fname = run_sam_at_pspace_num(args, space, par_num)
         if rv is False:
             failures += 1
 
@@ -170,29 +215,43 @@ def main():   # noqa : ignore complexity warning
 
 
 def run_sam_at_pspace_num(args, space, pnum):
-    """Run strain calculations for sample-parameter `pnum` in the `space` parameter-space.
+    """Run a given simulation (index number ``pnum``) in the ``space`` parameter-space.
+
+    This function performs the following:
+
+    (1) Constructs the appropriate filename for this simulation, and checks if it already exist.  If
+        the file exists and the ``args.recreate`` option is not specified, the function returns
+        ``True``, otherwise the function runs this simulation.
+    (2) Calls ``space.model_for_sample_number`` to generate the semi-analytic model and hardening
+        instances; see the function
+        :func:`holodeck.librarian.libraries._Param_Space.model_for_sample_number()`.
+    (3) Calculates populations and GW signatures from the SAM and hardening model using
+        :func:`holodeck.librarian.libraries.run_model()`, and saves the results to an output file.
+    (4) Optionally: some diagnostic plots are created in the :func:`make_plots()` function.
 
     Arguments
     ---------
-    args : `argparse.ArgumentParser` instance
+    args : ``argparse.ArgumentParser`` instance
         Arguments from the `gen_lib_sams.py` script.
         NOTE: this should be improved.
-    space : _Param_Space instance
-        Parameter space from which to load `sam` and `hard` instances.
+    space : :class:`holodeck.librarian.libraries._Param_space` instance
+        Parameter space from which to construct populations.
     pnum : int
-        Which parameter-sample from `space` should be run.
+        Which parameter-sample from ``space`` should be run.
 
     Returns
     -------
     rv : bool
-        True if this simulation was successfully run.
+        ``True`` if this simulation was successfully run, ``False`` otherwise.
+    sim_fname : ``pathlib.Path`` instance
+        Path of the simulation save file.
 
     """
     log = args.log
 
     # ---- get output filename for this simulation, check if already exists
 
-    sim_fname = lib_utils._get_sim_fname(args.output_sims, pnum)
+    sim_fname = libraries._get_sim_fname(args.output_sims, pnum)
 
     beg = datetime.now()
     log.info(f"{pnum=} :: {sim_fname=} beginning at {beg}")
@@ -201,7 +260,7 @@ def run_sam_at_pspace_num(args, space, pnum):
         log.info(f"File {sim_fname} already exists.  {args.recreate=}")
         # skip existing files unless we specifically want to recreate them
         if not args.recreate:
-            return True
+            return True, sim_fname
 
     # ---- run Model
 
@@ -209,7 +268,7 @@ def run_sam_at_pspace_num(args, space, pnum):
         log.debug("Selecting `sam` and `hard` instances")
         sam, hard = space.model_for_sample_number(pnum)
 
-        data = run_model(
+        data = libraries.run_model(
             sam, hard,
             pta_dur=args.pta_dur, nfreqs=args.nfreqs, nreals=args.nreals, nloudest=args.nloudest,
             gwb_flag=args.gwb_flag, singles_flag=args.ss_flag, details_flag=False, params_flag=args.params_flag,
@@ -239,174 +298,18 @@ def run_sam_at_pspace_num(args, space, pnum):
             log.exception("Failed to make strain plot!")
             log.exception(err)
 
-    return rv
+    return rv, sim_fname
 
 
-def run_model(
-    sam, hard,
-    pta_dur=DEF_PTA_DUR, nfreqs=DEF_NUM_FBINS, nreals=DEF_NUM_REALS, nloudest=DEF_NUM_LOUDEST,
-    gwb_flag=True, details_flag=False, singles_flag=False, params_flag=False,
-    log=None,
-):
-    """Run the given modeling, storing requested data
-    """
+def _setup_argparse(*args, **kwargs):
+    """Setup the argument-parser for command-line usage.
 
-    data = {}
-
-    fobs_cents, fobs_edges = holo.utils.pta_freqs(dur=pta_dur*YR, num=nfreqs)
-    # convert from GW to orbital frequencies
-    fobs_orb_cents = fobs_cents / 2.0
-    fobs_orb_edges = fobs_edges / 2.0
-
-    data['fobs_cents'] = fobs_cents
-    data['fobs_edges'] = fobs_edges
-
-    if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
-        err = f"`holo.hardening.Fixed_Time_2PL_SAM` must be used here!  Not {hard}!"
-        if log is not None:
-            log.exception(err)
-        raise RuntimeError(err)
-
-    redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
-        fobs_orb_cents, sam, hard, cosmo
-    )
-    use_redz = redz_final
-    edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
-    number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
-    if details_flag:
-        data['static_binary_density'] = sam.static_binary_density
-        data['number'] = number
-        data['redz_final'] = redz_final
-
-        gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final = _calc_model_details(edges, redz_final, number)
-
-        data['gwb_params'] = gwb_pars
-        data['num_params'] = num_pars
-        data['gwb_mtot_redz_final'] = gwb_mtot_redz_final
-        data['num_mtot_redz_final'] = num_mtot_redz_final
-
-    # calculate single sources and/or binary parameters
-    if singles_flag or params_flag:
-        nloudest = nloudest if singles_flag else 1
-
-        vals = holo.single_sources.ss_gws_redz(
-            edges, use_redz, number, realize=nreals,
-            loudest=nloudest, params=params_flag,
-        )
-        if params_flag:
-            hc_ss, hc_bg, sspar, bgpar = vals
-            data['sspar'] = sspar
-            data['bgpar'] = bgpar
-        else:
-            hc_ss, hc_bg = vals
-
-        if singles_flag:
-            data['hc_ss'] = hc_ss
-            data['hc_bg'] = hc_bg
-
-    if gwb_flag:
-        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, nreals)
-        data['gwb'] = gwb
-
-    return data
-
-
-def _calc_model_details(edges, redz_final, number):
-    """
-
-    Parameters
-    ----------
-    edges : (4,) list of 1darrays
-        [mtot, mrat, redz, fobs_orb_edges] with shapes (M, Q, Z, F+1)
-    redz_final : (M,Q,Z,F)
-        Redshift final (redshift at the given frequencies).
-    number : (M-1, Q-1, Z-1, F)
-        Absolute number of binaries in the given bin (dimensionless).
+    Arguments
+    ---------
+    *args : arguments
+    **kwargs : keyword arguments
 
     """
-
-    redz = edges[2]
-    nmbins = len(edges[0]) - 1
-    nzbins = len(redz) - 1
-    nfreqs = len(edges[3]) - 1
-    # (M-1, Q-1, Z-1, F) characteristic-strain squared for each bin
-    hc2 = holo.gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz_final)
-    # strain-squared weighted number of binaries
-    hc2_num = hc2 * number
-    # (F,) total GWB in each frequency bin
-    denom = np.sum(hc2_num, axis=(0, 1, 2))
-    gwb_pars = []
-    num_pars = []
-
-    # Iterate over the parameters to calculate weighted averaged of [mtot, mrat, redz]
-    for ii in range(3):
-        # Get the indices of the dimensions that we will be marginalizing (summing) over
-        # we'll also keep things in terms of redshift and frequency bins, so at most we marginalize
-        # over 0-mtot and 1-mrat
-        margins = [0, 1]
-        # if we're targeting mtot or mrat, then don't marginalize over that parameter
-        if ii in margins:
-            del margins[ii]
-        margins = tuple(margins)
-
-        # Get straight-squared weighted values (numerator, of the average)
-        numer = np.sum(hc2_num, axis=margins)
-        # divide by denominator to get average
-        tpar = numer / denom
-        gwb_pars.append(tpar)
-
-        # Get the total number of binaries
-        tpar = np.sum(number, axis=margins)
-        num_pars.append(tpar)
-
-    # ---- calculate redz_final based distributions
-
-    # get final-redshift at bin centers
-    rz = redz_final.copy()
-    for ii in range(3):
-        rz = holo.utils.midpoints(rz, axis=ii)
-
-    gwb_mtot_redz_final = np.zeros((nmbins, nzbins, nfreqs))
-    num_mtot_redz_final = np.zeros((nmbins, nzbins, nfreqs))
-    gwb_rz = np.zeros((nzbins, nfreqs))
-    num_rz = np.zeros((nzbins, nfreqs))
-    for ii in range(nfreqs):
-        rz_flat = rz[:, :, :, ii].flatten()
-        # calculate GWB-weighted average final-redshift
-        numer, *_ = sp.stats.binned_statistic(
-            rz_flat, hc2_num[:, :, :, ii].flatten(), bins=redz, statistic='sum'
-        )
-        tpar = numer / denom[ii]
-        gwb_rz[:, ii] = tpar
-
-        # calculate average final-redshift (number weighted)
-        tpar, *_ = sp.stats.binned_statistic(
-            rz_flat, number[:, :, :, ii].flatten(), bins=redz, statistic='sum'
-        )
-        num_rz[:, ii] = tpar
-
-        # Get values vs. mtot for redz-final
-        for mm in range(nmbins):
-            rz_flat = rz[mm, :, :, ii].flatten()
-            numer, *_ = sp.stats.binned_statistic(
-                rz_flat, hc2_num[mm, :, :, ii].flatten(), bins=redz, statistic='sum'
-            )
-            tpar = numer / denom[ii]
-            gwb_mtot_redz_final[mm, :, ii] = tpar
-
-            tpar, *_ = sp.stats.binned_statistic(
-                rz_flat, number[mm, :, :, ii].flatten(), bins=redz, statistic='sum'
-            )
-            num_mtot_redz_final[mm, :, ii] = tpar
-
-    gwb_pars.append(gwb_rz)
-    num_pars.append(num_rz)
-
-    return gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final
-
-
-def _setup_argparse(comm, *args, **kwargs):
-    assert comm.rank == 0
 
     parser = argparse.ArgumentParser()
     parser.add_argument('param_space', type=str,
@@ -429,12 +332,12 @@ def _setup_argparse(comm, *args, **kwargs):
     parser.add_argument('-l', '--nloudest', action='store', dest='nloudest', type=int,
                         help='Number of loudest single sources', default=holo.librarian.DEF_NUM_LOUDEST)
 
-    # what do run
-    parser.add_argument('--gwb', action='store_true', dest="gwb_flag", default=False,
+    # what to run
+    parser.add_argument('--gwb', dest="gwb_flag", default=True, action=argparse.BooleanOptionalAction,
                         help="calculate and store the 'gwb' per se")
-    parser.add_argument('--ss', action='store_true', dest="ss_flag", default=False,
+    parser.add_argument('--ss', dest="ss_flag", default=True, action=argparse.BooleanOptionalAction,
                         help="calculate and store SS/CW sources and the BG separately")
-    parser.add_argument('--params', action='store_true', dest="params_flag", default=False,
+    parser.add_argument('--params', dest="params_flag", default=True, action=argparse.BooleanOptionalAction,
                         help="calculate and store SS/BG binary parameters [NOTE: requires `--ss`]")
 
     # how do run
@@ -452,7 +355,8 @@ def _setup_argparse(comm, *args, **kwargs):
     # parser.add_argument('-v', '--verbose', action='store_true', default=False, dest='verbose',
     #                     help='verbose output [INFO]')
 
-    args = parser.parse_args(*args, **kwargs)
+    namespace = argparse.Namespace(**kwargs)
+    args = parser.parse_args(*args, namespace=namespace)
 
     # ---- check / sanitize arguments
 
@@ -518,6 +422,18 @@ def _setup_argparse(comm, *args, **kwargs):
 
 
 def _setup_log(comm, args):
+    """Setup up the logging module logger for output messaging.
+
+    Arguemnts
+    ---------
+    comm
+    args
+
+    Returns
+    -------
+    log : ``logging.Logger`` instance
+
+    """
     beg = datetime.now()
 
     # ---- setup name of log file
@@ -559,6 +475,8 @@ def _setup_log(comm, args):
 
 
 def make_plots(args, data, sim_fname):
+    """Generate diagnostic plots from the given simulation data and save to file.
+    """
     import matplotlib.pyplot as plt
     log = args.log
     log.info("generating characteristic strain/psd plots")
@@ -594,6 +512,9 @@ def make_plots(args, data, sim_fname):
 
 
 def make_gwb_plot(fobs, gwb, fit_data):
+    """Generate a GWB plot from the given data.
+
+    """
     # fig = holo.plot.plot_gwb(fobs, gwb)
     psd = holo.utils.char_strain_to_psd(fobs[:, np.newaxis], gwb)
     fig = holo.plot.plot_gwb(fobs, psd)
@@ -687,7 +608,7 @@ def make_ss_plot(fobs, hc_ss, hc_bg, fit_data):
 
 
 def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar):
-    """ Plot total mass, mass ratio, initial d_c, final d_c
+    """Plot total mass, mass ratio, initial d_c, final d_c
 
     """
     # fig = holo.plot.plot_gwb(fobs, gwb)

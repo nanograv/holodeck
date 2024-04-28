@@ -1,17 +1,9 @@
-"""'Classic' parameter spaces used in the 15yr analysis.
+"""'Classic' parameter spaces used in the NANOGrav 15yr analysis.
 """
 
-import holodeck as holo
 from holodeck.constants import PC, GYR
-from holodeck.librarian.params import _Param_Space, PD_Uniform, PD_Normal
-
-
-__all__ = [
-    "PS_Classic_Phenom_Uniform",
-    "PS_Classic_Phenom_Astro_Extended",
-    "PS_Classic_GWOnly_Uniform",
-    "PS_Classic_GWOnly_Astro_Extended",
-]
+from holodeck.librarian.libraries import _Param_Space, PD_Uniform, PD_Normal
+from holodeck import sams, hardening, host_relations
 
 
 class _PS_Classic_Phenom(_Param_Space):
@@ -51,7 +43,7 @@ class _PS_Classic_Phenom(_Param_Space):
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
-        gsmf = holo.sams.GSMF_Schechter(
+        gsmf = sams.GSMF_Schechter(
             phi0=params['gsmf_phi0_log10'],
             phiz=params['gsmf_phiz'],
             mchar0_log10=params['gsmf_mchar0_log10'],
@@ -59,26 +51,26 @@ class _PS_Classic_Phenom(_Param_Space):
             alpha0=params['gsmf_alpha0'],
             alphaz=params['gsmf_alphaz'],
         )
-        gpf = holo.sams.GPF_Power_Law(
+        gpf = sams.GPF_Power_Law(
             frac_norm_allq=params['gpf_frac_norm_allq'],
             malpha=params['gpf_malpha'],
             qgamma=params['gpf_qgamma'],
             zbeta=params['gpf_zbeta'],
             max_frac=params['gpf_max_frac'],
         )
-        gmt = holo.sams.GMT_Power_Law(
+        gmt = sams.GMT_Power_Law(
             time_norm=params['gmt_norm']*GYR,
             malpha=params['gmt_malpha'],
             qgamma=params['gmt_qgamma'],
             zbeta=params['gmt_zbeta'],
         )
-        mmbulge = holo.relations.MMBulge_KH2013(
+        mmbulge = host_relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
         )
 
-        sam = holo.sams.Semi_Analytic_Model(
+        sam = sams.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
             shape=sam_shape,
         )
@@ -86,7 +78,7 @@ class _PS_Classic_Phenom(_Param_Space):
 
     @classmethod
     def _init_hard(cls, sam, params):
-        hard = holo.hardening.Fixed_Time_2PL_SAM(
+        hard = hardening.Fixed_Time_2PL_SAM(
             sam,
             params['hard_time']*GYR,
             sepa_init=params['hard_sepa_init']*PC,
@@ -104,16 +96,19 @@ class PS_Classic_Phenom_Uniform(_PS_Classic_Phenom):
 
     """
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
-        super().__init__(
-            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
+            PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
+            PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
+            PD_Uniform("mmb_mamp_log10", +7.5, +9.5),      # [log10(Msol)]
+            PD_Uniform("mmb_scatter_dex", +0.0, +1.2),
+            PD_Uniform("hard_time", 0.1, 11.0),            # [Gyr]
+            PD_Uniform("hard_gamma_inner", -1.5, +0.0),
+        ]
 
-            gsmf_phi0_log10=PD_Uniform(-3.5, -1.5),
-            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
-            mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
-            mmb_scatter_dex=PD_Uniform(+0.0, +1.2),
-            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
-            hard_gamma_inner=PD_Uniform(-1.5, +0.0),
+        super().__init__(
+            parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
         )
 
 
@@ -124,29 +119,30 @@ class PS_Classic_Phenom_Astro_Extended(_PS_Classic_Phenom):
 
     """
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
-        super().__init__(
-            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
-
-            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
-            hard_gamma_inner=PD_Uniform(-1.5, +0.5),
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
+            PD_Uniform("hard_time", 0.1, 11.0),   # [Gyr]
+            PD_Uniform("hard_gamma_inner", -1.5, +0.5),
 
             # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
-            gsmf_phi0=PD_Normal(-2.56, 0.4),
-            gsmf_mchar0_log10=PD_Normal(10.9, 0.4),   # [log10(Msol)]
-            gsmf_alpha0=PD_Normal(-1.2, 0.2),
+            PD_Normal("gsmf_phi0", -2.56, 0.4),
+            PD_Normal("gsmf_mchar0_log10", 10.9, 0.4),   # [log10(Msol)]
+            PD_Normal("gsmf_alpha0", -1.2, 0.2),
 
-            gpf_zbeta=PD_Normal(+0.8, 0.4),
-            gpf_qgamma=PD_Normal(+0.5, 0.3),
+            PD_Normal("gpf_zbeta", +0.8, 0.4),
+            PD_Normal("gpf_qgamma", +0.5, 0.3),
 
-            gmt_norm=PD_Uniform(0.2, 5.0),    # [Gyr]
-            gmt_zbeta=PD_Uniform(-2.0, +0.0),
+            PD_Uniform("gmt_norm", 0.2, 5.0),    # [Gyr]
+            PD_Uniform("gmt_zbeta", -2.0, +0.0),
 
-            mmb_mamp_log10=PD_Normal(+8.6, 0.2),   # [log10(Msol)]
-            mmb_plaw=PD_Normal(+1.2, 0.2),
-            mmb_scatter_dex=PD_Normal(+0.32, 0.15),
+            PD_Normal("mmb_mamp_log10", +8.6, 0.2),   # [log10(Msol)]
+            PD_Normal("mmb_plaw", +1.2, 0.2),
+            PD_Normal("mmb_scatter_dex", +0.32, 0.15),
+        ]
+        super().__init__(
+            parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
         )
-
 
 
 class _PS_Classic_GWOnly(_Param_Space):
@@ -178,19 +174,22 @@ class _PS_Classic_GWOnly(_Param_Space):
         mmb_scatter_dex=0.3,
     )
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
+            PD_Uniform("gsmf_phi0", -3.5, -1.5),
+            PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
+            PD_Uniform("mmb_mamp_log10", +7.5, +9.5),   # [log10(Msol)]
+            PD_Uniform("mmb_scatter", +0.0, +1.2),
+        ]
         super().__init__(
-            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
-
-            gsmf_phi0=PD_Uniform(-3.5, -1.5),
-            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
-            mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
-            mmb_scatter=PD_Uniform(+0.0, +1.2),
+            parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
         )
+        return
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
-        gsmf = holo.sams.GSMF_Schechter(
+        gsmf = sams.GSMF_Schechter(
             phi0=params['gsmf_phi0'],
             phiz=params['gsmf_phiz'],
             mchar0_log10=params['gsmf_mchar0_log10'],
@@ -198,26 +197,26 @@ class _PS_Classic_GWOnly(_Param_Space):
             alpha0=params['gsmf_alpha0'],
             alphaz=params['gsmf_alphaz'],
         )
-        gpf = holo.sams.GPF_Power_Law(
+        gpf = sams.GPF_Power_Law(
             frac_norm_allq=params['gpf_frac_norm_allq'],
             malpha=params['gpf_malpha'],
             qgamma=params['gpf_qgamma'],
             zbeta=params['gpf_zbeta'],
             max_frac=params['gpf_max_frac'],
         )
-        gmt = holo.sams.GMT_Power_Law(
+        gmt = sams.GMT_Power_Law(
             time_norm=params['gmt_norm']*GYR,
             malpha=params['gmt_malpha'],
             qgamma=params['gmt_qgamma'],
             zbeta=params['gmt_zbeta'],
         )
-        mmbulge = holo.relations.MMBulge_KH2013(
+        mmbulge = host_relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
         )
 
-        sam = holo.sams.Semi_Analytic_Model(
+        sam = sams.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
             shape=sam_shape,
         )
@@ -225,7 +224,7 @@ class _PS_Classic_GWOnly(_Param_Space):
 
     @classmethod
     def _init_hard(cls, sam, params):
-        hard = holo.hardening.Hard_GW()
+        hard = hardening.Hard_GW()
         return hard
 
 
@@ -236,15 +235,18 @@ class PS_Classic_GWOnly_Uniform(_PS_Classic_GWOnly):
 
     """
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
-        super().__init__(
-            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
-
-            gsmf_phi0=PD_Uniform(-3.5, -1.5),
-            gsmf_mchar0_log10=PD_Uniform(10.5, 12.5),   # [log10(Msol)]
-            mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
-            mmb_scatter=PD_Uniform(+0.0, +1.2),
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
+            PD_Uniform("gsmf_phi0", -3.5, -1.5),
+            PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
+            PD_Uniform("mmb_mamp_log10", +7.5, +9.5),   # [log10(Msol)]
+            PD_Uniform("mmb_scatter", +0.0, +1.2),
+        ]
+        _Param_Space.__init__(
+            self, parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
         )
+        return
 
 
 class PS_Classic_GWOnly_Astro_Extended(_PS_Classic_GWOnly):
@@ -254,41 +256,49 @@ class PS_Classic_GWOnly_Astro_Extended(_PS_Classic_GWOnly):
 
     """
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
-        super().__init__(
-            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
-
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
             # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
-            gsmf_phi0=PD_Normal(-2.56, 0.4),
-            gsmf_mchar0_log10=PD_Normal(10.9, 0.4),   # [log10(Msol)]
-            gsmf_alpha0=PD_Normal(-1.2, 0.2),
+            PD_Normal("gsmf_phi0", -2.56, 0.4),
+            PD_Normal("gsmf_mchar0_log10", 10.9, 0.4),   # [log10(Msol)]
+            PD_Normal("gsmf_alpha0", -1.2, 0.2),
 
-            gpf_zbeta=PD_Normal(+0.8, 0.4),
-            gpf_qgamma=PD_Normal(+0.5, 0.3),
+            PD_Normal("gpf_zbeta", +0.8, 0.4),
+            PD_Normal("gpf_qgamma", +0.5, 0.3),
 
-            gmt_norm=PD_Uniform(0.2, 5.0),    # [Gyr]
-            gmt_zbeta=PD_Uniform(-2.0, +0.0),
+            PD_Uniform("gmt_norm", 0.2, 5.0),    # [Gyr]
+            PD_Uniform("gmt_zbeta", -2.0, +0.0),
 
-            mmb_mamp_log10=PD_Normal(+8.6, 0.2),   # [log10(Msol)]
-            mmb_plaw=PD_Normal(+1.2, 0.2),
-            mmb_scatter_dex=PD_Normal(+0.32, 0.15),
+            PD_Normal("mmb_mamp_log10", +8.6, 0.2),   # [log10(Msol)]
+            PD_Normal("mmb_plaw", +1.2, 0.2),
+            PD_Normal("mmb_scatter_dex", +0.32, 0.15),
+        ]
+        _Param_Space.__init__(
+            self, parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
         )
+        return
 
 
 class PS_Test(_PS_Classic_Phenom):
     """Simple test parameter space in 2D.
     """
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
-        super().__init__(
-            log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
 
-            mmb_mamp_log10=PD_Uniform(+7.5, +9.5),   # [log10(Msol)]
-            hard_time=PD_Uniform(0.1, 11.0),   # [Gyr]
+        parameters = [
+            PD_Uniform("mmb_mamp_log10", +7.5, +9.5),   # [log10(Msol)]
+            PD_Uniform("hard_time", 0.1, 11.0),         # [Gyr]
+        ]
+
+        _Param_Space.__init__(
+            self, parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
         )
+        return
 
 
-_param_spaces = {
+_param_spaces_dict = {
     "PS_Test": PS_Test,
     "PS_Classic_Phenom_Uniform": PS_Classic_Phenom_Uniform,    # PS_Uniform_09B
     "PS_Classic_Phenom_Astro_Extended": PS_Classic_Phenom_Astro_Extended,

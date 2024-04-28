@@ -15,5 +15,7 @@ cython<3.0.0
 schwimmbad
 emcee
 george
-# healpy
+sympy   # used in the detstats submodule
+hasasia   # used in the detstats submodule
+healpy   # used in the detstats submodule
 # mpi4py

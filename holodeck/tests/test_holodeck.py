@@ -1,5 +1,5 @@
-"""
-Unit and regression test for the holodeck package.
+"""Unit and regression test for the holodeck package.
+
 """
 
 # Import package, test suite, and other packages as needed
@@ -14,5 +14,6 @@ def test_holodeck_imported():
 
     assert hasattr(holodeck, 'cosmo')
     assert hasattr(holodeck, 'log')
+    assert hasattr(holodeck, '__version__')
 
     return
