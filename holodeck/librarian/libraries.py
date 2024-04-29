@@ -15,6 +15,7 @@ from holodeck import utils, cosmo
 from holodeck.constants import YR
 from holodeck.librarian import (
     DEF_NUM_FBINS, DEF_NUM_LOUDEST, DEF_NUM_REALS, DEF_PTA_DUR,
+    FNAME_LIBRARY_COMBINED_FILE, FNAME_DOMAIN_COMBINED_FILE,
 )
 
 PARAM_NAMES__ERROR = [
@@ -1021,8 +1022,14 @@ def _get_sim_fname(path, pnum, library=True):
     return temp
 
 
-def get_sam_lib_fname(path, gwb_only):
-    fname = 'sam_lib'
+def get_sam_lib_fname(path, gwb_only, library=True):
+    # standard 'library'
+    if library:
+        fname = FNAME_LIBRARY_COMBINED_FILE
+    # 'domain' of parameter space
+    else:
+        fname = FNAME_DOMAIN_COMBINED_FILE
+
     if gwb_only:
         fname += "_gwb-only"
     lib_path = path.joinpath(fname).with_suffix(".hdf5")

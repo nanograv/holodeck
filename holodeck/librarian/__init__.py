@@ -53,6 +53,8 @@ FNAME_LIBRARY_SIM_FILE = "library__p{pnum:06d}.npz"
 FNAME_DOMAIN_SIM_FILE = "domain__p{pnum:06d}.npz"
 DIRNAME_LIBRARY_SIMS = "library_sims"
 DIRNAME_DOMAIN_SIMS = "domain_sims"
+FNAME_LIBRARY_COMBINED_FILE = "sam-library"    # do NOT include file suffix (i.e. 'hdf5')
+FNAME_DOMAIN_COMBINED_FILE = "sam-domain"    # do NOT include file suffix (i.e. 'hdf5')
 PSPACE_FILE_SUFFIX = ".pspace.npz"
 ARGS_CONFIG_FNAME = "config.json"
 
