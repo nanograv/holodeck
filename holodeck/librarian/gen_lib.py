@@ -307,6 +307,8 @@ def run_sam_at_pspace_params(args, space, pnum, params):
             gwb_flag=args.gwb_flag, singles_flag=args.ss_flag, details_flag=False, params_flag=args.params_flag,
             log=log,
         )
+        data['params'] = params
+        data['param_names'] = space.param_names
 
         rv = True
     except Exception as err:
