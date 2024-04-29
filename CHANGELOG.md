@@ -29,6 +29,9 @@
 
 * Semi-Analytic Models
     * Improve accuracy of dynamic binary number calculation for consistent evolution models.
+* `holodeck.librarian`
+    * Added functionality to construct 'domain' sets of simulations, to explore each parameter in a parameter-space one at a time.
+    * NOTE: Standard library files will now be called "sam-library.hdf5" instead of "sam_lib.hdf5"
 
 
 ## v1.5.2 - 2024/04/12
