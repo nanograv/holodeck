@@ -3,7 +3,7 @@
 
 import holodeck as holo
 from holodeck.constants import GYR, PC, MSOL
-from holodeck.librarian.libraries import _Param_Space, PD_Uniform, PD_Normal, PD_Uniform_Log
+from holodeck.librarian.lib_tools import _Param_Space, PD_Uniform, PD_Normal, PD_Uniform_Log
 
 
 # Define a new Parameter-Space class by subclassing the base class:

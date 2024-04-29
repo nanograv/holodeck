@@ -26,6 +26,10 @@ PARAM_NAMES_REPLACE = {
     "gsmf_phi0": ["gsmf_phi0_log10", None],
 }
 
+# __all__ = [
+#     "_Param_space"
+# ]
+
 
 class _Param_Space(abc.ABC):
     """Base class for generating holodeck libraries.  Defines the parameter space and settings.
@@ -60,7 +64,7 @@ class _Param_Space(abc.ABC):
         param_kwargs : dict
             Key-value pairs specifying the parameters for this model.  Each key must be the name of
             the parameter, and each value must be a
-            :class:`~holodeck.librarian.libraries._Param_Dist`
+            :class:`~holodeck.librarian.lib_tools._Param_Dist`
             subclass instance with the desired distribution.
 
         Returns

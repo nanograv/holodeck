@@ -21,7 +21,7 @@ import holodeck as holo
 import holodeck.librarian
 import holodeck.librarian.gen_lib
 from holodeck.librarian import (
-    libraries, DIRNAME_LIBRARY_SIMS, DIRNAME_DOMAIN_SIMS, DomainNotLibraryError
+    lib_tools, DIRNAME_LIBRARY_SIMS, DIRNAME_DOMAIN_SIMS, DomainNotLibraryError
 )
 
 
@@ -122,7 +122,7 @@ def sam_lib_combine(
 
     # ---- see if a combined library already exists
 
-    lib_path = libraries.get_sam_lib_fname(path_output, gwb_only)
+    lib_path = lib_tools.get_sam_lib_fname(path_output, gwb_only)
     if lib_path.exists():
         lvl = log.INFO if recreate else log.WARNING
         log.log(lvl, f"combined library already exists: {lib_path}, run with `-r` to recreate.")
@@ -135,7 +135,7 @@ def sam_lib_combine(
 
     if path_pspace is None:
         path_pspace = path_output
-    pspace, pspace_fname = libraries.load_pspace_from_path(path_pspace, log=log)
+    pspace, pspace_fname = lib_tools.load_pspace_from_path(path_pspace, log=log)
     args, args_fname = holo.librarian.gen_lib.load_config_from_path(path_pspace, log=log)
 
     log.info(f"loaded param space: {pspace} from '{pspace_fname}'")
@@ -300,7 +300,7 @@ def _check_files_and_load_shapes(log, path_sims, nsamp, library):
 
     log.info(f"Checking {nsamp} files in {path_sims}")
     for ii in tqdm.trange(nsamp):
-        temp_fname = libraries._get_sim_fname(path_sims, ii, library=library)
+        temp_fname = lib_tools._get_sim_fname(path_sims, ii, library=library)
         if not temp_fname.exists():
             err = f"Missing at least file number {ii} out of {nsamp} files!  {temp_fname}"
             log.exception(err)
@@ -396,7 +396,7 @@ def _load_library_from_all_files(
     bad_files = np.zeros(nsamp_all, dtype=bool)     #: track which files contain UN-useable data
     msg = None
     for pnum in tqdm.trange(nsamp_all):
-        fname = libraries._get_sim_fname(path_sims, pnum, library=library)
+        fname = lib_tools._get_sim_fname(path_sims, pnum, library=library)
         temp = np.load(fname, allow_pickle=True)
         # When a processor fails for a given parameter, the output file is still created with the 'fail' key added
         if ('fail' in temp):
