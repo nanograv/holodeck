@@ -1,4 +1,4 @@
-"""Test holodeck/librarian/libraries.py: the parameter space base class, and parameter distributions.
+"""Test holodeck/librarian/lib_tools.py: the parameter space base class, and parameter distributions.
 """
 
 import numpy as np
@@ -12,7 +12,7 @@ from holodeck.constants import GYR
 from holodeck.librarian import (
     param_spaces_dict
 )
-from holodeck.librarian.libraries import (
+from holodeck.librarian.lib_tools import (
     _Param_Space, PD_Uniform,
 )
 
@@ -205,8 +205,8 @@ def _check_sam_hard(sam, hard, sam_shape):
     assert isinstance(hard, hardening.Hard_GW)
 
     # Make sure model runs
-    import holodeck.librarian.libraries  # noqa
-    data = librarian.libraries.run_model(sam, hard)
+    import holodeck.librarian.lib_tools  # noqa
+    data = librarian.lib_tools.run_model(sam, hard)
     assert data is not None
 
     return

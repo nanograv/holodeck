@@ -2,7 +2,7 @@
 """
 
 from holodeck.constants import PC, GYR
-from holodeck.librarian.libraries import _Param_Space, PD_Uniform, PD_Normal
+from holodeck.librarian.lib_tools import _Param_Space, PD_Uniform, PD_Normal
 from holodeck import sams, hardening, host_relations
 
 
