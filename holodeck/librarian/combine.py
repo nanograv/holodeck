@@ -122,7 +122,7 @@ def sam_lib_combine(
 
     # ---- see if a combined library already exists
 
-    lib_path = libraries.get_sam_lib_fname(path_output, gwb_only)
+    lib_path = libraries.get_sam_lib_fname(path_output, gwb_only, library=library)
     if lib_path.exists():
         lvl = log.INFO if recreate else log.WARNING
         log.log(lvl, f"combined library already exists: {lib_path}, run with `-r` to recreate.")
@@ -217,7 +217,12 @@ def sam_lib_combine(
     with h5py.File(lib_path, 'w') as h5:
         h5.create_dataset('fobs_cents', data=fobs_cents)
         h5.create_dataset('fobs_edges', data=fobs_edges)
+
+        if not library:
+            new_shape = (ndim, nsamp_dim) + param_samples.shape[1:]
+            param_samples = param_samples.reshape(new_shape)
         h5.create_dataset('sample_params', data=param_samples)
+
         if gwb is not None:
             # if 'domain', reshape to include each dimension
             if not library:
@@ -416,7 +421,12 @@ def _load_library_from_all_files(
         # for 'domain' simulations, we need to load the parameters.  For 'library' runs, we
         # already have them.
         if not library:
-            param_samples[pnum, :] = temp['params'][:]
+            #! NOTE: this is just temporary until bug is fixed
+            try:
+                param_samples[pnum, :] = temp['params'][:]
+            except:
+                pvals = temp['params'][()]
+                param_samples[pnum, :] = np.array([pvals[str(pn)] for pn in temp['param_names']])
 
         # store the GWB from this file
         if gwb is not None:
