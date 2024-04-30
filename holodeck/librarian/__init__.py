@@ -4,10 +4,10 @@ Holodeck 'libraries' are collections of simulations in which a certain set of pa
 producing different populations and/or GW signatures at each sampled parameter value.  Libraries are
 run from the same parameter-space and using the same hyper parameters.  Libraries are constructed
 using a 'parameter space' class that organizes the different simulations.  The base-class is
-:class:`~holodeck.librarian.libraries._Param_Space` (defined in the :mod:`holodeck.librarian.libraries`
+:class:`~holodeck.librarian.lib_tools._Param_Space` (defined in the :mod:`holodeck.librarian.lib_tools`
 file).  The parameter-space subclasses are given a number of different parameters to be varied.
-Each parameter is implemented as a subclass of :py:class:`~holodeck.librarian.libraries._Param_Dist`,
-for example the :py:class:`~holodeck.librarian.libraries.PD_Uniform` class that implements a uniform
+Each parameter is implemented as a subclass of :py:class:`~holodeck.librarian.lib_tools._Param_Dist`,
+for example the :py:class:`~holodeck.librarian.lib_tools.PD_Uniform` class that implements a uniform
 distribution.
 
 For more information, see the :doc:`'libraries' page in the getting-started guide
@@ -18,9 +18,9 @@ Notes
 The ``librarian`` module is composed of the following elements:
 
 * The core components of the holodeck libraries are defined in
-  :py:mod:`~holodeck.librarian.libraries`.  Constructing simulations from parameter spaces can be
+  :py:mod:`~holodeck.librarian.lib_tools`.  Constructing simulations from parameter spaces can be
   performed using the relevant parameter spaces themselves (subclasses of
-  :py:class:`~holodeck.librarian.libraries._Param_Space`).
+  :py:class:`~holodeck.librarian.lib_tools._Param_Space`).
 
 * Parameter spaces are defined in the 'param_spaces' files, particularly:
 
@@ -38,6 +38,10 @@ The ``librarian`` module is composed of the following elements:
   :py:mod:`~holodeck.librarian.posterior_populations`.
 
 """
+
+# ==============================================================================
+# ==== Submodule Definitions ====
+# ==============================================================================
 
 __version__ = "1.2"
 
@@ -67,11 +71,18 @@ class DomainNotLibraryError(Exception):
         # Call the base class constructor with the parameters it needs
         super(DomainNotLibraryError, self).__init__(message)
 
-from . libraries import (      # noqa
-    _Param_Space, _Param_Dist,
-    PD_Uniform, PD_Normal,
-    run_model, load_pspace_from_path,
-)
+# ==============================================================================
+# ==== Import Submodule Components ====
+# ==============================================================================
+
+from . lib_tools import *    # noqa
+from . import gen_lib        # noqa
+
+# from . lib_tools import (      # noqa
+#     _Param_Space, _Param_Dist,
+#     PD_Uniform, PD_Normal,
+#     run_model, load_pspace_from_path,
+# )
 
 param_spaces_dict = {}    #: Registry of standard parameter-spaces
 from . import param_spaces_classic as psc_temp  # noqa
