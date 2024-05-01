@@ -903,6 +903,8 @@ def run_model(
         # data['doppler_detect'] = detect
         data['doppler_num_all'] = num_all.sum(axis=2)
         data['doppler_num_det'] = num_det.sum(axis=2)
+        data['doppler_num_all_redz'] = num_all.sum(axis=(0, 1, 3))
+        data['doppler_num_det_redz'] = num_det.sum(axis=(0, 1, 3))
         data['doppler_detect'] = np.packbits(detect)
 
         # data['doppler_redz_final'] = doppler_redz_final
