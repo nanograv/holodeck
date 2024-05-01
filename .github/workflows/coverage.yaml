@@ -64,9 +64,10 @@ jobs:
         pytest -v --cov=./ --cov-report term --cov-report=xml --color=yes
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         name: codecov-${{ matrix.os }}-py${{ matrix.python-version }}
+        token: ${{ secrets.CODECOV_TOKEN }} # required
         env_vars: OS,PYTHON
         fail_ci_if_error: true
         verbose: true
