@@ -172,25 +172,25 @@ class Semi_Analytic_Model:
 
         gsmf = utils.get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
         mmbulge = utils.get_subclass_instance(mmbulge, None, host_relations._MMBulge_Relation)
-        # if GMR is None, then we need both GMT and GPF
-        if gmr is None:
-            gmt = utils.get_subclass_instance(gmt, GMT_Power_Law, _Galaxy_Merger_Time)
-            gpf = utils.get_subclass_instance(gpf, GPF_Power_Law, _Galaxy_Pair_Fraction)
-        # if GMR is given, GMT can still be used - for calculating stalling
-        else:
+        if gpf is None:
+            log.info("No galaxy pair-fraction given, using galaxy merger-rate.")
             gmr = utils.get_subclass_instance(gmr, GMR_Illustris, _Galaxy_Merger_Rate)
             gmt = utils.get_subclass_instance(gmt, None, _Galaxy_Merger_Time, allow_none=True)
-            # if GMR is given, GPF is not used: make sure it is not given
-            if (gpf is not None):
-                err = f"When `GMR` ({gmr}) is provided, do not provide a GPF!"
+        else:
+            if gmr is not None:
+                err = "Can only use one of `gpf` and `gmr`!"
                 log.exception(err)
                 raise ValueError(err)
 
+            log.info("Galaxy pair-fraction provided, using galaxy pair-fraction and merger-time.")
+            gmt = utils.get_subclass_instance(gmt, GMT_Power_Law, _Galaxy_Merger_Time)
+            gpf = utils.get_subclass_instance(gpf, GPF_Power_Law, _Galaxy_Pair_Fraction)
+
         self._gsmf = gsmf             #: Galaxy Stellar-Mass Function (`_Galaxy_Stellar_Mass_Function` instance)
-        self._mmbulge = mmbulge       #: Mbh-Mbulge relation (`host_relations._MMBulge_Relation` instance)
+        self._gmr = gmr               #: Galaxy Merger Rate (`_Galaxy_Merger_Rate` instance)
         self._gpf = gpf               #: Galaxy Pair Fraction (`_Galaxy_Pair_Fraction` instance)
         self._gmt = gmt               #: Galaxy Merger Time (`_Galaxy_Merger_Time` instance)
-        self._gmr = gmr               #: Galaxy Merger Rate (`_Galaxy_Merger_Rate` instance)
+        self._mmbulge = mmbulge       #: Mbh-Mbulge relation (`host_relations._MMBulge_Relation` instance)
         log.debug(f"{gsmf=}, {gmr=}, {gpf=}, {gmt=}, {mmbulge=}")
 
         # ---- Create SAM grid edges
@@ -227,8 +227,9 @@ class Semi_Analytic_Model:
         # These values are calculated as needed by the class when the corresponding methods are called
         self._density = None          #: Binary comoving number-density
         self._shape = None            #: Shape of the parameter-space domain (mtot, mrat, redz)
-        self._gmt_time = None         #: GMT timescale of galaxy mergers [sec]
         self._redz_prime = None       #: redshift following galaxy merger process
+        #: GMT timescale of galaxy mergers [sec], set in `static_binary_density`
+        self._gmt_time = None
 
         return
 
@@ -357,7 +358,7 @@ class Semi_Analytic_Model:
             # ==> (dMstar-tot/dMbh-tot) = (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) / (dMstar-pri / dMstar-tot)
             #                           = (dMstar-pri / dMbh-pri) * (1 / (1+q_bh)) / (1 / (1+q_star))
             #                           = (dMstar-pri / dMbh-pri) * ((1+q_star) / (1+q_bh))
-            dmstar_dmbh_pri = self._mmbulge.dmstar_dmbh(mstar_pri)   # [unitless]
+            dmstar_dmbh_pri = self._mmbulge.dmstar_dmbh(mstar_pri, redz=redz)   # [unitless]
             qterm = (1.0 + mstar_rat) / (1.0 + self.mrat[np.newaxis, :, np.newaxis])
             dmstar_dmbh = dmstar_dmbh_pri * qterm
 
@@ -465,12 +466,18 @@ class Semi_Analytic_Model:
         return grid, dnum, redz_final
 
     def _dynamic_binary_number_at_fobs_consistent(self, hard, fobs_orb, steps=200, details=False):
-        """Get correct redshifts for full binary-number calculation.
+        r"""Calculate the differential number of binaries in at each grid point, at each frequency.
 
-        Slower but more correct than old `dynamic_binary_number`.
-        Same as new cython implementation `sam_cyutils.dynamic_binary_number_at_fobs`, which is
-        more than 10x faster.
-        LZK 2023-05-11
+        See :meth:`dynamic_binary_number_at_fobs` for general information.
+
+        This is the python implementation for binary evolution (hardening) that is self-consistent,
+        i.e. evolution models that are able to evolve binaries from galaxy merger until the target
+        frequencies.
+
+        This function should produce the same results as the new cython implementation in:
+        :func:`holodeck.sams.sam_cyutils.dynamic_binary_number_at_fobs`, which is more than 10x
+        faster.  This python implementation is maintained for diagnostic purposes, and for
+        functionality when cython is not available.
 
         # BUG doesn't work for Fixed_Time_2PL
 
@@ -479,19 +486,27 @@ class Semi_Analytic_Model:
         edges = self.edges + [fobs_orb, ]
 
         # shape: (M, Q, Z)
-        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
+        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [cMpc^-3]
+
+        # ---- Choose the binary separations over which to integrate the binary evolution.
+
+        # Start at large separations (galaxy merger) and evolve to small separations (coalescense).
 
         # start from the hardening model's initial separation
         rmax = hard._sepa_init
-        # (M,) end at the ISCO
+        # end at the ISCO
+        # (M,)
         rmin = utils.rad_isco(self.mtot)
         # Choose steps for each binary, log-spaced between rmin and rmax
         extr = np.log10([rmax * np.ones_like(rmin), rmin])     # (2,M,)
-        rads = np.linspace(0.0, 1.0, steps)[np.newaxis, :]     # (1,X)
-        # (M, S)  =  (M,1) * (1,S)
+        rads = np.linspace(0.0, 1.0, steps+1)[np.newaxis, :]     # (1,S)
+        # (M, S)  <==  (M,1) * (1,S)
         rads = extr[0][:, np.newaxis] + (extr[1] - extr[0])[:, np.newaxis] * rads
         rads = 10.0 ** rads
 
+        # ---- Calculate binary hardening rate (da/dt) at each separation, for each grid point
+
+        # broadcast arrays to a consistent shape
         # (M, Q, S)
         mt, mr, rads, norm = np.broadcast_arrays(
             self.mtot[:, np.newaxis, np.newaxis],
@@ -499,33 +514,65 @@ class Semi_Analytic_Model:
             rads[:, np.newaxis, :],
             hard._norm[:, :, np.newaxis],
         )
+        # calculate hardening rate (negative values, in units of [cm/s])
         dadt_evo = hard.dadt(mt, mr, rads, norm=norm)
+
+        # ---- Integrate evolution
+        # to find times and redshifts at which binaries reach each separation
 
         # (M, Q, S-1)
         # Integrate (inverse) hardening rates to calculate total lifetime to each separation
         times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=-1, cumsum=True)
-        # Combine the binary-evolution time, with the galaxy-merger time
-        # (M, Q, Z, S-1)
-        rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis]
-        times_tot = times_evo[:, :, np.newaxis, :] + self._gmt_time[:, :, :, np.newaxis]
-        redz_evo = utils.redz_after(times_tot, redz=rz)
+        # ~~~~ RIEMANN integration ~~~~
+        # times_evo = 2.0 * np.diff(rads, axis=-1) / (dadt_evo[..., 1:] + dadt_evo[..., :-1])
+        # times_evo = np.cumsum(times_evo, axis=-1)
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+        # add array of zero time-delays at starting point (i.e. before the first step)
+        # with same shape as a slice at a single step
+        zpad = np.zeros_like(times_evo[..., 0])
+        times_evo = np.concatenate([zpad[..., np.newaxis], times_evo], axis=-1)
+
+        # ---- Convert from time to redshift
+
+        # initial redshift (of galaxy merger)
+        rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis]    # (1, 1, Z, 1)
+
+        tlbk_init = cosmo.z_to_tlbk(rz)
+        tlbk = tlbk_init - times_evo[:, :, np.newaxis, :]
+        # Combine the binary-evolution time, with the galaxy-merger time (if it is defined)
+        if self._gmt_time is not None:
+            tlbk -= self._gmt_time[:, :, :, np.newaxis]
+
+        # (M, Q, Z, S)
+        redz_evo = cosmo.tlbk_to_z(tlbk)
+
+        #! age of the universe version of calculation is MUCH less accurate !#
+        # Use age-of-the-universe
+        # times_tot = times_evo[:, :, np.newaxis, :]
+        # # Combine the binary-evolution time, with the galaxy-merger time (if it is defined)
+        # if self._gmt_time is not None:
+        #     times_tot += self._gmt_time[:, :, :, np.newaxis]
+        # redz_evo = utils.redz_after(times_tot, redz=rz)
+        #! ---------------------------------------------------------------- !#
+
+        # ---- interpolate to target frequencies
 
         # convert from separations to rest-frame orbital frequencies
         # (M, Q, S)
         frst_orb_evo = utils.kepler_freq_from_sepa(mt, rads)
         # (M, Q, Z, S)
-        fobs_orb_evo = frst_orb_evo[:, :, np.newaxis, :] / (1.0 + rz)
+        fobs_orb_evo = frst_orb_evo[:, :, np.newaxis, :] / (1.0 + redz_evo)
 
-        # ---- interpolate to target frequencies
+        # (M, Q, Z, S)  ==>  (M*Q*Z, S)
+        fobs_orb_evo, redz_evo = [tt.reshape(-1, steps+1) for tt in [fobs_orb_evo, redz_evo]]
         # `ndinterp` interpolates over 1th dimension
-
-        # (M, Q, Z, S-1)  ==>  (M*Q*Z, S-1)
-        fobs_orb_evo, redz_evo = [mm.reshape(-1, steps-1) for mm in [fobs_orb_evo[:, :, :, 1:], redz_evo]]
         # (M*Q*Z, X)
         redz_final = utils.ndinterp(fobs_orb, fobs_orb_evo, redz_evo, xlog=True, ylog=False)
 
-        # (M*Q*Z, X) ===> (M, Q, Z, X)
+        # (M, Q, Z, X)  <===  (M*Q*Z, X)
         redz_final = redz_final.reshape(self.shape + (fobs_orb.size,))
+
         coal = (redz_final > 0.0)
         frst_orb = fobs_orb * (1.0 + redz_final)
         frst_orb[frst_orb < 0.0] = 0.0
@@ -577,7 +624,13 @@ class Semi_Analytic_Model:
         shape = dens.shape
         new_shape = shape + (fobs_orb.size, )
 
-        rz = self._redz_prime[..., np.newaxis] * np.ones(new_shape)
+        # If a galaxy merger-time is being used, then `_redz_prime` gives the redshifts following
+        # galaxy merger.  NOTE: `_redz_prime` values past age of universe are set to `-1.0`.
+        # Use these as final redshifts if available, otherwise use the initial redshifts (`redz`).
+        if self._redz_prime is not None:
+            rz = self._redz_prime[..., np.newaxis] * np.ones(new_shape)
+        else:
+            rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis] * np.ones(new_shape)
         coal = (rz > 0.0)
 
         dc = cosmo.comoving_distance(rz[coal]).to('Mpc').value
@@ -585,27 +638,40 @@ class Semi_Analytic_Model:
             fobs_orb[np.newaxis, np.newaxis, np.newaxis, :], rz
         )
 
+        # (M,) ISCO separation
+        risco = utils.rad_isco(self.mtot)
+
         # (Z,) this is `(dVc/dz) * (dz/dt)` in units of [Mpc^3/s]
         cosmo_fact = 4 * np.pi * (SPLC/MPC) * np.square(dc) * (1.0 + rz[coal])
 
-        # # (M, Q) calculate chirp-mass
+        # broadcast to full shape, then take coalescing elements
+        # (M,) ==> (M, 1, 1, 1)
         mt = self.mtot[:, np.newaxis, np.newaxis, np.newaxis]
+        risco = risco[:, np.newaxis, np.newaxis, np.newaxis]
+        # (Q,) ==> (1, Q, 1, 1)
         mr = self.mrat[np.newaxis, :, np.newaxis, np.newaxis]
-        mt, mr = [(mm * np.ones(new_shape))[coal] for mm in [mt, mr]]
+        # These will now be 1D with shape (C,) for 'C' coalescing elements
+        mt, mr, fro, risco = [(mm * np.ones(new_shape))[coal] for mm in [mt, mr, frst_orb, risco]]
 
         # Convert from observer-frame orbital freq, to rest-frame orbital freq
-        sa = utils.kepler_sepa_from_freq(mt, frst_orb[coal])
-        # (X, M*Q*Z), hardening rate, negative values, units of [cm/sec]
+        sa = utils.kepler_sepa_from_freq(mt, fro)
+
+        # (C,), hardening rate, negative values, units of [cm/sec]
         args = [mt, mr, sa]
         dadt = hard.dadt(*args)
         # Calculate `tau = dt/dlnf_r = f_r / (df_r/dt)`
         # dfdt is positive (increasing frequency)
-        dfdt, _ = utils.dfdt_from_dadt(dadt, sa, frst_orb=frst_orb[coal])
-        tau = frst_orb[coal] / dfdt
+        dfdt, _ = utils.dfdt_from_dadt(dadt, sa, frst_orb=fro)
+        tau = fro / dfdt
 
-        # (M, Q, Z) units: [1/s] i.e. number per second
+        # (M, Q, Z, F) units: [1/s] i.e. number per second
         dnum = np.zeros(new_shape)
-        dnum[coal] = (dens[..., np.newaxis] * np.ones(new_shape))[coal] * cosmo_fact * tau
+
+        # Select only the binaries are separations larger than isco; this is a subset of `coal`
+        live = (sa > risco)
+        coal[coal] = coal[coal] & live
+
+        dnum[coal] = (dens[..., np.newaxis] * np.ones(new_shape))[coal] * cosmo_fact[live] * tau[live]
 
         return edges, dnum, rz
 

@@ -105,6 +105,9 @@ setup(
     ext_modules=cython_modules,
 
     entry_points = {
-        "console_scripts": ['holodeck_lib_gen = holodeck.librarian.gen_lib:main'],
+        "console_scripts": [
+            'holodeck_lib_gen = holodeck.librarian.gen_lib:main',
+            'holodeck_fit_spec = holodeck.librarian.fit_spectra:main',
+        ],
     },
 )

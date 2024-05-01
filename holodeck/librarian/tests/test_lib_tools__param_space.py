@@ -1,4 +1,4 @@
-"""Test holodeck/librarian/libraries.py: the parameter space base class, and parameter distributions.
+"""Test holodeck/librarian/lib_tools.py: the parameter space base class, and parameter distributions.
 """
 
 import numpy as np
@@ -9,9 +9,11 @@ import holodeck as holo
 
 from holodeck import sams, host_relations, hardening, librarian
 from holodeck.constants import GYR
-from holodeck.librarian.libraries import (
+from holodeck.librarian import (
+    param_spaces_dict
+)
+from holodeck.librarian.lib_tools import (
     _Param_Space, PD_Uniform,
-
 )
 
 MMB_MAMP_LOG10_EXTR = [+7.5, +9.5]
@@ -203,8 +205,8 @@ def _check_sam_hard(sam, hard, sam_shape):
     assert isinstance(hard, hardening.Hard_GW)
 
     # Make sure model runs
-    import holodeck.librarian.libraries  # noqa
-    data = librarian.libraries.run_model(sam, hard)
+    import holodeck.librarian.lib_tools  # noqa
+    data = librarian.lib_tools.run_model(sam, hard)
     assert data is not None
 
     return
@@ -241,5 +243,52 @@ def test__ps_test_with_defaults():
     SAM_SHAPE = 11
     sam, hard = pspace_class().model_for_params(params, sam_shape=SAM_SHAPE)
     _check_sam_hard(sam, hard, SAM_SHAPE)
+
+    return
+
+
+def _check_ps_basics(name, pspace_class):
+    # all default arguments
+    space = pspace_class()
+
+    param_names = space.param_names
+    params = space._parameters
+    nparams = space.nparameters
+    assert len(param_names) == nparams
+    assert len(params) == nparams
+
+    # check defaults
+    def_params = space.default_params()
+    for ii, (name, dp) in enumerate(def_params.items()):
+        assert dp == params[ii].default
+
+    np.random.seed(12345)
+    for ii in range(nparams):
+        # Choose random normalized values for each parameter
+        # must convert to list so that we can replace values with `None`
+        norm_vals = np.random.uniform(0.0, 1.0, size=nparams).tolist()
+        # Set parameter `ii` to default value (`None`)
+        norm_vals[ii] = None
+        dist_vals = space.normalized_params(norm_vals)
+        for jj, (pnam, pval) in enumerate(dist_vals.items()):
+            # make sure default value is set
+            if jj == ii:
+                def_val = params[jj].default
+                err = f"default was not set for {jj}: `{pnam}`!  value={pval}, def={def_val}"
+                assert pval == def_val, err
+            # make sure other values are set
+            else:
+                truth = params[jj](norm_vals[jj])
+                err = f"normalized param was not set for {jj}: `{pnam}`!  value={pval} {truth=}"
+                assert pval == truth, err
+
+    return
+
+def test_basics_all_param_spaces():
+    """Run `_check_ps_basics` on all registered parameters-space classes.
+    """
+    for name, pspace_class in param_spaces_dict.items():
+        print(f"Checking '{name}' ({pspace_class})")
+        _check_ps_basics(name, pspace_class)
 
     return

@@ -299,7 +299,6 @@ class BF_Sigmoid(_Bulge_Frac):
         mstar = np.ones_like(mbulge) * mbulge / fhi
         # find the systems that are below the char mass, based on this assumption
         sel = (mstar/self._mstar_char) < 1.0
-        print(f"{utils.frac_str(sel)=}")
         # interpolate to numerically invert the function
         # mstar[sel] = np.interp(mbulge[sel], self._grid_mbulge, self._grid_mstar)
         mstar[sel] = self._interp_mstar_from_mbulge(mbulge[sel])
@@ -779,7 +778,7 @@ class MMBulge_KH2013(MMBulge_Standard):
 
     """
     # MASS_AMP = 0.49 * 1e9 * MSOL      # 0.49 + 0.06 - 0.05   in units of [Msol]
-    MASS_AMP_LOG10 = 8.69
+    MASS_AMP_LOG10 = 8.69             # 8.69 ± 0.05  [log10(M/Msol)]  approximate uncertainties!
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.17                  # 1.17 ± 0.08
     SCATTER_DEX = 0.28                # scatter stdev in dex
@@ -843,7 +842,7 @@ class MMBulge_Redshift(MMBulge_Standard):
         # NOTE: this will work for (N,) ==> (N,)    or   (N,) ==> (N,X)
         try:
             redz = np.broadcast_to(redz, mbulge.T.shape).T
-        except TypeError:
+        except:
             redz = redz
         zmamp = self._mamp * (1.0 + redz)**self._zplaw
         mbh = _log10_relation(mbulge, zmamp, self._mplaw, scatter_dex, x0=self._mref)
