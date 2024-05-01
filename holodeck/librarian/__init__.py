@@ -43,7 +43,7 @@ The ``librarian`` module is composed of the following elements:
 # ==== Submodule Definitions ====
 # ==============================================================================
 
-__version__ = "1.2"
+__version__ = "1.3"
 
 DEF_NUM_REALS = 100     #: Default number of realizations to construct in libraries.
 DEF_NUM_FBINS = 40      #: Default number of frequency bins at which to calculate GW signals.
