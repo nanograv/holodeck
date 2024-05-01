@@ -333,7 +333,7 @@ class _Param_Space(abc.ABC):
             pspace_class = cls
 
         # construct instance with dummy/temporary values (which will be overwritten)
-        if data['param_samples'] == None:   # noqa : use ``== None`` to match arrays
+        if data['param_samples'][()] is None:
             nsamples = None
             nparameters = None
         else:
