@@ -140,11 +140,11 @@ def sam_lib_combine(
 
     log.info(f"loaded param space: {pspace} from '{pspace_fname}'")
     param_names = pspace.param_names
-    param_samples = pspace.param_samples
+    param_samples = pspace.param_samples[()]
 
     # Standard Library: vary all parameters together
     if library:
-        if param_samples == None:   # noqa : use `== None` to match arrays
+        if param_samples is None:
             log.error(f"`library`={library} but `param_samples`={param_samples}`")
             err = f"`library` is True, but {path_output} looks like it's a domain."
             raise DomainNotLibraryError(err)
@@ -155,7 +155,7 @@ def sam_lib_combine(
     # Domain: Vary only one parameter at a time to explore the domain
     else:
         err = f"Expected 'domain' but `param_samples`={param_samples} is not `None`!"
-        assert param_samples == None, err   # noqa : use `== None` to match arrays
+        assert param_samples is None, err
         ndim = pspace.nparameters
         # for 'domain' simulations, this is the number of samples in each dimension
         nsamp_dim = args.nsamples
