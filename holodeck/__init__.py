@@ -69,6 +69,10 @@ for cp in _check_paths:
         err = "ERROR: could not find directory '{}'!".format(cp)
         raise FileNotFoundError(err)
 
+def get_holodeck_path(*args):
+    from pathlib import Path
+    return Path(_PATH_PACKAGE).joinpath(*args)
+
 
 # ---- Load logger
 

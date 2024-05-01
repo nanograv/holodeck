@@ -26,6 +26,10 @@ PARAM_NAMES_REPLACE = {
     "gsmf_phi0": ["gsmf_phi0_log10", None],
 }
 
+#! DOPPLER
+import holodeck.doppler
+#! -------
+
 # __all__ = [
 #     "_Param_space"
 # ]
@@ -715,6 +719,9 @@ def run_model(
     sam, hard,
     pta_dur=DEF_PTA_DUR, nfreqs=DEF_NUM_FBINS, nreals=DEF_NUM_REALS, nloudest=DEF_NUM_LOUDEST,
     gwb_flag=True, singles_flag=True, details_flag=False, params_flag=False,
+    #! DOPPLER
+    doppler_args=None,
+    #! -------
     log=None,
 ):
     """Run the given SAM and hardening model to construct a binary population and GW signatures.
@@ -804,6 +811,49 @@ def run_model(
     use_redz = redz_final
     edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
     number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
+
+    #! DOPPLER
+    if doppler_args is not None:
+        print("\n\nDOPPLER")
+        data['static_binary_density'] = sam.static_binary_density
+
+        sens_curve_interp = holo.doppler.sens_curve(
+            doppler_args['expect'], doppler_args['wlog_test'], doppler_args['amplog_test']
+        )
+
+        doppler_fobs_gw_cents, doppler_fobs_gw_edges = utils.pta_freqs(
+            dur=doppler_args['tau_obs'], num=doppler_args['num_freqs']
+        )
+        doppler_fobs_orb_cents = doppler_fobs_gw_cents / 2.0
+        doppler_fobs_orb_edges = doppler_fobs_gw_edges / 2.0
+        doppler_redz_final, doppler_diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
+            doppler_fobs_orb_cents, sam, hard, cosmo
+        )
+        doppler_edges = [sam.mtot, sam.mrat, sam.redz, doppler_fobs_orb_edges]
+        # for de in doppler_edges:
+        #     print(f"{de.shape=}")
+
+        # print(f"{doppler_redz_final.shape=}")
+        # print(f"{doppler_diff_num.shape=}")
+
+        detect = holo.doppler.detectable(
+            doppler_edges, doppler_redz_final,
+            doppler_args['snr'], doppler_args['tau_obs'], sens_curve_interp,
+        )
+        num_all = sam_cyutils.integrate_differential_number_3dx1d(doppler_edges, doppler_diff_num)
+        num_det = sam_cyutils.integrate_differential_number_3dx1d(doppler_edges, doppler_diff_num*detect)
+
+        print(f"{num_all.sum()=:.2e} {num_det.sum()=:.2e}")
+
+        data['doppler_num_all'] = num_all
+        data['doppler_num_det'] = num_det
+        data['doppler_detect'] = detect
+        data['doppler_redz_final'] = doppler_redz_final
+        print("DOPPLER\n\n")
+
+    #! -------
+
+
     if details_flag:
         data['static_binary_density'] = sam.static_binary_density
         data['number'] = number

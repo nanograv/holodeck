@@ -38,11 +38,17 @@ from holodeck.librarian import (
     lib_tools, ARGS_CONFIG_FNAME, PSPACE_DOMAIN_EXTREMA, DIRNAME_LIBRARY_SIMS, DIRNAME_DOMAIN_SIMS
 )
 
+#! DOPPLER
+import holodeck.doppler
+DOPPLER_FNAME = holo.get_holodeck_path("data", "doppler-sens-fit_2024-05-01.csv")
+#! -------
+
 #: maximum number of failed simulations before task terminates with error (`None`: no limit)
 MAX_FAILURES = None
 
 # FILES_COPY_TO_OUTPUT = [__file__, holo.librarian.__file__, holo.param_spaces.__file__]
 FILES_COPY_TO_OUTPUT = []
+
 
 comm = None
 
@@ -306,6 +312,9 @@ def run_sam_at_pspace_params(args, space, pnum, params):
             pta_dur=args.pta_dur, nfreqs=args.nfreqs, nreals=args.nreals, nloudest=args.nloudest,
             gwb_flag=args.gwb_flag, singles_flag=args.ss_flag, details_flag=False, params_flag=args.params_flag,
             log=log,
+            #! DOPPLER
+            doppler_args=args.doppler_args,
+            #! -------
         )
         data['params'] = np.array([params[pn] for pn in space.param_names])
         data['param_names'] = space.param_names
@@ -469,6 +478,19 @@ def _setup_argparse(*args, **kwargs):
         output_plots.mkdir(parents=True, exist_ok=True)
         args.output_plots = output_plots
 
+    #! DOPPLER
+    args.doppler_args = dict(
+        expect    = 'optimistic',
+        snr       = 8.0,
+        tau_obs   = 10.0*YR,
+        num_freqs = 200
+    )
+
+    doppler_data = np.loadtxt(DOPPLER_FNAME, delimiter=',')
+    args.doppler_args['wlog_test']   = doppler_data[:,0]    #log10 of binary orbital frequency
+    args.doppler_args['amplog_test'] = doppler_data[:,1]  #log10 of detectable amplitude (visual threshold)
+    #! -------
+
     return args
 
 
@@ -532,6 +554,11 @@ def _save_config(args):
         # cannot store `logging.Logger` instances (`log`)
         elif isinstance(vv, logging.Logger):
             continue
+        #! DOPPLER
+        elif kk.startswith('doppler'):
+            continue
+        #! -------
+
         config[kk] = vv
 
     # Add additional entries
