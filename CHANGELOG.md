@@ -19,6 +19,8 @@
 
 ## Current
 
+## v1.6 - 2024/05/01
+
 * DEPRECATIONS:
     * `holodeck.librarian.py` ==> `holodeck.librarian.lib_tools`
         * Rename submodule.  All components remain the same.  All `lib_tools` elements are now also imported into the `librarian` namespace.  i.e. elements like `holodeck.librarian.lib_tools._Param_Space` will now be accessible via `holodeck.librarian._Param_Space`.
