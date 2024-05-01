@@ -15,6 +15,7 @@ from holodeck import utils, cosmo
 from holodeck.constants import YR
 from holodeck.librarian import (
     DEF_NUM_FBINS, DEF_NUM_LOUDEST, DEF_NUM_REALS, DEF_PTA_DUR,
+    FNAME_LIBRARY_COMBINED_FILE, FNAME_DOMAIN_COMBINED_FILE,
 )
 
 PARAM_NAMES__ERROR = [
@@ -24,6 +25,10 @@ PARAM_NAMES__ERROR = [
 PARAM_NAMES_REPLACE = {
     "gsmf_phi0": ["gsmf_phi0_log10", None],
 }
+
+# __all__ = [
+#     "_Param_space"
+# ]
 
 
 class _Param_Space(abc.ABC):
@@ -59,7 +64,7 @@ class _Param_Space(abc.ABC):
         param_kwargs : dict
             Key-value pairs specifying the parameters for this model.  Each key must be the name of
             the parameter, and each value must be a
-            :class:`~holodeck.librarian.libraries._Param_Dist`
+            :class:`~holodeck.librarian.lib_tools._Param_Dist`
             subclass instance with the desired distribution.
 
         Returns
@@ -123,7 +128,7 @@ class _Param_Space(abc.ABC):
             param_names.append(name)
 
         if (nsamples is None) or (nparameters == 0):
-            log.warning(f"{self}: {nsamples=} {nparameters=} - cannot generate parameter samples.")
+            log.info(f"{self}: {nsamples=} {nparameters=} - cannot generate parameter samples.")
             uniform_samples = None
             param_samples = None
         else:
@@ -206,14 +211,47 @@ class _Param_Space(abc.ABC):
 
         return sam, hard
 
-    @classmethod
+    # @classmethod
     @abc.abstractmethod
-    def _init_sam(cls, sam_shape, params):
+    def _init_sam(self, sam_shape, params):
+        """Initialize a :class:`holodeck.sams.sam.Semi_Analytic_Model` instance with given params.
+
+        Arguments
+        ---------
+        sam_shape : None  or  int  or  (3,) tuple of int
+            Shape of the SAM grid (M, Q, Z).  If:
+            * `None` : use default values.
+            * int : apply this size to each dimension of the grid.
+            * (3,) of int : provide size for each dimension.
+        params : dict
+            Dictionary of parameters needed to initialize SAM model.
+
+        Returns
+        -------
+        sam : :class:`holodeck.sams.sam.Semi_Analytic_Model` instance,
+            Initialized SAM model instance.
+
+        """
         raise
 
-    @classmethod
+    # @classmethod
     @abc.abstractmethod
-    def _init_hard(cls, sam, params):
+    def _init_hard(self, sam, params):
+        """Initialize a :class:`holodeck.hardening._Hardening` subclass instance with given params.
+
+        Arguments
+        ---------
+        sam : :class:`holodeck.sams.sam.Semi_Analytic_Model` instance,
+            SAM model instance.
+        params : dict
+            Dictionary of parameters needed to initialize hardening model.
+
+        Returns
+        -------
+        hard : :class:`holodeck.hardening._Hardening` subclass instance,
+            Initialized hardening model instance.
+
+        """
         raise
 
     def save(self, path_output):
@@ -234,7 +272,8 @@ class _Param_Space(abc.ABC):
 
         """
         log = self._log
-        my_name = self.__class__.__name__
+        class_name = self.__class__.__name__
+        class_vers = self.__version__
         vers = holo.librarian.__version__
 
         # make sure `path_output` is a directory, and that it exists
@@ -244,16 +283,16 @@ class _Param_Space(abc.ABC):
             log.exception(err)
             raise ValueError(err)
 
-        fname = f"{my_name}{holo.librarian.PSPACE_FILE_SUFFIX}"
+        fname = f"{class_name}{holo.librarian.PSPACE_FILE_SUFFIX}"
         fname = path_output.joinpath(fname)
-        log.debug(f"{my_name=} {vers=} {fname=}")
+        log.debug(f"{class_name=} {vers=} {fname=}")
 
         data = {}
         for key in self._SAVED_ATTRIBUTES:
             data[key] = getattr(self, key)
 
         np.savez(
-            fname, class_name=my_name, librarian_version=vers,
+            fname, class_name=class_name, class_vers=class_vers, librarian_version=vers,
             **data,
         )
 
@@ -290,8 +329,13 @@ class _Param_Space(abc.ABC):
             pspace_class = cls
 
         # construct instance with dummy/temporary values (which will be overwritten)
-        nsamples = data['param_samples'].shape[0]
-        nparameters = data['param_samples'].shape[1]
+        if data['param_samples'][()] is None:
+            nsamples = None
+            nparameters = None
+        else:
+            # print(f"{data['param_samples']=}")
+            nsamples = data['param_samples'].shape[0]
+            nparameters = data['param_samples'].shape[1]
         param_names = data['param_names']
         space = pspace_class(nsamples=nsamples, log=log)
         if class_name != space.name:
@@ -303,6 +347,15 @@ class _Param_Space(abc.ABC):
                 f"and class parameter names ({space.param_names})!"
             )
             log.exception(err)
+
+            for pn in param_names:
+                if pn not in space.param_names:
+                    log.exception(f"parameter name `{pn}` in loaded data is not in class param names!")
+
+            for pn in space.param_names:
+                if pn not in param_names:
+                    log.exception(f"parameter name `{pn}` in class param names is not in loaded parameter names!")
+
             raise RuntimeError(err)
 
         # Store loaded parameters into the parameter-space instance
@@ -354,22 +407,23 @@ class _Param_Space(abc.ABC):
         return self.model_for_params(params, sam_shape)
 
     def normalized_params(self, vals):
-        """Convert input values (uniform/linear) into parameters from the stored distributions.
+        """Convert input values (uniform [0.0, 1.0]) into parameters from the stored distributions.
 
         For example, if this parameter space has 2 dimensions, where the distributions are:
 
         0. 'value_a' is a uniform parameter from [-1.0, 1.0], and
-        1. 'value_b' normal with mean 10.0 and stdev 1.0
+        1. 'value_b' is normally distributed with mean 10.0 and stdev 1.0
 
         Then input values of ``[0.75, 0.5]`` are mapped to parameters ``[0.5, 10.0]``, which will be
         returned as ``{value_a: 0.5, value_b: 10.0}``.
 
         Arguments
         ---------
-        vals : (P,) iterable of float,
-            A list/iterable of `P` float values, matching the number of parameters (i.e. dimensions)
-            in this parameter space.  Each value is passed to the corresponding distribution for
-            that parameter.
+        vals : (P,) iterable of (float or `None`),
+            A list/iterable of `P` values, matching the number of parameters (i.e. dimensions)
+            in this parameter space.  If a value is `None`, then the default value for that
+            parameter is obtained, otherwise the value is passed to the corresponding parameter
+            distribution.
 
         Returns
         -------
@@ -381,11 +435,17 @@ class _Param_Space(abc.ABC):
         if np.ndim(vals) == 0:
             vals = self.nparameters * [vals]
         assert len(vals) == self.nparameters
+        all_finite = np.all([(vv is None) or np.isfinite(vv) for vv in vals])
+        assert all_finite, f"Not all `vals` are finite!  {vals}"
 
         params = {}
         for ii, pname in enumerate(self.param_names):
-            vv = vals[ii]                     # desired fractional parameter value [0.0, 1.0]
-            ss = self._parameters[ii](vv)     # convert to actual parameter values
+            param = self._parameters[ii]      # this parameter distribution
+            vv = vals[ii]                     # fractional parameter value [0.0, 1.0] or `None`
+            if vv is None:
+                ss = param.default
+            else:
+                ss = param(vv)                # convert from fractional to actual values
             params[pname] = ss                # store to dictionary
 
         return params
@@ -884,7 +944,7 @@ def _calc_model_details(edges, redz_final, number):
 
 
 def load_pspace_from_path(path, space_class=None, log=None):
-    """Load a `_Param_Space` subclass instance from the saved file in the given directory.
+    """Load a ``_Param_Space`` subclass instance from a save file with the given path.
 
     This function tries to determine the correct class based on the save file name, then uses that
     class to load the save itself.
@@ -928,9 +988,21 @@ def load_pspace_from_path(path, space_class=None, log=None):
     else:
         raise
 
-    # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces_dict`
     if space_class is None:
-        space_class = _get_space_class_from_space_fname(space_fname)
+        try:
+            space_class = str(np.load(space_fname, allow_pickle=True)['class_name'])
+            print(f"{space_class=}")
+            space_class = holo.librarian.param_spaces_dict[space_class]
+        except Exception as err:
+            if log is not None:
+                log.error(f"Could not load `class_name` from save file '{space_fname}'.")
+                log.error(str(err))
+            else:
+                print(f"Could not load `class_name` from save file '{space_fname}'.")
+                print(str(err))
+
+            # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces_dict`
+            space_class = _get_space_class_from_space_fname(space_fname)
 
     space = space_class.from_save(space_fname, log=log)
     return space, space_fname
@@ -943,14 +1015,25 @@ def _get_space_class_from_space_fname(space_fname):
     return space_class
 
 
-def _get_sim_fname(path, pnum):
-    temp = holo.librarian.FNAME_SIM_FILE.format(pnum=pnum)
+def _get_sim_fname(path, pnum, library=True):
+    if library:
+        temp = holo.librarian.FNAME_LIBRARY_SIM_FILE
+    else:
+        temp = holo.librarian.FNAME_DOMAIN_SIM_FILE
+
+    temp = temp.format(pnum=pnum)
     temp = path.joinpath(temp)
     return temp
 
 
-def get_sam_lib_fname(path, gwb_only):
-    fname = 'sam_lib'
+def get_sam_lib_fname(path, gwb_only, library=True):
+    # standard 'library'
+    if library:
+        fname = FNAME_LIBRARY_COMBINED_FILE
+    # 'domain' of parameter space
+    else:
+        fname = FNAME_DOMAIN_COMBINED_FILE
+
     if gwb_only:
         fname += "_gwb-only"
     lib_path = path.joinpath(fname).with_suffix(".hdf5")

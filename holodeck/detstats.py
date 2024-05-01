@@ -7,22 +7,32 @@ for Hasasia PTA's.
 
 import numpy as np
 from scipy import special, integrate
-from sympy import nsolve, Symbol
 import h5py
 import matplotlib.pyplot as plt
 import os
 from datetime import datetime
 import warnings
 
-
 import holodeck as holo
-from holodeck import utils, cosmo, log, plot, anisotropy
-from holodeck.constants import MPC, YR
+from holodeck import utils, log, plot  # , cosmo, anisotropy
+from holodeck.constants import YR
 from holodeck import cyutils
 
-import hasasia.sensitivity as hsen
-import hasasia.sim as hsim
-import hasasia as has
+try:
+    from sympy import nsolve, Symbol
+    import hasasia.sensitivity as hsen
+    import hasasia.sim as hsim
+    # import hasasia as has
+except ImportError as err:
+    SUBMOD = "detstats"
+    log.error(f"Failed to import some packages used in `{SUBMOD}` submodule!")
+    log.exception(err)
+    log.error(
+        f"Some required packages for `{SUBMOD}` have been temporarily disabled in the "
+        "global 'requirements.txt' file, so they are not installed by default!  Please install "
+        "the required packages manually for now, and feel free to raise a github issue."
+    )
+    raise
 
 GAMMA_RHO_GRID_PATH = '/Users/emigardiner/GWs/holodeck/output/rho_gamma_grids'
 HC_REF15_10YR = 11.2*10**-15

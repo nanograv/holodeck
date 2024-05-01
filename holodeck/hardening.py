@@ -60,11 +60,6 @@ _MIN_DENS_RAD__INFL_RAD_MULT = 10.0
 _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 
 
-# =================================================================================================
-# ====    Hardening Classes    ====
-# =================================================================================================
-
-
 class _Hardening(abc.ABC):
     """Base class for binary-hardening models, providing the `dadt_dedt(evo, step, ...)` method.
     """
@@ -82,6 +77,11 @@ class _Hardening(abc.ABC):
     def dedt(self, *args, **kwargs):
         _dadt, rv_dedt = self.dadt_dedt(*args, **kwargs)
         return rv_dedt
+
+
+# =================================================================================================
+# ====    Physical Hardening Classes    ====
+# =================================================================================================
 
 
 class Hard_GW(_Hardening):
@@ -710,6 +710,11 @@ class Dynamical_Friction_NFW(_Hardening):
         # Make sure that attenuation is always >= 1.0 (i.e. this never _increases_ the hardening rate)
         atten = np.maximum(atten, 1.0)
         return atten
+
+
+# =================================================================================================
+# ====    Phenomenological Hardening Classes    ====
+# =================================================================================================
 
 
 class Fixed_Time_2PL(_Hardening):
