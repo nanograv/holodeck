@@ -27,7 +27,7 @@ PARAM_NAMES_REPLACE = {
 }
 
 #! DOPPLER
-import holodeck.doppler
+import holodeck.doppler  # noqa
 #! -------
 
 # __all__ = [
@@ -812,10 +812,65 @@ def run_model(
     edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
     number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
 
+    if gwb_flag:
+        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, nreals)
+        data['gwb'] = gwb
+
+    # if details_flag:
+    #     data['static_binary_density'] = sam.static_binary_density
+    #     data['number'] = number
+    #     data['redz_final'] = redz_final
+
+    #     gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final = _calc_model_details(edges, redz_final, number)
+
+    #     data['gwb_params'] = gwb_pars
+    #     data['num_params'] = num_pars
+    #     data['gwb_mtot_redz_final'] = gwb_mtot_redz_final
+    #     data['num_mtot_redz_final'] = num_mtot_redz_final
+
+    # # calculate single sources and/or binary parameters
+    # if singles_flag or params_flag:
+    #     nloudest = nloudest if singles_flag else 1
+
+    #     vals = holo.single_sources.ss_gws_redz(
+    #         edges, use_redz, number, realize=nreals,
+    #         loudest=nloudest, params=params_flag,
+    #     )
+    #     if params_flag:
+    #         hc_ss, hc_bg, sspar, bgpar = vals
+    #         data['sspar'] = sspar
+    #         data['bgpar'] = bgpar
+    #     else:
+    #         hc_ss, hc_bg = vals
+
+    #     if singles_flag:
+    #         data['hc_ss'] = hc_ss
+    #         data['hc_bg'] = hc_bg
+
     #! DOPPLER
     if doppler_args is not None:
-        print("\n\nDOPPLER")
-        data['static_binary_density'] = sam.static_binary_density
+        # (F, R)
+        psd = holo.utils.char_strain_to_psd(fobs_orb_cents[:, np.newaxis], gwb)
+        # (F, R)  - samples, frequencies, realizations
+        NBINS = 5
+        xx = fobs_orb_cents[:NBINS]
+        yy = np.median(psd[:NBINS, :], axis=-1)
+        try:
+            print("FITTING")
+            fit = holo.utils.fit_powerlaw_psd(xx, yy, 1/YR)[0]
+            print(f"PSD {fit=}")
+            log.info(f"PSD {fit=}")
+        except Exception as err:
+            log.error(f"Failed to fit PSD: {err}!")
+            fit = [np.nan, np.nan]
+
+        data['psd_fit'] = np.asarray(fit)
+
+        if (fit[0] < -15.0) or (-14.0 < fit[0]) or (fit[1] < -5.0) or (-2.5 < fit[1]):
+            log.info("PSD fit is outside of bounds!")
+            return data
+
+        # data['static_binary_density'] = sam.static_binary_density
 
         sens_curve_interp = holo.doppler.sens_curve(
             doppler_args['expect'], doppler_args['wlog_test'], doppler_args['amplog_test']
@@ -830,64 +885,29 @@ def run_model(
             doppler_fobs_orb_cents, sam, hard, cosmo
         )
         doppler_edges = [sam.mtot, sam.mrat, sam.redz, doppler_fobs_orb_edges]
-        # for de in doppler_edges:
-        #     print(f"{de.shape=}")
-
-        # print(f"{doppler_redz_final.shape=}")
-        # print(f"{doppler_diff_num.shape=}")
 
         detect = holo.doppler.detectable(
             doppler_edges, doppler_redz_final,
             doppler_args['snr'], doppler_args['tau_obs'], sens_curve_interp,
         )
+        log.info(f"Fraction of bins doppler detectable: {utils.frac_str(detect)}")
         num_all = sam_cyutils.integrate_differential_number_3dx1d(doppler_edges, doppler_diff_num)
         num_det = sam_cyutils.integrate_differential_number_3dx1d(doppler_edges, doppler_diff_num*detect)
 
-        print(f"{num_all.sum()=:.2e} {num_det.sum()=:.2e}")
+        log.info(f"Doppler detections: {num_all.sum()=:.2e} {num_det.sum()=:.2e}")
 
-        data['doppler_num_all'] = num_all
-        data['doppler_num_det'] = num_det
-        data['doppler_detect'] = detect
-        data['doppler_redz_final'] = doppler_redz_final
-        print("DOPPLER\n\n")
+        data['doppler_fobs_gw_cents'] = doppler_fobs_gw_cents
+
+        # data['doppler_num_all'] = num_all
+        # data['doppler_num_det'] = num_det
+        # data['doppler_detect'] = detect
+        data['doppler_num_all'] = num_all.sum(axis=2)
+        data['doppler_num_det'] = num_det.sum(axis=2)
+        data['doppler_detect'] = np.packbits(detect)
+
+        # data['doppler_redz_final'] = doppler_redz_final
 
     #! -------
-
-
-    if details_flag:
-        data['static_binary_density'] = sam.static_binary_density
-        data['number'] = number
-        data['redz_final'] = redz_final
-
-        gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final = _calc_model_details(edges, redz_final, number)
-
-        data['gwb_params'] = gwb_pars
-        data['num_params'] = num_pars
-        data['gwb_mtot_redz_final'] = gwb_mtot_redz_final
-        data['num_mtot_redz_final'] = num_mtot_redz_final
-
-    # calculate single sources and/or binary parameters
-    if singles_flag or params_flag:
-        nloudest = nloudest if singles_flag else 1
-
-        vals = holo.single_sources.ss_gws_redz(
-            edges, use_redz, number, realize=nreals,
-            loudest=nloudest, params=params_flag,
-        )
-        if params_flag:
-            hc_ss, hc_bg, sspar, bgpar = vals
-            data['sspar'] = sspar
-            data['bgpar'] = bgpar
-        else:
-            hc_ss, hc_bg = vals
-
-        if singles_flag:
-            data['hc_ss'] = hc_ss
-            data['hc_bg'] = hc_bg
-
-    if gwb_flag:
-        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, nreals)
-        data['gwb'] = gwb
 
     return data
 

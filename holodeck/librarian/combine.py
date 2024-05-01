@@ -424,7 +424,9 @@ def _load_library_from_all_files(
             #! NOTE: this is just temporary until bug is fixed
             try:
                 param_samples[pnum, :] = temp['params'][:]
-            except:
+            except Exception as err:
+                log.error("1124123523awef5")
+                log.error(err)
                 pvals = temp['params'][()]
                 param_samples[pnum, :] = np.array([pvals[str(pn)] for pn in temp['param_names']])
 
