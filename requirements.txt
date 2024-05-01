@@ -10,10 +10,10 @@ scipy
 psutil
 tqdm
 cython<3.0.0
-schwimmbad
-emcee
-george
-sympy   # used in the detstats submodule
-hasasia   # used in the detstats submodule
-healpy   # used in the detstats submodule
+# schwimmbad  # used in the `gps` submodule
+# emcee   # used in the `gps` submodule
+# george  # used in the `gps` submodule
+# sympy   # used in the detstats submodule
+# hasasia   # used in the detstats submodule
+# healpy   # used in the anisotropy submodule
 # mpi4py
