@@ -454,29 +454,29 @@ def _setup_argparse(*args, **kwargs):
             raise RuntimeError("Cannot use `resume` in TEST mode!")
 
 
-    # ---- Create output directories as needed
+    # # ---- Create output directories as needed
 
-    output.mkdir(parents=True, exist_ok=True)
-    holo.utils.mpi_print(f"output path: {output}")
-    args.output = output
+    # output.mkdir(parents=True, exist_ok=True)
+    # holo.utils.mpi_print(f"output path: {output}")
+    # args.output = output
 
-    if args.domain:
-        sims_dirname = DIRNAME_DOMAIN_SIMS
-    else:
-        sims_dirname = DIRNAME_LIBRARY_SIMS
+    # if args.domain:
+    #     sims_dirname = DIRNAME_DOMAIN_SIMS
+    # else:
+    #     sims_dirname = DIRNAME_LIBRARY_SIMS
 
-    output_sims = output.joinpath(sims_dirname)
-    output_sims.mkdir(parents=True, exist_ok=True)
-    args.output_sims = output_sims
+    # output_sims = output.joinpath(sims_dirname)
+    # output_sims.mkdir(parents=True, exist_ok=True)
+    # args.output_sims = output_sims
 
-    output_logs = output.joinpath("logs")
-    output_logs.mkdir(parents=True, exist_ok=True)
-    args.output_logs = output_logs
+    # output_logs = output.joinpath("logs")
+    # output_logs.mkdir(parents=True, exist_ok=True)
+    # args.output_logs = output_logs
 
-    if args.plot:
-        output_plots = output.joinpath("figs")
-        output_plots.mkdir(parents=True, exist_ok=True)
-        args.output_plots = output_plots
+    # if args.plot:
+    #     output_plots = output.joinpath("figs")
+    #     output_plots.mkdir(parents=True, exist_ok=True)
+    #     args.output_plots = output_plots
 
     #! DOPPLER
     args.doppler_args = dict(
