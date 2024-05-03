@@ -1,4 +1,13 @@
 """'Classic' parameter spaces used in the NANOGrav 15yr analysis.
+
+15yr Astrophysics Analysis
+https://ui.adsabs.harvard.edu/abs/2023ApJ...952L..37A/abstract
+
+Notes
+-----
+[1] : The 15yr Astro paper quotes an initial separation (the `hard_sepa_init`) variable of "1e3 pc",
+      this is incorrect and the actual value used in the analysis was 1e4 pc.
+
 """
 
 from holodeck.constants import PC, GYR
