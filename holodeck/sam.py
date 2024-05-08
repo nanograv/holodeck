@@ -908,7 +908,8 @@ class Semi_Analytic_Model:
 
         gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
 
-        return gwb
+        #return gwb
+        return gwb, redz_final, number
 
     def gwb_old(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=100):
         """Calculate GWB using new `dynamic_binary_number_at_fobs` method, better, but slower.
