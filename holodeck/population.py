@@ -306,7 +306,7 @@ class Pop_Illustris(_Population_Discrete):
 
     """
 
-    def __init__(self, fname=None, **kwargs):
+    def __init__(self, fname=None, fixed_sepa=None, **kwargs):
         """Initialize a binary population using data in the given filename.
 
         Parameters
@@ -324,6 +324,9 @@ class Pop_Illustris(_Population_Discrete):
         fname = os.path.join(_PATH_DATA, fname) # assumes file in data directory
 
         self._fname = fname             #: Filename for binary data
+
+        self._fixed_sepa = fixed_sepa ####
+
         super().__init__(**kwargs)
         return
 
@@ -332,6 +335,7 @@ class Pop_Illustris(_Population_Discrete):
         """
         super()._init()
         fname = self._fname
+        fixed_sepa = self._fixed_sepa ####
         header, data = utils.load_hdf5(fname)
         
         print(f"fname = {fname}")
@@ -356,7 +360,11 @@ class Pop_Illustris(_Population_Discrete):
             # Set initial separation to sum of stellar half-mass radii
             gal_rads = data['SubhaloHalfmassRadType']
             gal_rads = gal_rads[:, st_idx, :]
-            self.sepa = np.sum(gal_rads, axis=-1)       #: Initial binary separation [cm]
+            if (fixed_sepa is not None):
+                ### DEBUG - testing sepa initialization
+                self.sepa = np.ones_like(gal_rads[:,0]) * fixed_sepa      #: Initial binary separation [cm]
+            else:
+                self.sepa = np.sum(gal_rads, axis=-1)       #: Initial binary separation [cm]
             self.scafa = data['time']              #: scale-factor at time of 'merger' event in sim []
             self.mass = data['SubhaloBHMass']      #: progenitor BH Masses in subhalo [grams]
             # ---- Galaxy Properties
@@ -385,18 +393,24 @@ class Pop_Illustris(_Population_Discrete):
             gal_rads = gal_rads[:, :, st_idx]
             #print('st_idx=',st_idx)
             #print(gal_rads.min(),gal_rads.max(),gal_rads.shape)
-            self.sepa = np.sum(gal_rads[:,:2], axis=-1)       #: Initial binary separation [cm]
+            if (fixed_sepa is not None):
+                ### DEBUG - testing sepa initialization
+                self.sepa = np.ones_like(gal_rads[:,0]) * fixed_sepa      #: Initial binary separation [cm]
+            else:
+                self.sepa = np.sum(gal_rads[:,:2], axis=-1)       #: Initial binary separation [cm]
+
             #print(self.sepa.min(), self.sepa.max())
             self.scafa = np.array([ np.maximum(tFirstProg,tNextProg) for tFirstProg,tNextProg 
                                     in zip(data['time'][:,0],data['time'][:,1]) ]) 
             #: progenitor BH Masses in subhalo [grams]
             self.mass = data['SubhaloBHMass'][:,:2] 
+
             # ---- Galaxy Properties
             # Get the stellar mass, and take that as bulge mass
-            self.mbulge = data['SubhaloMassInRadType'][:, :, st_idx] 
+            self.mbulge = data['SubhaloMassInRadType'][:, :2, st_idx] 
             self.vdisp = data['SubhaloVelDisp'] * 1.0e5   #: Velocity dispersion of galaxy [?cm/s?]
 
-        print(f"sample volume = {self._sample_volume/(1.0e6*PC)**3} [Mpc^3];"
+        print(f"sample volume = {self._sample_volume} [cgs] = {self._sample_volume/(1.0e6*PC)**3} [Mpc^3];"
               f" vol^(1/3) = {(self._sample_volume)**(1.0/3.0)/(1.0e6*PC)} [Mpc]")
         print(f"Read {self.mass.shape[0]} mergers from file.")
         
@@ -650,7 +664,7 @@ class PM_Mass_Reset(_Population_Modifier):
     """Reset the masses of a target population based on a given M-Host relation.
     """
 
-    def __init__(self, mhost, scatter=True):
+    def __init__(self, mhost, scatter=True, rescale_mbulge=False):
         """Initialize the modifier.
 
         Parameters
@@ -668,6 +682,8 @@ class PM_Mass_Reset(_Population_Modifier):
         # store attributes
         self.mhost = mhost         #: Scaling relationship between host and MBH (`holo.relations._Host_Relation`)
         self._scatter = scatter    #: Bool determining whether resampled masses should include statistical scatter
+        #: Bool determining whether to rescale mbulge, needed for TNG300 due to lack of res convergence 
+        self._rescale_mbulge = rescale_mbulge 
         return
 
     def modify(self, pop):
@@ -680,6 +696,15 @@ class PM_Mass_Reset(_Population_Modifier):
 
         """
         scatter = self._scatter
+
+        rescale_mbulge = self._rescale_mbulge
+        if rescale_mbulge == True:
+            print("Note: rescaling mbulge by constant factor of 1.4. This should *only* apply to TNG300"
+                  "and needs to be implemented properly by halo mass bin according to Appendix A in"
+                  "Pillepich et al. 2018, MNRAS 475, 648. And needs to be implemented with more safeguards"
+                  "so that it doesn't get used accidentally in other cases.")
+            pop.mbulge = pop.mbulge * 1.4
+        
         # Store old version
         pop._mass = pop.mass
         # if `scatter` is `True`, then it is set to the value in `mhost.SCATTER_DEX`
@@ -704,4 +729,23 @@ class PM_Density(_Population_Modifier):
             log.exception("Failed to modify `pop._sample_volume`= ({pop._sample_volume}) by factor of {self._factor}")
             raise
 
+        return
+
+class PM_Sepa_Reset(_Population_Modifier):
+
+
+    def __init__(self, new_sepa):
+        """Initialize the modifier.
+        """
+        self._new_sepa = new_sepa
+        return
+    
+    def modify(self, pop):
+        """Reset the initial separation of a target population to a specific value.
+        """
+        # store old version
+        
+        pop._sepa = pop.sepa
+        
+        pop.sepa = self._new_sepa * np.ones_like(pop._sepa)
         return
