@@ -551,8 +551,10 @@ class Semi_Analytic_Model:
             # `gmt` returns [sec]
             dens /= gmt_time
             # now `dens` is  ``dn_gal / [dlog10(Mstar) dq_gal dz]``  with units of [Mpc^-3]
-            # save galaxy merger number density as a separate class variable:
+            
+            # save galaxy merger number density and galaxy merger rate as separate class variables:
             self._dens_gal_gal = dens
+            self._gal_mrg_rate = self._gpf(mass_gpf, mstar_rat, redz) / gmt_time
             
             # ---- Convert to MBH Binary density
 
