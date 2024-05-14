@@ -6,13 +6,14 @@ and not the semi-analytic or observational population models.
 
 """
 
+from typing import Any
 import numba
 import numpy as np
 
 import kalepy as kale
 
 import holodeck as holo
-from holodeck import utils, cosmo, log
+from holodeck import utils, cosmo, log, hardening
 from holodeck.constants import SPLC, NWTG, MPC
 
 
@@ -21,7 +22,7 @@ _CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen']
 
 class Grav_Waves:
 
-    def __init__(self, bin_evo, fobs_gw, nharms=30, nreals=100):
+    def __init__(self, bin_evo, fobs_gw, nharms=103, nreals=100):
         self.fobs_gw = fobs_gw
         self.nharms = nharms
         self.nreals = nreals
@@ -38,15 +39,11 @@ class GW_Discrete(Grav_Waves):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._box_vol_cgs = self._bin_evo._sample_volume
-
-        dlnf = np.diff(np.log(self.fobs_gw))
-        if not np.allclose(dlnf[0], dlnf):
-            log.exception("`GW_Discrete` will not work properly with unevenly sampled frequency (log-space)!")
-
         return
 
     def emit(self, eccen=None, stats=False, progress=True, nloudest=5):
         fobs_gw = self.fobs_gw
+        nfreqs = fobs_gw.size
         nharms = self.nharms
         nreals = self.nreals
         bin_evo = self._bin_evo
@@ -58,15 +55,17 @@ class GW_Discrete(Grav_Waves):
         if eccen not in [True, False]:
             raise ValueError("`eccen` '{}' is invalid!".format(eccen))
 
-        loudest = np.zeros((fobs_gw.size, nloudest, nreals))
-        fore = np.zeros((fobs_gw.size, nreals))
-        back = np.zeros((fobs_gw.size, nreals))
-        both = np.zeros((fobs_gw.size, nreals))
+        loudest = np.zeros((nfreqs, nloudest, nreals))
+        fore = np.zeros((nfreqs, nreals))
+        back = np.zeros((nfreqs, nreals))
+        both = np.zeros((nfreqs, nreals))
 
         if eccen:
             harm_range = range(1, nharms+1)
         else:
             harm_range = [2]
+
+        harms = np.zeros((nfreqs, nharms))
 
         freq_iter = enumerate(fobs_gw)
         freq_iter = utils.tqdm(freq_iter, total=len(fobs_gw), desc='GW frequencies') if progress else freq_iter
@@ -74,20 +73,81 @@ class GW_Discrete(Grav_Waves):
             lo = fobs_gw[0] if (ii == 0) else fobs_gw[ii-1]
             hi = fobs_gw[1] if (ii == 0) else fobs_gw[ii]
             dlnf = np.log(hi) - np.log(lo)
-            _both, _fore, _back, _loud = _gws_harmonics_at_evo_fobs(
+            _both, _fore, _back, _loud, _gwb_harms = _gws_harmonics_at_evo_fobs(
                 fogw, dlnf, bin_evo, harm_range, nreals, box_vol, loudest=nloudest
             )
             loudest[ii, :] = _loud
             both[ii, :] = _both
             fore[ii, :] = _fore
             back[ii, :] = _back
+            harms[ii, :] = _gwb_harms
 
         self.both = np.sqrt(both)
         self.fore = np.sqrt(fore)
         self.back = np.sqrt(back)
         self.strain = np.sqrt(back + fore)
         self.loudest = loudest
+        self.harms = harms
         return
+
+
+class LISA:
+
+    def __init__(self, mission_duration_yrs=5.0, fobs=(1.0e-7, 1.0, 1000)):
+        from astropy import units as u
+        try:
+            import legwork
+        except ModuleNotFoundError:
+            err = (
+                "Could not load `legwork` module, required for `LISA` class.  "
+                "Run `$ pip install legwork` to install."
+            )
+            raise ModuleNotFoundError(err)
+
+        dur = mission_duration_yrs * u.yr
+        fobs = np.logspace(*np.log10(fobs[:2]), fobs[2]) * u.Hz
+
+        lisa_psd = legwork.psd.power_spectral_density(f=fobs, t_obs=dur)
+        lisa_hc = np.sqrt(fobs * lisa_psd)
+        self.sensitivity_fo = fobs.cgs.value
+        self.sensitivity_hc = lisa_hc.value
+        return
+
+    @property
+    def sensitivity(self):
+        return self.sensitivity_fo, self.sensitivity_hc
+
+    def is_above_hc_curve(self, ff, hc):
+        """Determine which frequencies and strains are above the LISA sensitivity curve.
+
+        Arguments
+        ---------
+        ff : array_like of float
+            Frequencies of binaries.  Units of [Hz]
+        hc : array_like of float
+            Characterstic-strains of binaries.
+
+        Returns
+        -------
+        sel : array_like of bool
+            Whether or not the corresponding binary is detectable.
+            Matches the shape of `ff`.
+
+        """
+
+        # get sensitivity curve, `fl` frequencies in [1/sec], `hl` characteristic-strain sensitivity
+        fl, hl = self.sensitivity
+
+        # use logarithmic interpolation to find the LISA sensitivity curve at the binary frequencies
+        # if the binary frequencies are outside of the LISA band, `NaN` values are returned
+        sens_at_ff = utils.interp(ff, fl, hl, xlog=True, ylog=True)
+        # select binaries above sensitivity curve, `NaN` values (i.e. outside of band) will be False.
+        sel = (hc > sens_at_ff)
+        return sel
+
+    # @utils.copy_docstring(is_above_hc_curve)
+    def __call__(self, ff, hc):
+        return self.is_above_hc_curve(ff, hc)
 
 
 def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, loudest=5):
@@ -126,6 +186,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
         realizations.
     loud : (L, R) ndarray,
         Strains of the `L` loudest binaries (L=`loudest` input parameter) for each realization.
+    gwb_harms : (H,)
 
     """
 
@@ -137,54 +198,78 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     data_harms = evo.at('fobs', fobs_orb, params=_CALC_MC_PARS)
 
     # Only examine binaries reaching the given locations before redshift zero (other redz=inifinite)
+    # (N, H)
     redz = data_harms['scafa']
     redz = cosmo.a_to_z(redz)
     valid = (redz > 0.0)
+    # There are 'V' valid == True elements of the (N, H) arrays, such that V <= N*H
+    # anytime an (N, H) ndarray is sliced by the `valid` ndarray, it results in a (V,) ndarray
 
-    # Broadcast harmonics numbers to correct shape
-    harms = np.ones_like(redz, dtype=int) * harm_range[np.newaxis, :]
+    # Broadcast harmonics numbers to correct shape, (N, H)
+    harms_2d = np.ones_like(redz, dtype=int) * harm_range[np.newaxis, :]
+    harms_1d = harms_2d[valid]
 
-    # If there are eccentricities, calculate the freq-dist-function
-    # shape (N, H)
+    # ---- Handle Eccentricities and eccentricity distribution function
+
+    # `None`  or  ndarray shape (N, H)
     eccen = data_harms['eccen']
+    # for circular binaries, we should only be consider the n=2 harmonic, and gne(n=2)=1.0
     if eccen is None:
         gne = 1
+        assert np.all(harms_2d == 2)
+
+    # If there are eccentricities, calculate the freq-dist-function
     else:
-        gne = utils.gw_freq_dist_func(harms[valid], ee=eccen[valid])
+        # (V,) array [i.e. the `valid` slice of (N, H)]
+        eccen = eccen[valid]
+        gne = utils.gw_freq_dist_func(harms_1d, ee=eccen)
+
+        # Handle (near-)zero eccentricities manually
+        # when eccentricity is very low, set all harmonics to zero except for n=2
+
         # Select the elements corresponding to the n=2 (circular) harmonic, to use later
+        # (N, H)
         sel_n2 = np.zeros_like(redz, dtype=bool)
-        sel_n2[(harms == 2)] = 1
+        sel_n2[(harms_2d == 2)] = 1
+        # (V,)
         sel_n2 = sel_n2[valid]
 
-        # BUG: FIX: NOTE: this fails for zero eccentricities (at times?)
-        # This is a reasonable, perhaps temporary, fix: when eccentricity is very low, set all
-        # harmonics to zero except for n=2
-        sel_e0 = (eccen[valid] < 1e-12)
+        # Select near-zero eccentricities and set the gne values manually
+        sel_e0 = (eccen < 1e-12)
         gne[sel_e0] = 0.0
         gne[sel_n2 & sel_e0] = 1.0
 
+    # ---- Calculate GWB
+
+    frst_orb = utils.frst_from_fobs(fobs_orb, redz)
     # Select only the valid elements, also converts to 1D, i.e. (N, H) ==> (V,)
-    harms = harms[valid]
     redz = redz[valid]
+    frst_orb = frst_orb[valid]
     # Calculate required parameters for valid binaries (V,)
     dcom = cosmo.z_to_dcom(redz)
-    frst_orb = utils.frst_from_fobs(fobs_gw, redz) / harms
+
     mchirp = data_harms['mass'][valid]
     mchirp = utils.chirp_mass(*mchirp.T)
     # Calculate strains from each source
     hs2 = utils.gw_strain_source(mchirp, dcom, frst_orb)**2
 
     dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], data_harms['sepa'][valid], frst_orb=frst_orb)
-    _lambda_fact = utils.lambda_factor_dlnf(frst_orb, dfdt, redz, dcom=None) / box_vol
+    _lambda_fact = utils.lambda_factor_dlnf(frst_orb, dfdt, redz, dcom=dcom) / box_vol
     num_binaries = _lambda_fact * dlnf
 
     shape = (num_binaries.size, nreals)
-    # num_pois = np.random.poisson(num_binaries[:, np.newaxis], shape)
     num_pois = poisson_as_needed(num_binaries[:, np.newaxis] * np.ones(shape))
 
     # --- Calculate GW Signals
-    temp = hs2 * gne * (2.0 / harms)**2
+    temp = hs2 * gne * (2.0 / harms_1d)**2
     both = np.sum(temp[:, np.newaxis] * num_pois / dlnf, axis=0)
+
+    # Calculate and return the expectation value hc^2 for each harmonic
+    # (N, H)
+    gwb_harms = np.zeros_like(harms_2d, dtype=float)
+    gwb_harms[valid] = temp * num_binaries / dlnf
+    # (N, H) ==> (H,)
+    gwb_harms = np.sum(gwb_harms, axis=0)
 
     if np.any(num_pois > 0):
         # Find the L loudest binaries in each realizations
@@ -196,7 +281,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
         loud = np.zeros((loudest, nreals))
 
     back = both - fore
-    return both, fore, back, loud
+    return both, fore, back, loud, gwb_harms
 
 
 def _gws_from_samples(vals, weights, fobs_gw_edges):
@@ -216,11 +301,11 @@ def _gws_from_samples(vals, weights, fobs_gw_edges):
 
     Returns
     -------
-    gff : (F,) ndarry,
+    gff : (F,) ndarray,
         Observer-frame GW-frequencies of the loudest binary in each bin [1/sec].
-    gwf : (F,) ndarry,
+    gwf : (F,) ndarray,
         GW Foreground: the characteristic strain of the loudest binary in each frequency bin.
-    gwb : (F,) ndarry,
+    gwb : (F,) ndarray,
         GW Background: the characteristic strain of the GWB in each frequency bin.
         Does not include the strain from the loudest binary in each bin (`gwf`).
 
@@ -348,7 +433,7 @@ def gws_from_sampled_strains(fobs_gw_edges, fo, hs, weights):
     return gwf_freqs, gwfore, gwback
 
 
-def sampled_gws_from_sam(sam, fobs_gw, hard=holo.hardening.Hard_GW, **kwargs):
+def sampled_gws_from_sam(sam, fobs_gw, hard=hardening.Hard_GW, **kwargs):
     """Sample the given binary population between the target frequencies, and calculate GW signals.
 
     NOTE: the input `fobs` are interpretted as bin edges, and GW signals are calculate within the
@@ -525,7 +610,7 @@ def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
 
     # convert from hc^2 to hc
     hc2 = np.sqrt(hc2)
-    # this is for clarity, note that it does not duplicate the memory
+    # hc is redefined for clarity, note that it does not duplicate the memory
     hc = hc2
 
     return hc
@@ -639,6 +724,38 @@ def char_strain_sq_from_bin_edges_redz(edges, redz):
     hc2 = (hs ** 2) * (fc / df)
     return hc2
 
+def strain_amp_from_bin_edges_redz(edges, redz):
+    assert len(edges) == 4
+    assert np.all([np.ndim(ee) == 1 for ee in edges])
+
+    foo = edges[-1]                   #: should be observer-frame orbital-frequencies
+    # df = np.diff(foo)                 #: frequency bin widths
+    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+
+    # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)
+    #    where M, Q, Z are edges and Fc is frequency centers
+    # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
+    for dd in range(3):
+        redz = np.moveaxis(redz, dd, 0)
+        redz = kale.utils.midpoints(redz, axis=0)
+        redz = np.moveaxis(redz, 0, dd)
+
+    # ---- calculate GW strain ----
+    mt = kale.utils.midpoints(edges[0])
+    mr = kale.utils.midpoints(edges[1])
+    # rz = kale.utils.midpoints(edges[2])
+    mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
+    mc = mc[:, :, np.newaxis, np.newaxis]
+    dc = +np.inf * np.ones_like(redz)
+    sel = (redz > 0.0)
+    dc[sel] = cosmo.comoving_distance(redz[sel]).cgs.value
+
+    # convert from observer-frame to rest-frame; still using frequency-bin centers
+    fr = utils.frst_from_fobs(fc[np.newaxis, np.newaxis, np.newaxis, :], redz)
+
+    hs = utils.gw_strain_source(mc, dc, fr)
+    return hs
+
 
 def char_strain_sq_from_bin_edges(edges):
     assert len(edges) == 4
@@ -671,8 +788,8 @@ def char_strain_sq_from_bin_edges(edges):
 # ==============================================================================
 
 
-#! NOTE: THIS IS SLOW PYTHON IMPLEMENTATION FOR TESTING.  USE `holodeck.cytuls.sam_calc_gwb_single_eccen()` !#
-
+# ! NOTE: THIS IS SLOW PYTHON IMPLEMENTATION FOR TESTING.
+# ! USE `holodeck.cytuls.sam_calc_gwb_single_eccen()`
 def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
     """
 
@@ -689,12 +806,21 @@ def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=1
     nharms : int
         Number of harmonics to use in calculating GWB.
 
+    Returns
+    -------
+    gwfobs_harms : Observer-frame GW harmonic frequencies.
+    gwb : (F,) ndarray
+        GW Background: the ideal characteristic strain of the GWB in each frequency bin.
+        Does not include the strain from the loudest binary in each bin (`gwf`).
+    ecc_out :
+    tau_out :
     """
 
     # NOTE: need to check for coalescences and set to zero
     # NOTE: need to check for frequencies below starting separation and set to zero
 
-    frst_orb_evo = utils.kepler_freq_from_sepa(sam.mtot[:, np.newaxis], sepa_evo[np.newaxis, :])
+    frst_orb_evo = utils.kepler_freq_from_sepa(sam.mtot[:, np.newaxis],
+                                               sepa_evo[np.newaxis, :])
 
     assert np.ndim(gwfobs) == 1
     assert np.ndim(frst_orb_evo) == 2
@@ -756,7 +882,8 @@ def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=1
                 # interpolate to target (rest-frame) frequency
                 # this is the same for all mass-ratios
                 # () scalar
-                ecc = np.interp(gwfr, frst_evo, eccen_evo, left=np.nan, right=np.nan)
+                ecc = np.interp(gwfr, frst_evo, eccen_evo,
+                                left=np.nan, right=np.nan)
                 # ecc_2 = np.interp(sa, sepa[::-1], eccen_evo[::-1], left=np.nan, right=np.nan)
 
                 # da/dt values are negative, get a positive rate
@@ -807,6 +934,29 @@ def sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
 
 
 def sam_calc_gwb_single_eccen_discrete(gwfobs, sam, sepa_evo, eccen_evo, nharms=100, nreals=None):
+    """
+    Parameters
+    ----------
+    gwfobs : (F,) array_like
+        Observer-frame frequencies at which to calculate GWB.
+    sam : `Semi_Analytic_Model` instance
+        Binary population to sample. See `holodeck.simple_sam` or 'holodeck.sam`
+    sepa_evo :
+        Separation at each evolution step.
+    eccen_evo : (E,) array_like
+        Eccentricities at each evolution step.  The same for all binaries, corresponding to fixed
+        binary separations for all binaries.
+    nharms : int, optional
+        Number of harmonics to use in calculating GWB.
+    nreals : int or None, optional
+        Number of realizations to calculate in Poisson sampling.
+
+    Returns
+    -------
+    gwb : (F,) ndarray,
+        GW Background: the characteristic strain of the GWB in each frequency bin.
+        Does not include the strain from the loudest binary in each bin (`gwf`).
+    """
     import holodeck.cyutils  # noqa
 
     ndens = sam.static_binary_density
@@ -820,7 +970,10 @@ def sam_calc_gwb_single_eccen_discrete(gwfobs, sam, sepa_evo, eccen_evo, nharms=
     else:
         squeeze = False
 
-    gwb = holo.cyutils.sam_calc_gwb_single_eccen_discrete(ndens, mt_l10, mr, rz, dc, gwfobs, sepa_evo, eccen_evo, nharms, nreals)
+    gwb = holo.cyutils.sam_calc_gwb_single_eccen_discrete(ndens, mt_l10, mr,
+                                                          rz, dc, gwfobs,
+                                                          sepa_evo, eccen_evo,
+                                                          nharms, nreals)
 
     if squeeze:
         gwb = gwb.squeeze()

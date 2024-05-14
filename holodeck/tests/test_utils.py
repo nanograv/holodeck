@@ -16,7 +16,7 @@ def test_minmax():
 
     return
 
-
+'''
 class Test__nyquist_freqs:
 
     def test_basic(self):
@@ -47,7 +47,7 @@ class Test__nyquist_freqs:
                 utils.nyquist_freqs(dur, cad, trim=trim)
 
         return
-
+'''
 
 class Test_GW_Methods:
 

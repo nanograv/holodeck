@@ -2,139 +2,147 @@
 holodeck
 ========
 
-|rtd| |actions|
+.. include:: header.rst
 
-.. |rtd|
-   image:: https://readthedocs.org/projects/kalepy/badge/?version=latest
-   target:: https://kalepy.readthedocs.io/en/latest/
+**Massive Black-Hole Binary Population Synthesis for Gravitational Wave Calculations ≋●≋●≋**
 
-.. |actions|
-   image:: https://github.com/nanograv/holodeck/actions/workflows/tests.yaml/badge.svg
-   target:: https://github.com/nanograv/holodeck/actions/workflows/tests.yaml
-
-*Massive Black-Hole Binary Population Synthesis for Gravitational Wave Calculations ≋●≋●≋*
+.. image:: /../media/holodeck_logo.png
+  :width: 260
+  :alt: holodeck (NANOGrav AstroWG) logo
+  :target: https://github.com/nanograv/holodeck
+  :align: right
 
 `holodeck on github <https://github.com/nanograv/holodeck>`_
 
-This package is aimed at providing a comprehensive framework for MBH binary population synthesis.  The framework includes modules to perform pop synth using a variety of methodologies to get a handle on both statistical and systematic uncertainties.  Currently, binary populations can be synthesized based on: cosmological hydrodynamic simulations (Illustris), semi-analytic/semi-empirical models (SAMs), and observational catalogs of local galaxies and/or quasars.
+This package provides a comprehensive framework for MBH binary population synthesis.  The framework includes modules to perform population synthesis using a variety of methodologies from semi-analytic models, to cosmological hydrodynamic simulations, and even observationally-derived galaxy merger catalogs.
 
 **This File:**
 
 .. contents:: :local:
-
-
-Contents of Documentation
-=========================
-
-| A guide can be found in :doc:`Getting Started <getting_started>`.
-| `The README file on github also includes installation and quick-start examples. <https://github.com/nanograv/holodeck/blob/master/README.md>`_.
-| There are a large number of demonstration/testing notebooks included in `the package notebooks <https://github.com/nanograv/holodeck/tree/master/notebooks>`_.
+   :depth: 1
 
 .. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Getting Started Guide
+
+   Introduction <getting_started/index>
+   Libraries <getting_started/libraries>
+   NANOGrav 15yr <getting_started/nanograv_15yr>
+
+.. toctree::
+   :hidden:
    :maxdepth: 1
+   :caption: Documents
 
-   Getting Started Guide <getting_started>
-   Calculating Gravitational Waves <calc_gws>
-   Definitions and Abbreviations <defs_abbrevs>
-   Annotated Bibliography <biblio>
-   Full Package Documentation <holodeck>
+   Definitions & Abbreviations <defs_abbrevs>
+   Bibliography <biblio>
+   Development & Contributions <development>
 
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Full Package Documentation
+
+   holodeck <api_ref/holodeck>
+   holodeck.discrete (module) <api_ref/holodeck.discrete>
+   holodeck.sams (module) <api_ref/holodeck.sams>
+   holodeck.librarian (module) <api_ref/holodeck.librarian>
+   holodeck.accretion <api_ref/holodeck.accretion>
+   holodeck.constants <api_ref/holodeck.constants>
+   holodeck.cyutils <api_ref/holodeck.cyutils>
+   holodeck.galaxy_profiles <api_ref/holodeck.galaxy_profiles>
+   holodeck.gravwaves <api_ref/holodeck.gravwaves>
+   holodeck.hardening <api_ref/holodeck.hardening>
+   holodeck.logger <api_ref/holodeck.logger>
+   holodeck.plot <api_ref/holodeck.plot>
+   holodeck.host_relations <api_ref/holodeck.host_relations>
+   holodeck.utils <api_ref/holodeck.utils>
+
+
+Getting Started
+===============
+
+(1) Read the :doc:`getting started <getting_started/index>` guide.
+(2) Install |holodeck| following the `installation`_ instructions below.
+(3) Explore the `package demonstration notebooks <https://github.com/nanograv/holodeck/tree/main/notebooks>`_.
 
 
 Installation
 ============
 
-The `holodeck` framework is currently under substantial, active development.  It will not available on `pypi` (`pip`) or via `conda` install until it has stabilized.  Currently `holodeck` requires `python >= 3.8` (See `Python Versions`_ below), and tests are run on versions `3.8`, `3.9`, `3.10`.  To build directly from source:
+The |holodeck| framework is currently under substantial, active development.  Stable versions are now available with ``pip install holodeck-gw`` (see `holodeck on pypi <https://pypi.org/project/holodeck-gw>`_).  However, recent versions and many development tools will not generally be available with ``pip`` or ``conda`` install.
 
-.. code-block:: bash
+|holodeck| requires ``python >= 3.9`` (with support for: ``3.9, 3.10, 3.11``).  The recommended installation is:
 
-    git clone https://github.com/nanograv/holodeck.git
-    pip install -e holodeck -r holodeck/requirements-dev.txt
+0) OPTIONAL & recommended: create and activate a new **anaconda** environment to isolate your build::
 
-The `pip install -e` command builds the package in 'editable' mode, so that changes to the source code are reflected in the package when it's imported from external python code.  The `-r holodeck/requirements-dev.txt` install not only the standard package requirements, but also the 'development' requirements.
+      conda create --name holo311 python=3.11; conda activate holo311
 
-Currently tests are run on python versions 3.8, 3.9, 3.10.  Ensure that you are using version >= 3.8
+   Note that you will need to activate this environment every time you want to use holodeck.  If you're not familiar with **anaconda**, take a look at their official `Getting started guide <https://conda.io/projects/conda/en/latest/user-guide/getting-started.html#managing-python>`_.  To use your anaconda environment with jupyter notebooks, make sure to add this environment to your ipython kernels::
 
-To uninstall the package, you can run `pip uninstall holodeck`.
+      conda install -c conda-forge ipykernel
+      python -m ipykernel install --user --name=holo311
 
-Python Versions
----------------
+1) Clone the ``holodeck`` repository, and move into the repo directory::
 
-If you do not currently use one of these python versions, it is strongly recommended to use `anaconda <https://www.anaconda.com/products/distribution>`_ which makes managing/using multiple python versions very easy.  `anaconda` is available through most OS package managers, for example `homebrew` on macos.  With `anaconda` installed, you can create a new conda environment:
+      git clone https://github.com/nanograv/holodeck.git; cd holodeck
 
-.. code-block:: bash
+2) Install the required external packages specified in the requirements file::
 
-   conda create -n py39_holodeck python=3.9     # create a new environment named `py39_holodeck` with python version 3.9
-   conda activate py39_holodeck                 # activate the new conda environment
-   pip install -e . -r requirements-dev.txt     # install holodeck from within the holodeck top-level directory
+      pip install -r requirements.txt
 
-All conda environments currently active on your system can be listed with `conda info -e`.  To deactivate an environment, use the command `conda deactivate`.
+   OPTIONAL: install development requirements::
 
+      pip install -r requirements-dev.txt
 
-Development & Contributions
-===========================
+3) Build the required c libraries from ``holodeck`` ``cython`` code::
 
-This project is being led by the `NANOGrav <http://nanograv.org/>`_ Astrophysics Working Group.
+      python setup.py build_ext -i
 
-Details on contributions and the mandatory code of conduct can be found in `CONTRIBUTING.md <https://raw.githubusercontent.com/nanograv/holodeck/docs/CONTRIBUTING.md>`_.
+4) Perform a development/editable local installation::
 
-To-do items and changes to the API should be included in the `CHANGELOG.md <https://raw.githubusercontent.com/nanograv/holodeck/docs/CHANGELOG.md>`_.
+      python setup.py develop
 
-Contributions are not only welcome but encouraged, anywhere from new modules/customizations to bug-fixes to improved documentation and usage examples.  The git workflow is based around a `main` branch which is intended to be (relatively) stable and operational, and an actively developed `dev` branch.  New development should be performed in "feature" branches (made off of the `dev` branch), and then incorporated via pull-request (back into the `dev` branch).
+The 'editable' installation allows the code base to be modified, and have those changes take effect when using the ``holodeck`` module without having to rebuild/reinstall it.  Note that any changes to the ``cython`` library files do still require a rebuild by running steps (3) and (4) above.
 
-Formatting
-----------
+MPI
+---
 
-New code should generally abide by PEP8 formatting, with `numpy` style docstrings.  Exceptions are:
+For some scripts (particularly for generating libraries), an MPI implementation is required (e.g. ``openmpi``), along with the `mpi4py package <https://github.com/mpi4py/mpi4py>`_.  This is not included as a requirement in the ``requirements.txt`` file as it significantly increases the installation complexity, and is not needed for many ``holodeck`` use cases.  If you already have an MPI implementation installed on your system, you should be able to install ``mpi4py`` with anaconda: ``conda install mpi4py``.  To see if you have ``mpi4py`` installed, run ``python -c 'import mpi4py; print(mpi4py.__version__)'`` from a terminal.
 
-* lines may be broken at either 100 or 120 columns
+**macos users**: if you are using homebrew on macos, you should be able to simply run: ``brew install mpi4py`` which will `include the required openmpi implementation <https://mpi4py.readthedocs.io/en/latest/install.html#macos>`_.
 
-Notebooks
----------
-
-Please strip all notebook outputs before commiting notebook changes.  The `[nbstripout](https://github.com/kynan/nbstripout)` package is an excellent option to automatically strip all notebook output only in git commits (i.e. it doesn't change your notebooks in-place).  You can also use `nbconvert` to strip output in place: `jupyter nbconvert --clear-output --inplace <NOTEBOOK-NAME>.ipynb`.
-
-To install `nbstripout` for the `holodeck` git package, make sure you're in the `holodeck` root directory and run:
-
-.. code-block:: bash
-
-  pip install --upgrade nbstripout    # install nbstripout
-  nbstripout --install                # install git hook in current repo only
-
-
-Test Suite
-----------
-
-**Before submitting a pull request, run `$ tox` to execute the full suite of builtin tests.**
-
-(Unit)tests should be developed in two ways: for simple functions/behaviors, standard unit-tests can be placed in the `holodeck/tests/` directory.  More complex functionality should be tested in notebooks (in `notebooks/`) where they can also be used as demonstrations/tutorials for that behavior.  The python script `scripts/convert_notebook_tests.py` converts target notebooks into python scripts in the `holodeck/tests/converted_notebooks` directory, which can then be run by `pytest`.  The script `scripts/tester.sh` will run the conversion script and then run `pytest`, for help and usage information, run `$ scripts/tester.sh -h`.
-
-The full test suite can be run on all supported python versions using `tox`.  In the base package directory, simply run `$ tox` and it will use `conda` to create environments and run tests on all supported python versions.  To include the notebook tests, make sure to run `scripts/tester.sh` before running `tox`.
 
 
 Attribution & Referencing
 =========================
 
-Copyright (c) 2022, NANOGrav.
+Copyright (c) 2024, NANOGrav.
 
-The `holodeck` package uses an `MIT license <https://raw.githubusercontent.com/nanograv/holodeck/docs/LICENSE>`_.
+The ``holodeck`` package uses an `MIT license <https://raw.githubusercontent.com/nanograv/holodeck/docs/LICENSE>`_.
 
-A NANOGrav paper on `holodeck` is currently in preparation.
+A dedicated paper on ``holodeck`` is currently in preparation, but the package is also described in the recent `astrophysics analysis from the NANOGrav 15yr dataset <https://ui.adsabs.harvard.edu/abs/2023ApJ...952L..37A/abstract>`_.
 
-.. .. code-block:: tex
+.. code-block:: tex
 
-..     @article{Kelley2021,
-..       doi = {10.21105/joss.02784},
-..       url = {https://doi.org/10.21105/joss.02784},
-..       year = {2021},
-..       publisher = {The Open Journal},
-..       volume = {6},
-..       number = {57},
-..       pages = {2784},
-..       author = {Luke Zoltan Kelley},
-..       title = {kalepy: a Python package for kernel density estimation, sampling and plotting},
-..       journal = {Journal of Open Source Software}
-..     }
+   @ARTICLE{2023ApJ...952L..37A,
+         author = {{Agazie}, Gabriella and {et al} and {Nanograv Collaboration}},
+         title = "{The NANOGrav 15 yr Data Set: Constraints on Supermassive Black Hole Binaries from the Gravitational-wave Background}",
+         journal = {\apjl},
+            year = 2023,
+         month = aug,
+         volume = {952},
+         number = {2},
+            eid = {L37},
+         pages = {L37},
+            doi = {10.3847/2041-8213/ace18b},
+   archivePrefix = {arXiv},
+         eprint = {2306.16220},
+   primaryClass = {astro-ph.HE},
+         adsurl = {https://ui.adsabs.harvard.edu/abs/2023ApJ...952L..37A},
+   }
+
 
 Indices and tables
 ==================

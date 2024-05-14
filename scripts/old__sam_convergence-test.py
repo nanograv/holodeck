@@ -39,7 +39,7 @@ def run_with_shape(fobs, num, nreals, sample_threshold, axis=None, **kw):
     gsmf = holo.sam.GSMF_Schechter()        # Galaxy Stellar-Mass Function (GSMF)
     gpf = holo.sam.GPF_Power_Law()          # Galaxy Pair Fraction         (GPF)
     gmt = holo.sam.GMT_Power_Law()          # Galaxy Merger Time           (GMT)
-    mmbulge = holo.relations.MMBulge_Standard()     # M-MBulge Relation            (MMB)
+    mmbulge = holo.host_relations.MMBulge_Standard()     # M-MBulge Relation            (MMB)
     hard = holo.hardening.Hard_GW
 
     sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge, shape=num)

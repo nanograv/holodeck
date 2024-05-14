@@ -13,8 +13,8 @@ import matplotlib.cm as cm
 import kalepy as kale
 
 import holodeck as holo
-from holodeck import cosmo, utils, observations, log
-from holodeck.constants import MSOL, PC, YR
+from holodeck import utils, log
+from holodeck.constants import MSOL, YR
 
 FIGSIZE = 6
 FONTSIZE = 13
@@ -38,24 +38,28 @@ LABEL_GW_FREQUENCY_NHZ = r"GW Frequency $[\mathrm{nHz}]$"
 LABEL_SEPARATION_PC = r"Binary Separation $[\mathrm{pc}]$"
 LABEL_CHARACTERISTIC_STRAIN = r"GW Characteristic Strain"
 LABEL_HARDENING_TIME = r"Hardening Time $[\mathrm{Gyr}]$"
-
+LABEL_CLC0 = r"$C_\ell / C_0$"
 
 PARAM_KEYS = {
     'hard_time': r"phenom $\tau_f$",
-    'hard_gamma_inner': r"phenom $\gamma_\mathrm{inner}$",
-    'hard_gamma_outer': r"phenom $\gamma_\mathrm{outer}$",
-    'hard_gamma_rot' : r"phenom $\gamma_{\mathrm{rot}}$",
-    'gsmf_phi0': r"GSMF $\Phi_0$",
-    'gsmf_mchar0_log10': r"GSMF $\log_{10}(M_0/M_\odot)$",
-    'gsmf_alpha0': r"GSMF $\alpha_0$",
-    'gpf_zbeta': r"GPF $\beta_z$",
-    'gpf_qgamma': r"GPF $\gamma_q$",
-    'gmt_norm': r"GMT $\tau_\mathrm{GMT}$",
-    'gmt_zbeta': r"GMT $\beta_z$",
-    'mmb_mamp_log10': r"MMB $\log_{10}(M_0/M_\odot)$",
-    'mmb_plaw': r"MMB $\alpha$",
-    'mmb_scatter_dex': r"MMB $\epsilon$",
+    'hard_gamma_inner': r"phenom $\nu_\mathrm{inner}$",
+    'hard_gamma_outer': r"phenom $\nu_\mathrm{outer}$",
+    'hard_gamma_rot' : r"phenom $\nu_{\mathrm{rot}}$",
+    'gsmf_phi0': r"GSMF $\psi_0$",
+    'gsmf_mchar0_log10': r"GSMF $m_{\psi,0}$",
+    'gsmf_alpha0': r"GSMF $\alpha_{\psi,0}$",
+    'gpf_zbeta': r"GPF $\beta_{p,z}$",
+    'gpf_qgamma': r"GPF $\gamma_{p,0}$",
+    'gmt_norm': r"GMT $T_0$",
+    'gmt_zbeta': r"GMT $\beta_{t,z}$",
+    'mmb_mamp_log10': r"MMB $\mu$",
+    'mmb_plaw': r"MMB $\alpha_{\mu}$",
+    'mmb_scatter_dex': r"MMB $\epsilon_{\mu}$",
 }
+
+LABEL_DPRATIO = r"$\langle N_\mathrm{SS} \rangle / \mathrm{DP}_\mathrm{BG}$"
+LABEL_EVSS = r"$\langle N_\mathrm{SS} \rangle$"
+LABEL_DPBG = r"$\mathrm{DP}_\mathrm{BG}$"
 
 COLORS_MPL = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
@@ -102,7 +106,7 @@ class MidpointLogNormalize(mpl.colors.LogNorm):
         return vals
 
 
-def figax_single(**kwargs):
+def figax_single(height=None, **kwargs):
     mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
     plt.rcParams['axes.grid'] = True
     plt.rcParams['grid.alpha'] = 0.15
@@ -115,7 +119,9 @@ def figax_single(**kwargs):
     mpl.rcParams['xtick.labelsize'] = FONTSIZE*0.8
     mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
 
-    figsize_single = [FIGSIZE, FIGSIZE * GOLDEN_RATIO]
+    if height is None:
+        height = FIGSIZE * GOLDEN_RATIO
+    figsize_single = [FIGSIZE, height]
     adjust_single = dict(left=0.15, bottom=0.15, right=0.95, top=0.95)
 
     kwargs.setdefault('figsize', figsize_single)
@@ -125,7 +131,7 @@ def figax_single(**kwargs):
     return figax(**kwargs)
 
 
-def figax_double(**kwargs):
+def figax_double(height=None, **kwargs):
     mpl.style.use('default')   # avoid dark backgrounds from dark theme vscode
     plt.rcParams['axes.grid'] = True
     plt.rcParams['grid.alpha'] = 0.15
@@ -138,7 +144,10 @@ def figax_double(**kwargs):
     mpl.rcParams['xtick.labelsize'] = FONTSIZE*0.8
     mpl.rcParams['ytick.labelsize'] = FONTSIZE*0.8
 
-    figsize_double = [2*FIGSIZE, 2*FIGSIZE*GOLDEN_RATIO]
+    if height is None:
+        height = 2 * FIGSIZE * GOLDEN_RATIO
+
+    figsize_double = [2*FIGSIZE, height]
     adjust_double = dict(left=0.10, bottom=0.10, right=0.98, top=0.95)
 
     kwargs.setdefault('figsize', figsize_double)
@@ -363,7 +372,7 @@ def _get_norm(data, midpoint=None, log=False):
     else:
         try:
             min, max = utils.minmax(data, filter=log)
-        except:
+        except Exception:
             err = f"Input `data` ({type(data)}) must be an integer, (2,) of scalar, or ndarray of scalar!"
             log.exception(err)
             raise ValueError(err)
@@ -494,7 +503,8 @@ def draw_ss_and_gwb(ax, xx, hc_ss, gwb, nsamp=10,
             if(ii==0):
                 label=bglabel
             else: label=None
-            ax.plot(xx, gwb[:, ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-')
+            cc = colors[ci] if color is None else color
+            ax.plot(xx, gwb[:, ii], color=cc, alpha=0.25, lw=1.0, ls='-')
             for ll in range(len(hc_ss[0,0])):
                 if(ll==0):
                     edgecolor='k'
@@ -503,7 +513,7 @@ def draw_ss_and_gwb(ax, xx, hc_ss, gwb, nsamp=10,
                 else:
                     edgecolor=None
                     label=None
-                ax.scatter(xx, hc_ss[:, ii, ll], color=colors[ci], alpha=0.25,
+                ax.scatter(xx, hc_ss[:, ii, ll], color=cc, alpha=0.25,
                            edgecolor=edgecolor, label=label)
             ci+=1
 
@@ -543,7 +553,7 @@ def plot_bg_ss(fobs, bg, ss=None, bglabel=None, sslabel=None,
     return fig
 
 
-def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=cm.rainbow_r, color = None, label=None, **kwargs):
+def draw_sspars_and_bgpars(axs, xx, sspar, bgpar, nsamp=10, cmap=cm.rainbow_r, color = None, label=None, **kwargs):
     # if color is None:
     #     color = axs[0,0]._get_lines.get_next_color()
 
@@ -559,14 +569,18 @@ def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=c
     q_ss = sspar[1,:,:,:] # ss ratios
     # qq_med = draw_med_conf(axs[0,1], xx, q_bg, plot=kw_plot, **kwargs)
 
-    d_bg = holo.cosmo.comoving_distance(bgpar[2,:,:]).value # bg avg distances in Mpc
-    d_ss = holo.cosmo.comoving_distance(sspar[2,:,:,:]).value # ss distances in Mpc
+    di_bg = holo.cosmo.comoving_distance(bgpar[2,:,:]).value # bg avg distances in Mpc
+    di_ss = holo.cosmo.comoving_distance(sspar[2,:,:,:]).value # ss distances in Mpc
+
+
+    df_bg = holo.cosmo.comoving_distance(bgpar[3,:,:]).value # bg avg distances in Mpc
+    df_ss = holo.cosmo.comoving_distance(sspar[3,:,:,:]).value # ss distances in Mpc
     # dd_med = draw_med_conf(axs[1,0], xx, d_bg, plot=kw_plot, **kwargs)
 
     # hh_med = draw_med_conf(axs[1,1], xx, hc_bg, plot=kw_plot, **kwargs)
 
     if (nsamp is not None) and (nsamp > 0):
-        nsamp_max = hc_bg.shape[1]
+        nsamp_max = bgpar.shape[2]
         nsize = np.min([nsamp, nsamp_max])
         colors = cmap(np.linspace(0,1,nsize))
         ci = 0
@@ -575,36 +589,37 @@ def draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, nsamp=10, cmap=c
             # background
             axs[0,0].plot(xx, m_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # masses (upper left)
             axs[0,1].plot(xx, q_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # ratios (upper right)
-            axs[1,0].plot(xx, d_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # distances (lower left)
-            axs[1,1].plot(xx, hc_bg[:, ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # strains (lower right)
+            axs[1,0].plot(xx, di_bg[:,ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # initial distances (lower left)
+            axs[1,1].plot(xx, df_bg[:, ii], color=colors[ci], alpha=0.25, lw=1.0, ls='-') # final distances (lower right)
 
             # single sources
-            for ll in range(len(hc_ss[0,0])):
+            for ll in range(sspar.shape[-1]):
                 if(ll==0): edgecolor='k'
                 else: edgecolor=None
                 axs[0,0].scatter(xx, m_ss[:, ii, ll], color=colors[ci], alpha=0.25,
                            edgecolor=edgecolor) # ss masses (upper left)
                 axs[0,1].scatter(xx, q_ss[:, ii, ll], color=colors[ci], alpha=0.25,
                            edgecolor=edgecolor) # ss ratios (upper right)
-                axs[1,0].scatter(xx, d_ss[:, ii, ll], color=colors[ci], alpha=0.25,
-                           edgecolor=edgecolor) # ss distances (lower left)
-                axs[1,1].scatter(xx, hc_ss[:, ii, ll], color=colors[ci], alpha=0.25,
-                           edgecolor=edgecolor) # ss strains (lower right)
+                axs[1,0].scatter(xx, di_ss[:, ii, ll], color=colors[ci], alpha=0.25,
+                           edgecolor=edgecolor) # ss intial distances (lower left)
+                axs[1,1].scatter(xx, df_ss[:, ii, ll], color=colors[ci], alpha=0.25,
+                           edgecolor=edgecolor) # ss final distances (lower left)
             ci +=1
     # return mm_med, qq_med, dd_med, hh_med
 
 
-def plot_pars(fobs, hc_ss, hc_bg, sspar, bgpar, **kwargs):
+def plot_pars(fobs, sspar, bgpar, **kwargs):
     xx= fobs * YR
     fig, axs = figax(figsize = (11,6), ncols=2, nrows=2, sharex = True)
     axs[0,0].set_ylabel('Total Mass $M/M_\odot$')
     axs[0,1].set_ylabel('Mass Ratio $q$')
-    axs[1,0].set_ylabel('Comoving Distance $d_c$')
+    axs[1,0].set_ylabel('Initial Comoving Distance $d_c$ (Mpc)')
+    axs[1,1].set_ylabel('Final Comoving Distance $d_c$ (Mpc)')
+
     axs[1,0].set_xlabel(LABEL_GW_FREQUENCY_YR)
-    axs[1,1].set_ylabel(LABEL_CHARACTERISTIC_STRAIN)
     axs[1,1].set_xlabel(LABEL_GW_FREQUENCY_YR)
-    draw_sspars_and_bgpars(axs, xx, hc_ss, hc_bg, sspar, bgpar, color='pink')
-    # fig.tight_layout()
+    draw_sspars_and_bgpars(axs, xx, sspar, bgpar, color='pink')
+    fig.tight_layout()
     return fig
 
 
@@ -672,8 +687,9 @@ def _draw_plaw(ax, freqs, amp=1e-15, f0=1/YR, **kwargs):
     return ax.plot(freqs, plaw, **kwargs)
 
 
-def _twin_hz(ax, nano=True, fs=8, **kw):
+def _twin_hz(ax, nano=True, fs=10, **kw):
     tw = ax.twiny()
+    tw.grid(False)
     xlim = np.array(ax.get_xlim()) / YR
     if nano:
         label = LABEL_GW_FREQUENCY_NHZ
@@ -686,8 +702,9 @@ def _twin_hz(ax, nano=True, fs=8, **kw):
     return tw
 
 
-def _twin_yr(ax, nano=True, fs=8, label=True, **kw):
+def _twin_yr(ax, nano=True, fs=10, label=True, **kw):
     tw = ax.twiny()
+    tw.grid(False)
     xlim = np.array(ax.get_xlim()) * YR
     if nano:
         xlim /= 1e9
@@ -721,6 +738,49 @@ def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill=
     med, *conf = rv.T
     # plot median
     hh, = ax.plot(xx, med, **plot)
+
+    # Reshape confidence intervals to nice plotting shape
+    # 2*P, X ==> (P, 2, X)
+    conf = np.array(conf).reshape(len(percs), 2, xx.size)
+
+    kw = dict(color=hh.get_color())
+    kw.update(fill)
+    fill = kw
+
+    # plot each confidence interval
+    for lo, hi in conf:
+        gg = ax.fill_between(xx, lo, hi, **fill)
+
+    return (hh, gg)
+
+def draw_med_conf_color(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={},
+                        filter=False, color=None, linestyle='-'):
+    plot.setdefault('alpha', 0.75)
+    fill.setdefault('alpha', 0.2)
+    percs = np.atleast_1d(fracs)
+    assert np.all((0.0 <= percs) & (percs <= 1.0))
+
+    # center the target percentages into pairs around 50%, e.g.  68 ==> [16,84]
+    inter_percs = [[0.5-pp/2, 0.5+pp/2] for pp in percs]
+    # Add the median value (50%)
+    inter_percs = [0.5, ] + np.concatenate(inter_percs).tolist()
+    # Get percentiles; they go along the last axis
+    if filter:
+        rv = [
+            kale.utils.quantiles(vv[vv > 0.0], percs=inter_percs, weights=weights)
+            for vv in vals
+        ]
+        rv = np.asarray(rv)
+    else:
+        rv = kale.utils.quantiles(vals, percs=inter_percs, weights=weights, axis=-1)
+
+    med, *conf = rv.T
+
+    # plot median
+    if color is not None:
+        hh, = ax.plot(xx, med, color=color, linestyle=linestyle, **plot)
+    else:
+        hh, = ax.plot(xx, med, **plot)
 
     # Reshape confidence intervals to nice plotting shape
     # 2*P, X ==> (P, 2, X)
@@ -809,7 +869,7 @@ def violins(ax, xx, yy, zz, width, **kwargs):
     return handle
 
 
-def violin(ax, xx, yy, zz, width, side='both', clip_pdf=None,
+def violin(ax, xx, yy, zz, width, median_log10=False, side='both', clip_pdf=None,
            median={}, line={}, fill={}, **kwargs):
     assert np.ndim(xx) == 0
     assert np.shape(xx) == np.shape(width)
@@ -835,11 +895,6 @@ def violin(ax, xx, yy, zz, width, side='both', clip_pdf=None,
         assert np.ndim(clip_pdf) == 0
         assert clip_pdf < 1.0
 
-    dy = np.diff(yy)
-    cdf = 0.5 * (zz[1:] + zz[:-1]) * dy
-    cdf = np.concatenate([[0.0, ], cdf])
-    cdf = np.cumsum(cdf)
-
     zz = zz / zz.max()
 
     if median is True:
@@ -848,6 +903,13 @@ def violin(ax, xx, yy, zz, width, side='both', clip_pdf=None,
         median = None
 
     if median is not None:
+        if median_log10:
+            dy = np.diff(np.log10(yy))
+        else:
+            dy = np.diff(yy)
+        cdf = 0.5 * (zz[1:] + zz[:-1]) * dy
+        cdf = np.concatenate([[0.0, ], cdf])
+        cdf = np.cumsum(cdf)
         med = np.interp([0.5], cdf/cdf.max(), yy)
 
     if clip_pdf is not None:
@@ -1398,6 +1460,17 @@ def _contour2d(ax, edges, hist, levels, outline=True, **kwargs):
 
     return edges, hist, cont
 
+
+def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
+    '''
+    https://stackoverflow.com/a/18926541
+    '''
+    if isinstance(cmap, str):
+        cmap = plt.get_cmap(cmap)
+    new_cmap = mpl.colors.LinearSegmentedColormap.from_list(
+        'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
+        cmap(np.linspace(minval, maxval, n)))
+    return new_cmap
 
 # =================================================================================================
 # ====    Below Needs Review / Cleaning    ====

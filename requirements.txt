@@ -6,10 +6,14 @@ kalepy
 matplotlib
 numpy
 scipy
-pydoe
+# pydoe
 psutil
 tqdm
-cython
-schwimmbad
-emcee
-george
+cython<3.0.0
+# schwimmbad  # used in the `gps` submodule
+# emcee   # used in the `gps` submodule
+# george  # used in the `gps` submodule
+# sympy   # used in the detstats submodule
+# hasasia   # used in the detstats submodule
+# healpy   # used in the anisotropy submodule
+# mpi4py

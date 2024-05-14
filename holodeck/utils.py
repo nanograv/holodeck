@@ -17,7 +17,13 @@ import numbers
 import os
 import subprocess
 import warnings
-from typing import Optional, Tuple, Union, List  # , Sequence,
+from pathlib import Path
+from typing import Optional, Tuple, Union, List   #, Callable, TypeVar, Any  # , TypeAlias  # , Sequence,
+
+# try:
+#     from typing import ParamSpec
+# except ImportError:
+#     from typing_extensions import ParamSpec
 
 import h5py
 import numba
@@ -28,7 +34,7 @@ import scipy.stats    # noqa
 import scipy.special  # noqa
 
 from holodeck import log, cosmo
-from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR
+from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, EDDT
 
 # [Sesana2004]_ Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
@@ -67,9 +73,51 @@ class _Modifier(abc.ABC):
         pass
 
 
+# T = TypeVar('T')
+# P = ParamSpec('P')
+# WrappedFuncDeco: TypeAlias = Callable[[Callable[P, T]], Callable[P, T]]
+# WrappedFuncDeco: 'TypeAlias' = Tuple[float, float]
+
+# def copy_docstring(copy_func: Callable[..., Any]) -> WrappedFuncDeco[P, T]:
+#     """Copies the doc string of the given function to the wrapped function.
+
+#     see: https://stackoverflow.com/a/68901244/230468
+#     """
+
+#     def wrapped(func: Callable[P, T]) -> Callable[P, T]:
+#         func.__doc__ = copy_func.__doc__
+#         return func
+
+#     return wrapped
+
+
 # =================================================================================================
 # ====    General Logistical    ====
 # =================================================================================================
+
+
+def deprecated_warn(msg, exc_info=True):
+    """Decorator for functions that will be deprecated, add warning, but still execute function.
+    """
+
+    def decorator(func):
+        nonlocal msg
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            nonlocal msg
+            old_name = func.__name__
+            _frame = inspect.currentframe().f_back
+            file_name = inspect.getfile(_frame.f_code)
+            fline = _frame.f_lineno
+            msg = f"{file_name}({fline}):{old_name} is deprecated!" + " | " + msg
+            warnings.warn_explicit(msg, category=DeprecationWarning, filename=file_name, lineno=fline)
+            log.warning(f"DEPRECATION: {msg}", exc_info=exc_info)
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 def deprecated_pass(new_func, msg="", exc_info=True):
@@ -172,7 +220,7 @@ def load_hdf5(fname, keys=None):
     return header, data
 
 
-def my_print(*args, **kwargs):
+def mpi_print(*args, **kwargs):
     return print(*args, flush=True, **kwargs)
 
 
@@ -193,7 +241,7 @@ def python_environment():
             return 'jupyter'
         if 'terminal' in ipy_str:
             return 'ipython'
-    except:
+    except:   # noqa
         return 'terminal'
 
     raise RuntimeError(f"unexpected result from `get_ipython()`: '{ipy_str}'!")
@@ -262,7 +310,14 @@ def get_file_size(fnames, precision=1):
     return byte_str
 
 
-def _get_subclass_instance(value, default, superclass):
+def path_name_ending(path, ending):
+    fname = Path(path)
+    name_bare = fname.with_suffix("")
+    fname = fname.parent.joinpath(str(name_bare) + ending).with_suffix(fname.suffix)
+    return fname
+
+
+def get_subclass_instance(value, default, superclass, allow_none=False):
     """Convert the given `value` into a subclass instance.
 
     `None` ==> instance from `default` class
@@ -294,6 +349,10 @@ def _get_subclass_instance(value, default, superclass):
     # Set `value` to a default, if needed and it is given
     if (value is None) and (default is not None):
         value = default
+
+    # if `value` is not set, and there is no default, and `None` is allowed... just return None
+    if (value is None) and allow_none:
+        return value
 
     # If `value` is a class (constructor), then construct an instance from it
     if inspect.isclass(value):
@@ -379,7 +438,7 @@ def get_scatter_weights(uniform_cents, dist):
     if not np.allclose(dx, dx[0]):
         log.error(f"{dx[0]=} {dx=}")
         log.error(f"{uniform_cents=}")
-        err = f"`get_scatter_weights` only works if `uniform_cents` are uniformly spaced!"
+        err = "`get_scatter_weights` only works if `uniform_cents` are uniformly spaced!"
         log.exception(err)
         raise ValueError(err)
 
@@ -429,7 +488,7 @@ def _get_rolled_weights(log_cents, dist):
     return weights
 
 
-def scatter_redistribute(cents, dist, dens, axis=0):
+def scatter_redistribute_densities(cents, dens, dist=None, scatter=None, axis=0):
     """Redistribute `dens` across the target axis to account for scatter/variance.
 
     Parameters
@@ -448,6 +507,12 @@ def scatter_redistribute(cents, dist, dens, axis=0):
         Array with resitributed values.  Same shape as input `dens`.
 
     """
+    if (dist is None) == (scatter is None):
+        raise ValueError(f"One and only one of `dist` ({dist}) and `scatter` ({scatter}) must be provided!")
+
+    if dist is None:
+        dist = sp.stats.norm(loc=0.0, scale=scatter)
+
     log_cents = np.log10(cents)
     num = log_cents.size
     if np.shape(dens)[axis] != num:
@@ -520,10 +585,7 @@ def frac_str(vals, prec=2):
     return rv
 
 
-def interp(
-    xnew: npt.ArrayLike, xold: npt.ArrayLike, yold: npt.ArrayLike,
-    left: float = np.nan, right: float = np.nan, xlog: bool = True, ylog: bool = True,
-) -> npt.ArrayLike:
+def interp(xnew, xold, yold, left=np.nan, right=np.nan, xlog=True, ylog=True):
     """Linear interpolation of the given arguments in log/lin-log/lin space.
 
     Parameters
@@ -649,6 +711,12 @@ def midpoints(vals, axis=-1, log=False):
     return mm
 
 
+def midpoints_multiax(vals, axis, log=False):
+    for aa in axis:
+        vals = midpoints(vals, aa, log=log)
+    return vals
+
+
 def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
     """Find the minimum and maximum values in the given array.
 
@@ -700,8 +768,9 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
 
     """
     # assert np.ndim(xx) == 1
-    assert np.ndim(xvals) == 2
-    assert np.shape(xvals) == np.shape(yvals)
+    err = f"Bad shapes!  {np.shape(xvals)=} {np.shape(yvals)=}"
+    assert np.ndim(xvals) == 2, err
+    assert np.shape(xvals) == np.shape(yvals), err
 
     xx = np.asarray(xx)
     xvals = np.asarray(xvals)
@@ -763,6 +832,7 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
     return ynew
 
 
+<<<<<<< HEAD
 def nyquist_freqs(
     dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None,
     lgspace: bool = False
@@ -830,14 +900,40 @@ def nyquist_freqs_edges(
         Creates evenly log-spaced frequencies if True, evenly linear-spaced frequencies if 
         False. Linear bin size is fmin, and number of log bins is int(fmax/fmin), such that
         the number of bins is comparable in either case. 
+=======
+def pta_freqs(dur=16.03*YR, num=40, cad=None):
+    """Get Fourier frequency bin specifications for the given parameters.
+
+    Arguments
+    ---------
+    dur : float,
+        Total observing duration, which determines the minimum sensitive frequency, ``1/dur``.
+        Typically `dur` should be given in units of [sec], such that the returned frequencies are
+        in units of [1/sec] = [Hz]
+    num : int,
+        Number of frequency bins.  If `cad` is not None, then the number of frequency bins is
+        determined by `cad` and the `num` value is disregarded.
+    cad : float or `None`,
+        Cadence of observations, which determines the maximum sensitive frequency (i.e. the Nyquist
+        frequency).  If `cad` is not given, then `num` frequency bins are constructed.
+>>>>>>> main
 
     Returns
     -------
-    freqs : ndarray,
-        edges of Nyquist frequency bins
+    cents : (F,) ndarray
+        Bin-center frequencies for `F` bins.  The frequency bin centers are at:
+        ``F_i = (i + 1.5) / dur`` for i between 0 and `num-1`.
+        The number of frequency bins, `F` is the argument `num`,
+        or determined by `cad` if it is given.
+    edges : (F+1,) ndarray
+        Bin-edge frequencies for `F` bins, i.e. `F+1` bin edges.  The frequency bin edges are at:
+        ``F_i = (i + 1) / dur`` for i between 0 and `num`.
+        The number of frequency bins, `F` is the argument `num`,
+        or determined by `cad` if it is given.
 
     """
     fmin = 1.0 / dur
+<<<<<<< HEAD
     fmax = 1.0 / cad * 0.5
     # df = fmin / sample
     if not lgspace:
@@ -860,8 +956,17 @@ def nyquist_freqs_edges(
             freqs_edges = freqs_edges[freqs_edges > trim[0]]
         if trim[1] is not None:
             freqs_edges = freqs_edges[freqs_edges < trim[1]]
+=======
+    if cad is not None:
+        num = dur / (2.0 * cad)
+        num = int(np.floor(num))
 
-    return freqs_edges
+    cents = np.arange(1, num+2) * fmin
+>>>>>>> main
+
+    edges = cents - fmin / 2.0
+    cents = cents[:-1]
+    return cents, edges
 
 
 def print_stats(stack=True, print_func=print, **kwargs):
@@ -891,15 +996,8 @@ def quantile_filtered(values, percs, axis, func=np.isfinite):
     return np.apply_along_axis(lambda xx: np.percentile(np.asarray(xx)[func(xx)], percs*100), axis, values)
 
 
-def quantiles(
-    values: npt.ArrayLike,
-    percs: Optional[npt.ArrayLike] = None,
-    sigmas: Optional[npt.ArrayLike] = None,
-    weights: Optional[npt.ArrayLike] = None,
-    axis: Optional[int] = None,
-    values_sorted: bool = False,
-    filter: Optional[str] = None,
-) -> Union[np.ndarray, np.ma.masked_array]:
+def quantiles(values, percs=None, sigmas=None, weights=None, axis=None,
+              values_sorted=False, filter=None):
     """Compute weighted percentiles.
 
     NOTE: if `values` is a masked array, then only unmasked values are used!
@@ -976,6 +1074,42 @@ def quantiles(
     return percs
 
 
+def random_power(extr, pdf_index, size=1):
+    """Draw from power-law PDF with the given extrema and index.
+
+    FIX/BUG : negative `extr` values break `pdf_index=-1` !!
+
+    Arguments
+    ---------
+    extr : array_like scalar
+        The minimum and maximum value of this array are used as extrema.
+    pdf_index : scalar
+        The power-law index of the PDF distribution to be drawn from.  Any real number is valid,
+        positive or negative.
+        NOTE: the `numpy.random.power` function uses the power-law index of the CDF, i.e. `g+1`
+    size : scalar
+        The number of points to draw (cast to int).
+    **kwags : dict pairs
+        Additional arguments passed to `zcode.math_core.minmax` with `extr`.
+
+    Returns
+    -------
+    rv : (N,) scalar
+        Array of random variables with N=`size` (default, size=1).
+
+    """
+
+    extr = minmax(extr)
+    if pdf_index == -1:
+        rv = 10**np.random.uniform(*np.log10(extr), size=int(size))
+    else:
+        rr = np.random.random(size=int(size))
+        gex = extr ** (pdf_index+1)
+        rv = (gex[0] + (gex[1] - gex[0])*rr) ** (1./(pdf_index+1))
+
+    return rv
+
+
 def rk4_step(func, x0, y0, dx, args=None, check_nan=0, check_nan_max=5):
     """Perform a single 4th-order Runge-Kutta integration step.
     """
@@ -1004,7 +1138,7 @@ def rk4_step(func, x0, y0, dx, args=None, check_nan=0, check_nan_max=5):
     return x1, y1
 
 
-def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int = 2, weights=None) -> str:
+def stats(vals, percs=None, prec=2, weights=None) -> str:
     """Return a string giving quantiles of the given input data.
 
     Parameters
@@ -1027,8 +1161,8 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
 
     """
     try:
-        if len(vals) == 0:        # type: ignore
-            raise TypeError
+        if len(vals) == 0:        #### type: ignore
+            return "[]"
     except TypeError:
         raise TypeError(f"`vals` (shape={np.shape(vals)}) is not iterable!")
 
@@ -1044,6 +1178,19 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
     return rv
 
 
+def std(vals, weights):
+    """Weighted standard deviation (stdev).
+
+    See: https://www.itl.nist.gov/div898/software/dataplot/refman2/ch2/weightsd.pdf
+    """
+    mm = np.count_nonzero(weights)
+    ave = np.sum(vals*weights) / np.sum(weights)
+    num = np.sum(weights * (vals - ave)**2)
+    den = np.sum(weights) * (mm - 1) / mm
+    std = np.sqrt(num/den)
+    return std
+
+
 def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = True):
     """Perform a cumulative integration along the given axis.
 
@@ -1053,7 +1200,7 @@ def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = T
         Input to be integrated.
     xx : ArrayLike of scalar,
         The sample points corresponding to the `yy` values.
-        This must be either be shaped as
+        This must either be shaped as
         * the same number of dimensions as `yy`, with the same length along the `axis` dimension, or
         * 1D with length matching `yy[axis]`
     axis : int,
@@ -1290,7 +1437,7 @@ def _integrate_grid_differential_number(edges, dnum, freq=False):
 
     NOTE: the `edges` provided MUST all be in linear space, mass is converted to ``log10(M)``
     and frequency is converted to ``ln(f)``.
-    NOTE: the density `dnum` MUST correspond to `dn/ [dlog10(M) dq dz dln(f)]`
+    NOTE: the density `dnum` MUST correspond to `d^3 n / [dlog10(M) dq dz dln(f)]`
 
     Parameters
     ----------
@@ -1331,7 +1478,33 @@ def _func_gaussian(xx, aa, mm, ss):
     return yy
 
 
-def fit_gaussian(xx, yy, guess=[1.0, 0.0, 1.0]):
+def fit_gaussian(xx, yy, guess=None):
+    """Fit a Gaussian/Normal distribution with the given initial guess of parameters.
+
+    Arguments
+    ---------
+    xx : array, (N,)
+    yy : array, (N,)
+    guess : None or (3,) array of float
+        Initial parameter values as starting point of fit.  The values correspond to:
+        [amplitude, mean, stdev].
+        If ``guess`` is None, then the maximum, mean, and stdev of the given values are used as a
+        starting point.
+
+    Return
+    ------
+    popt : (3,) array of float
+        Best fit parameters: [amplitude, mean, stdev]
+    pcov : (3, 3) array of float
+        Covariance matrix of best fit parameters.
+
+    """
+    if guess is None:
+        amp = np.max(yy)
+        mean = np.sum(xx * yy) / np.sum(yy)
+        stdev = std(xx, yy)
+        guess = [amp, mean, stdev]
+
     popt, pcov = sp.optimize.curve_fit(_func_gaussian, xx, yy, p0=guess, maxfev=10000)
     return popt, pcov
 
@@ -1671,22 +1844,42 @@ def rad_isco(m1, m2=0.0, factor=3.0):
     return factor * schwarzschild_radius(m1+m2)
 
 
+def frst_isco(m1, m2=0.0, **kwargs):
+    """Get rest-frame orbital frequency of ISCO orbit.
+
+    Arguments
+    ---------
+    m1 : array_like, units of [gram]
+        Total mass, or mass of the primary.  Added together with `m2` to get total mass.
+    m2 : array_like, units of [gram]  or  None
+        Mass of secondary, or None if `m1` is already total mass.
+
+    Returns
+    -------
+    fisco : array_like, units of [Hz]
+
+    """
+    risco = rad_isco(m1, m2, **kwargs)
+    fisco = kepler_freq_from_sepa(m1+m2, risco)
+    return fisco
+
+
 def redz_after(time, redz=None, age=None):
     """Calculate the redshift after the given amount of time has passed.
 
     Parameters
     ----------
-    time : array_like in units of [sec]
-        Amount of time to pass.
-    redz : None or array_like,
-        Redshift of starting point after which `time` is added.
-    age : None or array_like, in units of [sec]
-        Age of the Universe at the starting point, after which `time` is added.
+    time : array_like, [s]
+        Amount of time to pass, in units of seconds.
+    redz : None  or  array_like, []
+        Redshift of starting point after which `time` is added.  Unitless.
+    age : None  or  array_like, [s]
+        Age of the Universe at the starting point, after which `time` is added.  Units of seconds.
 
     Returns
     -------
-    new_redz : array_like
-        Redshift of the Universe after the given amount of time.
+    new_redz : array_like, []
+        Redshift of the Universe after the given amount of time.  Unitless
 
     """
     if (redz is None) == (age is None):
@@ -1794,6 +1987,55 @@ def lambda_factor_dlnf(frst, dfdt, redz, dcom=None):
     # Calculate weighting
     lambda_fact = vfac * tfac
     return lambda_fact
+
+
+def angs_from_sepa(sepa, dcom, redz):
+    """ Calculate angular separation
+
+    Parameters
+    ----------
+    sepa : ArrayLike
+        Binary separation, in cm
+    dcom : ArrayLike
+        Binary comoving distance, in cm
+    redz : ArrayLike
+        Binary redshift
+
+    Returns
+    -------
+    angs : ArrayLike
+        Angular separation
+
+    """
+    dang = dcom / (1.0 + redz)   # angular-diameter distance [cm]
+    angs = sepa / dang           # angular-separation [radians]
+    return angs
+
+
+def eddington_accretion(mass, eps=0.1):
+    """Eddington Accretion rate, $\\dot{M}_{Edd} = L_{Edd}/\\epsilon c^2$.
+
+    Arguments
+    ---------
+    mass : array_like of scalar
+        BH Mass.
+    eps : array_like of scalar
+        Efficiency parameter.
+
+    Returns
+    -------
+    mdot : array_like of scalar
+        Eddington accretion rate.
+
+    """
+    edd_lum = eddington_luminosity(mass)
+    mdot = edd_lum / eps / np.square(SPLC)
+    return mdot
+
+
+def eddington_luminosity(mass):
+    ledd = EDDT * mass
+    return ledd
 
 
 # =================================================================================================
@@ -2270,9 +2512,6 @@ def char_strain_to_strain_amp(hc, fc, df):
     return hs
 
 
-
-
-
 @numba.njit
 def _gw_ecc_func(eccen):
     """GW Hardening rate eccentricitiy dependence F(e).
@@ -2298,7 +2537,29 @@ def _gw_ecc_func(eccen):
 
 
 def _array_args(*args):
-    # args = [np.atleast_1d(aa) for aa in args]
     args = [np.asarray(aa) if aa is not None else None
             for aa in args]
     return args
+
+
+@deprecated_fail(scatter_redistribute_densities)
+def scatter_redistribute(cents, dist, dens, axis=0):
+    pass
+
+
+#! DEPRECATED
+def nyquist_freqs(dur, cad):
+    """DEPRECATED.  Use `holodeck.utils.pta_freqs` instead.
+    """
+    msg = ""
+    old_name = "nyquist_freqs"
+    new_name = "pta_freqs"
+    _frame = inspect.currentframe().f_back
+    file_name = inspect.getfile(_frame.f_code)
+    fline = _frame.f_lineno
+    msg = f"{file_name}({fline}):{old_name} ==> {new_name}" + (len(msg) > 0) * " | " + msg
+    warnings.warn_explicit(msg, category=DeprecationWarning, filename=file_name, lineno=fline)
+    log.warning(f"DEPRECATION: {msg}", exc_info=True)
+    return pta_freqs(dur=dur, num=None, cad=cad)[0]
+
+

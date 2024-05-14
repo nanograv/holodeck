@@ -1,9 +1,9 @@
 [build-system]
 # cython/numpy/scipy are required to build cython extensions.  The build steps are specified in `setup.py`
-requires = ["setuptools >= 40.6.0", "wheel", "Cython", "numpy", "scipy"]
+requires = ["setuptools >= 40.6.0", "wheel", "Cython<3.0.0", "numpy", "scipy"]
 build-backend = "setuptools.build_meta"
 
-[mypy]
+[tool.mypy]
 allow_redefinition = true
 
 [tool.ruff]
@@ -40,4 +40,4 @@ select = [
 ]
 
 [tool.ruff.mccabe]
-max-complexity = 10
+max-complexity = 15

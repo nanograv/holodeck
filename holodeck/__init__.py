@@ -34,7 +34,7 @@ In general, `holodeck` calculations proceed in three stages:
 """
 
 __author__ = "NANOGrav"
-__copyright__ = "Copyright (c) 2023 NANOGrav"
+__copyright__ = "Copyright (c) 2024 NANOGrav"
 __license__ = "MIT"
 
 import os
@@ -46,7 +46,8 @@ __all__ = ["log", "cosmo"]
 
 
 class Parameters:
-    # These are WMAP9 parameters, see [WMAP9], Table 3, WMAP+BAO+H0
+    """These are WMAP9 parameters, see: [WMAP9]_ Table 3, WMAP+BAO+H0
+    """
     Omega0 = 0.2880                #: Matter density parameter "Om0"
     OmegaBaryon = 0.0472           #: Baryon density parameter "Ob0"
     HubbleParam = 0.6933           #: Hubble Parameter as H0/[100 km/s/Mpc], i.e. 0.69 instead of 69
@@ -72,28 +73,32 @@ for cp in _check_paths:
 # ---- Load logger
 
 from . import logger   # noqa
-log = logger.get_logger(__name__, logging.INFO)       #: global root logger from `holodeck.logger`
+log = logger.get_logger(__name__, logging.WARNING)       #: global root logger from `holodeck.logger`
 
 # ---- Load cosmology instance
 
 # NOTE: Must load and initialize cosmology before importing other submodules!
 import cosmopy   # noqa
-cosmo = cosmopy.Cosmology(h=Parameters.HubbleParam, Om0=Parameters.Omega0, Ob0=Parameters.OmegaBaryon)
+cosmo = cosmopy.Cosmology(
+    h=Parameters.HubbleParam, Om0=Parameters.Omega0, Ob0=Parameters.OmegaBaryon,
+    size=200,
+)
 del cosmopy
 
 # ---- Import submodules
 
 from . import constants       # noqa
-from . import evolution       # noqa
-from . import gps             # noqa
-from . import gravwaves       # noqa
-from . import hardening       # noqa
-from . import librarian       # noqa
-from . import param_spaces    # noqa
-from . import plot            # noqa
-from . import population      # noqa
-from . import relations       # noqa
-from . import sam             # noqa
+# from . import evolution       # noqa
+# from . import gps             # noqa
+# from . import gravwaves       # noqa
+# from . import hardening       # noqa
+# from . import librarian       # noqa
+# from . import param_spaces    # noqa
+# from . import plot            # noqa
+# from . import population      # noqa
+# from . import host_relations  # noqa
+# from . import sams            # noqa
+# from . import librarian       # noqa
 from . import utils           # noqa
 
 # ---- Handle version

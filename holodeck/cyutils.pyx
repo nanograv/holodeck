@@ -23,7 +23,7 @@ cimport scipy.special.cython_special as sp_special
 from libc.stdio cimport printf
 from libc.stdlib cimport malloc, free, qsort
 # make sure to use c-native math functions instead of python/numpy
-from libc.math cimport pow, sqrt, abs, M_PI, NAN
+from libc.math cimport pow, sqrt, abs, M_PI, NAN, cos, sin
 
 from cpython.pycapsule cimport PyCapsule_IsValid, PyCapsule_GetPointer
 from numpy.random cimport bitgen_t
@@ -264,7 +264,7 @@ cdef struct sorter:
     double value
 
 
-cdef int sort_compare(const void *a, const void *b) nogil:
+cdef int sort_compare(const void *a, const void *b) noexcept nogil:
     """Comparison function used by the `qsort` builtin method to perform an array-sort by index.
 
     Parameters
@@ -923,10 +923,9 @@ def ss_bg_hc(number, h2fdf, nreals, normal_threshold=1e10):
     R = nreals
     cdef np.ndarray[np.double_t, ndim=2] hc2ss = np.zeros((F,R))
     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
-    cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
+    cdef np.ndarray[np.longlong_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
     _ss_bg_hc(shape, h2fdf, number, nreals, normal_threshold,
                 hc2ss, hc2bg, ssidx)
-    # print(hc2ss, hc2bg, ssidx)
     return hc2ss, hc2bg, ssidx
 
 @cython.boundscheck(False)
@@ -1010,8 +1009,6 @@ cdef void _ss_bg_hc(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number
             ssidx[0,ff,rr] = m_max
             ssidx[1,ff,rr] = q_max
             ssidx[2,ff,rr] = z_max
-            if (max==0):
-                print('No sources found at %dth frequency' % ff) # could warn
     # still need to sqrt and sum! (or do this back in python)
 
     return
@@ -1056,13 +1053,12 @@ def ss_bg_hc_and_par(number, h2fdf, nreals, mt, mr, rz, normal_threshold=1e10):
     R = nreals
     cdef np.ndarray[np.double_t, ndim=2] hc2ss = np.zeros((F,R))
     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
-    cdef np.ndarray[np.long_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
+    cdef np.ndarray[np.longlong_t, ndim=3] ssidx = np.zeros((3,F,R), dtype=int)
     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
     cdef np.ndarray[np.double_t, ndim=3] sspar = np.zeros((3,F,R))
     _ss_bg_hc_and_par(shape, h2fdf, number, nreals, normal_threshold,
                  mt, mr, rz,
                 hc2ss, hc2bg, ssidx, bgpar, sspar)
-    # print(hc2ss, hc2bg, ssidx)
     return hc2ss, hc2bg, ssidx, bgpar, sspar
 
 @cython.boundscheck(True)
@@ -1179,22 +1175,6 @@ cdef void _ss_bg_hc_and_par(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:
                 print('No sources found at %dth frequency' % ff) # could warn
     # still need to sqrt and sum! (back in python)
 
-    return
-
-
-def test_sort():
-    _test_sort()
-    return None
-
-cdef void _test_sort():
-    cdef double test[4]
-    test[:] = [1.0, -2.3, 7.8, 0.0]
-    cdef (int *)indices = <int *>malloc(4 * sizeof(int))
-    print(test)
-
-    argsort(test, 4, &indices)
-    print(test)
-    print(test[indices[0]], test[indices[1]], test[indices[2]], test[indices[3]])
     return
 
 def sort_h2fdf(h2fdf):
@@ -1326,9 +1306,8 @@ cdef void _loudest_hc_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, double[:
     cdef int L = nloudest
     cdef int R = nreals
 
-    cdef int mm, qq, zz, ff, rr, ll, loud
+    cdef int mm, qq, zz, ff, rr, ll
     cdef double num, sum
-    cdef np.ndarray[np.double_t, ndim=3] maxes = np.zeros((F,R,L))
 
     # Setup random number generator from numpy library
     cdef bitgen_t *rng
@@ -1416,7 +1395,7 @@ def loudest_hc_and_par_from_sorted(number, h2fdf, nreals, nloudest, mt, mr, rz, 
     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
     cdef np.ndarray[np.double_t, ndim=3] lspar = np.zeros((3,F,R))
     cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
-    cdef np.ndarray[np.long_t, ndim=4] ssidx = np.zeros((3,F,R,L), dtype=int)
+    cdef np.ndarray[np.longlong_t, ndim=4] ssidx = np.zeros((3,F,R,L), dtype=int)
     _loudest_hc_and_par_from_sorted(shape, h2fdf, number, nreals, nloudest, normal_threshold,
                             mt, mr, rz, msort, qsort, zsort,
                             hc2ss, hc2bg, lspar, bgpar, ssidx)
@@ -1559,9 +1538,12 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
             lspar[2,ff,rr] = z_ls/sum_ls # ls avg redshift
 
 
-def loudest_hc_and_par_from_sorted_redz(number, h2fdf, nreals, nloudest, mt, mr, redz, msort, qsort, zsort, normal_threshold=1e10):
+def loudest_hc_and_par_from_sorted_redz(
+    number, h2fdf, nreals, nloudest,
+    mt, mr, rz, redz_final, dcom_final, sepa, angs,
+    msort, qsort, zsort, normal_threshold=1e10):
     """
-    Calculates the characteristic strain and binary parameters from loud single sources and a 
+    Calculates the characteristic strain and binary parameters from loud single sources and a
     background of all other sources.
 
     Parameters
@@ -1578,8 +1560,16 @@ def loudest_hc_and_par_from_sorted_redz(number, h2fdf, nreals, nloudest, mt, mr,
         Total masses, M, of each bin center.
     mr : (Q,) 1Darray of scalars
         Mass ratios, q, of each bin center.
-    redz : (M,Q,Z,F) NDarray of scalars
-        Final redshifts, z, of each bin.
+    rz : (Z,) 1Darray of scalars
+        Redshifts, z, of each bin center.
+    redz_final : (M,Q,Z,F) NDarray of scalars
+        Final redshifts of each bin.
+    dcom_final : (M,Q,Z,F) NDarray of scalars
+        Final comoving distances of each bin.
+    sepa : (M,Q,Z,F) NDarray of scalars
+        Final separations of each mass and frequency combination.
+    angs : (M,Q,Z,F)
+        Final angular separations of each bin.
     msort : (M*Q*Z,) 1Darray
         M indices of each bin, sorted from largest to smallest h2fdf.
     qsort : (M*Q*Z,) 1Darray
@@ -1595,10 +1585,12 @@ def loudest_hc_and_par_from_sorted_redz(number, h2fdf, nreals, nloudest, mt, mr,
         Char strain squared of the loudest single sources.
     hc2bg : (F, R) Ndarray of scalars
         Char strain squared of the background.
-    sspar : (3, F, R) NDarray of scalars
+    sspar : (4, F, R) NDarray of scalars
         Effective M, q, z parameters of the loudest L sources.
-    bgpar : (3, F, R) NDarray of scalars
+        mass, ratio, redshift, redshift_final
+    bgpar : (4, F, R) NDarray of scalars
         Average effective M, q, z parameters of the background.
+        mass, ratio, redshift, redshift_final
     """
 
     cdef long[:] shape = np.array(number.shape)
@@ -1607,10 +1599,11 @@ def loudest_hc_and_par_from_sorted_redz(number, h2fdf, nreals, nloudest, mt, mr,
     L = nloudest
     cdef np.ndarray[np.double_t, ndim=3] hc2ss = np.zeros((F,R,L))
     cdef np.ndarray[np.double_t, ndim=2] hc2bg = np.zeros((F,R))
-    cdef np.ndarray[np.double_t, ndim=4] sspar = np.zeros((3,F,R,L))
-    cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((3,F,R))
+    cdef np.ndarray[np.double_t, ndim=4] sspar = np.zeros((4,F,R,L))
+    cdef np.ndarray[np.double_t, ndim=3] bgpar = np.zeros((7,F,R))
     _loudest_hc_and_par_from_sorted_redz(shape, h2fdf, number, nreals, nloudest, normal_threshold,
-                            mt, mr, redz, msort, qsort, zsort,
+                            mt, mr, rz, redz_final, dcom_final, sepa, angs,
+                            msort, qsort, zsort,
                             hc2ss, hc2bg, sspar, bgpar)
     return hc2ss, hc2bg, sspar, bgpar
 
@@ -1621,7 +1614,8 @@ def loudest_hc_and_par_from_sorted_redz(number, h2fdf, nreals, nloudest, mt, mr,
 @cython.cdivision(True)
 cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number,
             long nreals, long nloudest, long thresh,
-            double[:] mt, double[:] mr, double[:,:,:,:] redz,
+            double[:] mt, double[:] mr, double[:] rz,
+            double[:,:,:,:] redz_final, double[:,:,:,:] dcom_final, double[:,:,:,:] sepa, double[:,:,:,:] angs,
             long[:] msort, long[:] qsort, long[:] zsort,
             double[:,:,:] hc2ss, double[:,:] hc2bg, double[:,:,:,:] sspar, double[:,:,:] bgpar):
     """
@@ -1643,8 +1637,16 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
         Total masses of each bin center.
     mr : (Q,) 1Darray of scalars
         Mass ratios of each bin center.
-    redz : (M,Q,Z,F) 1Darray of scalars
-        Final redshifts of each bin center.
+    rz : (Z,) 1Darray of scalars
+        Redshifts, z, of each bin center.
+    redz_final : (M,Q,Z,F) NDarray of scalars
+        Final redshifts of each bin.
+    dcom_final : (M,Q,Z,F) NDarray of scalars
+        Final comoving distances of each bin.
+    sepa : (M,Q,Z,F) NDarray of scalars
+        Final separations of each bin.
+    angs : (M,Q,Z,F)
+        Final angular separations of each bin.
     msort : (M*Q*Z,) 1Darray
         M indices of each bin, sorted from largest to smallest h2fdf.
     qsort : (M*Q*Z,) 1Darray
@@ -1655,10 +1657,12 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
         (Memory address of) single source characteristic strain squared array.
     hc2bg : double[:,:] array
         (Memory address of) background characteristic strain squared array.
-    sspar : (3, F, R) NDarray of scalars
+    sspar : (4, F, R) NDarray of scalars
         Effective M, q, z parameters of the loudest L sources.
-    bgpar : (3, F, R) NDarray of scalars
+        mass, ratio, redshift, redshift_final
+    bgpar : (4, F, R) NDarray of scalars
         Average effective M, q, z parameters of the background.
+        mass, ratio, redshift, redshift_final
 
     Returns
     -------
@@ -1674,8 +1678,19 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
     cdef int R = nreals
 
     cdef int mm, qq, zz, ff, rr, ll
-    cdef double num, cur, sum_bg, m_bg, q_bg, z_bg
-    cdef np.ndarray[np.double_t, ndim=3] maxes = np.zeros((F,R,L))
+    cdef double num, cur, sum_bg, m_bg, q_bg, z_bg, zfinal_bg, dcom_bg, sepa_bg, angs_bg
+
+    # # check all redz_final are positive
+    # for mm in range(len(redz_final)):
+    #     for qq in range(len(redz_final[0])):
+    #         for zz in range(len(redz_final[0,0])):
+    #             for ff in range(len(redz_final[0,0,0])):
+    #                 if (redz_final[mm,qq,zz,ff]<0 and redz_final[mm,qq,zz,ff] !=-1):
+    #                     err = f"redz_final[{mm},{qq},{zz},{ff},] = {redz_final[mm,qq,zz,ff]} < 0"
+    #                     raise ValueError(err)
+    # print("passed redz_final check in _loudest_hc_and_par_from_sorted_redz")
+
+
 
     # Setup random number generator from numpy library
     cdef bitgen_t *rng
@@ -1693,6 +1708,10 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
             m_bg = 0
             q_bg = 0
             z_bg = 0
+            zfinal_bg = 0
+            dcom_bg = 0
+            sepa_bg = 0
+            angs_bg = 0
             for bb in range(M*Q*Z): #iterate through bins, loudest to quietest
                 mm = msort[bb]
                 qq = qsort[bb]
@@ -1703,10 +1722,9 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
                     num = <double>random_normal(rng, num, std)
                 else:            # Poisson sample
                     num = <double>random_poisson(rng, num)
-                if(num < 1):
-                    continue
                 cur = h2fdf[mm,qq,zz,ff] # h^2 * f/df of current bin
-                if (num<1):
+
+                if (num < 1) or (cur == 0):
                     continue # to next loudest bin
                 while (ll < L) and (num > 0):
                     # store ll loudest source strain
@@ -1715,7 +1733,14 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
                     # store indices of ll loudest source
                     sspar[0,ff,rr,ll] = mt[mm]
                     sspar[1,ff,rr,ll] = mr[qq]
-                    sspar[2,ff,rr,ll] = redz[mm,qq,zz,ff]
+                    sspar[2,ff,rr,ll] = rz[zz]
+                    sspar[3,ff,rr,ll] = redz_final[mm,qq,zz,ff]
+
+                    # check for negative redz_final
+                    if redz_final[mm,qq,zz,ff]<0 and redz_final[mm,qq,zz,ff]!=-1:
+                        # badz = badz+1
+                        err = f"redz_final[{mm},{qq},{zz},{ff}] = {redz_final[mm,qq,zz,ff]} < 0"
+                        print("ERROR IN CYUTILS:", err)
 
                     # update number and ll index
                     num -= 1
@@ -1725,13 +1750,21 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
                 # add to average parameters of background sources
                 m_bg += num * cur * mt[mm] # tot weight bg mass
                 q_bg += num * cur * mr[qq] # tot weighted bg ratio
-                z_bg += num * cur * redz[mm,qq,zz,ff] # tot weighted bg redshift
+                z_bg += num * cur * rz[zz] # tot weighted bg redshift
+                zfinal_bg += num * cur * redz_final[mm,qq,zz,ff] # tot weighted bg redshift after hardening
+                dcom_bg += num * cur * dcom_final[mm,qq,zz,ff] # tot weighted bg com. dist. after hardening
+                sepa_bg += num * cur * sepa[mm,qq,zz,ff] # tot weighted bg separation after hardening
+                angs_bg += num * cur * angs[mm,qq,zz,ff] # tot weighted bg angular separation after hardening
 
             hc2bg[ff,rr] = sum_bg # background strain
             # background average parameters
             bgpar[0,ff,rr] = m_bg/sum_bg # bg avg mass
             bgpar[1,ff,rr] = q_bg/sum_bg # bg avg ratio
             bgpar[2,ff,rr] = z_bg/sum_bg # bg avg redshift
+            bgpar[3,ff,rr] = zfinal_bg/sum_bg # bg avg redshift after hardening
+            bgpar[4,ff,rr] = dcom_bg/sum_bg # bg avg comoving distance after hardening
+            bgpar[5,ff,rr] = sepa_bg/sum_bg # bg avg binary separation after hardening
+            bgpar[6,ff,rr] = angs_bg/sum_bg # bg avg binary angular separation after hardening
 
 
 
@@ -1783,3 +1816,283 @@ cdef double[:, :] _interp_2d(
                 ynew[ii, nn] = NAN
 
     return ynew
+
+
+
+
+
+
+
+
+# ==================================================================================================
+# ====    DetStats Functions    ====
+# ==================================================================================================
+
+
+def gamma_of_rho_interp(rho, rsort, rho_interp_grid, gamma_interp_grid):
+    """
+    rho : 1Darray of scalars
+        SNR of single sources, in flat array
+    rsort : 1Darray
+        order of flat rho values smallest to largest
+    rho_interp_grid : 1Darray
+        rho values corresponding to each gamma
+    gamma_interp_grid : 1Darray
+        gamma values corresponding to each rho
+
+    """
+    # pass in the interp grid
+    cdef np.ndarray[np.double_t, ndim=1] gamma = np.zeros(rho.shape)
+
+    _gamma_of_rho_interp(rho, rsort, rho_interp_grid, gamma_interp_grid, gamma)
+
+    return gamma
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef int _gamma_of_rho_interp(
+    double[:] rho, long[:] rsort,
+    double[:] rho_interp_grid, double[:] gamma_interp_grid,
+    # output
+    double[:] gamma
+    ):
+    """ Find gamma of rho by interpolation over rho and gamma grids.
+    """
+
+    cdef int n_rho = rho.size
+    cdef int n_interp = rho_interp_grid.size
+    cdef int ii, kk, rr
+    ii = 0 # get rho in order using rho[rsort[ii]]
+
+    for kk in range(n_rho):
+        rr = rsort[kk] # index of next largest rho, equiv to rev in redz calculation
+        # print('kk =',kk,' rr =', rr, 'rho[rr] =', rho[rr])
+        # get to the right index of the interpolation-grid
+        while (rho_interp_grid[ii+1] < rho[rr]) and (ii < n_interp -2):
+            ii += 1
+        # print('ii =',ii, ' rho_interp[ii] =', rho_interp_grid[ii], ' rho_interp[ii+1] =', rho_interp_grid[ii+1])
+        # interpolate
+        gamma[rr] = interp_at_index(ii, rho[rr], rho_interp_grid, gamma_interp_grid)
+        # print('rho =', rho[rr], ' gamma =', gamma[rr], '\n')\
+
+    return 0
+
+
+def snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
+    """Calculate single source SNR.
+
+    Parameters
+    ----------
+    amp : (F,R,L) NDarray
+        Dimensionless strain amplitude of loudest single sources
+    F_iplus : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    F_icross : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    iotas : (F,S,L) NDarray
+        Inclination, used to calculate:
+        :math:`a_pol = 1 + np.cos(iotas)^2`
+        :math:`b_pol = -2 np.cos(iotas)`
+    dur : scalar
+        Duration of observations.
+    Phi_0 : (F,S,L) NDarray
+        Initial GW phase
+    S_i : (P,F,R,L) NDarray
+        Total noise of each pulsar wrt detection of each single source, in $s^3$.
+    freqs : (F,) 1Darray
+        Observed frequency bin centers.
+
+    Returns
+    -------
+    snr_ss : (F,R,S,L) NDarray
+        SNR from the whole PTA for each single source with
+        each realized sky position (S) and realized strain (R)
+
+    """
+    nfreqs, nreals, nloudest = amp.shape[0], amp.shape[1], amp.shape[2]
+    npsrs, nskies = F_iplus.shape[0], F_iplus.shape[2]
+    cdef np.ndarray[np.double_t, ndim=4] snr_ss = np.zeros((nfreqs, nreals, nskies, nloudest))
+    _snr_ss(
+        amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs,
+        npsrs, nfreqs, nreals, nskies, nloudest,
+        snr_ss)
+    return snr_ss
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef int _snr_ss(
+    double[:,:,:] amp,
+    double[:,:,:,:] F_iplus,
+    double[:,:,:,:] F_icross,
+    double[:,:,:] iotas,
+    double dur,
+    double[:,:,:] Phi_0,
+    double[:,:,:,:] S_i,
+    double[:] freqs,
+    long npsrs, long nfreqs, long nreals, long nskies, long nloudest,
+    # output
+    double[:,:,:,:] snr_ss
+    ):
+    """
+
+    Parameters
+    ----------
+    amp : (F,R,L) NDarray
+        Dimensionless strain amplitude of loudest single sources
+    F_iplus : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    F_icross : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    iotas : (F,S,L) NDarray
+        Inclination, used to calculate:
+        a_pol = 1 + np.cos(iotas) **2
+        b_pol = -2 * np.cos(iotas)
+    dur : scalar
+        Duration of observations.
+    Phi_0 : (F,S,L) NDarray
+        Initial GW phase
+    S_i : (P,F,R,L) NDarray
+        Total noise of each pulsar wrt detection of each single source, in s^3
+    freqs : (F,) 1Darray
+        Observed frequency bin centers.
+    snr_ss : (F,R,S,L) NDarray
+        Pointer to single source SNR array, to be calculated.
+
+    NOTE: This may be improved by moving some of the math outside the function.
+    I.e., passing in sin/cos of NDarrays to be used.
+    """
+
+    cdef int pp, ff, rr, ss, ll
+    cdef float a_pol, b_pol, Phi_T, pta_snr_sq, coef, term1, term2, term3
+    # print('npsrs %d, nfreqs %d, nreals %d, nskies %d, nloudest %d' % (npsrs, nfreqs, nreals, nskies, nloudest))
+
+    for ff in range(nfreqs):
+        for ss in range(nskies):
+            for ll in range(nloudest):
+                a_pol = 1 + pow(cos(iotas[ff,ss,ll]), 2.0)
+                b_pol = -2 * cos(iotas[ff,ss,ll])
+                Phi_T = 2 * M_PI * freqs[ff] * dur + Phi_0[ff,ss,ll]
+                for rr in range(nreals):
+                    pta_snr_sq = 0
+                    for pp in range(npsrs):
+                        # calculate coefficient depending on
+                        # function of amp, S_i, and freqs
+                        coef = pow(amp[ff,rr,ll], 2.0) / (S_i[pp,ff,rr,ll] * 8 * pow(M_PI * freqs[ff], 3.0))
+
+                        # calculate terms that depend on p, f, s, and l
+                        # functions of F_iplus, F_icross, a_pol, b_pol, Phi_0, and Phi_T
+                        term1 = (
+                            pow(a_pol * F_iplus[pp,ff,ss,ll], 2.0)
+                            * (Phi_T * (1.0 + 2.0 * pow(sin(Phi_0[ff,ss,ll]), 2.0))
+                                + cos(Phi_T) * (-1.0 * sin(Phi_T) + 4.0 * cos(Phi_0[ff,ss,ll]))
+                                - 4.0 * sin(Phi_0[ff,ss,ll])
+                                )
+                        )
+                        term2 = (
+                            pow(b_pol * F_icross[pp,ff,ss,ll], 2.0)
+                            * (Phi_T * (1.0 + 2.0 * pow(cos(Phi_0[ff,ss,ll]), 2.0))
+                                + sin(Phi_T) * cos(Phi_T) - 4.0 * cos(Phi_0[ff,ss,ll])
+                                )
+                        )
+                        term3 = (
+                            -2.0 * a_pol * b_pol * F_iplus[pp,ff,ss,ll] * F_icross[pp,ff,ss,ll]
+                            * (2.0 * Phi_T * sin(Phi_T) *cos(Phi_0[ff,ss,ll])
+                                + sin(Phi_T) * (sin(Phi_T) - 2.0 * sin(Phi_0[ff,ss,ll])
+                                                + 2.0 * cos(Phi_T) * cos(Phi_0[ff,ss,ll])
+                                                - 2.0 * cos(Phi_0[ff,ss,ll])
+                                                )
+                            )
+                        )
+                        pta_snr_sq += coef*(term1 + term2 + term3) # sum snr^2 of all pulsars for a single source
+
+                    # set snr for a single source, using sum from all pulsars
+                    snr_ss[ff,rr,ss,ll] = sqrt(pta_snr_sq)
+
+
+def Sh_rest(hc_ss, hc_bg, freqs, nexcl):
+    """
+    Calculate the noise from all the single sources except the source in question
+    and the next N_excl loudest sources.
+
+    Parameters
+    ----------
+    hc_ss : (F,R,L) NDarray
+        Characteristic strain from all loud single sources.
+    hc_bg : (F,R) NDarray
+        Characteristic strain from all but loudest source at each frequency.
+    freqs : (F,) 1Darray
+        Frequency bin centers.
+    nexcl : int
+        Number of loudest single sources to exclude from hc_rest noise, in addition
+        to the source in question.
+
+    Returns
+    -------
+    Sh_rest : (F,R,L) NDarray of scalars
+        The noise in a single pulsar from other GW sources for detecting each single source.
+
+    """
+
+    nfreqs, nreals, nloudest = hc_ss.shape[0], hc_ss.shape[1], hc_ss.shape[2]
+    cdef np.ndarray[np.double_t, ndim=3] Sh_rest = np.zeros((nfreqs, nreals, nloudest))
+    _Sh_rest(hc_ss, hc_bg, freqs, nexcl, nreals, nfreqs, nloudest, Sh_rest)
+    return Sh_rest
+
+
+cdef void _Sh_rest(
+    double[:,:,:] hc_ss, double[:,:,] hc_bg, double[:] freqs, long nexcl,
+    long nreals, long nfreqs, long nloudest,
+    double[:,:,:] Sh_rest):
+    """
+    Calculate the noise from all the single sources except the source in question
+    and the next N_excl loudest sources.
+
+    Parameters
+    ----------
+    hc_ss : (F,R,L) NDarray
+        Characteristic strain from all loud single sources.
+    hc_bg : (F,R) NDarray
+        Characteristic strain from all but loudest source at each frequency.
+    freqs : (F,) 1Darray
+        Frequency bin centers.
+    nexcl : int
+        Number of loudest single sources to exclude from hc_rest noise, in addition
+        to the source in question.
+
+    Returns
+    -------
+    void
+    Sh_rest : (F,R,L) NDarray of scalars, updated via memory address
+
+
+    Sh = hc^2 / (f^3 12 pi^2)
+
+    """
+    cdef int ff, rr, ll, count
+    cdef double Sh_ss, Sh_bg
+
+    for ff in range(nfreqs):
+        freq = freqs[ff]
+        for rr in range(nreals):
+            for ll in range(nloudest): # calculating for the llth loduest
+                Sh_ss = 0
+                count = 0
+                for ii in range(nloudest): # adding other loudest with index ii
+                    if (ii != ll): # check it's not our current source
+                    # if current is in top N_excl, must be (N_excl+1)th or above
+                    # if current is >= top N_excl, must be (N_excl)th or above
+                        if ((ll < nexcl) and (ii > nexcl)) or ((ll >= nexcl) and (ii > nexcl-1)):
+                            Sh_ss += pow(hc_ss[ff,rr,ii], 2.0) / pow(freq, 3.0) / (12*pow(M_PI, 2.0))
+                            count += 1
+                Sh_bg = pow(hc_bg[ff,rr], 2.0) / pow(freq, 3.0) / (12*pow(M_PI, 2.0))
+                Sh_rest[ff,rr,ll] = Sh_rest[ff,rr,ll] + Sh_ss + Sh_bg
+                if count != (nloudest - nexcl - 1):
+                    err = (f"ERROR in calculate Sh_rest! count of sources={count}")
+                    print(err)
+
+
+

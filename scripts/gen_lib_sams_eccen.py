@@ -95,7 +95,7 @@ class Parameter_Space_Mix01(holo.librarian._Parameter_Space):
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law(qgamma=gpf_qgamma)
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
+        mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
 
         sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge, shape=self.sam_shape)
         hard = holo.hardening.Fixed_Time.from_sam(sam, time, gamma_sc=hard_gamma_inner, exact=True, progress=False)
@@ -130,7 +130,7 @@ class Parameter_Space_Hard01(holo.librarian._Parameter_Space):
         gsmf = holo.sam.GSMF_Schechter()
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013()
+        mmbulge = holo.host_relations.MMBulge_KH2013()
 
         sam = holo.sam.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
@@ -176,7 +176,7 @@ class Parameter_Space_Hard02_BAD(holo.librarian._Parameter_Space):
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
+        mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
         sam = holo.sam.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
@@ -222,7 +222,7 @@ class Parameter_Space_Hard03(holo.librarian._Parameter_Space):
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
+        mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
         sam = holo.sam.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
@@ -268,7 +268,7 @@ class Parameter_Space_Hard04(holo.librarian._Parameter_Space):
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
+        mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
         sam = holo.sam.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
@@ -326,7 +326,7 @@ class Parameter_Space_Debug01(holo.librarian._Parameter_Space):
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
+        mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
         sam = holo.sam.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
@@ -383,7 +383,7 @@ class Parameter_Space_Simple01(holo.librarian._Parameter_Space):
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013()
+        mmbulge = holo.host_relations.MMBulge_KH2013()
 
         sam = holo.sam.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
@@ -429,7 +429,7 @@ class LHS_Parameter_Space_Hard04(holo.librarian._LHS_Parameter_Space):
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
+        mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
         sam = holo.sam.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
@@ -474,7 +474,7 @@ class LHS_PSpace_Eccen_01(holo.librarian._LHS_Parameter_Space):
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law(zbeta=gpf_zbeta)
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp)
+        mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
         sam = holo.sam.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
@@ -536,7 +536,7 @@ class LHS_PSpace_Eccen_02(holo.librarian._LHS_Parameter_Space):
         gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0, phiz=gsmf_phiz)
         gpf = holo.sam.GPF_Power_Law(malpha=gpf_malpha, qgamma=gpf_qgamma, zbeta=gpf_zbeta)
         gmt = holo.sam.GMT_Power_Law(malpha=gmt_malpha, qgamma=gmt_qgamma, zbeta=gmt_zbeta)
-        mmbulge = holo.relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
+        mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
 
         sam = holo.sam.Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
