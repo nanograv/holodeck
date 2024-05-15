@@ -335,7 +335,6 @@ class Pop_Illustris(_Population_Discrete):
         fname = self._fname
         fixed_sepa = self._fixed_sepa ####
         header, data = utils.load_hdf5(fname)
-<<<<<<< HEAD:holodeck/population.py
         
         print(f"fname = {fname}")
         if fname.split('/')[-1] == 'illustris-galaxy-mergers_L75n1820FP_gas-100_dm-100_star-100_bh-000.hdf5':
@@ -413,7 +412,6 @@ class Pop_Illustris(_Population_Discrete):
               f" vol^(1/3) = {(self._sample_volume)**(1.0/3.0)/(1.0e6*PC)} [Mpc]")
         print(f"Read {self.mass.shape[0]} mergers from file.")
         
-=======
         self._sample_volume_mpc3 = header['box_volume_mpc']            #: comoving-volume of sim [Mpc^3]
         self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3   #: comoving-volume of sim [cm^3]
 
@@ -431,7 +429,6 @@ class Pop_Illustris(_Population_Discrete):
         # Get the stellar mass, and take that as bulge mass
         self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :]   #: Stellar mass / stellar-bulge mass [grams]
         self.vdisp = data['SubhaloVelDisp']    #: Velocity dispersion of galaxy [?cm/s?]
->>>>>>> main:holodeck/discrete/population.py
         return
 
 
