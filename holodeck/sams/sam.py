@@ -345,7 +345,9 @@ class Semi_Analytic_Model:
 
             # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]   `gal_merger_rate` is [1/sec]  ===>  [Mpc^-3]
             dens = self._gsmf(mass_gsmf, redz) * gal_merger_rate * cosmo.dtdz(redz)
-
+            self._gal_mrg_rate = gal_merger_rate
+            self._dens_gal_gal = dens 
+            
             # ---- Convert to MBH Binary density
 
             # we want ``dn_mbhb / [dlog10(M_bh) dq_bh qz]``
