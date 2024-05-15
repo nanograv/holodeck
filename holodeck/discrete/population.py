@@ -415,20 +415,6 @@ class Pop_Illustris(_Population_Discrete):
         self._sample_volume_mpc3 = header['box_volume_mpc']            #: comoving-volume of sim [Mpc^3]
         self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3   #: comoving-volume of sim [cm^3]
 
-        # Select the stellar radius
-        part_names = header['part_names'].tolist()
-        st_idx = part_names.index('star')
-        # ---- Binary Properties
-        gal_rads = data['SubhaloHalfmassRadType']
-        gal_rads = gal_rads[:, st_idx, :]
-        # Set initial separation to sum of stellar half-mass radii
-        self.sepa = np.sum(gal_rads, axis=-1)       #: Initial binary separation [cm]
-        self.mass = data['SubhaloBHMass']      #: BH Mass in subhalo [grams]
-        self.scafa = data['time']              #: scale-factor at time of 'merger' event in sim []
-        # ---- Galaxy Properties
-        # Get the stellar mass, and take that as bulge mass
-        self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :]   #: Stellar mass / stellar-bulge mass [grams]
-        self.vdisp = data['SubhaloVelDisp']    #: Velocity dispersion of galaxy [?cm/s?]
         return
 
 
