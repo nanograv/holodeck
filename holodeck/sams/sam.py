@@ -331,18 +331,6 @@ class Semi_Analytic_Model:
                 log.info("No GMT was provided, cannot calculate Galaxy-Merger based stalling.")
                 idx_stalled = None
 
-<<<<<<< HEAD:holodeck/sam.py
-            # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]
-            dens = self._gsmf(mass_gsmf, redz) * self._gpf(mass_gpf, mstar_rat, redz) * cosmo.dtdz(redz)
-            # `gmt` returns [sec]
-            dens /= gmt_time
-            # now `dens` is  ``dn_gal / [dlog10(Mstar) dq_gal dz]``  with units of [Mpc^-3]
-            
-            # save galaxy merger number density and galaxy merger rate as separate class variables:
-            self._dens_gal_gal = dens
-            self._gal_mrg_rate = self._gpf(mass_gpf, mstar_rat, redz) / gmt_time
-            
-=======
             # ---- get galaxy merger rate
 
             if self._gmr is None:
@@ -358,7 +346,6 @@ class Semi_Analytic_Model:
             # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]   `gal_merger_rate` is [1/sec]  ===>  [Mpc^-3]
             dens = self._gsmf(mass_gsmf, redz) * gal_merger_rate * cosmo.dtdz(redz)
 
->>>>>>> main:holodeck/sams/sam.py
             # ---- Convert to MBH Binary density
 
             # we want ``dn_mbhb / [dlog10(M_bh) dq_bh qz]``
@@ -823,8 +810,7 @@ class Semi_Analytic_Model:
 
         gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
 
-        #return gwb
-        return gwb, redz_final, number
+        return gwb
 
     def gwb_old(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=100):
         """Calculate GWB using new `dynamic_binary_number_at_fobs` method, better, but slower.
