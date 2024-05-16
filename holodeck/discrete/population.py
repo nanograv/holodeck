@@ -338,18 +338,20 @@ class Pop_Illustris(_Population_Discrete):
         
         print(f"fname = {fname}")
         if fname.split('/')[-1] == 'illustris-galaxy-mergers_L75n1820FP_gas-100_dm-100_star-100_bh-000.hdf5':
-            print("Warning: using old illustris merger data file."
-                  +" This has numerous implications which I will list at some point.")
 
             hubbleParam = 0.704
-            print(f"Warning: manually converting 'box_volume_mpc' in old illustris data file"
-                  +f" from Mpc/h to actual Mpc units (h={hubbleParam}).")
-            self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3 / hubbleParam**3
+            msg = (
+                "WARNING: this Illustris galaxy merger data file is old and incomplete. "
+                "It includes only the first and next progenitors along the MPB, does not walk subtrees.\n"
+                "File contains galaxy data for first progenior and next progenitor, but not descendants. "
+                " Note that this means array shapes are different from new file versions!\n"
+                "Note also that box_volume_mpc is actually in units of Mpc/h; converting manually to Mpc here.\n"
+                f"hubbleParam = {hubbleParam} is also hard-coded here (not present in file).\n"
+            )
+            log.warning(msg)
+            warnings.warn(msg)
 
-            # no cosmo params
-            # box vol actually in Mpc/h
-            # indices different
-            # no descendant data
+            self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3 / hubbleParam**3
             
             # Select the stellar radius
             part_names = header['part_names'].tolist()
@@ -374,8 +376,7 @@ class Pop_Illustris(_Population_Discrete):
         else:
             # get comoving-volume of sim [cm^3/h]
             hubbleParam = header['HubbleParam']
-            self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3 / (hubbleParam**2.0)
-            print(f"Warning: manually adding missing factor of h^-2 in new data files.")
+            self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3 
             
             # Select the stellar radius
             part_names = header['part_names'].tolist()
