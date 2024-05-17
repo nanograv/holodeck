@@ -360,22 +360,6 @@ class Pop_Illustris(_Population_Discrete):
             st_idx = part_names.index('star')
             self.scafa = data['time']              #: scale-factor at time of 'merger' event in sim []
 
-            # ---- Binary Properties
-            # Set initial separation to sum of stellar half-mass radii
-            #gal_rads = data['SubhaloHalfmassRadType']
-            #gal_rads = gal_rads[:, st_idx, :]
-            #if (fixed_sepa is not None):
-            #    self.sepa = np.ones_like(gal_rads[:,0]) * fixed_sepa      #: Initial binary separation [cm]
-            #else:
-            #    self.sepa = np.sum(gal_rads, axis=-1)       #: Initial binary separation [cm]
-
-            #self.mass = data['SubhaloBHMass']      #: progenitor BH Masses in subhalo [grams]
-            # ---- Galaxy Properties
-            # Get the stellar mass, and take that as bulge mass
-            #self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :]   #: [grams]
-            #self.vdisp = data['SubhaloVelDisp']    #: Velocity dispersion of galaxy [?cm/s?]
-
-
         else:
             # get hubble param and comoving volume of sim [cm^3]
             hubbleParam = header['HubbleParam']
@@ -389,32 +373,6 @@ class Pop_Illustris(_Population_Discrete):
             # tFirstProg and tNextProg don't always correspond to same snap; use later one as merger time
             self.scafa = np.array([ np.maximum(tFirstProg,tNextProg) for tFirstProg,tNextProg 
                                     in zip(data['time'][:,0],data['time'][:,1]) ]) 
-
-            ## Select the stellar radius
-            # ---- Binary Properties
-            # Set initial separation to sum of stellar half-mass radii
-            # scale-factor at time of 'merger' event in sim []
-            # note that the first prog and next prog are usually but not always identified in the same snapshot,
-            # we are taking the later of the two progenitor snapshot times in these case
-            #print(data['SubhaloHalfmassRadType'].min(), data['SubhaloHalfmassRadType'].max())
-            #gal_rads = data['SubhaloHalfmassRadType'] 
-            ##gal_rads = gal_rads[:, :, st_idx]
-            #print('st_idx=',st_idx)
-            #print(gal_rads.min(),gal_rads.max(),gal_rads.shape)
-            #if (fixed_sepa is not None):
-            #    self.sepa = np.ones_like(gal_rads[:,0]) * fixed_sepa      #: Initial binary separation [cm]
-            #else:
-            #    self.sepa = np.sum(gal_rads[:,:2], axis=-1)       #: Initial binary separation [cm]
-
-            ##print(self.sepa.min(), self.sepa.max())
-            #: progenitor BH Masses in subhalo [grams]
-            #self.mass = data['SubhaloBHMass'][:,:2] 
-
-            # ---- Galaxy Properties
-            # Get the stellar mass, and take that as bulge mass
-            #self.mbulge = data['SubhaloMassInRadType'][:, :2, st_idx] 
-            #self.vdisp = data['SubhaloVelDisp']   #: Velocity dispersion of galaxy [cm/s]
-
             
                     
         # ---- Binary Properties
