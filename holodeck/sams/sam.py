@@ -1073,13 +1073,39 @@ class Semi_Analytic_Model:
         return integ
 
     def _ndens_gal(self, mass_gal, mrat_gal, redz):
+ 
         if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
-            self._log.warning("{self.__class__}._ndens_gal assumes that primary mass is used for GSMF, GPF and GMT!")
+            self._log.warning("{self.__class__}._ndens_gal assumes that "
+                              "primary mass is used for GSMF, GPF and GMT!")
+        
+        if self._gmr is None:
+            # NOTE: dlog10(M_1) / dlog10(M) = (M/M_1) * (dM_1/dM) = 1
+            nd = self._gsmf(mass_gal, redz) * self._gpf(mass_gal, mrat_gal, redz)
+            nd = nd * cosmo.dtdz(redz) / self._gmt(mass_gal, mrat_gal, redz)
+        else:
+            # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]   `gal_merger_rate` is [1/sec]  ===>  [Mpc^-3]
+            nd = self._gmr(mass_gal, mrat_gal, redz) * self._gsmf(mass_gal, redz) * cosmo.dtdz(redz)
 
-        # NOTE: dlog10(M_1) / dlog10(M) = (M/M_1) * (dM_1/dM) = 1
-        nd = self._gsmf(mass_gal, redz) * self._gpf(mass_gal, mrat_gal, redz)
-        nd = nd * cosmo.dtdz(redz) / self._gmt(mass_gal, mrat_gal, redz)
         return nd
+    
+    def _gal_merger_rate(self, mass_gal, mrat_gal, redz):
+        
+        if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
+            self._log.warning("{self.__class__}._gal_merger_rate assumes "
+                              "that primary mass is used for GSMF, GPF and GMT!")
+
+        if self._gmr is None:
+            log.debug("Calculating galaxy merger rate using pair-fraction (GPF) and merger-time (GMT)")
+            # GMT returns `-1.0` for values beyond age of universe
+            zprime, gmt_time = self._gmt.zprime(mass_gal, mrat_gal, redz)
+            # `gmt` returns [sec]  `gpf` is dimensionless,  so this is [1/sec]
+            gmr = self._gpf(mass_gal, mrat_gal, redz) / gmt_time
+        else:
+            log.debug("Calculating galaxy merger rate directly from GMR")
+            gmr = self._gmr(mass_gal, mrat_gal, redz)
+            
+        return gmr
+    
 
     def _ndens_mbh(self, mass_gal, mrat_gal, redz):
         if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
