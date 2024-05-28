@@ -3,7 +3,7 @@
 
 import holodeck as holo
 from holodeck.constants import GYR, PC, MSOL
-from holodeck.librarian.libraries import _Param_Space, PD_Uniform, PD_Normal
+from holodeck.librarian.lib_tools import _Param_Space, PD_Uniform, PD_Normal, PD_Uniform_Log
 
 
 # Define a new Parameter-Space class by subclassing the base class:
@@ -129,7 +129,7 @@ class PS_Test(_Param_Space):
         )
 
         sam = holo.sams.Semi_Analytic_Model(
-            gsmf=gsmf, gmr=gmr, mmbulge=mmbulge, shape=sam_shape,
+            gsmf=gsmf, gmr=gmr, mmbulge=mmbulge, shape=sam_shape, log=self._log,
         )
         return sam
 
@@ -158,7 +158,7 @@ class _PS_Astro_Strong(_Param_Space):
 
     """
 
-    __version__ = "0.1"
+    __version__ = "0.2"
 
     DEFAULTS = dict(
         # Hardening model (phenom 2PL)
@@ -166,7 +166,7 @@ class _PS_Astro_Strong(_Param_Space):
         hard_sepa_init=1e4,     # [pc]
         hard_rchar=10.0,        # [pc]
         hard_gamma_inner=-1.0,
-        hard_gamma_outer=+2.5,
+        hard_gamma_outer=0.0,
 
         # Galaxy stellar-mass Function (``GSMF_Double_Schechter``)
         # Parameters are based on `double-schechter.ipynb` conversions from [Leja2020]_
@@ -196,13 +196,17 @@ class _PS_Astro_Strong(_Param_Space):
 
         # M-MBulge Relationship (``MMBulge_KH2013``)
         # From [KH2013]_
-        mmb_mamp=0.49e9,                 # 0.49e9 + 0.06 - 0.05  [Msol]
+        mmb_mamp_log10=8.69,             # 8.69±0.05  [log10(M/Msol)]  approx uncertainties!
         mmb_plaw=1.17,                   # 1.17 ± 0.08
         mmb_scatter_dex=0.28,            # no uncertainties given
+        # bulge fraction
+        bf_frac_lo=0.4,
+        bf_frac_hi=0.8,
+        bf_mstar_crit=11.0,              # [log10(M_star/M_Sol)]
+        bf_width_dex=1.0,                # [dex]
     )
 
-    @classmethod
-    def _init_sam(cls, sam_shape, params):
+    def _init_sam(self, sam_shape, params):
         log10_phi_one = [
             params['gsmf_log10_phi_one_z0'],
             params['gsmf_log10_phi_one_z1'],
@@ -239,19 +243,26 @@ class _PS_Astro_Strong(_Param_Space):
             qgammam=params['gmr_qgammam'],
         )
 
+        # Mbh-MBulge relationship (and bulge-fractions)
+        bulge_frac = holo.host_relations.BF_Sigmoid(
+            bulge_frac_lo=params['bf_frac_lo'],
+            bulge_frac_hi=params['bf_frac_hi'],
+            mstar_char_log10=params['bf_mstar_crit'],
+            width_dex=params['bf_width_dex'],
+        )
         mmbulge = holo.host_relations.MMBulge_KH2013(
-            mamp=params['mmb_mamp']*MSOL,
+            mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
+            bulge_frac=bulge_frac,
         )
 
         sam = holo.sams.Semi_Analytic_Model(
-            gsmf=gsmf, gmr=gmr, mmbulge=mmbulge, shape=sam_shape,
+            gsmf=gsmf, gmr=gmr, mmbulge=mmbulge, shape=sam_shape, log=self._log,
         )
         return sam
 
-    @classmethod
-    def _init_hard(cls, sam, params):
+    def _init_hard(self, sam, params):
         hard = holo.hardening.Fixed_Time_2PL_SAM(
             sam,
             params['hard_time']*GYR,
@@ -269,7 +280,8 @@ class PS_Astro_Strong_All(_PS_Astro_Strong):
         parameters = [
             # Hardening model (phenom 2PL)
             PD_Uniform("hard_time", 0.1, 11.0, default=3.0),   # [Gyr]
-            PD_Uniform("hard_gamma_inner", -1.5, +0.0, default=-1.0),
+            PD_Uniform("hard_gamma_inner", -2.0, +0.0, default=-1.0),
+            PD_Uniform("hard_rchar", 2.0, 20.0, default=10.0),    # [pc]
 
             # GSMF
             PD_Normal('gsmf_log10_phi_one_z0', -2.383, 0.028),    # - 2.383 ± 0.028
@@ -295,9 +307,15 @@ class PS_Astro_Strong_All(_PS_Astro_Strong):
             PD_Normal('gmr_qgammaz', +0.0611, 0.0021),            # +0.0611 ± 0.0021    beta1
             PD_Normal('gmr_qgammam', -0.0477, 0.0013),            # -0.0477 ± 0.0013    gamma
 
+            # MMBulge
             # From [KH2013]_
-            PD_Normal('mmb_mamp', 0.49e9, 0.055e9),               # 0.49e9 + 0.06 - 0.05  [Msol]
+            PD_Normal('mmb_mamp_log10', 8.69, 0.05),              # 8.69 ± 0.05  [log10(M/Msol)]
             PD_Normal('mmb_plaw', 1.17, 0.08),                    # 1.17 ± 0.08
+            # Extra
+            PD_Normal('mmb_scatter_dex', 0.28, 0.05),             # no uncertainties given
+            PD_Uniform('bf_frac_lo', 0.1, 0.4),
+            PD_Uniform('bf_frac_hi', 0.6, 1.0),
+            PD_Uniform('bf_width_dex', 0.5, 1.5),                 # [dex]
         ]
         _Param_Space.__init__(
             self, parameters,
@@ -312,7 +330,26 @@ class PS_Astro_Strong_Hard(_PS_Astro_Strong):
         parameters = [
             # Hardening model (phenom 2PL)
             PD_Uniform("hard_time", 0.1, 11.0, default=3.0),   # [Gyr]
-            PD_Uniform("hard_gamma_inner", -1.5, +0.0, default=-1.0),
+            PD_Uniform("hard_gamma_inner", -2.0, +0.0, default=-1.0),
+            PD_Uniform("hard_rchar", 2.0, 20.0, default=10.0),    # [pc]
+        ]
+        _Param_Space.__init__(
+            self, parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+        )
+        return
+
+
+class PS_Astro_Strong_Hard_All(_PS_Astro_Strong):
+
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
+            # Hardening model (phenom 2PL)
+            PD_Uniform("hard_time", 0.1, 11.0, default=3.0),   # [Gyr]
+            PD_Uniform("hard_gamma_inner", -2.0, +0.0, default=-1.0),
+            PD_Uniform("hard_rchar", 2.0, 20.0, default=10.0),    # [pc]
+            PD_Uniform_Log("hard_sepa_init", 1e3, 1e4, default=1e4),    # [pc]
+            PD_Uniform("hard_gamma_outer", 0.0, +2.5, default=0.0),
         ]
         _Param_Space.__init__(
             self, parameters,
@@ -367,13 +404,33 @@ class PS_Astro_Strong_GMR(_PS_Astro_Strong):
         return
 
 
+class PS_Astro_Strong_MMBulge_BFrac(_PS_Astro_Strong):
+
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
+            # MMbulge - from [KH2013]_
+            PD_Normal('mmb_mamp_log10', 8.69, 0.05),              # 8.69 ± 0.05  [log10(M/Msol)]
+            PD_Normal('mmb_plaw', 1.17, 0.08),                    # 1.17 ± 0.08
+            PD_Normal('mmb_scatter_dex', 0.28, 0.05),             # no uncertainties given
+            PD_Uniform('bf_frac_lo', 0.1, 0.4),
+            PD_Uniform('bf_frac_hi', 0.6, 1.0),
+            PD_Uniform('bf_width_dex', 0.5, 1.5),                 # [dex]
+        ]
+        _Param_Space.__init__(
+            self, parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+        )
+        return
+
+
 class PS_Astro_Strong_MMBulge(_PS_Astro_Strong):
 
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
         parameters = [
             # MMbulge - from [KH2013]_
-            PD_Normal('mmb_mamp', 0.49e9, 0.055e9),               # 0.49e9 + 0.06 - 0.05  [Msol]
+            PD_Normal('mmb_mamp_log10', 8.69, 0.05),              # 8.69 ± 0.05  [log10(M/Msol)]
             PD_Normal('mmb_plaw', 1.17, 0.08),                    # 1.17 ± 0.08
+            PD_Normal('mmb_scatter_dex', 0.28, 0.05),             # no uncertainties given
         ]
         _Param_Space.__init__(
             self, parameters,
@@ -385,8 +442,10 @@ class PS_Astro_Strong_MMBulge(_PS_Astro_Strong):
 _param_spaces_dict = {
     'PS_Astro_Strong_All': PS_Astro_Strong_All,
     'PS_Astro_Strong_Hard': PS_Astro_Strong_Hard,
+    'PS_Astro_Strong_Hard_All': PS_Astro_Strong_Hard_All,
     'PS_Astro_Strong_GSMF': PS_Astro_Strong_GSMF,
     'PS_Astro_Strong_GMR': PS_Astro_Strong_GMR,
     'PS_Astro_Strong_MMBulge': PS_Astro_Strong_MMBulge,
+    'PS_Astro_Strong_MMBulge_BFrac': PS_Astro_Strong_MMBulge_BFrac,
 }
 

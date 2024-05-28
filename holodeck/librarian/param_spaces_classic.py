@@ -1,8 +1,17 @@
 """'Classic' parameter spaces used in the NANOGrav 15yr analysis.
+
+15yr Astrophysics Analysis
+https://ui.adsabs.harvard.edu/abs/2023ApJ...952L..37A/abstract
+
+Notes
+-----
+[1] : The 15yr Astro paper quotes an initial separation (the `hard_sepa_init`) variable of "1e3 pc",
+      this is incorrect and the actual value used in the analysis was 1e4 pc.
+
 """
 
 from holodeck.constants import PC, GYR
-from holodeck.librarian.libraries import _Param_Space, PD_Uniform, PD_Normal
+from holodeck.librarian.lib_tools import _Param_Space, PD_Uniform, PD_Normal
 from holodeck import sams, hardening, host_relations
 
 
@@ -100,8 +109,8 @@ class PS_Classic_Phenom_Uniform(_PS_Classic_Phenom):
         parameters = [
             PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
             PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
-            PD_Uniform("mmb_mamp_log10", +7.5, +9.5),      # [log10(Msol)]
-            PD_Uniform("mmb_scatter_dex", +0.0, +1.2),
+            PD_Uniform("mmb_mamp_log10", +7.6, +9.0),      # [log10(Msol)]
+            PD_Uniform("mmb_scatter_dex", +0.0, +0.9),
             PD_Uniform("hard_time", 0.1, 11.0),            # [Gyr]
             PD_Uniform("hard_gamma_inner", -1.5, +0.0),
         ]

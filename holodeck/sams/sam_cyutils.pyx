@@ -144,9 +144,10 @@ def integrate_differential_number_3dx1d(edges, dnum):
 
     # each edge should have the same length as the corresponding dimension of `dnum`
     shape = [len(ee) for ee in edges]
+    err = f"Shape of edges={shape} does not match dnum={np.shape(dnum)}"
     # except the last edge (freq), where `dnum` should be 1-shorter
     shape[-1] -= 1
-    assert np.shape(dnum) == tuple(shape)
+    assert np.shape(dnum) == tuple(shape), err
     # the number will be shaped as one-less the size of each dimension of `dnum`
     new_shape = [sh-1 for sh in dnum.shape]
     # except for the last dimension (freq) which is the same shape
@@ -418,8 +419,42 @@ def integrate_binary_evolution_2pwl(norm_log10, mtot, mrat, sepa_init, rchar, ga
 
 
 def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
+    """Calculate the differential number of binaries at the given frequencies.
 
-    dens = sam.static_binary_density
+    This function converts from differential binary volume-density to differential number of
+    binaries.  The differential binary volume-density is:
+
+    .. math::
+        d^3 n / [d \log_{10} M  d q  d z]
+
+    Where the number density is $n = d N/d V_c$ for a comoving volume $V_c$.  The differential
+    binary number is:
+
+    .. math::
+        d^4 N / [d \log_{10} M  d q  d z  d \ln f]
+
+    Arguments
+    ---------
+    fobs_orb : (F,) array of float, [1/s]
+        The observer-frame orbital frequencies of interest, in units of inverse seconds.
+    sam : :py:class:`holodeck.sams.sam.Semi_Analytic_Model` instance
+        The semi-analytic model population.
+    hard : :py:class:`holodeck.hardening._Hardening` subclass instance,
+        The binary evolution model to evolve binaries from galaxy merger to the given frequencies.
+    cosmo : :py:class:`astropy.cosmology.core.Cosmology` instance
+        Cosmology object used for calculating cosmological measurements.
+
+    Returns
+    -------
+    redz_final : (M, Q, Z, F) array of float, []
+        The redshifts at which binaries at each grid point reach the frequencies of interest.
+        Unitless.
+    diff_num : (M, Q, Z, F) array of float, []
+        The differential number of binaries at each grid point.  Unitless.
+
+    """
+
+    nden = sam.static_binary_density
 
     shape = sam.shape + (fobs_orb.size,)
     cdef np.ndarray[np.double_t, ndim=4] diff_num = np.zeros(shape)
@@ -437,7 +472,7 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
         _dynamic_binary_number_at_fobs_2pwl(
             fobs_orb, hard._sepa_init, hard._num_steps,
             hard._norm, hard._rchar, hard._gamma_inner, hard._gamma_outer,
-            dens, sam.mtot, sam.mrat, sam.redz, gmt_time,
+            nden, sam.mtot, sam.mrat, sam.redz, gmt_time,
             cosmo._grid_z, cosmo._grid_dcom, cosmo._grid_age,
             # output:
             redz_final, diff_num
@@ -447,14 +482,15 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
 
     elif isinstance(hard, holo.hardening.Hard_GW) or issubclass(hard, holo.hardening.Hard_GW):
         redz_prime = sam._redz_prime
-        # if `sam` is using galaxy merger rate (GMR), then `redz_prime` will be `None`
+        # if `sam` doesn't use a galaxy merger time (GMT), then `redz_prime` will be `None`,
+        # set to initial redshift values instead
         if redz_prime is None:
             sam._log.info("`redz_prime` not calculated in SAM.  Setting to `redz` (initial) values.")
             redz_prime = sam.redz[np.newaxis, np.newaxis, :] * np.ones(sam.shape)
 
         _dynamic_binary_number_at_fobs_gw(
             fobs_orb,
-            dens, sam.mtot, sam.mrat, sam.redz, redz_prime,
+            nden, sam.mtot, sam.mrat, sam.redz, redz_prime,
             cosmo._grid_z, cosmo._grid_dcom,
             # output:
             redz_final, diff_num
@@ -481,7 +517,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
     double hard_gamma_inner,
     double hard_gamma_outer,
 
-    double[:, :, :] dens,
+    double[:, :, :] nden,
     double[:] mtot,
     double[:] mrat,
     double[:] redz,
@@ -495,7 +531,44 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
     double[:, :, :, :] redz_final,
     double[:, :, :, :] diff_num,
 ) except -1:
-    """Convert from binary volume-density (all separations) to binary number at particular frequencies.
+    """Calculate differential binary number at the given frequencies, with phenom 2pl evolution.
+
+    This function converts from differential binary volume-density to differential binary number.
+    Binary evolution follows the 'phenomenological' double power-law model implemented in the
+    :py:func:`_hard_func_2pwl_gw`, which matches the implementation in
+    :py:class:`Fixed_Time_2PL_SAM`.
+
+    See :py:func:`dynamic_binary_number_at_fobs` for more information.
+
+    Arguments
+    ---------
+    target_fobs_orb : (F,) array of float [1/s]
+        The observer-frame orbital frequencies of interest, in units of inverse seconds.
+    nden : (M, Q, Z) array of float [Mpc^{-3}]
+        The differential binary volume-density in units of inverse-cubic comoving-Mpc.
+    mtot : (M,) array of float [g]
+        The edges of the total-mass grid dimension in units of grams.
+    mrat : (Q,) array of float []
+        The edges of the mass-ratio grid dimension.  Unitless.
+    redz : (Z,) array of float []
+        The edges of the redshift grid dimension.  Unitless.
+    redz_prime : (M, Q, Z) array of float []
+        The redshifts of binaries after galaxy merger, but before binary evolution to the
+        frequencies of interest.  Unitless.
+    redz_interp_grid : (Zi,) array of float, []
+        The redshift values at which comoving distances are calculated; used for interpolation.
+    dcom_interp_grid : (Zi,) array of float, [cm]
+        The comoving-distance values at the ``redz_interp_grid`` redshifts, in units of centimeters,
+        used for interpolation.
+
+    Returns
+    -------
+    redz_final : (M, Q, Z, F) array of float, []
+        The redshifts at which binaries at each grid point reach the frequencies of interest.
+        Unitless.
+    diff_num : (M, Q, Z, F) array of float, []
+        The differential number of binaries at each grid point.  Unitless.
+
     """
 
     cdef int n_mtot = mtot.size
@@ -571,7 +644,11 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
                 )
 
                 # Find time to move from left- to right- edges:  dt = da / (da/dt)
+                # average da/dt on the left- and right- edges of the bin (i.e. trapezoid rule)
                 dt = 2.0 * (sepa_right - sepa_left) / (dadt_left + dadt_right)
+                # if ii == 8 and jj == 0:
+                #     printf("cy %03d : %.2e ==> %.2e  ==  %.2e\n", step, sepa_left, sepa_right, dt)
+
                 time_evo += dt
 
                 # ---- Iterate over starting redshift bins
@@ -585,8 +662,8 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
 
                     # if we pass the age of the universe, this binary has stalled, no further redshifts will work
                     # NOTE: if `gmt_time` decreases faster than redshift bins increase the universe age,
-                    #       then systems in later `redz` bins may no longer stall, so we still need to calculate them
-                    #       i.e. we can NOT use a `break` statement here
+                    #       then systems in later `redz` bins may no longer stall, so we still need to calculate them.
+                    #       i.e. we can NOT use a `break` statement here, must use `continue` statement.
                     if time_left > age_universe:
                         continue
 
@@ -611,6 +688,9 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
                     # NOTE: at this point `redz_right` could be negative, even though `redz_left` is definitely not
                     if redz_right < 0.0:
                         redz_right = 0.0
+
+                    # if ii == 8 and jj == 0 and kk == 11:
+                    #     printf("cy %03d : t=%.2e z=%.2e\n", step, time_right, redz_right)
 
                     # convert to frequencies
                     fobs_orb_left = frst_orb_left / (1.0 + redz_left)
@@ -652,6 +732,21 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
                         # get comoving distance
                         dcom = interp_at_index(new_interp_idx, new_time, tage_interp_grid, dcom_interp_grid)
 
+                        # if (ii == 0) and (jj == 0) and (kk == 0):
+                        #     printf("cy f=%03d (step=%03d)\n", ff, step)
+                        #     printf(
+                        #         "fl=%.6e, f=%.6e, fr=%.6e ==> tl=%.6e, t=%.6e, tr=%.6e\n",
+                        #         fobs_orb_left, ftarget, fobs_orb_right,
+                        #         time_left, new_time, time_right
+                        #     )
+                        #     printf(
+                        #         "interp (%d) time: %.6e, %.6e, %.6e ==> z: %.6e, %.6e, %.6e\n",
+                        #         new_interp_idx,
+                        #         tage_interp_grid[new_interp_idx], new_time, tage_interp_grid[new_interp_idx+1],
+                        #         redz_interp_grid[new_interp_idx], new_redz, redz_interp_grid[new_interp_idx+1],
+                        #     )
+                        #     printf("======> z=%.6e\n", new_redz)
+
                         # Store redshift
                         redz_final[ii, jj, kk, ff] = new_redz
 
@@ -670,7 +765,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
 
                         # calculate number of binaries
                         cosmo_fact = FOUR_PI_SPLC_OVER_MPC * (1.0 + new_redz) * pow(dcom / MY_MPC, 2)
-                        diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
+                        diff_num[ii, jj, kk, ff] = nden[ii, jj, kk] * tres * cosmo_fact
 
                         # ----------------------
                         # ------------------------------------------------------
@@ -693,7 +788,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
 cdef int _dynamic_binary_number_at_fobs_gw(
     double[:] target_fobs_orb,
 
-    double[:, :, :] dens,
+    double[:, :, :] nden,
     double[:] mtot,
     double[:] mrat,
     double[:] redz,
@@ -706,7 +801,41 @@ cdef int _dynamic_binary_number_at_fobs_gw(
     double[:, :, :, :] redz_final,
     double[:, :, :, :] diff_num,
 ) except -1:
-    """Convert from binary volume-density (all separations) to binary number at particular frequencies.
+    """Calculate differential binary number at the given frequencies, under GW-only evolution.
+
+    This function converts from differential binary volume-density to differential binary number.
+
+    See :py:func:`dynamic_binary_number_at_fobs` for more information.
+
+    Arguments
+    ---------
+    target_fobs_orb : (F,) array of float [1/s]
+        The observer-frame orbital frequencies of interest, in units of inverse seconds.
+    nden : (M, Q, Z) array of float [Mpc^{-3}]
+        The differential binary volume-density in units of inverse-cubic comoving-Mpc.
+    mtot : (M,) array of float [g]
+        The edges of the total-mass grid dimension in units of grams.
+    mrat : (Q,) array of float []
+        The edges of the mass-ratio grid dimension.  Unitless.
+    redz : (Z,) array of float []
+        The edges of the redshift grid dimension.  Unitless.
+    redz_prime : (M, Q, Z) array of float []
+        The redshifts of binaries after galaxy merger, but before binary evolution to the
+        frequencies of interest.  Unitless.
+    redz_interp_grid : (Zi,) array of float, []
+        The redshift values at which comoving distances are calculated; used for interpolation.
+    dcom_interp_grid : (Zi,) array of float, [cm]
+        The comoving-distance values at the ``redz_interp_grid`` redshifts, in units of centimeters,
+        used for interpolation.
+
+    Returns
+    -------
+    redz_final : (M, Q, Z, F) array of float, []
+        The redshifts at which binaries at each grid point reach the frequencies of interest.
+        Unitless.
+    diff_num : (M, Q, Z, F) array of float, []
+        The differential number of binaries at each grid point.  Unitless.
+
     """
 
     cdef int n_mtot = mtot.size
@@ -746,6 +875,10 @@ cdef int _dynamic_binary_number_at_fobs_gw(
                     target_frst_orb = ftarget * (1.0 + rzp)
                     # if target frequency is above ISCO freq, then all future ones will be also, so: break
                     if target_frst_orb > frst_orb_isco:
+                        # but still fill in the final redshifts (redz_final)
+                        for fp in range(ff+1, n_freq):
+                            redz_final[ii, jj, kk, fp] = rzp
+
                         break
 
                     # get comoving distance
@@ -761,7 +894,7 @@ cdef int _dynamic_binary_number_at_fobs_gw(
 
                     # calculate number of binaries
                     cosmo_fact = FOUR_PI_SPLC_OVER_MPC * (1.0 + rzp) * pow(dcom / MY_MPC, 2)
-                    diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
+                    diff_num[ii, jj, kk, ff] = nden[ii, jj, kk] * tres * cosmo_fact
 
     return 0
 

@@ -475,7 +475,7 @@ class GMR_Illustris(_Galaxy_Merger_Rate):
         xx = (mtot/self._mref)
         mt = np.power(xx, malpha)
         yy = mtot/self._mref_delta
-        mp1t = np.power(1.0 + yy, mdelta)
+        mp1t = 1.0 + np.power(yy, mdelta)
         qt = np.power(mrat, qgamma)
 
         rate = norm * mt * mp1t * qt

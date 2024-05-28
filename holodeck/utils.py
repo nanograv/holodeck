@@ -768,8 +768,9 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
 
     """
     # assert np.ndim(xx) == 1
-    assert np.ndim(xvals) == 2
-    assert np.shape(xvals) == np.shape(yvals)
+    err = f"Bad shapes!  {np.shape(xvals)=} {np.shape(yvals)=}"
+    assert np.ndim(xvals) == 2, err
+    assert np.shape(xvals) == np.shape(yvals), err
 
     xx = np.asarray(xx)
     xvals = np.asarray(xvals)
@@ -1042,7 +1043,7 @@ def rk4_step(func, x0, y0, dx, args=None, check_nan=0, check_nan_max=5):
     return x1, y1
 
 
-def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int = 2, weights=None) -> str:
+def stats(vals, percs=None, prec=2, weights=None) -> str:
     """Return a string giving quantiles of the given input data.
 
     Parameters
@@ -1065,8 +1066,8 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
 
     """
     try:
-        if len(vals) == 0:        # type: ignore
-            raise TypeError
+        if len(vals) == 0:        #### type: ignore
+            return "[]"
     except TypeError:
         raise TypeError(f"`vals` (shape={np.shape(vals)}) is not iterable!")
 
@@ -1341,7 +1342,7 @@ def _integrate_grid_differential_number(edges, dnum, freq=False):
 
     NOTE: the `edges` provided MUST all be in linear space, mass is converted to ``log10(M)``
     and frequency is converted to ``ln(f)``.
-    NOTE: the density `dnum` MUST correspond to `dn/ [dlog10(M) dq dz dln(f)]`
+    NOTE: the density `dnum` MUST correspond to `d^3 n / [dlog10(M) dq dz dln(f)]`
 
     Parameters
     ----------
@@ -1773,17 +1774,17 @@ def redz_after(time, redz=None, age=None):
 
     Parameters
     ----------
-    time : array_like in units of [sec]
-        Amount of time to pass.
-    redz : None or array_like,
-        Redshift of starting point after which `time` is added.
-    age : None or array_like, in units of [sec]
-        Age of the Universe at the starting point, after which `time` is added.
+    time : array_like, [s]
+        Amount of time to pass, in units of seconds.
+    redz : None  or  array_like, []
+        Redshift of starting point after which `time` is added.  Unitless.
+    age : None  or  array_like, [s]
+        Age of the Universe at the starting point, after which `time` is added.  Units of seconds.
 
     Returns
     -------
-    new_redz : array_like
-        Redshift of the Universe after the given amount of time.
+    new_redz : array_like, []
+        Redshift of the Universe after the given amount of time.  Unitless
 
     """
     if (redz is None) == (age is None):

@@ -20,3 +20,7 @@ The initial set of **NANOGrav 15yr papers** are:
 
 The use of **holodeck in the 15yr astrophysics interpretation**:
 
+
+Errata
+======
+[1] : The 15yr Astro paper quotes an initial separation (the ``hard_sepa_init`` parameter) of "1e3 pc", this is incorrect and the actual value used in the analysis was 1e4 pc.  The values in the parameter-space objects (i.e. :py:class:`~holodeck.librarian.param_spaces_classic:_PS_Classic_Phenom`) is correct.

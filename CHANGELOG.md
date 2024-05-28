@@ -19,6 +19,35 @@
 
 ## Current
 
+## v1.6 - 2024/05/01
+
+* DEPRECATIONS:
+    * `holodeck.librarian.py` ==> `holodeck.librarian.lib_tools`
+        * Rename submodule.  All components remain the same.  All `lib_tools` elements are now also imported into the `librarian` namespace.  i.e. elements like `holodeck.librarian.lib_tools._Param_Space` will now be accessible via `holodeck.librarian._Param_Space`.
+    * Library filenames:
+        * Standard library simulation files will now be saved to the 'library_sims' subdirectory, and filenames 'library__p######.npz'.  Combined library files will now be 'sam-library.hdf5'.
+        * 'Domain' simulation files will be saved to the 'domain_sims' subdirectory, and filenames 'domain__p######.npz'.  Combined domain files will now be 'sam-domain.hdf5'.
+
+* BUGS:
+    * Semi-Analytic Models
+        * `Semi_Analytic_Model._dynamic_binary_number_at_fobs_inconsistent` was not checking for systems that had already coalesced.  Only effected GW-only evolution using the python version of the calculation.
+
+* DEFAULTS:
+    * Semi-Analytic Models
+        * `Semi_Analytic_Models` instances now use galaxy merger-rates (instead of galaxy pair-fractions and merger-times) by default.  To use GPF+GMT SAMs, the user must pass in at least a GPF instance manually.
+
+* General Changes
+
+    * Semi-Analytic Models (`holodeck.sams`)
+        * Improve accuracy of dynamic binary number calculation for consistent evolution models.
+
+    * `holodeck.librarian`
+        * Added functionality to construct 'domain' sets of simulations, to explore each parameter in a parameter-space one at a time.
+        * NOTE: Standard library files will now be called "sam-library.hdf5" instead of "sam_lib.hdf5"
+
+
+## v1.5.2 - 2024/04/12
+
 * DEPRECATIONS
     * `host_relations.py`: remove the `mamp` parameter and `MASS_AMP` attributes in the MMBulge relationships, and use `mamp_log10` and `MASS_AMP_LOG10` exclusively.
 

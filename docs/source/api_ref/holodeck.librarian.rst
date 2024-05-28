@@ -15,7 +15,7 @@ holodeck.librarian module
     holodeck.librarian.combine
     holodeck.librarian.fit_spectra
     holodeck.librarian.gen_lib
-    holodeck.librarian.libraries
+    holodeck.librarian.lib_tools
     holodeck.librarian.param_spaces
     holodeck.librarian.param_spaces_classic
     holodeck.librarian.posterior_populations

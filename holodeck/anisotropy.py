@@ -3,26 +3,38 @@
 """
 
 import numpy as np
-import matplotlib as plt
+# import matplotlib as plt
 import matplotlib.cm as cm
 
 import kalepy as kale
-import healpy as hp
 import h5py
 
 import holodeck as holo
-from holodeck import utils, cosmo, log, detstats, plot
+from holodeck import utils, log, detstats, plot
 from holodeck.constants import YR
+
+try:
+    import healpy as hp
+except ImportError as err:
+    SUBMOD = "anisotropy"
+    log.error(f"Failed to import `healpy` packaged used in `{SUBMOD}` submodule!")
+    log.exception(err)
+    log.error(
+        f"Some required packages for `{SUBMOD}` have been temporarily disabled in the "
+        "global 'requirements.txt' file, so they are not installed by default!  Please install "
+        "the required packages manually for now, and feel free to raise a github issue."
+    )
+    raise
 
 NSIDE = 32
 NPIX = hp.nside2npix(NSIDE)
 LMAX = 8
-HC_REF15_10YR = 11.2*10**-15 
+HC_REF15_10YR = 11.2*10**-15
 
 
 def healpix_map(hc_ss, hc_bg, nside=NSIDE, seed=None, ret_seed=False):
     """ Build mollview array of hc^2/dOmega for a healpix map
-    
+
     Parameters
     ----------
     hc_ss : (F,R,L) NDarray
@@ -36,7 +48,7 @@ def healpix_map(hc_ss, hc_bg, nside=NSIDE, seed=None, ret_seed=False):
     -------
     moll_hc : (NPIX,) 1Darray
         Array of h_c^2/dOmega at every pixel for a mollview healpix map.
-    
+
     NOTE: Could speed up the for-loops, but it's ok for now.
     """
 
@@ -50,7 +62,7 @@ def healpix_map(hc_ss, hc_bg, nside=NSIDE, seed=None, ret_seed=False):
     if seed is None:
         seed = np.random.randint(99999)   # get a random number
     print(f"random seed: {seed}")                           # print it out so we can reuse it if desired
-    np.random.seed(seed)   
+    np.random.seed(seed)
 
     # spread background evenly across pixels in moll_hc
     moll_hc = np.ones((nfreqs,nreals,npix)) * hc_bg[:,:,np.newaxis]**2/(npix*area) # (frequency, realization, pixel)
@@ -62,12 +74,12 @@ def healpix_map(hc_ss, hc_bg, nside=NSIDE, seed=None, ret_seed=False):
             for ll in range(nloudest):
                 moll_hc[ff,rr,pix_ss[ff,rr,ll]] = (moll_hc[ff,rr,pix_ss[ff,rr,ll]] + hc_ss[ff,rr,ll]**2/area)
     if ret_seed:
-        return moll_hc, seed           
+        return moll_hc, seed
     return moll_hc
 
 def healpix_map_oldhc2(hc_ss, hc_bg, nside=NSIDE):
     """ Build mollview array of hc^2/dOmega for a healpix map
-    
+
     Parameters
     ----------
     hc_ss : (F,R,L) NDarray
@@ -81,7 +93,7 @@ def healpix_map_oldhc2(hc_ss, hc_bg, nside=NSIDE):
     -------
     moll_hc : (NPIX,) 1Darray
         Array of h_c^2 at every pixel for a mollview healpix map.
-    
+
     NOTE: Could speed up the for-loops, but it's ok for now.
     """
 
@@ -100,12 +112,12 @@ def healpix_map_oldhc2(hc_ss, hc_bg, nside=NSIDE):
         for rr in range(nreals):
             for ll in range(nloudest):
                 moll_hc[ff,rr,pix_ss[ff,rr,ll]] = (moll_hc[ff,rr,pix_ss[ff,rr,ll]] + hc_ss[ff,rr,ll]**2)
-                
+
     return moll_hc
 
 def healpix_map_oldhc(hc_ss, hc_bg, nside=NSIDE):
     """ Build mollview array of strains for a healpix map
-    
+
     Parameters
     ----------
     hc_ss : (F,R,L) NDarray
@@ -119,7 +131,7 @@ def healpix_map_oldhc(hc_ss, hc_bg, nside=NSIDE):
     -------
     moll_hc : (NPIX,) 1Darray
         Array of strain at every pixel for a mollview healpix map.
-    
+
     NOTE: Could speed up the for-loops, but it's ok for now.
     """
 
@@ -138,13 +150,13 @@ def healpix_map_oldhc(hc_ss, hc_bg, nside=NSIDE):
             for ll in range(nloudest):
                 moll_hc[ff,rr,pix_ss[ff,rr,ll]] = np.sqrt(moll_hc[ff,rr,pix_ss[ff,rr,ll]]**2
                                                           + hc_ss[ff,rr,ll]**2)
-                
+
     return moll_hc
 
 
 def healpix_hcsq_map(hc_ss, hc_bg, nside=NSIDE):
     """ Build mollview array of strains for a healpix map
-    
+
     Parameters
     ----------
     hc_ss : (F,R,L) NDarray
@@ -158,7 +170,7 @@ def healpix_hcsq_map(hc_ss, hc_bg, nside=NSIDE):
     -------
     moll_hc : (NPIX,) 1Darray
         Array of strain at every pixel for a mollview healpix map.
-    
+
     NOTE: Could speed up the for-loops, but it's ok for now.
     """
 
@@ -176,13 +188,13 @@ def healpix_hcsq_map(hc_ss, hc_bg, nside=NSIDE):
         for rr in range(nreals):
             for ll in range(nloudest):
                 moll_hc2[ff,rr,pix_ss[ff,rr,ll]] = moll_hc2[ff,rr,pix_ss[ff,rr,ll]] + hc_ss[ff,rr,ll]**2
-                
+
     return moll_hc2
 
 def sph_harm_from_map(moll_hc, lmax=LMAX):
-    """ Calculate spherical harmonics from strains at every pixel of 
+    """ Calculate spherical harmonics from strains at every pixel of
     a healpix mollview map.
-    
+
     Parameters
     ----------
     moll_hc : (F,R,NPIX,) 1Darray
@@ -193,8 +205,8 @@ def sph_harm_from_map(moll_hc, lmax=LMAX):
     Returns
     -------
     Cl : (F,R,lmax+1) NDarray
-        Spherical harmonic coefficients 
-        
+        Spherical harmonic coefficients
+
     """
     nfreqs = len(moll_hc)
     nreals = len(moll_hc[0])
@@ -224,8 +236,8 @@ def sph_harm_from_hc(hc_ss, hc_bg, nside = NSIDE, lmax = LMAX):
     moll_hc : (F,R,NPIX,) 2Darray
         Array of hc^2/dOmega at every pixel for a mollview healpix map.
     Cl : (F,R,lmax+1) NDarray
-        Spherical harmonic coefficients 
-    
+        Spherical harmonic coefficients
+
     """
     moll_hc = healpix_map(hc_ss, hc_bg, nside)
     Cl = sph_harm_from_map(moll_hc, lmax)
@@ -251,13 +263,13 @@ def plot_ClC0_medians(fobs, Cl_best, lmax, nshow):
             percs = pp/2
             percs = [50-percs, 50+percs]
             ax.fill_between(xx, *np.percentile(yy[:,:,ll], percs, axis=0), alpha=0.1, color=colors[ll])
-        
+
         for bb in range(0,nshow):
             ax.plot(xx, yy[bb,:,ll], color=colors[ll], linestyle=':', alpha=0.1,
-                                 linewidth=1)         
+                                 linewidth=1)
         ax.legend(ncols=2)
     holo.plot._twin_hz(ax, nano=False)
-    
+
     # ax.set_title('50%% and 98%% confidence intervals of the %d best samples \nusing realizations medians, lmax=%d'
     #             % (nbest, lmax))
     return fig
@@ -288,7 +300,7 @@ def lib_anisotropy(lib_path, hc_ref_10yr=HC_REF15_10YR, nbest=100, nreals=50, lm
 
      # ---- rank samples
     nsort, fidx, hc_ref = detstats.rank_samples(hc_ss, hc_bg, fobs, fidx=1, hc_ref=hc_ref_10yr, ret_all=True)
-    
+
     print('Ranked samples by hc_ref = %.2e at fobs = %.2f/yr' % (hc_ref, fobs[fidx]*YR))
 
 
@@ -301,7 +313,7 @@ def lib_anisotropy(lib_path, hc_ref_10yr=HC_REF15_10YR, nbest=100, nreals=50, lm
         print('on nn=%d out of nbest=%d' % (nn,nbest))
         moll_hc_best[nn,...], Cl_best[nn,...] = sph_harm_from_hc(
             hc_ss[nsort[nn]], hc_bg[nsort[nn]], nside=nside, lmax=lmax, )
-        
+
 
     # ---- save to npz file
 
@@ -319,10 +331,10 @@ def lib_anisotropy(lib_path, hc_ref_10yr=HC_REF15_10YR, nbest=100, nreals=50, lm
     np.savez(output_name,
              nsort=nsort, fidx=fidx, hc_ref=hc_ref, ss_shape=shape,
          moll_hc_best=moll_hc_best, Cl_best=Cl_best, nside=nside, lmax=lmax, fobs=fobs)
-    
+
 
     # ---- plot median Cl/C0
-    
+
     print('Plotting Cl/C0 for median realizations')
     fig = plot_ClC0_medians(fobs, Cl_best, lmax, nshow=nbest)
     fig_name = output_dir+'/sph_harm_lmax%d_nside%d_nbest%d.png' % (lmax, nside, nbest)
@@ -349,7 +361,7 @@ def lib_anisotropy_split(lib_path, hc_ref_10yr=HC_REF15_10YR, nbest=100, nreals=
 
      # ---- rank samples
     nsort, fidx, hc_ref = detstats.rank_samples(hc_ss, hc_bg, fobs, fidx=1, hc_ref=hc_ref_10yr, ret_all=True)
-    
+
     print('Ranked samples by hc_ref = %.2e at fobs = %.2f/yr' % (hc_ref, fobs[fidx]*YR))
 
 
@@ -366,7 +378,7 @@ def lib_anisotropy_split(lib_path, hc_ref_10yr=HC_REF15_10YR, nbest=100, nreals=
             print('on nn=%d out of nbest=%d' % (nn,nbest))
             moll_hc_best[ii,...], Cl_best[ii,...] = sph_harm_from_hc(
                 hc_ss[nsort[nn]], hc_bg[nsort[nn]], nside=nside, lmax=lmax, )
-            
+
 
         # ---- save to npz file
 
@@ -379,19 +391,19 @@ def lib_anisotropy_split(lib_path, hc_ref_10yr=HC_REF15_10YR, nbest=100, nreals=
         else:
             print('Writing to an existing directory.')
 
-        output_name =(output_dir+'/sph_harm_hc2dOm_lmax%d_ns%02d_r%d_b%02d-%-02d.npz' 
+        output_name =(output_dir+'/sph_harm_hc2dOm_lmax%d_ns%02d_r%d_b%02d-%-02d.npz'
                       % (lmax, nside, nreals, bestrange[0], bestrange[1]-1))
         print('Saving npz file: ', output_name)
         np.savez(output_name,
                 nsort=nsort, fidx=fidx, hc_ref=hc_ref, ss_shape=shape,
             moll_hc_best=moll_hc_best, Cl_best=Cl_best, nside=nside, lmax=lmax, fobs=fobs, split=split)
-    
+
 
         # # ---- plot median Cl/C0
-        
+
         # print('Plotting Cl/C0 for median realizations')
         # fig = plot_ClC0_medians(fobs, Cl_best, lmax, nshow=(bestrange[1]-bestrange[0]))
-        # fig_name = (output_dir+'/sph_harm_hc2dOm_lmax%d_ns%02d_r%d_b%02d-%-02d.png' 
+        # fig_name = (output_dir+'/sph_harm_hc2dOm_lmax%d_ns%02d_r%d_b%02d-%-02d.png'
         #               % (lmax, nside, nreals, bestrange[0], bestrange[1]-1))
         # fig.savefig(fig_name, dpi=300)
 
@@ -415,17 +427,17 @@ def Cl_analytic_from_num(fobs_orb_edges, number, hs, realize = False, floor = Fa
         How many realizations to Poisson sample.
     floor : boolean
         Whether or not to round numbers down to nearest integers, if not realizing
-    
+
     Returns
     -------
     C0 : (F,R) or (F,) NDarray
-        C_0 
+        C_0
     Cl : (F,R) or (F,) NDarray
         C_l>0 for arbitrary l using shot noise approximation
     """
 
     df = np.diff(fobs_orb_edges)                 #: frequency bin widths
-    fc = kale.utils.midpoints(fobs_orb_edges)    #: frequency-bin centers 
+    fc = kale.utils.midpoints(fobs_orb_edges)    #: frequency-bin centers
 
     # df = fobs_orb_widths[np.newaxis, np.newaxis, np.newaxis, :] # (M,Q,Z,F) NDarray
     # fc = fobs_orb_cents[np.newaxis, np.newaxis, np.newaxis, :]  # (M,Q,Z,F) NDarray
@@ -433,7 +445,7 @@ def Cl_analytic_from_num(fobs_orb_edges, number, hs, realize = False, floor = Fa
 
     # Poisson sample number in each bin
     if utils.isinteger(realize):
-        number = np.random.poisson(number[...,np.newaxis], 
+        number = np.random.poisson(number[...,np.newaxis],
                                 size = (number.shape + (realize,)))
         df = df[...,np.newaxis]
         fc = fc[...,np.newaxis]
@@ -455,7 +467,7 @@ def Cl_analytic_from_num(fobs_orb_edges, number, hs, realize = False, floor = Fa
 
 def strain_amp_at_bin_edges_redz(edges, redz=None):
     """ Calculate strain amplitude at bin edges, with final or initial redz.
-    
+
     """
     assert len(edges) == 4
     assert np.all([np.ndim(ee) == 1 for ee in edges])
@@ -469,7 +481,7 @@ def strain_amp_at_bin_edges_redz(edges, redz=None):
         dc = +np.inf * np.ones_like(redz)
         sel = (redz > 0.0)
         dc[sel] = holo.cosmo.comoving_distance(redz[sel]).cgs.value
-    else: 
+    else:
         redz = edges[2][np.newaxis,np.newaxis,:,np.newaxis]
         dc = holo.cosmo.comoving_distance(redz).cgs.value
 
@@ -478,7 +490,7 @@ def strain_amp_at_bin_edges_redz(edges, redz=None):
     mr = (edges[1])
     mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
     mc = mc[:, :, np.newaxis, np.newaxis]
-    
+
     # convert from observer-frame to rest-frame; still using frequency-bin centers
     fr = utils.frst_from_fobs(fc[np.newaxis, np.newaxis, np.newaxis, :], redz)
 
@@ -488,7 +500,7 @@ def strain_amp_at_bin_edges_redz(edges, redz=None):
 
 def strain_amp_at_bin_centers_redz(edges, redz=None):
     """ Calculate strain amplitude at bin centers, with final or initial redz.
-    
+
     """
     assert len(edges) == 4
     assert np.all([np.ndim(ee) == 1 for ee in edges])
@@ -518,7 +530,7 @@ def strain_amp_at_bin_centers_redz(edges, redz=None):
     mr = kale.utils.midpoints(edges[1])
     mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
     mc = mc[:, :, np.newaxis, np.newaxis]
-    
+
     # convert from observer-frame to rest-frame; still using frequency-bin centers
     fr = utils.frst_from_fobs(fc[np.newaxis, np.newaxis, np.newaxis, :], redz)
 
@@ -536,7 +548,7 @@ def Cl_analytic_from_dnum(edges, dnum, redz=None, realize=False):
         dN / [ dlog10M dq dz dlnf ]
     hs : (M,Q,Z,F) NDarray
         Strain amplitude of each M,q,z bin
-    
+
     """
     fobs_orb_edges = edges[-1]
     fobs_gw_edges = fobs_orb_edges * 2.0
@@ -556,7 +568,7 @@ def Cl_analytic_from_dnum(edges, dnum, redz=None, realize=False):
         # integrate over redshift
         numh2 = utils.trapz(numh2, edges[2], axis=2)
         # times dln(f)
-        numh2 = numh2 * np.diff(np.log(fobs_gw_edges)) 
+        numh2 = numh2 * np.diff(np.log(fobs_gw_edges))
 
         # integrate over dlog10(M)
         numh4 = utils.trapz(dnum*hs_edges**4, np.log10(edges[0]), axis=0)
@@ -570,18 +582,18 @@ def Cl_analytic_from_dnum(edges, dnum, redz=None, realize=False):
     elif utils.isinteger(realize):
         # add reals axis
         hs_cents = strain_amp_at_bin_centers_redz(edges, redz)[...,np.newaxis]
-        df = df[:,np.newaxis] 
-        fc = fc[:,np.newaxis] 
+        df = df[:,np.newaxis]
+        fc = fc[:,np.newaxis]
 
-    
+
         number = holo.sam_cython.integrate_differential_number_3dx1d(edges, dnum)
         shape = number.shape + (realize,)
         number = holo.gravwaves.poisson_as_needed(number[...,np.newaxis] * np.ones(shape))
 
-        # numh2 = number * hs_cents**2 * np.diff(np.log(fobs_gw_edges))[:,np.newaxis] 
-        # numh4 = number * hs_cents**4 * np.diff(np.log(fobs_gw_edges))[:,np.newaxis] 
-        numh2 = number * hs_cents**2 
-        numh4 = number * hs_cents**4 
+        # numh2 = number * hs_cents**2 * np.diff(np.log(fobs_gw_edges))[:,np.newaxis]
+        # numh4 = number * hs_cents**4 * np.diff(np.log(fobs_gw_edges))[:,np.newaxis]
+        numh2 = number * hs_cents**2
+        numh4 = number * hs_cents**4
     else:
         err = "`realize` ({}) must be one of {{False, integer}}!".format(realize)
         raise ValueError(err)
@@ -603,7 +615,7 @@ def Cl_analytic_from_dnum(edges, dnum, redz=None, realize=False):
 
 
 
-def draw_analytic(ax, Cl, C0, fobs_gw_cents, color='tab:orange', label='Eq. 17 analytic', 
+def draw_analytic(ax, Cl, C0, fobs_gw_cents, color='tab:orange', label='Eq. 17 analytic',
                   alpha=1, lw=2, ls='-.'):
     xx = fobs_gw_cents
     yy = Cl/C0 # (F,)
@@ -615,7 +627,7 @@ def draw_reals(ax, Cl_many, C0_many, fobs_gw_cents,  color='tab:orange', label= 
     xx = fobs_gw_cents
     yy = Cl_many/C0_many # (F,R)
     if show_median:
-        ax.plot(xx, np.median(yy[:,:], axis=-1), color=color, lw=lw_median, alpha=0.75) #, label='median of samples, $l=%d$' % ll)     
+        ax.plot(xx, np.median(yy[:,:], axis=-1), color=color, lw=lw_median, alpha=0.75) #, label='median of samples, $l=%d$' % ll)
     if show_ci:
         for pp in [50, 98]:
             percs = pp/2
@@ -623,7 +635,7 @@ def draw_reals(ax, Cl_many, C0_many, fobs_gw_cents,  color='tab:orange', label= 
             ax.fill_between(xx, *np.percentile(yy[:,:], percs, axis=-1), color=color, alpha=0.15)
     if show_reals:
         rr = 0
-        ax.plot(xx, yy[:,rr], color=color, alpha=0.15, linestyle=ls_reals, 
+        ax.plot(xx, yy[:,rr], color=color, alpha=0.15, linestyle=ls_reals,
                 label = label)
         for rr in range(1, np.min([nshow, len(Cl_many[0])])):
             ax.plot(xx, yy[:,rr], color=color, alpha=0.15, linestyle=ls_reals)
@@ -635,7 +647,7 @@ def draw_spk(ax, label='SP & K Rough Estimate'):
 
 def draw_bayes(ax, lmax, colors = ['k', 'b', 'r', 'g', 'c', 'm'], ms=8):
     xx_nihan = np.array([2.0, 4.0, 5.9, 7.9, 9.9]) *10**-9 # Hz
-    
+
     ClC0_nihan = np.array([
     [0.20216773, 0.14690035, 0.09676646, 0.07453352, 0.05500382, 0.03177427],
     [0.21201336, 0.14884939, 0.10545698, 0.07734305, 0.05257189, 0.03090662],
@@ -643,10 +655,10 @@ def draw_bayes(ax, lmax, colors = ['k', 'b', 'r', 'g', 'c', 'm'], ms=8):
     [0.19788951, 0.15765126, 0.09615489, 0.07475364, 0.0527356 , 0.03113331],
     [0.20182648, 0.14745265, 0.09681202, 0.0746824 , 0.05503161, 0.0317012 ]])
     for ll in range(lmax):
-        ax.plot(xx_nihan, ClC0_nihan[:,ll], 
-                    label = '$l=%d$' % (ll+1), 
+        ax.plot(xx_nihan, ClC0_nihan[:,ll],
+                    label = '$l=%d$' % (ll+1),
                 color=colors[ll], marker='o', ms=ms)
-        
+
 def draw_sim(ax, xx, Cl_best, lmax, nshow, show_ci=True, show_reals=True):
 
     yy = Cl_best[:,:,:,1:]/Cl_best[:,:,:,0,np.newaxis] # (B,F,R,l)
@@ -664,25 +676,25 @@ def draw_sim(ax, xx, Cl_best, lmax, nshow, show_ci=True, show_reals=True):
             for bb in range(0,nshow):
                 # if ll==0 and bb==0:
                 #     label = "individual best samples, median of realizations"
-                # else: 
+                # else:
                 label=None
                 ax.plot(xx, yy[bb,:,ll], color=colors[ll], linestyle=':', alpha=0.1,
                                  linewidth=1, label=label)
 
 
-def plot_ClC0_versions(fobs_gw_cents, spk=True, bayes=True, 
+def plot_ClC0_versions(fobs_gw_cents, spk=True, bayes=True,
               sim=True, Cl_best_sim=None, lmax_sim=None,
               analytic=False, Cl_analytic=None, C0_analytic=None, label_analytic='analytic',
-              anreals=False, Cl_anreals=None, C0_anreals=None, label_anreals=None, 
+              anreals=False, Cl_anreals=None, C0_anreals=None, label_anreals=None,
               xmax = 1/YR, leg_anchor=(0,-0.15), leg_cols=3, legend=False):
     fig, ax = plot.figax(xlabel=plot.LABEL_GW_FREQUENCY_HZ, ylabel='$C_{\ell>0}/C_0$')
 
     if analytic: draw_analytic(ax, Cl_analytic, C0_analytic, fobs_gw_cents, label=label_analytic)
     if anreals: draw_reals(ax, Cl_anreals, C0_anreals, fobs_gw_cents, label=label_anreals)
-      
+
     if bayes: draw_bayes(ax, lmax=6)
     if spk: draw_spk(ax, label='S-P & K')
-    if sim and (Cl_best_sim is not None) and (lmax_sim is not None): 
+    if sim and (Cl_best_sim is not None) and (lmax_sim is not None):
         draw_sim(ax, fobs_gw_cents, Cl_best_sim, lmax_sim, show_ci=True, show_reals=True, nshow=10)
     # ax.set_ylim(10**-6, 10**0)
     # plot._twin_yr(ax, nano=False)

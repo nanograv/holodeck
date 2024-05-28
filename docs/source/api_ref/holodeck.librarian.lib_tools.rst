@@ -1,8 +1,8 @@
 ============================
-holodeck.librarian.libraries
+holodeck.librarian.lib_tools
 ============================
 
-.. automodule:: holodeck.librarian.libraries
+.. automodule:: holodeck.librarian.lib_tools
     :members:
     :private-members:
     :undoc-members:
