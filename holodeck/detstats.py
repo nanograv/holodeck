@@ -1667,7 +1667,7 @@ def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,
     else:
         S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, red_amp, red_gamma, nexcl=nexcl_noise)
 
-    # amplitudw
+    # amplitude
     amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
 
     # SNR (includes a_pol, b_pol, and Phi_T calculations internally)
