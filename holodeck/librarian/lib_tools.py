@@ -856,9 +856,7 @@ def run_model(
         xx = fobs_orb_cents[:NBINS]
         yy = np.median(psd[:NBINS, :], axis=-1)
         try:
-            print("FITTING")
             fit = holo.utils.fit_powerlaw_psd(xx, yy, 1/YR)[0]
-            print(f"PSD {fit=}")
             log.info(f"PSD {fit=}")
         except Exception as err:
             log.error(f"Failed to fit PSD: {err}!")

@@ -480,8 +480,12 @@ def _setup_argparse(*args, **kwargs):
 
     #! DOPPLER
     args.doppler_args = dict(
-        expect    = 'optimistic',
-        snr       = 8.0,
+        # expect    = 'optimistic',
+        expect    = 'priority',
+        # expect    = 'base',
+        snr       = 1.0,
+        # snr       = 3.0,
+        # snr       = 8.0,
         tau_obs   = 10.0*YR,
         num_freqs = 200
     )
