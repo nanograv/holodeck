@@ -11,7 +11,7 @@ import scipy as sp
 import scipy.stats
 
 import holodeck as holo
-from holodeck import utils, cosmo
+from holodeck import utils, cosmo, log
 from holodeck.constants import YR
 from holodeck.librarian import (
     DEF_NUM_FBINS, DEF_NUM_LOUDEST, DEF_NUM_REALS, DEF_PTA_DUR,
@@ -943,7 +943,7 @@ def _calc_model_details(edges, redz_final, number):
     return gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final
 
 
-def load_pspace_from_path(path, space_class=None, log=None):
+def load_pspace_from_path(path, space_class=None):
     """Load a ``_Param_Space`` subclass instance from a save file with the given path.
 
     This function tries to determine the correct class based on the save file name, then uses that
@@ -958,7 +958,6 @@ def load_pspace_from_path(path, space_class=None, log=None):
     space_class : `_Param_Space` subclass  or  `None`
         Class with which to call the `from_save()` method to load a new `_Param_Space` instance.
         If `None` is given, then the filename is used to try to determine the appropriate class.
-    log : `logging.Logger`
 
     Returns
     -------
@@ -969,17 +968,23 @@ def load_pspace_from_path(path, space_class=None, log=None):
 
     """
     path = Path(path).absolute().resolve()
+    log.debug(f"Loading pspace from path '{path}'")
     if not path.exists():
-        raise RuntimeError(f"path {path} does not exist!")
+        err = f"Cannot load pspace from path that does not exist!  {path}"
+        log.exception(err)
+        raise RuntimeError(err)
 
     # If this is a directory, look for a pspace save file
     if path.is_dir():
         pattern = "*" + holo.librarian.PSPACE_FILE_SUFFIX
         space_fname = list(path.glob(pattern))
         if len(space_fname) != 1:
-            raise FileNotFoundError(f"found {len(space_fname)} matches to {pattern} in output {path}!")
+            err = f"found {len(space_fname)} matches to {pattern} in output {path}!"
+            log.exception(err)
+            raise FileNotFoundError(err)
 
         space_fname = space_fname[0]
+        log.debug(f"Found space file '{space_fname}'")
 
     # if this is a file, assume that it's already the pspace save file
     elif path.is_file():
@@ -991,19 +996,15 @@ def load_pspace_from_path(path, space_class=None, log=None):
     if space_class is None:
         try:
             space_class = str(np.load(space_fname, allow_pickle=True)['class_name'])
-            print(f"{space_class=}")
             space_class = holo.librarian.param_spaces_dict[space_class]
         except Exception as err:
-            if log is not None:
-                log.error(f"Could not load `class_name` from save file '{space_fname}'.")
-                log.error(str(err))
-            else:
-                print(f"Could not load `class_name` from save file '{space_fname}'.")
-                print(str(err))
+            log.error(f"Could not load `class_name` from save file '{space_fname}'.")
+            log.error(str(err))
 
             # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces_dict`
             space_class = _get_space_class_from_space_fname(space_fname)
 
+    log.debug(f"Constructing parameter space from {space_class} : {space_fname}")
     space = space_class.from_save(space_fname, log=log)
     return space, space_fname
 

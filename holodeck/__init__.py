@@ -44,6 +44,8 @@ __all__ = ["log", "cosmo"]
 
 # ---- Define Global Parameters
 
+LOG_SUFFIX = '.log'
+LOG_FILENAME_WITH_TIME_STAMP = False
 
 class Parameters:
     """These are WMAP9 parameters, see: [WMAP9]_ Table 3, WMAP+BAO+H0
@@ -73,7 +75,14 @@ for cp in _check_paths:
 # ---- Load logger
 
 from . import logger   # noqa
-log = logger.get_logger(__name__, logging.WARNING)       #: global root logger from `holodeck.logger`
+log = logger.get_logger(__name__, level_stream=logging.WARNING)       #: global root logger from `holodeck.logger`
+log.setLevel(logging.WARNING)
+
+def log_to_file(**kwargs):
+    logger.log_to_file(log, **kwargs)
+
+def set_log_level(level):
+    log.setLevel(level)
 
 # ---- Load cosmology instance
 
