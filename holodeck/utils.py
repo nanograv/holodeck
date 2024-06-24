@@ -980,9 +980,10 @@ def quantiles(values, percs=None, sigmas=None, weights=None, axis=None,
 
 
 def random_power(extr, pdf_index, size=1):
-    """Draw from power-law PDF with the given extrema and index.
+    """Draw from a power-law PDF with the given index, between the given extrema.
 
-    FIX/BUG : negative `extr` values break `pdf_index=-1` !!
+    NOTE: The power-law index must correspond to the power-law index of $\frac{dN}{dx}$.
+          You may need to convert, e.g. $dN/dx = \frac{dN}{d \ln x} \frac{1}{x}$.
 
     Arguments
     ---------
@@ -1005,7 +1006,13 @@ def random_power(extr, pdf_index, size=1):
     """
 
     extr = minmax(extr)
-    if pdf_index == -1:
+    if np.any(extr <= 0.0):
+        err = f"Cannot draw from negative extrema values!  {extr=}"
+        log.exception(err)
+        raise ValueError(err)
+
+    # if pdf_index == -1:
+    if np.isclose(pdf_index, -1.0, rtol=1e-3):
         rv = 10**np.random.uniform(*np.log10(extr), size=int(size))
     else:
         rr = np.random.random(size=int(size))
