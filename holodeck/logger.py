@@ -12,7 +12,7 @@ import logging
 from logging import DEBUG, INFO, WARNING, ERROR  # noqa import these for easier access internally
 import sys
 
-from holodeck import LOG_SUFFIX, LOG_FILENAME_WITH_TIME_STAMP
+from holodeck import LOG_SUFFIX, LOG_FILENAME_WITH_TIME_STAMP, _PATH_LOGS
 
 
 # LOG_SUFFIX = '.log'
@@ -128,7 +128,7 @@ def get_logger(name=None, level_stream=WARNING, tostr=sys.stdout, tofile=None, l
     return logger
 
 
-def log_to_file(logger, file_level=DEBUG, file_name=None, base_name='holodeck', path="./logs"):
+def log_to_file(logger, file_level=DEBUG, file_name=None, base_name='holodeck', path=None):
     """Add a `FileHandler` to the given logger, to log to an output (text) file.
 
     If `file_name` IS given, then it is used as the output filename.
@@ -140,6 +140,9 @@ def log_to_file(logger, file_level=DEBUG, file_name=None, base_name='holodeck', 
     """
 
     # ---- Construct filename as needed
+
+    if path is None:
+        path = _PATH_LOGS
 
     comm_rank = logger.comm_rank
     if file_name is None:
