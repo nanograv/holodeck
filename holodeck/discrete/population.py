@@ -379,10 +379,12 @@ class Pop_Illustris(_Population_Discrete):
         # Set initial separation to sum of stellar half-mass radii
         gal_rads = data['SubhaloHalfmassRadType']
         gal_rads = gal_rads[:, st_idx, :2] # progenitor galaxy radii
+        print(f"{gal_rads.min()=}, {gal_rads.max()=}")
         if (fixed_sepa is not None):
             self.sepa = np.ones_like(gal_rads[:, 0]) * fixed_sepa      #: Initial binary separation [cm]
         else:
             self.sepa = np.sum(gal_rads, axis=-1)       #: Initial binary separation [cm]
+        print(f"{self.sepa.min()=}, {self.sepa.max()=}")
         self.mass = data['SubhaloBHMass'][:, :2]       #: progenitor BH Masses in subhalo [grams]
 
         # ---- Galaxy Properties
@@ -390,8 +392,8 @@ class Pop_Illustris(_Population_Discrete):
         self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :2]   #: [grams]
         self.vdisp = data['SubhaloVelDisp']    #: Velocity dispersion of galaxy [cm/s]
         
-        print(f"sample volume = {self._sample_volume} [cgs] = {self._sample_volume_mpc3} [Mpc^3];"
-              f" vol^(1/3) = {(self._sample_volume)**(1.0/3.0) / (1.0e6*PC)} [Mpc]")
+        print(f"sample volume = {self._sample_volume:0.4g} [cgs] = {self._sample_volume_mpc3:0.4g} [Mpc^3];"
+              f" vol^(1/3) = {(self._sample_volume)**(1.0/3.0) / (1.0e6*PC):0.4g} [Mpc]")
         print(f"Read {self.mass.shape[0]} mergers from file.")
         
         return
