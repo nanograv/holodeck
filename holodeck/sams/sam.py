@@ -352,7 +352,7 @@ class Semi_Analytic_Model:
             # so far we have ``dn_gal / [dlog10(M_gal) dq_gal dz]``
 
             # dn / [dM dq dz] = (dn_gal / [dM_gal dq_gal dz]) * (dM_gal/dM_bh) * (dq_gal / dq_bh)
-            mplaw = self._mmbulge._mplaw
+            mplaw = self._mmbulge._mplaw * (1.0 + redz)**self._mmbulge._zplaw_slope
             dqbh_dqgal = mplaw * np.power(mstar_rat, mplaw - 1.0)
             # (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) = (dMstar-pri / dMstar-tot) * (dMstar-tot/dMbh-tot)
             # ==> (dMstar-tot/dMbh-tot) = (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) / (dMstar-pri / dMstar-tot)
@@ -1086,7 +1086,7 @@ class Semi_Analytic_Model:
         # this is  d^3 n / [dlog10(M_gal-pri) dq_gal dz]
         nd_gal = self._ndens_gal(mass_gal, mrat_gal, redz)
 
-        mplaw = self._mmbulge._mplaw
+        mplaw = self._mmbulge._mplaw * (1.0 + redz)**self._mmbulge._zplaw_slope
         dqbh_dqgal = mplaw * np.power(mrat_gal, mplaw - 1.0)
 
         dmstar_dmbh__pri = self._mmbulge.dmstar_dmbh(mass_gal)   # [unitless]
