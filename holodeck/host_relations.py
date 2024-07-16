@@ -699,6 +699,8 @@ class MMBulge_Standard(_MMBulge_Relation):
         self._mplaw = mplaw                 #: Mass Power-law index
         self._mref = mref                   #: Reference Mass (argument normalization)
         self._scatter_dex = scatter_dex
+        self._zplaw_amp = 0.0               #: Mass-Amplitude evolution parameter (0 for no evolution)
+        self._zplaw_slope = 0.0             #: Mass Power-law index (0 for no evolution)
 
         if len(kwargs) > 0:
             warn = f"Unused parameters passed to {self}!  {kwargs=}"
