@@ -808,6 +808,8 @@ class MMBulge_Redshift(MMBulge_Standard):
     that depends on redshift. ``zplaw_amp=0``, ``zplaw_slope=0`` (default) is identical to MMBulge_Standard.
     ``mamp = mamp0 * (1 + z)**zplaw_amp``.
     ``mplaw = mplaw0 * (1 + z)**zplaw_slope``.
+    Amplitude evolution can be positive, negative, or zero.
+    Slope evolution can be positive or zero only for the time being.
 
     TODO: make sure all of the inherited methods from `MMBulge_Standard` are appropriate for
           redshift dependencies!!  In particular, check `dmstar_dmbh`
