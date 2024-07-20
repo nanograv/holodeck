@@ -303,6 +303,9 @@ class Semi_Analytic_Model:
 
         """
         if self._density is None:
+            
+            print("\n *** in _static_binary_density() *** \n")
+
             log = self._log
 
             # ---- convert from MBH ===> mstar
@@ -334,20 +337,38 @@ class Semi_Analytic_Model:
             # ---- get galaxy merger rate
 
             if self._gmr is None:
+                print("** using GPF in _ndens_gal() **")
+
                 log.debug("Calculating galaxy merger rate using pair-fraction (GPF) and merger-time (GMT)")
                 log.debug(f"GPF_USES_MTOT ={GPF_USES_MTOT}")
+                print(f"{GPF_USES_MTOT=}, {GMT_USES_MTOT=}, {GSMF_USES_MTOT=}")
                 mass_gpf = mstar_tot if GPF_USES_MTOT else mstar_pri
                 # `gmt` returns [sec]  `gpf` is dimensionless,  so this is [1/sec]
                 gal_merger_rate = self._gpf(mass_gpf, mstar_rat, redz) / gmt_time
+                print(f"{self._gpf(mass_gpf, mstar_rat, redz).shape=}, {self._gpf(mass_gpf, mstar_rat, redz).min()=}, {self._gpf(mass_gpf, mstar_rat, redz).max()=}")
             else:
+                print("** using GMT in _ndens_gal() **")
+
                 log.debug("Calculating galaxy merger rate directly from GMR")
                 gal_merger_rate = self._gmr(mstar_tot, mstar_rat, redz)
 
+            print(f"{gal_merger_rate.shape=}, {gal_merger_rate.max()=}, {gal_merger_rate.min()=}")
+
             # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]   `gal_merger_rate` is [1/sec]  ===>  [Mpc^-3]
             dens = self._gsmf(mass_gsmf, redz) * gal_merger_rate * cosmo.dtdz(redz)
-            self._gal_mrg_rate = gal_merger_rate
-            self._dens_gal_gal = dens 
             
+            ## this is a crap way to define these quantities, b/c they dont take arguments and can get changed when the binaries are evolved. 
+            #self._gal_mrg_rate = gal_merger_rate
+            #self._dens_gal_gal = dens 
+            #print(f"{self._gsmf(mass_gsmf, redz).shape=}, {self._gsmf(mass_gsmf, redz).max()=}, {self._gsmf(mass_gsmf, redz).min()=}")
+            #print(f"{mass_gsmf.shape=}, {mass_gsmf.max()=}, {mass_gsmf.min()=}")
+            #print(f"{mass_gpf.shape=}, {mass_gpf.max()=}, {mass_gpf.min()=}")
+            #print(f"{mass_gmt.shape=}, {mass_gmt.max()=}, {mass_gmt.min()=}")
+            #print(f"{mstar_rat.shape=}, {mstar_rat.max()=}, {mstar_rat.min()=}")
+            #print(f"{redz.shape=}, {redz.max()=}, {redz.min()=}")
+            #print(f"{self._dens_gal_gal.shape=},{self._dens_gal_gal.min()=},{self._dens_gal_gal.max()=}")
+            #print(f"{cosmo.dtdz(redz).shape=}, {cosmo.dtdz(redz).max()=}, {cosmo.dtdz(redz).min()=}")
+
             # ---- Convert to MBH Binary density
 
             # we want ``dn_mbhb / [dlog10(M_bh) dq_bh qz]``
@@ -790,6 +811,7 @@ class Semi_Analytic_Model:
         """Calculate GWB using new cython implementation, 10x faster!
         """
         from . import sam_cyutils
+        print("\n*** in gwb_new ***\n")
 
         assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
 
@@ -804,7 +826,6 @@ class Semi_Analytic_Model:
         redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
             fobs_orb_cents, self, hard, cosmo
         )
-
         edges = [self.mtot, self.mrat, self.redz, fobs_orb_edges]
         number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
 
@@ -1072,44 +1093,76 @@ class Semi_Analytic_Model:
 
         return integ
 
-    def _ndens_gal(self, mass_gal, mrat_gal, redz):
- 
+    def _ndens_gal(self, mass_gal, mrat_gal, redz):        
+        print("*** in _ndens_gal() ***")
+        print(f"{self._gsmf(mass_gal, redz).shape=}, {self._gsmf(mass_gal, redz).max()=}, {self._gsmf(mass_gal, redz).min()=}")
+        print(f"{mass_gal.shape=}, {mass_gal.max()=}, {mass_gal.min()=}")
+        print(f"{mrat_gal.shape=}, {mrat_gal.max()=}, {mrat_gal.min()=}")
+        print(f"{redz.shape=}, {redz.max()=}, {redz.min()=}")
+        print(f"{cosmo.dtdz(redz).shape=}, {cosmo.dtdz(redz).max()=}, {cosmo.dtdz(redz).min()=}")
+
+            
         if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
             self._log.warning("{self.__class__}._ndens_gal assumes that "
-                              "primary mass is used for GSMF, GPF and GMT!")
+                              "total mass is used for GSMF, GPF and/or GMT!")
         
         if self._gmr is None:
+            print("** using GPF in _ndens_gal() **")
+
             # NOTE: dlog10(M_1) / dlog10(M) = (M/M_1) * (dM_1/dM) = 1
-            nd = self._gsmf(mass_gal, redz) * self._gpf(mass_gal, mrat_gal, redz)
-            nd = nd * cosmo.dtdz(redz) / self._gmt(mass_gal, mrat_gal, redz)
+            zprime, gmt_time = self._gmt.zprime(mass_gal, mrat_gal, redz)
+
+            gmr = self._gpf(mass_gal, mrat_gal, redz) / gmt_time 
+            nd = gmr * self._gsmf(mass_gal, redz) * cosmo.dtdz(redz) 
+            print(f"{gmr.shape=}, {gmr.max()=}, {gmr.min()=}")
+            print(f"{self._gpf(mass_gal, mrat_gal, redz).shape=}, "
+                  f"{self._gpf(mass_gal, mrat_gal, redz).max()=}, {self._gpf(mass_gal, mrat_gal, redz).min()=}")
+            print(f"{gmt_time.shape=}, {gmt_time.min()=}, {gmt_time.max=}")    
+
+            #nd = self._gsmf(mass_gal, redz) * self._gpf(mass_gal, mrat_gal, redz)
+            ##nd = nd * cosmo.dtdz(redz) / gmt_time
+            #nd = nd * cosmo.dtdz(redz) / self._gmt(mass_gal, mrat_gal, redz)
         else:
+            print("** using GMR in _ndens_gal() **")
             # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]   `gal_merger_rate` is [1/sec]  ===>  [Mpc^-3]
             nd = self._gmr(mass_gal, mrat_gal, redz) * self._gsmf(mass_gal, redz) * cosmo.dtdz(redz)
-
+            print(f"{nd.shape=}")
+            print(f"{self._gsmf(mass_gal, redz).shape=}")
+            print(f"{cosmo.dtdz(redz).shape=}")
+            print(f"{self._gmr(mass_gal, mrat_gal, redz).shape=}, "
+                  f"{self._gmr(mass_gal, mrat_gal, redz).max()=}, {self._gmr(mass_gal, mrat_gal, redz).min()=}")
+        
+        print(f"{nd.shape=}, {nd.min()=}, {nd.max()=}")
+        
         return nd
     
     def _gal_merger_rate(self, mass_gal, mrat_gal, redz):
         
         if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
             self._log.warning("{self.__class__}._gal_merger_rate assumes "
-                              "that primary mass is used for GSMF, GPF and GMT!")
+                              "that total mass is used for GSMF, GPF and/or GMT!")
 
         if self._gmr is None:
+            print("** using GPF in _ndens_gal() **")
             log.debug("Calculating galaxy merger rate using pair-fraction (GPF) and merger-time (GMT)")
             # GMT returns `-1.0` for values beyond age of universe
             zprime, gmt_time = self._gmt.zprime(mass_gal, mrat_gal, redz)
             # `gmt` returns [sec]  `gpf` is dimensionless,  so this is [1/sec]
             gmr = self._gpf(mass_gal, mrat_gal, redz) / gmt_time
         else:
+            print("** using GMR in _ndens_gal() **")
             log.debug("Calculating galaxy merger rate directly from GMR")
             gmr = self._gmr(mass_gal, mrat_gal, redz)
-            
+        
+        print(f"{gmr.shape=}, {gmr.max()=}, {gmr.min()=}")
+
         return gmr
     
 
     def _ndens_mbh(self, mass_gal, mrat_gal, redz):
         if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
-            self._log.warning("{self.__class__}._ndens_mbh assumes that primary mass is used for GSMF, GPF and GMT!")
+            self._log.warning("{self.__class__}._ndens_mbh assumes "
+                              "that total mass is used for GSMF, GPF and/or GMT!")
 
         # this is  d^3 n / [dlog10(M_gal-pri) dq_gal dz]
         nd_gal = self._ndens_gal(mass_gal, mrat_gal, redz)
