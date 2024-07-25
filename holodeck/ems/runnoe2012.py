@@ -68,7 +68,9 @@ class Runnoe2012:
         vals = self._FITS[band]
         alpha = vals['alpha']
         beta = vals['beta']
-        wlen = ap.units.Quantity(vals['wlen'], 'angstrom')
+        wlen = vals['wlen']
+        if wlen is not None:
+            wlen = ap.units.Quantity(wlen, 'angstrom')
         return alpha, beta, wlen
 
     def lband_from_lbol(self, band, lbol, scatter=False, fiso=FRAC_ISO):
