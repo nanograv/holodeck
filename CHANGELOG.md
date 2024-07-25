@@ -22,6 +22,9 @@
 * DEPRECATIONS:
     * `holodeck.librarian.py` ==> `holodeck.librarian.lib_tools`
         * Rename submodule.  All components remain the same.  All `lib_tools` elements are now also imported into the `librarian` namespace.  i.e. elements like `holodeck.librarian.lib_tools._Param_Space` will now be accessible via `holodeck.librarian._Param_Space`.
+    * Library filenames:
+        * Standard library simulation files will now be saved to the 'library_sims' subdirectory, and filenames 'library__p######.npz'.  Combined library files will now be 'sam-library.hdf5'.
+        * 'Domain' simulation files will be saved to the 'domain_sims' subdirectory, and filenames 'domain__p######.npz'.  Combined domain files will now be 'sam-domain.hdf5'.
 
 * BUGS:
     * Semi-Analytic Models
