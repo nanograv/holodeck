@@ -66,7 +66,7 @@ class Realizer:
 class Realizer_SAM:
     def __init__(
             self, fobs_orb_edges, sam=None, hard=None, params=None,
-            pspace=PSPACE
+            pspace=None
         ):
         """Construct a Realizer for a given semi-analytic model and hardening model,
         or build this model using params and a pspace.
@@ -91,7 +91,7 @@ class Realizer_SAM:
         # check that ('sam' and 'hard') OR 'params' is provided
         if params is not None:
             if sam is not None or hard is not None:
-                err = "Only 'params' or ('sam' and 'hard') should be provided."
+                err = "Only ('params' and 'pspace') or ('sam' and 'hard') should be provided."
                 raise ValueError(err)
             sam, hard = pspace.model_for_params(params=params, sam_shape=pspace.sam_shape,)
         else:
@@ -103,7 +103,7 @@ class Realizer_SAM:
         self._hard = hard
         self._fobs_orb_edges = fobs_orb_edges
 
-    def __call__(self, nreals=100, gwb_flag=False, ss_flag=False, nloudest=5):
+    def __call__(self, nreals=100, gwb_flag=False, ss_flag=False, nloudest=5, debug=False):
         """ Calculate samples and weights for an entire semi-analytic population.
 
         Parameters
@@ -153,10 +153,13 @@ class Realizer_SAM:
         samples = get_samples_from_edges(edges, redz_final, number.shape, flatten=True)
         names = ['mtot', 'mrat', 'redz', 'fobs']
         number = number.flatten()
+        if debug: print(f"number:", np.sum(number, axis=0))
         shape = (number.size, nreals)
         weights = gravwaves.poisson_as_needed(number[..., np.newaxis] * np.ones(shape)).reshape(shape)
         self._all_weights = weights
+        if debug: print(f"weights 1:", np.sum(weights, axis=0))
 
+        # remove empty bins from samples and weights arrays
         nonzero_samples = []
         nonzero_weights = []
         for rr in range(nreals):
@@ -167,6 +170,7 @@ class Realizer_SAM:
             fobs = samples[3][nonzero]
             nonzero_samples.append([mtot, mrat, redz, fobs])
             nonzero_weights.append(weights[:,rr][nonzero])
+            if debug: print(f"{rr=} {np.sum(nonzero_weights[rr])}")
 
         weights = nonzero_weights
         samples = nonzero_samples
