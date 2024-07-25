@@ -254,6 +254,6 @@ Generating references on `NASA ADS <https://ui.adsabs.harvard.edu/user/libraries
 
 * For full references (e.g. in the `Quick References`_ section above)::
 
-    .. [%1.1h%Y] %3.1M (%Y), %q, %V, %S.\n   %T\n   %u\n
+    * [%1.1h%Y] %3.1M (%Y), %q, %V, %S.\n   %T\n   %u\n
 
 

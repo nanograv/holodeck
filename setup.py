@@ -4,6 +4,9 @@
 To build cython library in-place:
     $ python setup.py build_ext -i
 
+Then run local/development install:
+    $ python setup.py develop
+
 """
 
 from os.path import abspath, join

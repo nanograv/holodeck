@@ -26,7 +26,7 @@ MELC = ap.constants.m_e.cgs.value           #: Electron Mass [g]
 MPRT = ap.constants.m_p.cgs.value           #: Proton Mass [g]
 QELC = ap.constants.e.gauss.value           #: Fundamental unit of charge (electron charge) [fr]
 KBOLTZ = ap.constants.k_B.cgs.value         #: Boltzmann constant [erg/K]
-HPLANCK = ap.constants.h.cgs.value          #: Planck constant [erg/s]
+HPLANCK = ap.constants.h.cgs.value          #: Planck constant [erg/s] ('h' *not* 'h-bar')
 SIGMA_SB = ap.constants.sigma_sb.cgs.value  #: Stefan-Boltzmann constant [erg/cm^2/s/K^4]
 SIGMA_T = ap.constants.sigma_T.cgs.value    #: Thomson/Electron -Scattering cross-section [cm^2]
 
