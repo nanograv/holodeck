@@ -10,7 +10,7 @@ import numpy as np
 import kalepy as kale
 from holodeck.sams import sam_cyutils
 
-PSPACE = holo.librarian.param_spaces_classic.PS_Classic_Phenom_Uniform(log=holo.log)
+# PSPACE = holo.librarian.param_spaces_classic.PS_Classic_Phenom_Uniform(log=holo.log)
 
 
 
@@ -309,7 +309,7 @@ def get_samples_from_edges(edges, redz, number_shape, flatten=True):
 
 
 def realizer_single_sources(params, nreals, nloudest, nfreqs=40, log10=False,
-               pspace=PSPACE):
+               pspace=None):
     """ Like Realizer but using single sources from a SAM instead of Illustris populations
 
     Parameters
