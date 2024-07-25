@@ -169,6 +169,7 @@ class _Param_Space(abc.ABC):
         hard : :class:`holodeck.hardening._Hardening` instance
 
         """
+        log = self._log
 
         if sam_shape is None:
             sam_shape = self.sam_shape
@@ -201,6 +202,16 @@ class _Param_Space(abc.ABC):
                 err = f"Found '{name}' in parameters: {msg}"
                 self._log.exception(err)
                 raise ValueError(err)
+
+            # Nowhere is it required that all parameters have values stored in the default settings (`DEFAULTS`).
+            # For that reason, we don't raise an error if a passed parameter is not already in the defaults.
+            # But a good parameter space class should probably always have a default value set.
+            # An error may be raised in the future.
+            if name not in settings:
+                log.warning(
+                    f"`params` has key '{name}' which is not already in the default settings!  "
+                    f"Ensure '{name}' is consistent with this parameter space ({self})!"
+                )
 
             settings[name] = value
 
@@ -329,7 +340,7 @@ class _Param_Space(abc.ABC):
             pspace_class = cls
 
         # construct instance with dummy/temporary values (which will be overwritten)
-        if data['param_samples'][()] is None:
+        if np.all(data['param_samples'] == None):   # noqa : use ``== None`` to match arrays
             nsamples = None
             nparameters = None
         else:
