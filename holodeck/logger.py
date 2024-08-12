@@ -113,13 +113,12 @@ def get_logger(name=None, level_stream=WARNING, tostr=sys.stdout, tofile=None, l
     # ---- Make sure that the `setLevel` command reaches the stream logger
 
     # Construct a new function to replace 'setLevel'
+    #! FIX/TODO: IMPROVE THIS
     def _set_level(self, lvl):
         for handler in self.handlers:
-            if not isinstance(handler, logging.StreamHandler):
+            if isinstance(handler, logging.FileHandler):
                 continue
             handler.setLevel(lvl)
-
-        return
 
     # replace `setLevel` function on the logger
     logger.setLevel = _set_level.__get__(logger)
