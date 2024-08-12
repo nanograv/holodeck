@@ -31,6 +31,10 @@ In general, `holodeck` calculations proceed in three stages:
     evolution.  Note that GWs can only be calculated based on some sort of model for binary
     evolution.  The model may be extremely simple, in which case it is sometimes glanced over.
 
+References
+----------
+* [WMAP9] Hinshaw, Larson, Komatsu et al. 2013
+
 """
 
 __author__ = "NANOGrav"
