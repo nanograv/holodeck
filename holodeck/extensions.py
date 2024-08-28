@@ -102,6 +102,19 @@ class Realizer_SAM:
         self._sam = sam
         self._hard = hard
         self._fobs_orb_edges = fobs_orb_edges
+        
+
+        # ---- Calculate number of binaries in each bin
+        fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges)
+        redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
+            fobs_orb_cents, sam, hard, cosmo
+        )
+
+        edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
+        number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num) # fractional number per bin
+        self._edges = edges
+        self._number = number
+        self._redz_final = redz_final
 
     def __call__(self, nreals=100, gwb_flag=False, ss_flag=False, nloudest=5, debug=False):
         """ Calculate samples and weights for an entire semi-analytic population.
@@ -133,23 +146,12 @@ class Realizer_SAM:
         hard = self._hard
         fobs_orb_edges = self._fobs_orb_edges
 
-        fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges)
-        fobs = 2.0 * fobs_orb_cents
+        # number and redz_final only need to be calculated once, in init()
+        edges = self._edges 
+        number = self._number 
+        redz_final = self._redz_final
 
-
-        # ---- Calculate number of binaries in each bin
-
-        redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
-            fobs_orb_cents, sam, hard, cosmo
-        )
-
-        edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
-        number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num) # fractional number per bin
-        self._edges = edges
-        self._number = number
-        self._redz_final = redz_final
-        self._nreals = nreals
-
+        # sample weights around sam number distribution
         samples = get_samples_from_edges(edges, redz_final, number.shape, flatten=True)
         names = ['mtot', 'mrat', 'redz', 'fobs']
         number = number.flatten()
@@ -175,6 +177,7 @@ class Realizer_SAM:
         weights = nonzero_weights
         samples = nonzero_samples
 
+        # self only stores the latest sample called, will be overwritten by call()
         self._vals_names = names
         self._binary_vals = samples
         self._binary_weights = weights
