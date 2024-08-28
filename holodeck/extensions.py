@@ -116,7 +116,7 @@ class Realizer_SAM:
         self._number = number
         self._redz_final = redz_final
 
-    def __call__(self, nreals=100, gwb_flag=False, ss_flag=False, nloudest=5, debug=False):
+    def __call__(self, nreals=1, debug=False):
         """ Calculate samples and weights for an entire semi-analytic population.
 
         Parameters
@@ -181,6 +181,7 @@ class Realizer_SAM:
         self._vals_names = names
         self._binary_vals = samples
         self._binary_weights = weights
+        self._nreals = nreals
 
         return names, samples, weights
     
