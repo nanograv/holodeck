@@ -502,7 +502,7 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret = False
 
 
 def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss=None, custom_noise=None,
-                  alpha_0=0.001, ret_snr = False,
+                  alpha_0=0.001, ret_snr = False, cad=None, 
                   red_amp=None, red_gamma=None, ss_noise=False):
     """ Calculate the background detection probability, and all the intermediary steps
     from a list of hasasia.Pulsar objects.
@@ -535,7 +535,7 @@ def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss=None, custom_noise=None,
     TODO: implement red noise
     """
 
-    cad = 1.0/(2*fobs[-1])
+    if cad is None: 1.0/(2*fobs[-1])
 
     # get pulsar properties
     thetas = np.zeros(len(pulsars))
@@ -1557,7 +1557,7 @@ def detect_ss(thetas, phis, sigmas, fobs, hc_ss, hc_bg,
 
 
 def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,
-                custom_noise=None, nexcl_noise=0,
+                custom_noise=None, nexcl_noise=0, cad=None,
               theta_ss=None, phi_ss=None, Phi0_ss=None, iota_ss=None, psi_ss=None, nskies=25,
               Fe_bar = None, red_amp=None, red_gamma=None, alpha_0=0.001, Fe_bar_guess=15,
               ret_snr=False, print_nans=False, snr_cython=True, gamma_cython=True, grid_path=GAMMA_RHO_GRID_PATH):
@@ -1619,7 +1619,8 @@ def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,
     """
 
     dur = 1.0/fobs[0]
-    cad = 1.0/(2*fobs[-1])
+    if cad is None:
+        cad = 1.0/(2*fobs[-1])
     fobs_cents, fobs_edges = utils.pta_freqs(dur, num=len(fobs))
     dfobs = np.diff(fobs_edges)
 
@@ -1699,7 +1700,7 @@ def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,
 ########################################################################
 
 def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
-                plot=True, debug=False, grid_path=GAMMA_RHO_GRID_PATH,
+                plot=True, cad = None, debug=False, grid_path=GAMMA_RHO_GRID_PATH,
                 snr_cython = True, save_ssi=False, ret_dict=False):
     """ Calculate detection statistics for an ss library output.
 
@@ -1760,7 +1761,8 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
     ssfile = h5py.File(hdf_name, 'r')
     fobs = ssfile['fobs'][:]
     dur = 1.0/fobs[0]
-    cad = 1.0/(2*fobs[-1])
+    if cad is None: 
+        cad = 1.0/(2*fobs[-1])
     # if dfobs is None: dfobs = ssfile['dfobs'][:]
     # if dur is None: dur = ssfile['pta_dur'][0]
     # if cad is None: cad = ssfile['pta_cad'][0]
@@ -1858,7 +1860,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
 
 def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
                          sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
-                plot=True, debug=False,
+                plot=True, debug=False, cad=None,
                 save_ssi=False, ret_dict=False, ss_noise=False):
     """ Calculate detection statistics for an ss library output.
 
@@ -1923,7 +1925,8 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
     ssfile = h5py.File(hdf_name, 'r')
     fobs = ssfile['fobs'][:]
     dur = 1.0/fobs[0]
-    cad = 1.0/(2*fobs[-1])
+    if cad is None:
+        cad = 1.0/(2*fobs[-1])
     hc_ss = ssfile['hc_ss'][...]
     hc_bg = ssfile['hc_bg'][...]
     shape = hc_ss.shape
@@ -2318,11 +2321,12 @@ def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref
 ######################### Param Space Models ###########################
 
 def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
-                        npsrs, sigma, nskies, thresh=DEF_THRESH, debug=False):
+                        npsrs, sigma, nskies, cad = None, thresh=DEF_THRESH, debug=False):
 
     nfreqs, nreals, nloudest = [*hc_ss.shape]
     dur = 1/fobs_cents[0]
-    cad = 1.0 / (2 * fobs_cents[-1])
+    if cad is None: 
+        cad = 1.0 / (2 * fobs_cents[-1])
     # fobs_cents, fobs_edges = holo.utils.pta_freqs(dur)
     # dfobs = np.diff(fobs_edges)
 
@@ -2361,11 +2365,12 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
 
 
 def detect_pspace_model_psrs(fobs_cents, hc_ss, hc_bg, psrs, nskies, hc_bg_noise=None,
-                        thresh=DEF_THRESH, debug=False, nexcl_noise=0):
+                        cad=None, thresh=DEF_THRESH, debug=False, nexcl_noise=0):
 
     nfreqs, nreals, nloudest = [*hc_ss.shape]
     dur = 1/fobs_cents[0]
-    cad = 1.0 / (2 * fobs_cents[-1])
+    if cad is None:
+        cad = 1.0 / (2 * fobs_cents[-1])
     # fobs_cents, fobs_edges = holo.utils.pta_freqs(dur)
     # dfobs = np.diff(fobs_edges)
 
@@ -2409,7 +2414,7 @@ def detect_pspace_model_clbrt_pta(
         fobs_cents, hc_ss, hc_bg, npsrs, nskies,
         hc_bg_noise=None,
         sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
-        thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
+        cad = None, thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
         red_amp=None, red_gamma=None, red2white=None, ss_noise=False, dsc_flag=False, nexcl_noise=0):
     """ Detect pspace model using individual sigma calibration for each realization
 
@@ -2431,7 +2436,8 @@ def detect_pspace_model_clbrt_pta(
         to the source in question.
     """
     dur = 1.0/fobs_cents[0]
-    cad = 1.0/(2*fobs_cents[-1])
+    if cad is None:
+        cad = 1.0/(2*fobs_cents[-1])
 
     nfreqs, nreals, nloudest = [*hc_ss.shape]
 
@@ -2859,7 +2865,7 @@ def _red_amp_from_white_noise(cad, sigma, red2white, fref=1/YR):
                       red2white * _white_noise(cad, sigma))
     return red_amp
 
-def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs, seed=None,
+def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs, seed=None, cad=None,
                       sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
                       phis=None, thetas=None, ret_sig = False, red_amp=None, red_gamma=None, red2white=None,
                       ss_noise=False):
@@ -2893,7 +2899,8 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs, seed=None,
 
     # get duration and cadence from fobs
     dur = 1.0/fobs[0]
-    cad = 1.0/(2.0*fobs[-1])
+    if cad is None:
+        cad = 1.0/(2.0*fobs[-1])
 
     # randomize pulsar positions
     if seed is None:
@@ -3399,7 +3406,7 @@ def get_ratio_arrays(
     return xx_params, yy_ratio
 
 def build_noise_arrays(
-        target, nreals=500, nskies=100,
+        target, nreals=500, nskies=100, cad=None,
         gw_only=False, red2white=None, red_gamma=None,
         nloudest=10, bgl=1, save_temp=True,
         gsc_flag=False, dsc_flag=False, divide_flag=False, nexcl=0,
@@ -3413,7 +3420,8 @@ def build_noise_arrays(
         var_hard_time=var_hard_time)
     fobs_cents = data[0]['fobs_cents']
     nfreqs=len(fobs_cents)
-    cad = 1.0/(2.0*fobs_cents[-1])
+    if cad is None:
+        cad = 1.0/(2.0*fobs_cents[-1])
 
     sigmas = []
     hc_ss = []
