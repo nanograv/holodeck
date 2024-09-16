@@ -78,6 +78,7 @@ import os
 from typing import Tuple
 
 import numpy as np
+import warnings
 
 import holodeck as holo
 from holodeck import utils, log, _PATH_DATA, cosmo
@@ -302,7 +303,7 @@ class Pop_Illustris(_Population_Discrete):
 
     """
 
-    def __init__(self, fname=None, fixed_sepa=None, **kwargs):
+    def __init__(self, fname=None, fixed_sepa=None, allow_mbh0=False, **kwargs):
         """Initialize a binary population using data in the given filename.
 
         Parameters
@@ -323,6 +324,8 @@ class Pop_Illustris(_Population_Discrete):
 
         self._fixed_sepa = fixed_sepa ####
 
+        self._allow_mbh0 = allow_mbh0 # allow input files with galaxies that have mbh=0; set these BHs to mbh=1e2 msun
+        
         super().__init__(**kwargs)
         if 'eccen' in kwargs:
             self.eccen = kwargs['eccen']
@@ -370,9 +373,11 @@ class Pop_Illustris(_Population_Discrete):
             part_names = header['part_names'].tolist()
             part_types = header['part_types'].tolist()
             st_idx = part_types[part_names.index('star')]
-            # tFirstProg and tNextProg don't always correspond to same snap; use later one as merger time
-            self.scafa = np.array([ np.maximum(tFirstProg,tNextProg) for tFirstProg,tNextProg 
-                                    in zip(data['time'][:,0],data['time'][:,1]) ]) 
+            ## tFirstProg and tNextProg don't always correspond to same snap; use later one as merger time
+            #self.scafa = np.array([ np.maximum(tFirstProg,tNextProg) for tFirstProg,tNextProg 
+            #                        in zip(data['time'][:,0],data['time'][:,1]) ]) 
+            # RG15 defines the *descendant* snap as the merger time
+            self.scafa = data['time'][:,2]
             
                     
         # ---- Binary Properties
@@ -387,10 +392,42 @@ class Pop_Illustris(_Population_Discrete):
         print(f"{self.sepa.min()=}, {self.sepa.max()=}")
         self.mass = data['SubhaloBHMass'][:, :2]       #: progenitor BH Masses in subhalo [grams]
 
+        # check for zero BH mass and treat based on `self._allow_mbh0` flag
+        if self.mass.min() == 0.0:
+            if self._allow_mbh0:
+                # identify galaxies with no BH (mbh=0)
+                mask0 = (self.mass[:,0]==0)
+                mask1 = (self.mass[:,1]==0)
+                all0count = np.where((mask0)&(mask1))[0].size 
+                msg = (f"Changing BH mass from 0 to 1e2msun for {self.mass[mask0,0].size} first progs "
+                       f"and {self.mass[mask1,1].size} next progs.\n Both BH masses reset for {all0count} mergers.")
+                log.warning(msg)
+                warnings.warn(msg)
+                self.mass[mask0,0] = 1.0e2 * MSOL ## setting zero-mass BHs to initial mass of 1e2
+                self.mass[mask1,1] = 1.0e2 * MSOL ## setting zero-mass BHs to initial mass of 1e2
+            else:
+                err = f"One or more galaxies have zero BH mass with {self._allow_mbh0=}!"
+                log.exception(err)
+                raise ValueError(err)
+        else:
+            print("No zero-mass BHs found in this merger tree file!")
+        
         # ---- Galaxy Properties
         # Get the stellar mass, and take that as bulge mass
         self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :2]   #: [grams]
+        self.mstar_tot = data['SubhaloMassType'][:, st_idx, :]   #: [grams]
         self.vdisp = data['SubhaloVelDisp']    #: Velocity dispersion of galaxy [cm/s]
+        try:
+            self.prog_mass_ratio = data['ProgMassRatio'] # progenitor mass ratio at tmax (time of max past mass)
+            if self.prog_mass_ratio.max() > 1.0:
+                msg = "Redefining mass ratio to be always <= 1."
+                log.warning(msg)
+                warnings.warn(msg)
+                self.prog_mass_ratio[self.prog_mass_ratio>1] = 1.0 / self.prog_mass_ratio[self.prog_mass_ratio>1]
+            self.first_prog_mass = data['fpMass'] # first progenitor mass at tmax (time of max past mass)
+            self.next_prog_mass = data['npMass'] # next progenitor mass at tmax (time of max past mass)
+        except:
+            pass
         
         print(f"sample volume = {self._sample_volume:0.4g} [cgs] = {self._sample_volume_mpc3:0.4g} [Mpc^3];"
               f" vol^(1/3) = {(self._sample_volume)**(1.0/3.0) / (1.0e6*PC):0.4g} [Mpc]")
@@ -677,14 +714,23 @@ class PM_Mass_Reset(_Population_Modifier):
             Binary population to be modified.
 
         """
+        # make sure we do not have any galaxies with zero stellar bulge mass
+        if pop.mbulge.min() == 0.0:
+            err = "At least one galaxy has zero mbulge. Cannot rescale BH masses using host_relations."
+            log.exception(err)
+            raise ValueError(err)
+
         scatter = self._scatter
 
         rescale_mbulge = self._rescale_mbulge
         if rescale_mbulge == True:
-            print("Note: rescaling mbulge by constant factor of 1.4. This should *only* apply to TNG300"
-                  "and needs to be implemented properly by halo mass bin according to Appendix A in"
-                  "Pillepich et al. 2018, MNRAS 475, 648. And needs to be implemented with more safeguards"
-                  "so that it doesn't get used accidentally in other cases.")
+            msg = ("Note: rescaling mbulge by constant factor of 1.4. This should *only* apply to TNG300"
+                   "and needs to be implemented properly by halo mass bin according to Appendix A in"
+                   "Pillepich et al. 2018, MNRAS 475, 648. And needs to be implemented with more safeguards"
+                   "so that it doesn't get used accidentally in other cases.")
+            log.warning(msg)
+            warnings.warn(msg)
+
             pop.mbulge = pop.mbulge * 1.4
         
         # Store old version
