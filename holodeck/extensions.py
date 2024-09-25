@@ -123,9 +123,6 @@ class Realizer_SAM:
         ----------
         nreals : int
             Number of realizations
-        clean : boolean
-            Whether or not to make a samples array for every realization
-            and clean weights==zero bins from each array
 
         Returns
         -------
