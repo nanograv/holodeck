@@ -303,7 +303,8 @@ class Pop_Illustris(_Population_Discrete):
 
     """
 
-    def __init__(self, fname=None, fixed_sepa=None, allow_mbh0=False, **kwargs):
+    def __init__(self, fname=None, fixed_sepa=None, allow_mbh0=False, 
+                 use_mstar_tot_as_mbulge=False, **kwargs):
         """Initialize a binary population using data in the given filename.
 
         Parameters
@@ -325,6 +326,8 @@ class Pop_Illustris(_Population_Discrete):
         self._fixed_sepa = fixed_sepa ####
 
         self._allow_mbh0 = allow_mbh0 # allow input files with galaxies that have mbh=0; set these BHs to mbh=1e2 msun
+
+        self._use_mstar_tot_as_mbulge = use_mstar_tot_as_mbulge 
         
         super().__init__(**kwargs)
         if 'eccen' in kwargs:
@@ -414,8 +417,35 @@ class Pop_Illustris(_Population_Discrete):
         
         # ---- Galaxy Properties
         # Get the stellar mass, and take that as bulge mass
-        self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :2]   #: [grams]
         self.mstar_tot = data['SubhaloMassType'][:, st_idx, :]   #: [grams]
+        print(f"{self._use_mstar_tot_as_mbulge=}")
+        if self._use_mstar_tot_as_mbulge:
+            self.mbulge = self.mstar_tot[:,:2]
+        else:
+            self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :2]   #: [grams]
+        print(f"{self.mbulge.min()=}, {self.mbulge.max()=}")
+        print(f"{self.mstar_tot.min()=}, {self.mstar_tot.max()=}")
+
+        # check for zero mbulge and treat based on `self._allow_mbh0` flag
+        if self.mbulge.min() == 0.0:
+            if self._allow_mbh0:
+                # identify galaxies with mbulge=0
+                mask0 = (self.mbulge[:,0]==0)
+                mask1 = (self.mbulge[:,1]==0)
+                all0count = np.where((mask0)&(mask1))[0].size 
+                msg = (f"Changing mbulge from 0 to 1e5msun for {self.mass[mask0,0].size} first progs "
+                       f"and {self.mass[mask1,1].size} next progs.\n Both BH masses reset for {all0count} mergers.")
+                log.warning(msg)
+                warnings.warn(msg)
+                self.mbulge[mask0,0] = 1.0e5 * MSOL ## setting zero-mass bulges to mass of 1e5
+                self.mbulge[mask1,1] = 1.0e5 * MSOL ## setting zero-mass bulges to mass of 1e5
+            else:
+                err = f"One or more galaxies have zero mbulge with {self._allow_mbh0=}!"
+                log.exception(err)
+                raise ValueError(err)
+        else:
+            print("No zero-mass BHs found in this merger tree file!")
+
         self.vdisp = data['SubhaloVelDisp']    #: Velocity dispersion of galaxy [cm/s]
         try:
             self.prog_mass_ratio = data['ProgMassRatio'] # progenitor mass ratio at tmax (time of max past mass)
@@ -717,8 +747,9 @@ class PM_Mass_Reset(_Population_Modifier):
         # make sure we do not have any galaxies with zero stellar bulge mass
         if pop.mbulge.min() == 0.0:
             err = "At least one galaxy has zero mbulge. Cannot rescale BH masses using host_relations."
-            log.exception(err)
-            raise ValueError(err)
+            print("WARNING: "+err)
+            #log.exception(err)
+            #raise ValueError(err)
 
         scatter = self._scatter
 
