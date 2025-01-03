@@ -303,7 +303,7 @@ class Pop_Illustris(_Population_Discrete):
 
     """
 
-    def __init__(self, fname=None, fixed_sepa=None, allow_mbh0=False, 
+    def __init__(self, fname=None, basepath=None, fixed_sepa=None, allow_mbh0=False, 
                  use_mstar_tot_as_mbulge=False, **kwargs):
         """Initialize a binary population using data in the given filename.
 
@@ -319,8 +319,11 @@ class Pop_Illustris(_Population_Discrete):
         if fname is None:
             fname = _DEF_ILLUSTRIS_FNAME
         
-        fname = os.path.join(_PATH_DATA, fname) # assumes file in data directory
-
+        if basepath is None:
+            fname = os.path.join(_PATH_DATA, fname) # assumes file in data directory
+        else:
+            fname = os.path.join(basepath, fname)
+            
         self._fname = fname             #: Filename for binary data
 
         self._fixed_sepa = fixed_sepa ####
