@@ -849,6 +849,7 @@ def run_model(
 
     #! DOPPLER
     if doppler_args is not None:
+        log.warning(f"RUNNING IN DOPPLER MODE: {doppler_args=}")
         # (F, R)
         psd = holo.utils.char_strain_to_psd(fobs_orb_cents[:, np.newaxis], gwb)
         # (F, R)  - samples, frequencies, realizations
@@ -870,42 +871,47 @@ def run_model(
 
         # data['static_binary_density'] = sam.static_binary_density
 
-        sens_curve_interp = holo.doppler.sens_curve(
-            doppler_args['expect'], doppler_args['wlog_test'], doppler_args['amplog_test']
-        )
-
-        doppler_fobs_gw_cents, doppler_fobs_gw_edges = utils.pta_freqs(
+        dop_fobs_gw_cents, dop_fobs_gw_edges = utils.pta_freqs(
             dur=doppler_args['tau_obs'], num=doppler_args['num_freqs']
         )
-        doppler_fobs_orb_cents = doppler_fobs_gw_cents / 2.0
-        doppler_fobs_orb_edges = doppler_fobs_gw_edges / 2.0
-        doppler_redz_final, doppler_diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
-            doppler_fobs_orb_cents, sam, hard, cosmo
+        dop_fobs_orb_cents = dop_fobs_gw_cents / 2.0
+        dop_fobs_orb_edges = dop_fobs_gw_edges / 2.0
+        dop_redz_final, dop_diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
+            dop_fobs_orb_cents, sam, hard, cosmo
         )
-        doppler_edges = [sam.mtot, sam.mrat, sam.redz, doppler_fobs_orb_edges]
-
-        detect = holo.doppler.detectable(
-            doppler_edges, doppler_redz_final,
-            doppler_args['snr'], doppler_args['tau_obs'], sens_curve_interp,
-        )
-        log.info(f"Fraction of bins doppler detectable: {utils.frac_str(detect)}")
-        num_all = sam_cyutils.integrate_differential_number_3dx1d(doppler_edges, doppler_diff_num)
-        num_det = sam_cyutils.integrate_differential_number_3dx1d(doppler_edges, doppler_diff_num*detect)
-
-        log.info(f"Doppler detections: {num_all.sum()=:.2e} {num_det.sum()=:.2e}")
-
-        data['doppler_fobs_gw_cents'] = doppler_fobs_gw_cents
-
+        dop_edges = [sam.mtot, sam.mrat, sam.redz, dop_fobs_orb_edges]
+        num_all = sam_cyutils.integrate_differential_number_3dx1d(dop_edges, dop_diff_num)
+        data['doppler_fobs_gw_cents'] = dop_fobs_gw_cents
         # data['doppler_num_all'] = num_all
-        # data['doppler_num_det'] = num_det
-        # data['doppler_detect'] = detect
         data['doppler_num_all'] = num_all.sum(axis=2)
-        data['doppler_num_det'] = num_det.sum(axis=2)
         data['doppler_num_all_redz'] = num_all.sum(axis=(0, 1, 3))
-        data['doppler_num_det_redz'] = num_det.sum(axis=(0, 1, 3))
-        data['doppler_detect'] = np.packbits(detect)
-
         # data['doppler_redz_final'] = doppler_redz_final
+
+        expect_list = ['optimistic', 'priority', 'base']
+        snr_list = [1.0, 3.0, 8.0]
+
+        for expect in expect_list:
+            sens_curve_interp = holo.doppler.sens_curve(
+                expect, doppler_args['freqs'], doppler_args['strain']
+            )
+
+            for dop_snr in snr_list:
+                log.info(f"DOPPLER: {expect=}, {dop_snr=}")
+
+                detect = holo.doppler.detectable(
+                    dop_edges, dop_redz_final,
+                    dop_snr, doppler_args['tau_obs'], sens_curve_interp,
+                )
+                log.info(f"Fraction of bins doppler detectable: {utils.frac_str(detect)}")
+                num_det = sam_cyutils.integrate_differential_number_3dx1d(dop_edges, dop_diff_num*detect)
+
+                log.info(f"Doppler detections: {num_all.sum()=:.2e} {num_det.sum()=:.2e}")
+
+                # data['doppler_num_det'] = num_det
+                # data['doppler_detect'] = detect
+                data['doppler_num_det'] = num_det.sum(axis=2)
+                data['doppler_num_det_redz'] = num_det.sum(axis=(0, 1, 3))
+                data['doppler_detect'] = np.packbits(detect)
 
     #! -------
 

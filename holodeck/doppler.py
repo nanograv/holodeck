@@ -9,6 +9,29 @@ import scipy as sp
 import holodeck as holo
 
 
+def sens_curve(expect, f_arr, sensfinal):
+
+    interp_xx = np.log10(f_arr)
+
+    if expect == 'base':
+        interp_yy = np.log10(sensfinal*3)
+    elif expect == 'priority':
+        interp_yy = np.log10(sensfinal)
+    elif expect == 'optimistic':
+        interp_yy = np.log10(sensfinal/3.3333/np.sqrt(3))
+    else:
+        raise
+
+    loghc_SNR1_curv = sp.interpolate.interp1d(interp_xx, interp_yy, kind='linear', fill_value="extrapolate")
+
+    def hc_SNR1_curv(f):
+        return 10**(loghc_SNR1_curv(np.log10(f)))
+
+    return hc_SNR1_curv
+
+
+'''
+#! THIS IS THE OLD VERSION FROM 2024-04/2025-05
 def sens_curve(expect, wlog_test, amplog_test):
 
     avrgfactor = 1/1.143    #factor to correct for sky average from MCMC results
@@ -41,6 +64,7 @@ def sens_curve(expect, wlog_test, amplog_test):
         return 10**(loghc_SNR1_curv(np.log10(f)))
 
     return hc_SNR1_curv
+'''
 
 
 def detectable(edges, redz_final, snr, tau_obs, sens_curve_interp):

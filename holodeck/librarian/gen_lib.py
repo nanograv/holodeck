@@ -40,7 +40,10 @@ from holodeck.librarian import (
 
 #! DOPPLER
 import holodeck.doppler
-DOPPLER_FNAME = holo.get_holodeck_path("data", "doppler-sens-fit_2024-05-01.csv")
+
+DOPPLER_FNAME = holo.get_holodeck_path("data", "doppler-sens_2025-01-13.npz")
+#! THIS IS THE OLD VERSION FROM 2024-04/2025-05
+# DOPPLER_FNAME = holo.get_holodeck_path("data", "doppler-sens-fit_2024-05-01.csv")
 #! -------
 
 #: maximum number of failed simulations before task terminates with error (`None`: no limit)
@@ -456,43 +459,50 @@ def _setup_argparse(*args, **kwargs):
 
     # # ---- Create output directories as needed
 
-    # output.mkdir(parents=True, exist_ok=True)
-    # holo.utils.mpi_print(f"output path: {output}")
-    # args.output = output
+    output.mkdir(parents=True, exist_ok=True)
+    holo.utils.mpi_print(f"output path: {output}")
+    args.output = output
 
-    # if args.domain:
-    #     sims_dirname = DIRNAME_DOMAIN_SIMS
-    # else:
-    #     sims_dirname = DIRNAME_LIBRARY_SIMS
+    if args.domain:
+        sims_dirname = DIRNAME_DOMAIN_SIMS
+    else:
+        sims_dirname = DIRNAME_LIBRARY_SIMS
 
-    # output_sims = output.joinpath(sims_dirname)
-    # output_sims.mkdir(parents=True, exist_ok=True)
-    # args.output_sims = output_sims
+    output_sims = output.joinpath(sims_dirname)
+    output_sims.mkdir(parents=True, exist_ok=True)
+    args.output_sims = output_sims
 
-    # output_logs = output.joinpath("logs")
-    # output_logs.mkdir(parents=True, exist_ok=True)
-    # args.output_logs = output_logs
+    output_logs = output.joinpath("logs")
+    output_logs.mkdir(parents=True, exist_ok=True)
+    args.output_logs = output_logs
 
-    # if args.plot:
-    #     output_plots = output.joinpath("figs")
-    #     output_plots.mkdir(parents=True, exist_ok=True)
-    #     args.output_plots = output_plots
+    if args.plot:
+        output_plots = output.joinpath("figs")
+        output_plots.mkdir(parents=True, exist_ok=True)
+        args.output_plots = output_plots
 
     #! DOPPLER
+    print("!!! SETTING UP DOPPLER ARGS !!!")
     args.doppler_args = dict(
         # expect    = 'optimistic',
-        expect    = 'priority',
+        # expect    = 'priority',
         # expect    = 'base',
-        snr       = 1.0,
+        # snr       = 1.0,
         # snr       = 3.0,
         # snr       = 8.0,
         tau_obs   = 10.0*YR,
         num_freqs = 200
     )
 
-    doppler_data = np.loadtxt(DOPPLER_FNAME, delimiter=',')
-    args.doppler_args['wlog_test']   = doppler_data[:,0]    #log10 of binary orbital frequency
-    args.doppler_args['amplog_test'] = doppler_data[:,1]  #log10 of detectable amplitude (visual threshold)
+    #! THIS IS THE OLD VERSION FROM 2024-04/2025-05
+    # doppler_data = np.loadtxt(DOPPLER_FNAME, delimiter=',')
+    # args.doppler_args['wlog_test']   = doppler_data[:,0]    #log10 of binary orbital frequency
+    # args.doppler_args['amplog_test'] = doppler_data[:,1]  #log10 of detectable amplitude (visual threshold)
+
+    #! THIS IS THE NEW VERSION FROM 2025-01
+    doppler_data = np.load(DOPPLER_FNAME)
+    args.doppler_args['freqs'] = doppler_data['freqs']
+    args.doppler_args['strain'] = doppler_data['strain']
     #! -------
 
     return args
@@ -585,7 +595,7 @@ def load_config_from_path(path, log):
     with open(fname, 'r') as inp:
         config = json.load(inp)
 
-    log.info("Loaded configuration from {fname}")
+    log.info(f"Loaded configuration from {fname}")
 
     pop_keys = [
         'holodeck_version', 'holodeck_librarian_version', 'holodeck_git_hash', 'created'
