@@ -105,7 +105,8 @@ def detectable(edges, redz_final, snr, tau_obs, sens_curve_interp):
     hs_obs = holo.utils.gw_strain_source(mchirp, dcom, frst_orb)
     hc_obs = np.sqrt(fobs_gw_cents * tau_obs) * hs_obs
 
-    hnoise = snr * sens_curve_interp(fobs_gw_cents)
+    sens_curve = sens_curve_interp(fobs_gw_cents)
+    hnoise = snr * sens_curve
 
     detectable = (hc_obs > hnoise)
 

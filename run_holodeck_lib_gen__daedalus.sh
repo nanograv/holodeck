@@ -10,10 +10,10 @@
 
 SPACE="PS_Astro_Strong_All"
 
-NTASKS=4
+NTASKS=10
 
-NSAMPS=20
-NREALS=10
+NSAMPS=200
+NREALS=100
 NFREQS=40
 NLOUDEST=3
 
@@ -29,7 +29,7 @@ NAME=${NAME/ps_/}   # remove "PS_"
 NAME=${NAME//_/-}  # replace all occurrences of '_' with '-'
 DATE=$(date +'%Y-%m-%d')
 # NAME=$NAME"_"$PARS"_domain"
-NAME=$NAME"_"$PARS"_doppler-test"
+NAME=$NAME"_"$PARS"_doppler"
 
 echo "run name: " $NAME
 
@@ -59,8 +59,8 @@ echo -e "Running mpiexec $(date +'%Y-%m-%d|%H:%M:%S')\n"
 echo ""
 
 # START NEW
-# mpirun -np $NTASKS  $COMMAND $SPACE $OUTPUT -n $NSAMPS -r $NREALS -f $NFREQS  1> $LOG_OUT 2> $LOG_ERR &
-mpiexec -np $NTASKS  $COMMAND $SPACE $OUTPUT -n $NSAMPS -r $NREALS -f $NFREQS  1> $LOG_OUT 2> $LOG_ERR &
+mpirun -np $NTASKS  $COMMAND $SPACE $OUTPUT -n $NSAMPS -r $NREALS -f $NFREQS  1> $LOG_OUT 2> $LOG_ERR &
+# mpiexec -np $NTASKS  $COMMAND $SPACE $OUTPUT -n $NSAMPS -r $NREALS -f $NFREQS  1> $LOG_OUT 2> $LOG_ERR &
 
 # RESUME
 # mpirun -np $NTASKS  $COMMAND $SPACE $OUTPUT --resume -n $NSAMPS -r $NREALS -f $NFREQS  1> $LOG_OUT 2> $LOG_ERR &

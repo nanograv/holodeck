@@ -894,9 +894,11 @@ def run_model(
             sens_curve_interp = holo.doppler.sens_curve(
                 expect, doppler_args['freqs'], doppler_args['strain']
             )
+            data['doppler_sens_' + expect] = sens_curve_interp(dop_fobs_gw_cents)
 
             for dop_snr in snr_list:
                 log.info(f"DOPPLER: {expect=}, {dop_snr=}")
+                key = f"_{expect}-SNR{dop_snr:.1f}"
 
                 detect = holo.doppler.detectable(
                     dop_edges, dop_redz_final,
@@ -909,9 +911,9 @@ def run_model(
 
                 # data['doppler_num_det'] = num_det
                 # data['doppler_detect'] = detect
-                data['doppler_num_det'] = num_det.sum(axis=2)
-                data['doppler_num_det_redz'] = num_det.sum(axis=(0, 1, 3))
-                data['doppler_detect'] = np.packbits(detect)
+                data['doppler_num_det' + key] = num_det.sum(axis=2)
+                data['doppler_num_det_redz' + key] = num_det.sum(axis=(0, 1, 3))
+                data['doppler_detect' + key] = np.packbits(detect)
 
     #! -------
 
