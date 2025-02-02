@@ -352,9 +352,8 @@ class Semi_Analytic_Model:
             # so far we have ``dn_gal / [dlog10(M_gal) dq_gal dz]``
 
             # dn / [dM dq dz] = (dn_gal / [dM_gal dq_gal dz]) * (dM_gal/dM_bh) * (dq_gal / dq_bh)
-            # mplaw = self._mmbulge._mplaw # commented out by Shreyas
-            # dqbh_dqgal = mplaw * np.power(mstar_rat, mplaw - 1.0) # commented out by Shreyas
-            dqbh_dqgal = self._mmbulge.dqbh_dqgal(mstar_rat, mstar_pri) # added by Shreyas to implement Chen2019 or KH20213 bulge-frac via same line
+            mplaw = self._mmbulge._mplaw
+            dqbh_dqgal = mplaw * np.power(mstar_rat, mplaw - 1.0)
             # (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) = (dMstar-pri / dMstar-tot) * (dMstar-tot/dMbh-tot)
             # ==> (dMstar-tot/dMbh-tot) = (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) / (dMstar-pri / dMstar-tot)
             #                           = (dMstar-pri / dMbh-pri) * (1 / (1+q_bh)) / (1 / (1+q_star))

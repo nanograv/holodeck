@@ -319,4 +319,107 @@ class NFW(_Density_Profile):
         rs = NFW._nfw_rho_rad(mhalo, redz)[0]
         return rs
 
+class NFW_Shreyas:
+    """
+    Navarro, Frank & White dark-matter density profile from [NFW1997]_.
+    with my corrections in method density
+    """
+    def density(self, rads, mhalo, redz):
+        """NFW DM Density profile.
+
+        Parameters
+        ----------
+        rads : ArrayLike    (shape depends on the user: (n,) with any value of n)
+            Target radial distances.  [cm]
+        mhalo : ArrayLike   (shape (sam.mtot.size, sam.redz.size))
+            Halo mass.  [grams]
+        redz : ArrayLike    (shape (sam.redz.size,))
+            Redshift.    []
+
+        Returns
+        -------
+        dens : ArrayLike    (shape (sam.mtot.size, sam.redz.size, n))
+            Densities at the given radii.  [g/cm^3]
+
+        """
+        rho_s, rs = NFW._nfw_rho_rad(mhalo, redz)
+        rads = rads[np.newaxis, np.newaxis, :] # Shreyas modification
+        rho_s = rho_s[:, :, np.newaxis] # Shreyas modification
+        rs = rs[:, :, np.newaxis] # Shreyas modification
+        dens = rads / rs
+        dens = dens * np.square(1 + dens)
+        dens = rho_s / dens
+        return dens
+
+    @staticmethod
+    def _nfw_rho_rad(mhalo, redz):
+        """Return the DM halo parameters for characteristic density and halo scale radius.
+
+        Parameters
+        ----------
+        mhalo : ArrayLike   (shape (sam.mtot.size, sam.redz.size))
+            Halo mass.  [grams]
+        redz : ArrayLike    (shape (sam.redz.size,))
+            Redshift.
+
+        Returns
+        -------
+        rho_s : ArrayLike   (shape (sam.mtot.size, sam.redz.size))
+            DM halo characteristic density.   [g/cm^3]
+        rs : ArrayLike  (shape (sam.mtot.size, sam.redz.size))
+            Scale radius of the DM halo.  [cm]
+
+        """
+        conc = NFW._concentration(mhalo, redz)
+        log_c_term = np.log(1 + conc) - conc/(1+conc)
+
+        # Critical over-density
+        delta_c = (200/3) * (conc**3) / log_c_term
+        # NFW density (*not* the density at the characteristic-radius)
+        rho_s = cosmo.critical_density(redz).cgs.value * delta_c
+        # scale-radius
+        rs = mhalo / (4*np.pi*rho_s*log_c_term)
+        rs = np.power(rs, 1.0/3.0)
+        return rho_s, rs
+
+class DM_Spike:
+    """Dark-matter spike density profile from Alonso-Alvarez_2024.
+    """
+
+    def density(self, rads, mhalo, redz, gamma, mtot):
+        """DM spike Density profile. Alonso-Alvarez_2024 eq.1
+
+        Parameters
+        ----------
+        rads : ArrayLike    (shape depends on the user: (n,) with any value of n)
+            Target radial distances.  [cm]
+        mhalo : ArrayLike   (shape (sam.mtot.size, sam.redz.size))
+            Halo mass.  [grams]
+        redz : ArrayLike    (shape (sam.redz.size,))
+            Redshift.    []
+        gamma : Scalar quantity (typically a float)
+        mtot : ArrayLike   (shape (sam.mtot.size,))
+            Total blackhole mass.  [grams]
+
+        Returns
+        -------
+        dens : ArrayLike    (shape (sam.mtot.size, sam.redz.size, n))
+            Densities at the given radii.  [g/cm^3]
+        """
+        nfw_density = NFW_Shreyas().density(rads, mhalo, redz)
+
+        rho_s, rs = NFW_Shreyas._nfw_rho_rad(mhalo, redz) # (shape of both: (sam.mtot.size, sam.redz.size))
+        mtot = mtot[:, np.newaxis]
+        rads = rads[np.newaxis, np.newaxis, :] 
+        r_2m_2 = mtot / (np.pi * rho_s * rs) # (shape (sam.mtot.size, sam.redz.size))
+        r_sp = 0.2 * np.sqrt(r_2m_2) # (shape (sam.mtot.size, sam.redz.size))
+        rho_sp0 = rho_s / ((r_sp / rs) * np.square(1 + r_sp / rs)) # NFW density at r=r_sp (shape (sam.mtot.size, sam.redz.size)
+        rho_sp0 = rho_sp0[:, :, np.newaxis]
+        r_sp = r_sp[:, :, np.newaxis]
+        density = rho_sp0 * np.power(r_sp / rads, gamma)
+        xx = rads/r_sp
+        idx = np.where(xx > 1)
+        density[idx] = nfw_density[idx]
+        
+        return density
 

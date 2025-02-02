@@ -1,3 +1,7 @@
+# I have commented some lines out and used a different line as I wsa getting deprication error
+# The lines where I have made these changes are Lines: 532 - 540
+# The defined function fit_kernel_params (line 453 - 545) isn't returning anything at the moment. So added a return value in line 545.
+
 """Utilities for Gaussian Processes."""
 import sys
 import time
@@ -525,14 +529,20 @@ def fit_kernel_params(gp_freqs, yobs_mean, gp_george, nkpars, nwalkers,
     # Populate the GP class with the details of the kernel
     # MAP values for each frequency.
     for ii in range(len(gp_freqs)):
-        gp_george[ii].emcee_flatchain = sampler[ii].flatchain
-        gp_george[ii].emcee_flatlnprob = sampler[ii].flatlnprobability
+        # gp_george[ii].emcee_flatchain = sampler[ii].flatchain # I commented this out and used a different line as I wsa getting deprication error
+        gp_george[ii].emcee_flatchain = sampler[ii].get_chain(flat=True)
+        # gp_george[ii].emcee_flatlnprob = sampler[ii].flatlnprobability # I commented this out and used a different line as I wsa getting deprication error
+        gp_george[ii].emcee_flatlnprob = sampler[ii].get_log_prob(flat=True)
 
-        gp_george[ii].emcee_kernel_map = sampler[ii].flatchain[np.argmax(
-            sampler[ii].flatlnprobability)]
+        # gp_george[ii].emcee_kernel_map = sampler[ii].flatchain[np.argmax( # I commented this out and used a different line as I wsa getting deprication error
+        gp_george[ii].emcee_kernel_map = sampler[ii].get_chain(flat=True)[np.argmax(
+            # sampler[ii].flatlnprobability)] # I commented this out and used a different line as I wsa getting deprication error
+            sampler[ii].get_log_prob(flat=True))]
 
         # add-in mean yobs (freq) values
         gp_george[ii].mean_spectra = yobs_mean[ii]
+    
+    return gp_george # Added by me, as this function doesn't return anything otherwise
 
 
 def set_up_predictions(spectra, gp_george):

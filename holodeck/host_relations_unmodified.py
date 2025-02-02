@@ -68,7 +68,7 @@ from typing import Type, Union
 import numpy as np
 from numpy.typing import ArrayLike
 import scipy as sp
-from scipy.interpolate import interp1d # added by me to support interp1d
+
 from holodeck import cosmo, utils, log
 from holodeck.constants import MSOL, KMPERSEC
 
@@ -770,56 +770,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         mstar = self._bulge_frac.mstar_from_mbulge(mbulge, redz=redz, **kwargs)
         return mstar
 
-class MMBulge_Chen2019(MMBulge_Standard):
-    """
-    added by Shreyas to implement the mstar dependant bulge-frac from Chen2019 eq.19 
-    which is also used in Alonso-Alvarez 2024 eq. A5
 
-    """
-    def mstar_from_mbh(self, mbh, redz=None, scatter=False):
-        mbulge = self.mbulge_from_mbh(mbh)
-        mstar = self.mstar_from_mbulge(mbulge)
-        return mstar
-    
-    def fstar_from_mstar(self, mstar, redz=None, scatter=False):
-        xx = mstar / (1e10 * MSOL)
-        dfstar = np.where(
-            xx <= 1, 
-            0, 
-            (6.9**0.5 * np.exp(-3.45 / (np.log10(xx)))) / (np.log10(xx))**1.5
-        )
-        fstar = 0.615 + dfstar
-        return fstar
-    
-    def mbulge_from_mstar(self, mstar, redz=None, scatter=False):
-        mbulge = self.fstar_from_mstar(mstar) * mstar
-        return mbulge
-    
-    def mstar_from_mbulge(self, mbulge, redz=None, scatter=False):
-        # interpolation
-        mstar_interp_array = np.logspace(3, 30, 1000) * MSOL
-        mbulge_interp_array = np.zeros(len(mstar_interp_array))
-        for i, ms in enumerate(mstar_interp_array):
-            mbulge_interp_array[i] = self.mbulge_from_mstar(ms)
-        mstar_as_a_function_of_mbulge = interp1d(mbulge_interp_array, mstar_interp_array)
-        mstar = mstar_as_a_function_of_mbulge(mbulge)
-        return mstar
-    
-    def dmstar_dmbh(self, mstar, redz=None, scatter=False):
-        epsilon = 1e-5
-        h = epsilon * mstar # saw this technique on chatgpt
-        dmbh_dmstar = (self.mbh_from_mstar(mstar + h) - self.mbh_from_mstar(mstar - h))/ (2 * h)
-        derivative = np.power(dmbh_dmstar, -1.0)
-        return derivative        
-
-    def mrat_from_mstar_rat(self, mstar_rat, mstar_pri, redz=None, scatter=False):
-        mrat = (mstar_rat * self.fstar_from_mstar(mstar_pri * mstar_rat) / self.fstar_from_mstar(mstar_pri))**self._mplaw
-        return mrat
-    
-    def dqbh_dqgal(self, mstar_rat, mstar_pri, redz=None, scatter=False):
-        h = 1e-5
-        derivative = (self.mrat_from_mstar_rat(mstar_rat + h, mstar_pri) - self.mrat_from_mstar_rat(mstar_rat - h, mstar_pri))/ (2 * h)
-        return derivative
 class MMBulge_KH2013(MMBulge_Standard):
     """Mbh-MBulge Relation, single power-law, from Kormendy & Ho 2013.
 
@@ -831,10 +782,6 @@ class MMBulge_KH2013(MMBulge_Standard):
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.17                  # 1.17 ± 0.08
     SCATTER_DEX = 0.28                # scatter stdev in dex
-    # following function added by Shreyas to implement any fstar_bulge relation without changes in sam.py line 356
-    def dqbh_dqgal(self, mstar_rat, mstar_pri, redz=None, scatter=False):
-        dqbh_dqgal = self._mplaw * np.power(mstar_rat, self._mplaw - 1.0)
-        return dqbh_dqgal
 
 
 class MMBulge_MM2013(MMBulge_Standard):
@@ -1293,8 +1240,7 @@ class _StellarMass_HaloMass_Redshift(_StellarMass_HaloMass):
     """
 
     _REDZ_GRID_EXTR = [0.0, 10.0]     #: edges of the parameter space in redshift
-    # _MSTAR_GRID_EXTR = [5.0, 14.0]    #: edges of the parameter space in stellar-mass [log10(M/Msol)]
-    _MSTAR_GRID_EXTR = [5.0, 16.0]    # I extended the upper limit, otherwise the total bh masses of 1e11 MSOL and above are going out of range
+    _MSTAR_GRID_EXTR = [5.0, 14.0]    #: edges of the parameter space in stellar-mass [log10(M/Msol)]
 
     def __init__(self, extend_nearest=True):
         self._mhalo_grid = np.logspace(*self._MHALO_GRID_EXTR, self._NUM_GRID) * MSOL   # shape (H,)
@@ -1551,101 +1497,6 @@ class Behroozi_2013(_StellarMass_HaloMass_Redshift):
         ff = t1 + delta * t2 / t3
         return ff
 
-class Girelli_2020(_StellarMass_HaloMass_Redshift):
-    """Redshift-dependent Stellar-Mass - Halo-Mass relation based on Girelli et al. 2020. (http://arxiv.org/abs/2001.02230)
-
-    best fit values are in Table 3, uncertainties are 1-sigma.
-
-    """
-    
-    # the following function is written inspired from /home/users/sti50/Codes/dm_spike_acd2024_fig6_version2.ipynb
-    def stellar_mass(self, mhalo, redz):
-        """
-        Parameters
-        ----------
-        mhalo: ArrayLike with size sam.mtot.size
-            Halo mass.  [gram]
-        redz: ArrayLike with size sam.redz.size
-
-        Returns
-        -------
-        mstar: Reshaped array with shape (sam.mtot.size, sam.redz.size)
-            Stellar mass.   [gram]
-        """
-        B = 11.79   # +0.03 -0.03
-        mu = 0.20   # +0.02 -0.02
-        C = 0.046   # +0.001 -0.001
-        nu = -0.38   # +0.03 -0.03
-        D = 0.709   # +0.007 -0.007
-        eta = -0.18   # +0.02 -0.02
-        F = 0.043   # +0.039 -0.041
-        E = 0.96   # +0.04 -0.05
-        mhalo_meshgrid, redz_meshgrid = np.meshgrid(mhalo, redz, indexing='ij')
-        mhalo_flatten = mhalo_meshgrid.flatten()
-        redz_flatten = redz_meshgrid.flatten()
-        assert(mhalo_flatten.size == redz_flatten.size)
-
-        Az = np.zeros(mhalo_flatten.size)
-        Maz = np.zeros(mhalo_flatten.size)
-        betaz = np.zeros(mhalo_flatten.size)
-        gammaz = np.zeros(mhalo_flatten.size)
-        mstar_flatten = np.zeros(mhalo_flatten.size)
-        for i in range(mhalo_flatten.size):
-            Az[i] = C * (1 + redz_flatten[i])**nu
-            Maz[i] = MSOL * 10**(B + redz_flatten[i] * mu)
-            betaz[i] = F * redz_flatten[i] + E
-            gammaz[i] = D * (1 + redz_flatten[i])**eta
-            
-            mstar_flatten[i] = mhalo_flatten[i] * 2 * Az[i] * ((mhalo_flatten[i]/Maz[i])**(-betaz[i]) + (mhalo_flatten[i]/Maz[i])**gammaz[i])**-1
-        mstar = mstar_flatten.reshape(mhalo.size, redz.size)
-        return mstar
-
-    def halo_mass(self, mstar_array, redz_array):
-        """Calculate the halo-mass for the given stellar mass and redshift.
-
-        Parameters
-        ----------
-        mstar : ArrayLike
-            Stellar mass.  [gram]
-        redz : ArrayLike
-            Redshift.
-        clip : bool
-            Whether or not to clip the input `mstar` values to the extrema of the predefined grid
-            of stellar-masses (`_mstar_grid`).
-
-        Returns
-        -------
-        mhalo : ArrayLike
-            Halmhalo_class = o mass.  [gram]
-
-        """
-        mstar_array = np.asarray(mstar_array)
-        redz_array = np.asarray(redz_array)
-
-        # Prepare output array
-        mhalo = np.zeros((mstar_array.size, redz_array.size))
-        # the following constants are inspired by other classes in host_relations and the function- halo_mass() is written with the help of chatgpt
-        # Constants
-        _NUM_GRID = 1000              #: grid size             
-        _MHALO_GRID_EXTR = [4, 20]
-        _mhalo_grid = np.logspace(*_MHALO_GRID_EXTR, _NUM_GRID) * MSOL
-
-        # Given mstar_from_mhalo function
-        _mstar_grid = self.stellar_mass(_mhalo_grid, self._redz_grid)  # Shape (1000, 101)
-
-        from scipy.interpolate import RegularGridInterpolator
-        # 1. Create an interpolator for Mstar(Mhalo, z)
-        mstar_interp = RegularGridInterpolator((_mhalo_grid, self._redz_grid), _mstar_grid)
-
-        for j, redz_value in enumerate(redz_array):  # Iterate over each redshift
-            # Interpolator for this redshift
-            mstar_values = mstar_interp((_mhalo_grid, np.full_like(_mhalo_grid, redz_value)))
-
-            for i, mstar_value in enumerate(mstar_array):  # Iterate over each mstar
-                # Use np.interp to find Mhalo corresponding to the given mstar
-                mhalo[i, j] = np.interp(mstar_value, mstar_values, _mhalo_grid)
-        
-        return mhalo
 
 def get_stellar_mass_halo_mass_relation(
     smhm: Union[_StellarMass_HaloMass, Type[_StellarMass_HaloMass]] = None
