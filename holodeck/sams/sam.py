@@ -70,11 +70,11 @@ class Semi_Analytic_Model:
     This class produces simulated MBH binary populations using idealized (semi-)analytic functions
     starting from galaxy populations, to massive black holes, to merger rates.  Using SAMs, MBH
     binary populations are calculated over a fixed, rectilinear grid of 3 or 4 dimensional
-    parameter-space.  The starting parameter space is total mass, mass ratio, and redshift; but
+    parameter-space.  The starting parameter space is mass1, mass2, and redshift; but
     often the distribution of binaries are desired at particular orbital frequencies or separations,
     which adds a dimension.  Some parameters are calculated at grid edges (e.g. binary number
     densities), while others are calculated at grid centers (e.g. number of binaries in a universe).
-    Ultimately, what the SAM calculates in the number (or number-density) of binaries at each point
+    Ultimately, what the SAM calculates is the number (or number-density) of binaries at each point
     in this 3-4 dimensional parameter space.
 
     Conceptually, three components are required to build SAMs.
@@ -106,6 +106,8 @@ class Semi_Analytic_Model:
         self,
         mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91),
         mrat=(1e-3, 1.0, 81),
+        mbh1=(1.0e4*MSOL, 1.0e12*MSOL, 91),
+        mbh2=(1.0e4*MSOL, 1.0e12*MSOL, 91),
         redz=(1e-3, 10.0, 101),
         shape=None,
         log=None,
@@ -130,23 +132,35 @@ class Semi_Analytic_Model:
             Three arguments must be included, the 0th giving the lower-limit, the 1th giving the
             upper-limit, and the 2th giving the number of bin-edges (i.e. the number-of-bins plus
             one).
+        mbh1 : (3,) tuple
+            Specification for the domain of the grid in mass of the first black hole.
+            Three arguments must be included, the 0th giving the lower-limit [grams], the 1th
+            giving the upper-limit [grams], and the 2th giving the number of bin-edges (i.e. the
+            number-of-bins plus one).
+        mbh2 : (3,) tuple
+            Specification for the domain of the grid in mass of the first black hole.
+            Three arguments must be included, the 0th giving the lower-limit [grams], the 1th
+            giving the upper-limit [grams], and the 2th giving the number of bin-edges (i.e. the
+            number-of-bins plus one).
         redz : (3,) tuple
             Specification for the domain of the grid in redshift.
             Three arguments must be included, the 0th giving the lower-limit, the 1th giving the
             upper-limit, and the 2th giving the number of bin-edges (i.e. the number-of-bins plus
             one).
         shape : int  or  (3,) tuple
-            The shape of the grid in total-mass, mass-ratio, and redshift.  This argument specifies
+            The shape of the grid in mbh1, mbh2, and redshift.  This argument specifies
             the number of grid-edges in each dimension, and overrides the shape arguments of
-            ``mtot``, ``mrat``, and ``redz``.
+            ``mbh1``, ``mbh2``, and ``redz``.
 
             * If a single `int` is given, then this is the number of edges for all dimensions.
 
             * If a (3,) iterable of values is given, then each value specifies the size of the grid
               in the corresponding dimension.  `None` values can be provided which indicate to use
-              the default sizes (provided by the ``mtot``, ``mrat``, and ``redz`` arguments.)  For
-              example, ``shape=(12, None, 14)`` would produce 12 grid edges in total mass, the
-              default number of grid edges in mass ratio, and 14 grid edges in redshit.
+              the default sizes (provided by the ``mbh1``, ``mbh2``, and ``redz`` arguments.)  For
+              example, ``shape=(12, None, 14)`` would produce 12 grid edges in mbh1, the
+              default number of grid edges in mbh2, and 14 grid edges in redshit.  If you set 
+              different shapes for ``mbh1`` and ``mbh2``, you will probably get inaccurate results and 
+              never amount to anything.
 
         gsmf : None  or  :class:`_Galaxy_Stellar_Mass_Function` subclass instance
         gpf : None  or  :class:`_Galaxy_Pair_Fraction` subclass instance
@@ -195,12 +209,13 @@ class Semi_Analytic_Model:
 
         # ---- Create SAM grid edges
 
+        params = [mtot, mrat, mbh1, mbh2, redz]
+        param_names = ['mtot', 'mrat', 'mbh1', 'mbh2', 'redz']
+ 
         if shape is not None:
             if np.isscalar(shape):
-                shape = [shape for ii in range(3)]
+                shape = [shape for ii in range(len(params))]
 
-        params = [mtot, mrat, redz]
-        param_names = ['mtot', 'mrat', 'redz']
         for ii, (par, name) in enumerate(zip(params, param_names)):
             if not isinstance(par, tuple) and (len(par) == 3):
                 err = (
@@ -217,9 +232,11 @@ class Semi_Analytic_Model:
             params[ii] = np.logspace(*np.log10(par[:2]), par[2])
             log.debug(f"{name}: [{params[ii][0]}, {params[ii][-1]}] {params[ii].size}")
 
-        mtot, mrat, redz = params
+        mtot, mrat, mbh1, mbh2, redz = params
         self.mtot = mtot
         self.mrat = mrat
+        self.mbh1 = mbh1
+        self.mbh2 = mbh2
         self.redz = redz
 
         # ---- Set other parameters
@@ -237,7 +254,7 @@ class Semi_Analytic_Model:
     def edges(self):
         """The grid edges defining the domain (list of: [`mtot`, `mrat`, `redz`])
         """
-        return [self.mtot, self.mrat, self.redz]
+        return [self.mtot, self.mrat, self.mbh1, self.mbh2, self.redz]
 
     @property
     def shape(self):
@@ -895,7 +912,7 @@ class Semi_Analytic_Model:
         hc_bg : (F, R) NDarray of scalars
             Characteristic strain of the GWB.
         sspar : (4, F, R, L) NDarray of scalars
-            Astrophysical parametes (total mass, mass ratio, initial redshift, final redshift) of each
+            Astrophysical parameters (total mass, mass ratio, initial redshift, final redshift) of each
             loud single sources, for each frequency and realization.
             Returned only if params = True.
         bgpar : (7, F, R) NDarray of scalars
@@ -922,7 +939,6 @@ class Semi_Analytic_Model:
         fobs_orb_cents = fobs_gw_cents / 2.0
 
         # ---- Calculate number of binaries in each bin
-
         redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
             fobs_orb_cents, self, hard, cosmo
         )

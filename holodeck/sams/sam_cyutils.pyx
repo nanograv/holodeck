@@ -455,8 +455,9 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
     """
 
     nden = sam.static_binary_density
+    samshape = sam.shape[0:2] + (sam.shape[4],)  # Kayhan's dirty little hack while moving to mbh1, mbh2 space. replacing all instances below of sam.shape with samshape
+    shape = samshape + (fobs_orb.size,) 
 
-    shape = sam.shape + (fobs_orb.size,)
     cdef np.ndarray[np.double_t, ndim=4] diff_num = np.zeros(shape)
     cdef np.ndarray[np.double_t, ndim=4] redz_final = -1.0 * np.ones(shape)
 
@@ -467,7 +468,7 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
         # if `sam` is using galaxy merger rate (GMR), then `gmt_time` will be `None`
         if gmt_time is None:
             sam._log.info("`gmt_time` not calculated in SAM.  Setting to zeros.")
-            gmt_time = np.zeros(sam.shape)
+            gmt_time = np.zeros(samshape)
 
         _dynamic_binary_number_at_fobs_2pwl(
             fobs_orb, hard._sepa_init, hard._num_steps,
@@ -486,7 +487,7 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
         # set to initial redshift values instead
         if redz_prime is None:
             sam._log.info("`redz_prime` not calculated in SAM.  Setting to `redz` (initial) values.")
-            redz_prime = sam.redz[np.newaxis, np.newaxis, :] * np.ones(sam.shape)
+            redz_prime = sam.redz[np.newaxis, np.newaxis, :] * np.ones(samshape)
 
         _dynamic_binary_number_at_fobs_gw(
             fobs_orb,
