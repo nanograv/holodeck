@@ -1641,6 +1641,29 @@ def m1m2_from_mtmr(mt: npt.ArrayLike, mr: npt.ArrayLike) -> npt.ArrayLike:
     m2 = mt - m1
     return np.array([m1, m2])
 
+def mprimsec_from_m1m2(m1: npt.ArrayLike, m2: npt.ArrayLike) -> npt.ArrayLike:
+    """Convert from total-mass and mass-ratio to individual masses.
+
+    Parameters
+    ----------
+    mt : array_like
+        Total mass of the binary.
+    mr : array_like
+        Mass ratio of the binary.
+
+    Returns
+    -------
+    (2,N) ndarray
+        Primary and secondary masses respectively.
+        0-primary (more massive component),
+        1-secondary (less massive component)
+
+    """
+    #mt = np.asarray(mt)
+    #mr = np.asarray(mr)
+    #m1 = mt/(1.0 + mr)
+    #m2 = mt - m1
+    return np.array([m1, m2])
 
 def frst_from_fobs(fobs, redz):
     """Calculate rest-frame frequency from observed frequency and redshift.

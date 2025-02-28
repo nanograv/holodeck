@@ -276,9 +276,15 @@ class Semi_Analytic_Model:
         redz = self.redz[np.newaxis, np.newaxis, :]
         # total-mass, mass-ratio ==> (M1, M2)
         masses = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
-        # BH-masses to stellar-masses
+        # BH-masses to stellar-masses        
         mbh_pri = masses[0]
         mbh_sec = masses[1]
+        print("HELLO FROM mass_stellar()!!!")
+        print("#\n#\n#\n")
+        print(f"{mbh_pri=}")
+        print(f"{mbh_sec=}")
+        print(f"{self.mbh1=}")
+        print(f"{self.mbh2=}")
         args = [mbh_pri[..., np.newaxis], mbh_sec[..., np.newaxis], redz]
         # Convert to shape (M, Q, Z)
         mbh_pri, mbh_sec, redz = np.broadcast_arrays(*args)
@@ -292,6 +298,10 @@ class Semi_Analytic_Model:
         # args = [mstar_rat[..., np.newaxis]]
         # # Convert to shape (M, Q, Z)
         # mstar_rat = np.broadcast_arrays(*args)
+        #
+        # #### This following is repeating the above calculation in mbh1 mbh2 space instead of mtot mrat. 
+        #      KG will run tests to see that it produces identical output and then move from one to the other.
+        # masses = utils.mprimsec_from_m1m2(self.mbh1[:, np.newaxis], self.mbh2[np.newaxis, :])
         return mstar_pri, mstar_rat, mstar_tot, redz
 
     @property
