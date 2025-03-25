@@ -828,6 +828,12 @@ class Semi_Analytic_Model:
         )
         edges = [self.mtot, self.mrat, self.redz, fobs_orb_edges]
         number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
+        print(f"In gwb_new, {number.shape=}, {diff_num.shape=}")
+        #print(f"number summed over all M: {number.sum(axis=0)}")
+        #print(f"number summed over all Q: {number.sum(axis=1)}")
+        #print(f"number summed over all Z: {number.sum(axis=2)}")
+        print(f"number summed over all M, Q, & Z: {number.sum(axis=2).sum(axis=1).sum(axis=0)}")
+
 
         # ---- Get the GWB spectrum from number of binaries over grid
 
