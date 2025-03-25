@@ -385,7 +385,8 @@ class Pop_Illustris(_Population_Discrete):
             # RG15 defines the *descendant* snap as the merger time
             self.scafa = data['time'][:,2]
             
-                    
+        print(f"DEBUG: in population: {self.scafa.min()=}, {self.scafa.max()=}, {np.median(self.scafa)=}")
+        print(f"num with scafa=1: {self.scafa[self.scafa==1].size}")
         # ---- Binary Properties
         # Set initial separation to sum of stellar half-mass radii
         gal_rads = data['SubhaloHalfmassRadType']
