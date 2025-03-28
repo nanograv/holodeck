@@ -357,18 +357,6 @@ class Semi_Analytic_Model:
             # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]   `gal_merger_rate` is [1/sec]  ===>  [Mpc^-3]
             dens = self._gsmf(mass_gsmf, redz) * gal_merger_rate * cosmo.dtdz(redz)
             
-            ## this is a crap way to define these quantities, b/c they dont take arguments and can get changed when the binaries are evolved. 
-            #self._gal_mrg_rate = gal_merger_rate
-            #self._dens_gal_gal = dens 
-            #print(f"{self._gsmf(mass_gsmf, redz).shape=}, {self._gsmf(mass_gsmf, redz).max()=}, {self._gsmf(mass_gsmf, redz).min()=}")
-            #print(f"{mass_gsmf.shape=}, {mass_gsmf.max()=}, {mass_gsmf.min()=}")
-            #print(f"{mass_gpf.shape=}, {mass_gpf.max()=}, {mass_gpf.min()=}")
-            #print(f"{mass_gmt.shape=}, {mass_gmt.max()=}, {mass_gmt.min()=}")
-            #print(f"{mstar_rat.shape=}, {mstar_rat.max()=}, {mstar_rat.min()=}")
-            #print(f"{redz.shape=}, {redz.max()=}, {redz.min()=}")
-            #print(f"{self._dens_gal_gal.shape=},{self._dens_gal_gal.min()=},{self._dens_gal_gal.max()=}")
-            #print(f"{cosmo.dtdz(redz).shape=}, {cosmo.dtdz(redz).max()=}, {cosmo.dtdz(redz).min()=}")
-
             # ---- Convert to MBH Binary density
 
             # we want ``dn_mbhb / [dlog10(M_bh) dq_bh qz]``

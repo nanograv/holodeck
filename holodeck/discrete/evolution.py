@@ -345,19 +345,9 @@ class Evolution:
             if np.any(scafa_old != scafa):
                 raise ValueError(f"scafa != scafa_old and {rev=}!")
             
-        #print(f"DEBUG: in evo.at: {scafa.shape=}")
-        #print(f"DEBUG: in evo.at: {scafa[:,0].min()=}, {scafa[:,0].max()=}")
-        #print(f"DEBUG: in evo.at: {scafa[:,-1].min()=}, {scafa[:,-1].max()=}")
-        #print(f"DEBUG: in evo.at: {np.where(scafa[:,-1]==1)[0].shape=}")
-        #print(f"DEBUG: in evo.at: {np.where(scafa[:,-1]<1)[0].shape=}")
         # find indices between which to interpolate, and the fractional distance to go between them
         cut_idx, interp_frac, valid = self._at__index_frac(xnew, xold)
-        #print(f"DEBUG: in evo.at: {valid.shape=}, {valid[valid].size=}")
-        #print(f"DEBUG: in evo.at: {cut_idx[1,valid].shape=}, {cut_idx[1,valid]=}")
-        #print(f"DEBUG: in evo.at: {cut_idx[0,valid].shape=}, {cut_idx[0,valid]=}")
 
-        #print(f"DEBUG: in evo.at: {cut_idx.shape=}, {valid.shape=}, {scafa.shape=}, {self.scafa.shape=}")
-        #print(f"DEBUG: in evo.at: {scafa[valid[:,0],:].shape=}")
         # if we only want coalescing systems, set non-coalescing (stalling) systems to invalid
         if coal:
             print(f"DEBUG: WARNING: `valid` being modified for {coal=}")
@@ -365,12 +355,9 @@ class Evolution:
 
         # Valid binaries must be valid at both `bef` and `aft` indices
         # BUG: is this actually doing what it's supposed to be doing?
-        # ...it doesn't actually seem to be doing anything? at least not for the data I'm looking at? (LB - 1/21/25)
         for cc in cut_idx:
             valid = valid & np.isfinite(np.take_along_axis(scafa, cc, axis=-1))
         
-        #print(f"DEBUG: in evo.at: after np.isfinite call: {cut_idx.shape=}, {valid.shape=}, {scafa.shape=}")
-
         invalid = ~valid
 
         data = dict()
@@ -388,37 +375,16 @@ class Evolution:
                 assert np.ndim(yold)==2, f"{rev=} with {np.ndim(yold)=}. can't reverse this array!"
                 yold = yold[..., ::-1]
 
-            #if par=='scafa':
-                #print(f"DEBUG: in evo.at: for 'scafa': {yold.shape=}, {yold[(np.max(yold,axis=1)==1),:].shape=}, {yold[(np.max(yold,axis=1)<1),:].shape=}, {np.isfinite(yold).shape=}")
-                #tmpmask = (np.max(yold,axis=1)==1)
-                #print(yold[(np.max(yold,axis=1)==1),:].shape[0])
-                #afirst1=0
-                #alast1=0
-                #for jj in range(yold[(np.max(yold,axis=1)==1),:].shape[0]):
-                #    #print(yold[(np.max(yold,axis=1)==1),:][jj,:])
-                #    if yold[(np.max(yold,axis=1)==1),:][jj,0]==1:
-                #        afirst1 +=1
-                #        #print(f"{jj=} 1st evo scafa={yold[(np.max(yold,axis=1)==1),:][jj,0]}, last evo scafa={yold[(np.max(yold,axis=1)==1),:][jj,-1]}; {afirst1=}")
-                #    if yold[(np.max(yold,axis=1)==1),:][jj,-1]==1:
-                #        alast1 +=1
-                #        #print(f"{jj=} 1st evo scafa={yold[(np.max(yold,axis=1)==1),:][jj,0]}, last evo scafa={yold[(np.max(yold,axis=1)==1),:][jj,-1]}; {alast1=}")
-                #print(f" DEBUG: in evo.at: {afirst1=}, {alast1=}")
-                #print(f" DEBUG: in evo.at: tot with yold[0]=1: {np.where(yold[(np.max(yold,axis=1)==1),:][:,0]==1)[0].size}")
-                #print(f" DEBUG: in evo.at: tot with yold[-1]=1: {np.where(yold[(np.max(yold,axis=1)==1),:][:,-1]==1)[0].size}")
                 
             # interpolate
             lin_interp_flag = (par in lin_interp_list)
             ynew = self._at__interpolate_array(yold, cut_idx, interp_frac, lin_interp_flag)
-
-            #print(f"DEBUG: in evo.at: {ynew.shape=}, {ynew[valid, ...].shape=}, {ynew[invalid, ...].shape=}")
             
             # fill 'invalid' (i.e. out of bounds, or non-coalescing binaries if ``coal==True``)
             ynew[invalid, ...] = np.nan
             # remove excess dimensions if a single target was requested (i.e. ``T=1``)
             if squeeze:
                 ynew = ynew.squeeze()
-            #if par=='scafa':
-            #    print(f"DEBUG: in evo.at: for 'scafa': {ynew.shape=}, {ynew[(np.max(ynew,axis=1)==1),:].shape=}, {ynew[(np.max(ynew,axis=1)<1),:].shape=}, {np.isfinite(ynew).shape=}")
 
             # store
             data[par] = ynew
@@ -556,7 +522,6 @@ class Evolution:
         select = (xnew[np.newaxis, :, np.newaxis] <= xold[:, np.newaxis, :])
         # (N, T), xvalue index [0, M-1] following each target point (T,), for each binary (N,)
         aft = np.argmax(select, axis=-1)
-        #print(f"DEBUG: in evo._at__index_frac: {select[0,:,:]=}, {xnew=}, {xold[0,:]=}, {aft[0,:]=}")
         
         # ---- Determine which locations are 'valid' (i.e. within the evolutionary tracks)
         # zero values in `aft` mean no `xold` after the targets were found; these are 'invalid',
@@ -572,10 +537,6 @@ class Evolution:
 
         # Get the x-values before and after the target locations  (2, N, T)
         xold_temp = [np.take_along_axis(xold, cc, axis=-1) for cc in cut_idx]
-        #print(f"DEBUG: in evo._at__index_frac: {valid[0,:]=}, {cut_idx[:,0,:]=}") #, {xold_temp=}")
-        #print(f"DEBUG: in evo._at__index_frac: {valid.shape=}, {valid=}")
-        #print(f"DEBUG: in evo._at__index_frac: {aft[valid].shape=}, {aft[valid]=}")
-        #print(f"DEBUG: in evo._at__index_frac: {bef[valid].shape=}, {bef[valid]=}")
 
         # Find how far to interpolate between values (in log-space; `xold` was already log10'd
         #     (N, T)
@@ -584,7 +545,6 @@ class Evolution:
         interp_frac = np.zeros_like(numer)
         idx = (denom != 0.0)
         interp_frac[idx] = numer[idx] / denom[idx]
-        #print(f"DEBUG: in evo._at__index_frac: {interp_frac[0,:]=}")
         
         return cut_idx, interp_frac, valid
 
@@ -618,7 +578,6 @@ class Evolution:
             present if the input `data` was 3D.
 
         """
-        #print(f"DEBUG: _at__interpolate_array: {yold.shape=}, {cut_idx.shape=}, {interp_frac.shape=}, {lin_interp_flag=}")
         reshape = False
         cut = cut_idx
         frac = interp_frac
@@ -634,59 +593,19 @@ class Evolution:
                 reshape = True
             else:   # nocov
                 raise ValueError("Unexpected shape of yold: {}!".format(np.shape(yold)))
-
-        #print(f"DEBUG: _at__interpolate_array: after checking for 'double data': {yold.shape=}, {cut_idx.shape=}, {cut.shape=},{interp_frac.shape=}")
-
-        #print(f"DEBUG: _at__interpolate_array: tot with yold[0]=1: {np.where(yold[(np.max(yold,axis=1)==1),:][:,0]==1)[0].size}")
-        #print(f"DEBUG: _at__interpolate_array: tot with yold[-1]=1: {np.where(yold[(np.max(yold,axis=1)==1),:][:,-1]==1)[0].size}")
-        
-        coal_index = np.zeros(yold.shape[0])*np.nan ### ADDED FOR DEBUG
-        ncoal_before_cut = 0
-        for ll in range(yold.shape[0]):  ### ADDED FOR DEBUG
-            if np.max(yold[ll,:])==1:    ### ADDED FOR DEBUG
-                coal_index[ll] = np.where(yold[ll,:]==1)[0][0]    ### ADDED FOR DEBUG
-                if coal_index[ll]<=cut[0,ll,0]:   ### ADDED FOR DEBUG
-                    ncoal_before_cut += 1    ### ADDED FOR DEBUG
-                    #print(f"{coal_index[ll]=}, {cut[:,ll,0]=}, {ncoal_before_cut=}")    ### ADDED FOR DEBUG
-        ####
-        #print(f"DEBUG: _at__interpolate_array: {coal_index[coal_index>=0].size=} {coal_index[coal_index>0].size=}") ### ADDED FOR DEBUG
-        
+                
         if not lin_interp_flag:
             yold = np.log10(yold)
 
         # (2, N, T) for scalar data or (2, N, 2, T) for "double-data"
-        #for cc in cut:
-        #    print(f"DEBUG: _at__interpolate_array: {cc.shape=} {np.take_along_axis(yold, cc, axis=-1).shape=}")
         yold = [np.take_along_axis(yold, cc, axis=-1) for cc in cut]
-        ### yold = np.array([np.take_along_axis(yold, cc, axis=-1) for cc in cut]) ### ADDED FOR DEBUG
-        #print(f"DEBUG: _at__interpolate_array:  {len(yold)=}, {len(yold[0])=}, {len(yold[1])=}, {np.subtract(*yold).shape=}")
-        ##print(f"DEBUG: _at__interpolate_array:  {yold.shape=}")
-        #print(f"DEBUG: _at__interpolate_array:  {len(yold)=}")
         # Interpolate by `frac` for each binary   (N, T) or (N, 2, T) for "double-data"
         ynew = yold[1] + (np.subtract(*yold) * frac)
-        #print(f"DEBUG: _at__interpolate_array:  {ynew.shape=}")
-        #print(f"DEBUG: _at__interpolate_array:")
-        #a1all = 0
-        ##a1old = 0
-        #tol = 1.0e-8
-        #for jj in range(ynew.shape[0]):
-        #    if np.abs(ynew[jj,0]-1) < tol:
-        #        a1all += 1
-        #        #print(f"{jj=}, old: {yold[0][jj]} {yold[1][jj]}, new: {ynew[jj,...]}; {a1all=}")
-        #        ##print(f"{jj=}, old: {yold[0,jj,...]} {yold[1,jj,...]}, new: {ynew[jj,...]}; {a1all=}")
-        #    ##if np.abs(yold[0,jj,0]-1) < tol or np.abs(yold[0,jj,0]-1) < tol:
-        #    #if np.abs(yold[0][jj]-1) < tol or np.abs(yold[0][jj]-1) < tol:
-        #    #    a1old += 1
-        #    #    ##print(f"{jj=}, old: {yold[0,jj,...]} {yold[1,jj,...]}, new: {ynew[jj,...]}; {a1old=}")
-        #    #    #print(f"{jj=}, old: {yold[0][jj]} {yold[1][jj]}, new: {ynew[jj,...]}; {a1old=}")
-        #print(f"DEBUG: _at__interpolate_array: {a1all} binaries with ynew=1")
-        ##print(f"DEBUG: _at__interpolate_array: {a1all} binaries with ynew=1, {a1old} binaries with yold=1")
-        #print(f"DEBUG: _at__interpolate_array: {ynew=}")
+
         # In the "double-data" case, move the doublet back to the last dimension
         #    (N, T) or (N, T, 2)
         if reshape:
             ynew = np.moveaxis(ynew, 1, -1)
-        #print(f"DEBUG: _at__interpolate_array: after reshape: {ynew.shape=}")
 
         # fill return dictionary
         if not lin_interp_flag:
