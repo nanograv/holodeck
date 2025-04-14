@@ -164,7 +164,7 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
     def _mchar_func(self, redz):
         """See: [Chen2019]_ Eq.10 - NOTE: added `redz` term
         """
-        return self._mchar0 + self._mcharz * redz
+        return self._mchar0 * np.power(10, self._mcharz * redz)
 
     def _alpha_func(self, redz):
         """See: [Chen2019]_ Eq.11
