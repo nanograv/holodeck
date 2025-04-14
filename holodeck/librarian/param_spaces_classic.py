@@ -125,7 +125,7 @@ class PS_Classic_Phenom_Astro_Extended(_PS_Classic_Phenom):
             PD_Uniform("hard_gamma_inner", -1.5, +0.5),
 
             # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
-            PD_Normal("gsmf_phi0", -2.56, 0.4),
+            PD_Normal("gsmf_phi0_log10", -2.56, 0.4),
             PD_Normal("gsmf_mchar0_log10", 10.9, 0.4),   # [log10(Msol)]
             PD_Normal("gsmf_alpha0", -1.2, 0.2),
 
@@ -151,7 +151,7 @@ class _PS_Classic_GWOnly(_Param_Space):
 
     DEFAULTS = dict(
         # Parameters are based on `sam-parameters.ipynb` fit to [Tomczak+2014]
-        gsmf_phi0=-2.77,
+        gsmf_phi0_log10=-2.77,
         gsmf_phiz=-0.6,
         gsmf_mchar0_log10=11.24,
         gsmf_mcharz=0.11,
@@ -176,10 +176,10 @@ class _PS_Classic_GWOnly(_Param_Space):
 
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
         parameters = [
-            PD_Uniform("gsmf_phi0", -3.5, -1.5),
+            PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
             PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
             PD_Uniform("mmb_mamp_log10", +7.5, +9.5),   # [log10(Msol)]
-            PD_Uniform("mmb_scatter", +0.0, +1.2),
+            PD_Uniform("mmb_scatter_dex", +0.0, +1.2),
         ]
         super().__init__(
             parameters,
@@ -190,7 +190,7 @@ class _PS_Classic_GWOnly(_Param_Space):
     @classmethod
     def _init_sam(cls, sam_shape, params):
         gsmf = sams.GSMF_Schechter(
-            phi0=params['gsmf_phi0'],
+            phi0=params['gsmf_phi0_log10'],
             phiz=params['gsmf_phiz'],
             mchar0_log10=params['gsmf_mchar0_log10'],
             mcharz=params['gsmf_mcharz'],
@@ -237,10 +237,10 @@ class PS_Classic_GWOnly_Uniform(_PS_Classic_GWOnly):
 
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
         parameters = [
-            PD_Uniform("gsmf_phi0", -3.5, -1.5),
+            PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
             PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
             PD_Uniform("mmb_mamp_log10", +7.5, +9.5),   # [log10(Msol)]
-            PD_Uniform("mmb_scatter", +0.0, +1.2),
+            PD_Uniform("mmb_scatter_dex", +0.0, +1.2),
         ]
         _Param_Space.__init__(
             self, parameters,
@@ -259,7 +259,7 @@ class PS_Classic_GWOnly_Astro_Extended(_PS_Classic_GWOnly):
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
         parameters = [
             # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
-            PD_Normal("gsmf_phi0", -2.56, 0.4),
+            PD_Normal("gsmf_phi0_log10", -2.56, 0.4),
             PD_Normal("gsmf_mchar0_log10", 10.9, 0.4),   # [log10(Msol)]
             PD_Normal("gsmf_alpha0", -1.2, 0.2),
 
