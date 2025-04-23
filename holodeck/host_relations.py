@@ -824,10 +824,11 @@ class MMBulge_Redshift(MMBulge_Standard):
     SCATTER_DEX = 0.0
     Z_PLAW_AMP = 0.0
     Z_PLAW_SLOPE = 0.0
+    Z_PLAW_SCATTER = 0.0
 
     _PROPERTIES = ['mbulge', 'redz']
 
-    def __init__(self, *args, zplaw_amp=None, zplaw_slope=None, **kwargs):
+    def __init__(self, *args, zplaw_amp=None, zplaw_slope=None, zplaw_scatter=None, **kwargs):
         super().__init__(*args, **kwargs)
 
         if zplaw_amp is None:
@@ -835,8 +836,12 @@ class MMBulge_Redshift(MMBulge_Standard):
         if zplaw_slope is None:
             zplaw_slope = self.Z_PLAW_SLOPE
 
+        if zplaw_scatter is None:
+            zplaw_scatter = self.Z_PLAW_SCATTER
+
         self._zplaw_amp = zplaw_amp
         self._zplaw_slope = zplaw_slope
+        self._zplaw_scatter = zplaw_scatter
         return
 
     def mbh_from_host(self, pop, scatter):
@@ -846,7 +851,7 @@ class MMBulge_Redshift(MMBulge_Standard):
         return self.mbh_from_mbulge(mbulge, redz=redz, scatter=scatter)
 
     def mbh_from_mbulge(self, mbulge, redz, scatter):
-        scatter_dex = self._scatter_dex if scatter else None
+        scatter_dex = self._scatter_dex * (1.0 + redz)**self._zplaw_scatter if scatter else None
         # Broadcast `redz` to match shape of `mbulge`, if needed
         # NOTE: this will work for (N,) ==> (N,)    or   (N,) ==> (N,X)
         try:
@@ -859,7 +864,7 @@ class MMBulge_Redshift(MMBulge_Standard):
         return mbh
 
     def mbulge_from_mbh(self, mbh, redz, scatter):
-        scatter_dex = self._scatter_dex if scatter else None
+        scatter_dex = self._scatter_dex * (1.0 + redz)**self._zplaw_scatter if scatter else None
         zmamp = self._mamp * (1.0 + redz)**self._zplaw_amp
         zmplaw = self._mplaw * (1.0 + redz)**self._zplaw_slope
         mbulge = _log10_relation_reverse(mbh, zmamp, zmplaw, scatter_dex, x0=self._mref)
