@@ -805,11 +805,11 @@ class MMBulge_Redshift(MMBulge_Standard):
     """Mbh-Mbulge relation with an additional redshift power-law dependence.
 
     Provides black hole mass as a function of galaxy bulge mass and redshift with a normalization
-    that depends on redshift. ``zplaw_amp=0``, ``zplaw_slope=0`` (default) is identical to MMBulge_Standard.
+    that depends on redshift. ``zplaw_amp=0``, ``zplaw_slope=0``, ``zplaw_slope=0`` (default) is identical to MMBulge_Standard.
     ``mamp = mamp0 * (1 + z)**zplaw_amp``.
-    ``mplaw = mplaw0 * (1 + z)**zplaw_slope``.
-    Amplitude evolution can be positive, negative, or zero.
-    Slope evolution can be positive or zero only for the time being.
+    ``mplaw = mplaw0 * (1 + z)**zplaw_slope``
+    ``_scatter_dex * (1.0 + z)**_zplaw_scatter``..
+    All zplaw_* values evolution can be positive, negative, or zero
 
     TODO: make sure all of the inherited methods from `MMBulge_Standard` are appropriate for
           redshift dependencies!!  In particular, check `dmstar_dmbh`
@@ -885,6 +885,7 @@ class MMBulge_Redshift_MM2013(MMBulge_Redshift):
     SCATTER_DEX = 0.34
     Z_PLAW_AMP = 0.0
     Z_PLAW_SLOPE = 0.0
+    Z_PLAW_SCATTER = 0.0
 
 
 class MMBulge_Redshift_KH2013(MMBulge_Redshift):
@@ -901,6 +902,7 @@ class MMBulge_Redshift_KH2013(MMBulge_Redshift):
     SCATTER_DEX = 0.28
     Z_PLAW_AMP = 0.0
     Z_PLAW_SLOPE = 0.0
+    Z_PLAW_SCATTER = 0.0
 
 
 def get_mmbulge_relation(mmbulge: Union[_MMBulge_Relation, Type[_MMBulge_Relation]] = None) -> _MMBulge_Relation:
