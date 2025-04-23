@@ -365,11 +365,18 @@ class Semi_Analytic_Model:
             dens *= (self.mtot[:, np.newaxis, np.newaxis] / mstar_tot) * (dmstar_dmbh / dqbh_dqgal)
 
             # ---- Add scatter from the M-Mbulge relation
-
-            scatter = self._mmbulge._scatter_dex
+            
+            try:
+                scatter = self._mmbulge._scatter_dex * (1 + redz)**self._mmbulge._zplaw_scatter
+                scatter = scatter[-1][-1]
+            except AttributeError:
+                scatter = self._mmbulge._scatter_dex* (1 + redz)**0
+                scatter = scatter[-1][-1]
+                
             log.debug(f"mmbulge scatter = {scatter}")
-            if scatter > 0.0:
-                log.info(f"Adding MMbulge scatter ({scatter:.4e})")
+            if scatter[0] > 0.0:
+                # log.info(f"Adding MMbulge scatter ({scatter[0]:.4e})")
+                log.info(f"Adding MMbulge scatter ({', '.join(f'{ww:.4e}' for ww in scatter)})")
                 log.info(f"\tdens bef: ({utils.stats(dens)})")
                 dur = datetime.now()
                 mass_bef = self._integrated_binary_density(dens, sum=True)
@@ -1332,7 +1339,6 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
 
     assert np.ndim(dens) == 3
     assert np.shape(dens)[:2] == (mtot.size, mrat.size)
-    dist = sp.stats.norm(loc=0.0, scale=scatter)
     output = np.zeros_like(dens)
 
     # Get the primary and secondary masses corresponding to these total-mass and mass-ratios
@@ -1354,9 +1360,10 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
     # Interpolate from irregular m1m2 space (based on mtmr space), into regular m1m2 grid
     numz = np.shape(dens)[2]
     dlay = None
-    weights = utils._get_rolled_weights(mgrid_log10, dist)
-
+    
     for ii in range(numz):
+        dist = sp.stats.norm(loc=0.0, scale=scatter[ii])
+        weights = utils._get_rolled_weights(mgrid_log10, dist)
         dens_redz = dens[:, :, ii]
         if dlay is None:
             points = m1m2_on_mtmr_grid
