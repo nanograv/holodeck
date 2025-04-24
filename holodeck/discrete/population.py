@@ -84,6 +84,9 @@ import holodeck as holo
 from holodeck import utils, log, _PATH_DATA, cosmo
 from holodeck.constants import PC, MSOL
 
+import h5py
+
+
 _DEF_ECCEN_DIST = (1.0, 0.2)
 _DEF_ILLUSTRIS_FNAME = "illustris-galaxy-mergers_L75n1820FP_gas-100_dm-100_star-100_bh-000.hdf5"
 
@@ -301,10 +304,14 @@ class Pop_Illustris(_Population_Discrete):
         * `SubhaloVelDisp`:
         * `SubhaloBHMass`:
 
+
+    Modifications:
+    Now allows to take in BH merger data if you use BH_merger_data_flag=True.
+
+
     """
 
-    def __init__(self, fname=None, basepath=None, fixed_sepa=None, allow_mbh0=False, 
-                 use_mstar_tot_as_mbulge=False, **kwargs):
+    def __init__(self, fname=None, basepath=None, fixed_sepa=None, allow_mbh0=False,use_mstar_tot_as_mbulge=False,bh_merger_data_flag=False, **kwargs):
         """Initialize a binary population using data in the given filename.
 
         Parameters
@@ -332,141 +339,201 @@ class Pop_Illustris(_Population_Discrete):
 
         self._use_mstar_tot_as_mbulge = use_mstar_tot_as_mbulge 
         
+        self.bh_merger_data_flag = bh_merger_data_flag
+        #allows to use black hole merger data instead of galaxy merger data
+
+        #storing additional kwargs for later use
+        self._kwargs = kwargs
         super().__init__(**kwargs)
+        
+
         if 'eccen' in kwargs:
             self.eccen = kwargs['eccen']
         return
-
+    
     def _init(self):
         """Set the population parameters using an input simulation file.
         """
         super()._init()
-        fname = self._fname
-        fixed_sepa = self._fixed_sepa ####
-        header, data = utils.load_hdf5(fname)
+
+        if(self.bh_merger_data_flag==False):
+            fname = self._fname
+            fixed_sepa = self._fixed_sepa ####
+            header, data = utils.load_hdf5(fname)
+            
+            print(f"fname = {fname}")
+            if fname.split('/')[-1] == 'illustris-galaxy-mergers_L75n1820FP_gas-100_dm-100_star-100_bh-000.hdf5':
+
+                # get hubble param and comoving volume of sim [cm^3]
+                hubbleParam = 0.704
+                self._sample_volume_mpc3 = header['box_volume_mpc'] / hubbleParam**3  #: comoving-volume of sim [Mpc^3]
+                self._sample_volume = header['box_volume_mpc'] * (1e6*PC / hubbleParam)**3 #: comoving-volume of sim [cm^3]
+
+                msg = (
+                    "WARNING: this Illustris galaxy merger data file is old and incomplete. "
+                    "It includes only the first and next progenitors along the MPB, does not walk subtrees.\n"
+                    "File contains galaxy data for first progenior and next progenitor, but not descendants. "
+                    " Note that this means array shapes are different from new file versions!\n"
+                    "Note also that box_volume_mpc is actually in units of Mpc/h; converting manually to Mpc here.\n"
+                    f"hubbleParam = {hubbleParam} is also hard-coded here (not present in file).\n"
+                )
+                log.warning(msg)
+                warnings.warn(msg)
+
+                # Get stellar parttype index and merger times
+                part_names = header['part_names'].tolist()
+                st_idx = part_names.index('star')
+                self.scafa = data['time']              #: scale-factor at time of 'merger' event in sim []
+
+            else:
+                # get hubble param and comoving volume of sim [cm^3]
+                hubbleParam = header['HubbleParam']
+                self._sample_volume_mpc3 = header['box_volume_mpc']  #: comoving-volume of sim [Mpc^3]
+                self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3 #: comoving-volume of sim [cm^3]
+                
+                # Get stellar parttype index and merger times
+                part_names = header['part_names'].tolist()
+                part_types = header['part_types'].tolist()
+                st_idx = part_types[part_names.index('star')]
+                ## tFirstProg and tNextProg don't always correspond to same snap; use later one as merger time
+                #self.scafa = np.array([ np.maximum(tFirstProg,tNextProg) for tFirstProg,tNextProg 
+                #                        in zip(data['time'][:,0],data['time'][:,1]) ]) 
+                # RG15 defines the *descendant* snap as the merger time
+                self.scafa = data['time'][:,2]
+                
+            print(f"DEBUG: in population: {self.scafa.min()=}, {self.scafa.max()=}, {np.median(self.scafa)=}")
+            print(f"num with scafa=1: {self.scafa[self.scafa==1].size}")
+            # ---- Binary Properties
+            # Set initial separation to sum of stellar half-mass radii
+            gal_rads = data['SubhaloHalfmassRadType']
+            gal_rads = gal_rads[:, st_idx, :2] # progenitor galaxy radii
+            print(f"{gal_rads.min()=}, {gal_rads.max()=}")
+            if (fixed_sepa is not None):
+                self.sepa = np.ones_like(gal_rads[:, 0]) * fixed_sepa      #: Initial binary separation [cm]
+            else:
+                self.sepa = np.sum(gal_rads, axis=-1)       #: Initial binary separation [cm]
+            print(f"{self.sepa.min()=}, {self.sepa.max()=}")
+            self.mass = data['SubhaloBHMass'][:, :2]       #: progenitor BH Masses in subhalo [grams]
+
+            # check for zero BH mass and treat based on `self._allow_mbh0` flag
+            if self.mass.min() == 0.0:
+                if self._allow_mbh0:
+                    # identify galaxies with no BH (mbh=0)
+                    mask0 = (self.mass[:,0]==0)
+                    mask1 = (self.mass[:,1]==0)
+                    all0count = np.where((mask0)&(mask1))[0].size 
+                    msg = (f"Changing BH mass from 0 to 1e2msun for {self.mass[mask0,0].size} first progs "
+                        f"and {self.mass[mask1,1].size} next progs.\n Both BH masses reset for {all0count} mergers.")
+                    log.warning(msg)
+                    warnings.warn(msg)
+                    self.mass[mask0,0] = 1.0e2 * MSOL ## setting zero-mass BHs to initial mass of 1e2
+                    self.mass[mask1,1] = 1.0e2 * MSOL ## setting zero-mass BHs to initial mass of 1e2
+                else:
+                    err = f"One or more galaxies have zero BH mass with {self._allow_mbh0=}!"
+                    log.exception(err)
+                    raise ValueError(err)
+            else:
+                print("No zero-mass BHs found in this merger tree file!")
+            
+            # ---- Galaxy Properties
+            # Get the stellar mass, and take that as bulge mass
+            self.mstar_tot = data['SubhaloMassType'][:, st_idx, :]   #: [grams]
+            print(f"{self._use_mstar_tot_as_mbulge=}")
+            if self._use_mstar_tot_as_mbulge:
+                self.mbulge = self.mstar_tot[:,:2]
+            else:
+                self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :2]   #: [grams]
+            print(f"{self.mbulge.min()=}, {self.mbulge.max()=}")
+            print(f"{self.mstar_tot.min()=}, {self.mstar_tot.max()=}")
+
+            # check for zero mbulge and treat based on `self._allow_mbh0` flag
+            if self.mbulge.min() == 0.0:
+                if self._allow_mbh0:
+                    # identify galaxies with mbulge=0
+                    mask0 = (self.mbulge[:,0]==0)
+                    mask1 = (self.mbulge[:,1]==0)
+                    all0count = np.where((mask0)&(mask1))[0].size 
+                    msg = (f"Changing mbulge from 0 to 1e5msun for {self.mass[mask0,0].size} first progs "
+                        f"and {self.mass[mask1,1].size} next progs.\n Both BH masses reset for {all0count} mergers.")
+                    log.warning(msg)
+                    warnings.warn(msg)
+                    self.mbulge[mask0,0] = 1.0e5 * MSOL ## setting zero-mass bulges to mass of 1e5
+                    self.mbulge[mask1,1] = 1.0e5 * MSOL ## setting zero-mass bulges to mass of 1e5
+                else:
+                    err = f"One or more galaxies have zero mbulge with {self._allow_mbh0=}!"
+                    log.exception(err)
+                    raise ValueError(err)
+            else:
+                print("No zero-mass BHs found in this merger tree file!")
+
+            self.vdisp = data['SubhaloVelDisp']    #: Velocity dispersion of galaxy [cm/s]
+            try:
+                self.prog_mass_ratio = data['ProgMassRatio'] # progenitor mass ratio at tmax (time of max past mass)
+                if self.prog_mass_ratio.max() > 1.0:
+                    msg = "Redefining mass ratio to be always <= 1."
+                    log.warning(msg)
+                    warnings.warn(msg)
+                    self.prog_mass_ratio[self.prog_mass_ratio>1] = 1.0 / self.prog_mass_ratio[self.prog_mass_ratio>1]
+                self.first_prog_mass = data['fpMass'] # first progenitor mass at tmax (time of max past mass)
+                self.next_prog_mass = data['npMass'] # next progenitor mass at tmax (time of max past mass)
+            except:
+                pass
+            
+            print(f"sample volume = {self._sample_volume:0.4g} [cgs] = {self._sample_volume_mpc3:0.4g} [Mpc^3];"
+                f" vol^(1/3) = {(self._sample_volume)**(1.0/3.0) / (1.0e6*PC):0.4g} [Mpc]")
+            print(f"Read {self.mass.shape[0]} mergers from file.")
         
-        print(f"fname = {fname}")
-        if fname.split('/')[-1] == 'illustris-galaxy-mergers_L75n1820FP_gas-100_dm-100_star-100_bh-000.hdf5':
+        else:
+            #if black hole merger files are used instead we can extract data as such
+            fname = self._fname
+            fixed_sepa = self._fixed_sepa
+            bh_merger_file = h5py.File(fname,'r')
+            self.bh_merger_file = bh_merger_file
 
-            # get hubble param and comoving volume of sim [cm^3]
-            hubbleParam = 0.704
-            self._sample_volume_mpc3 = header['box_volume_mpc'] / hubbleParam**3  #: comoving-volume of sim [Mpc^3]
-            self._sample_volume = header['box_volume_mpc'] * (1e6*PC / hubbleParam)**3 #: comoving-volume of sim [cm^3]
+            # Extract filtering parameters from kwargs
+            min_BH_mass = self._kwargs.get('min_BH_mass', 1e6)  
+            min_DM = self._kwargs.get('min_DM', 300)            
+            min_gas = self._kwargs.get('min_gas', 100)          
+            min_star = self._kwargs.get('min_star', 100)        
 
-            msg = (
-                "WARNING: this Illustris galaxy merger data file is old and incomplete. "
-                "It includes only the first and next progenitors along the MPB, does not walk subtrees.\n"
-                "File contains galaxy data for first progenior and next progenitor, but not descendants. "
-                " Note that this means array shapes are different from new file versions!\n"
-                "Note also that box_volume_mpc is actually in units of Mpc/h; converting manually to Mpc here.\n"
-                f"hubbleParam = {hubbleParam} is also hard-coded here (not present in file).\n"
+            #for TNG BH merger files - will have to modify for other sims and maintain uniformity
+            hubbleParam = bh_merger_file['metadata/hubble_param_100'][()]
+            self._sample_volume_mpc3 = bh_merger_file['metadata/box_length_mpc'][()]**3
+            self._sample_volume = self._sample_volume_mpc3 * (1e6*PC)**3
+
+            bh_masses = bh_merger_file['blackhole-mergers/bh_mass'][:]*1e10/hubbleParam
+            
+            #filtering out the black holes with mass less than minmum BH mass and applying particle cuts
+            print(f"Filtering black holes with mass > {min_BH_mass:.1e} Msun...")
+            print(f"Applying particle cuts: N(DM) > {min_DM}, N(gas) > {min_gas}, N(star) > {min_star}")
+
+            valid_mass_flag = (bh_masses[:, 0] > min_BH_mass) & (bh_masses[:, 1] > min_BH_mass)
+
+            valid_pt_flag = (
+                (bh_merger_file['subhalos/SubhaloLenType'][:, 0] > min_gas) &
+                (bh_merger_file['subhalos/SubhaloLenType'][:, 1] > min_DM) &
+                (bh_merger_file['subhalos/SubhaloLenType'][:, 4] > min_star)
             )
-            log.warning(msg)
-            warnings.warn(msg)
 
-            # Get stellar parttype index and merger times
-            part_names = header['part_names'].tolist()
-            st_idx = part_names.index('star')
-            self.scafa = data['time']              #: scale-factor at time of 'merger' event in sim []
+            valid_merger_flag = valid_mass_flag&valid_pt_flag
 
-        else:
-            # get hubble param and comoving volume of sim [cm^3]
-            hubbleParam = header['HubbleParam']
-            self._sample_volume_mpc3 = header['box_volume_mpc']  #: comoving-volume of sim [Mpc^3]
-            self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3 #: comoving-volume of sim [cm^3]
+            self.valid_merger_flag = valid_merger_flag
+
+            print(f"Number of valid mergers:{np.sum(valid_merger_flag)}")
+            self.N_binaries = np.sum(valid_merger_flag)
+
+            self.mass = bh_masses[valid_merger_flag]*MSOL #BH masses in gms
             
-            # Get stellar parttype index and merger times
-            part_names = header['part_names'].tolist()
-            part_types = header['part_types'].tolist()
-            st_idx = part_types[part_names.index('star')]
-            ## tFirstProg and tNextProg don't always correspond to same snap; use later one as merger time
-            #self.scafa = np.array([ np.maximum(tFirstProg,tNextProg) for tFirstProg,tNextProg 
-            #                        in zip(data['time'][:,0],data['time'][:,1]) ]) 
-            # RG15 defines the *descendant* snap as the merger time
-            self.scafa = data['time'][:,2]
+            st_idx = 4 #index of 'star' particles in Illustris/TNG.
+            gal_rads = bh_merger_file['subhalos/SubhaloHalfmassRadType'][:,st_idx]
+            #approxing the descendant subhalo half mass radius as the initial binary seperation
+            if (fixed_sepa is not None):
+                self.sepa = np.ones_like(gal_rads[valid_merger_flag]) * fixed_sepa #: Initial binary separation [cm]
+            else:
+                self.sepa = gal_rads[valid_merger_flag]*1e3*PC/hubbleParam  #: Initial binary separation [cm]
+
+            self.scafa = bh_merger_file['blackhole-mergers/scafa'][valid_merger_flag]
             
-        print(f"DEBUG: in population: {self.scafa.min()=}, {self.scafa.max()=}, {np.median(self.scafa)=}")
-        print(f"num with scafa=1: {self.scafa[self.scafa==1].size}")
-        # ---- Binary Properties
-        # Set initial separation to sum of stellar half-mass radii
-        gal_rads = data['SubhaloHalfmassRadType']
-        gal_rads = gal_rads[:, st_idx, :2] # progenitor galaxy radii
-        print(f"{gal_rads.min()=}, {gal_rads.max()=}")
-        if (fixed_sepa is not None):
-            self.sepa = np.ones_like(gal_rads[:, 0]) * fixed_sepa      #: Initial binary separation [cm]
-        else:
-            self.sepa = np.sum(gal_rads, axis=-1)       #: Initial binary separation [cm]
-        print(f"{self.sepa.min()=}, {self.sepa.max()=}")
-        self.mass = data['SubhaloBHMass'][:, :2]       #: progenitor BH Masses in subhalo [grams]
-
-        # check for zero BH mass and treat based on `self._allow_mbh0` flag
-        if self.mass.min() == 0.0:
-            if self._allow_mbh0:
-                # identify galaxies with no BH (mbh=0)
-                mask0 = (self.mass[:,0]==0)
-                mask1 = (self.mass[:,1]==0)
-                all0count = np.where((mask0)&(mask1))[0].size 
-                msg = (f"Changing BH mass from 0 to 1e2msun for {self.mass[mask0,0].size} first progs "
-                       f"and {self.mass[mask1,1].size} next progs.\n Both BH masses reset for {all0count} mergers.")
-                log.warning(msg)
-                warnings.warn(msg)
-                self.mass[mask0,0] = 1.0e2 * MSOL ## setting zero-mass BHs to initial mass of 1e2
-                self.mass[mask1,1] = 1.0e2 * MSOL ## setting zero-mass BHs to initial mass of 1e2
-            else:
-                err = f"One or more galaxies have zero BH mass with {self._allow_mbh0=}!"
-                log.exception(err)
-                raise ValueError(err)
-        else:
-            print("No zero-mass BHs found in this merger tree file!")
-        
-        # ---- Galaxy Properties
-        # Get the stellar mass, and take that as bulge mass
-        self.mstar_tot = data['SubhaloMassType'][:, st_idx, :]   #: [grams]
-        print(f"{self._use_mstar_tot_as_mbulge=}")
-        if self._use_mstar_tot_as_mbulge:
-            self.mbulge = self.mstar_tot[:,:2]
-        else:
-            self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :2]   #: [grams]
-        print(f"{self.mbulge.min()=}, {self.mbulge.max()=}")
-        print(f"{self.mstar_tot.min()=}, {self.mstar_tot.max()=}")
-
-        # check for zero mbulge and treat based on `self._allow_mbh0` flag
-        if self.mbulge.min() == 0.0:
-            if self._allow_mbh0:
-                # identify galaxies with mbulge=0
-                mask0 = (self.mbulge[:,0]==0)
-                mask1 = (self.mbulge[:,1]==0)
-                all0count = np.where((mask0)&(mask1))[0].size 
-                msg = (f"Changing mbulge from 0 to 1e5msun for {self.mass[mask0,0].size} first progs "
-                       f"and {self.mass[mask1,1].size} next progs.\n Both BH masses reset for {all0count} mergers.")
-                log.warning(msg)
-                warnings.warn(msg)
-                self.mbulge[mask0,0] = 1.0e5 * MSOL ## setting zero-mass bulges to mass of 1e5
-                self.mbulge[mask1,1] = 1.0e5 * MSOL ## setting zero-mass bulges to mass of 1e5
-            else:
-                err = f"One or more galaxies have zero mbulge with {self._allow_mbh0=}!"
-                log.exception(err)
-                raise ValueError(err)
-        else:
-            print("No zero-mass BHs found in this merger tree file!")
-
-        self.vdisp = data['SubhaloVelDisp']    #: Velocity dispersion of galaxy [cm/s]
-        try:
-            self.prog_mass_ratio = data['ProgMassRatio'] # progenitor mass ratio at tmax (time of max past mass)
-            if self.prog_mass_ratio.max() > 1.0:
-                msg = "Redefining mass ratio to be always <= 1."
-                log.warning(msg)
-                warnings.warn(msg)
-                self.prog_mass_ratio[self.prog_mass_ratio>1] = 1.0 / self.prog_mass_ratio[self.prog_mass_ratio>1]
-            self.first_prog_mass = data['fpMass'] # first progenitor mass at tmax (time of max past mass)
-            self.next_prog_mass = data['npMass'] # next progenitor mass at tmax (time of max past mass)
-        except:
-            pass
-        
-        print(f"sample volume = {self._sample_volume:0.4g} [cgs] = {self._sample_volume_mpc3:0.4g} [Mpc^3];"
-              f" vol^(1/3) = {(self._sample_volume)**(1.0/3.0) / (1.0e6*PC):0.4g} [Mpc]")
-        print(f"Read {self.mass.shape[0]} mergers from file.")
-        
         return
 
 
