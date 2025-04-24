@@ -335,22 +335,14 @@ class Evolution:
         xnew, xold, params, lin_interp_list, rev, squeeze = self._at__inputs(xpar, targets, params, lin_interp)
 
         # (N, M); scale-factors; make sure direction matches that of `xold`
-        scafa_old = self.scafa[...] ### DEBUG
         scafa = self.scafa[:, ::-1] if rev else self.scafa[...]
-        if rev:
-            print(f"DEBUG: WARNING: reversing order of scafa!")
-            if np.any(scafa_old[:,0] != scafa[:,-1]):
-                raise ValueError(f"scafa[:,-1] != scafa_old[:,0] and {rev=}!")
-        else:
-            if np.any(scafa_old != scafa):
-                raise ValueError(f"scafa != scafa_old and {rev=}!")
-            
+
         # find indices between which to interpolate, and the fractional distance to go between them
         cut_idx, interp_frac, valid = self._at__index_frac(xnew, xold)
 
         # if we only want coalescing systems, set non-coalescing (stalling) systems to invalid
         if coal:
-            print(f"DEBUG: WARNING: `valid` being modified for {coal=}")
+            #print(f"DEBUG: WARNING: `valid` being modified for {coal=}")
             valid = valid & self.coal[:, np.newaxis]
 
         # Valid binaries must be valid at both `bef` and `aft` indices
@@ -363,7 +355,6 @@ class Evolution:
         data = dict()
         # Interpolate each parameter to the given locations, store to `dict`
         for par in params:
-            #print(f"DEBUG: in evo.at: {par=}")
             # Load the raw evolution data for this parameter, can be None or ndarray shaped (N, M) or (N, M, 2)
             yold = getattr(self, par)
             if yold is None:
@@ -372,7 +363,6 @@ class Evolution:
 
             # Reverse data to match x-values, if needed
             if rev:
-                assert np.ndim(yold)==2, f"{rev=} with {np.ndim(yold)=}. can't reverse this array!"
                 yold = yold[..., ::-1]
 
                 
@@ -385,7 +375,6 @@ class Evolution:
             # remove excess dimensions if a single target was requested (i.e. ``T=1``)
             if squeeze:
                 ynew = ynew.squeeze()
-
             # store
             data[par] = ynew
 
@@ -531,7 +520,6 @@ class Evolution:
         # ---- get the x-value index immediately preceding each target point
         bef = np.copy(aft)
         bef[valid] -= 1
-
         # (2, N, T)
         cut_idx = np.array([aft, bef])
 
@@ -601,7 +589,6 @@ class Evolution:
         yold = [np.take_along_axis(yold, cc, axis=-1) for cc in cut]
         # Interpolate by `frac` for each binary   (N, T) or (N, 2, T) for "double-data"
         ynew = yold[1] + (np.subtract(*yold) * frac)
-
         # In the "double-data" case, move the doublet back to the last dimension
         #    (N, T) or (N, T, 2)
         if reshape:
