@@ -215,7 +215,6 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     redz_final = evo.scafa[:,-1]
     redz_init = cosmo.a_to_z(redz_init)
     redz_final = cosmo.a_to_z(redz_final)
-    print(f"{redz_init.shape=} {redz_final.shape=}")
     
     # Only examine binaries reaching the given locations before redshift zero (other redz=inifinite)
     # (N, H)
@@ -225,7 +224,6 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
 
     redz = cosmo.a_to_z(redz)
     valid = (redz > 0.0)
-    print(f"\nDEBUG: {redz.shape=} {valid.shape=}\n")
     # There are 'V' valid == True elements of the (N, H) arrays, such that V <= N*H
     # anytime an (N, H) ndarray is sliced by the `valid` ndarray, it results in a (V,) ndarray
 
@@ -267,19 +265,17 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
 
     frst_orb = utils.frst_from_fobs(fobs_orb, redz)
     # Select only the valid elements, also converts to 1D, i.e. (N, H) ==> (V,)
-    print(f"DEBUG: before 'valid' mask applied: {redz.shape=}")
     redz = redz[valid]
-    print(f"DEBUG: after 'valid' mask applied: {redz.shape=}")
     frst_orb = frst_orb[valid]
     # Calculate required parameters for valid binaries (V,)
     dcom = cosmo.z_to_dcom(redz)
     mchirp = data_harms['mass'][valid]
     mchirp = utils.chirp_mass(*mchirp.T)
     
-    sepa = data_harms['sepa'][valid] ## debug
+    #sepa = data_harms['sepa'][valid] ## debug
     mtot, mrat = utils.mtmr_from_m1m2(data_harms['mass'][valid]) ## debug
-    mpri = mtot / (1 + mrat) ## debug
-    print(f"*** DEBUG *** {mrat.min()=}, {mrat.max()}")
+    #mpri = mtot / (1 + mrat) ## debug
+    #print(f"*** DEBUG *** {mrat.min()=}, {mrat.max()}")
 
     # DEBUG: adding redz_init and redz_final here
     # shape mismatch with `valid`, dealing with this by just calling 0 index, 
@@ -313,23 +309,12 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
         # Find the L loudest binaries in each realizations
         #loud = np.sort(temp[:, np.newaxis] * (num_pois > 0), axis=0)[::-1, :]
         temp_to_sort = temp[:, np.newaxis] * (num_pois > 0)
-        print(f"{temp.shape=}, {gwb_harms.shape=}, {num_pois.shape=}, {both.shape=}, {temp_to_sort.shape=}") #,{mchirp_to_sort.shape=}, {redz_to_sort.shape=}")
-        #debug_loud = np.sort(temp[:, np.newaxis] * (num_pois > 0), axis=0)[::-1, :]
         idx_loud = np.argsort(temp_to_sort, axis=0)[::-1, :]
         loud = np.take_along_axis(temp_to_sort, idx_loud, axis=0)
-        print(f"{idx_loud.shape=}, {loud.shape=}")
+        #print(f"{idx_loud.shape=}, {loud.shape=}")
         fore = loud[0, :]
         loud = loud[:loudest, :]
-        #debug_loud = loud[:loudest, :]
-        mchirp_loud = np.take_along_axis(mchirp[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
-        mchirp_loud = mchirp_loud[:loudest,:]
-        print(f"DEBUG: before 'redz_loud' definition: {redz.shape=}")
-        redz_loud = np.take_along_axis(redz[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
-        redz_loud = redz_loud[:loudest,:]
-        sepa_loud = np.take_along_axis(sepa[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
-        sepa_loud = sepa_loud[:loudest,:]
-        mpri_loud = np.take_along_axis(mpri[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
-        mpri_loud = mpri_loud[:loudest,:]
+
         mtot_loud = np.take_along_axis(mtot[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
         mtot_loud = mtot_loud[:loudest,:]
         mrat_loud = np.take_along_axis(mrat[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
@@ -338,27 +323,6 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
         redz_init_loud = redz_init_loud[:loudest,:]
         redz_final_loud = np.take_along_axis(redz_final[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
         redz_final_loud = redz_final_loud[:loudest,:]
-
-        print(f"{mchirp.shape=}, {redz.shape=}, {idx_loud.shape}=")
-        print(f"{mchirp_loud.shape=}, {redz_loud.shape=}") #, {idx_loud.shape}=")
-        #print(idx_loud[:loudest,:])
-        #print(loud)
-        print(f"{loud.shape=}, {mchirp_loud.shape=}, {redz_loud.shape=}") #,{loud=}")
-        print(f"mchirp: min={(mchirp/MSOL).min():.4g}, max={(mchirp/MSOL).max():.4g}, med={np.median(mchirp/MSOL):.4g}")
-        print(f"mchirp_loud: min={(mchirp_loud/MSOL).min():.4g}, max={(mchirp_loud/MSOL).max():.4g}, med={np.median(mchirp_loud/MSOL):.4g}")
-        print(f"mpri: min={(mpri/MSOL).min():.4g}, max={(mpri/MSOL).max():.4g}, med={np.median(mpri/MSOL):.4g}")
-        print(f"mpri_loud: min={(mpri_loud/MSOL).min():.4g}, max={(mpri_loud/MSOL).max():.4g}, med={np.median(mpri_loud/MSOL):.4g}")
-        print(f"mrat: min={(mrat).min():.4g}, max={(mrat).max():.4g}, med={np.median(mrat):.4g}")
-        print(f"mrat_loud: min={(mrat_loud).min():.4g}, max={(mrat_loud).max():.4g}, med={np.median(mrat_loud):.4g}")
-        print(f"redz: min={(redz).min():.4g}, max={(redz).max():.4g}, med={np.median(redz):.4g}")
-        print(f"redz_loud: min={(redz_loud).min():.4g}, max={(redz_loud).max():.4g}, med={np.median(redz_loud):.4g}")
-        print(f"sepa: min={(sepa/PC).min():.4g}, max={(sepa/PC).max():.4g}, med={np.median(sepa/PC):.4g}")
-        print(f"sepa_loud: min={(sepa_loud/PC).min():.4g}, max={(sepa_loud/PC).max():.4g}, med={np.median(sepa_loud/PC):.4g}")
-        print(f"redz_init: min={(redz_init).min():.4g}, max={(redz_init).max():.4g}, med={np.median(redz_init):.4g}")
-        print(f"redz_init_loud: min={(redz_init_loud).min():.4g}, max={(redz_init_loud).max():.4g}, med={np.median(redz_init_loud):.4g}")
-        print(f"redz_final: min={(redz_final).min():.4g}, max={(redz_final).max():.4g}, med={np.median(redz_final):.4g}")
-        print(f"redz_final_loud: min={(redz_final_loud).min():.4g}, max={(redz_final_loud).max():.4g}, med={np.median(redz_final_loud):.4g}")
-        #print(f"{debug_loud.shape=}, {debug_loud=}")
 
         sspar = [mtot_loud, mrat_loud, redz_init_loud, redz_final_loud]
         #bgpar_freq = 
