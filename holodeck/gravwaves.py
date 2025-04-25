@@ -61,12 +61,18 @@ class GW_Discrete(Grav_Waves):
         back = np.zeros((nfreqs, nreals))
         both = np.zeros((nfreqs, nreals))
 
+        ss_mt = np.zeros((nfreqs, nloudest, nreals))
+        ss_mr = np.zeros((nfreqs, nloudest, nreals))
+        ss_rzi = np.zeros((nfreqs, nloudest, nreals))
+        ss_rzf = np.zeros((nfreqs, nloudest, nreals))
+
         if eccen:
             harm_range = range(1, nharms+1)
         else:
             harm_range = [2]
 
         harms = np.zeros((nfreqs, nharms))
+        
 
         freq_iter = enumerate(fobs_gw)
         freq_iter = utils.tqdm(freq_iter, total=len(fobs_gw), desc='GW frequencies') if progress else freq_iter
@@ -74,7 +80,7 @@ class GW_Discrete(Grav_Waves):
             lo = fobs_gw[0] if (ii == 0) else fobs_gw[ii-1]
             hi = fobs_gw[1] if (ii == 0) else fobs_gw[ii]
             dlnf = np.log(hi) - np.log(lo)
-            _both, _fore, _back, _loud, _gwb_harms = _gws_harmonics_at_evo_fobs(
+            _both, _fore, _back, _loud, _gwb_harms, _sspar = _gws_harmonics_at_evo_fobs(
                 fogw, dlnf, bin_evo, harm_range, nreals, box_vol, loudest=nloudest
             )
             loudest[ii, :] = _loud
@@ -82,6 +88,10 @@ class GW_Discrete(Grav_Waves):
             fore[ii, :] = _fore
             back[ii, :] = _back
             harms[ii, :] = _gwb_harms
+            ss_mt[ii, :] = _sspar[0]
+            ss_mr[ii, :] = _sspar[1]
+            ss_rzi[ii, :] = _sspar[2]
+            ss_rzf[ii, :] = _sspar[3]
 
         self.both = np.sqrt(both)
         self.fore = np.sqrt(fore)
@@ -89,6 +99,7 @@ class GW_Discrete(Grav_Waves):
         self.strain = np.sqrt(back + fore)
         self.loudest = loudest
         self.harms = harms
+        self.sspar = [ss_mt, ss_mr, ss_rzi, ss_rzf]
         return
 
 
@@ -265,7 +276,6 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     mchirp = data_harms['mass'][valid]
     mchirp = utils.chirp_mass(*mchirp.T)
     
-    # TO DO: clean up binary params calculation and create option to return this info for each freq
     sepa = data_harms['sepa'][valid] ## debug
     mtot, mrat = utils.mtmr_from_m1m2(data_harms['mass'][valid]) ## debug
     mpri = mtot / (1 + mrat) ## debug
@@ -320,6 +330,8 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
         sepa_loud = sepa_loud[:loudest,:]
         mpri_loud = np.take_along_axis(mpri[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
         mpri_loud = mpri_loud[:loudest,:]
+        mtot_loud = np.take_along_axis(mtot[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
+        mtot_loud = mtot_loud[:loudest,:]
         mrat_loud = np.take_along_axis(mrat[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
         mrat_loud = mrat_loud[:loudest,:]
         redz_init_loud = np.take_along_axis(redz_init[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
@@ -347,13 +359,17 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
         print(f"redz_final: min={(redz_final).min():.4g}, max={(redz_final).max():.4g}, med={np.median(redz_final):.4g}")
         print(f"redz_final_loud: min={(redz_final_loud).min():.4g}, max={(redz_final_loud).max():.4g}, med={np.median(redz_final_loud):.4g}")
         #print(f"{debug_loud.shape=}, {debug_loud=}")
+
+        sspar = [mtot_loud, mrat_loud, redz_init_loud, redz_final_loud]
+        #bgpar_freq = 
     else:
         fore = np.zeros_like(both)
         loud = np.zeros((loudest, nreals))
+        sspar_freq = [np.zeros((loudest,nreals))]*4
         print(f"no loud sources in any realizations for {fobs_gw=}")
         
     back = both - fore
-    return both, fore, back, loud, gwb_harms
+    return both, fore, back, loud, gwb_harms, sspar
 
 
 def _gws_from_samples(vals, weights, fobs_gw_edges):
