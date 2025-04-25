@@ -851,7 +851,7 @@ class MMBulge_Redshift(MMBulge_Standard):
         return self.mbh_from_mbulge(mbulge, redz=redz, scatter=scatter)
 
     def mbh_from_mbulge(self, mbulge, redz, scatter):
-        scatter_dex = self._scatter_dex * (1.0 + redz)**self._zplaw_scatter if scatter else None
+        scatter_dex = np.log10(10**self._scatter_dex * (1.0 + redz)**self._zplaw_scatter) if scatter else None
         # Broadcast `redz` to match shape of `mbulge`, if needed
         # NOTE: this will work for (N,) ==> (N,)    or   (N,) ==> (N,X)
         try:
@@ -864,7 +864,7 @@ class MMBulge_Redshift(MMBulge_Standard):
         return mbh
 
     def mbulge_from_mbh(self, mbh, redz, scatter):
-        scatter_dex = self._scatter_dex * (1.0 + redz)**self._zplaw_scatter if scatter else None
+        scatter_dex = np.log10(self._scatter_dex * (1.0 + redz)**self._zplaw_scatter) if scatter else None
         zmamp = self._mamp * (1.0 + redz)**self._zplaw_amp
         zmplaw = self._mplaw * (1.0 + redz)**self._zplaw_slope
         mbulge = _log10_relation_reverse(mbh, zmamp, zmplaw, scatter_dex, x0=self._mref)
