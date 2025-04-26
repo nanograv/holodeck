@@ -329,7 +329,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     else:
         fore = np.zeros_like(both)
         loud = np.zeros((loudest, nreals))
-        sspar_freq = [np.zeros((loudest,nreals))]*4
+        sspar = [np.zeros((loudest,nreals))]*4
         print(f"no loud sources in any realizations for {fobs_gw=}")
         
     back = both - fore
