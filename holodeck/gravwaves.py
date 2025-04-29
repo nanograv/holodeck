@@ -297,6 +297,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     # --- Calculate GW Signals
     temp = hs2 * gne * (2.0 / harms_1d)**2
     both = np.sum(temp[:, np.newaxis] * num_pois / dlnf, axis=0)
+    #print(f"DEBUG: {both.shape=}")
 
     # Calculate and return the expectation value hc^2 for each harmonic
     # (N, H)
@@ -305,25 +306,31 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     # (N, H) ==> (H,)
     gwb_harms = np.sum(gwb_harms, axis=0)
 
+    print(f"DEBUG: {dlnf=}")
+    
     if np.any(num_pois > 0):
         # Find the L loudest binaries in each realizations
         #loud = np.sort(temp[:, np.newaxis] * (num_pois > 0), axis=0)[::-1, :]
-        temp_to_sort = temp[:, np.newaxis] * (num_pois > 0)
+        #temp_to_sort = temp[:, np.newaxis] * (num_pois > 0)
+        temp_to_sort = temp[:, np.newaxis] * (num_pois > 0) / dlnf # bugfix: the factor of dlnf was missing here
         idx_loud = np.argsort(temp_to_sort, axis=0)[::-1, :]
         loud = np.take_along_axis(temp_to_sort, idx_loud, axis=0)
-        #print(f"{idx_loud.shape=}, {loud.shape=}")
+        #print(f"DEBUG: before `loudest` cut: {idx_loud.shape=}, {loud.shape=}")
         fore = loud[0, :]
         loud = loud[:loudest, :]
-
+        #print(f"DEBUG: after `loudest` cut: {idx_loud.shape=}, {loud.shape=}, {fore.shape=}")
+        
         mtot_loud = np.take_along_axis(mtot[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
+        #print(f"DEBUG: before `loudest` cut: {mtot_loud.shape=}")
         mtot_loud = mtot_loud[:loudest,:]
+        #print(f"DEBUG: after `loudest` cut: {mtot_loud.shape=}")
         mrat_loud = np.take_along_axis(mrat[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
         mrat_loud = mrat_loud[:loudest,:]
         redz_init_loud = np.take_along_axis(redz_init[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
         redz_init_loud = redz_init_loud[:loudest,:]
         redz_final_loud = np.take_along_axis(redz_final[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
         redz_final_loud = redz_final_loud[:loudest,:]
-
+        
         sspar = [mtot_loud, mrat_loud, redz_init_loud, redz_final_loud]
         #bgpar_freq = 
     else:
@@ -333,6 +340,8 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
         print(f"no loud sources in any realizations for {fobs_gw=}")
         
     back = both - fore
+    print(f"DEBUG: {back.mean()=}, {both.mean()=}, {fore.mean()=}")
+    
     return both, fore, back, loud, gwb_harms, sspar
 
 
