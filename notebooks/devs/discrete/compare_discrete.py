@@ -136,8 +136,8 @@ class Discrete:
             #          f"m2: {self.evo.mass[ix_coal_at_t0[ii],0,1]:.6g}, {self.evo.mass[ix_coal_at_t0[ii],-1,1]:.6g}")
             
             ## create GWB
-            self.gwb = holo.gravwaves.GW_Discrete(self.evo, self.freqs, nreals=self.nreals) #,nloudest=self.nloudest)
-            self.gwb.emit(nloudest=10)
+            self.gwb = holo.gravwaves.GW_Discrete(self.evo, self.freqs, nreals=self.nreals) #, nloudest=self.nloudest)
+            self.gwb.emit(nloudest=self.nloudest)
 
 
 
