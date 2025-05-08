@@ -1,11 +1,18 @@
 import numpy as np
 import pandas as pd
 import re
+import os
 import matplotlib.pyplot as plt
+from holodeck import _PATH_DATA
 
 def parse_ascii_file(verbose=False):
     # File path
-    file_path = "/home/lblecha/gsmf/apjaa3284t1_ascii.txt"
+    fname = "apjaa3284t1_ascii.txt"
+    try: 
+        file_path = os.path.join(_PATH_DATA, fname) # try this first; assumes file in data directory
+    except: 
+        if basepath is not None:
+            file_path = os.path.join(basepath, fname) # look for file in user-defined basepath
 
     # Read the data into a DataFrame
     data = []
