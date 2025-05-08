@@ -319,12 +319,20 @@ class Pop_Illustris(_Population_Discrete):
         if fname is None:
             fname = _DEF_ILLUSTRIS_FNAME
 
-        try: 
-            fname = os.path.join(_PATH_DATA, fname) # try this first; assumes file in data directory
-        except: 
-            if basepath is not None:
-                fname = os.path.join(basepath, fname) # look for file in user-defined basepath
-            
+        if basepath is not None:
+            try: 
+                fname = os.path.join(basepath, fname) # look for file in user-defined basepath if present
+            except: 
+                try:
+                    fname = os.path.join(_PATH_DATA, fname) # then look for file in data directory
+                except:
+                    raise OSError(f"file {fname} not found in {basepath} or{_PATH_DATA}.")
+        else:
+            try:
+                fname = os.path.join(_PATH_DATA, fname) # then look for file in data directory
+            except:
+                raise OSError(f"file {fname} not found in {_PATH_DATA}.")
+
         self._fname = fname             #: Filename for binary data
 
         self._fixed_sepa = fixed_sepa ####
