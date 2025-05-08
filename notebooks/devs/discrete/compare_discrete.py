@@ -143,7 +143,7 @@ class Discrete:
 
 def create_dpops(tau=1.0, fsa=1.0e4, mod_mmbulge=True, nreals=500, inclIll=True, inclOldIll=False, 
                  inclT50=True, inclT300=True, inclRescale=False, allow_mbh0=False, skip_evo=False,
-                 fsa_only=False, use_mstar_tot_as_mbulge=False, nloudest=10):
+                 fsa_only=False, use_mstar_tot_as_mbulge=False, nloudest=10, fpath=_PATH_DATA):
     
     assert ((fsa is not None) or (not fsa_only)), f"{fsa_only=} and {fsa=}; no dpops to generate."
     
@@ -166,50 +166,37 @@ def create_dpops(tau=1.0, fsa=1.0e4, mod_mmbulge=True, nreals=500, inclIll=True,
         tng_fsa_dpops = []
         
     # ---- Define dpop attributes: (filename, plot color, plot linewidth)
-    tpath = '/orange/lblecha/IllustrisTNG/Runs/'
-    ipath = '/orange/lblecha/Illustris/'
+    #tpath = '/orange/lblecha/IllustrisTNG/Runs/'
+    #ipath = '/orange/lblecha/Illustris/'
     dpop_attrs = {
-        # dont use this file; it has at least one merger remnant with mbulge=0. prob need to rerun with Ngas=10
-        ### ('galaxy-mergers_Illustris-1_gas-000_dm-010_star-010_bh-000.hdf5', 'darkgreen', 1.5), 
-        #'TNG50-1-N100' : ('galaxy-mergers_TNG50-1_gas-100_dm-100_star-100_bh-001.hdf5', 
-        #                  tpath+'TNG50-1/output/', 'darkred', 4),
-        #'TNG50-1-N100-bh0' : ('galaxy-mergers_TNG50-1_gas-100_dm-100_star-100_bh-000.hdf5', 
-        #                      tpath+'TNG50-1/output/', 'darkred', 3),
-        #'TNG50-1' : ('galaxy-mergers_TNG50-1_gas-800_dm-800_star-800_bh-001.hdf5', 
-        #             tpath+'TNG50-1/output/', 'r', 3.5),
-        #'TNG50-1-bh0' : ('galaxy-mergers_TNG50-1_gas-800_dm-800_star-800_bh-000.hdf5', 
-        #                 tpath+'TNG50-1/output/', 'r', 2.5),
-        #'TNG50-2' : ('galaxy-mergers_TNG50-2_gas-100_dm-100_star-100_bh-001.hdf5', 
-        #             tpath+'TNG50-2/output/', 'orange', 2.5),
-        #'TNG50-3' : ('galaxy-mergers_TNG50-3_gas-012_dm-012_star-012_bh-001.hdf5', 
-        #             tpath+'TNG50-3/output/', 'y', 1.5),
-        ##'oldIll' : (None, 'brown', 2.5),
-        #---'Ill-nomprog' : ('galaxy_merger_files_with_no_mprog/galaxy-mergers_Illustris-1_gas-100_dm-100_star-100_bh-001.hdf5', 
-        #---                 ipath+'Illustris-1/output/', 'g', 2.5),
-        #'Ill-N010-bh0' : ('galaxy-mergers_Illustris-1_gas-000_dm-000_star-010_bh-000.hdf5', 
-        #                  ipath+'Illustris-1/output/', 'darkgreen', 1.5),
-        #'Ill-bh0' : ('galaxy-mergers_Illustris-1_gas-100_dm-100_star-100_bh-000.hdf5', 
-        #             ipath+'Illustris-1/output/', 'g', 1.5),
-        #'Ill' : ('galaxy-mergers_Illustris-1_gas-100_dm-100_star-100_bh-001.hdf5', 
-        #         ipath+'Illustris-1/output/', 'g', 2.5),
-        #'TNG100-1-N010-bh0' : ('galaxy-mergers_TNG100-1_gas-000_dm-000_star-010_bh-000.hdf5', 
-        #                       tpath+'TNG100-1/output/', 'darkblue', 2.5),
-        #'TNG100-1-bh0' : ('galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-000.hdf5', 
-        #                  tpath+'TNG100-1/output/', 'b', 1.5),
-        'TNG100-1' : ('galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-001.hdf5', 
-                      tpath+'TNG100-1/output/', 'b', 2.5),
-        #---'TNG100-1-nomprog' : ('galaxy_merger_files_with_no_mprog/galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-001.hdf5', 
-        #---                      tpath+'TNG100-1/output/', 'b', 2.5),
-        #---'TNG100-1-bh0-nomprog' : ('galaxy_merger_files_with_no_mprog/galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-000.hdf5', 
-        #---                          tpath+'TNG100-1/output/', 'b', 1.5),
-        #---'TNG100-1-N012-bh0' : ('galaxy_merger_files_with_no_mprog/galaxy-mergers_TNG100-1_gas-012_dm-012_star-012_bh-000.hdf5', 
-        #---                       tpath+'TNG100-1/output/', 'darkblue', 2.5),
-        #'TNG100-2' : ('galaxy-mergers_TNG100-2_gas-012_dm-012_star-012_bh-001.hdf5', 
-        #              tpath+'TNG100-1/output/', 'c', 1.5),
-        #'TNG300-1' : ('galaxy-mergers_TNG300-1_gas-012_dm-012_star-012_bh-001.hdf5', tpath+'TNG300-1/output/', 'm', 1.5),
-        #'TNG300-1-bh0' : ('galaxy-mergers_TNG300-1_gas-012_dm-012_star-012_bh-000.hdf5', tpath+'TNG300-1/output/', 'm', 1.0),
-        #'TNG300-1-N100' : ('galaxy-mergers_TNG300-1_gas-100_dm-100_star-100_bh-001.hdf5', tpath+'TNG300-1/output/', 'pink', 1.5),
-        #'TNG300-1-N100-bh0' : ('galaxy-mergers_TNG300-1_gas-100_dm-100_star-100_bh-000.hdf5', tpath+'TNG300-1/output/', 'pink', 1)
+        #'TNG50-1-N100' : ('galaxy-mergers_TNG50-1_gas-100_dm-100_star-100_bh-001.hdf5',  fpath, 'darkred', 4),
+        #'TNG50-1-N100-bh0' : ('galaxy-mergers_TNG50-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 'darkred', 3),
+        #'TNG50-1' : ('galaxy-mergers_TNG50-1_gas-800_dm-800_star-800_bh-001.hdf5', fpath, 'r', 3.5),
+        #'TNG50-1-bh0' : ('galaxy-mergers_TNG50-1_gas-800_dm-800_star-800_bh-000.hdf5', fpath, 'r', 2.5),
+        #'TNG50-2' : ('galaxy-mergers_TNG50-2_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 'orange', 2.5),
+        #'TNG50-3' : ('galaxy-mergers_TNG50-3_gas-012_dm-012_star-012_bh-001.hdf5', fpath, 'y', 1.5),
+        #'Ill-N010-bh0' : ('galaxy-mergers_Illustris-1_gas-000_dm-000_star-010_bh-000.hdf5', fpath, 'darkgreen', 1.5),
+        #'Ill-bh0' : ('galaxy-mergers_Illustris-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 'g', 1.5),
+        #'Ill' : ('galaxy-mergers_Illustris-1_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 'g', 2.5),
+        #'TNG100-1-N010-bh0' : ('galaxy-mergers_TNG100-1_gas-000_dm-000_star-010_bh-000.hdf5', fpath, 'darkblue', 2.5),
+        #'TNG100-1-bh0' : ('galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 'b', 1.5),
+        'TNG100-1' : ('galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 'b', 2.5),
+        #'TNG100-2' : ('galaxy-mergers_TNG100-2_gas-012_dm-012_star-012_bh-001.hdf5', fpath, 'c', 1.5),
+        #'TNG300-1' : ('galaxy-mergers_TNG300-1_gas-012_dm-012_star-012_bh-001.hdf5', fpath, 'm', 1.5),
+        #'TNG300-1-bh0' : ('galaxy-mergers_TNG300-1_gas-012_dm-012_star-012_bh-000.hdf5', fpath, 'm', 1.0),
+        #'TNG300-1-N100' : ('galaxy-mergers_TNG300-1_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 'pink', 1.5),
+        #'TNG300-1-N100-bh0' : ('galaxy-mergers_TNG300-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 'pink', 1)
+        ##---'oldIll' : (None, 'brown', 2.5),
+        ##---'Ill-nomprog' : ('galaxy_merger_files_with_no_mprog/galaxy-mergers_Illustris-1_gas-100_dm-100_star-100_bh-001.hdf5', 
+        ##---                 ipath+'Illustris-1/output/', 'g', 2.5),
+        ##---'TNG100-1-nomprog' : ('galaxy_merger_files_with_no_mprog/galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-001.hdf5', 
+        ##---                      tpath+'TNG100-1/output/', 'b', 2.5),
+        ##---'TNG100-1-bh0-nomprog' : ('galaxy_merger_files_with_no_mprog/galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-000.hdf5', 
+        ##---                          tpath+'TNG100-1/output/', 'b', 1.5),
+        ##---'TNG100-1-N012-bh0' : ('galaxy_merger_files_with_no_mprog/galaxy-mergers_TNG100-1_gas-012_dm-012_star-012_bh-000.hdf5', 
+        ##---                       tpath+'TNG100-1/output/', 'darkblue', 2.5),
+        ### dont use this file; it has at least one merger remnant with mbulge=0. prob need to rerun with Ngas=10
+        ### ('galaxy-mergers_Illustris-1_gas-000_dm-010_star-010_bh-000.hdf5', 'darkgreen', 1.5)
     }
     
     # ---- Loop thru dict and create dpops
