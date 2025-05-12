@@ -1,5 +1,7 @@
 """Compare multiple discrete MBH Binary Populations (from cosmological hydrodynamic simulations)."""
 
+import os
+import h5py
 import numpy as np
 import holodeck as holo
 from holodeck import utils, log, _PATH_DATA, cosmo, discrete
@@ -138,6 +140,95 @@ class Discrete:
             ## create GWB
             self.gwb = holo.gravwaves.GW_Discrete(self.evo, self.freqs, nreals=self.nreals) #, nloudest=self.nloudest)
             self.gwb.emit(nloudest=self.nloudest)
+
+    def load_sim_gsmf_file(self, basePath=_PATH_DATA):
+
+        for s in ['Ill-1', 'TNG50-1', 'TNG100-1', 'TNG300-1']:
+            if s in self.lbl: 
+                print(f"{s=}")
+                try:                
+                    gsmf_fpath = os.path.join(basePath, f"gsmf_all_snaps_Nmin1_{s}.hdf5")
+                    print(f"{gsmf_fpath=}")
+                    f = h5py.File(gsmf_fpath,"r")
+                except:
+                    try:
+                        gsmf_fpath = os.path.join(_PATH_DATA, f"gsmf_all_snaps_Nmin1_{s}.hdf5")
+                        print(f"{gsmf_fpath=}")
+                        f = h5py.File(gsmf_fpath,"r")
+                    except:
+                        raise Exception(f"Could not open GSMF file {gsmf_fpath}.")
+
+        if not hasattr(self, "mhist_bins"): self.mhist_bins = {}
+        if not hasattr(self, "gsmf"): self.gsmf = {}
+        if not hasattr(self, "mhist"): self.mhist = {}
+        
+        return f
+        
+    def calc_sim_gsmf_from_snaps(self, req_z, req_binsize=0.05, verbose=False): 
+
+        f = self.load_sim_gsmf_file(self.basepath)
+
+        box_vol_mpc = f.attrs['box_volume_mpc']
+        snapnums = f.attrs['SnapshotNums']
+        scalefacs = f.attrs['SnapshotScaleFacs']
+        zsnaps = 1.0 / scalefacs - 1.0
+    
+        diff = np.abs(zsnaps-req_z)
+        snapNum = snapnums[diff==diff.min()][0]
+        zsnap = zsnaps[diff==diff.min()][0]
+        if verbose or (diff.min()>0.01):
+            print(f"{req_z=}, {snapNum=}, {zsnap=}, {diff.min()=}")
+
+        dlgm_orig = f.attrs['LogMassBinWidth']
+        mbin_edges_orig = np.array(f['StellarMassBinEdges'])
+        nbins_orig = mbin_edges_orig.size - 1
+        mhist_all_snaps = np.array(f['StellarMassHistograms'])
+    
+        mhist_snap_orig = mhist_all_snaps[:,(snapnums==snapNum)].flatten()
+        if verbose: print(f"{mhist_snap_orig.shape=}, {mbin_edges_orig.shape=}")
+        if mhist_snap_orig.size != nbins_orig:
+            print('whoops')
+            return
+
+        if req_binsize < dlgm_orig:
+            raise ValueError(f"{req_binsize=} requested, but min allowed is {dlgm_orig=}")
+        if int(req_binsize/dlgm_orig) > nbins_orig/2:
+            raise ValueError(f"{req_binsize=} requested, but max allowed is {dlgm_orig*nbins_orig/2=}")
+
+        ncomb = int(req_binsize/dlgm_orig)
+        dlgm = dlgm_orig * ncomb
+        mbin_edges = mbin_edges_orig[::ncomb]
+        nbins = mbin_edges.size
+        if ncomb > 1:
+            mbin_edges = np.append(mbin_edges, mbin_edges[-1]+dlgm)
+            mhist_snap = np.zeros((nbins))
+            if verbose: print(f"{mbin_edges.size=}")
+            for i in range(mbin_edges.size-1):
+                mhist_snap[i] = mhist_snap_orig[i*ncomb:i*ncomb+ncomb].sum()
+            if verbose:
+                print(f"{mbin_edges_orig=}")
+                print(f"{mbin_edges=}")
+        else:
+            if verbose:
+                print(f"WARNING: {req_binsize=}, {ncomb=}; retaining original binsize {dlgm_orig=}")
+            assert mbin_edges.all() == mbin_edges_orig.all() and dlgm == dlgm_orig, "Error in setting ncomb=1!"
+            mhist_snap = mhist_snap_orig
+        
+        if verbose:
+            print(f"{mhist_all_snaps.shape=}, {mhist_all_snaps.min()=}, {mhist_all_snaps.max()=}")
+            print(f"{mhist_snap.shape=}, {mhist_snap.min()=}, {mhist_snap.max()=}")
+            print(f"{snapnums=}")
+            print(f"{dlgm=}, {mbin_edges.shape=}")
+            print(f"{mbin_edges=}")
+
+        ##gsmf = mhist_snap / dlgm / np.log(10) / box_vol_mpc  # dex^-1 Mpc^-3
+        gsmf = mhist_snap / dlgm / box_vol_mpc  # dex^-1 Mpc^-3
+
+        self.mhist_bins[req_z] = mbin_edges[:-1]+0.5*dlgm
+        self.gsmf[req_z] = gsmf
+        self.mhist[req_z] = mhist_snap
+        
+        #return mbin_edges[:-1]+0.5*dlgm, gsmf, mhist_snap #mbin_edges, dlgm
 
 
 
