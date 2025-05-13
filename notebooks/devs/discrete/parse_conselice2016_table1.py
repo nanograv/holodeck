@@ -114,7 +114,7 @@ def parse_ascii_file(verbose=False):
     return df_clean
 
 
-def calc_c16_gsmfs(zbins=None):
+def calc_c16_gsmfs(zbins=None, verbose=False):
     
 
     lgm = np.arange(7,13,0.1)
@@ -128,6 +128,32 @@ def calc_c16_gsmfs(zbins=None):
     z_upper = data['z (upper)'].to_numpy().astype('float')
     z_cen = ( z_upper - z_lower ) / 2
     refs = data["References"].to_numpy().astype('str')
+
+    if verbose: print(f"{refs=}")
+
+    abbr = {
+        'Perez-Gonzalez+08': 'PG08',
+        'Muzzin+13': 'Mu13',
+        'Tomczak+14': 'T14',
+        'Fontana+04': 'F04',
+        'Mortlock+13': 'Mo13',
+        'Fontana+06^a': 'F06',
+        'Pozzetti+07': 'P07',
+        'Kajisawa+09': 'K09',
+        'Mortlock+11': 'Mo11',
+        'Mortlock+11^b': 'Mo11',
+        'Caputi+11': 'C11',
+        'Song+16': 'S16',
+        'Duncan+14': 'D14',
+        'Grazian+15': 'G15'
+    }
+    short_refs = np.array([])
+    for r in refs:
+        if r in abbr.keys():
+            short_refs = np.append(short_refs, abbr[r])
+        else:
+            raise ValueError(f'abbr does not contain key {r}.')
+    if verbose: print(f"{short_refs=}")
     
     gsmf = np.zeros((lgm.size, len(data)))
     print(gsmf.shape)
@@ -150,7 +176,7 @@ def calc_c16_gsmfs(zbins=None):
     #elif zbins is not None:
     #    print(f"Error: {zbins=} is not a numpy array; no redshift bins calculated.")           
         
-    return z_lower, z_upper, lgm, gsmf, lgmstar_lim, refs
+    return z_lower, z_upper, lgm, gsmf, lgmstar_lim, refs, short_refs
         
 def plot_c16_gsmfs():
     
