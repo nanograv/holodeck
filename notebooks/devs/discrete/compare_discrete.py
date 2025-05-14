@@ -141,6 +141,26 @@ class Discrete:
             self.gwb = holo.gravwaves.GW_Discrete(self.evo, self.freqs, nreals=self.nreals) #, nloudest=self.nloudest)
             self.gwb.emit(nloudest=self.nloudest)
 
+    def sim_mass_resolution(self):
+        # Baryonic mass resolution for each simulation, in Msun
+        mres_baryon = {
+            'Ill-1': 1.3e6,
+            'TNG50-1': 8.4e4,
+            'TNG50-2': 6.8e5,
+            'TNG50-3': 5.4e6,
+            'TNG100-1': 1.4e6,
+            'TNG100-2': 1.1e7,
+            'TNG300-1': 1.1e7,
+        }
+        self.mres_baryon = None
+        for k in mres_baryon.keys():
+            if k in self.lbl: 
+                self.mres_baryon = mres_baryon[k]
+                break
+        if self.mres_baryon is None:
+            raise ValueError(f"{self.lbl=} has no match for mres_baryon.keys().")
+
+    
     def load_sim_gsmf_file(self, basePath=_PATH_DATA):
 
         for s in ['Ill-1', 'TNG50-1', 'TNG100-1', 'TNG300-1']:
@@ -256,7 +276,7 @@ def create_dpops(tau=1.0, fsa=1.0e4, mod_mmbulge=True, nreals=500, inclIll=True,
         all_fsa_dpops = []
         tng_fsa_dpops = []
         
-    # ---- Define dpop attributes: (filename, plot color, plot linewidth)
+    # ---- Define dpop attributes: (filename, filepath, plot color, plot linewidth)    
     #tpath = '/orange/lblecha/IllustrisTNG/Runs/'
     #ipath = '/orange/lblecha/Illustris/'
     dpop_attrs = {
