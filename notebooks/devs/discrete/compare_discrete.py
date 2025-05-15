@@ -6,7 +6,7 @@ import numpy as np
 import holodeck as holo
 from holodeck import utils, log, _PATH_DATA, cosmo, discrete
 from holodeck.constants import PC, MSOL, YR, MPC, GYR, SPLC
-
+import matplotlib.pyplot as plt
 
 class Discrete:
     
@@ -42,13 +42,77 @@ class Discrete:
         if self.mod_mmbulge == True:
             print(f"before mass mod: {self.pop.mass.min()=}, {self.pop.mass.max()=}, {self.pop.mass.shape=}")
             print(f"before mass mod: {self.pop.mbulge.min()=}, {self.pop.mbulge.max()=}, {self.pop.mbulge.shape=}")
-            print(f"after mass mod: {self.pop.mbulge.min()=}, {self.pop.mbulge.max()=}, {self.pop.mbulge.shape=}")
-            self.mmbulge = holo.relations.MMBulge_KH2013()
+            old_mass = self.pop.mass
+            old_mbulge = self.pop.mbulge
+            old_mrat = self.pop.mass[:,1]/self.pop.mass[:,0]
+            old_mrat[old_mrat>1] = 1/old_mrat[old_mrat>1]
+            
+            print(f"before mass mod: mass ratio m2/m1: {old_mrat.min()=}, {old_mrat.max()=}, {old_mrat.shape=}")
+            ## self.mmbulge = holo.relations.MMBulge_KH2013() # deprecated
+            self.mmbulge = holo.host_relations.MMBulge_KH2013()
             self.mod_KH2013 = discrete.population.PM_Mass_Reset(self.mmbulge, scatter=True, 
                                                                 rescale_mbulge=rescale_mbulge)
             self.pop.modify(self.mod_KH2013)
+
+            # ---- Added for debugging change in mass ratios 5/15/25 - LB ----#
+            new_mrat = self.pop.mass[:,1]/self.pop.mass[:,0]
+            new_mrat[new_mrat>1] = 1/new_mrat[new_mrat>1]
+
             print(f"after mass mod: {self.pop.mass.min()=}, {self.pop.mass.max()=}, {self.pop.mass.shape=}")
             print(f"after mass mod: {self.pop.mbulge.min()=}, {self.pop.mbulge.max()=}, {self.pop.mbulge.shape=}")
+            print(f"after mass mod: mass ratio m2/m1: {new_mrat.min()=}, {new_mrat.max()=}, {new_mrat.shape=}")
+
+            mrat_increase_factor = new_mrat / old_mrat
+            mass_increase_factor = self.pop.mass / old_mass
+            mbulge_increase_factor = self.pop.mbulge / old_mbulge
+            test_old_mass_fac = self.pop._mass / old_mass
+            print(f"after mass mod: {mrat_increase_factor.min()=}, {mrat_increase_factor.max()=}, {np.median(mrat_increase_factor)=}")
+            print(f"after mass mod: {mass_increase_factor.min()=}, {mass_increase_factor.max()=}, {np.median(mass_increase_factor)=}")
+            print(f"after mass mod: {mbulge_increase_factor.min()=}, {mbulge_increase_factor.max()=}, {np.median(mbulge_increase_factor)=}")
+            print(f"after mass mod: {test_old_mass_fac.min()=}, {test_old_mass_fac.max()=}, {np.median(test_old_mass_fac)=}")
+
+            ix_low_mrat = np.where(mrat_increase_factor<0.25)[0]
+            print(f"{ix_low_mrat.size=}")
+            #print(f"{mrat_increase_factor[ix_low_mrat]}")
+            #for i in range(ix_low_mrat.size):
+            #    print(f"mrat inc fac: {mrat_increase_factor[ix_low_mrat[i]]:.3g}, " 
+            #          f"mbh old: {old_mass[ix_low_mrat[i],0]/MSOL:.3g}, {old_mass[ix_low_mrat[i],1]/MSOL:.3g}, ", 
+            #          f"mbh new: {self.pop.mass[ix_low_mrat[i],0]/MSOL:.3g}, {self.pop.mass[ix_low_mrat[i],1]/MSOL:.3g}, ", 
+            #          f"mbulge: {self.pop.mbulge[ix_low_mrat[i],0]/MSOL:.3g}, {self.pop.mbulge[ix_low_mrat[i],1]/MSOL:.3g}")
+
+            plt.xscale('log')
+            plt.yscale('log')
+            plt.xlabel('q')
+            plt.ylabel('Mtot [Msun]')
+            old_mtot = old_mass[:,0] + old_mass[:,1]
+            new_mtot = self.pop.mass[:,0] + self.pop.mass[:,1]
+            himass_mrat_increased = 0
+            himass_mrat_decreased = 0
+            mrat_increased = 0
+            mrat_decreased = 0
+            himass_count = 0
+            for i in range(old_mrat.size):
+                if new_mrat[i]>old_mrat[i]:
+                    mrat_increased += 1
+                else:
+                    mrat_decreased += 1
+                    
+                if np.max([old_mass[i,0],old_mass[i,1],self.pop.mass[i,0],self.pop.mass[i,1]])>1e8*MSOL:
+                    himass_count += 1
+                    if new_mrat[i]>old_mrat[i]:
+                        col='r'
+                        himass_mrat_increased += 1 
+                    else: 
+                        col='k'
+                        himass_mrat_decreased += 1
+                    #plt.plot([old_mass[i,0]/MSOL,self.pop.mass[i,0]/MSOL], [old_mass[i,1]/MSOL,self.pop.mass[i,1]/MSOL],alpha=0.2)
+                    plt.plot([old_mrat[i],new_mrat[i]], [old_mtot[i]/MSOL,new_mtot[i]/MSOL],alpha=0.3, lw=0.5, color=col)
+                    plt.plot([new_mrat[i]], [new_mtot[i]/MSOL],alpha=0.3, marker='.', ms=2, color=col)
+            print(f"{old_mrat.size=}, {mrat_increased=}, {mrat_decreased=}")
+            print(f"{himass_count=}, {himass_mrat_increased=}, {himass_mrat_decreased=}")
+            plt.show()
+            # ---------------------------------------------------------------------------- #
+
             #print(f"{self.pop.sepa.min()=}, {self.pop.sepa.max()=}, {self.pop.sepa.shape=}")
 
         if skip_evo == False:
@@ -281,20 +345,20 @@ def create_dpops(tau=1.0, fsa=1.0e4, mod_mmbulge=True, nreals=500, inclIll=True,
     #ipath = '/orange/lblecha/Illustris/'
     dpop_attrs = {
         #'Ill-1-N010-bh0' : ('galaxy-mergers_Illustris-1_gas-000_dm-000_star-010_bh-000.hdf5', fpath, 'darkgreen', 1.5),
-        'Ill-1-bh0' : ('galaxy-mergers_Illustris-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 'g', 1.5),
-        'Ill-1' : ('galaxy-mergers_Illustris-1_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 'g', 2.5),
+        #'Ill-1-bh0' : ('galaxy-mergers_Illustris-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 'g', 1.5),
+        #'Ill-1' : ('galaxy-mergers_Illustris-1_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 'g', 2.5),
         #'TNG50-1-N100' : ('galaxy-mergers_TNG50-1_gas-100_dm-100_star-100_bh-001.hdf5',  fpath, 'darkred', 4),
         #'TNG50-1-N100-bh0' : ('galaxy-mergers_TNG50-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 'darkred', 3),
-        'TNG50-1-bh0' : ('galaxy-mergers_TNG50-1_gas-800_dm-800_star-800_bh-000.hdf5', fpath, 'r', 2.5),
-        'TNG50-1' : ('galaxy-mergers_TNG50-1_gas-800_dm-800_star-800_bh-001.hdf5', fpath, 'r', 3.5),
+        #'TNG50-1-bh0' : ('galaxy-mergers_TNG50-1_gas-800_dm-800_star-800_bh-000.hdf5', fpath, 'r', 2.5),
+        #'TNG50-1' : ('galaxy-mergers_TNG50-1_gas-800_dm-800_star-800_bh-001.hdf5', fpath, 'r', 3.5),
         #'TNG50-2' : ('galaxy-mergers_TNG50-2_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 'orange', 2.5),
         #'TNG50-3' : ('galaxy-mergers_TNG50-3_gas-012_dm-012_star-012_bh-001.hdf5', fpath, 'y', 1.5),
         #'TNG100-1-N010-bh0' : ('galaxy-mergers_TNG100-1_gas-000_dm-000_star-010_bh-000.hdf5', fpath, 'darkblue', 2.5),
-        'TNG100-1-bh0' : ('galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 'b', 1.5),
+        #'TNG100-1-bh0' : ('galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 'b', 1.5),
         'TNG100-1' : ('galaxy-mergers_TNG100-1_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 'b', 2.5),
         #'TNG100-2' : ('galaxy-mergers_TNG100-2_gas-012_dm-012_star-012_bh-001.hdf5', fpath, 'c', 1.5),
-        'TNG300-1-bh0' : ('galaxy-mergers_TNG300-1_gas-012_dm-012_star-012_bh-000.hdf5', fpath, 'm', 1.0),
-        'TNG300-1' : ('galaxy-mergers_TNG300-1_gas-012_dm-012_star-012_bh-001.hdf5', fpath, 'm', 1.5),
+        #'TNG300-1-bh0' : ('galaxy-mergers_TNG300-1_gas-012_dm-012_star-012_bh-000.hdf5', fpath, 'm', 1.0),
+        #'TNG300-1' : ('galaxy-mergers_TNG300-1_gas-012_dm-012_star-012_bh-001.hdf5', fpath, 'm', 1.5),
         #'TNG300-1-N100' : ('galaxy-mergers_TNG300-1_gas-100_dm-100_star-100_bh-001.hdf5', fpath, 'pink', 1.5),
         #'TNG300-1-N100-bh0' : ('galaxy-mergers_TNG300-1_gas-100_dm-100_star-100_bh-000.hdf5', fpath, 'pink', 1)
         ##---'oldIll' : (None, 'brown', 2.5),
