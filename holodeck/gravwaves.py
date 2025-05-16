@@ -14,7 +14,6 @@ import kalepy as kale
 
 import holodeck as holo
 from holodeck import utils, cosmo, log, hardening
-#from holodeck.constants import SPLC, NWTG, MPC
 from holodeck.constants import SPLC, NWTG, MPC, MSOL, PC
 
 
@@ -72,7 +71,6 @@ class GW_Discrete(Grav_Waves):
             harm_range = [2]
 
         harms = np.zeros((nfreqs, nharms))
-        
 
         freq_iter = enumerate(fobs_gw)
         freq_iter = utils.tqdm(freq_iter, total=len(fobs_gw), desc='GW frequencies') if progress else freq_iter
@@ -207,7 +205,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     # (H,) observer-frame orbital-frequency for each harmonic
     fobs_orb = fobs_gw / harm_range
     # Each parameter will be (N, H) = (binaries, harmonics)
-    data_harms = evo.at('fobs', fobs_orb, params=_CALC_MC_PARS) 
+    data_harms = evo.at('fobs', fobs_orb, params=_CALC_MC_PARS)
 
     ## DEBUG - trying to get redz initital and final for each binary
     ## but need to make it match shape of data_harms
@@ -220,7 +218,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     # (N, H)
     redz = data_harms['scafa']
 
-    print(f"\nDEBUG: {fobs_gw=}\n")
+    #print(f"\nDEBUG: {fobs_gw=}\n")
 
     redz = cosmo.a_to_z(redz)
     valid = (redz > 0.0)
@@ -306,7 +304,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     # (N, H) ==> (H,)
     gwb_harms = np.sum(gwb_harms, axis=0)
 
-    print(f"DEBUG: {dlnf=}")
+    #print(f"DEBUG: {dlnf=}")
     
     if np.any(num_pois > 0):
         # Find the L loudest binaries in each realizations
@@ -340,7 +338,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
         print(f"no loud sources in any realizations for {fobs_gw=}")
         
     back = both - fore
-    print(f"DEBUG: {back.mean()=}, {both.mean()=}, {fore.mean()=}")
+    #print(f"DEBUG: {back.mean()=}, {both.mean()=}, {fore.mean()=}")
     
     return both, fore, back, loud, gwb_harms, sspar
 
