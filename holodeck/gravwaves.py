@@ -319,7 +319,6 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
         #print(f"DEBUG: after `loudest` cut: {idx_loud.shape=}, {loud.shape=}, {fore.shape=}")
         
         mtot_loud = np.take_along_axis(mtot[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
-        #print(f"DEBUG: before `loudest` cut: {mtot_loud.shape=}")
         mtot_loud = mtot_loud[:loudest,:]
         #print(f"DEBUG: after `loudest` cut: {mtot_loud.shape=}")
         mrat_loud = np.take_along_axis(mrat[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
@@ -328,7 +327,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
         redz_init_loud = redz_init_loud[:loudest,:]
         redz_final_loud = np.take_along_axis(redz_final[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
         redz_final_loud = redz_final_loud[:loudest,:]
-        
+
         sspar = [mtot_loud, mrat_loud, redz_init_loud, redz_final_loud]
         #bgpar_freq = 
     else:
