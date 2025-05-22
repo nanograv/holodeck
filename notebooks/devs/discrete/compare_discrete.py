@@ -12,7 +12,7 @@ class Discrete:
     
     def __init__(self, freqs, freqs_edges, attrs=(None,None,'k',1.0), lbl=None, fixed_sepa=None, 
                  tau=1.0*YR, nreals=500, mod_mmbulge=False, rescale_mbulge=False, allow_mbh0=False, 
-                 skip_evo=False, use_mstar_tot_as_mbulge=False, nloudest=10):
+                 skip_evo=False, subhalo_mstar_defn='SubhaloMassInRadType', bfrac=None, nloudest=10):
 
         self.attrs = attrs
         self.freqs = freqs
@@ -27,16 +27,19 @@ class Discrete:
         self.nreals = nreals
         self.mod_mmbulge = mod_mmbulge
         self.allow_mbh0 = allow_mbh0
-        self.use_mstar_tot_as_mbulge = use_mstar_tot_as_mbulge
+        #self.use_mstar_tot_as_mbulge = use_mstar_tot_as_mbulge
+        self.subhalo_mstar_defn = subhalo_mstar_defn
+        self.bfrac = bfrac
         self.nloudest = nloudest
         
         print(f"\nCreating Discrete_Pop class instance '{self.lbl}' with tau={self.tau}, fixed_sepa={self.fixed_sepa}")
         print(f" fname={self.fname}")
         self.pop = discrete.population.Pop_Illustris(fname=self.fname, basepath=self.basepath, 
                                                      fixed_sepa=self.fixed_sepa, allow_mbh0=self.allow_mbh0,
-                                                     use_mstar_tot_as_mbulge=self.use_mstar_tot_as_mbulge)
+                                                     subhalo_mstar_defn=self.subhalo_mstar_defn, bfrac=self.bfrac)
         print(f"{self.pop.sepa.min()=}, {self.pop.sepa.max()=}, {self.pop.sepa.shape=}")
-        print(f"{self.pop.mstar_tot.min()=}, {self.pop.mstar_tot.max()=}, {self.pop.mstar_tot.shape=}")
+        #print(f"{self.pop.mstar_tot.min()=}, {self.pop.mstar_tot.max()=}, {self.pop.mstar_tot.shape=}")
+        print(f"{self.pop.mstar.min()=}, {self.pop.mstar.max()=}, {self.pop.mstar.shape=}")
 
         # apply modifiers if requested
         if self.mod_mmbulge == True:
@@ -318,7 +321,7 @@ class Discrete:
 
 def create_dpops(tau=1.0, fsa=1.0e4, mod_mmbulge=True, nreals=500, inclIll=True, inclOldIll=False, 
                  inclT50=True, inclT300=True, inclRescale=False, allow_mbh0=False, skip_evo=False,
-                 fsa_only=False, use_mstar_tot_as_mbulge=False, nloudest=10, fpath=_PATH_DATA):
+                 fsa_only=False, subhalo_mstar_defn='SubhaloMassInRadType', nloudest=10, bfrac=None, fpath=_PATH_DATA):
     
     assert ((fsa is not None) or (not fsa_only)), f"{fsa_only=} and {fsa=}; no dpops to generate."
     
@@ -389,7 +392,7 @@ def create_dpops(tau=1.0, fsa=1.0e4, mod_mmbulge=True, nreals=500, inclIll=True,
             #if '-bh0' not in l:
             dp = Discrete(freqs, freqs_edges, lbl=l, tau=tau, fixed_sepa=None, nreals=nreals,
                           allow_mbh0=allow_mbh0, skip_evo=skip_evo, attrs=dpop_attrs[l],
-                          use_mstar_tot_as_mbulge=use_mstar_tot_as_mbulge ,nloudest=nloudest)
+                          subhalo_mstar_defn=subhalo_mstar_defn, nloudest=nloudest, bfrac=bfrac)
 
             all_dpops = all_dpops + [dp]
             if 'Ill' not in l: 
@@ -402,16 +405,18 @@ def create_dpops(tau=1.0, fsa=1.0e4, mod_mmbulge=True, nreals=500, inclIll=True,
             lbl='fsa-mm-'+l if mod_mmbulge else 'fsa-'+l
             dp_fsa = Discrete(freqs, freqs_edges, lbl='fsa-mm-'+l, tau=tau, fixed_sepa=fsa, nreals=nreals,
                               allow_mbh0=allow_mbh0, skip_evo=skip_evo, attrs=dpop_attrs[l], 
-                              mod_mmbulge=mod_mmbulge, use_mstar_tot_as_mbulge=use_mstar_tot_as_mbulge, nloudest=nloudest)
+                              mod_mmbulge=mod_mmbulge, subhalo_mstar_defn=subhalo_mstar_defn, bfrac=bfrac, nloudest=nloudest)
 
             all_fsa_dpops = all_fsa_dpops + [dp_fsa]
             if 'Ill' not in l: 
                 tng_fsa_dpops = tng_fsa_dpops + [dp_fsa]
             
             if ('TNG300' in l) and (inclT300) and (inclRescale):
-                rescale_dp_fsa = Discrete(freqs, freqs_edges, lbl='rescale-fsa-mm-'+l,tau=tau, fixed_sepa=fsa, 
+                rescale_dp_fsa = Discrete(freqs, freqs_edges, lbl='fsa-mm-r'+l,tau=tau, fixed_sepa=fsa, 
                                           nreals=nreals, allow_mbh0=allow_mbh0, skip_evo=skip_evo, attrs=dpop_attrs[l],
-                                          mod_mmbulge=True, use_mstar_tot_as_mbulge=use_mstar_tot_as_mbulge, rescale_mbulge=True, nloudest=nloudest)
+                                          mod_mmbulge=True, subhalo_mstar_defn=subhalo_mstar_defn, bfrac=bfrac, 
+                                          rescale_mbulge=True, nloudest=nloudest)
+                all_fsa_dpops = all_fsa_dpops + [dp_fsa]
                 tng_fsa_dpops = tng_fsa_dpops + [rescale_dp_fsa]
 
         print(f"{l} dpop_attrs: {dpop_attrs[l][0]} {dpop_attrs[l][1]} {dpop_attrs[l][2]} {dpop_attrs[l][3]}")
