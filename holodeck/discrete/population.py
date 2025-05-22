@@ -304,7 +304,7 @@ class Pop_Illustris(_Population_Discrete):
     """
 
     def __init__(self, fname=None, basepath=None, fixed_sepa=None, allow_mbh0=False, 
-                 use_mstar_tot_as_mbulge=False, **kwargs):
+                 subhalo_mstar_defn='SubhaloMassInRadType', bfrac=None, **kwargs):
         """Initialize a binary population using data in the given filename.
 
         Parameters
@@ -339,7 +339,10 @@ class Pop_Illustris(_Population_Discrete):
 
         self._allow_mbh0 = allow_mbh0 # allow input files with galaxies that have mbh=0; set these BHs to mbh=1e2 msun
 
-        self._use_mstar_tot_as_mbulge = use_mstar_tot_as_mbulge 
+        #self._use_mstar_tot_as_mbulge = use_mstar_tot_as_mbulge 
+        self._subhalo_mstar_defn = subhalo_mstar_defn
+
+        self._bfrac = bfrac
         
         super().__init__(**kwargs)
         if 'eccen' in kwargs:
@@ -429,16 +432,58 @@ class Pop_Illustris(_Population_Discrete):
             print("No zero-mass BHs found in this merger tree file!")
         
         # ---- Galaxy Properties
-        # Get the stellar mass, and take that as bulge mass
-        self.mstar_tot = data['SubhaloMassType'][:, st_idx, :]   #: [grams]
-        print(f"{self._use_mstar_tot_as_mbulge=}")
-        if self._use_mstar_tot_as_mbulge:
-            self.mbulge = self.mstar_tot[:,:2]
-        else:
-            self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :2]   #: [grams]
-        print(f"{self.mbulge.min()=}, {self.mbulge.max()=}")
-        print(f"{self.mstar_tot.min()=}, {self.mstar_tot.max()=}")
+        ## Get the stellar mass, and take that as bulge mass
+        #self.mstar_tot = data['SubhaloMassType'][:, st_idx, :]   #: [grams]
+        ##print(f"{self._use_mstar_tot_as_mbulge=}")
+        ##if self._use_mstar_tot_as_mbulge:
+        #    #LB: this was an option I added (to test impact on GWB signal)
+        #    self.mbulge = self.mstar_tot[:,:2]
+        #else:
+        #    #LB: this was the default before I started mucking with the code, uses mstar(inRad) as mbulge
+        #    self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :2]   #: [grams]
+        #print(f"{self.mbulge.min()=}, {self.mbulge.max()=}")
+        #print(f"{self.mstar_tot.min()=}, {self.mstar_tot.max()=}")
 
+        if self._subhalo_mstar_defn == 'SubhaloMassType':
+            self.mstar = data['SubhaloMassType'][:, st_idx, :2]   #: [grams]
+        elif self._subhalo_mstar_defn == 'SubhaloMassInRadType':
+            self.mstar = data['SubhaloMassInRadType'][:, st_idx, :2]   #: [grams]
+        else:
+            raise ValueError(f"Invalid keyword value: {self._subhalo_mstar_defn=}. "
+                             f"Must be 'SubhaloMassType' or 'SubhaloMassInRadType'")
+
+        # set the bulge fractions
+        if isinstance(self._bfrac, (int,float)):
+            if self._bfrac<=0.0 or self._bfrac>1.0:
+                raise ValueError(f"self._bfrac value must be in (0,1]. {self._bfrac=}")
+            # assign constant stellar bulge fraction to all galaxies
+            bulge_frac = np.ones_like(self.mstar) * self._bfrac
+        elif isinstance(self._bfrac,(list,tuple,np.ndarray)) and len(self._bfrac)==2:
+            if min(self._bfrac)<=0.0 or max(self._bfrac)>1.0:
+                raise ValueError(f"self._bfrac values must be in (0,1]. {self._bfrac=}")
+            bf_lo = self._bfrac[0]
+            bf_hi = self._bfrac[1]
+            if np.abs(bf_hi-bf_lo)/bf_lo < 1.0e-6:
+                # assign a constant stellar bulge fraction to all galaxies
+                bulge_frac = np.ones_like(self.mstar) * bf_lo
+            elif bf_lo < bf_hi:
+                # this call uses default values for keywords mstar_char_log10=11.0 and width_dex=1.0
+                bulge_frac = holo.host_relations.BF_Sigmoid(bf_lo, bf_hi).bulge_frac(self.mstar) 
+                print(f"after call to sigmoid func: {bulge_frac.shape}, {bulge_frac.dtype=}")
+            else:
+                raise ValueError(f"bf_lo must be <= bf_hi. {bf_lo=}, {bf_hi=}")
+        elif self._bfrac is None:
+            bulge_frac = np.ones_like(self.mstar)
+            msg = (f"{bulge_frac=}. Setting mbulge=mstar.")
+            log.warning(msg)
+            warnings.warn(msg)
+        else:
+            raise ValueError(f"bfrac must be of type int, list, tuple, np.ndarray, or None.")
+
+        print(f"before mbulge assignment: {self._bfrac=}, {bulge_frac.shape=}, {bulge_frac.dtype=}")
+        self.mbulge = bulge_frac * self.mstar
+        
+        
         # check for zero mbulge and treat based on `self._allow_mbh0` flag
         if self.mbulge.min() == 0.0:
             if self._allow_mbh0:
@@ -781,6 +826,8 @@ class PM_Mass_Reset(_Population_Modifier):
         pop._mass = pop.mass
         # if `scatter` is `True`, then it is set to the value in `mhost.SCATTER_DEX`
         pop.mass = self.mhost.mbh_from_host(pop, scatter=scatter)
+
+
         return
 
 
