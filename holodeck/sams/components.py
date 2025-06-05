@@ -128,7 +128,7 @@ def mbh_mass_func_conv(self, mbh, redz, mmbulge, scatter=None):
 
         """
         if scatter in [None, True]:
-            scatter = mmbulge._scatter_dex
+            scatter = np.log10(10**mmbulge._scatter_dex * (1.0 + redz)**mmbulge._zplaw_scatter)
 
         mstar = mmbulge.mstar_from_mbh(mbh, redz=redz, scatter=False)
         # This is `dn_star / dlog10(M_star)`
