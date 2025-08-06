@@ -696,6 +696,7 @@ class MMBulge_Standard(_MMBulge_Relation):
             scatter_dex = self.SCATTER_DEX
 
         self._mamp = mamp                   #: Mass-Amplitude [grams]
+        self._mamp_log10 = mamp_log10       #: log10 of Mass-Amplitude [log10(Msol)]
         self._mplaw = mplaw                 #: Mass Power-law index
         self._mref = mref                   #: Reference Mass (argument normalization)
         self._scatter_dex = scatter_dex
