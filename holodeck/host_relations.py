@@ -700,6 +700,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         self._mplaw = mplaw                 #: Mass Power-law index
         self._mref = mref                   #: Reference Mass (argument normalization)
         self._scatter_dex = scatter_dex
+        self._zplaw = 0.0
 
         if len(kwargs) > 0:
             warn = f"Unused parameters passed to {self}!  {kwargs=}"
