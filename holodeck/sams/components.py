@@ -137,7 +137,7 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
 
         """
         if scatter in [None, True]:
-            scatter = np.log10(10**mmbulge._scatter_dex * (1.0 + redz)**mmbulge._zplaw_scatter)
+            scatter = mmbulge._scatter_dex
 
         mstar = mmbulge.mstar_from_mbh(mbh, redz=redz, scatter=False)
         # This is `dn_star / dlog10(M_star)`
