@@ -852,7 +852,7 @@ cdef double[:, :, :] _sam_calc_gwb_single_eccen_discrete(
 
 
 def sam_poisson_gwb(dist, hc2, nreals, normal_threshold=1e10):
-    return _sam_poisson_gwb(np.array(dist.shape), dist, hc2, nreals, long(normal_threshold))
+    return _sam_poisson_gwb(np.array(dist.shape), dist, hc2, nreals, int(normal_threshold))
 
 
 @cython.boundscheck(False)
