@@ -809,7 +809,7 @@ class MMBulge_Redshift(MMBulge_Standard):
     that depends on redshift. ``zplaw_amp=0``, ``zplaw_slope=0``, ``zplaw_slope=0`` (default) is identical to MMBulge_Standard.
     ``mamp = mamp0 * (1 + z)**zplaw_amp``.
     ``mplaw = mplaw0 * (1 + z)**zplaw_slope``
-    ``_scatter_dex * (1.0 + z)**_zplaw_scatter``..
+    ``log10(10**_scatter_dex * (1.0 + z)**_zplaw_scatter)``..
     All zplaw_* values evolution can be positive, negative, or zero
 
     TODO: make sure all of the inherited methods from `MMBulge_Standard` are appropriate for
@@ -865,7 +865,7 @@ class MMBulge_Redshift(MMBulge_Standard):
         return mbh
 
     def mbulge_from_mbh(self, mbh, redz, scatter):
-        scatter_dex = np.log10(self._scatter_dex * (1.0 + redz)**self._zplaw_scatter) if scatter else None
+        scatter_dex = np.log10(10**self._scatter_dex * (1.0 + redz)**self._zplaw_scatter) if scatter else None
         zmamp = self._mamp * (1.0 + redz)**self._zplaw_amp
         zmplaw = self._mplaw * (1.0 + redz)**self._zplaw_slope
         mbulge = _log10_relation_reverse(mbh, zmamp, zmplaw, scatter_dex, x0=self._mref)
