@@ -316,7 +316,7 @@ class Pop_Illustris(_Population_Discrete):
         """
         if fname is None:
             fname = _DEF_ILLUSTRIS_FNAME
-            fname = os.path.join(_PATH_DATA, fname)
+            fname = os.path.join(_PATH_DATA, "illustris", fname)
 
         self._fname = fname             #: Filename for binary data
         super().__init__(**kwargs)
