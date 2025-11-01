@@ -50,20 +50,20 @@ cpdef double hard_gw(double mtot, double mrat, double sepa):
 
 
 @cython.cdivision(True)
-cdef double kepler_freq_from_sepa(double mtot, double sepa):
+cdef double kepler_freq_from_sepa(double mtot, double sepa) noexcept:
     cdef double freq = KEPLER_CONST_FREQ * sqrt(mtot) / pow(sepa, 1.5)
     return freq
 
 
 @cython.cdivision(True)
-cdef double kepler_sepa_from_freq(double mtot, double freq):
+cdef double kepler_sepa_from_freq(double mtot, double freq) noexcept:
     cdef double sepa = KEPLER_CONST_SEPA * pow(mtot, 1.0/3.0) / pow(freq, 2.0/3.0)
     return sepa
 
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef int while_while_increasing(int start, int size, double val, double[:] edges):
+cdef int while_while_increasing(int start, int size, double val, double[:] edges) noexcept:
     """Step through an INCREASING array of `edges`, first forward, then backward, to find edges bounding `val`.
 
     Use this function when `start` is already a close guess, and we just need to update a bit.
@@ -86,7 +86,7 @@ cdef int while_while_increasing(int start, int size, double val, double[:] edges
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef int while_while_decreasing(int start, int size, double val, double[:] edges):
+cdef int while_while_decreasing(int start, int size, double val, double[:] edges) noexcept:
     """Step through a DECREASING array of `edges`, first forward, then backward, to find edges bounding `val`.
 
     Use this function when `start` is already a close guess, and we just need to update a bit.
@@ -175,7 +175,7 @@ cdef void _integrate_differential_number_3dx1d(
     double[:, :, :, :] dnum,
     # output
     double[:, :, :, :] numb
-):
+) noexcept:
     """Integrate the differential number of binaries over each grid bin into total numbers of binaries.
 
     Trapezoid used over first 3 dims (mtot, mrat, redz), and Riemann over 4th (freq).
@@ -238,7 +238,7 @@ cdef void _integrate_differential_number_3dx1d(
 
 
 @cython.cdivision(True)
-cdef double _hard_func_2pwl(double norm, double xx, double gamma_inner, double gamma_outer):
+cdef double _hard_func_2pwl(double norm, double xx, double gamma_inner, double gamma_outer) noexcept:
     cdef double dadt = - norm * pow(1.0 + xx, -gamma_outer+gamma_inner) / pow(xx, gamma_inner-1)
     return dadt
 
@@ -247,7 +247,7 @@ cdef double _hard_func_2pwl(double norm, double xx, double gamma_inner, double g
 cdef double _hard_func_2pwl_gw(
     double mtot, double mrat, double sepa,
     double norm, double rchar, double gamma_inner, double gamma_outer
-):
+) noexcept:
     cdef double dadt = _hard_func_2pwl(norm, sepa/rchar, gamma_inner, gamma_outer)
     dadt += hard_gw(mtot, mrat, sepa)
     return dadt
@@ -327,7 +327,7 @@ cdef void _get_hardening_norm_2pwl(
     lifetime_2pwl_params args,
     # output
     double[:] norm_log10,
-):
+) noexcept:
 
     cdef double XTOL = 1e-3
     cdef double RTOL = 1e-5
