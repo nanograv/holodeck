@@ -30,6 +30,7 @@ import numpy as np
 import holodeck as holo
 from holodeck import cosmo, utils
 from holodeck.constants import GYR, MSOL
+from scipy.stats import norm as stnorm
 
 
 # ----    Galaxy Stellar-Mass Function    ----
