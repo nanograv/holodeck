@@ -984,7 +984,6 @@ class Evolution:
                 # Raise error on invalid entries
                 bads = ~np.isfinite(_hard_dadt) | (_hard_dadt > 0.0)
                 if np.any(bads):
-                    print("hard = ", hard)
                     log.error(f"{step} hard={hard} : dadt = {utils.stats(_hard_dadt)}")
                     err = f"invalid `dadt` for hard={hard}  (bads: {utils.frac_str(bads)})!"
                     log.exception(err)
@@ -992,7 +991,7 @@ class Evolution:
                     log.error(f"BAD sepa = {self.sepa[bads, step]}")
                     log.error(f"BAD mass = {self.sepa[bads, step]}")
                     raise ValueError(err)
-
+                
             if (self.eccen is not None):
                 if _ecc is None:
                     log.warning(f"`Evolution.eccen` is not None, but `dedt` is None!  {step} {hard}")
