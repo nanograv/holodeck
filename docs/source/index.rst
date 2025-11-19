@@ -2,7 +2,11 @@
 holodeck
 ========
 
+<<<<<<< HEAD
 |rtd| |actions|
+=======
+.. include:: header.rst
+>>>>>>> dev
 
 .. |rtd|
    image:: https://readthedocs.org/projects/kalepy/badge/?version=latest
@@ -16,7 +20,11 @@ holodeck
 
 `holodeck on github <https://github.com/nanograv/holodeck>`_
 
+<<<<<<< HEAD
 This package is aimed at providing a comprehensive framework for MBH binary population synthesis.  The framework includes modules to perform pop synth using a variety of methodologies to get a handle on both statistical and systematic uncertainties.  Currently, binary populations can be synthesized based on: cosmological hydrodynamic simulations (Illustris), semi-analytic/semi-empirical models (SAMs), and observational catalogs of local galaxies and/or quasars.
+=======
+This package provides a comprehensive framework for MBH binary population synthesis.  The framework includes modules to perform population synthesis using a variety of methodologies from semi-analytic models, to cosmological hydrodynamic simulations, and even observationally-derived galaxy merger catalogs.
+>>>>>>> dev
 
 **This File:**
 
@@ -39,12 +47,48 @@ Contents of Documentation
    Annotated Bibliography <biblio>
    Full Package Documentation <holodeck>
 
+<<<<<<< HEAD
+=======
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Full Package Documentation
+
+   holodeck <api_ref/holodeck>
+   holodeck.discrete (module) <api_ref/holodeck.discrete>
+   holodeck.sams (module) <api_ref/holodeck.sams>
+   holodeck.librarian (module) <api_ref/holodeck.librarian>
+   holodeck.accretion <api_ref/holodeck.accretion>
+   holodeck.constants <api_ref/holodeck.constants>
+   holodeck.cyutils <api_ref/holodeck.cyutils>
+   holodeck.galaxy_profiles <api_ref/holodeck.galaxy_profiles>
+   holodeck.gravwaves <api_ref/holodeck.gravwaves>
+   holodeck.hardening <api_ref/holodeck.hardening>
+   holodeck.logger <api_ref/holodeck.logger>
+   holodeck.plot <api_ref/holodeck.plot>
+   holodeck.host_relations <api_ref/holodeck.host_relations>
+   holodeck.utils <api_ref/holodeck.utils>
+
+
+Getting Started
+===============
+
+(1) Read the :doc:`getting started <getting_started/index>` guide.
+(2) Install |holodeck| following the `installation`_ instructions below.
+(3) Explore the `package demonstration notebooks <https://github.com/nanograv/holodeck/tree/main/notebooks>`_.
+>>>>>>> dev
 
 
 Installation
 ============
 
+<<<<<<< HEAD
 The `holodeck` framework is currently under substantial, active development.  It will not available on `pypi` (`pip`) or via `conda` install until it has stabilized.  Currently `holodeck` requires `python >= 3.8` (See `Python Versions`_ below), and tests are run on versions `3.8`, `3.9`, `3.10`.  To build directly from source:
+=======
+The |holodeck| framework is currently under substantial, active development.  Stable versions are now available with ``pip install holodeck-gw`` (see `holodeck on pypi <https://pypi.org/project/holodeck-gw>`_).  However, recent versions and many development tools will not generally be available with ``pip`` or ``conda`` install.
+
+|holodeck| requires ``python >= 3.9`` (with support for: ``3.9, 3.10, 3.11``).  The recommended installation is:
+>>>>>>> dev
 
 .. code-block:: bash
 
@@ -78,7 +122,11 @@ This project is being led by the `NANOGrav <http://nanograv.org/>`_ Astrophysics
 
 Details on contributions and the mandatory code of conduct can be found in `CONTRIBUTING.md <https://raw.githubusercontent.com/nanograv/holodeck/docs/CONTRIBUTING.md>`_.
 
+<<<<<<< HEAD
 To-do items and changes to the API should be included in the `CHANGELOG.md <https://raw.githubusercontent.com/nanograv/holodeck/docs/CHANGELOG.md>`_.
+=======
+The 'editable' installation allows the code base to be modified, and have those changes take effect when using the ``holodeck`` module without having to rebuild/reinstall it.  Note that any changes to the ``cython`` library files do still require a rebuild by running steps (3) and (4) above.
+>>>>>>> dev
 
 Contributions are not only welcome but encouraged, anywhere from new modules/customizations to bug-fixes to improved documentation and usage examples.  The git workflow is based around a `main` branch which is intended to be (relatively) stable and operational, and an actively developed `dev` branch.  New development should be performed in "feature" branches (made off of the `dev` branch), and then incorporated via pull-request (back into the `dev` branch).
 

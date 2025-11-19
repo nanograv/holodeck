@@ -120,7 +120,6 @@ output/*
 docs/source/apidoc_modules
 hostfile
 readthedocs.html
-data/
 notes.md
 minos_run_gen_lib_sams.sh
 cyutils.c
