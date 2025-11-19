@@ -544,7 +544,12 @@ class Pop_Illustris(_Population_Discrete):
             
         return
 
+class Pop_cosmosim(_Population_Discrete):
+    '''Placeholder for future population class based on data from any 
+    general cosmological simulation.
+    The data should be the galaxy merger file from the simulation.'''
 
+    pass
 # =========================
 # ====    Modifiers    ====
 # =========================
