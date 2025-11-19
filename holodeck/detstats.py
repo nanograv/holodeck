@@ -12,16 +12,28 @@ import h5py
 import matplotlib.pyplot as plt
 import os
 from datetime import datetime
-
+import warnings
 
 import holodeck as holo
 from holodeck import utils, cosmo, log, plot, sam_cython
 from holodeck.constants import MPC, YR
 from holodeck.sams import cyutils as sam_cyutils
 
-import hasasia.sensitivity as hsen
-import hasasia.sim as hsim
-import hasasia as has
+try:
+    from sympy import nsolve, Symbol
+    import hasasia.sensitivity as hsen
+    import hasasia.sim as hsim
+    # import hasasia as has
+except ImportError as err:
+    SUBMOD = "detstats"
+    log.error(f"Failed to import some packages used in `{SUBMOD}` submodule!")
+    log.exception(err)
+    log.error(
+        f"Some required packages for `{SUBMOD}` have been temporarily disabled in the "
+        "global 'requirements.txt' file, so they are not installed by default!  Please install "
+        "the required packages manually for now, and feel free to raise a github issue."
+    )
+    raise
 
 GAMMA_RHO_GRID_PATH = '/Users/emigardiner/GWs/holodeck/output/rho_gamma_grids'
 HC_REF15_10YR = 11.2*10**-15 
@@ -183,7 +195,7 @@ def _white_noise(delta_t, sigma_i):
 
 ######################## Power Spectral Density ########################
 
-def _power_spectral_density(hc_bg, freqs):
+def _power_spectral_density(hc_bg, freqs, reshape_freqs=True):
     """ Calculate the spectral density S_h(f_k) ~ S_h0(f_k) at the kth frequency
 
     Parameters
@@ -202,8 +214,10 @@ def _power_spectral_density(hc_bg, freqs):
 
     Follows Eq. (25) of Rosado et al. 2015
     """
+    if reshape_freqs:
+        freqs = freqs[:,np.newaxis]
 
-    S_h = hc_bg**2 / (12 * np.pi**2 * freqs[:,np.newaxis]**3)
+    S_h = hc_bg**2 / (12 * np.pi**2 * freqs**3)
     return S_h
 
 
@@ -488,8 +502,9 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret = False
 
 
 
-def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss, alpha_0=0.001, ret_snr = False,
-                  red_amp=None, red_gamma=None, ss_noise=True):
+def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss=None, custom_noise=None,
+                  alpha_0=0.001, ret_snr = False,
+                  red_amp=None, red_gamma=None, ss_noise=False):
     """ Calculate the background detection probability, and all the intermediary steps
     from a list of hasasia.Pulsar objects.
 
@@ -538,6 +553,25 @@ def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss, alpha_0=0.001, ret_snr = False,
     Sh_bg = _power_spectral_density(hc_bg[:], fobs)
     Sh0_bg = Sh_bg # note this refers to same object, not a copy
 
+    # noise spectral density
+    if custom_noise is not None:
+        if custom_noise.shape != (len(pulsars), len(fobs), len(hc_bg[0])):
+            err = f"{custom_noise.shape=}, must be shape (P,F,R)=({len(pulsars)}, {len(fobs)}, {len(hc_bg[0])})"
+            raise ValueError(err)
+        noise = custom_noise
+    else:
+        # calculate white noise
+        noise = _white_noise(cad, sigmas)[:,np.newaxis] # P,1
+
+        # add red noise
+        if (red_amp is not None) and (red_gamma is not None):
+            red_noise = _red_noise(red_amp, red_gamma, fobs)[np.newaxis,:] # (1,F,)
+            noise = noise + red_noise # (P,F,)
+
+        # add single source noise
+        noise = noise[:,:,np.newaxis]
+        if ss_noise:
+            noise = noise + _Sh_ss_noise(hc_ss, fobs) # (P, F, R)
     # calculate white noise
     noise = _white_noise(cad, sigmas)[:,np.newaxis] # P,1
 
@@ -872,7 +906,7 @@ def _antenna_pattern_functions(m_hat, n_hat, Omega_hat, pi_hat):
 ######################## Noise Spectral Density ########################
 
 
-def _Sh_rest_noise(hc_ss, hc_bg, freqs):
+def _Sh_rest_noise(hc_ss, hc_bg, freqs, nexcl=0):
     """ Calculate the noise spectral density contribution from all but the current single source.
 
     Parameters
@@ -883,6 +917,10 @@ def _Sh_rest_noise(hc_ss, hc_bg, freqs):
         Characteristic strain from all but loudest source at each frequency.
     freqs : (F,) 1Darray
         Frequency bin centers.
+    exclude_loudest : int
+        Number of loudest single sources to exclude from hc_rest noise, in addition
+        to the source in question.
+
 
     Returns
     -------
@@ -891,10 +929,15 @@ def _Sh_rest_noise(hc_ss, hc_bg, freqs):
 
     Follows Eq. (45) in Rosado et al. 2015.
     """
-    hc2_louds = np.sum(hc_ss**2, axis=2) # (F,R)
-    # subtract the single source from rest of loud sources and the background, for each single source
-    hc2_rest = hc_bg[:,:,np.newaxis]**2 + hc2_louds[:,:,np.newaxis] - hc_ss**2 # (F,R,L)
-    Sh_rest = hc2_rest / freqs[:,np.newaxis,np.newaxis]**3 /(12 * np.pi**2) # (F,R,L)
+
+    if nexcl>0:
+        Sh_rest = cyutils.Sh_rest(hc_ss, hc_bg, freqs, nexcl)
+    else:
+        hc2_louds = np.sum(hc_ss**2, axis=2) # (F,R)
+        # subtract the single source from rest of loud sources and the background, for each single source
+        hc2_rest = hc_bg[:,:,np.newaxis]**2 + hc2_louds[:,:,np.newaxis] - hc_ss**2 # (F,R,L)
+        Sh_rest = hc2_rest / freqs[:,np.newaxis,np.newaxis]**3 /(12 * np.pi**2) # (F,R,L)
+
     return Sh_rest
 
 
@@ -913,7 +956,7 @@ def _Sh_ss_noise(hc_ss, freqs):
 
     Returns
     -------
-    Sh_ss : (F,R,L) NDarray of scalars
+    Sh_ss : (F,R,R) NDarray of scalars
         The noise in a single pulsar from other GW sources for detecting each single source.
 
     Follows Eq. (45) in Rosado et al. 2015.
@@ -952,7 +995,8 @@ def _red_noise(red_amp, red_gamma, freqs, f_ref=1/YR):
 
 
 
-def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=None):
+def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=None,
+                 nexcl=0):
     """ Calculate the noise spectral density of each pulsar, as it pertains to single
     source detections, i.e., including the background as a noise source.
 
@@ -968,6 +1012,9 @@ def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=N
         Characteristic strain from all but loudest source at each frequency.
     freqs : (F,) 1Darray
         Frequency bin centers.
+    exclude_loudest : int
+        Number of loudest single sources to exclude from hc_rest noise
+
 
     Returns
     -------
@@ -978,13 +1025,57 @@ def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=N
     """
 
     noise = _white_noise(delta_t, sigmas) # (P,)
-    Sh_rest = _Sh_rest_noise(hc_ss, hc_bg, freqs) # (F,R,L,)
+    Sh_rest = _Sh_rest_noise(hc_ss, hc_bg, freqs, nexcl) # (F,R,L,)
     noise = noise[:,np.newaxis,np.newaxis,np.newaxis] + Sh_rest[np.newaxis,:,:,:] # (P,F,R,L)
     if (red_amp is not None) and (red_gamma is not None):
         red_noise = _red_noise(red_amp, red_gamma, freqs) # (F,)
         noise = noise + red_noise[np.newaxis,:,np.newaxis,np.newaxis] # (P,F,R,L)
     return noise
 
+def psrs_spectra_gwbnoise(psrs, fobs, nreals, npsrs, divide_flag=False):
+    """ Get GWBSensitivityCurve noise and spectra for psrs
+
+    Returns
+    -------
+    spectra :
+    noise_gsc : (P,F,R)
+    """
+    spectra = []
+    for psr in psrs:
+        sp = hsen.Spectrum(psr, freqs=fobs)
+        sp.NcalInv
+        spectra.append(sp)
+    sc_bg = hsen.GWBSensitivityCurve(spectra).h_c
+    noise_gsc = sc_bg**2 / (12 *np.pi**2 *fobs**3)
+    noise_gsc = np.repeat(noise_gsc, npsrs*nreals).reshape(len(fobs), npsrs, nreals) # (F,P,R)
+    noise_gsc = np.swapaxes(noise_gsc, 0, 1) # (P,F,R)
+
+    if divide_flag: noise_gsc *= npsrs*(npsrs-1)
+
+    return spectra, noise_gsc
+
+def _dsc_noise(fobs, nreals, npsrs, nloudest, psrs=None, spectra=None, divide_flag=False):
+    """ Get DeterSensitivityCurve noise using either psrs or spectra
+
+    Returns
+    -------
+    noise_dsc : (P,F,R,L) NDarray
+    """
+
+    if spectra is None:
+        assert psrs is not None, 'Must provide spectra or psrs'
+        spectra = []
+        for psr in psrs:
+            sp = hsen.Spectrum(psr, freqs=fobs)
+            sp.NcalInv
+            spectra.append(sp)
+    sc_ss = hsen.DeterSensitivityCurve(spectra).h_c
+    noise_dsc = sc_ss**2 / (12 *np.pi**2 *fobs**3)
+    noise_dsc = np.repeat(noise_dsc, npsrs*nreals*nloudest).reshape(len(fobs), npsrs, nreals, nloudest) # (F,P,R,L)
+    noise_dsc = np.swapaxes(noise_dsc, 0, 1) # (P,F,R,L)
+
+    if divide_flag: noise_dsc *= npsrs*(npsrs-1)
+    return noise_dsc
 
 
 ################### GW polarization, phase, amplitude ###################
@@ -1191,7 +1282,7 @@ def _Fe_thresh(Num, alpha_0=0.001, guess=15):
     Fe_bar = Symbol('Fe_bar')
     func = 1 - (1 - (1 + Fe_bar)*np.e**(-Fe_bar))**Num - alpha_0
     Fe_bar = nsolve(func, Fe_bar, guess) # mod from
-    return(Fe_bar)
+    return Fe_bar
 
 def _I1_approx(xx):
     """ Modified Bessel Function of the first kind, first order, expansion for large values.
@@ -1354,7 +1445,7 @@ def _gamma_ssi_cython(rho, grid_path):
         # interpolate for gamma in cython
         rho_flat = rho[:,rr].flatten()
         rsort = np.argsort(rho_flat)
-        gamma_flat = sam_cyutils.gamma_of_rho_interp(rho_flat, rsort, rho_interp_grid, gamma_interp_grid)
+        gamma_flat = cyutils.gamma_of_rho_interp(rho_flat, rsort, rho_interp_grid, gamma_interp_grid)
         gamma_ssi[:,rr] = gamma_flat.reshape(rho[:,rr].shape)
 
 
