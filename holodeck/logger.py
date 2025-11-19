@@ -10,6 +10,9 @@ import logging
 from logging import DEBUG, INFO, WARNING, ERROR  # noqa import these for easier access internally
 import sys
 
+import logging
+logging.getLogger().addHandler(logging.NullHandler())
+
 
 def get_logger(name='holodeck', level_stream=logging.WARNING, tostr=sys.stdout, tofile=None, level_file=logging.DEBUG):
     """Create a standard logger object which logs to file and or stdout stream.
