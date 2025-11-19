@@ -11,7 +11,7 @@ import os
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
 from holodeck import _PATH_DATA, utils
-
+from holodeck.constants import SPLC, EDDT
 
 class Accretion:
     """ Preferential Accretion prescription

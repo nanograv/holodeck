@@ -23,7 +23,7 @@ cimport scipy.special.cython_special as sp_special
 from libc.stdio cimport printf
 from libc.stdlib cimport malloc, free, qsort
 # make sure to use c-native math functions instead of python/numpy
-from libc.math cimport pow, sqrt, abs, M_PI, NAN
+from libc.math cimport pow, sqrt, abs, M_PI, NAN, cos, sin
 
 from cpython.pycapsule cimport PyCapsule_IsValid, PyCapsule_GetPointer
 from numpy.random cimport bitgen_t
