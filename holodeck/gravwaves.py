@@ -273,7 +273,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
 
     if np.any(num_pois > 0):
         # Find the L loudest binaries in each realizations
-        loud = np.sort(temp[:, np.newaxis] * (num_pois > 0), axis=0)[::-1, :]
+        loud = np.sort(temp[:, np.newaxis] * (num_pois > 0) / dlnf, axis=0)[::-1, :]
         fore = loud[0, :]
         loud = loud[:loudest, :]
     else:
