@@ -824,6 +824,46 @@ def pta_freqs(dur=16.03*YR, num=40, cad=None):
     cents = cents[:-1]
     return cents, edges
 
+def gaussian_freqs(num, fmax, dur=16.03*YR):
+    """Get Fourier frequency bin specifications for the given parameters.
+
+    Arguments
+    ---------
+    dur : float,
+        Total observing duration, which determines the minimum sensitive frequency, ``1/dur``.
+        Typically `dur` should be given in units of [sec], such that the returned frequencies are
+        in units of [1/sec] = [Hz]
+    num : int,
+        Number of frequency bins between 1/dur and fmax.
+    fmax : float
+        Maximum frequency to consider. Must be less than the Nyquist frequency.
+
+    Returns
+    -------
+    centers : (F,) ndarray
+        Bin-center frequencies for `F` bins.  The frequency bin centers are at:
+        ``F_i = (1/dur) + (i+1) * (fmax - 1/dur)/(2*(num-1))`` for i between 0 and `num-1`.
+        The number of frequency bins, `F` is the argument `num`.
+    edges : (F+1,) ndarray
+        Bin-edge frequencies for `F` bins, i.e. `F+1` bin edges.  The frequency bin edges are at:
+        ``F_i = (1/dur) + (i+1) * (fmax - 1/dur)/(num-1) `` for i between 0 and `num`.
+        The number of frequency bins, `F` is the argument `num`.
+
+    """
+    ## get the minimum sensitive frequency
+    fmin = 1.0 / dur
+
+    ## set bin centers
+    centers = np.linspace(fmin,fmax,num+1)
+
+    ## get bin width
+    bin_width = centers[1] - centers[0]
+
+    ## set edges
+    edges = centers - bin_width/2.0
+    centers = centers[:-1]
+
+    return centers, edges
 
 def print_stats(stack=True, print_func=print, **kwargs):
     """Print out basic properties and statistics on the input key-value array_like values.
