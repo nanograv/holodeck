@@ -78,6 +78,7 @@ import kalepy as kale
 import holodeck as holo
 import holodeck.discrete_cyutils
 from holodeck import utils, cosmo, log
+from holodeck.discrete import population
 from holodeck.constants import PC, GYR, MSOL, YR
 from holodeck.hardening import _Hardening
 # from holodeck import accretion
@@ -166,8 +167,8 @@ class Evolution:
         self._hard = hard
 
         # Make sure types look right
-        if not isinstance(pop, holo.population._Population_Discrete):
-            err = f"`pop` is {pop}, must be subclass of `holo.population._Population_Discrete`!"
+        if not isinstance(pop, population._Population_Discrete):
+            err = f"`pop` is {pop}, must be subclass of `population._Population_Discrete`!"
             log.exception(err)
             raise TypeError(err)
 
@@ -290,7 +291,7 @@ class Evolution:
         xpar : str, in ['fobs', 'sepa']
             String specifying the variable of interpolation.
         targets : array_like,
-            Locations to interpolate to.
+            Locations to interpolate to:
             * if ``xpar == sepa`` : binary separation, units of [cm],
             * if ``xpar == fobs`` : binary orbital freq, observer-frame, units of [1/sec],
         params : None or (list of str)
@@ -322,7 +323,7 @@ class Evolution:
         * Interpolation is 1st-order in log-log space in general, but properties which are in the
           `_LIN_INTERP_PARS` array are interpolated at 1st-order in lin-lin space.  Parameters
           which can be negative should be interpolated in linear space.  Passing a boolean for the
-          `lin_interp` parameter will override the behavior (see `Parameters`_ above).
+          `lin_interp` parameter will override the behavior (see `Parameters` above).
 
         """
         # parse/sanitize input arguments

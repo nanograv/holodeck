@@ -29,7 +29,7 @@ log = holo.log
 log.setLevel(logging.INFO)
 
 par_names = np.array(['mtot', 'mrat', 'redz_init', 'redz_final', 'dcom_final', 'sepa_final', 'angs_final'])
-par_labels = np.array(['Total Mass $M$ ($M_\odot$)', 'Mass Ratio $q$', 'Initial Redshift $z_i$', 'Final Redshift $z_f$', 
+par_labels = np.array(['Total Mass $M$ ($M_\odot$)', 'Mass Ratio $q$', 'Initial Redshift $z_i$', 'Final Redshift $z_f$',
                    'Final Comoving Distance $d_c$ (Mpc)', 'Final Separation (pc)', 'Final Angular Separation (rad)'])
 par_units = np.array([1/MSOL, 1, 1, 1, 1/MPC,  1/PC, 1])
 
@@ -67,12 +67,12 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
     hc_bg : (F, R) NDarray of scalars
         Characteristic strain of the GWB.
     sspar : (4, F, R, L) NDarray of scalars
-        Astrophysical parametes (total mass, mass ratio, initial redshift, final redshift) of each 
-        loud single sources, for each frequency and realization. 
+        Astrophysical parametes (total mass, mass ratio, initial redshift, final redshift) of each
+        loud single sources, for each frequency and realization.
         Returned only if params = True.
     bgpar : (7, F, R) NDarray of scalars
-        Average effective binary astrophysical parameters (total mass, mass ratio, initial redshift, 
-        final redshift, final comoving distances, final separation, final angular separation) for background sources at each frequency and realization, 
+        Average effective binary astrophysical parameters (total mass, mass ratio, initial redshift,
+        final redshift, final comoving distances, final separation, final angular separation) for background sources at each frequency and realization,
         Returned only if params = True.
     """
  
@@ -203,12 +203,12 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
     hc_bg : (F, R) NDarray of scalars
         Characteristic strain of the GWB.
     sspar : (3, F, R, L) NDarray of scalars
-        Astrophysical parametes of each loud single sources, 
-        for each frequency and realization. 
+        Astrophysical parametes of each loud single sources,
+        for each frequency and realization.
         Returned only if params = True.
     bgpar : (3, F, R) NDarray of scalars
         Average effective binary astrophysical parameters for background
-        sources at each frequency and realization, 
+        sources at each frequency and realization,
         Returned only if params = True.
     """
 
@@ -224,22 +224,22 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
     rz = kale.utils.midpoints(edges[2]) #: redshift
 
 
-    # --- Chirp Masses --- in shape (M, Q) 
+    # --- Chirp Masses --- in shape (M, Q)
     cmass = utils.chirp_mass_mtmr(mt[:,np.newaxis], mr[np.newaxis,:])
 
     # --- Comoving Distances --- in shape (Z)
     cdist = holo.cosmo.comoving_distance(rz).cgs.value
 
-    # --- Rest Frame Frequencies --- in shape (Z, F) 
+    # --- Rest Frame Frequencies --- in shape (Z, F)
     rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
 
-    # --- Source Strain Amplitude --- in shape (M, Q, Z, F) 
+    # --- Source Strain Amplitude --- in shape (M, Q, Z, F)
     hsamp = utils.gw_strain_source(cmass[:,:,np.newaxis,np.newaxis],
                                    cdist[np.newaxis,np.newaxis,:,np.newaxis],
                                    rfreq[np.newaxis,np.newaxis,:,:])
     # hsfdf = hsamp^2 * f/df
     h2fdf = hsamp**2 * (fc[np.newaxis, np.newaxis, np.newaxis,:]
-                    /df[np.newaxis, np.newaxis, np.newaxis,:]) 
+                    /df[np.newaxis, np.newaxis, np.newaxis,:])
     # indices of bins sorted by h2fdf
     indices = np.argsort(-h2fdf[...,0].flatten()) # just sort for first frequency
     unraveled = np.array(np.unravel_index(indices, (len(mt),len(mr),len(rz))))
@@ -282,7 +282,7 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
 
 def loudest_by_cython(edges, number, realize, loudest, round = True, params = False):
        
-    """ More efficient way to calculate strain from numbered 
+    """ More efficient way to calculate strain from numbered
     grid integrated
 
 
@@ -302,7 +302,7 @@ def loudest_by_cython(edges, number, realize, loudest, round = True, params = Fa
         Number of loudest single sources to separate from background.
     round : bool
         Specification of whether to discretize the sample if realize is False, 
-        by rounding number of binaries in each bin to integers. 
+        by rounding number of binaries in each bin to integers.
         Does nothing if realize is True.
     
 
@@ -314,11 +314,11 @@ def loudest_by_cython(edges, number, realize, loudest, round = True, params = Fa
         Characteristic strain of the GWB.
     lspar : (3, F, R) NDarray of scalars
         Average effective binary astrophysical parametes of the L loudest sources 
-        at each frequency, for each realization. 
+        at each frequency, for each realization.
         Returned only if params = True.
     bgpar : (3, F, R) NDarray of scalars
         Average effective binary astrophysical parameters for background
-        sources at each frequency and realization, 
+        sources at each frequency and realization,
         Returned only if params = True.
     lsidx : (3, F, R, L) NDarray
         The M, q, and z indices of loudest single sources at each frequency of each realization.
@@ -338,16 +338,16 @@ def loudest_by_cython(edges, number, realize, loudest, round = True, params = Fa
     rz = kale.utils.midpoints(edges[2]) #: redshift
 
 
-    # --- Chirp Masses --- in shape (M, Q) 
+    # --- Chirp Masses --- in shape (M, Q)
     cmass = utils.chirp_mass_mtmr(mt[:,np.newaxis], mr[np.newaxis,:])
 
     # --- Comoving Distances --- in shape (Z)
     cdist = holo.cosmo.comoving_distance(rz).cgs.value
 
-    # --- Rest Frame Frequencies --- in shape (Z, F) 
+    # --- Rest Frame Frequencies --- in shape (Z, F)
     rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
 
-    # --- Source Strain Amplitude --- in shape (M, Q, Z, F) 
+    # --- Source Strain Amplitude --- in shape (M, Q, Z, F)
     hsamp = utils.gw_strain_source(cmass[:,:,np.newaxis,np.newaxis],
                                    cdist[np.newaxis,np.newaxis,:,np.newaxis],
                                    rfreq[np.newaxis,np.newaxis,:,:])
@@ -715,14 +715,14 @@ def ss_by_ndars(edges, number, realize, round = True):
 
 
     
-    #### 5) Calculate the background with the new number 
+    #### 5) Calculate the background with the new number
  
     # --- Background Characteristic Strain Squared ---
     # to get characteristic strain in shape (M, Q, Z, F, R) we need
     # hsamp in shape (M, Q, Z, F, R)
     # fc in shape (1, 1, 1, F, 1)
     hchar = hsamp**2 * (fc[np.newaxis, np.newaxis, np.newaxis,:,np.newaxis]
-                        /df[np.newaxis, np.newaxis, np.newaxis,:,np.newaxis])   
+                        /df[np.newaxis, np.newaxis, np.newaxis,:,np.newaxis])
     hchar *= bgnum
 
         

@@ -21,7 +21,7 @@ import numpy as np
 import holodeck as holo
 from holodeck import cosmo, utils
 from holodeck.constants import GYR, MSOL
-
+from scipy.stats import norm as stnorm
 
 # ----    Galaxy Stellar-Mass Function    ----
 
@@ -56,7 +56,56 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
         return
 
     def mbh_mass_func(self, mbh, redz, mmbulge, scatter=None):
+        """
+        !!!!! DEPRICATED: use mbh_mass_func_conv instead !!!!!
+        This function is faster, but less accurate than mbh_mass_func_conv, scatter is not handled effectively.
+        
+        Convert from the GSMF to a MBH mass function (number density), using a given Mbh-Mbulge relation.
+
+        Parameters
+        ----------
+        mbh : array_like
+            Blackhole masses at which to evaluate the mass function.
+        redz : array_like
+            Redshift(s) at which to evaluate the mass function.
+        mmbulge : `relations._MMBulge_Relation` subclass instance
+            Scaling relation between galaxy and MBH masses.
+        scatter : None, bool, or float
+            Introduce scatter in masses.
+            * `None` or `True` : use the value from `mmbulge._scatter_dex`
+            * `False` : do not introduce scatter
+            * float : introduce scatter with this amplitude (in dex)
+
+        Returns
+        -------
+        ndens : array_like
+            Number density of MBHs, in units of [Mpc^-3]
+
+        """
+        print('WARNING: mbh_mass_func is deprecated.  Use mbh_mass_func_conv instead.')
+        if scatter in [None, True]:
+            scatter = mmbulge._scatter_dex
+
+        mstar = mmbulge.mstar_from_mbh(mbh, scatter=False)
+        # This is `dn_star / dlog10(M_star)`
+        ndens = self(mstar, redz)    # units of  [1/Mpc^3]
+
+        # dM_star / dM_bh
+        dmstar_dmbh = mmbulge.dmstar_dmbh(mstar)   # [unitless]
+        # convert to dlog10(M_star) / dlog10(M_bh) = (M_bh / M_star) * (dM_star / dM_bh)
+        jac = (mbh/mstar) * dmstar_dmbh
+        # convert galaxy number density to  to dn_bh / dlog10(M_bh)
+        ndens *= jac
+
+        if scatter is not False:
+            ndens = holo.utils.scatter_redistribute_densities(mbh, ndens, scatter=scatter)
+
+        return ndens
+
+def mbh_mass_func_conv(self, mbh, redz, mmbulge, scatter=None):
         """Convert from the GSMF to a MBH mass function (number density), using a given Mbh-Mbulge relation.
+        This version convolves the GSMF with the Mbh-Mbulge relation including scatter.
+        This will very minorly underestimate the number density at the high-mass end, but this is negligible for scatter_dex > 0.2
 
         Parameters
         ----------
@@ -81,27 +130,27 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
         if scatter in [None, True]:
             scatter = mmbulge._scatter_dex
 
-        mstar = mmbulge.mstar_from_mbh(mbh, scatter=False)
+        mstar = mmbulge.mstar_from_mbh(mbh, redz=redz, scatter=False)
         # This is `dn_star / dlog10(M_star)`
         ndens = self(mstar, redz)    # units of  [1/Mpc^3]
+        
+        mstar_log10 = np.log10(mstar/MSOL)
+        mbh_log10 = np.log10(mbh/MSOL)
 
-        # dM_star / dM_bh
-        dmstar_dmbh = mmbulge.dmstar_dmbh(mstar)   # [unitless]
-        # convert to dlog10(M_star) / dlog10(M_bh) = (M_bh / M_star) * (dM_star / dM_bh)
-        jac = (mbh/mstar) * dmstar_dmbh
-        # convert galaxy number density to  to dn_bh / dlog10(M_bh)
-        ndens *= jac
+        bhmf_conv = np.zeros_like(mbh_log10)
+        logamp = np.log10((mmbulge._mamp * (1.0 + redz)**mmbulge._zplaw)/MSOL)
 
-        if scatter is not False:
-            ndens = holo.utils.scatter_redistribute_densities(mbh, ndens, scatter=scatter)
-
-        return ndens
-
+        for i, logMbh in enumerate(mbh_log10):
+            logMbh_mean = logamp + mmbulge._mplaw * (mstar_log10 - 11.0)
+            pdf = stnorm.pdf(logMbh, loc=logMbh_mean, scale=scatter)
+            bhmf_conv[i] = np.trapz(ndens * pdf, mstar_log10)
+        
+        return bhmf_conv
 
 class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
     r"""Single Schechter Function - Galaxy Stellar Mass Function.
 
-    This is density per unit log10-interval of stellar mass, i.e. $Phi = dn / d\\log_{10}(M)$
+    This is density per unit log10-interval of stellar mass, i.e. $\Phi = dn / d\log_{10}(M)$
 
     See: [Chen2019]_ Eq.9 and enclosing section.
 
@@ -123,7 +172,7 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
     def __call__(self, mstar, redz):
         r"""Return the number-density of galaxies at a given stellar mass.
 
-        See: [Chen2019] Eq.8
+        See: [Chen2019]_ Eq.8
 
         Parameters
         ----------
@@ -164,14 +213,73 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
 
 
 class _GSMF_Single_Schechter(_Galaxy_Stellar_Mass_Function):
+    r"""Schechter function, with parameters as quadratics with respect to redshift.
 
+    Parameterization follows [Leja2020]_ and is primarily for use in the
+    :class:`GSMF_Double_Schechter` class.  From [Leja2020]_ Eq.14:
+
+    .. math::
+
+        \frac{\partial n}{\partial \log_{10} \! M} =
+            \ln(10) \phi \left(\frac{M}{M_\star}\right)^{\alpha+1} \exp[-M/M_\star].
+
+    The power-law index $\alpha$ is a scalar value, while the reference mass $M_\star$, and the
+    normalization $\phi$ are defined as quadratics with respect to redshift:
+
+    .. math::
+
+        \log_{10}(\phi) & = a_0 + a_1 z + a_2 z^2, \\
+        \log_{10}(M_\star) & = b_0 + b_1 z + b_2 z^2.
+
+    Class instances are callable, see :meth:`__call__`, and return galaxy number densities in units
+    of $[\mathrm{Mpc}^{-3} \, \mathrm{dex}^{-1}]$.
+
+    """
+    
     def __init__(self, log10_phi_terms, log10_mstar_terms, alpha):
-        self._log10_phi_terms = log10_phi_terms
-        self._log10_mstar_terms = log10_mstar_terms
-        self._alpha = alpha
+        r"""Initialize a Schechter function GSMF.
+
+        Arguments
+        ---------
+        log10_phi_terms : (3,) of float
+            Three terms determining the redshift behavior of
+            $\log_{10}(\phi / \mathrm{Mpc}^{-3} \mathrm{dex}^{-1})$, the normalization in units of
+            $[\mathrm{Mpc}^{-3} \, \mathrm{dex}^{-1}]$.
+        log10_mstar_terms : (3,) of float
+            Three terms determining the redshift behavior of $\log_{10}(M_\star/M_\odot)$, the
+            characteristic mass, in units of solar masses.
+        alpha : float
+            Power-law index for GSMF in terms of $dN/dM$, even though the function is written in
+            terms of $dn/d \log_{10} \! M$.
+
+        Returns
+        -------
+        None
+
+        """
+        self._log10_phi_terms = log10_phi_terms      #: these are the $a_i$ terms in the defintion.
+        self._log10_mstar_terms = log10_mstar_terms  #: these are the $b_i$ terms.
+        self._alpha = alpha                          #: power-law index
         return
 
     def __call__(self, mstar, redz):
+        r"""Evaluate this GSMF instance at the target stellar-mass(es) and redshift(s).
+
+        Arguments
+        ---------
+        mstar : array_like of float, [Msol]
+            Stellar mass(es), in units of [gram], at which to evaluate the GSMF.
+            Must be broadcastable against ``redz``.
+        redz : array_like of float
+            Redshift(s) at which to evaluate the GSMF.  Must be broadcastable against ``mstar``.
+
+        Returns
+        -------
+        rv : float  or  array_like of float
+            Number density of galaxies, $dn/d \log_{10} \! M$, in units of
+            $[\mathrm{Mpc}^{-3} \, \mathrm{dex}^{-1}]$.
+
+        """
         phi = self._phi_func(redz)
         mchar = self._mstar_func(redz)
         alpha = self._alpha
@@ -180,33 +288,82 @@ class _GSMF_Single_Schechter(_Galaxy_Stellar_Mass_Function):
         return rv
 
     def _phi_func(self, redz):
+        """Evaluate the GSMF normalization (phi) at the given redshift(s).
+
+        Arguments
+        ---------
+        redz : array_like of float,
+            Redshift(s) at which to calculate the GSMF normalization.
+
+        Returns
+        -------
+        phi : array_like of float, [Mpc^-3 dex^-1]
+            Number density normalization.
+
+        """
         cc = self._log10_phi_terms
         phi = np.power(10.0, cc[0] + cc[1] * redz + cc[2] * redz**2)
         return phi
 
     def _mstar_func(self, redz):
+        r"""Evaluate the GSMF characteristic mass ($M_\star$) at the given redshift(s).
+        """
         cc = self._log10_mstar_terms
         mstar = MSOL * np.power(10.0, cc[0] + cc[1] * redz + cc[2] * redz**2)
         return mstar
 
 
 class GSMF_Double_Schechter(_Galaxy_Stellar_Mass_Function):
+    r"""Sum of two Schechter functions, each parameterized as quadratics in redshift.
+
+    For each Schechter Function (:class:`_GSMF_Single_Schechter`), the normalizations ($\phi$) and
+    characteristic masses ($M_\star$) are parameterized as quadratics with respect to redshift.
+
+    Each Schechter function is parameterized as,
+
+    .. math::
+
+        \frac{\partial n}{\partial \log_{10} \! M} & =
+            \ln(10) \, \phi \cdot \left(\frac{M}{M_\star}\right)^{\alpha+1} \exp[-M/M_\star], \\
+        \log_{10}(\phi) & = a_0 + a_1 z + a_2 z^2, \\
+        \log_{10}(M_\star) & = b_0 + b_1 z + b_2 z^2.
+
+    The parameters for $\phi$ and $\alpha$ are different for the two functions, while the parameters
+    for $M_\star$ are shared (i.e. the same characteristic mass is used for both).  Default
+    parameters are the best fits from [Leja2020]_.  With uncertainties, these are::
+
+        log10(phi_1):  [ -2.383 ± 0.027,  -0.264 ± 0.071,  -0.107 ± 0.030],
+        log10(phi_2):  [ -2.818 ± 0.050,  -0.368 ± 0.070,  +0.046 ± 0.020],
+        log10(M_star): [+10.767 ± 0.026,  +0.124 ± 0.045,  -0.033 ± 0.015].
+
+    """
 
     def __init__(
         self,
-        phi1=[-2.383, -0.264, -0.107],
-        phi2=[-2.818, -0.368, +0.046],
-        mstar=[+10.767, +0.124, -0.033],
+        log10_phi1=[-2.383, -0.264, -0.107],
+        log10_phi2=[-2.818, -0.368, +0.046],
+        log10_mstar=[+10.767, +0.124, -0.033],
         alpha1=-0.28,
         alpha2=-1.48
     ):
-        gsmf_one = _GSMF_Single_Schechter(log10_phi_terms=phi1, log10_mstar_terms=mstar, alpha=alpha1)
-        gsmf_two = _GSMF_Single_Schechter(log10_phi_terms=phi2, log10_mstar_terms=mstar, alpha=alpha2)
+        gsmf_one = _GSMF_Single_Schechter(log10_phi_terms=log10_phi1, log10_mstar_terms=log10_mstar, alpha=alpha1)
+        gsmf_two = _GSMF_Single_Schechter(log10_phi_terms=log10_phi2, log10_mstar_terms=log10_mstar, alpha=alpha2)
         self._gsmf_one = gsmf_one
         self._gsmf_two = gsmf_two
         return
 
     def __call__(self, mstar, redz):
+        """Evaluate the double Schechter function at the given stellar masses [Msol] and redshifts.
+
+        Arguments
+        ---------
+        mstar : array_like of float, [Msol]
+            Galaxy stellar masses at which to evaluate the GSMF.  Units of solar-masses.  Must be
+            broadcastable against ``redz``.
+        redz : array_like of float,
+            Redshift(s) at which to evaluate the GSMF.  Must be broadcastable against ``mstar``.
+
+        """
         vals = self._gsmf_one(mstar, redz)
         vals += self._gsmf_two(mstar, redz)
         return vals
@@ -216,7 +373,21 @@ class GSMF_Double_Schechter(_Galaxy_Stellar_Mass_Function):
 
 
 class _Galaxy_Merger_Rate(abc.ABC):
-    """Galaxy Merger Rate base class, used to model merger rates of galaxy pairs.
+    r"""Galaxy Merger Rate base class, used to model merger rates of galaxy pairs.
+
+    NOTE: the definition of mass is ambiguous, i.e. whether it is the primary mass, the
+    combined system mass, the descendent mass, etc.
+
+    :class:`_Galaxy_Merger_Rate` instances are callable, returning the specific galaxy merger-rate
+    (i.e. the rate per galaxy), per unit mass-ratio, i.e.
+
+    .. math::
+
+        R = \frac{\partial N_\mathrm{mergers}(M_\star, q_\star, z)}{\partial q_\star \, \partial t}.
+
+    Typically the mass $M_\star$ is taken to be that of the descendent (roughly the combined mass
+    of the two galaxies), and the mass ratio is $q_\star \equiv M_{2,\star} / M_{1,\star} \leq 1.0$.
+
     """
 
     @abc.abstractmethod
@@ -225,7 +396,7 @@ class _Galaxy_Merger_Rate(abc.ABC):
 
     @abc.abstractmethod
     def __call__(self, mass, mrat, redz):
-        """Return the galaxy merger rate for the given parameters.
+        r"""Return the galaxy merger rate for the given parameters.
 
         Parameters
         ----------
@@ -241,8 +412,8 @@ class _Galaxy_Merger_Rate(abc.ABC):
         Returns
         -------
         rv : scalar or ndarray,
-            Galaxy merger rate, in units of [1/sec].
-
+            Galaxy merger rate, per unit mass-ratio, in units of [1/sec], i.e.
+            $\partial N / \partial q_\star \, \partial t$
         """
         return
 

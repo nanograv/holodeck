@@ -322,7 +322,7 @@ class Pop_Illustris(_Population_Discrete):
 
         if fname is None:
             fname = _DEF_ILLUSTRIS_FNAME
-            fname = os.path.join(_PATH_DATA, fname)
+            fname = os.path.join(_PATH_DATA, "illustris", fname)
 
         self._fname = fname             #: Filename for binary data
         super().__init__(**kwargs)
@@ -336,6 +336,7 @@ class Pop_Illustris(_Population_Discrete):
         super()._init()
         fname = self._fname
         header, data = utils.load_hdf5(fname)
+        self._sample_volume_mpc3 = header['box_volume_mpc']  #: comoving-volume of sim [Mpc^3]
         self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3   #: comoving-volume of sim [cm^3]
 
         # Select the stellar radius
@@ -616,7 +617,7 @@ class PM_Mass_Reset(_Population_Modifier):
 
         Parameters
         ----------
-        mhost : class or instance of `holodeck.relations._Host_Relation`
+        mhost : class or instance of `holodeck.host_relations._BH_Host_Relation`
             The Mbh-MHost scaling relationship with which to reset population masses.
         scatter : bool, optional
             Include random scatter when resetting masses.
@@ -624,10 +625,10 @@ class PM_Mass_Reset(_Population_Modifier):
 
         """
         # if `mhost` is a class (not an instance), then instantiate it; make sure its a subclass
-        # of `_Host_Relation`
-        mhost = utils.get_subclass_instance(mhost, None, holo.relations._Host_Relation)
+        # of `_BH_Host_Relation`
+        mhost = utils.get_subclass_instance(mhost, None, holo.host_relations._BH_Host_Relation)
         # store attributes
-        self.mhost = mhost         #: Scaling relationship between host and MBH (`holo.relations._Host_Relation`)
+        self.mhost = mhost         #: Scaling relationship between host and MBH (`holo.host_relations._BH_Host_Relation`)
         self._scatter = scatter    #: Bool determining whether resampled masses should include statistical scatter
         return
 
@@ -644,7 +645,7 @@ class PM_Mass_Reset(_Population_Modifier):
         # Store old version
         pop._mass = pop.mass
         # if `scatter` is `True`, then it is set to the value in `mhost.SCATTER_DEX`
-        pop.mass = self.mhost.mbh_from_host(pop, scatter)
+        pop.mass = self.mhost.mbh_from_host(pop, scatter=scatter)
         return
 
 

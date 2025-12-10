@@ -1,8 +1,8 @@
 """Binary evolution hardening submodules.
 
-To-Do
------
-*   Dynamical_Friction_NFW
+To-Do (Hardening)
+-----------------
+*Dynamical_Friction_NFW
     *   Allow stellar-density profiles to also be specified (instead of using a hard-coded
         Dehnen profile)
     *   Generalize calculation of stellar characteristic radius.  Make self-consistent with
@@ -14,7 +14,7 @@ To-Do
         and flexible.  Currently hard-coded to Dehnen profile estimate.
 *   _SHM06
     *   Interpolants of hardening parameters return 1D arrays.
-*   Fixed_Time
+*   Fixed_Time_2PL 
     *   Handle `rchar` better with respect to interpolation.  Currently not an interpolation
         variable, which restricts it's usage.
     *   This class should be separated into a generic `_Fixed_Time` class that can use any
@@ -31,7 +31,7 @@ References
 * [Quinlan1996]_ Quinlan 1996.
 * [Sesana2006]_ Sesana, Haardt & Madau et al. 2006.
 * [Sesana2010]_ Sesana 2010.
-* [Siwek2023]_ Siwek+ 2023
+* [Siwek2023]_ Siwek+2023
 
 """
 
@@ -50,7 +50,10 @@ import pickle as pkl
 from scipy.interpolate import RectBivariateSpline
 
 import holodeck as holo
-from holodeck import utils, cosmo, log, _PATH_DATA
+from holodeck import utils, cosmo, log, _PATH_DATA, galaxy_profiles
+from holodeck.host_relations import (
+    get_stellar_mass_halo_mass_relation, get_mmbulge_relation, get_msigma_relation
+)
 from holodeck.constants import GYR, NWTG, PC, MSOL
 
 #: number of influence radii to set minimum radius for dens calculation
@@ -379,8 +382,8 @@ class Sesana_Scattering(_Hardening):
             If `None` a default relationship is used.
 
         """
-        self._mmbulge = holo.relations.get_mmbulge_relation(mmbulge)
-        self._msigma = holo.relations.get_msigma_relation(msigma)
+        self._mmbulge = get_mmbulge_relation(mmbulge)
+        self._msigma = get_msigma_relation(msigma)
         self._gamma_dehnen = gamma_dehnen
         self._shm06 = _SHM06()
         return
@@ -543,14 +546,14 @@ class Dynamical_Friction_NFW(_Hardening):
         if not attenuate:
             log.warning("WARNING: `{attenuate=}` no-attenuation should be used with CAUTION --- NON-PHYSICAL RESULTS!")
 
-        self._mmbulge = holo.relations.get_mmbulge_relation(mmbulge)
-        self._msigma = holo.relations.get_msigma_relation(msigma)
-        self._smhm = holo.relations.get_stellar_mass_halo_mass_relation(smhm)
+        self._mmbulge = get_mmbulge_relation(mmbulge)
+        self._msigma = get_msigma_relation(msigma)
+        self._smhm = get_stellar_mass_halo_mass_relation(smhm)
         self._coulomb = coulomb
         self._attenuate = attenuate
         self._rbound_from_density = rbound_from_density
 
-        self._NFW = holo.relations.NFW
+        self._NFW = galaxy_profiles.NFW
         self._time_dynamical = None
         return
 

@@ -217,7 +217,7 @@ def _setup_argparse(*args, **kwargs):
         output = output.resolve()
 
     output.mkdir(parents=True, exist_ok=True)
-    my_print(f"output path: {output}")
+    mpi_print(f"output path: {output}")
     args.output = output
 
     output_sims = output.joinpath("sims")
@@ -253,7 +253,7 @@ def _setup_log(args):
     return log
 
 
-def my_print(*args, **kwargs):
+def mpi_print(*args, **kwargs):
     return print(*args, flush=True, **kwargs)
 
 
@@ -274,7 +274,7 @@ if __name__ == "__main__":
         this_fname = os.path.abspath(__file__)
         head = f"holodeck :: {this_fname} : {str(beg_time)} - rank: {comm.rank}/{comm.size}"
         head = "\n" + head + "\n" + "=" * len(head) + "\n"
-        my_print(head)
+        mpi_print(head)
 
     main()
 
@@ -282,6 +282,6 @@ if __name__ == "__main__":
         end = datetime.now()
         dur = end - beg_time
         tail = f"Done at {str(end)} after {str(dur)} = {dur.total_seconds()}"
-        my_print("\n" + "=" * len(tail) + "\n" + tail + "\n")
+        mpi_print("\n" + "=" * len(tail) + "\n" + tail + "\n")
 
     sys.exit(0)

@@ -31,7 +31,7 @@ except ImportError as err:
 NSIDE = 32
 NPIX = hp.nside2npix(NSIDE)
 LMAX = 8
-HC_REF15_10YR = 11.2*10**-15 
+HC_REF15_10YR = 11.2*10**-15
 
 
 def healpix_map(hc_ss, hc_bg, nside=NSIDE, seed=None, ret_seed=False):
@@ -76,7 +76,7 @@ def healpix_map(hc_ss, hc_bg, nside=NSIDE, seed=None, ret_seed=False):
             for ll in range(nloudest):
                 moll_hc[ff,rr,pix_ss[ff,rr,ll]] = (moll_hc[ff,rr,pix_ss[ff,rr,ll]] + hc_ss[ff,rr,ll]**2/area)
     if ret_seed:
-        return moll_hc, seed           
+        return moll_hc, seed
     return moll_hc
 
 def healpix_map_oldhc2(hc_ss, hc_bg, nside=NSIDE):

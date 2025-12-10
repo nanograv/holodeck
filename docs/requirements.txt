@@ -2,6 +2,7 @@
 ipykernel
 nbsphinx
 numpydoc
+sphinx
 sphinx-math-dollar
 sphinx-rtd-theme
 # sphinxcontrib-bibtex

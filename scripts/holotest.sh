@@ -15,7 +15,7 @@ NOTEBOOK_TESTS_NAME="holodeck/tests/converted_notebooks/"
 PYTEST_ARGS=("-v" "--cov=holodeck" "--cov-report=html:coverage" "--color=yes")
 VERBOSE=false;
 DRY=false;
-BUILD=false;
+BUILD=true;
 
 # ---------
 
@@ -27,7 +27,7 @@ function help()
 {
     echo "Setup and run 'holodeck' tests."
     echo
-    echo "Syntax: tester.sh [-h|v|d|b] [FILES/DIRS...]"
+    echo "Syntax: holotest.sh [-h|v|d|b] [FILES/DIRS...]"
     echo
     echo "options:"
     echo "h   (help)    print this Help."
@@ -35,6 +35,7 @@ function help()
     echo "d   (dryrun)  print commands without running them."
     echo "l   (list)    list collected tests without running them."
     echo "b   (build)   rebuild notebook tests."
+    echo "n   (no-build) do NOT rebuild notebook tests."
     echo "s   (skip)    skip    notebook tests."
     echo "x   (exit)    exit on first failure."
     echo
@@ -42,7 +43,7 @@ function help()
 
 
 # process command-line arguments
-while getopts ":hvdbslx" option; do
+while getopts ":hvdbnslx" option; do
     case $option in
         h) # ---- display Help
             help;
@@ -56,6 +57,8 @@ while getopts ":hvdbslx" option; do
             PYTEST_ARGS+=("--collect-only");;
         b) # ---- build (notebook tests)
             BUILD=true;;
+        n) # ---- NO-build (notebook tests)
+            BUILD=false;;
         s) # ---- skip (notebook tests)
             PYTEST_ARGS+=("--ignore=${NOTEBOOK_TESTS_NAME}");;
         x) # ---- exit (on first failure)
@@ -75,7 +78,7 @@ else
     PATH_TESTS="${DIR_PACKAGE}/${TESTS_NAME}";
 fi
 
-if ${VERBOSE}; then echo "==== holodeck tester.sh ===="; fi
+if ${VERBOSE}; then echo "==== holotest.sh - holodeck tests ===="; fi
 if ${DRY}; then echo "DRYRUN"; fi
 if ${VERBOSE}; then echo ""; fi
 

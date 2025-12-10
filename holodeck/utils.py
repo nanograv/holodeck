@@ -18,7 +18,12 @@ import os
 import subprocess
 import warnings
 from pathlib import Path
-from typing import Optional, Tuple, Union, List  # , Sequence,
+from typing import Optional, Tuple, Union, List   #, Callable, TypeVar, Any  # , TypeAlias  # , Sequence,
+
+# try:
+#     from typing import ParamSpec
+# except ImportError:
+#     from typing_extensions import ParamSpec
 
 import h5py
 import numba
@@ -29,7 +34,7 @@ import scipy.stats    # noqa
 import scipy.special  # noqa
 
 from holodeck import log, cosmo
-from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC
+from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC, EDDT
 
 # [Sesana2004]_ Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
@@ -68,7 +73,22 @@ class _Modifier(abc.ABC):
         """
         pass
 
+# T = TypeVar('T')
+# P = ParamSpec('P')
+# WrappedFuncDeco: TypeAlias = Callable[[Callable[P, T]], Callable[P, T]]
+# WrappedFuncDeco: 'TypeAlias' = Tuple[float, float]
 
+# def copy_docstring(copy_func: Callable[..., Any]) -> WrappedFuncDeco[P, T]:
+#     """Copies the doc string of the given function to the wrapped function.
+
+#     see: https://stackoverflow.com/a/68901244/230468
+#     """
+
+#     def wrapped(func: Callable[P, T]) -> Callable[P, T]:
+#         func.__doc__ = copy_func.__doc__
+#         return func
+
+#     return wrapped
 # =================================================================================================
 # ====    General Logistical    ====
 # =================================================================================================
@@ -198,7 +218,7 @@ def load_hdf5(fname, keys=None):
     return header, data
 
 
-def my_print(*args, **kwargs):
+def mpi_print(*args, **kwargs):
     return print(*args, flush=True, **kwargs)
 
 
@@ -219,7 +239,7 @@ def python_environment():
             return 'jupyter'
         if 'terminal' in ipy_str:
             return 'ipython'
-    except:
+    except:   # noqa
         return 'terminal'
 
     raise RuntimeError(f"unexpected result from `get_ipython()`: '{ipy_str}'!")
@@ -749,8 +769,9 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
 
     """
     # assert np.ndim(xx) == 1
-    assert np.ndim(xvals) == 2
-    assert np.shape(xvals) == np.shape(yvals)
+    err = f"Bad shapes!  {np.shape(xvals)=} {np.shape(yvals)=}"
+    assert np.ndim(xvals) == 2, err
+    assert np.shape(xvals) == np.shape(yvals), err
 
     xx = np.asarray(xx)
     xvals = np.asarray(xvals)
@@ -813,6 +834,35 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
 
 
 def pta_freqs(dur=16.03*YR, num=40, cad=None):
+    """Get Fourier frequency bin specifications for the given parameters.
+
+    Arguments
+    ---------
+    dur : float,
+        Total observing duration, which determines the minimum sensitive frequency, ``1/dur``.
+        Typically `dur` should be given in units of [sec], such that the returned frequencies are
+        in units of [1/sec] = [Hz]
+    num : int,
+        Number of frequency bins.  If `cad` is not None, then the number of frequency bins is
+        determined by `cad` and the `num` value is disregarded.
+    cad : float or `None`,
+        Cadence of observations, which determines the maximum sensitive frequency (i.e. the Nyquist
+        frequency).  If `cad` is not given, then `num` frequency bins are constructed.
+
+    Returns
+    -------
+    cents : (F,) ndarray
+        Bin-center frequencies for `F` bins.  The frequency bin centers are at:
+        ``F_i = (i + 1.5) / dur`` for i between 0 and `num-1`.
+        The number of frequency bins, `F` is the argument `num`,
+        or determined by `cad` if it is given.
+    edges : (F+1,) ndarray
+        Bin-edge frequencies for `F` bins, i.e. `F+1` bin edges.  The frequency bin edges are at:
+        ``F_i = (i + 1) / dur`` for i between 0 and `num`.
+        The number of frequency bins, `F` is the argument `num`,
+        or determined by `cad` if it is given.
+
+    """
     fmin = 1.0 / dur
     if cad is not None:
         num = dur / (2.0 * cad)
@@ -976,6 +1026,48 @@ def quantiles(
     percs = np.array(percs)
     return percs
 
+def random_power(extr, pdf_index, size=1):
+    """Draw from a power-law PDF with the given index, between the given extrema.
+
+    NOTE: The power-law index must correspond to the power-law index of $\frac{dN}{dx}$.
+          You may need to convert, e.g. $dN/dx = \frac{dN}{d \ln x} \frac{1}{x}$.
+
+    Arguments
+    ---------
+    extr : array_like scalar
+        The minimum and maximum value of this array are used as extrema.
+    pdf_index : scalar
+        The power-law index of the PDF distribution to be drawn from.  Any real number is valid,
+        positive or negative.
+        NOTE: the `numpy.random.power` function uses the power-law index of the CDF, i.e. `g+1`
+    size : scalar
+        The number of points to draw (cast to int).
+    **kwags : dict pairs
+        Additional arguments passed to `zcode.math_core.minmax` with `extr`.
+
+    Returns
+    -------
+    rv : (N,) scalar
+        Array of random variables with N=`size` (default, size=1).
+
+    """
+
+    extr = minmax(extr)
+    if np.any(extr <= 0.0):
+        err = f"Cannot draw from negative extrema values!  {extr=}"
+        log.exception(err)
+        raise ValueError(err)
+
+    # if pdf_index == -1:
+    if np.isclose(pdf_index, -1.0, rtol=1e-3):
+        rv = 10**np.random.uniform(*np.log10(extr), size=int(size))
+    else:
+        rr = np.random.random(size=int(size))
+        gex = extr ** (pdf_index+1)
+        rv = (gex[0] + (gex[1] - gex[0])*rr) ** (1./(pdf_index+1))
+
+    return rv
+
 
 def rk4_step(func, x0, y0, dx, args=None, check_nan=0, check_nan_max=5):
     """Perform a single 4th-order Runge-Kutta integration step.
@@ -1028,8 +1120,8 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
 
     """
     try:
-        if len(vals) == 0:        # type: ignore
-            raise TypeError
+        if len(vals) == 0:        #### type: ignore
+            return "[]"
     except TypeError:
         raise TypeError(f"`vals` (shape={np.shape(vals)}) is not iterable!")
 
@@ -1044,6 +1136,17 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
     rv = ", ".join(_rv)
     return rv
 
+def std(vals, weights):
+    """Weighted standard deviation (stdev).
+
+    See: https://www.itl.nist.gov/div898/software/dataplot/refman2/ch2/weightsd.pdf
+    """
+    mm = np.count_nonzero(weights)
+    ave = np.sum(vals*weights) / np.sum(weights)
+    num = np.sum(weights * (vals - ave)**2)
+    den = np.sum(weights) * (mm - 1) / mm
+    std = np.sqrt(num/den)
+    return std
 
 def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = True):
     """Perform a cumulative integration along the given axis.
@@ -1293,7 +1396,7 @@ def _integrate_grid_differential_number(edges, dnum, freq=False):
 
     NOTE: the `edges` provided MUST all be in linear space, mass is converted to ``log10(M)``
     and frequency is converted to ``ln(f)``.
-    NOTE: the density `dnum` MUST correspond to `dn/ [dlog10(M) dq dz dln(f)]`
+    NOTE: the density `dnum` MUST correspond to `d^3 n / [dlog10(M) dq dz dln(f)]`
 
     Parameters
     ----------
@@ -1334,7 +1437,32 @@ def _func_gaussian(xx, aa, mm, ss):
     return yy
 
 
-def fit_gaussian(xx, yy, guess=[1.0, 0.0, 1.0]):
+def fit_gaussian(xx, yy, guess=None):
+    """Fit a Gaussian/Normal distribution with the given initial guess of parameters.
+
+    Arguments
+    ---------
+    xx : array, (N,)
+    yy : array, (N,)
+    guess : None or (3,) array of float
+        Initial parameter values as starting point of fit.  The values correspond to:
+        [amplitude, mean, stdev].
+        If ``guess`` is None, then the maximum, mean, and stdev of the given values are used as a
+        starting point.
+
+    Return
+    ------
+    popt : (3,) array of float
+        Best fit parameters: [amplitude, mean, stdev]
+    pcov : (3, 3) array of float
+        Covariance matrix of best fit parameters.
+
+    """
+    if guess is None:
+        amp = np.max(yy)
+        mean = np.sum(xx * yy) / np.sum(yy)
+        stdev = std(xx, yy)
+        guess = [amp, mean, stdev]
     popt, pcov = sp.optimize.curve_fit(_func_gaussian, xx, yy, p0=guess, maxfev=10000)
     return popt, pcov
 
@@ -1716,7 +1844,24 @@ def rad_isco(m1, m2=0.0, factor=3.0):
     """
     return factor * schwarzschild_radius(m1+m2)
 
+def frst_isco(m1, m2=0.0, **kwargs):
+    """Get rest-frame orbital frequency of ISCO orbit.
 
+    Arguments
+    ---------
+    m1 : array_like, units of [gram]
+        Total mass, or mass of the primary.  Added together with `m2` to get total mass.
+    m2 : array_like, units of [gram]  or  None
+        Mass of secondary, or None if `m1` is already total mass.
+
+    Returns
+    -------
+    fisco : array_like, units of [Hz]
+
+    """
+    risco = rad_isco(m1, m2, **kwargs)
+    fisco = kepler_freq_from_sepa(m1+m2, risco)
+    return fisco
 def redz_after(time, redz=None, age=None):
     """Calculate the redshift after the given amount of time has passed.
 
@@ -1881,7 +2026,30 @@ def angs_from_sepa(sepa, dcom, redz):
     angs = sepa / dang           # angular-separation [radians]
     return angs
 
+def eddington_accretion(mass, eps=0.1):
+    """Eddington Accretion rate, $\\dot{M}_{Edd} = L_{Edd}/\\epsilon c^2$.
 
+    Arguments
+    ---------
+    mass : array_like of scalar
+        BH Mass.
+    eps : array_like of scalar
+        Efficiency parameter.
+
+    Returns
+    -------
+    mdot : array_like of scalar
+        Eddington accretion rate.
+
+    """
+    edd_lum = eddington_luminosity(mass)
+    mdot = edd_lum / eps / np.square(SPLC)
+    return mdot
+
+
+def eddington_luminosity(mass):
+    ledd = EDDT * mass
+    return ledd
 
 # =================================================================================================
 # ====    Gravitational Waves    ====
