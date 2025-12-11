@@ -1131,8 +1131,12 @@ class Evolution:
         return
 
 
-class New_Evolution:
-
+class cEvolution:
+    """
+        New evolution class that uses time, rather than binary separation, as the free parameter.
+        This allows the full circumbinary disk module, including +ve abdot values, 
+        to be used in the evolution calculation.
+    """
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
     _TIME_STEP_MAX = 0.1 * GYR
@@ -1384,10 +1388,10 @@ class New_Evolution:
 
     def at(self, xpar, targets, params=None, coal=None, lin_interp=None):
         if xpar != 'fobs':
-            raise NotImplementedError("Only 'fobs' ({xpar=}) is implemented in New_Evolution!")
+            raise NotImplementedError("Only 'fobs' ({xpar=}) is implemented in cEvolution!")
 
         if (params is not None) or (coal is not None) or (lin_interp is not None):
-            raise NotImplementedError(f"{params=} {coal=} {lin_interp=} are not implemented in New_Evolution!")
+            raise NotImplementedError(f"{params=} {coal=} {lin_interp=} are not implemented in cEvolution!")
 
         if np.any(np.diff(targets) < 0.0):
             raise RuntimeError("`targets` must be monotonically increasing!")
