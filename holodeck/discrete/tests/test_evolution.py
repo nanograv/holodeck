@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 
 import holodeck as holo
-import holodeck.population
-import holodeck.evolution
+from holodeck.discrete import population, evolution
+from holodeck.hardening import Fixed_Time_2PL
 from holodeck.constants import GYR, MSOL, KPC, YR, PC
 
 TIME = 2.0 * GYR
@@ -18,7 +18,7 @@ def test_init_generic_evolution():
 
     SIZE = 10
 
-    class Good_Pop(holo.population._Population_Discrete):
+    class Good_Pop(population._Population_Discrete):
 
         def _init(self):
             self.mass = np.zeros((SIZE, 2))
@@ -33,49 +33,52 @@ def test_init_generic_evolution():
 
     pop = Good_Pop()
     hard = Good_Hard()
-    holo.evolution.Evolution(pop, hard)
-    holo.evolution.Evolution(pop, [hard])
+    evolution.Evolution(pop, hard)
+    evolution.Evolution(pop, [hard])
 
     with pytest.raises(TypeError):
-        holo.evolution.Evolution(pop, pop)
+        evolution.Evolution(pop, pop)
 
     with pytest.raises(TypeError):
-        holo.evolution.Evolution(hard, hard)
+        evolution.Evolution(hard, hard)
 
     with pytest.raises(TypeError):
-        holo.evolution.Evolution(pop, None)
+        evolution.Evolution(pop, None)
 
     with pytest.raises(TypeError):
-        holo.evolution.Evolution(None, hard)
+        evolution.Evolution(None, hard)
 
     return
 
 
 @pytest.fixture(scope='session')
 def evolution_illustris_fixed_time_circ():
-    pop = holo.population.Pop_Illustris()
-    fixed = holo.hardening.Fixed_Time.from_pop(pop, TIME)
-    evo = holo.evolution.Evolution(pop, fixed, nsteps=30)
+    resamp = population.PM_Resample(0.2)
+    pop = population.Pop_Illustris(mods=resamp)
+    fixed = Fixed_Time_2PL.from_pop(pop, TIME)
+    evo = evolution.Evolution(pop, fixed, nsteps=30)
     evo.evolve()
     return evo
 
 
 @pytest.fixture(scope='session')
 def evolution_illustris_fixed_time_eccen():
-    ecc = holo.population.PM_Eccentricity()
-    pop = holo.population.Pop_Illustris(mods=ecc)
-    fixed = holo.hardening.Fixed_Time.from_pop(pop, TIME)
-    evo = holo.evolution.Evolution(pop, fixed, nsteps=30)
+    ecc = population.PM_Eccentricity()
+    resamp = population.PM_Resample(0.2)
+    pop = population.Pop_Illustris(mods=[resamp, ecc])
+    fixed = Fixed_Time_2PL.from_pop(pop, TIME)
+    evo = evolution.Evolution(pop, fixed, nsteps=30)
     evo.evolve()
     return evo
 
 
 @pytest.fixture(scope='session')
 def evo_def():
-    ecc = holo.population.PM_Eccentricity()
-    pop = holo.population.Pop_Illustris(mods=ecc)
-    fixed = holo.hardening.Fixed_Time.from_pop(pop, TIME)
-    evo = holo.evolution.Evolution(pop, fixed, nsteps=30)
+    ecc = population.PM_Eccentricity()
+    resamp = population.PM_Resample(0.2)
+    pop = population.Pop_Illustris(mods=[resamp, ecc])
+    fixed = Fixed_Time_2PL.from_pop(pop, TIME)
+    evo = evolution.Evolution(pop, fixed, nsteps=30)
 
     assert evo._evolved is False
     with pytest.raises(RuntimeError):
@@ -89,9 +92,9 @@ def evo_def():
 
 @pytest.fixture(scope='session')
 def simplest():
-    SIZE = 100
+    SIZE = 35
 
-    class Pop(holo.population._Population_Discrete):
+    class Pop(population._Population_Discrete):
         def _init(self):
             self.mass = (10.0 ** np.random.uniform(6, 10, (SIZE, 2))) * MSOL
             self.sepa = (10.0 ** np.random.uniform(1, 3, SIZE)) * 1e3 * PC
@@ -107,7 +110,7 @@ def simplest():
 
     pop = Pop()
     hard = Hard()
-    evo = holo.evolution.Evolution(pop, hard)
+    evo = evolution.Evolution(pop, hard)
 
     return evo
 
@@ -190,15 +193,16 @@ class Test_Illustris_Fixed:
 class Test_Evolution_Basic:
 
     def test_construction(self):
-        pop = holo.population.Pop_Illustris()
+        resamp = population.PM_Resample(0.2)
+        pop = population.Pop_Illustris(mods=resamp)
         with pytest.raises(TypeError):
-            holo.evolution.Evolution(pop, pop, nsteps=30)
+            evolution.Evolution(pop, pop, nsteps=6)
         with pytest.raises(TypeError):
-            holo.evolution.Evolution(pop, None, nsteps=30)
+            evolution.Evolution(pop, None, nsteps=7)
         with pytest.raises(TypeError):
-            holo.evolution.Evolution(pop, 2.0, nsteps=30)
+            evolution.Evolution(pop, 2.0, nsteps=8)
 
-        holo.evolution.Evolution(pop, holo.hardening.Hard_GW, nsteps=30)
+        evolution.Evolution(pop, holo.hardening.Hard_GW, nsteps=30)
 
         return
 
@@ -426,9 +430,9 @@ class Test_Evolution_Advanced:
 
 def mockup_modified():
 
-    SIZE = 123
+    SIZE = 39
 
-    class Pop(holo.population._Population_Discrete):
+    class Pop(population._Population_Discrete):
 
         def _init(self):
             self.mass = (10.0 ** np.random.uniform(6, 10, (SIZE, 2))) * MSOL
@@ -451,7 +455,7 @@ def mockup_modified():
     pop = Pop()
     hard = Hard()
     mod = Mod()
-    evo = holo.evolution.Evolution(pop, hard, mods=mod)
+    evo = evolution.Evolution(pop, hard, mods=mod)
     return evo
 
 
@@ -572,8 +576,8 @@ class Test_Sesana_Scattering:
 
     def test_basics(self):
         SIZE = 6
-        mmbulge = holo.relations.MMBulge_KH2013()
-        msigma = holo.relations.MSigma_KH2013()
+        mmbulge = holo.host_relations.MMBulge_KH2013()
+        msigma = holo.host_relations.MSigma_KH2013()
         mass = (10.0 ** np.random.uniform(6, 10, (SIZE, 2))) * MSOL
         sepa = (10.0 ** np.random.uniform(1, 3, SIZE)) * PC
 
@@ -608,9 +612,9 @@ class Test_Sesana_Scattering:
 class Test_Dynamical_Friction_NFW:
 
     def test_basics(self):
-        SIZE = 600
-        mmbulge = holo.relations.MMBulge_KH2013()
-        msigma = holo.relations.MSigma_KH2013()
+        SIZE = 11
+        mmbulge = holo.host_relations.MMBulge_KH2013()
+        msigma = holo.host_relations.MSigma_KH2013()
         mass = (10.0 ** np.random.uniform(6, 9, (SIZE, 2))) * MSOL
         sepa = (10.0 ** np.random.uniform(1, 3, SIZE)) * PC
         redz = np.random.uniform(0.1, 2.0, SIZE)
@@ -662,8 +666,8 @@ class Test_Dynamical_Friction_NFW:
 
 @pytest.fixture(scope='session')
 def composite_circ():
-    resamp = holo.population.PM_Resample(0.2)
-    pop = holo.population.Pop_Illustris(mods=resamp)
+    resamp = population.PM_Resample(0.2)
+    pop = population.Pop_Illustris(mods=resamp)
 
     hards = [
         holo.hardening.Hard_GW,
@@ -671,16 +675,16 @@ def composite_circ():
         holo.hardening.Dynamical_Friction_NFW(),
     ]
 
-    evo = holo.evolution.Evolution(pop, hards, debug=True)
+    evo = evolution.Evolution(pop, hards, debug=True)
     evo.evolve()
     return evo
 
 
 @pytest.fixture(scope='session')
 def composite_eccen():
-    resamp = holo.population.PM_Resample(0.2)
-    ecc = holo.population.PM_Eccentricity()
-    pop = holo.population.Pop_Illustris(mods=[ecc, resamp])
+    resamp = population.PM_Resample(0.2)
+    ecc = population.PM_Eccentricity()
+    pop = population.Pop_Illustris(mods=[ecc, resamp])
 
     hards = [
         holo.hardening.Hard_GW,
@@ -688,7 +692,7 @@ def composite_eccen():
         holo.hardening.Dynamical_Friction_NFW(),
     ]
 
-    evo = holo.evolution.Evolution(pop, hards, debug=True)
+    evo = evolution.Evolution(pop, hards, debug=True)
     evo.evolve()
     return evo
 
@@ -757,8 +761,8 @@ class Test_Composite_Hardening:
         assert isinstance(evo_atten._hard[-1], holo.hardening.Dynamical_Friction_NFW), "BAD INSTANCE"
         assert evo_atten._hard[-1]._attenuate is True, "BAD SETTING"
 
-        # resamp = holo.population.PM_Resample(0.2)
-        # pop = holo.population.Pop_Illustris(mods=resamp)
+        # resamp = population.PM_Resample(0.2)
+        # pop = population.Pop_Illustris(mods=resamp)
 
         hards = [
             holo.hardening.Hard_GW,
@@ -766,7 +770,7 @@ class Test_Composite_Hardening:
             holo.hardening.Dynamical_Friction_NFW(attenuate=False),
         ]
 
-        evo_noatt = holo.evolution.Evolution(evo_atten._pop, hards, debug=True)
+        evo_noatt = evolution.Evolution(evo_atten._pop, hards, debug=True)
         evo_noatt.evolve()
 
         # Attenuated DF should always be weaker (less negative) than un-attenuated
@@ -798,15 +802,15 @@ class Test_Composite_Hardening:
         return
 
 
-class Test_Fixed_Time:
+class Test_Fixed_Time_2PL:
 
     def test_circ(self):
-        resamp = holo.population.PM_Resample(0.2)
-        pop = holo.population.Pop_Illustris(mods=resamp)
+        resamp = population.PM_Resample(0.2)
+        pop = population.Pop_Illustris(mods=resamp)
 
         TIME = 2 * GYR
-        fixed = holo.hardening.Fixed_Time.from_pop(pop, TIME)
-        evo = holo.evolution.Evolution(pop, fixed, debug=False)
+        fixed = Fixed_Time_2PL.from_pop(pop, TIME)
+        evo = evolution.Evolution(pop, fixed, debug=False)
         evo.evolve()
 
         assert np.all((evo.dadt < 0.0))
@@ -823,13 +827,13 @@ class Test_Fixed_Time:
         return
 
     def test_eccen(self):
-        resamp = holo.population.PM_Resample(0.2)
-        eccen = holo.population.PM_Eccentricity()
-        pop = holo.population.Pop_Illustris(mods=[resamp, eccen])
+        resamp = population.PM_Resample(0.2)
+        eccen = population.PM_Eccentricity()
+        pop = population.Pop_Illustris(mods=[resamp, eccen])
 
         TIME = 2 * GYR
-        fixed = holo.hardening.Fixed_Time.from_pop(pop, TIME)
-        evo = holo.evolution.Evolution(pop, fixed, debug=False)
+        fixed = Fixed_Time_2PL.from_pop(pop, TIME)
+        evo = evolution.Evolution(pop, fixed, debug=False)
         evo.evolve()
 
         assert np.all((evo.dadt < 0.0))
