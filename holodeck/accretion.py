@@ -113,12 +113,11 @@ class Accretion:
         Examples
         --------
         >>> acc = Accretion()
-        >>> mass =
+        >>> mass = 1.0e8 * MSOL
         >>> print(acc.mdot_eddington(mass))
         """
         from holodeck.constants import SPLC, EDDT
 
-        # medd = (4.*np.pi*NWTG*MPRT)/(eps*SPLC*SIGMA_T) * self.mtot
         medd = self.f_edd * (EDDT/(eps * SPLC**2)) * mass
         return(medd)
 
@@ -133,7 +132,7 @@ class Accretion:
         else:
             """ Get accretion rates as a fraction (f_edd in self._acc) of the
                 Eddington limit from current BH masses """
-            if bin == None: 
+            if bin is None:
                 total_bh_masses = np.sum(evol.mass[:, step, :], axis=-1)
             else:
                 total_bh_masses = np.sum(evol.mass[step, :])
@@ -142,7 +141,7 @@ class Accretion:
         """ Calculate individual accretion rates """
         if self.subpc:
             """ Indices where separation is less than or equal to a parsec """
-            if bin == None:
+            if bin is None:
                 #we are using old evol method, i.e. calculating mdot for all binaries at a given step
                 mdot[evol.sepa[:, step]>PC] = 0.0
             else:
@@ -189,8 +188,7 @@ class Accretion:
         accessed.
 
         """
-        
-        if bin == None:
+        if bin is None:
             m1, m2 = utils.m1m2_ordered(evol.mass[:,step].T[0], evol.mass[:,step].T[1])
         else:
             m1, m2 = utils.m1m2_ordered(*evol.mass[step])
@@ -200,7 +198,7 @@ class Accretion:
             """if evol has an eccentricity distribution,
                we use it, if not, we set each eccentricity to
                the value specified in __init__ """
-            if bin == None:
+            if bin is None:
                 e_b = evol.eccen[:, step] if (evol.eccen is not None) else None
             else:
                 e_b = evol.eccen[step] if (evol.eccen is not None) else None
@@ -251,7 +249,7 @@ class Accretion:
         # After calculating the primary and secondary accretion rates,
         # they need to be placed at the correct index into `mdot_arr`, to
         # account for primary/secondary being at 0-th OR 1-st index
-        if bin == None:
+        if bin is None:
             inds_m1_primary = evol.mass[:,step].T[0] >= evol.mass[:,step].T[1]
             mdot_arr = np.zeros(np.shape(evol.mass[:, step-1, :]))
             mdot_arr[:, 0][inds_m1_primary] = mdot_1[inds_m1_primary]
