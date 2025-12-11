@@ -103,7 +103,7 @@ class Hard_GW(_Hardening):
             Hardening rate in eccentricity, returns negative value, units [1/s].
 
         """
-        if bin == None:
+        if bin is None:
             # we are using old evolution class, supplying bin = None since we integrate all the 
             # binaries at the same time at a given step
             m1, m2 = evo.mass[:, step].T
@@ -218,12 +218,14 @@ class Hard_GW(_Hardening):
 
 class CBD_Torques(_Hardening):
     """Binary Orbital Evolution based on Hydrodynamic Simulations by Siwek+23.
+    https://academic.oup.com/mnras/article/522/2/2707/7131464
 
     This module uses data from Siwek+23, which supplies rates of change of
     binary semi-major axis a_b
     and
     binary eccentricity e_b.
-    The calculation of a_b and e_b versus time requires accretion rates (for scale).
+    The calculation of a_b and e_b versus time requires accretion rates 
+    to scale the magnitude of the orbital migration rates.
     """
 
     CONSISTENT = None
@@ -233,6 +235,13 @@ class CBD_Torques(_Hardening):
 
         Parameters
         ----------
+        
+        f_edd : float
+            Eddington fraction for accretion rate scaling.
+        subpc : bool
+            Whether to use sub-parsec scale calculations.
+        allow_softening : bool
+            Whether to allow positive dadt values (softening).
 
         """
 
@@ -264,7 +273,7 @@ class CBD_Torques(_Hardening):
 
         """
 
-        if bin == None:
+        if bin is None:
             # we are using old evolution class, supplying bin = None since we integrate all the 
             # binaries at the same time at a given step
             mass = evo.mass[:, idx, :]
@@ -287,7 +296,7 @@ class CBD_Torques(_Hardening):
 
         """ CURRENTLY WE CANNOT USE +ve dadt VALUES, SO WE SET THEM TO 0 """
 
-        if bin == None:
+        if bin is None:
             if (not self.allow_softening) and np.any(dadt > 0.0):
                 inds_dadt_pos = dadt > 0.0
                 dadt[inds_dadt_pos] = 0.0
@@ -322,23 +331,7 @@ class CBD_Torques(_Hardening):
             If eccentricity is not being evolved (i.e. `eccen==None`) then `None` is returned.
 
         """
-        # mass = np.atleast_2d(mass)
-        # mtot = mass[:,0] + mass[:,1]
-        # """ MASS RATIO """
-        # m1 = mass[:, 0]
-        # m2 = mass[:, 1]
-        # mrat = m2/m1
-        #m1, m2 = [mass[0], mass[1]] if mass[0] >= mass[1] else [mass[1], mass[0]]
         mtot, mrat = utils.mtmr_from_m1m2(mass)
-        """ secondary and primary can swap indices. need to account for that and reverse the mass ratio """
-        # inds_rev = mrat > 1
-        # mrat[inds_rev] = 1./mrat[inds_rev]
-        """ SEPARATION """
-        # sepa = np.atleast_1d(sepa)
-        """ ECCENTRICITY """
-        # eccen = np.atleast_1d(eccen) if eccen is not None else None
-
-        semimajor_axis = sepa 
 
         """ dadt and dedt from Siwek+23 are parameterized
             by the semimajor axis, mass and accretion rate
@@ -348,7 +341,7 @@ class CBD_Torques(_Hardening):
             [dedt] = 1/s
             which depend on the physical scale
             and accretion rate of the system """
-        dadt = self.SWK23.dadt(mrat, eccen) * semimajor_axis * (mdot/mtot)
+        dadt = self.SWK23.dadt(mrat, eccen) * sepa * (mdot/mtot)
         if eccen is not None:
             dedt =  self.SWK23.dedt(mrat, eccen) * (mdot/mtot)
         else:
@@ -407,7 +400,7 @@ class Sesana_Scattering(_Hardening):
 
         """
 
-        if bin == None:
+        if bin is None:
             # we are using old evolution class, supplying bin = None since we integrate all the 
             # binaries at the same time at a given step
             mass = evo.mass[:, idx, :]
@@ -445,20 +438,11 @@ class Sesana_Scattering(_Hardening):
             If eccentricity is not being evolved (i.e. `eccen==None`) then `None` is returned.
 
         """
-        # mass = np.atleast_2d(mass)
-        # sepa = np.atleast_1d(sepa)
-        # eccen = np.atleast_1d(eccen) if eccen is not None else None
-        # assert np.size(mass) == 2
-        # if np.size(mass) == 2:
-        #     if mass[0] < mass[1]:
-        #         mass = mass[::-1]
-        #     m1, secondary_mass = mass
-        # else:
-        
-        m1,secondary_mass = utils.m1m2_ordered(mass.T[0], mass.T[1])
+        m1,m2 = utils.m1m2_ordered(mass.T[0], mass.T[1])
 
         mtot, mrat = utils.mtmr_from_m1m2(mass)
-
+        
+        """ Make sure that mass ratio is always < 1, and find primary/secondary masses """
         if np.any(mrat>1):
             import sys
             sys.terminate("mrat>1 in stellar scattering.")
@@ -466,15 +450,7 @@ class Sesana_Scattering(_Hardening):
         mbulge = self._mmbulge.mbulge_from_mbh(mtot, scatter=False)
         vdisp = self._msigma.vdisp_from_mbh(mtot, scatter=False)
         dens = _density_at_influence_radius_dehnen(mtot, mbulge, self._gamma_dehnen)
-
-        """ Make sure that mass ratio is always < 1, and find primary/secondary masses """
-        # mass_ratio_test = mass[:, 1]/mass[:, 0]
-        # inds_mrat_1 = mass_ratio_test>1
-        # secondary_mass = np.zeros(np.shape(mass[:, 1]))
-        # secondary_mass[inds_mrat_1] = mass[:, 0][inds_mrat_1]
-        # secondary_mass[~inds_mrat_1]  = mass[:, 1][~inds_mrat_1]
-        #bug fix below: previously used mass[:,1] as secondary mass, this is not always true
-        rhard = _Quinlan1996.radius_hardening(secondary_mass, vdisp)
+        rhard = _Quinlan1996.radius_hardening(m2, vdisp)
         hh = self._shm06.H(mrat, sepa/rhard)
         dadt = _Quinlan1996.dadt(sepa, dens, vdisp, hh)
 
@@ -601,10 +577,6 @@ class Dynamical_Friction_NFW(_Hardening):
             eccen = evo.eccen[idx] if (evo.eccen is not None) else None
             dt = evo._tlook_init[bin] - evo.tlook[idx]   # positive time-duration since 'formation'
             redz = evo.redz[idx]
-        # NOTE `scafa` is nan for systems "after" redshift zero (i.e. do not merge before redz=0)
-        # redz = np.zeros_like(sepa)
-        # val = (evo.scafa[idx] > 0.0)
-        # redz[val] = cosmo.a_to_z(evo.scafa[val, step])
 
         dadt, dedt = self._dadt_dedt(mass, sepa, redz, dt, eccen, attenuate)
         return dadt, dedt
@@ -636,11 +608,6 @@ class Dynamical_Friction_NFW(_Hardening):
             `None` is returned if the input `eccen` is None.
 
         """
-        # assert np.shape(mass)[-1] == 2 and np.ndim(mass) <= 2
-        # mass = np.atleast_2d(mass)
-        # redz = np.atleast_1d(redz)
-        # assert np.shape(mass) == (2,)
-        # m1, m2 = utils.m1m2_ordered(*mass)
         m1,m2 = utils.m1m2_ordered(mass.T[0], mass.T[1])
         mtot = m1 + m2
 
@@ -784,7 +751,7 @@ class Dynamical_Friction_NFW(_Hardening):
         # inds_wrongq = (m2/m1)>1
         q_fixed = m2/m1
         if np.any(q_fixed > 1.0):
-            raise
+            raise ValueError("Mass ratio greater than 1 encountered")
         # q_fixed[inds_wrongq] = 1./(q_fixed[inds_wrongq])
         #then calculate attenuation coefficient with correct mass ratio
         atten_lc = np.power(q_fixed, 1.75) * nstar * np.power(rbnd/rstar, 6.75) * (rlc / sepa)
