@@ -1534,7 +1534,7 @@ class Fixed_Time_2PL_SAM(_Hardening):
         shape = args[0].shape
         args = [aa.flatten() for aa in args]
         mtot, mrat, sepa, norm = args
-        dadt_vals = holo.sams.cyutils.hard_func_2pwl_gw(
+        dadt_vals = holo.sams.sam_cyutils.hard_func_2pwl_gw(
             mtot, mrat, sepa, norm,                             # must all be 1darrays of matching size (X,)
             self._rchar, self._gamma_inner, self._gamma_outer   # must all be scalars
         )
