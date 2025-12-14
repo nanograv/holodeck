@@ -541,7 +541,7 @@ class Test_Hard_GW:
 
         step = np.random.randint(evo.steps)
         print(f"step = {step}")
-        dadt, dedt = holo.hardening.Hard_GW.dadt_dedt(evo, step)
+        dadt, dedt = holo.hardening.Hard_GW.dadt_dedt(evo, None, step)
         assert np.shape(dadt) == (evo.size,)
         assert np.shape(dedt) == (evo.size,)
         assert np.all(dadt <= 0.0)
