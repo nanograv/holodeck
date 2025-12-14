@@ -1157,8 +1157,8 @@ class cEvolution:
         self._nhards = len(hard)
 
         # Make sure types look right
-        if not isinstance(pop, holo.population._Population_Discrete):
-            err = f"`pop` is {pop}, must be subclass of `holo.population._Population_Discrete`!"
+        if not isinstance(pop, population._Population_Discrete):
+            err = f"`pop` is {pop}, must be subclass of `population._Population_Discrete`!"
             log.exception(err)
             raise TypeError(err)
 
