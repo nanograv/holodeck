@@ -535,7 +535,7 @@ def run_sam_at_pspace_num(args, space, pnum):
         True if this simulation was successfully run.
 
     """
-    from holodeck.sams import cyutils as sam_cyutils
+    from holodeck.sams import sam_cyutils
     log = args.log
 
     # ---- get output filename for this simulation, check if already exists
@@ -670,7 +670,7 @@ def run_model(sam, hard, nreals, nfreqs, nloudest=5,
               gwb_flag=True, details_flag=False, singles_flag=False, params_flag=False):
     """Run the given modeling, storing requested data
     """
-    from holodeck.sams import cyutils as sam_cyutils
+    from holodeck.sams import sam_cyutils
     fobs_cents, fobs_edges = holo.librarian.get_freqs(None)
     if nfreqs is not None:
         fobs_edges = fobs_edges[:nfreqs+1]
