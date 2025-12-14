@@ -1000,8 +1000,16 @@ class Fixed_Time_2PL(_Hardening):
             `None` is returned if the input `eccen` is None.
 
         """
-        mass = evo.mass[step, :]
-        sepa = evo.sepa[step]
+        if bin is None:
+            #we are using the old evolution class and hence we integrate
+            #binaries at the same time at a give step
+            mass = evo.mass[:, step, :]
+            sepa = evo.sepa[:, step]
+        else:
+            #in new evolution class, we give each binary an index ('bin') and
+            # we loop over individual binaries
+            mass = evo.mass[step, :]
+            sepa = evo.sepa[step]
         mt, mr = utils.mtmr_from_m1m2(mass)
         dadt, _dedt = self._dadt_dedt(mt, mr, sepa, self._norm, self._rchar, self._gamma_inner, self._gamma_outer)
         dedt = None if evo.eccen is None else np.zeros_like(dadt)
