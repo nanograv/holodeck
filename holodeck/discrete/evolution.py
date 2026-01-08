@@ -846,7 +846,7 @@ class Evolution:
                 and binary masses are evolved through accretion
                 First, get total accretion rates """
 
-            mdot_t = self._acc.mdot_total(self, None, left)
+            mdot_t = self._acc.mdot_total(self, left, None)
             """ A preferential accretion model is called to divide up
                 total accretion rates into primary and secondary accretion rates """
             #set bin = None
@@ -926,11 +926,11 @@ class Evolution:
                 First, get total accretion rates """
 
             #set bin = None
-            mdot_t = self._acc.mdot_total(self, None, step-1)
+            mdot_t = self._acc.mdot_total(self, step-1, None)
             """ A preferential accretion model is called to divide up
                 total accretion rates into primary and secondary accretion rates """
             #set bin = None
-            self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_t, self, None, step-1)
+            self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_t, self,step-1, None)
             """ Accreted mass is calculated and added to primary and secondary masses """
             if self._acc.evol_mass:
                 #this switch helps to separate out accretion effects from other cbd effects
@@ -975,7 +975,7 @@ class Evolution:
             # [MSS 2023/09/29]: New hard.dadt_dedt takes
             # 'bin' as well as 'step' argument, (see new evolution class)
             # so we set bin = None here
-            _hard_dadt, _ecc = hard.dadt_dedt(self, None, step)
+            _hard_dadt, _ecc = hard.dadt_dedt(self, step)
             dadt[:] += _hard_dadt
             if self._debug:    # nocov
                 log.debug(f"{step} hard={hard} : dadt = {utils.stats(_hard_dadt)}")
@@ -1424,13 +1424,13 @@ class cEvolution:
         dadt = np.zeros(self._nhards)
         dedt = None if (self.eccen is None) else np.zeros_like(dadt)
         for ii, hard in enumerate(self._hard):
-            dadt[ii], _hard_dedt = hard.dadt_dedt(self, bin, step)
+            dadt[ii], _hard_dedt = hard.dadt_dedt(self, step, bin=bin)
             if (dedt is not None):
                 dedt[ii] = _hard_dedt
 
         if self._acc is not None:
-            _mdot_tot = self._acc.mdot_total(self, bin, step)
-            mdot = self._acc.pref_acc(_mdot_tot, self, bin, step)
+            _mdot_tot = self._acc.mdot_total(self, step, bin)
+            mdot = self._acc.pref_acc(_mdot_tot, self, step, bin)
         else:
             mdot = 0.0
 

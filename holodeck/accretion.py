@@ -121,7 +121,7 @@ class Accretion:
         medd = self.f_edd * (EDDT/(eps * SPLC**2)) * mass
         return(medd)
 
-    def mdot_total(self, evol, bin, step):
+    def mdot_total(self, evol, step, bin=None):
         from holodeck.constants import PC
 
         if self.mdot_ext is not None:
@@ -151,7 +151,7 @@ class Accretion:
 
         return mdot
 
-    def pref_acc(self, mdot, evol, bin, step):
+    def pref_acc(self, mdot, evol, step, bin=None):
         """
         Contains a variety of accretion models to choose from to calculate primary vs secondary
         accretion rates.

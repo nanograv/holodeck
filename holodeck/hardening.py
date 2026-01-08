@@ -73,8 +73,21 @@ class _Hardening(abc.ABC):
     CONSISTENT = None
 
     @abc.abstractmethod
-    def dadt_dedt(self, evo, bin, step, *args, **kwargs):
+    def dadt_dedt(self, evo, step, *args, **kwargs):
         pass
+
+    def dadt(self, *args, **kwargs):
+        rv_dadt, _dedt = self.dadt_dedt(*args, **kwargs)
+        return rv_dadt
+
+    def dedt(self, *args, **kwargs):
+        _dadt, rv_dedt = self.dadt_dedt(*args, **kwargs)
+        return rv_dedt
+
+
+# =================================================================================================
+# ====    Physical Hardening Classes    ====
+# =================================================================================================
 
 
 class Hard_GW(_Hardening):
@@ -84,7 +97,7 @@ class Hard_GW(_Hardening):
     CONSISTENT = False
 
     @staticmethod
-    def dadt_dedt(evo, bin, step):
+    def dadt_dedt(evo, step, bin=None):
         """Calculate GW binary evolution (hardening rate) in semi-major-axis and eccentricity.
 
         Parameters
@@ -94,6 +107,11 @@ class Hard_GW(_Hardening):
         step : int
             Evolution integration step index from which to load binary parameters.
             e.g. separations are loaded as ``evo.sepa[:, step]``.
+        bin : int or None
+            If `None`, we are using the old evolution class, supplying `bin = None` since we integrate all the 
+            binaries at the same time at a given step.
+            If an integer index, we are using the new evolution class, and `bin` specifies which binary
+            we are calculating the hardening rate for.
 
         Returns
         -------
@@ -254,7 +272,7 @@ class CBD_Torques(_Hardening):
 
         return
 
-    def dadt_dedt(self, evo, bin, idx):
+    def dadt_dedt(self, evo, idx, bin=None):
         """Circumbinary Disk Torque hardening rate.
 
         Parameters
@@ -290,7 +308,7 @@ class CBD_Torques(_Hardening):
         """ An instance of the accretion class has been supplied,
             and binary masses are evolved through accretion
             Get total accretion rates """
-        mdot = evo._acc.mdot_total(evo, bin, idx)
+        mdot = evo._acc.mdot_total(evo, idx, bin)
 
         dadt, dedt = self._dadt_dedt(mass, sepa, eccen, mdot)
 
@@ -381,7 +399,7 @@ class Sesana_Scattering(_Hardening):
         self._shm06 = _SHM06()
         return
 
-    def dadt_dedt(self, evo, bin, idx):
+    def dadt_dedt(self, evo, idx, bin=None):
         """Stellar scattering hardening rate.
 
         Parameters
@@ -533,7 +551,7 @@ class Dynamical_Friction_NFW(_Hardening):
         self._time_dynamical = None
         return
 
-    def dadt_dedt(self, evo, bin, idx, attenuate=None):
+    def dadt_dedt(self, evo, idx, bin=None, attenuate=None):
         """Calculate DF hardening rate given `Evolution` instance, and an integration `step`.
 
         Parameters
@@ -981,7 +999,7 @@ class Fixed_Time_2PL(_Hardening):
 
     # ====     Hardening Rate Methods    ====
 
-    def dadt_dedt(self, evo, bin, step):
+    def dadt_dedt(self, evo, step, bin=None):
         """Calculate hardening rate at the given integration `step`, for the given population.
 
         Parameters
