@@ -273,7 +273,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
 
     if np.any(num_pois > 0):
         # Find the L loudest binaries in each realizations
-        loud = np.sort(temp[:, np.newaxis] * (num_pois > 0), axis=0)[::-1, :]
+        loud = np.sort(temp[:, np.newaxis] * (num_pois > 0) / dlnf, axis=0)[::-1, :]
         fore = loud[0, :]
         loud = loud[:loudest, :]
     else:
@@ -719,7 +719,9 @@ def char_strain_sq_from_bin_edges_redz(edges, redz):
 
     # convert from observer-frame to rest-frame; still using frequency-bin centers
     fr = utils.frst_from_fobs(fc[np.newaxis, np.newaxis, np.newaxis, :], redz)
-
+    # redz is set to -np.inf instead of -1, which makes fr negative and creates a nan error in hs calculation
+    # so, to avoid nan, setting those fr to zero
+    fr[fr<0] = 0.0
     hs = utils.gw_strain_source(mc, dc, fr)
     hc2 = (hs ** 2) * (fc / df)
     return hc2

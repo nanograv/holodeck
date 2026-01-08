@@ -836,6 +836,8 @@ def run_model(
             data['hc_bg'] = hc_bg
 
     if gwb_flag:
+        negative_mask = use_redz < 0.0 # galaxy mergers that stall
+        use_redz[negative_mask] = -np.inf # set to -inf so they can't contribute to GWB
         gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, nreals)
         data['gwb'] = gwb
 
