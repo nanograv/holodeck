@@ -80,7 +80,7 @@ def test_interp_at_fobs_1():
     evo.dedt = [dedt]
     evo.mass = mass
     #adding a dummy mdot attribute to evo
-    evo.mdot = [np.zeros_like(sepa)]
+    evo.mdot = np.zeros_like(sepa)
     
     
 
@@ -169,7 +169,7 @@ def test_interp_at_fobs_2():
     evo.dadt = [sepa]
     evo.dedt = [dedt]
     evo.mass = mass
-    evo.mdot = [np.zeros_like(sepa)]
+    evo.mdot = np.zeros_like(sepa)
 
     bin, target, m1, m2, redz, eccen, dadt, dedt = holo.discrete_cyutils.interp_at_fobs(evo, target_fobs)
 
