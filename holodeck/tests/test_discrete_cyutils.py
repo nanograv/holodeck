@@ -84,8 +84,9 @@ def test_interp_at_fobs_1():
     
     
 
-    bin, target, m1, m2, redz, eccen, dadt, dedt = holo.discrete_cyutils.interp_at_fobs(evo, target_fobs)
+    bin, interp_idx, m1, m2, mdot1, mdot2, redz, sepa, eccen, dadt, dedt = holo.discrete_cyutils.interp_at_fobs(evo, target_fobs)
 
+    target = interp_idx
     assert len(target) == len(answer_targets)
     for ii in range(len(target)):
         lo_0 = answer_mass_lo[ii] * m0[0]
@@ -171,8 +172,9 @@ def test_interp_at_fobs_2():
     evo.mass = mass
     evo.mdot = np.zeros_like(mass)
 
-    bin, target, m1, m2, redz, eccen, dadt, dedt = holo.discrete_cyutils.interp_at_fobs(evo, target_fobs)
+    bin, interp_idx, m1, m2, mdot1, mdot2, redz, sepa, eccen, dadt, dedt = holo.discrete_cyutils.interp_at_fobs(evo, target_fobs)
 
+    target = interp_idx
     print(f"truth  ={answer_targets}")
     print(f"test   ={target}")
     assert len(target) == len(answer_targets)
