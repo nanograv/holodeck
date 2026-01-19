@@ -743,6 +743,10 @@ cdef int _dynamic_binary_number_at_fobs_gw(
                     target_frst_orb = ftarget * (1.0 + rzp)
                     # if target frequency is above ISCO freq, then all future ones will be also, so: break
                     if target_frst_orb > frst_orb_isco:
+                        # but still fill in the final redshifts (redz_final)
+                        for fp in range(ff+1, n_freq):
+                            redz_final[ii, jj, kk, fp] = rzp
+
                         break
 
                     # get comoving distance
