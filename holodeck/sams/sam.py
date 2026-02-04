@@ -812,6 +812,34 @@ class Semi_Analytic_Model:
 
         return gwb
 
+    def gwb_new_nima(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100):
+        """Calculate GWB using new cython implementation, 10x faster!
+        """
+        from . import sam_cyutils
+
+        assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
+
+        fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
+
+        # convert to orbital-frequency (from GW-frequency)
+        fobs_orb_edges = fobs_gw_edges / 2.0
+        fobs_orb_cents = fobs_gw_cents / 2.0
+
+        # ---- Calculate number of binaries in each bin
+
+        redz_final, diff_num = sam_cyutils.dynamic_binary_number_at_fobs(
+            fobs_orb_cents, self, hard, cosmo
+        )
+
+        edges = [self.mtot, self.mrat, self.redz, fobs_orb_edges]
+        number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
+
+        # ---- Get the GWB spectrum from number of binaries over grid
+
+        # gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
+
+        return edges, redz_final, number, realize
+    
     def gwb_old(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=100):
         """Calculate GWB using new `dynamic_binary_number_at_fobs` method, better, but slower.
         """

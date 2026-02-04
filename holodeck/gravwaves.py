@@ -524,10 +524,10 @@ def _gws_from_number_grid_integrated_redz(edges, redz, number, realize, sum=True
             log.warning(f"`sum`={sum} :: this requires a large amount of memory!")
             shape = number.shape + (realize,)
             hc2 = hc2[..., np.newaxis] * poisson_as_needed(number[..., np.newaxis] * np.ones(shape))
-            if holo.sam._DEBUG:
-                log.info(f"number = {utils.stats(number)}")
-                log.info(f"hc2 = {utils.stats(hc2)}")
-                holo.sam._check_bads(edges + [np.arange(realize),], hc2, "hc2")
+            # if holo.sams.sam._DEBUG:
+            #     log.info(f"number = {utils.stats(number)}")
+            #     log.info(f"hc2 = {utils.stats(hc2)}")
+            #     holo.sam._check_bads(edges + [np.arange(realize),], hc2, "hc2")
 
     else:
         err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
@@ -754,7 +754,7 @@ def strain_amp_from_bin_edges_redz(edges, redz):
     fr = utils.frst_from_fobs(fc[np.newaxis, np.newaxis, np.newaxis, :], redz)
 
     hs = utils.gw_strain_source(mc, dc, fr)
-    return hs
+    return hs, mc, redz
 
 
 def char_strain_sq_from_bin_edges(edges):
