@@ -140,7 +140,10 @@ def mbh_mass_func_conv(self, mbh, redz, mmbulge, scatter=None):
         bhmf_conv = np.zeros_like(mbh_log10)
 
         for i, logMbh in enumerate(mbh_log10):
-            logMbh_mean = np.log10(mmbulge._mamp_z/MSOL) + mmbulge._mplaw_z * (mstar_log10 - 11.0)
+            mamp_z = mmbulge._mamp * (1.0 + redz)**mmbulge._zplaw_amp
+            mplaw_z = mmbulge._mplaw * (1.0 + redz)**mmbulge._zplaw_slope
+
+            logMbh_mean = np.log10(mamp_z/MSOL) + mplaw_z * (mstar_log10 - 11.0)
             pdf = stnorm.pdf(logMbh, loc=logMbh_mean, scale=scatter)
             bhmf_conv[i] = np.trapz(ndens * pdf, mstar_log10)
         

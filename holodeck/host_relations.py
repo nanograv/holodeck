@@ -703,6 +703,7 @@ class MMBulge_Standard(_MMBulge_Relation):
         self._scatter_dex = scatter_dex
         self._zplaw_amp = 0.0               #: Mass-Amplitude evolution parameter (0 for no evolution)
         self._zplaw_slope = 0.0             #: Mass Power-law index (0 for no evolution)
+        self._zplaw_scatter = 0.0
 
         if len(kwargs) > 0:
             warn = f"Unused parameters passed to {self}!  {kwargs=}"
@@ -860,16 +861,16 @@ class MMBulge_Redshift(MMBulge_Standard):
             redz = np.broadcast_to(redz, mbulge.T.shape).T
         except:
             redz = redz
-        self._mamp_z = self._mamp * (1.0 + redz)**self._zplaw_amp
-        self._mplaw_z = self._mplaw * (1.0 + redz)**self._zplaw_slope
-        mbh = _log10_relation(mbulge, self._mamp_z, self._mplaw_z, self._scatter_dex_z, x0=self._mref)
+        mamp_z = self._mamp * (1.0 + redz)**self._zplaw_amp
+        mplaw_z = self._mplaw * (1.0 + redz)**self._zplaw_slope
+        mbh = _log10_relation(mbulge, mamp_z, mplaw_z, self._scatter_dex_z, x0=self._mref)
         return mbh
 
     def mbulge_from_mbh(self, mbh, redz, scatter):
         self._scatter_dex_z = self._scatter_dex + self._zplaw_scatter * np.log10(1.0 + redz) if scatter else None
-        self._mamp_z = self._mamp * (1.0 + redz)**self._zplaw_amp
-        self._mplaw_z = self._mplaw * (1.0 + redz)**self._zplaw_slope
-        mbulge = _log10_relation_reverse(mbh, self._mamp_z, self._mplaw_z, self._scatter_dex_z, x0=self._mref)
+        mamp_z = self._mamp * (1.0 + redz)**self._zplaw_amp
+        mplaw_z = self._mplaw * (1.0 + redz)**self._zplaw_slope
+        mbulge = _log10_relation_reverse(mbh, mamp_z, mplaw_z, self._scatter_dex_z, x0=self._mref)
         return mbulge
 
 class MMBulge_Redshift_MM2013(MMBulge_Redshift):
