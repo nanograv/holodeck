@@ -158,7 +158,7 @@ class _PS_Astro_Strong(_Param_Space):
 
     """
 
-    __version__ = "0.2"
+    __version__ = "0.3"
 
     DEFAULTS = dict(
         # Hardening model (phenom 2PL)
