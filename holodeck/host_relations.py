@@ -805,10 +805,11 @@ class MMBulge_MM2013(MMBulge_Standard):
 
 
 class MMBulge_Redshift(MMBulge_Standard):
-    """Mbh-Mbulge relation with an additional redshift power-law dependence. See Matt et al. (2026) for testing of evolving normalization.
+    """Mbh-Mbulge relation with an additional redshift power-law dependence. See Matt et al. (2026a) for testing of evolving normalization
+    and Matt et al. (2026b) for testing of evolving scatter.
 
-    Provides black hole mass as a function of galaxy bulge mass and redshift with a normalization
-    that depends on redshift. ``zplaw_amp=0``, ``zplaw_slope=0``, ``zplaw_slope=0`` (default) is identical to MMBulge_Standard.
+    Provides black hole mass as a function of galaxy bulge mass and redshift with normalization, slope, and scatter which can
+    depends on redshift. ``zplaw_amp=0``, ``zplaw_slope=0``, ``zplaw_scatter=0`` (default) is identical to MMBulge_Standard.
     ``mamp = mamp0 * (1 + z)**zplaw_amp``.
     ``mplaw = mplaw0 * (1 + z)**zplaw_slope``
     ``log10(10**_scatter_dex * (1.0 + z)**_zplaw_scatter)``..
