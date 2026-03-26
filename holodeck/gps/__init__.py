@@ -1,6 +1,5 @@
 """
 """
-
 from holodeck import log
 
 try:
@@ -16,7 +15,6 @@ except ImportError as err:
         "the required packages manually for now, and feel free to raise a github issue."
     )
     raise
-
 # ---- Import submodules
 
 # from . import gp_utils        # noqa

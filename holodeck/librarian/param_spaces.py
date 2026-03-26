@@ -166,7 +166,7 @@ class _PS_Astro_Strong(_Param_Space):
         hard_sepa_init=1e4,     # [pc]
         hard_rchar=10.0,        # [pc]
         hard_gamma_inner=-1.0,
-        hard_gamma_outer=0.0,
+        hard_gamma_outer=+2.5,
 
         # Galaxy stellar-mass Function (``GSMF_Double_Schechter``)
         # Parameters are based on `double-schechter.ipynb` conversions from [Leja2020]_

@@ -6,13 +6,12 @@ import pytest
 
 # import holodeck as holo
 from holodeck.constants import MSOL
-
 from holodeck.sams import components
 
 
 def _test_abc_parent(parent_class):
 
-    # Parent = components._Galaxy_Pair_Fraction
+    # Parent = comps._Galaxy_Pair_Fraction
 
     # Make sure the abc cannot be instantiated directly
     with pytest.raises(TypeError):
@@ -119,6 +118,17 @@ def test_GMT_Power_Law():
 
 def test_gmr_base():
     _test_abc_parent(components._Galaxy_Merger_Rate)
+    return
+
+
+def test_GMR_Power_Law():
+    gmr = components.GMR_Power_Law()
+    SIZE = 100
+    mstar = MSOL * (10.0**np.random.uniform(10, 15, SIZE))
+    mrat = 10.0 ** np.random.uniform(-4, 0.0, SIZE)
+    redz = np.random.uniform(0.0, 10.0, SIZE)
+
+    vals = gmr(mstar, mrat, redz)   # noqa
     return
 
 

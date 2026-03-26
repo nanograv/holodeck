@@ -26,11 +26,21 @@ with open(join('.', "requirements.txt"), "r") as handle:
 with open(join('.', 'holodeck', 'version.txt')) as handle:
     version = handle.read().strip()
 
+# with open("README.md", "r") as handle:
+#     long_description = handle.read()
+
+# with open("requirements.txt", "r") as handle:
+#     requirements = handle.read()
+
+# with open('holodeck/version.txt') as handle:
+#     version = handle.read().strip()
+
 
 # ---- Handle cython submodules ----
 
 ext_cyutils = Extension(
     "holodeck.cyutils",    # specify the resulting name/location of compiled extension
+    #sources=[join('.', 'holodeck', 'sams', 'sam_cyutils.pyx')],   # location of source code
     sources=[join('.', 'holodeck', 'cyutils.pyx')],   # location of source code
     # define parameters external libraries
     include_dirs=[
@@ -65,8 +75,26 @@ ext_sam_cyutils = Extension(
     extra_compile_args=['-Wno-unreachable-code-fallthrough', '-Wno-unused-function'],
 )
 
+ext_discrete_cyutils = Extension(
+    "holodeck.discrete_cyutils",    # specify the resulting name/location of compiled extension
+    sources=[join('.', 'holodeck', 'discrete_cyutils.pyx')],   # location of source code
+    # define parameters external libraries
+    include_dirs=[
+        np.get_include()
+    ],
+    library_dirs=[
+        abspath(join(np.get_include(), '..', '..', 'random', 'lib')),
+        abspath(join(np.get_include(), '..', 'lib'))
+    ],
+    libraries=['npyrandom', 'npymath'],
+
+    # Silence some undesired warnings
+    define_macros=[('NPY_NO_DEPRECATED_API', 0)],
+    extra_compile_args=['-Wno-unreachable-code-fallthrough', '-Wno-unused-function'],
+)
+
 cython_modules = cythonize(
-    [ext_cyutils, ext_sam_cyutils],
+    [ext_cyutils, ext_sam_cyutils, ext_discrete_cyutils],
     compiler_directives={"language_level": "3"},
     annotate=True,   # create html output about cython files
 )
@@ -110,4 +138,5 @@ setup(
             'holodeck_fit_spec = holodeck.librarian.fit_spectra:main',
         ],
     },
+
 )

@@ -125,7 +125,7 @@ def sam_lib_combine(
     lib_path = lib_tools.get_sam_lib_fname(path_output, gwb_only, library=library)
     if lib_path.exists():
         lvl = log.INFO if recreate else log.WARNING
-        log.log(lvl, f"combined library already exists: {lib_path}, run with `-r` to recreate.")
+        log.log(lvl, f"Combined library already exists: {lib_path}, run with `-r` to recreate.")
         if not recreate:
             return
 
@@ -135,7 +135,7 @@ def sam_lib_combine(
 
     if path_pspace is None:
         path_pspace = path_output
-    pspace, pspace_fname = lib_tools.load_pspace_from_path(path_pspace, log=log)
+    pspace, pspace_fname = lib_tools.load_pspace_from_path(path_pspace)
     args, args_fname = holo.librarian.gen_lib.load_config_from_path(path_pspace, log=log)
 
     log.info(f"loaded param space: {pspace} from '{pspace_fname}'")

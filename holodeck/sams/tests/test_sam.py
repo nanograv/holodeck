@@ -103,8 +103,6 @@ def test_sam_basics__gsmf_double_chechter():
     _test_sam_basics(sam)
 
     return
-
-
 # ===========================================
 # ====    Test: dynamic_binary_number    ====
 # ===========================================

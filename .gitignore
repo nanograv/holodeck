@@ -70,6 +70,10 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+notebooks/*.pkl
+# notebooks for CBD tutorials, will be modified and included after merge with dev
+notebooks/cbd/*.ipynb
+notebooks/cbd/*.py
 
 # pyenv
 .python-version
