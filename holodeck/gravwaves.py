@@ -5,6 +5,7 @@ Currently the components here are used with the 'discrete' / 'illustris' populat
 and not the semi-analytic or observational population models.
 
 """
+
 from typing import Any
 import numba
 import numpy as np
@@ -13,10 +14,11 @@ import kalepy as kale
 
 import holodeck as holo
 from holodeck import utils, cosmo, log, hardening
-from holodeck.constants import SPLC, NWTG, MPC
+#from holodeck.constants import SPLC, NWTG, MPC
+from holodeck.constants import SPLC, NWTG, MPC, MSOL, PC
 
 
-_CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen', 'mdot']
+_CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen']
 
 
 class Grav_Waves:
@@ -89,6 +91,7 @@ class GW_Discrete(Grav_Waves):
         self.harms = harms
         return
 
+
 class LISA:
 
     def __init__(self, mission_duration_yrs=5.0, fobs=(1.0e-7, 1.0, 1000)):
@@ -148,7 +151,6 @@ class LISA:
         return self.is_above_hc_curve(ff, hc)
 
 
-
 def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, loudest=5):
     """Calculate GW signal at range of frequency harmonics for a single observer-frame GW frequency.
 
@@ -194,11 +196,14 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     # (H,) observer-frame orbital-frequency for each harmonic
     fobs_orb = fobs_gw / harm_range
     # Each parameter will be (N, H) = (binaries, harmonics)
-    data_harms = evo.at('fobs', fobs_orb, params=_CALC_MC_PARS)
+    data_harms = evo.at('fobs', fobs_orb, params=_CALC_MC_PARS) 
 
     # Only examine binaries reaching the given locations before redshift zero (other redz=inifinite)
     # (N, H)
     redz = data_harms['scafa']
+
+    print(f"\nDEBUG: {fobs_gw=}\n")
+
     redz = cosmo.a_to_z(redz)
     valid = (redz > 0.0)
     # There are 'V' valid == True elements of the (N, H) arrays, such that V <= N*H
@@ -207,7 +212,6 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     # Broadcast harmonics numbers to correct shape, (N, H)
     harms_2d = np.ones_like(redz, dtype=int) * harm_range[np.newaxis, :]
     harms_1d = harms_2d[valid]
-
 
     # ---- Handle Eccentricities and eccentricity distribution function
 
@@ -247,26 +251,26 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     frst_orb = frst_orb[valid]
     # Calculate required parameters for valid binaries (V,)
     dcom = cosmo.z_to_dcom(redz)
-
     mchirp = data_harms['mass'][valid]
     mchirp = utils.chirp_mass(*mchirp.T)
+    
+    # TO DO: clean up binary params calculation and create option to return this info for each freq
+    sepa = data_harms['sepa'][valid] ## debug
+    mtot, mrat = utils.mtmr_from_m1m2(data_harms['mass'][valid]) ## debug
+    mpri = mtot / (1 + mrat) ## debug
+    print(f"*** DEBUG *** {mrat.min()=}, {mrat.max()}")
+    
     # Calculate strains from each source
     hs2 = utils.gw_strain_source(mchirp, dcom, frst_orb)**2
 
-    dfdt_mdot=getattr(evo, 'dfdt_mdot', False) #checks if dfdt_mdot attribute exists in evo
-    dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], \
-                                   data_harms['sepa'][valid], \
-                                   mtot = data_harms['mass'][valid].sum(axis=-1),\
-                                   frst_orb=frst_orb,\
-                                   mdot = data_harms['mdot'][valid].sum(axis=-1), \
-                                   dfdt_mdot=dfdt_mdot)
-
+    dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], data_harms['sepa'][valid], frst_orb=frst_orb)
     _lambda_fact = utils.lambda_factor_dlnf(frst_orb, dfdt, redz, dcom=dcom) / box_vol
     num_binaries = _lambda_fact * dlnf
-
+    
     shape = (num_binaries.size, nreals)
     num_pois = poisson_as_needed(num_binaries[:, np.newaxis] * np.ones(shape))
 
+    
     # --- Calculate GW Signals
     temp = hs2 * gne * (2.0 / harms_1d)**2
     both = np.sum(temp[:, np.newaxis] * num_pois / dlnf, axis=0)
@@ -280,13 +284,48 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
 
     if np.any(num_pois > 0):
         # Find the L loudest binaries in each realizations
-        loud = np.sort(temp[:, np.newaxis] * (num_pois > 0) / dlnf, axis=0)[::-1, :]
+        #loud = np.sort(temp[:, np.newaxis] * (num_pois > 0), axis=0)[::-1, :]
+        temp_to_sort = temp[:, np.newaxis] * (num_pois > 0)
+        print(f"{temp.shape=}, {gwb_harms.shape=}, {num_pois.shape=}, {both.shape=}, {temp_to_sort.shape=}") #,{mchirp_to_sort.shape=}, {redz_to_sort.shape=}")
+        #debug_loud = np.sort(temp[:, np.newaxis] * (num_pois > 0), axis=0)[::-1, :]
+        idx_loud = np.argsort(temp_to_sort, axis=0)[::-1, :]
+        loud = np.take_along_axis(temp_to_sort, idx_loud, axis=0)
+        print(f"{idx_loud.shape=}, {loud.shape=}")
         fore = loud[0, :]
         loud = loud[:loudest, :]
+        #debug_loud = loud[:loudest, :]
+        mchirp_loud = np.take_along_axis(mchirp[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
+        mchirp_loud = mchirp_loud[:loudest,:]
+        redz_loud = np.take_along_axis(redz[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
+        redz_loud = redz_loud[:loudest,:]
+        sepa_loud = np.take_along_axis(sepa[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
+        sepa_loud = sepa_loud[:loudest,:]
+        mpri_loud = np.take_along_axis(mpri[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
+        mpri_loud = mpri_loud[:loudest,:]
+        mrat_loud = np.take_along_axis(mrat[:, np.newaxis] * (num_pois > 0), idx_loud, axis=0)
+        mrat_loud = mrat_loud[:loudest,:]
+
+        print(f"{mchirp.shape=}, {redz.shape=}, {idx_loud.shape}=")
+        print(f"{mchirp_loud.shape=}, {redz_loud.shape=}") #, {idx_loud.shape}=")
+        #print(idx_loud[:loudest,:])
+        #print(loud)
+        print(f"{loud.shape=}, {mchirp_loud.shape=}, {redz_loud.shape=}") #,{loud=}")
+        print(f"mchirp: min={(mchirp/MSOL).min():.4g}, max={(mchirp/MSOL).max():.4g}, med={np.median(mchirp/MSOL):.4g}")
+        print(f"mchirp_loud: min={(mchirp_loud/MSOL).min():.4g}, max={(mchirp_loud/MSOL).max():.4g}, med={np.median(mchirp_loud/MSOL):.4g}")
+        print(f"mpri: min={(mpri/MSOL).min():.4g}, max={(mpri/MSOL).max():.4g}, med={np.median(mpri/MSOL):.4g}")
+        print(f"mpri_loud: min={(mpri_loud/MSOL).min():.4g}, max={(mpri_loud/MSOL).max():.4g}, med={np.median(mpri_loud/MSOL):.4g}")
+        print(f"mrat: min={(mrat).min():.4g}, max={(mrat).max():.4g}, med={np.median(mrat):.4g}")
+        print(f"mrat_loud: min={(mrat_loud).min():.4g}, max={(mrat_loud).max():.4g}, med={np.median(mrat_loud):.4g}")
+        print(f"redz: min={(redz).min():.4g}, max={(redz).max():.4g}, med={np.median(redz):.4g}")
+        print(f"redz_loud: min={(redz_loud).min():.4g}, max={(redz_loud).max():.4g}, med={np.median(redz_loud):.4g}")
+        print(f"sepa: min={(sepa/PC).min():.4g}, max={(sepa/PC).max():.4g}, med={np.median(sepa/PC):.4g}")
+        print(f"sepa_loud: min={(sepa_loud/PC).min():.4g}, max={(sepa_loud/PC).max():.4g}, med={np.median(sepa_loud/PC):.4g}")
+        #print(f"{debug_loud.shape=}, {debug_loud=}")
     else:
         fore = np.zeros_like(both)
         loud = np.zeros((loudest, nreals))
-
+        print(f"no loud sources in any realizations for {fobs_gw=}")
+        
     back = both - fore
     return both, fore, back, loud, gwb_harms
 
@@ -617,7 +656,7 @@ def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
 
     # convert from hc^2 to hc
     hc2 = np.sqrt(hc2)
-    # this is for clarity, note that it does not duplicate the memory
+    # hc is redefined for clarity, note that it does not duplicate the memory
     hc = hc2
 
     return hc
@@ -795,9 +834,8 @@ def char_strain_sq_from_bin_edges(edges):
 # ==============================================================================
 
 
-#! NOTE: THIS IS SLOW PYTHON IMPLEMENTATION FOR TESTING.
+# ! NOTE: THIS IS SLOW PYTHON IMPLEMENTATION FOR TESTING.
 # ! USE `holodeck.cytuls.sam_calc_gwb_single_eccen()`
-
 def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
     """
 
@@ -827,7 +865,8 @@ def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=1
     # NOTE: need to check for coalescences and set to zero
     # NOTE: need to check for frequencies below starting separation and set to zero
 
-    frst_orb_evo = utils.kepler_freq_from_sepa(sam.mtot[:, np.newaxis], sepa_evo[np.newaxis, :])
+    frst_orb_evo = utils.kepler_freq_from_sepa(sam.mtot[:, np.newaxis],
+                                               sepa_evo[np.newaxis, :])
 
     assert np.ndim(gwfobs) == 1
     assert np.ndim(frst_orb_evo) == 2
@@ -889,7 +928,8 @@ def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=1
                 # interpolate to target (rest-frame) frequency
                 # this is the same for all mass-ratios
                 # () scalar
-                ecc = np.interp(gwfr, frst_evo, eccen_evo, left=np.nan, right=np.nan)
+                ecc = np.interp(gwfr, frst_evo, eccen_evo,
+                                left=np.nan, right=np.nan)
                 # ecc_2 = np.interp(sa, sepa[::-1], eccen_evo[::-1], left=np.nan, right=np.nan)
 
                 # da/dt values are negative, get a positive rate
@@ -976,7 +1016,10 @@ def sam_calc_gwb_single_eccen_discrete(gwfobs, sam, sepa_evo, eccen_evo, nharms=
     else:
         squeeze = False
 
-    gwb = holo.cyutils.sam_calc_gwb_single_eccen_discrete(ndens, mt_l10, mr, rz, dc, gwfobs, sepa_evo, eccen_evo, nharms, nreals)
+    gwb = holo.cyutils.sam_calc_gwb_single_eccen_discrete(ndens, mt_l10, mr,
+                                                          rz, dc, gwfobs,
+                                                          sepa_evo, eccen_evo,
+                                                          nharms, nreals)
 
     if squeeze:
         gwb = gwb.squeeze()
