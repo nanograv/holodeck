@@ -176,7 +176,7 @@ class _PS_Astro_Strong(_Param_Space):
         gsmf_log10_mstar_z1=+0.124,  # + 0.124 ± 0.045
         gsmf_log10_mstar_z2=-0.033,  # - 0.033 ± 0.015
         gsmf_alpha_one=-0.28,  # - 0.280 ± 0.070
-        gsmf_alpha_two=-1.48,  # - 1.480 ± 0.150
+        gsmf_alpha_two=-1.48,  # - 1.480 ± 0.0150
         # Galaxy merger rate (``GMR_Illustris``)
         # Parameters are taken directly from [Rodriguez-Gomez2015]_
         gmr_norm0_log10=-2.2287,  # -2.2287 ± 0.0045    A0 [log10(A*Gyr)]
@@ -290,7 +290,7 @@ class PS_Astro_Strong_All(_PS_Astro_Strong):
             PD_Normal("gsmf_log10_mstar_z1", +0.124, 0.045),  # + 0.124 ± 0.045
             PD_Normal("gsmf_log10_mstar_z2", -0.033, 0.015),  # - 0.033 ± 0.015
             PD_Normal("gsmf_alpha_one", -0.28, 0.070),  # - 0.280 ± 0.070
-            PD_Normal("gsmf_alpha_two", -1.48, 0.150),  # - 1.480 ± 0.150
+            PD_Normal("gsmf_alpha_two", -1.48, 0.0150),  # - 1.480 ± 0.0150
             # GMR
             PD_Normal("gmr_norm0_log10", -2.2287, 0.0045),  # -2.2287 ± 0.0045    A0 [log10(A*Gyr)]
             PD_Normal("gmr_normz", +2.4644, 0.0128),  # +2.4644 ± 0.0128    eta
@@ -376,7 +376,7 @@ class PS_Astro_Strong_GSMF(_PS_Astro_Strong):
             PD_Normal("gsmf_log10_mstar_z1", +0.124, 0.045),  # + 0.124 ± 0.045
             PD_Normal("gsmf_log10_mstar_z2", -0.033, 0.015),  # - 0.033 ± 0.015
             PD_Normal("gsmf_alpha_one", -0.28, 0.070),  # - 0.280 ± 0.070
-            PD_Normal("gsmf_alpha_two", -1.48, 0.150),  # - 1.480 ± 0.150
+            PD_Normal("gsmf_alpha_two", -1.48, 0.0150),  # - 1.480 ± 0.0150
         ]
         _Param_Space.__init__(
             self,
