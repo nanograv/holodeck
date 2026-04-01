@@ -51,7 +51,7 @@ cdef double GW_SRC_CONST = 8.0 * pow(MY_NWTG, 5.0/3.0) * pow(M_PI, 2.0/3.0) / sq
 # ====    Utility Functions    ====
 
 
-cdef double bessel_recursive(int nn, double ne, double jn_m1, double jn_m2):
+cdef double bessel_recursive(int nn, double ne, double jn_m1, double jn_m2) noexcept:
     """Recursive relation for calculating bessel functions
 
     J_n(x) = 2 * [(n-1) / x] * J_n-1(x) - J_n-2(x)
@@ -76,7 +76,7 @@ cdef double bessel_recursive(int nn, double ne, double jn_m1, double jn_m2):
     return jn
 
 
-cdef double _gw_ecc_func(double eccen):
+cdef double _gw_ecc_func(double eccen) noexcept:
     """Calculate the GW Hardening rate eccentricitiy dependence F(e).
 
     See [Peters1964]_ Eq. 5.6, or [EN2007]_ Eq. 2.3
@@ -99,7 +99,7 @@ cdef double _gw_ecc_func(double eccen):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef void my_trapz_grid_weight(int index, int size, double[:] grid, double *rv):
+cdef void my_trapz_grid_weight(int index, int size, double[:] grid, double *rv) noexcept:
     """Determine the trapezoid-rule weight and bin-width for the given grid point.
 
     Parameters
@@ -142,7 +142,7 @@ cdef void my_trapz_grid_weight(int index, int size, double[:] grid, double *rv):
     return
 
 
-cdef double gw_freq_dist_func__scalar_scalar(int nn, double ee):
+cdef double gw_freq_dist_func__scalar_scalar(int nn, double ee) noexcept:
     """Calculate the GW frequency distribution function at the given harmonic and eccentricity, g(n,e).
 
     See [EN2007]_ Eq. 2.4
@@ -198,7 +198,7 @@ cdef double gw_freq_dist_func__scalar_scalar(int nn, double ee):
 @cython.wraparound(False)
 @cython.nonecheck(False)
 @cython.cdivision(True)
-cdef void unravel(int idx, int[] shape, int *ii_out, int *jj_out):
+cdef void unravel(int idx, int[] shape, int *ii_out, int *jj_out) noexcept:
     """Convert from a 1D/flattened index into a 2D pair of (unraveled) indices.
 
     NOTE: row-major / c-style ordering is assumed.  This is the numpy default.
@@ -290,7 +290,7 @@ cdef int sort_compare(const void *a, const void *b) noexcept nogil:
         return 0
 
 
-cdef void argsort(double *values, int size, int **indices):
+cdef void argsort(double *values, int size, int **indices) noexcept:
     """Find the indices that sort the given 1D array of double values.
 
     This is done using an array of `sorter` struct instances which store both index and value.
@@ -323,7 +323,7 @@ cdef void argsort(double *values, int size, int **indices):
 @cython.wraparound(False)
 @cython.nonecheck(False)
 @cython.cdivision(True)
-cdef double _interp_between_vals(double xnew, double xl, double xr, double yl, double yr):
+cdef double _interp_between_vals(double xnew, double xl, double xr, double yl, double yr) noexcept:
     cdef double ynew = yl + (yr - yl) * (xnew - xl) / (xr - xl)
     return ynew
 
@@ -332,7 +332,7 @@ cdef double _interp_between_vals(double xnew, double xl, double xr, double yl, d
 @cython.wraparound(False)
 @cython.nonecheck(False)
 @cython.cdivision(True)
-cdef double interp_at_index(int idx, double xnew, double[:] xold, double[:] yold):
+cdef double interp_at_index(int idx, double xnew, double[:] xold, double[:] yold) noexcept:
     """Perform linear interpolation at the given index in a pair of arrays.
 
     Parameters
@@ -852,7 +852,7 @@ cdef double[:, :, :] _sam_calc_gwb_single_eccen_discrete(
 
 
 def sam_poisson_gwb(dist, hc2, nreals, normal_threshold=1e10):
-    return _sam_poisson_gwb(np.array(dist.shape), dist, hc2, nreals, long(normal_threshold))
+    return _sam_poisson_gwb(np.array(dist.shape), dist, hc2, nreals, int(normal_threshold))
 
 
 @cython.boundscheck(False)
@@ -934,7 +934,7 @@ def ss_bg_hc(number, h2fdf, nreals, normal_threshold=1e10):
 @cython.cdivision(True)
 cdef void _ss_bg_hc(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number,
             long nreals, long thresh,
-            double[:,:] hc2ss, double[:,:] hc2bg, long[:,:,:] ssidx):
+            double[:,:] hc2ss, double[:,:] hc2bg, long[:,:,:] ssidx) noexcept:
     """
     Calculates the characteristic strain from loud single sources and a background of all other sources.
 
@@ -1069,7 +1069,7 @@ cdef void _ss_bg_hc_and_par(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:
             long nreals, long thresh,
             double[:] mt, double[:] mr, double[:] rz,
             double[:,:] hc2ss, double[:,:] hc2bg, long[:,:,:] ssidx,
-            double[:,:,:] bgpar, double[:,:,:] sspar):
+            double[:,:,:] bgpar, double[:,:,:] sspar) noexcept:
     """
     Calculates the characteristic strain from loud single sources and a background of all other sources.
 
@@ -1204,7 +1204,7 @@ def sort_h2fdf(h2fdf):
 
     return
 
-cdef (int *) _sort_h2fdf(double[:] flat_h2fdf, long size):
+cdef (int *) _sort_h2fdf(double[:] flat_h2fdf, long size) except NULL:
 
     cdef (double *)array = <double *>malloc(size * sizeof(double))
     cdef (int *)indices = <int *>malloc(size * sizeof(int))
@@ -1266,7 +1266,7 @@ def loudest_hc_from_sorted(number, h2fdf, nreals, nloudest, msort, qsort, zsort,
 cdef void _loudest_hc_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, double[:,:,:,:] number,
             long nreals, long nloudest, long thresh,
             long[:] msort, long[:] qsort, long[:] zsort,
-            double[:,:,:] hc2ss, double[:,:] hc2bg):
+            double[:,:,:] hc2ss, double[:,:] hc2bg) noexcept:
     """
     Calculates the characteristic strain from loud single sources and a background of all other sources.
 
@@ -1410,7 +1410,7 @@ cdef void _loudest_hc_and_par_from_sorted(long[:] shape, double[:,:,:,:] h2fdf, 
             long nreals, long nloudest, long thresh,
             double[:] mt, double[:] mr, double[:] rz,
             long[:] msort, long[:] qsort, long[:] zsort,
-            double[:,:,:] hc2ss, double[:,:] hc2bg, double[:,:,:] lspar, double[:,:,:] bgpar, long[:,:,:,:] ssidx):
+            double[:,:,:] hc2ss, double[:,:] hc2bg, double[:,:,:] lspar, double[:,:,:] bgpar, long[:,:,:,:] ssidx) noexcept:
     """
     Calculates the characteristic strain from loud single sources and a background of all other sources.
 
@@ -1617,7 +1617,7 @@ cdef void _loudest_hc_and_par_from_sorted_redz(long[:] shape, double[:,:,:,:] h2
             double[:] mt, double[:] mr, double[:] rz,
             double[:,:,:,:] redz_final, double[:,:,:,:] dcom_final, double[:,:,:,:] sepa, double[:,:,:,:] angs,
             long[:] msort, long[:] qsort, long[:] zsort,
-            double[:,:,:] hc2ss, double[:,:] hc2bg, double[:,:,:,:] sspar, double[:,:,:] bgpar):
+            double[:,:,:] hc2ss, double[:,:] hc2bg, double[:,:,:,:] sspar, double[:,:,:] bgpar) noexcept:
     """
     Calculates the characteristic strain from loud single sources and a background of all other sources.
 
@@ -2046,7 +2046,7 @@ def Sh_rest(hc_ss, hc_bg, freqs, nexcl):
 cdef void _Sh_rest(
     double[:,:,:] hc_ss, double[:,:,] hc_bg, double[:] freqs, long nexcl,
     long nreals, long nfreqs, long nloudest,
-    double[:,:,:] Sh_rest):
+    double[:,:,:] Sh_rest) noexcept:
     """
     Calculate the noise from all the single sources except the source in question
     and the next N_excl loudest sources.
