@@ -56,3 +56,9 @@ GYR = 1.0e9*YR                                  #: Giga-year [s]
 KPC = 1.0e3*PC                                  #: Kilo-parsec [cm]
 MPC = 1.0e6*PC                                  #: Mega-parsec [cm]
 GPC = 1.0e9*PC                                  #: Giga-parsec [cm]
+
+# ---- PTA / timing convenience constants (SI-like, in seconds)
+KPC2S = KPC / SPLC                              #: kpc in light-seconds [s/kpc]  (= kpc/c)
+MPC2S = MPC / SPLC                              #: Mpc in light-seconds [s/Mpc]  (= Mpc/c)
+TSUN  = NWTG * MSOL / SPLC**3                   #: G*Msol/c^3 [s]  (chirp-mass unit)
+FYR   = 1.0 / YR                                #: 1/year [Hz]  (PTA frequency unit)
