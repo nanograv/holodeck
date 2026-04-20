@@ -289,7 +289,7 @@ class PS_Classic_GWOnly_Astro_Extended(_PS_Classic_GWOnly):
         return
 
 
-class PS_Test(_PS_Classic_Phenom):
+class PS_Classic_Test(_PS_Classic_Phenom):
     """Simple test parameter space in 2D.
     """
 
@@ -308,7 +308,7 @@ class PS_Test(_PS_Classic_Phenom):
 
 
 _param_spaces_dict = {
-    "PS_Test": PS_Test,
+    "PS_Classic_Test": PS_Classic_Test,
     "PS_Classic_Phenom_Uniform": PS_Classic_Phenom_Uniform,    # PS_Uniform_09B
     "PS_Classic_Phenom_Astro_Extended": PS_Classic_Phenom_Astro_Extended,
     "PS_Classic_GWOnly_Uniform": PS_Classic_GWOnly_Uniform,
