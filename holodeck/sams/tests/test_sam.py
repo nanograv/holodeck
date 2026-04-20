@@ -3,10 +3,17 @@
 
 import numpy as np
 
-import holodeck as holo
-from holodeck import utils
+from holodeck import utils, hardening
 from holodeck.constants import MSOL, PC, YR
-
+from holodeck.sams import sam_cyutils
+from holodeck.sams.components import (
+    GSMF_Schechter, GSMF_Double_Schechter,
+    GPF_Power_Law,
+    GMT_Power_Law,
+    GMR_Illustris,
+)
+from holodeck.sams.sam import Semi_Analytic_Model
+from holodeck.host_relations import MMBulge_KH2013
 
 def _test_sam_basics(sam):
     NFREQS = 3
@@ -30,7 +37,7 @@ def _test_sam_basics(sam):
 
     # ---- try GWB
 
-    fobs_cents, fobs_edges = holo.utils.pta_freqs(num=NFREQS)
+    fobs_cents, fobs_edges = utils.pta_freqs(num=NFREQS)
     hc_ss, hc_bg = sam.gwb(fobs_edges, realize=NREALS, loudest=NLOUDS)
     if np.shape(hc_bg) != (NFREQS, NREALS):
         err = f"{np.shape(hc_bg)=} but {NFREQS=} {NREALS=}"
@@ -46,10 +53,10 @@ def _test_sam_basics(sam):
 def test_sam_basics():
     SHAPE = 12
 
-    sam = holo.sams.Semi_Analytic_Model(shape=SHAPE)
+    sam = Semi_Analytic_Model(shape=SHAPE)
     _test_sam_basics(sam)
 
-    sam = holo.sams.Semi_Analytic_Model(shape=(11, 12, 13))
+    sam = Semi_Analytic_Model(shape=(11, 12, 13))
     _test_sam_basics(sam)
     return
 
@@ -59,16 +66,16 @@ def test_sam_basics_gpf_gmt():
     """
     SHAPE = 12
 
-    gsmf = holo.sams.GSMF_Schechter()
-    gpf = holo.sams.GPF_Power_Law()
-    gmt = holo.sams.GMT_Power_Law()
-    sam = holo.sams.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, shape=SHAPE)
+    gsmf = GSMF_Schechter()
+    gpf = GPF_Power_Law()
+    gmt = GMT_Power_Law()
+    sam = Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, shape=SHAPE)
     _test_sam_basics(sam)
 
     # With MMBulge also
 
-    mmbulge = holo.host_relations.MMBulge_KH2013()
-    sam = holo.sams.Semi_Analytic_Model(mmbulge=mmbulge, gpf=gpf, gmt=gmt, shape=SHAPE)
+    mmbulge = MMBulge_KH2013()
+    sam = Semi_Analytic_Model(mmbulge=mmbulge, gpf=gpf, gmt=gmt, shape=SHAPE)
     _test_sam_basics(sam)
     return
 
@@ -78,16 +85,16 @@ def test_sam_basics_gmr():
     """
     SHAPE = 12
 
-    gsmf = holo.sams.GSMF_Schechter()
-    gmr = holo.sams.GMR_Illustris()
-    sam = holo.sams.Semi_Analytic_Model(gsmf=gsmf, gmr=gmr, shape=SHAPE)
+    gsmf = GSMF_Schechter()
+    gmr = GMR_Illustris()
+    sam = Semi_Analytic_Model(gsmf=gsmf, gmr=gmr, shape=SHAPE)
     _test_sam_basics(sam)
 
     # With MMBulge and GMT also
 
-    gmt = holo.sams.GMT_Power_Law()
-    mmbulge = holo.host_relations.MMBulge_KH2013()
-    sam = holo.sams.Semi_Analytic_Model(mmbulge=mmbulge, gmr=gmr, gmt=gmt, shape=SHAPE)
+    gmt = GMT_Power_Law()
+    mmbulge = MMBulge_KH2013()
+    sam = Semi_Analytic_Model(mmbulge=mmbulge, gmr=gmr, gmt=gmt, shape=SHAPE)
     _test_sam_basics(sam)
 
     return
@@ -98,8 +105,8 @@ def test_sam_basics__gsmf_double_chechter():
     """
     SHAPE = 12
 
-    gsmf = holo.sams.GSMF_Double_Schechter()
-    sam = holo.sams.Semi_Analytic_Model(gsmf=gsmf, shape=SHAPE)
+    gsmf = GSMF_Double_Schechter()
+    sam = Semi_Analytic_Model(gsmf=gsmf, shape=SHAPE)
     _test_sam_basics(sam)
 
     return
@@ -121,12 +128,12 @@ def test_dbn_gw_only():
     """
 
     shape = (10, 11, 12)
-    sam = holo.sams.Semi_Analytic_Model(shape=shape)
-    hard_gw = holo.hardening.Hard_GW()
+    sam = Semi_Analytic_Model(shape=shape)
+    hard_gw = hardening.Hard_GW()
 
     PTA_DUR = 20.0 * YR
     NUM_FREQS = 9
-    fobs_gw_cents, fobs_gw_edges = holo.utils.pta_freqs(PTA_DUR, NUM_FREQS)
+    fobs_gw_cents, fobs_gw_edges = utils.pta_freqs(PTA_DUR, NUM_FREQS)
     fobs_orb_cents = fobs_gw_cents / 2.0
 
     # (1) make sure it runs
@@ -169,13 +176,13 @@ def test_dbn_phenom():
     """
 
     shape = (10, 11, 12)
-    sam = holo.sams.Semi_Analytic_Model(shape=shape)
+    sam = Semi_Analytic_Model(shape=shape)
     TIME = 1.0e9 * YR
-    hard_phenom = holo.hardening.Fixed_Time_2PL_SAM(sam, TIME, num_steps=300)
+    hard_phenom = hardening.Fixed_Time_2PL_SAM(sam, TIME, num_steps=300)
 
     PTA_DUR = 20.0 * YR
     NUM_FREQS = 9
-    fobs_gw_cents, fobs_gw_edges = holo.utils.pta_freqs(PTA_DUR, NUM_FREQS)
+    fobs_gw_cents, fobs_gw_edges = utils.pta_freqs(PTA_DUR, NUM_FREQS)
     fobs_orb_cents = fobs_gw_cents / 2.0
     fobs_orb_edges = fobs_gw_edges / 2.0
 
@@ -234,8 +241,8 @@ def test_dbn_phenom():
 
     # (4,) make sure that ALL numbers of binaries are consistent
 
-    num_py = holo.sams.sam_cyutils.integrate_differential_number_3dx1d(edges_py, dnum_py)
-    num_cy = holo.sams.sam_cyutils.integrate_differential_number_3dx1d(edges_cy, dnum_cy)
+    num_py = sam_cyutils.integrate_differential_number_3dx1d(edges_py, dnum_py)
+    num_cy = sam_cyutils.integrate_differential_number_3dx1d(edges_cy, dnum_cy)
 
     # Make sure that `atol` is also set to a reasonable value
     bads = ~np.isclose(num_py, num_cy, rtol=1e-2, atol=1.0e-1)

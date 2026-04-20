@@ -10,7 +10,7 @@ import scipy.stats
 import pytest
 
 import holodeck as holo
-from holodeck import host_relations
+from holodeck import host_relations, utils
 from holodeck.discrete import population
 from holodeck.constants import MSOL
 
@@ -266,7 +266,7 @@ def check_scatter_per_dex(mmbulge_relation, scatter_dex):
 
     # ---- check quantiles
     # difference between sample quantiles and median value
-    quants = holo.utils.quantiles(vals, sigmas=SIGMAS) - med
+    quants = utils.quantiles(vals, sigmas=SIGMAS) - med
     # expected difference between sample quantiles and median value
     expect_quants = scatter_dex * np.array(SIGMAS)
     for ii, ss in enumerate(SIGMAS):
@@ -315,8 +315,8 @@ def check_mass_reset(mmbulge_relation, truth_func):
     mass = pop.mass
 
     truth = truth_func(pop.mbulge)
-    print(f"Modified masses: {holo.utils.stats(mass/MSOL)}")
-    print(f"Expected masses: {holo.utils.stats(truth/MSOL)}")
+    print(f"Modified masses: {utils.stats(mass/MSOL)}")
+    print(f"Expected masses: {utils.stats(truth/MSOL)}")
     assert np.allclose(mass, truth), "Modified masses do not match true values from M-Mbulge relation!"
 
     return
