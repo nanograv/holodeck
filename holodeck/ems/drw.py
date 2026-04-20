@@ -3,8 +3,8 @@
 
 import numpy as np
 
-import holodeck as holo
 from holodeck.constants import MSOL
+from holodeck import ems
 # from holodeck.ems import runnoe2012, bands_sdss
 
 
@@ -133,7 +133,7 @@ def drw_params(mass, fedd, eps=0.1, scatter=False):
         Structure-Function at Infinity
 
     """
-    imag = holo.ems.runnoe2012.iband_from_mass_fedd(mass, fedd, eps=eps, magnitude=True).value
+    imag = ems.runnoe2012.iband_from_mass_fedd(mass, fedd, eps=eps, magnitude=True).value
     taus = MacLeod2010.tau(imag, mass, randomize=scatter)
     sfis = MacLeod2010.sfinf(imag, mass, randomize=scatter)
     return imag, taus, sfis

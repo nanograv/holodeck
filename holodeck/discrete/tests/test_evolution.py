@@ -4,7 +4,8 @@
 import numpy as np
 import pytest
 
-import holodeck as holo
+from holodeck import cosmo, host_relations, utils
+from holodeck import hardening
 from holodeck.discrete import population, evolution
 from holodeck.hardening import Fixed_Time_2PL
 from holodeck.constants import GYR, MSOL, KPC, YR, PC
@@ -26,7 +27,7 @@ def test_init_generic_evolution():
             self.scafa = np.zeros(SIZE)
             return
 
-    class Good_Hard(holo.hardening._Hardening):
+    class Good_Hard(hardening._Hardening):
 
         def dadt_dedt(self, *args, **kwargs):   # nocov
             return 0.0
@@ -103,7 +104,7 @@ def simplest():
             self.eccen = np.random.uniform(0.4, 0.6, SIZE)
             return
 
-    class Hard(holo.hardening._Hardening):
+    class Hard(hardening._Hardening):
         def dadt_dedt(self, evo, step, *args, **kwargs):
             dadt = -(PC/YR) * np.ones(evo.size)
             dedt = None
@@ -133,11 +134,11 @@ class Test_Illustris_Fixed:
         for kk in keys:
             vv = getattr(evo, kk)
 
-            err = f"Attribute '{kk}' has non-finite values: {holo.utils.stats(vv)}"
+            err = f"Attribute '{kk}' has non-finite values: {utils.stats(vv)}"
             assert np.all(np.isfinite(vv)), err
 
             if kk in positive:
-                err = f"Attribute '{kk}' has <= 0.0 values: {holo.utils.stats(vv)}"
+                err = f"Attribute '{kk}' has <= 0.0 values: {utils.stats(vv)}"
                 assert np.all(vv > 0.0), err
 
         return
@@ -203,7 +204,7 @@ class Test_Evolution_Basic:
         with pytest.raises(TypeError):
             evolution.Evolution(pop, 2.0, nsteps=8)
 
-        evolution.Evolution(pop, holo.hardening.Hard_GW, nsteps=30)
+        evolution.Evolution(pop, hardening.Hard_GW, nsteps=30)
 
         return
 
@@ -213,7 +214,7 @@ class Test_Evolution_Basic:
         tage = evo.tage
         assert tage.shape == evo.tlook.shape
 
-        check = holo.cosmo.age(0.0).cgs.value - evo.tlook
+        check = cosmo.age(0.0).cgs.value - evo.tlook
         assert np.allclose(tage, check)
         return
 
@@ -227,7 +228,7 @@ class Test_Evolution_Basic:
         mass = evo.mass
         assert mass.shape == (evo.size, evo.steps, 2)
         mass = np.moveaxis(mass, -1, 0)
-        mt_check, mr_check = holo.utils.mtmr_from_m1m2(*mass)
+        mt_check, mr_check = utils.mtmr_from_m1m2(*mass)
         assert np.all(mt == mt_check)
         assert np.all(mr == mr_check)
 
@@ -305,13 +306,13 @@ class Test_Evolution_Advanced:
             assert np.ndim(vv) == 2 or np.shape(vv)[2] == 2
 
             if FINITE_FLAG:
-                err = f"{par} found {holo.utils.frac_str(~np.isfinite(vv))} non-finite values!"
+                err = f"{par} found {utils.frac_str(~np.isfinite(vv))} non-finite values!"
                 assert np.all(np.isfinite(vv)), err
 
             # Make sure values are positive when they should be
             if par in self._PARS_POSITIVE:
-                print(par, np.all(vv > 0.0), holo.utils.frac_str(vv > 0.0), np.any(vv <= 0.0), np.any(~np.isfinite(vv)))
-                assert np.all(vv > 0.0), f"{par} values found to be non-positive ({holo.utils.frac_str(vv > 0.0)})!"
+                print(par, np.all(vv > 0.0), utils.frac_str(vv > 0.0), np.any(vv <= 0.0), np.any(~np.isfinite(vv)))
+                assert np.all(vv > 0.0), f"{par} values found to be non-positive ({utils.frac_str(vv > 0.0)})!"
 
         for par in evo._EVO_PARS:
             assert par in vals, f"'{par}' missing from returned `at` dictionary!"
@@ -328,7 +329,7 @@ class Test_Evolution_Advanced:
             for kk, vv in vals.items():
                 vv = vv[:, ii]
                 test = np.isfinite(vv) if ii == 0 else ~np.isfinite(vv)
-                err = f"{kk} {msg}, good={holo.utils.frac_str(test)} | bad={holo.utils.frac_str(~test)}"
+                err = f"{kk} {msg}, good={utils.frac_str(test)} | bad={utils.frac_str(~test)}"
                 print(err)
                 assert np.all(test), err
 
@@ -355,7 +356,7 @@ class Test_Evolution_Advanced:
         sel = (evo.scafa[:, -1] < 1.0)
 
         def fstr(xx):
-            return holo.utils.frac_str(xx, 8)
+            return utils.frac_str(xx, 8)
 
         # make sure returned `at` values are all finite for coalescing systems
         yesfin = np.isfinite(vv[sel])
@@ -399,13 +400,13 @@ class Test_Evolution_Advanced:
             assert np.ndim(vv) == 2 or np.shape(vv)[2] == 2
 
             if FINITE_FLAG:
-                err = f"{par} found {holo.utils.frac_str(~np.isfinite(vv))} non-finite values!"
+                err = f"{par} found {utils.frac_str(~np.isfinite(vv))} non-finite values!"
                 assert np.all(np.isfinite(vv)), err
 
             # Make sure values are positive when they should be
             if par in self._PARS_POSITIVE:
-                print(par, np.all(vv > 0.0), holo.utils.frac_str(vv > 0.0), np.any(vv <= 0.0), np.any(~np.isfinite(vv)))
-                assert np.all(vv > 0.0), f"{par} values found to be non-positive ({holo.utils.frac_str(vv > 0.0)})!"
+                print(par, np.all(vv > 0.0), utils.frac_str(vv > 0.0), np.any(vv <= 0.0), np.any(~np.isfinite(vv)))
+                assert np.all(vv > 0.0), f"{par} values found to be non-positive ({utils.frac_str(vv > 0.0)})!"
 
         for par in evo._EVO_PARS:
             assert par in vals, f"'{par}' missing from returned `at` dictionary!"
@@ -422,7 +423,7 @@ class Test_Evolution_Advanced:
             for kk, vv in vals.items():
                 vv = vv[:, ii]
                 test = np.isfinite(vv) if ii == 1 else ~np.isfinite(vv)
-                err = f"{kk} {msg}, good={holo.utils.frac_str(test)} | bad={holo.utils.frac_str(~test)}"
+                err = f"{kk} {msg}, good={utils.frac_str(test)} | bad={utils.frac_str(~test)}"
                 print(err)
                 assert np.all(test), err
 
@@ -441,14 +442,14 @@ def mockup_modified():
             self.scafa = np.random.uniform(0.25, 0.75, SIZE)
             return
 
-    class Hard(holo.hardening._Hardening):
+    class Hard(hardening._Hardening):
 
         def dadt_dedt(self, evo, step, *args, **kwargs):
             dadt = -(PC/YR) * np.ones(evo.size)
             dedt = None
             return dadt, dedt
 
-    class Mod(holo.utils._Modifier):
+    class Mod(utils._Modifier):
 
         def modify(self, base):
             base.mass[...] = 0.0
@@ -500,17 +501,17 @@ class Test_Hardening_Generic:
 
     def test_subclassing(self):
         with pytest.raises(TypeError, match="Can't instantiate abstract class"):
-            holo.hardening._Hardening()
+            hardening._Hardening()
 
         # Without overriding `dadt_dedt` method, `TypeError` raises on instantiation
-        class Hard_Fail(holo.hardening._Hardening):
+        class Hard_Fail(hardening._Hardening):
             pass
 
         with pytest.raises(TypeError, match="Can't instantiate abstract class"):
             Hard_Fail()
 
         # Overriding `dadt_dedt` method, instantiation allowed
-        class Hard_Succeed(holo.hardening._Hardening):
+        class Hard_Succeed(hardening._Hardening):
             def dadt_dedt(self, evo, step):   # nocov
                 pass
 
@@ -542,7 +543,7 @@ class Test_Hard_GW:
 
         step = np.random.randint(evo.steps)
         print(f"step = {step}")
-        dadt, dedt = holo.hardening.Hard_GW.dadt_dedt(evo, step)
+        dadt, dedt = hardening.Hard_GW.dadt_dedt(evo, step)
         assert np.shape(dadt) == (evo.size,)
         assert np.shape(dedt) == (evo.size,)
         assert np.all(dadt <= 0.0)
@@ -553,8 +554,8 @@ class Test_Hard_GW:
         ee = evo.eccen[:, step]
 
         # Make sure combined method matches individual methods
-        _dadt = holo.hardening.Hard_GW.dadt(mt, mr, aa, eccen=ee)
-        _dedt = holo.hardening.Hard_GW.dedt(mt, mr, aa, eccen=ee)
+        _dadt = hardening.Hard_GW.dadt(mt, mr, aa, eccen=ee)
+        _dedt = hardening.Hard_GW.dedt(mt, mr, aa, eccen=ee)
 
         assert np.shape(dadt) == np.shape(_dadt)
         assert np.shape(dedt) == np.shape(_dedt)
@@ -562,8 +563,8 @@ class Test_Hard_GW:
         assert np.allclose(dedt, _dedt, rtol=1e-10)
 
         # Make sure combined method matches `utils` GW methods
-        _dadt = holo.hardening.Hard_GW.dadt(mt, mr, aa, eccen=ee)
-        _dedt = holo.hardening.Hard_GW.dedt(mt, mr, aa, eccen=ee)
+        _dadt = hardening.Hard_GW.dadt(mt, mr, aa, eccen=ee)
+        _dedt = hardening.Hard_GW.dedt(mt, mr, aa, eccen=ee)
 
         assert np.shape(dadt) == np.shape(_dadt)
         assert np.shape(dedt) == np.shape(_dedt)
@@ -577,8 +578,8 @@ class Test_Sesana_Scattering:
 
     def test_basics(self):
         SIZE = 6
-        mmbulge = holo.host_relations.MMBulge_KH2013()
-        msigma = holo.host_relations.MSigma_KH2013()
+        mmbulge = host_relations.MMBulge_KH2013()
+        msigma = host_relations.MSigma_KH2013()
         mass = (10.0 ** np.random.uniform(6, 10, (SIZE, 2))) * MSOL
         sepa = (10.0 ** np.random.uniform(1, 3, SIZE)) * PC
 
@@ -594,7 +595,7 @@ class Test_Sesana_Scattering:
             print(f"\neccen = {eccen}")
             for kw in kwargs_list:
                 print(f"kw = {kw}")
-                sc = holo.hardening.Sesana_Scattering(**kw)
+                sc = hardening.Sesana_Scattering(**kw)
                 dadt, dedt = sc._dadt_dedt(mass, sepa, eccen)
                 print(f"dadt = {dadt}")
                 print(f"dedt = {dedt}")
@@ -614,8 +615,8 @@ class Test_Dynamical_Friction_NFW:
 
     def test_basics(self):
         SIZE = 11
-        mmbulge = holo.host_relations.MMBulge_KH2013()
-        msigma = holo.host_relations.MSigma_KH2013()
+        mmbulge = host_relations.MMBulge_KH2013()
+        msigma = host_relations.MSigma_KH2013()
         mass = (10.0 ** np.random.uniform(6, 9, (SIZE, 2))) * MSOL
         sepa = (10.0 ** np.random.uniform(1, 3, SIZE)) * PC
         redz = np.random.uniform(0.1, 2.0, SIZE)
@@ -639,7 +640,7 @@ class Test_Dynamical_Friction_NFW:
                 print(f"\neccen = {eccen}, atten = {atten}")
                 for kw in kwargs_list:
                     print(f"kw = {kw}")
-                    df = holo.hardening.Dynamical_Friction_NFW(**kw)
+                    df = hardening.Dynamical_Friction_NFW(**kw)
                     dadt, dedt = df._dadt_dedt(mass, sepa, redz, dt, eccen, attenuate=atten)
                     print(f"dadt = {dadt}")
                     print(f"dedt = {dedt}")
@@ -647,7 +648,7 @@ class Test_Dynamical_Friction_NFW:
                     bads = ~np.isfinite(dadt)
                     assert not np.any(bads)
                     # if np.any(bads):
-                    #     print(f"FOUND BADS {holo.utils.frac_str(bads)}")
+                    #     print(f"FOUND BADS {utils.frac_str(bads)}")
                     #     for kk, vv in dict(mass=mass, sepa=sepa, redz=redz, eccen=eccen).items():
                     #         if vv is None:
                     #             continue
@@ -671,9 +672,9 @@ def composite_circ():
     pop = population.Pop_Illustris(mods=resamp)
 
     hards = [
-        holo.hardening.Hard_GW,
-        holo.hardening.Sesana_Scattering(),
-        holo.hardening.Dynamical_Friction_NFW(),
+        hardening.Hard_GW,
+        hardening.Sesana_Scattering(),
+        hardening.Dynamical_Friction_NFW(),
     ]
 
     evo = evolution.Evolution(pop, hards, debug=True)
@@ -688,9 +689,9 @@ def composite_eccen():
     pop = population.Pop_Illustris(mods=[ecc, resamp])
 
     hards = [
-        holo.hardening.Hard_GW,
-        holo.hardening.Sesana_Scattering(),
-        holo.hardening.Dynamical_Friction_NFW(),
+        hardening.Hard_GW,
+        hardening.Sesana_Scattering(),
+        hardening.Dynamical_Friction_NFW(),
     ]
 
     evo = evolution.Evolution(pop, hards, debug=True)
@@ -727,8 +728,8 @@ class Test_Composite_Hardening:
             assert np.shape(comp_hard) == (evo.size, evo.steps)
             dedt_sum[...] = dedt_sum[...] + comp_hard[...]
 
-        print(f"dadt_sum = {holo.utils.stats(dadt_sum)}")
-        print(f"evo.dadt = {holo.utils.stats(evo.dadt)}")
+        print(f"dadt_sum = {utils.stats(dadt_sum)}")
+        print(f"evo.dadt = {utils.stats(evo.dadt)}")
         bads = ~np.isclose(dadt_sum, evo.dadt, rtol=1e-6)
         if np.any(bads):
             bads = np.where(bads)
@@ -739,8 +740,8 @@ class Test_Composite_Hardening:
         assert not np.any(bads)
 
         if eccen_flag:
-            print(f"dedt_sum = {holo.utils.stats(dedt_sum)}")
-            print(f"evo.dedt = {holo.utils.stats(evo.dedt)}")
+            print(f"dedt_sum = {utils.stats(dedt_sum)}")
+            print(f"evo.dedt = {utils.stats(evo.dedt)}")
             assert np.allclose(dedt_sum, evo.dedt, rtol=1e-6)
 
         assert np.all(np.diff(evo.tage, axis=-1) >= 0.0)
@@ -759,16 +760,16 @@ class Test_Composite_Hardening:
 
     def test_attenuated(self, composite_circ):
         evo_atten = composite_circ
-        assert isinstance(evo_atten._hard[-1], holo.hardening.Dynamical_Friction_NFW), "BAD INSTANCE"
+        assert isinstance(evo_atten._hard[-1], hardening.Dynamical_Friction_NFW), "BAD INSTANCE"
         assert evo_atten._hard[-1]._attenuate is True, "BAD SETTING"
 
         # resamp = population.PM_Resample(0.2)
         # pop = population.Pop_Illustris(mods=resamp)
 
         hards = [
-            holo.hardening.Hard_GW,
-            holo.hardening.Sesana_Scattering(),
-            holo.hardening.Dynamical_Friction_NFW(attenuate=False),
+            hardening.Hard_GW,
+            hardening.Sesana_Scattering(),
+            hardening.Dynamical_Friction_NFW(attenuate=False),
         ]
 
         evo_noatt = evolution.Evolution(evo_atten._pop, hards, debug=True)
@@ -787,14 +788,14 @@ class Test_Composite_Hardening:
         assert noatt_dadt.shape == atten_dadt.shape, "BAD SHAPE"
 
         bads = (noatt_dadt > atten_dadt) & ~np.isclose(noatt_dadt, atten_dadt, rtol=1e-6)
-        err = f"Found {holo.utils.frac_str(bads)} cases where attenuated DF is stronger than un-attenuated!"
+        err = f"Found {utils.frac_str(bads)} cases where attenuated DF is stronger than un-attenuated!"
         print(err)
         if np.any(bads):
-            print(f"BADS: {holo.utils.frac_str(bads)}")
+            print(f"BADS: {utils.frac_str(bads)}")
             bads = np.where(bads)
             print(bads)
-            print("noatt = ", holo.utils.stats(noatt_dadt[bads]))
-            print("atten = ", holo.utils.stats(atten_dadt[bads]))
+            print("noatt = ", utils.stats(noatt_dadt[bads]))
+            print("atten = ", utils.stats(atten_dadt[bads]))
             print("noatt = ", noatt_dadt[bads])
             print("atten = ", atten_dadt[bads])
 
@@ -821,7 +822,7 @@ class Test_Fixed_Time_2PL:
 
         tage = evo.tage
         time = tage[:, -1] - tage[:, 0]
-        err = f"Targe time: {TIME/GYR} [Gyr] | actual = {holo.utils.stats(time/GYR)}!"
+        err = f"Targe time: {TIME/GYR} [Gyr] | actual = {utils.stats(time/GYR)}!"
         print(err)
         assert np.allclose(time, TIME, rtol=0.1), err
 
@@ -844,7 +845,7 @@ class Test_Fixed_Time_2PL:
 
         tage = evo.tage
         time = tage[:, -1] - tage[:, 0]
-        err = f"Targe time: {TIME/GYR} [Gyr] | actual = {holo.utils.stats(time/GYR)}!"
+        err = f"Targe time: {TIME/GYR} [Gyr] | actual = {utils.stats(time/GYR)}!"
         print(err)
         assert np.allclose(time, TIME, rtol=0.1), err
 

@@ -41,14 +41,12 @@ import numpy as np
 import h5py
 import tqdm
 
-import holodeck as holo
-import holodeck.librarian
+from holodeck import log, utils, librarian
 from holodeck.librarian import lib_tools, FITS_NBINS_PLAW, FITS_NBINS_TURN
 from holodeck.constants import YR
 
 
 def main():
-    log = holo.log
 
     parser = argparse.ArgumentParser()
 
@@ -132,7 +130,7 @@ def fit_library_spectra(library_path, log, recreate=False):
 
         with h5py.File(library_path, 'r') as library:
             fobs = library['fobs_cents'][()]
-            psd = holo.utils.char_strain_to_psd(fobs[np.newaxis, :, np.newaxis], library['gwb'][()])
+            psd = utils.char_strain_to_psd(fobs[np.newaxis, :, np.newaxis], library['gwb'][()])
 
         nsamps, nfreqs, nreals = psd.shape
         log.debug(f"{nsamps=}, {nfreqs=}, {nreals=}")
@@ -237,20 +235,20 @@ def fit_library_spectra(library_path, log, recreate=False):
         # Report how many fits failed
         fails = np.any(~np.isfinite(fits_plaw), axis=-1)
         lvl = log.INFO if np.any(fails) else log.DEBUG
-        log.log(lvl, f"Failed to fit {holo.utils.frac_str(fails)} spectra with power-law model")
+        log.log(lvl, f"Failed to fit {utils.frac_str(fails)} spectra with power-law model")
 
         fails = np.any(~np.isfinite(fits_turn), axis=-1)
         lvl = log.INFO if np.any(fails) else log.DEBUG
-        log.log(lvl, f"Failed to fit {holo.utils.frac_str(fails)} spectra with turn-over model")
+        log.log(lvl, f"Failed to fit {utils.frac_str(fails)} spectra with turn-over model")
 
         # --- Save to output file
 
         np.savez(
-            fits_path, fobs=fobs, psd=psd, version=holo.librarian.__version__,
+            fits_path, fobs=fobs, psd=psd, version=librarian.__version__,
             nbins_plaw=nbins_plaw, fits_plaw=fits_plaw,
             nbins_turn=nbins_turn, fits_turn=fits_turn,
         )
-        log.warning(f"Saved fits to {fits_path} size: {holo.utils.get_file_size(fits_path)}")
+        log.warning(f"Saved fits to {fits_path} size: {utils.get_file_size(fits_path)}")
 
     return
 
@@ -344,14 +342,14 @@ def _fit_spectra(comm, freqs, psd, nbins_list, fit_npars, fit_func):
 
 
 def fit_spectra_plaw(comm, freqs, psd, nbins_list=FITS_NBINS_PLAW):
-    fit_func = lambda xx, yy: holo.utils.fit_powerlaw_psd(xx, yy, 1/YR)[0]
+    fit_func = lambda xx, yy: utils.fit_powerlaw_psd(xx, yy, 1/YR)[0]
     fit_npars = 2
     fits = _fit_spectra(comm, freqs, psd, nbins_list, fit_npars, fit_func)
     return nbins_list, fits
 
 
 def fit_spectra_turn(comm, freqs, psd, nbins_list=FITS_NBINS_TURN):
-    fit_func = lambda xx, yy: holo.utils.fit_turnover_psd(xx, yy, 1/YR)[0]
+    fit_func = lambda xx, yy: utils.fit_turnover_psd(xx, yy, 1/YR)[0]
     fit_npars = 4
     fits = _fit_spectra(comm, freqs, psd, nbins_list, fit_npars, fit_func)
     return nbins_list, fits

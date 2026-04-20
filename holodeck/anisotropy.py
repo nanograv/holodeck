@@ -9,8 +9,8 @@ import matplotlib.cm as cm
 import kalepy as kale
 import h5py
 
-import holodeck as holo
-from holodeck import utils, log, detstats, plot
+from holodeck import cosmo, plot, gravwaves, sam_cython
+from holodeck import utils, log, detstats
 from holodeck.constants import YR
 
 try:
@@ -251,7 +251,7 @@ def sph_harm_from_hc(hc_ss, hc_bg, nside = NSIDE, lmax = LMAX):
 
 def plot_ClC0_medians(fobs, Cl_best, lmax, nshow):
     xx = fobs*YR
-    fig, ax = holo.plot.figax(figsize=(8,5), xlabel=holo.plot.LABEL_GW_FREQUENCY_YR, ylabel='$C_{\ell>0}/C_0$')
+    fig, ax = plot.figax(figsize=(8,5), xlabel=plot.LABEL_GW_FREQUENCY_YR, ylabel='$C_{\ell>0}/C_0$')
 
     yy = Cl_best[:,:,:,1:]/Cl_best[:,:,:,0,np.newaxis] # (B,F,R,l)
     yy = np.median(yy, axis=-1) # (B,F,l) median over realizations
@@ -268,7 +268,7 @@ def plot_ClC0_medians(fobs, Cl_best, lmax, nshow):
             ax.plot(xx, yy[bb,:,ll], color=colors[ll], linestyle=':', alpha=0.1,
                                  linewidth=1)
         ax.legend(ncols=2)
-    holo.plot._twin_hz(ax, nano=False)
+    plot._twin_hz(ax, nano=False)
 
     # ax.set_title('50%% and 98%% confidence intervals of the %d best samples \nusing realizations medians, lmax=%d'
     #             % (nbest, lmax))
@@ -451,7 +451,7 @@ def Cl_analytic_from_num(fobs_orb_edges, number, hs, realize = False, floor = Fa
         fc = fc[...,np.newaxis]
         hs = hs[...,np.newaxis]
     elif realize is True:
-        number = holo.gravwaves.poisson_as_needed(number)
+        number = gravwaves.poisson_as_needed(number)
     elif floor is True: # assumes realize is False
         number = np.floor(number)
 
@@ -480,10 +480,10 @@ def strain_amp_at_bin_edges_redz(edges, redz=None):
     if redz is not None:
         dc = +np.inf * np.ones_like(redz)
         sel = (redz > 0.0)
-        dc[sel] = holo.cosmo.comoving_distance(redz[sel]).cgs.value
+        dc[sel] = cosmo.comoving_distance(redz[sel]).cgs.value
     else:
         redz = edges[2][np.newaxis,np.newaxis,:,np.newaxis]
-        dc = holo.cosmo.comoving_distance(redz).cgs.value
+        dc = cosmo.comoving_distance(redz).cgs.value
 
     # ---- calculate GW strain ----
     mt = (edges[0])
@@ -519,10 +519,10 @@ def strain_amp_at_bin_centers_redz(edges, redz=None):
             redz = np.moveaxis(redz, 0, dd)
         dc = +np.inf * np.ones_like(redz)
         sel = (redz > 0.0)
-        dc[sel] = holo.cosmo.comoving_distance(redz[sel]).cgs.value
+        dc[sel] = cosmo.comoving_distance(redz[sel]).cgs.value
     else:
         redz = kale.utils.midpoints(edges[2])[np.newaxis,np.newaxis,:,np.newaxis]
-        dc = holo.cosmo.comoving_distance(redz).cgs.value
+        dc = cosmo.comoving_distance(redz).cgs.value
 
 
     # ---- calculate GW strain ----
@@ -586,9 +586,9 @@ def Cl_analytic_from_dnum(edges, dnum, redz=None, realize=False):
         fc = fc[:,np.newaxis]
 
 
-        number = holo.sam_cython.integrate_differential_number_3dx1d(edges, dnum)
+        number = sam_cython.integrate_differential_number_3dx1d(edges, dnum)
         shape = number.shape + (realize,)
-        number = holo.gravwaves.poisson_as_needed(number[...,np.newaxis] * np.ones(shape))
+        number = gravwaves.poisson_as_needed(number[...,np.newaxis] * np.ones(shape))
 
         # numh2 = number * hs_cents**2 * np.diff(np.log(fobs_gw_edges))[:,np.newaxis]
         # numh4 = number * hs_cents**4 * np.diff(np.log(fobs_gw_edges))[:,np.newaxis]

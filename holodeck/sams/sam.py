@@ -43,8 +43,7 @@ import scipy.interpolate  # noqa
 
 import kalepy as kale
 
-import holodeck as holo
-from holodeck import cosmo, utils, log
+from holodeck import cosmo, utils, hardening, gravwaves, log as logger
 from holodeck.constants import SPLC, MSOL, MPC
 from holodeck import host_relations, single_sources
 from holodeck.sams.components import (
@@ -156,7 +155,7 @@ class Semi_Analytic_Model:
 
         """
         if log is None:
-            log = holo.log
+            log = logger
         self._log = log
 
         deprecated_keys = ['ZERO_DYNAMIC_STALLED_SYSTEMS', 'ZERO_GMT_STALLED_SYSTEMS']
@@ -784,12 +783,12 @@ class Semi_Analytic_Model:
 
         return edges, dnum, redz_final
 
-    def gwb_new(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100):
+    def gwb_new(self, fobs_gw_edges, hard=hardening.Hard_GW(), realize=100):
         """Calculate GWB using new cython implementation, 10x faster!
         """
         from . import sam_cyutils
 
-        assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
+        assert isinstance(hard, (hardening.Fixed_Time_2PL_SAM, hardening.Hard_GW))
 
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
 
@@ -808,11 +807,11 @@ class Semi_Analytic_Model:
 
         # ---- Get the GWB spectrum from number of binaries over grid
 
-        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
+        gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
 
         return gwb
 
-    def gwb_old(self, fobs_gw_edges, hard=holo.hardening.Hard_GW, realize=100):
+    def gwb_old(self, fobs_gw_edges, hard=hardening.Hard_GW, realize=100):
         """Calculate GWB using new `dynamic_binary_number_at_fobs` method, better, but slower.
         """
 
@@ -830,7 +829,7 @@ class Semi_Analytic_Model:
 
         # ---- Get the GWB spectrum from number of binaries over grid
 
-        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
+        gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
 
         return gwb
 
@@ -866,10 +865,10 @@ class Semi_Analytic_Model:
 
         mt = self.mtot[:, np.newaxis, np.newaxis]
         mr = self.mrat[np.newaxis, :, np.newaxis]
-        gwb = holo.gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
+        gwb = gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
         return gwb
 
-    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100, loudest=1, params=False):
+    def gwb(self, fobs_gw_edges, hard=hardening.Hard_GW(), realize=100, loudest=1, params=False):
         """Calculate the (smooth/semi-analytic) GWB and CWs at the given observed GW-frequencies.
 
         Parameters
@@ -907,7 +906,7 @@ class Semi_Analytic_Model:
         """
         from . import sam_cyutils
 
-        if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
+        if not isinstance(hard, (hardening.Fixed_Time_2PL_SAM, hardening.Hard_GW)):
             err = (
                 "`sam_cyutils` methods only work with `Fixed_Time_2PL_SAM` or `Hard_GW` hardening models!  "
                 "Use `gwb_only` for alternative classes!"
@@ -975,7 +974,7 @@ class Semi_Analytic_Model:
         log = self._log
 
         if hard is not None:
-            if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM,)):
+            if not isinstance(hard, (hardening.Fixed_Time_2PL_SAM,)):
                 err = "Only the `Fixed_Time` models, or no hardening, are supported for rate calculation!"
                 log.exception(err)
                 raise ValueError(err)
@@ -1270,7 +1269,7 @@ def evolve_eccen_uniform_single(sam, eccen_init, sepa_init, nsteps):
     eccen[0] = eccen_init
 
     sepa_max = sepa_init
-    sepa_coal = holo.utils.schwarzschild_radius(sam.mtot) * 3
+    sepa_coal = utils.schwarzschild_radius(sam.mtot) * 3
     # frst_coal = utils.kepler_freq_from_sepa(sam.mtot, sepa_coal)
     sepa_min = sepa_coal.min()
     sepa = np.logspace(*np.log10([sepa_max, sepa_min]), nsteps)
@@ -1281,7 +1280,7 @@ def evolve_eccen_uniform_single(sam, eccen_init, sepa_init, nsteps):
         da = (a1 - a0)
         e0 = eccen[step-1]
 
-        _, e1 = holo.utils.rk4_step(holo.hardening.Hard_GW.deda, x0=a0, y0=e0, dx=da)
+        _, e1 = utils.rk4_step(hardening.Hard_GW.deda, x0=a0, y0=e0, dx=da)
         e1 = np.clip(e1, 0.0, None)
         eccen[step] = e1
 
@@ -1328,7 +1327,7 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
 
     """
     if log is None:
-        log = holo.log
+        log = logger
 
     assert np.ndim(dens) == 3
     assert np.shape(dens)[:2] == (mtot.size, mrat.size)

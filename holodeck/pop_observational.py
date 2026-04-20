@@ -23,8 +23,7 @@ import astropy.units as u
 from astropy.cosmology import Planck15, z_at_value
 import os
 
-import holodeck as holo
-from holodeck import _PATH_DATA, cosmo, log
+from holodeck import _PATH_DATA, cosmo, log, population, utils
 from holodeck.constants import MSOL
 
 # physical constants for natural units c = G = 1
@@ -41,7 +40,7 @@ sqrt = np.sqrt
 _DEF_OBSERVATIONAL_FNAME = "observational_2mass_galaxy-catalog_extended.npz"
 
 
-class BP_Observational(holo.population._Population_Discrete):
+class BP_Observational(population._Population_Discrete):
 
     FREQ_MIN = 1e-9    # Hz, minimum of PTA band of interest
 
@@ -73,13 +72,13 @@ class BP_Observational(holo.population._Population_Discrete):
         self._redz, self._mtot, self._mrat = edges
         redz, mtot, mrat = [xx.flatten() for xx in np.meshgrid(*edges, indexing='ij')]
         mtot = (10.0**mtot) * MSOL
-        mass = holo.utils.m1m2_from_mtmr(mtot, mrat).T
+        mass = utils.m1m2_from_mtmr(mtot, mrat).T
 
         # print(f"{pop.shape=}, {pop.size=}, {redz.shape=}, {mtot.shape=}, {mass.shape=}")
 
         # Store standardized quantities
         self.scafa = cosmo.z_to_a(redz)
-        self.sepa = holo.utils.kepler_sepa_from_freq(mtot, self.FREQ_MIN)
+        self.sepa = utils.kepler_sepa_from_freq(mtot, self.FREQ_MIN)
         self.mass = mass
         self.weight = pop.flatten()
 

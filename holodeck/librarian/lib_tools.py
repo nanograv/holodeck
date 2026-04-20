@@ -11,8 +11,9 @@ import scipy as sp
 import scipy.stats
 
 import holodeck as holo
-from holodeck import utils, cosmo, log
+from holodeck import utils, cosmo, log as holo_log
 from holodeck.constants import YR
+from holodeck import librarian, hardening, single_sources, gravwaves
 from holodeck.librarian import (
     DEF_NUM_FBINS,
     DEF_NUM_LOUDEST,
@@ -20,6 +21,10 @@ from holodeck.librarian import (
     DEF_PTA_DUR,
     FNAME_LIBRARY_COMBINED_FILE,
     FNAME_DOMAIN_COMBINED_FILE,
+    PSPACE_FILE_SUFFIX,
+    FNAME_LIBRARY_SIM_FILE,
+    FNAME_DOMAIN_SIM_FILE,
+    __version__ as librarian_version,
 )
 
 PARAM_NAMES__ERROR = [
@@ -75,7 +80,7 @@ class _Param_Space(abc.ABC):
 
         """
         if log is None:
-            log = holo.log
+            log = holo_log
         log.debug(f"seed = {seed}")
         if random_state is None:
             np.random.seed(seed)
@@ -318,7 +323,7 @@ class _Param_Space(abc.ABC):
         log = self._log
         class_name = self.__class__.__name__
         class_vers = self.__version__
-        vers = holo.librarian.__version__
+        vers = librarian_version
 
         # make sure `path_output` is a directory, and that it exists
         path_output = Path(path_output)
@@ -327,7 +332,7 @@ class _Param_Space(abc.ABC):
             log.exception(err)
             raise ValueError(err)
 
-        fname = f"{class_name}{holo.librarian.PSPACE_FILE_SUFFIX}"
+        fname = f"{class_name}{PSPACE_FILE_SUFFIX}"
         fname = path_output.joinpath(fname)
         log.debug(f"{class_name=} {vers=} {fname=}")
 
@@ -361,7 +366,7 @@ class _Param_Space(abc.ABC):
 
         """
         if log is None:
-            log = holo.log
+            log = holo_log
         log.debug(f"loading parameter space from {fname}")
         data = np.load(fname, allow_pickle=True)
 
@@ -369,10 +374,10 @@ class _Param_Space(abc.ABC):
         # `holodeck.param_spaces` module
         class_name = data["class_name"][()]
         log.debug(f"loaded: {class_name=}, vers={data['librarian_version']}")
-        pspace_class = holo.librarian.param_spaces_dict.get(class_name, None)
+        pspace_class = librarian.param_spaces_dict.get(class_name, None)
         # if it is not found, default to the current class/subclass
         if pspace_class is None:
-            log.warning(f"pspace file {fname} has {class_name=}, not found in `holo.param_spaces_dict`!")
+            log.warning(f"pspace file {fname} has {class_name=}, not found in `librarian.param_spaces_dict`!")
             pspace_class = cls
 
         # construct instance with dummy/temporary values (which will be overwritten)
@@ -1047,8 +1052,8 @@ def run_model(
     data["fobs_cents"] = fobs_cents
     data["fobs_edges"] = fobs_edges
 
-    if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
-        err = f"`holo.hardening.Fixed_Time_2PL_SAM` must be used here!  Not {hard}!"
+    if not isinstance(hard, (hardening.Fixed_Time_2PL_SAM, hardening.Hard_GW)):
+        err = f"`hardening.Fixed_Time_2PL_SAM` must be used here!  Not {hard}!"
         if log is not None:
             log.exception(err)
         raise RuntimeError(err)
@@ -1073,7 +1078,7 @@ def run_model(
     if singles_flag or params_flag:
         nloudest = nloudest if singles_flag else 1
 
-        vals = holo.single_sources.ss_gws_redz(
+        vals = single_sources.ss_gws_redz(
             edges,
             use_redz,
             number,
@@ -1093,7 +1098,7 @@ def run_model(
             data["hc_bg"] = hc_bg
 
     if gwb_flag:
-        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, nreals)
+        gwb = gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, nreals)
         data["gwb"] = gwb
 
     return data
@@ -1125,7 +1130,7 @@ def _calc_model_details(edges, redz_final, number):
     nzbins = len(redz) - 1
     nfreqs = len(edges[3]) - 1
     # (M-1, Q-1, Z-1, F) characteristic-strain squared for each bin
-    hc2 = holo.gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz_final)
+    hc2 = gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz_final)
     # strain-squared weighted number of binaries
     hc2_num = hc2 * number
     # (F,) total GWB in each frequency bin
@@ -1225,7 +1230,7 @@ def load_pspace_from_path(path, space_class=None):
 
     # If this is a directory, look for a pspace save file
     if path.is_dir():
-        pattern = "*" + holo.librarian.PSPACE_FILE_SUFFIX
+        pattern = "*" + PSPACE_FILE_SUFFIX
         space_fname = list(path.glob(pattern))
         if len(space_fname) != 1:
             err = f"found {len(space_fname)} matches to {pattern} in output {path}!"
@@ -1245,7 +1250,7 @@ def load_pspace_from_path(path, space_class=None):
     if space_class is None:
         try:
             space_class = str(np.load(space_fname, allow_pickle=True)["class_name"])
-            space_class = holo.librarian.param_spaces_dict[space_class]
+            space_class = librarian.param_spaces_dict[space_class]
         except Exception as err:
             log.error(f"Could not load `class_name` from save file '{space_fname}'.")
             log.error(str(err))
@@ -1261,15 +1266,15 @@ def load_pspace_from_path(path, space_class=None):
 def _get_space_class_from_space_fname(space_fname):
     # Based on the `space_fname`, try to find a matching PS (parameter-space) in `holodeck.param_spaces_dict`
     space_name = space_fname.name.split(".")[0]
-    space_class = holo.librarian.param_spaces_dict[space_name]
+    space_class = librarian.param_spaces_dict[space_name]
     return space_class
 
 
 def _get_sim_fname(path, pnum, library=True):
     if library:
-        temp = holo.librarian.FNAME_LIBRARY_SIM_FILE
+        temp = FNAME_LIBRARY_SIM_FILE
     else:
-        temp = holo.librarian.FNAME_DOMAIN_SIM_FILE
+        temp = FNAME_DOMAIN_SIM_FILE
 
     temp = temp.format(pnum=pnum)
     temp = path.joinpath(temp)

@@ -13,8 +13,7 @@ import os
 from datetime import datetime
 import warnings
 
-import holodeck as holo
-from holodeck import utils, log, plot  # , cosmo, anisotropy
+from holodeck import single_sources, utils, log, plot, anisotropy  # , cosmo
 from holodeck.constants import YR
 from holodeck import cyutils
 
@@ -2323,7 +2322,7 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
     nfreqs, nreals, nloudest = [*hc_ss.shape]
     dur = 1/fobs_cents[0]
     cad = 1.0 / (2 * fobs_cents[-1])
-    # fobs_cents, fobs_edges = holo.utils.pta_freqs(dur)
+    # fobs_cents, fobs_edges = utils.pta_freqs(dur)
     # dfobs = np.diff(fobs_edges)
 
     # build PTA
@@ -2371,7 +2370,7 @@ def detect_pspace_model_psrs(fobs_cents, hc_ss, hc_bg, psrs, nskies, hc_bg_noise
     nfreqs, nreals, nloudest = [*hc_ss.shape]
     dur = 1/fobs_cents[0]
     cad = 1.0 / (2 * fobs_cents[-1])
-    # fobs_cents, fobs_edges = holo.utils.pta_freqs(dur)
+    # fobs_cents, fobs_edges = utils.pta_freqs(dur)
     # dfobs = np.diff(fobs_edges)
 
     if hc_bg_noise is None:
@@ -3509,7 +3508,7 @@ def build_anis_var_arrays(
     cl=[]
     for pp, par in enumerate(params):
         xx.append(params[pp][target])
-        _, Cl = holo.anisotropy.sph_harm_from_hc(
+        _, Cl = anisotropy.sph_harm_from_hc(
             data[pp]['hc_ss'], data[pp]['hc_bg'], nside=nside, lmax=lmax
         )
         yy.append(Cl[...,1]/Cl[...,0])
@@ -3581,7 +3580,7 @@ def build_anis_freq_arrays(
     params_cl = []
     xx_fobs = data[0]['fobs_cents']
     for var in parvars:
-        _, Cl = holo.anisotropy.sph_harm_from_hc(
+        _, Cl = anisotropy.sph_harm_from_hc(
             data[var]['hc_ss'], data[var]['hc_bg'], nside=nside, lmax=lmax
         )
         yy_cl.append(Cl)
@@ -3678,9 +3677,9 @@ def build_hcpar_arrays(
         sspar = data[var]['sspar']
         bgpar = data[var]['bgpar']
 
-        sspar = holo.single_sources.all_sspars(fobs_cents, sspar)
-        bgpar = bgpar*holo.single_sources.par_units[:,np.newaxis,np.newaxis]
-        sspar = sspar*holo.single_sources.par_units[:,np.newaxis,np.newaxis,np.newaxis]
+        sspar = single_sources.all_sspars(fobs_cents, sspar)
+        bgpar = bgpar*single_sources.par_units[:,np.newaxis,np.newaxis]
+        sspar = sspar*single_sources.par_units[:,np.newaxis,np.newaxis,np.newaxis]
 
         # parameters to plot
         if ss_zero:

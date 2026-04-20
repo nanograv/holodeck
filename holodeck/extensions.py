@@ -2,43 +2,43 @@
 """
 
 import holodeck as holo
-from holodeck import log, cosmo, gravwaves
+from holodeck import log, cosmo, gravwaves, utils, host_relations
 from holodeck.constants import MSOL, GYR
-import holodeck.librarian
+from holodeck import librarian, population, host_relations, evolution, hardening
 import numpy as np
 import kalepy as kale
 from holodeck.sams import sam_cyutils
 
-PSPACE = holo.librarian.param_spaces_classic.PS_Classic_Phenom_Uniform
+PSPACE = librarian.param_spaces_classic.PS_Classic_Phenom_Uniform
 
 
 
 class Realizer:
 
     def __init__(self, fobs_orb_edges, resample=None, lifetime=2*GYR, dens=None, **mmbulge_kwargs):
-        pop = holo.population.Pop_Illustris()
+        pop = population.Pop_Illustris()
         if resample is not None:
-            mod_resamp = holo.population.PM_Resample(resample=resample)
+            mod_resamp = population.PM_Resample(resample=resample)
             pop.modify(mod_resamp)
             log.info(f"Resampling population by {resample}")
 
         if dens is not None:
-            mod_dens = holo.population.PM_Density(factor=dens)
+            mod_dens = population.PM_Density(factor=dens)
             pop.modify(mod_dens)
             log.info(f"Modifying population density by {dens}")
 
         if len(mmbulge_kwargs):
             log.info(f"Modifying population masses with params: {mmbulge_kwargs}")
-            mmbulge = holo.host_relations.MMBulge_KH2013(**mmbulge_kwargs)
-            mod_mm13 = holo.population.PM_Mass_Reset(mmbulge, scatter=True)
-            mt, _ = holo.utils.mtmr_from_m1m2(pop.mass)
-            log.debug(f"mass bef = {holo.utils.stats(mt/MSOL)}")
+            mmbulge = host_relations.MMBulge_KH2013(**mmbulge_kwargs)
+            mod_mm13 = population.PM_Mass_Reset(mmbulge, scatter=True)
+            mt, _ = utils.mtmr_from_m1m2(pop.mass)
+            log.debug(f"mass bef = {utils.stats(mt/MSOL)}")
             pop.modify(mod_mm13)
-            mt, _ = holo.utils.mtmr_from_m1m2(pop.mass)
-            log.debug(f"mass aft = {holo.utils.stats(mt/MSOL)}")
+            mt, _ = utils.mtmr_from_m1m2(pop.mass)
+            log.debug(f"mass aft = {utils.stats(mt/MSOL)}")
 
-        fixed = holo.hardening.Fixed_Time_2PL.from_pop(pop, lifetime)
-        evo = holo.evolution.Evolution(pop, fixed)
+        fixed = hardening.Fixed_Time_2PL.from_pop(pop, lifetime)
+        evo = evolution.Evolution(pop, fixed)
         evo.evolve()
 
         self._pop = pop
@@ -262,7 +262,7 @@ def realizer_single_sources(params, nreals, nloudest, nfreqs=40, log10=False,
 
     """
     pspace = pspace()
-    fobs_cents, fobs_edges = holo.utils.pta_freqs(num=nfreqs)
+    fobs_cents, fobs_edges = utils.pta_freqs(num=nfreqs)
 
     sam, hard = pspace.model_for_params(params=params, sam_shape=None,)
     _, _, sspar, bgpar = sam.gwb(

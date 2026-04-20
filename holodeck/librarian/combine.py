@@ -17,8 +17,9 @@ import numpy as np
 import h5py
 import tqdm
 
-import holodeck as holo
-import holodeck.librarian
+from holodeck import __version__ as holo_version
+from holodeck import log, utils
+from holodeck import librarian
 import holodeck.librarian.gen_lib
 from holodeck.librarian import (
     lib_tools, DIRNAME_LIBRARY_SIMS, DIRNAME_DOMAIN_SIMS, DomainNotLibraryError
@@ -28,8 +29,6 @@ from holodeck.librarian import (
 def main():
     """Command-line interface executable method for combining holodeck simulation files.
     """
-
-    log = holo.log
 
     # ---- Make sure we're NOT running in parallel (MPI)
 
@@ -136,7 +135,7 @@ def sam_lib_combine(
     if path_pspace is None:
         path_pspace = path_output
     pspace, pspace_fname = lib_tools.load_pspace_from_path(path_pspace)
-    args, args_fname = holo.librarian.gen_lib.load_config_from_path(path_pspace, log=log)
+    args, args_fname = librarian.gen_lib.load_config_from_path(path_pspace, log=log)
 
     log.info(f"loaded param space: {pspace} from '{pspace_fname}'")
     param_names = pspace.param_names
@@ -207,7 +206,7 @@ def sam_lib_combine(
         path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, param_samples, log, library
     )
     if has_gwb:
-        log.info(f"Loaded data from all library files | {holo.utils.stats(gwb)=}")
+        log.info(f"Loaded data from all library files | {utils.stats(gwb)=}")
     if library:
         param_samples[bad_files] = np.nan
 
@@ -251,21 +250,21 @@ def sam_lib_combine(
         h5.attrs['param_names'] = np.array(param_names).astype('S')
         # new in librarian-v1.1
         h5.attrs['parameter_space_class_name'] = pspace.name
-        h5.attrs['holodeck_version'] = holo.__version__
+        h5.attrs['holodeck_version'] = holo_version
         # I'm not sure if this can/will throw errors, but don't let the combination fail if it does.
         try:
-            git_hash = holo.utils.get_git_hash()
+            git_hash = utils.get_git_hash()
         except:  # noqa
             git_hash = "None"
         h5.attrs['holodeck_git_hash'] = git_hash
-        h5.attrs['holodeck_librarian_version'] = holo.librarian.__version__
+        h5.attrs['holodeck_librarian_version'] = librarian.__version__
 
-    log.warning(f"Saved to {lib_path}, size: {holo.utils.get_file_size(lib_path)}")
+    log.warning(f"Saved to {lib_path}, size: {utils.get_file_size(lib_path)}")
 
     with h5py.File(lib_path, 'r') as h5:
         assert np.all(h5['fobs_cents'][()] > 0.0)
         if has_gwb:
-            log.info(f"Checking library file: {holo.utils.stats(gwb)=}")
+            log.info(f"Checking library file: {utils.stats(gwb)=}")
 
     return lib_path
 
@@ -440,7 +439,7 @@ def _load_library_from_all_files(
             sspar[pnum, :, :, :, :] = temp['sspar'][...]
             bgpar[pnum, :, :, :] = temp['bgpar'][...]
 
-    log.info(f"{holo.utils.frac_str(bad_files)} files are failures")
+    log.info(f"{utils.frac_str(bad_files)} files are failures")
 
     return gwb, hc_ss, hc_bg, sspar, bgpar, param_samples, bad_files
 

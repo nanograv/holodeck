@@ -18,7 +18,7 @@ from libc.stdlib cimport malloc, free
 # make sure to use c-native math functions instead of python/numpy
 from libc.math cimport pow, sqrt, M_PI, NAN, log10, sin, cos
 
-import holodeck as holo
+from holodeck import hardening
 from holodeck.cyutils cimport interp_at_index, _interp_between_vals
 
 
@@ -462,7 +462,7 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
 
     # ---- Fixed_Time_2pwl_SAM
 
-    if isinstance(hard, holo.hardening.Fixed_Time_2PL_SAM):
+    if isinstance(hard, hardening.Fixed_Time_2PL_SAM):
         gmt_time = sam._gmt_time
         # if `sam` is using galaxy merger rate (GMR), then `gmt_time` will be `None`
         if gmt_time is None:
@@ -480,7 +480,7 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
 
     # ---- Hard_GW
 
-    elif isinstance(hard, holo.hardening.Hard_GW) or issubclass(hard, holo.hardening.Hard_GW):
+    elif isinstance(hard, hardening.Hard_GW) or issubclass(hard, hardening.Hard_GW):
         redz_prime = sam._redz_prime
         # if `sam` doesn't use a galaxy merger time (GMT), then `redz_prime` will be `None`,
         # set to initial redshift values instead

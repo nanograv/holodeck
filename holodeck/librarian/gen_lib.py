@@ -30,11 +30,10 @@ import shutil
 
 import numpy as np
 
-import holodeck as holo
+from holodeck import logger, utils, plot, librarian, set_log_level, log_to_file
 from holodeck.constants import YR
-import holodeck.librarian
 import holodeck.librarian.combine
-from holodeck import log
+from holodeck import log, __version__ as holo_version, __file__ as holo_file
 from holodeck.librarian import (
     lib_tools, ARGS_CONFIG_FNAME, PSPACE_DOMAIN_EXTREMA, DIRNAME_LIBRARY_SIMS, DIRNAME_DOMAIN_SIMS
 )
@@ -42,7 +41,7 @@ from holodeck.librarian import (
 #: maximum number of failed simulations before task terminates with error (`None`: no limit)
 MAX_FAILURES = None
 
-# FILES_COPY_TO_OUTPUT = [__file__, holo.librarian.__file__, holo.param_spaces.__file__]
+# FILES_COPY_TO_OUTPUT = [__file__, librarian.__file__, param_spaces.__file__]
 FILES_COPY_TO_OUTPUT = []
 
 # comm = None
@@ -171,7 +170,7 @@ def main():   # noqa : ignore complexity warning
     # ---- distribute jobs to processors
 
     indices = comm.scatter(indices, root=0)
-    iterator = holo.utils.tqdm(indices) if (comm.rank == 0) else np.atleast_1d(indices)
+    iterator = utils.tqdm(indices) if (comm.rank == 0) else np.atleast_1d(indices)
 
     comm.barrier()
 
@@ -231,7 +230,7 @@ def main():   # noqa : ignore complexity warning
 
     if (comm.rank == 0):
         log.warning("Combining simulation files into single library file")
-        holo.librarian.combine.sam_lib_combine(args.output, log, library=(not args.domain))
+        librarian.combine.sam_lib_combine(args.output, log, library=(not args.domain))
         log.info("Library combination completed.")
 
     return
@@ -348,7 +347,7 @@ def run_sam_at_pspace_params(args, space, pnum, params):
     log.debug(f"Saving {pnum} to file | {args.gwb_flag=} {args.ss_flag=} {args.params_flag=}")
     log.debug(f"data has keys: {list(data.keys())}")
     np.savez(sim_fname, **data)
-    log.info(f"Saved to {sim_fname}, size {holo.utils.get_file_size(sim_fname)} after {(datetime.now()-beg)}")
+    log.info(f"Saved to {sim_fname}, size {utils.get_file_size(sim_fname)} after {(datetime.now()-beg)}")
 
     # ---- make diagnostic plots
 
@@ -383,15 +382,15 @@ def _setup_argparse(*args, **kwargs):
     parser.add_argument('-n', '--nsamples', action='store', dest='nsamples', type=int, default=1000,
                         help='number of parameter space samples')
     parser.add_argument('-r', '--nreals', action='store', dest='nreals', type=int,
-                        help='number of realiz  ations', default=holo.librarian.DEF_NUM_REALS)
+                        help='number of realiz  ations', default=librarian.DEF_NUM_REALS)
     parser.add_argument('-d', '--dur', action='store', dest='pta_dur', type=float,
-                        help='PTA observing duration [yrs]', default=holo.librarian.DEF_PTA_DUR)
+                        help='PTA observing duration [yrs]', default=librarian.DEF_PTA_DUR)
     parser.add_argument('-f', '--nfreqs', action='store', dest='nfreqs', type=int,
-                        help='Number of frequency bins', default=holo.librarian.DEF_NUM_FBINS)
+                        help='Number of frequency bins', default=librarian.DEF_NUM_FBINS)
     parser.add_argument('-s', '--shape', action='store', dest='sam_shape', type=int,
                         help='Shape of SAM grid', default=None)
     parser.add_argument('-l', '--nloudest', action='store', dest='nloudest', type=int,
-                        help='Number of loudest single sources', default=holo.librarian.DEF_NUM_LOUDEST)
+                        help='Number of loudest single sources', default=librarian.DEF_NUM_LOUDEST)
 
     # what to run
     parser.add_argument('--gwb', dest="gwb_flag", default=True, action=argparse.BooleanOptionalAction,
@@ -515,11 +514,11 @@ def _setup_param_space(args):
         # - `file_name.PS_Test` : as long as `file_name` is a module within `librarian`
         space_name = args.param_space.split(".")
         if len(space_name) > 1:
-            space_class = holo.librarian
+            space_class = librarian
             for class_name in space_name:
                 space_class = getattr(space_class, class_name)
         else:
-            space_class = holo.librarian.param_spaces_dict[space_name[0]]
+            space_class = librarian.param_spaces_dict[space_name[0]]
 
     except Exception as err:
         log.error(f"Failed to load parameter space '{args.param_space}' !")
@@ -532,7 +531,7 @@ def _setup_param_space(args):
     if args.resume:
         # Load pspace object from previous save
         log.info(f"{args.resume=} : attempting to load pspace {space_class=} from {args.output=}")
-        space, space_fname = holo.librarian.load_pspace_from_path(args.output, space_class=space_class)
+        space, space_fname = librarian.load_pspace_from_path(args.output, space_class=space_class)
         log.warning(f"Loaded param-space   save from {space_fname}")
     else:
         log.info(f"Constructing a new parameter space from {space_class=} ({args.resume=})")
@@ -560,15 +559,15 @@ def _save_config(args):
         config[kk] = vv
 
     # Add additional entries
-    config['holodeck_version'] = holo.__version__
-    config['holodeck_librarian_version'] = holo.librarian.__version__
-    config['holodeck_git_hash'] = holo.utils.get_git_hash()
+    config['holodeck_version'] = holo_version
+    config['holodeck_librarian_version'] = librarian.__version__
+    config['holodeck_git_hash'] = utils.get_git_hash()
     config['created'] = str(datetime.now())
 
     with open(fname, 'w') as out:
         json.dump(config, out)
 
-    log.warning(f"Saved to {fname} - {holo.utils.get_file_size(fname)}")
+    log.warning(f"Saved to {fname} - {utils.get_file_size(fname)}")
 
     return fname
 
@@ -600,14 +599,14 @@ def _setup_log(comm, args):
 
     # ---- setup logger level
 
-    log_lvl = args.verbose if comm.rank == 0 else holo.logger.ERROR
-    holo.set_log_level(log_lvl)
+    log_lvl = args.verbose if comm.rank == 0 else logger.ERROR
+    set_log_level(log_lvl)
 
     # ---- set name of log file
 
     # get the path to the directory containing the `holodeck` module
     # e.g.: "/Users/lzkelley/Programs/nanograv/holodeck"
-    holo_parent = Path(holo.__file__).parent.parent
+    holo_parent = Path(holo_file).parent.parent
     # get the relative path from holodeck to this file
     # e.g.: "holodeck/librarian/gen_lib.py"
     log_name = Path(__file__).relative_to(holo_parent)
@@ -615,7 +614,7 @@ def _setup_log(comm, args):
     log_name = ".".join(log_name.with_suffix("").parts)
 
     output = args.output_logs
-    holo.log_to_file(base_name=log_name, path=output)
+    log_to_file(base_name=log_name, path=output)
 
     log.info(f"  Processor: rank={comm.rank=} / size={comm.size}")
     log.info(f"Output path: {output}")
@@ -644,14 +643,14 @@ def make_plots(args, data, sim_fname):
         fobs_cents = data['fobs_cents']
         hc_bg = data['hc_bg']
         hc_ss = data['hc_ss']
-        fig = holo.plot.plot_bg_ss(fobs_cents, bg=hc_bg, ss=hc_ss)
+        fig = plot.plot_bg_ss(fobs_cents, bg=hc_bg, ss=hc_ss)
         fig.savefig(hc_fname, dpi=100)
 
     # log.info("generating PSD plots")
     # psd_fname = str(plot_fname.with_suffix('')) + "_psd.png"
     # fig = make_ss_plot(fobs_cents, hc_ss, hc_bg, fit_data)
     # fig.savefig(psd_fname, dpi=100)
-    # log.info(f"Saved to {psd_fname}, size {holo.utils.get_file_size(psd_fname)}")
+    # log.info(f"Saved to {psd_fname}, size {utils.get_file_size(psd_fname)}")
 
     if args.params_flag:
         log.info("generating pars plots")
@@ -661,7 +660,7 @@ def make_plots(args, data, sim_fname):
         bgpar = data['bgpar']
         fig = make_pars_plot(fobs_cents, hc_ss, hc_bg, sspar, bgpar)
         fig.savefig(pars_fname, dpi=100)
-        log.info(f"Saved to {pars_fname}, size {holo.utils.get_file_size(pars_fname)}")
+        log.info(f"Saved to {pars_fname}, size {utils.get_file_size(pars_fname)}")
 
     plt.close('all')
     return
@@ -671,9 +670,9 @@ def make_gwb_plot(fobs, gwb, fit_data):
     """Generate a GWB plot from the given data.
 
     """
-    # fig = holo.plot.plot_gwb(fobs, gwb)
-    psd = holo.utils.char_strain_to_psd(fobs[:, np.newaxis], gwb)
-    fig = holo.plot.plot_gwb(fobs, psd)
+    # fig = plot.plot_gwb(fobs, gwb)
+    psd = utils.char_strain_to_psd(fobs[:, np.newaxis], gwb)
+    fig = plot.plot_gwb(fobs, psd)
     ax = fig.axes[0]
 
     xx = fobs * YR
@@ -691,7 +690,7 @@ def make_gwb_plot(fobs, gwb, fit_data):
             pars = med_pars[idx]
 
             pars[0] = 10.0 ** pars[0]
-            yy = holo.utils._func_powerlaw_psd(fobs, 1/YR, *pars)
+            yy = utils._func_powerlaw_psd(fobs, 1/YR, *pars)
             label = fit_nbins[idx]
             label = 'all' if label in [0, None] else f"{label:02d}"
             ax.plot(xx, yy, alpha=0.75, lw=1.0, label="plaw: " + str(label) + " bins", ls='--')
@@ -706,7 +705,7 @@ def make_gwb_plot(fobs, gwb, fit_data):
             pars = med_pars[idx]
 
             pars[0] = 10.0 ** pars[0]
-            zz = holo.utils._func_turnover_psd(fobs, 1/YR, *pars)
+            zz = utils._func_turnover_psd(fobs, 1/YR, *pars)
             label = fit_nbins[idx]
             label = 'all' if label in [0, None] else f"{label:02d}"
             ax.plot(xx, zz, alpha=0.75, lw=1.0, label="turn: " + str(label) + " bins")
@@ -717,10 +716,10 @@ def make_gwb_plot(fobs, gwb, fit_data):
 
 
 def make_ss_plot(fobs, hc_ss, hc_bg, fit_data):
-    # fig = holo.plot.plot_gwb(fobs, gwb)
-    psd_bg = holo.utils.char_strain_to_psd(fobs[:, np.newaxis], hc_bg)
-    psd_ss = holo.utils.char_strain_to_psd(fobs[:, np.newaxis, np.newaxis], hc_ss)
-    fig = holo.plot.plot_bg_ss(fobs, bg=psd_bg, ss=psd_ss, ylabel='GW Power Spectral Density')
+    # fig = plot.plot_gwb(fobs, gwb)
+    psd_bg = utils.char_strain_to_psd(fobs[:, np.newaxis], hc_bg)
+    psd_ss = utils.char_strain_to_psd(fobs[:, np.newaxis, np.newaxis], hc_ss)
+    fig = plot.plot_bg_ss(fobs, bg=psd_bg, ss=psd_ss, ylabel='GW Power Spectral Density')
     ax = fig.axes[0]
 
     xx = fobs * YR
@@ -738,7 +737,7 @@ def make_ss_plot(fobs, hc_ss, hc_bg, fit_data):
             pars = med_pars[idx]
 
             pars[0] = 10.0 ** pars[0]
-            yy = holo.utils._func_powerlaw_psd(fobs, 1/YR, *pars)
+            yy = utils._func_powerlaw_psd(fobs, 1/YR, *pars)
             label = fit_nbins[idx]
             label = 'all' if label in [0, None] else f"{label:02d}"
             ax.plot(xx, yy, alpha=0.75, lw=1.0, label="plaw: " + str(label) + " bins", ls='--')
@@ -753,7 +752,7 @@ def make_ss_plot(fobs, hc_ss, hc_bg, fit_data):
             pars = med_pars[idx]
 
             pars[0] = 10.0 ** pars[0]
-            zz = holo.utils._func_turnover_psd(fobs, 1/YR, *pars)
+            zz = utils._func_turnover_psd(fobs, 1/YR, *pars)
             label = fit_nbins[idx]
             label = 'all' if label in [0, None] else f"{label:02d}"
             ax.plot(xx, zz, alpha=0.75, lw=1.0, label="turn: " + str(label) + " bins")
@@ -767,14 +766,14 @@ def make_pars_plot(fobs, hc_ss, hc_bg, sspar, bgpar):
     """Plot total mass, mass ratio, initial d_c, final d_c
 
     """
-    # fig = holo.plot.plot_gwb(fobs, gwb)
-    fig = holo.plot.plot_pars(fobs, sspar, bgpar)
+    # fig = plot.plot_gwb(fobs, gwb)
+    fig = plot.plot_pars(fobs, sspar, bgpar)
 
     return fig
 
 
 if __name__ == "__main__":
-    holo.set_log_level(holo.log.WARNING)
+    set_log_level(log.WARNING)
     main()
 
     #! the below doesn't work for catching errors... maybe because of comm.barrier() calls?

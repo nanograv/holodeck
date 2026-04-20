@@ -79,8 +79,7 @@ from typing import Tuple
 
 import numpy as np
 
-import holodeck as holo
-from holodeck import utils, log, _PATH_DATA, cosmo
+from holodeck import utils, log, _PATH_DATA, cosmo, host_relations
 from holodeck.constants import PC, MSOL
 
 _DEF_ECCEN_DIST = (1.0, 0.2)
@@ -611,9 +610,9 @@ class PM_Mass_Reset(_Population_Modifier):
         """
         # if `mhost` is a class (not an instance), then instantiate it; make sure its a subclass
         # of `_BH_Host_Relation`
-        mhost = utils.get_subclass_instance(mhost, None, holo.host_relations._BH_Host_Relation)
+        mhost = utils.get_subclass_instance(mhost, None, host_relations._BH_Host_Relation)
         # store attributes
-        self.mhost = mhost         #: Scaling relationship between host and MBH (`holo.host_relations._BH_Host_Relation`)
+        self.mhost = mhost         #: Scaling relationship between host and MBH (`host_relations._BH_Host_Relation`)
         self._scatter = scatter    #: Bool determining whether resampled masses should include statistical scatter
         return
 

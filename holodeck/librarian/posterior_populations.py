@@ -28,8 +28,7 @@ import argparse
 from pathlib import Path
 import numpy as np
 
-import holodeck as holo
-import holodeck.librarian
+from holodeck import librarian, _PATH_OUTPUT, log, utils, sams, single_sources, cosmo
 from holodeck.constants import YR
 
 # Choose range of orbital periods of interest
@@ -48,10 +47,10 @@ PATH_DATA = Path(
 )
 
 # Parameter space corresponding to the fit data
-PSPACE = holo.librarian.param_spaces_classic.PS_Classic_Phenom_Uniform
+PSPACE = librarian.param_spaces_classic.PS_Classic_Phenom_Uniform
 
 # Path to save output data
-PATH_OUTPUT = Path(holo._PATH_OUTPUT).resolve().joinpath("15yr_pops")
+PATH_OUTPUT = Path(_PATH_OUTPUT).resolve().joinpath("15yr_pops")
 
 
 def main(args=None):
@@ -89,7 +88,7 @@ def main(args=None):
             break
         if (num > 0) and args.maxlike and (ml_warning is False):
             err = "Maximum likelihood population with these paramters already exists!  {fname}"
-            holo.log.error(err)
+            log.error(err)
             raise RuntimeError(err)
 
     else:
@@ -111,7 +110,7 @@ def main(args=None):
         data_path=PATH_DATA.resolve(),
         **data
     )
-    print(f"Saved size {holo.utils.get_file_size(fname)} : {fname}")
+    print(f"Saved size {utils.get_file_size(fname)} : {fname}")
 
     return
 
@@ -226,18 +225,18 @@ def load_population_for_pars(pars, pta_dur=TDUR, nfreqs=NFREQS, nreals=NREALS, n
     # Load SAM and hardening model for desired parameters
     sam, hard = PSPACE.model_for_params(pars)
 
-    fobs_orb_cents, fobs_orb_edges = holo.utils.pta_freqs(pta_dur, nfreqs)
+    fobs_orb_cents, fobs_orb_edges = utils.pta_freqs(pta_dur, nfreqs)
 
     # calculate (differential) number of binaries
-    redz_final, diff_num = holo.sams.sam_cyutils.dynamic_binary_number_at_fobs(
-        fobs_orb_cents, sam, hard, holo.cosmo
+    redz_final, diff_num = sams.sam_cyutils.dynamic_binary_number_at_fobs(
+        fobs_orb_cents, sam, hard, cosmo
     )
     # integrate to find total number of binaries in each bin
     edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
-    number = holo.sams.sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
+    number = sams.sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
     # print(f"Loaded {number.sum():.1e} binaries across frequency range")
 
-    vals = holo.single_sources.ss_gws_redz(
+    vals = single_sources.ss_gws_redz(
         edges, redz_final, number,
         realize=nreals, loudest=nloudest, params=True,
     )
@@ -356,7 +355,7 @@ def get_maxlike_pars_from_chains(chains=None):
     # Get maximum likelihood parameters (estimate using KDE)
     mlpars = {}
     for name, vals in chains.items():
-        extr = holo.utils.minmax(vals)
+        extr = utils.minmax(vals)
         xx, yy = kale.density(vals, reflect=extr)
         idx = np.argmax(yy)
         xmax = xx[idx]

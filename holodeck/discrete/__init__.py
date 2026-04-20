@@ -4,5 +4,5 @@ This module handles generating MBH binary populations using discrete samples of 
 
 """
 
-from . import evolution     # noqa
-from . import population    # noqa
+# from . import evolution     # noqa
+# from . import population    # noqa

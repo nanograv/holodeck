@@ -1,7 +1,9 @@
 """Parameter-Space definitions for holodeck libraries."""
 
 import numpy as np
-import holodeck as holo
+from holodeck import hardening, host_relations
+from holodeck.sams.sam import Semi_Analytic_Model
+from holodeck.sams.components import GSMF_Double_Schechter, GSMF_Schechter, GMR_Illustris
 from holodeck.constants import GYR, PC, MSOL
 from holodeck.librarian.lib_tools import _Param_Space, PD_Uniform, PD_Normal, PD_Uniform_Log, PD_MVNormal
 
@@ -84,11 +86,11 @@ class PS_Test(_Param_Space):
     # Define the function which actually constructs the SAM, using a dictionary of model parameters.
     # This is not intended as an API function, but an internal method used to build the SAM model.
     # The call signature of this function should *not* be changed, and the function must always
-    # return a single object: the instance of :py:class:`holodeck.sams.sam.Semi_Analytic_Model`.
+    # return a single object: the instance of :py:class:`Semi_Analytic_Model`.
     def _init_sam(self, sam_shape, params):
 
         # Schechter Galaxy Stellar-Mass Function
-        gsmf = holo.sams.GSMF_Schechter(
+        gsmf = GSMF_Schechter(
             phi0=params["gsmf_phi0_log10"],
             phiz=params["gsmf_phiz"],
             mchar0_log10=params["gsmf_mchar0_log10"],
@@ -98,7 +100,7 @@ class PS_Test(_Param_Space):
         )
 
         # Illustris Galaxy Merger Rate
-        gmr = holo.sams.GMR_Illustris(
+        gmr = GMR_Illustris(
             norm0_log10=params["gmr_norm0_log10"],
             normz=params["gmr_normz"],
             malpha0=params["gmr_malpha0"],
@@ -115,13 +117,13 @@ class PS_Test(_Param_Space):
         # the M-Mbulge class itself is defined such that the normalization is in units of grams.
         # This is a very easy place to make mistakes, and so any/all units (and particularly unit
         # conversions) should be described carefully in docstrings.
-        mmbulge = holo.host_relations.MMBulge_KH2013(
+        mmbulge = host_relations.MMBulge_KH2013(
             mamp=params["mmb_mamp"] * MSOL,
             mplaw=params["mmb_plaw"],
             scatter_dex=params["mmb_scatter_dex"],
         )
 
-        sam = holo.sams.Semi_Analytic_Model(
+        sam = Semi_Analytic_Model(
             gsmf=gsmf,
             gmr=gmr,
             mmbulge=mmbulge,
@@ -136,7 +138,7 @@ class PS_Test(_Param_Space):
     # return a single object: an instance of a subclass of
     # :py:class:`holodeck.hardening._Hardening`.
     def _init_hard(self, sam, params):
-        hard = holo.hardening.Fixed_Time_2PL_SAM(
+        hard = hardening.Fixed_Time_2PL_SAM(
             sam,
             params["hard_time"] * GYR,
             sepa_init=params["hard_sepa_init"] * PC,
@@ -216,7 +218,7 @@ class _PS_Astro_Strong(_Param_Space):
             params["gsmf_log10_mstar_z1"],
             params["gsmf_log10_mstar_z2"],
         ]
-        gsmf = holo.sams.GSMF_Double_Schechter(
+        gsmf = GSMF_Double_Schechter(
             log10_phi1=log10_phi_one,
             log10_phi2=log10_phi_two,
             log10_mstar=log10_mstar,
@@ -225,7 +227,7 @@ class _PS_Astro_Strong(_Param_Space):
         )
 
         # Illustris Galaxy Merger Rate
-        gmr = holo.sams.GMR_Illustris(
+        gmr = GMR_Illustris(
             norm0_log10=params["gmr_norm0_log10"],
             normz=params["gmr_normz"],
             malpha0=params["gmr_malpha0"],
@@ -238,20 +240,20 @@ class _PS_Astro_Strong(_Param_Space):
         )
 
         # Mbh-MBulge relationship (and bulge-fractions)
-        bulge_frac = holo.host_relations.BF_Sigmoid(
+        bulge_frac = host_relations.BF_Sigmoid(
             bulge_frac_lo=params["bf_frac_lo"],
             bulge_frac_hi=params["bf_frac_hi"],
             mstar_char_log10=params["bf_mstar_crit"],
             width_dex=params["bf_width_dex"],
         )
-        mmbulge = holo.host_relations.MMBulge_KH2013(
+        mmbulge = host_relations.MMBulge_KH2013(
             mamp_log10=params["mmb_mamp_log10"],
             mplaw=params["mmb_plaw"],
             scatter_dex=params["mmb_scatter_dex"],
             bulge_frac=bulge_frac,
         )
 
-        sam = holo.sams.Semi_Analytic_Model(
+        sam = Semi_Analytic_Model(
             gsmf=gsmf,
             gmr=gmr,
             mmbulge=mmbulge,
@@ -261,7 +263,7 @@ class _PS_Astro_Strong(_Param_Space):
         return sam
 
     def _init_hard(self, sam, params):
-        hard = holo.hardening.Fixed_Time_2PL_SAM(
+        hard = hardening.Fixed_Time_2PL_SAM(
             sam,
             params["hard_time"] * GYR,
             sepa_init=params["hard_sepa_init"] * PC,

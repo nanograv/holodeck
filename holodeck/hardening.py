@@ -48,8 +48,8 @@ import scipy.interpolate   # noqa
 import pickle as pkl
 from scipy.interpolate import RectBivariateSpline
 
-import holodeck as holo
-from holodeck import utils, cosmo, log, _PATH_DATA, galaxy_profiles
+from holodeck import utils, cosmo, log, _PATH_DATA, galaxy_profiles, accretion
+from holodeck.sams import sam_cyutils   # noqa
 from holodeck.host_relations import (
     get_stellar_mass_halo_mass_relation, get_mmbulge_relation, get_msigma_relation
 )
@@ -262,7 +262,7 @@ class CBD_Torques(_Hardening):
         if evo._acc is None:
             """ If no accretion modules is supplied, use an Eddington fraction for now """
             # total_mass = mass[:,0] + mass[:,1]
-            accretion_instance = holo.accretion.Accretion(f_edd = self.f_edd, subpc=self.subpc)
+            accretion_instance = accretion.Accretion(f_edd = self.f_edd, subpc=self.subpc)
             mdot = accretion_instance.mdot_total(evo, step)
         if evo._acc is not None:
             """ An instance of the accretion class has been supplied,
@@ -1394,8 +1394,8 @@ class Fixed_Time_2PL_SAM(_Hardening):
             Instance configured for the given binary population.
 
         """
-        import holodeck.sams  # noqa
-        import holodeck.sams.sam_cyutils  # noqa
+        #import holodeck.sams  # noqa
+        #import holodeck.sams.sam_cyutils  # noqa
 
         assert np.ndim(time) == 0
         assert np.ndim(rchar) == 0
@@ -1405,7 +1405,7 @@ class Fixed_Time_2PL_SAM(_Hardening):
         shape = mtot.shape
         mt, mr = [mm.flatten() for mm in [mtot, mrat]]
 
-        norm_log10 = holo.sams.sam_cyutils.find_2pwl_hardening_norm(
+        norm_log10 = sam_cyutils.find_2pwl_hardening_norm(
             time, mt, mr,
             sepa_init, rchar, gamma_inner, gamma_outer, num_steps,
         )
@@ -1435,8 +1435,7 @@ class Fixed_Time_2PL_SAM(_Hardening):
         raise NotImplementedError()
 
     def dadt(self, mtot, mrat, sepa, norm=None):
-        import holodeck.sams.sam_cyutils   # noqa
-
+        
         if norm is None:
             norm = self._norm
 
@@ -1444,7 +1443,7 @@ class Fixed_Time_2PL_SAM(_Hardening):
         shape = args[0].shape
         args = [aa.flatten() for aa in args]
         mtot, mrat, sepa, norm = args
-        dadt_vals = holo.sams.sam_cyutils.hard_func_2pwl_gw(
+        dadt_vals = sam_cyutils.hard_func_2pwl_gw(
             mtot, mrat, sepa, norm,                             # must all be 1darrays of matching size (X,)
             self._rchar, self._gamma_inner, self._gamma_outer   # must all be scalars
         )

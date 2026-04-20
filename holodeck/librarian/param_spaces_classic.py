@@ -12,7 +12,9 @@ Notes
 
 from holodeck.constants import PC, GYR
 from holodeck.librarian.lib_tools import _Param_Space, PD_Uniform, PD_Normal
-from holodeck import sams, hardening, host_relations
+from holodeck import hardening, host_relations
+from holodeck.sams.components import GSMF_Schechter, GPF_Power_Law, GMT_Power_Law
+from holodeck.sams.sam import Semi_Analytic_Model
 
 
 class _PS_Classic_Phenom(_Param_Space):
@@ -52,7 +54,7 @@ class _PS_Classic_Phenom(_Param_Space):
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
-        gsmf = sams.GSMF_Schechter(
+        gsmf = GSMF_Schechter(
             phi0=params['gsmf_phi0_log10'],
             phiz=params['gsmf_phiz'],
             mchar0_log10=params['gsmf_mchar0_log10'],
@@ -60,14 +62,14 @@ class _PS_Classic_Phenom(_Param_Space):
             alpha0=params['gsmf_alpha0'],
             alphaz=params['gsmf_alphaz'],
         )
-        gpf = sams.GPF_Power_Law(
+        gpf = GPF_Power_Law(
             frac_norm_allq=params['gpf_frac_norm_allq'],
             malpha=params['gpf_malpha'],
             qgamma=params['gpf_qgamma'],
             zbeta=params['gpf_zbeta'],
             max_frac=params['gpf_max_frac'],
         )
-        gmt = sams.GMT_Power_Law(
+        gmt = GMT_Power_Law(
             time_norm=params['gmt_norm']*GYR,
             malpha=params['gmt_malpha'],
             qgamma=params['gmt_qgamma'],
@@ -79,7 +81,7 @@ class _PS_Classic_Phenom(_Param_Space):
             scatter_dex=params['mmb_scatter_dex'],
         )
 
-        sam = sams.Semi_Analytic_Model(
+        sam = Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
             shape=sam_shape,
         )
@@ -198,7 +200,7 @@ class _PS_Classic_GWOnly(_Param_Space):
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
-        gsmf = sams.GSMF_Schechter(
+        gsmf = GSMF_Schechter(
             phi0=params['gsmf_phi0_log10'],
             phiz=params['gsmf_phiz'],
             mchar0_log10=params['gsmf_mchar0_log10'],
@@ -206,14 +208,14 @@ class _PS_Classic_GWOnly(_Param_Space):
             alpha0=params['gsmf_alpha0'],
             alphaz=params['gsmf_alphaz'],
         )
-        gpf = sams.GPF_Power_Law(
+        gpf = GPF_Power_Law(
             frac_norm_allq=params['gpf_frac_norm_allq'],
             malpha=params['gpf_malpha'],
             qgamma=params['gpf_qgamma'],
             zbeta=params['gpf_zbeta'],
             max_frac=params['gpf_max_frac'],
         )
-        gmt = sams.GMT_Power_Law(
+        gmt = GMT_Power_Law(
             time_norm=params['gmt_norm']*GYR,
             malpha=params['gmt_malpha'],
             qgamma=params['gmt_qgamma'],
@@ -225,7 +227,7 @@ class _PS_Classic_GWOnly(_Param_Space):
             scatter_dex=params['mmb_scatter_dex'],
         )
 
-        sam = sams.Semi_Analytic_Model(
+        sam = Semi_Analytic_Model(
             gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
             shape=sam_shape,
         )

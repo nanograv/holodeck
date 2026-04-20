@@ -12,8 +12,7 @@ import matplotlib.cm as cm
 
 import kalepy as kale
 
-import holodeck as holo
-from holodeck import utils, log
+from holodeck import utils, log, cosmo
 from holodeck.constants import MSOL, YR
 
 FIGSIZE = 6
@@ -569,12 +568,12 @@ def draw_sspars_and_bgpars(axs, xx, sspar, bgpar, nsamp=10, cmap=cm.rainbow_r, c
     q_ss = sspar[1,:,:,:] # ss ratios
     # qq_med = draw_med_conf(axs[0,1], xx, q_bg, plot=kw_plot, **kwargs)
 
-    di_bg = holo.cosmo.comoving_distance(bgpar[2,:,:]).value # bg avg distances in Mpc
-    di_ss = holo.cosmo.comoving_distance(sspar[2,:,:,:]).value # ss distances in Mpc
+    di_bg = cosmo.comoving_distance(bgpar[2,:,:]).value # bg avg distances in Mpc
+    di_ss = cosmo.comoving_distance(sspar[2,:,:,:]).value # ss distances in Mpc
 
 
-    df_bg = holo.cosmo.comoving_distance(bgpar[3,:,:]).value # bg avg distances in Mpc
-    df_ss = holo.cosmo.comoving_distance(sspar[3,:,:,:]).value # ss distances in Mpc
+    df_bg = cosmo.comoving_distance(bgpar[3,:,:]).value # bg avg distances in Mpc
+    df_ss = cosmo.comoving_distance(sspar[3,:,:,:]).value # ss distances in Mpc
     # dd_med = draw_med_conf(axs[1,0], xx, d_bg, plot=kw_plot, **kwargs)
 
     # hh_med = draw_med_conf(axs[1,1], xx, hc_bg, plot=kw_plot, **kwargs)

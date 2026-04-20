@@ -12,8 +12,7 @@ import numpy as np
 
 import kalepy as kale
 
-import holodeck as holo
-from holodeck import utils, cosmo, log, hardening
+from holodeck import utils, cosmo, log, hardening, cyutils, sams
 from holodeck.constants import SPLC, NWTG, MPC
 
 
@@ -462,7 +461,7 @@ def sampled_gws_from_sam(sam, fobs_gw, hard=hardening.Hard_GW, **kwargs):
 
     """
     fobs_orb = fobs_gw / 2.0
-    vals, weights, edges, dens, mass = holo.sam.sample_sam_with_hardening(sam, hard, fobs=fobs_orb, **kwargs)
+    vals, weights, edges, dens, mass = sams.sam.simple_sam_with_hardening(sam, hard, fobs=fobs_orb, **kwargs)
     gff, gwf, gwb = _gws_from_samples(vals, weights, fobs_gw)
     return gff, gwf, gwb
 
@@ -518,16 +517,16 @@ def _gws_from_number_grid_integrated_redz(edges, redz, number, realize, sum=True
         if sum:
             import holodeck.cyutils   # noqa
             # This function reate
-            hc2 = holo.cyutils.sam_poisson_gwb(number, hc2, realize)
+            hc2 = cyutils.sam_poisson_gwb(number, hc2, realize)
 
         else:
             log.warning(f"`sum`={sum} :: this requires a large amount of memory!")
             shape = number.shape + (realize,)
             hc2 = hc2[..., np.newaxis] * poisson_as_needed(number[..., np.newaxis] * np.ones(shape))
-            if holo.sam._DEBUG:
+            if sams.sam._DEBUG:
                 log.info(f"number = {utils.stats(number)}")
                 log.info(f"hc2 = {utils.stats(hc2)}")
-                holo.sam._check_bads(edges + [np.arange(realize),], hc2, "hc2")
+                sams.sam._check_bads(edges + [np.arange(realize),], hc2, "hc2")
 
     else:
         err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
@@ -592,16 +591,16 @@ def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
         if sum:
             import holodeck.cyutils   # noqa
             # This function reate
-            hc2 = holo.cyutils.sam_poisson_gwb(number, hc2, realize)
+            hc2 = cyutils.sam_poisson_gwb(number, hc2, realize)
 
         else:
             log.warning(f"`sum`={sum} :: this requires a large amount of memory!")
             shape = number.shape + (realize,)
             hc2 = hc2[..., np.newaxis] * poisson_as_needed(number[..., np.newaxis] * np.ones(shape))
-            if holo.sam._DEBUG:
+            if sams.sam._DEBUG:
                 log.info(f"number = {utils.stats(number)}")
                 log.info(f"hc2 = {utils.stats(hc2)}")
-                holo.sam._check_bads(edges + [np.arange(realize),], hc2, "hc2")
+                sams.sam._check_bads(edges + [np.arange(realize),], hc2, "hc2")
 
     else:
         err = "`realize` ({}) must be one of {{True, False, integer}}!".format(realize)
@@ -929,7 +928,7 @@ def sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
     mr = sam.mrat
     rz = sam.redz
     dc = cosmo.comoving_distance(sam.redz).to('Mpc').value
-    gwb = holo.cyutils.sam_calc_gwb_single_eccen(ndens, mt_l10, mr, rz, dc, gwfobs, sepa_evo, eccen_evo, nharms)
+    gwb = cyutils.sam_calc_gwb_single_eccen(ndens, mt_l10, mr, rz, dc, gwfobs, sepa_evo, eccen_evo, nharms)
     return np.asarray(gwb)
 
 
@@ -970,7 +969,7 @@ def sam_calc_gwb_single_eccen_discrete(gwfobs, sam, sepa_evo, eccen_evo, nharms=
     else:
         squeeze = False
 
-    gwb = holo.cyutils.sam_calc_gwb_single_eccen_discrete(ndens, mt_l10, mr,
+    gwb = cyutils.sam_calc_gwb_single_eccen_discrete(ndens, mt_l10, mr,
                                                           rz, dc, gwfobs,
                                                           sepa_evo, eccen_evo,
                                                           nharms, nreals)

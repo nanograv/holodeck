@@ -14,8 +14,7 @@ import matplotlib.cm as cm
 import kalepy as kale # noqa
 # import kalepy.plot
 
-import holodeck as holo
-import holodeck.cyutils
+from holodeck import hardening, log, cyutils, sams
 from holodeck import cosmo, utils, plot, gravwaves
 from holodeck.constants import MSOL, PC, YR, MPC
 
@@ -23,7 +22,6 @@ from holodeck.constants import MSOL, PC, YR, MPC
 np.seterr(divide='ignore', invalid='ignore', over='ignore')
 warnings.filterwarnings("ignore", category=UserWarning)
 
-log = holo.log
 log.setLevel(logging.INFO)
 
 par_names = np.array(['mtot', 'mrat', 'redz_init', 'redz_final', 'dcom_final', 'sepa_final', 'angs_final'])
@@ -141,7 +139,7 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
 
 
             hc2ss, hc2bg, sspar, bgpar = \
-                holo.cyutils.loudest_hc_and_par_from_sorted_redz(
+                cyutils.loudest_hc_and_par_from_sorted_redz(
                     number, h2fdf, realize, loudest,
                     mt, mr, rz, redz, dcom_final, sepa, angs,
                     msort, qsort, zsort)
@@ -162,7 +160,7 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
 
         else:
             # use cython to get h_c^2 for ss and bg
-            hc2ss, hc2bg = holo.cyutils.loudest_hc_from_sorted(number, h2fdf, realize, loudest,
+            hc2ss, hc2bg = cyutils.loudest_hc_from_sorted(number, h2fdf, realize, loudest,
                                                                msort, qsort, zsort)
             hc_ss = np.sqrt(hc2ss)
             hc_bg = np.sqrt(hc2bg)
@@ -226,10 +224,10 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
     cmass = utils.chirp_mass_mtmr(mt[:,np.newaxis], mr[np.newaxis,:])
 
     # --- Comoving Distances --- in shape (Z)
-    cdist = holo.cosmo.comoving_distance(rz).cgs.value
+    cdist = cosmo.comoving_distance(rz).cgs.value
 
     # --- Rest Frame Frequencies --- in shape (Z, F)
-    rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
+    rfreq = utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
 
     # --- Source Strain Amplitude --- in shape (M, Q, Z, F)
     hsamp = utils.gw_strain_source(cmass[:,:,np.newaxis,np.newaxis],
@@ -254,7 +252,7 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
             # bgpar = avg parameters of background
             # ssidx = indices of loud single sources
             hc2ss, hc2bg, lspar, bgpar, ssidx = \
-                holo.cyutils.loudest_hc_and_par_from_sorted(number, h2fdf, realize, loudest,
+                cyutils.loudest_hc_and_par_from_sorted(number, h2fdf, realize, loudest,
                                                             mt, mr, rz, msort, qsort, zsort)
             hc_ss = np.sqrt(hc2ss) # calculate single source strain
             hc_bg = np.sqrt(hc2bg) # calculate background strain
@@ -264,7 +262,7 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
 
         else:
             # use cython to get h_c^2 for ss and bg
-            hc2ss, hc2bg = holo.cyutils.loudest_hc_from_sorted(number, h2fdf, realize, loudest,
+            hc2ss, hc2bg = cyutils.loudest_hc_from_sorted(number, h2fdf, realize, loudest,
                                                                msort, qsort, zsort)
             hc_ss = np.sqrt(hc2ss)
             hc_bg = np.sqrt(hc2bg)
@@ -340,10 +338,10 @@ def loudest_by_cython(edges, number, realize, loudest, round = True, params = Fa
     cmass = utils.chirp_mass_mtmr(mt[:,np.newaxis], mr[np.newaxis,:])
 
     # --- Comoving Distances --- in shape (Z)
-    cdist = holo.cosmo.comoving_distance(rz).cgs.value
+    cdist = cosmo.comoving_distance(rz).cgs.value
 
     # --- Rest Frame Frequencies --- in shape (Z, F)
-    rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
+    rfreq = utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
 
     # --- Source Strain Amplitude --- in shape (M, Q, Z, F)
     hsamp = utils.gw_strain_source(cmass[:,:,np.newaxis,np.newaxis],
@@ -364,7 +362,7 @@ def loudest_by_cython(edges, number, realize, loudest, round = True, params = Fa
     if(utils.isinteger(realize)):
         if(params == True):
             hc2ls, hc2bg, lspar, bgpar, lsidx = \
-                holo.cyutils.loudest_hc_and_par_from_sorted(number, h2fdf, realize, loudest,
+                cyutils.loudest_hc_and_par_from_sorted(number, h2fdf, realize, loudest,
                                                             mt, mr, rz, msort, qsort, zsort)
             hc_ls = np.sqrt(hc2ls)
             hc_bg = np.sqrt(hc2bg)
@@ -372,7 +370,7 @@ def loudest_by_cython(edges, number, realize, loudest, round = True, params = Fa
 
         else:
             # use cython to get h_c^2 for ss and bg
-            hc2ls, hc2bg = holo.cyutils.loudest_hc_from_sorted(number, h2fdf, realize, loudest,
+            hc2ls, hc2bg = cyutils.loudest_hc_from_sorted(number, h2fdf, realize, loudest,
                                                                msort, qsort, zsort)
             hc_ls = np.sqrt(hc2ls)
             hc_bg = np.sqrt(hc2bg)
@@ -450,10 +448,10 @@ def ss_by_cdefs(edges, number, realize, round = True, params = False):
     cmass = utils.chirp_mass_mtmr(mt[:,np.newaxis], mr[np.newaxis,:])
 
     # --- Comoving Distances --- in shape (Z)
-    cdist = holo.cosmo.comoving_distance(rz).cgs.value
+    cdist = cosmo.comoving_distance(rz).cgs.value
 
     # --- Rest Frame Frequencies --- in shape (Z, F)
-    rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
+    rfreq = utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
 
     # --- Source Strain Amplitude --- in shape (M, Q, Z, F)
     hsamp = utils.gw_strain_source(cmass[:,:,np.newaxis,np.newaxis],
@@ -467,14 +465,14 @@ def ss_by_cdefs(edges, number, realize, round = True, params = False):
     if(utils.isinteger(realize)):
         if(params == True):
             hc2ss, hc2bg, ssidx, bgpar, sspar = \
-                holo.cyutils.ss_bg_hc_and_par(number, h2fdf, realize, mt, mr, rz)
+                cyutils.ss_bg_hc_and_par(number, h2fdf, realize, mt, mr, rz)
             hc_ss = np.sqrt(hc2ss)
             hc_bg = np.sqrt(hc2bg)
             return hc_bg, hc_ss, ssidx, hsamp, bgpar, sspar
 
         else:
             # use cython to get h_c^2 for ss and bg
-            hc2ss, hc2bg, ssidx = holo.cyutils.ss_bg_hc(number, h2fdf, realize)
+            hc2ss, hc2bg, ssidx = cyutils.ss_bg_hc(number, h2fdf, realize)
             hc_ss = np.sqrt(hc2ss)
             hc_bg = np.sqrt(hc2bg)
             return hc_bg, hc_ss, ssidx, hsamp
@@ -597,13 +595,13 @@ def ss_by_ndars(edges, number, realize, round = True):
     # --- Comoving Distances ---
     # to get cdist in shape (Z) we need
     # rz in shape (Z)
-    cdist = holo.cosmo.comoving_distance(rz).cgs.value
+    cdist = cosmo.comoving_distance(rz).cgs.value
 
     # --- Rest Frame Frequencies ---
     # to get rest freqs in shape (Z, F) we need
     # rz in shape (Z, 1)
     # fc in shape (1, F)
-    rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
+    rfreq = utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
 
     # --- Source Strain Amplitude ---
     # to get hs amplitude in shape (M, Q, Z, F) we need
@@ -691,13 +689,13 @@ def ss_by_ndars(edges, number, realize, round = True):
     if np.any(hsmax<=0):
         raise Exception("hsmax <=0 found")
 
-    # print('bgnum stats:\n', holo.utils.stats(bgnum))
-    # print('bgnum[hsamp==hsmax] stats:\n', holo.utils.stats(bgnum[(hsamp == hsmax)]))
+    # print('bgnum stats:\n', utils.stats(bgnum))
+    # print('bgnum[hsamp==hsmax] stats:\n', utils.stats(bgnum[(hsamp == hsmax)]))
     # print('ssidx\n', ssidx, ssidx.shape)
     bgnum[ssidx[0], ssidx[1], ssidx[2], ssidx[3], ssidx[4]] -= 1
     # print('\nafter subtraction')
-    # print('bgnum stats:\n', holo.utils.stats(bgnum))
-    # print('bgnum[hsamp==hsmax] stats:\n', holo.utils.stats(bgnum[(hsamp == hsmax)]))
+    # print('bgnum stats:\n', utils.stats(bgnum))
+    # print('bgnum[hsamp==hsmax] stats:\n', utils.stats(bgnum[(hsamp == hsmax)]))
 
     assert np.all(bgnum>=0), f"bgnum contains negative values at: {np.where(bgnum<0)}"
 
@@ -775,13 +773,13 @@ def h2fdf(edges):
     # --- Comoving Distances ---
     # to get cdist in shape (Z) we need
     # rz in shape (Z)
-    cdist = holo.cosmo.comoving_distance(rz).cgs.value
+    cdist = cosmo.comoving_distance(rz).cgs.value
 
     # --- Rest Frame Frequencies ---
     # to get rest freqs in shape (Z, F) we need
     # rz in shape (Z, 1)
     # fc in shape (1, F)
-    rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
+    rfreq = utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
 
     # --- Source Strain Amplitude ---
     # to get hs amplitude in shape (M, Q, Z, F) we need
@@ -824,7 +822,7 @@ def all_sspars(fobs_gw_cents, sspar):
     mrat = sspar[1,:,:] # (F,R,L) dimensionless
     redz_init = sspar[2,:,:]  # (F,R,L) dimensionless
     redz_final = sspar[3,:,:]  # (F,R,L) dimensionless
-    dcom_final = holo.cosmo.comoving_distance(redz_final).to('cm').value # (F,R,L) in cm
+    dcom_final = cosmo.comoving_distance(redz_final).to('cm').value # (F,R,L) in cm
     dcom_final[dcom_final<0] = np.nan
     fobs_orb_cents = fobs_gw_cents/2.0  # (F,)
     frst_orb_cents = utils.frst_from_fobs(fobs_orb_cents[:,np.newaxis,np.newaxis], redz_final) #  (F,R,L) in Hz
@@ -986,9 +984,9 @@ def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
 
     for m_idx in range(len(mt)):
         for q_idx in range(len(mr)):
-            cmass = holo.utils.chirp_mass_mtmr(mt[m_idx], mr[q_idx])
+            cmass = utils.chirp_mass_mtmr(mt[m_idx], mr[q_idx])
             for z_idx in range(len(rz)):
-                cdist = holo.cosmo.comoving_distance(rz[z_idx]).cgs.value
+                cdist = cosmo.comoving_distance(rz[z_idx]).cgs.value
 
                 # print M, q, z, M_c, d_c
                 if(print_test):
@@ -999,7 +997,7 @@ def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
 
                 # check if loudest source in any bin
                 for f_idx in range(len(fc)):
-                    rfreq = holo.utils.frst_from_fobs(fc[f_idx], rz[z_idx])
+                    rfreq = utils.frst_from_fobs(fc[f_idx], rz[z_idx])
                     # hs of a source in that bin
                     hs_mqzf = utils.gw_strain_source(cmass, cdist, rfreq)
 
@@ -1054,11 +1052,11 @@ def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
     # instead of recalculating
     for m_idx in range(len(mt)):
         for q_idx in range(len(mr)):
-            cmass = holo.utils.chirp_mass_mtmr(mt[m_idx], mr[q_idx])
+            cmass = utils.chirp_mass_mtmr(mt[m_idx], mr[q_idx])
             for z_idx in range(len(rz)):
-                cdist = holo.cosmo.comoving_distance(rz[z_idx]).cgs.value
+                cdist = cosmo.comoving_distance(rz[z_idx]).cgs.value
                 for f_idx in range(len(fc)):
-                    rfreq = holo.utils.frst_from_fobs(fc[f_idx], rz[z_idx])
+                    rfreq = utils.frst_from_fobs(fc[f_idx], rz[z_idx])
                     hs_mqzf = utils.gw_strain_source(cmass, cdist, rfreq)
                     hc_dlnf = hs_mqzf**2 * (fc[f_idx]/df[f_idx])
                     for r_idx in range(reals):
@@ -1139,7 +1137,7 @@ def gws_by_ndars(edges, number, realize, round = True, sum = True, print_test = 
     # --- Comoving Distances ---
     # to get cdist in shape (Z) we need
     # rz in shape (Z)
-    cdist = holo.cosmo.comoving_distance(rz).cgs.value
+    cdist = cosmo.comoving_distance(rz).cgs.value
     if(print_test):
         print('cdist:', cdist.shape, '\n', cdist)
 
@@ -1147,7 +1145,7 @@ def gws_by_ndars(edges, number, realize, round = True, sum = True, print_test = 
     # to get rest freqs in shape (Z, F) we need
     # rz in shape (Z, 1)
     # fc in shape (1, F)
-    rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
+    rfreq = utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
     if(print_test):
         print('rfreq:', rfreq.shape, '\n', rfreq)
 
@@ -1303,7 +1301,7 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
     # --- Comoving Distances ---
     # to get cdist in shape (Z) we need
     # rz in shape (Z)
-    cdist = holo.cosmo.comoving_distance(rz).cgs.value
+    cdist = cosmo.comoving_distance(rz).cgs.value
     if(print_test):
         print('cdist:', cdist.shape, '\n', cdist)
 
@@ -1311,7 +1309,7 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
     # to get rest freqs in shape (Z, F) we need
     # rz in shape (Z, 1)
     # fc in shape (1, F)
-    rfreq = holo.utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
+    rfreq = utils.frst_from_fobs(fc[np.newaxis,:], rz[:,np.newaxis])
     if(print_test):
         print('rfreq:', rfreq.shape, '\n', rfreq)
 
@@ -1392,14 +1390,14 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
     if np.any(hsmax<=0):
         raise Exception("hsmax <=0 found")
 
-    # print('bgnum stats:\n', holo.utils.stats(bgnum))
-    # print('bgnum[hsamp==hsmax] stats:\n', holo.utils.stats(bgnum[(hsamp == hsmax)]))
+    # print('bgnum stats:\n', utils.stats(bgnum))
+    # print('bgnum[hsamp==hsmax] stats:\n', utils.stats(bgnum[(hsamp == hsmax)]))
     bgnum[(hsamp == hsmax)]-=1
     # NOTE keep an eye out for if hsmax is not found anywhere in hsasmp
     # could change to bgnum(np.where(hsamp==hsmax) & (bgnum >0))-=1
     # print('\nafter subtraction')
-    # print('bgnum stats:\n', holo.utils.stats(bgnum))
-    # print('bgnum[hsamp==hsmax] stats:\n', holo.utils.stats(bgnum[(hsamp == hsmax)]))
+    # print('bgnum stats:\n', utils.stats(bgnum))
+    # print('bgnum[hsamp==hsmax] stats:\n', utils.stats(bgnum[(hsamp == hsmax)]))
 
     assert np.all(bgnum>=0), f"bgnum contains negative values at: {np.where(bgnum<0)}"
     # if(np.any(bgnum<0)):   # alternate way to check for this error, and give index of neg number
@@ -1680,10 +1678,10 @@ def example(dur, cad, mtot, mrat, redz, print_test):
     # 2) Build Semi-Analytic-Model with super simple parameters
     if(mtot==None or mrat==None or redz==None):
         print('using default mtot, mrat, and redz')
-        sam = holo.sam.Semi_Analytic_Model(ZERO_GMT_STALLED_SYSTEMS=True,
+        sam = sams.Semi_Analytic_Model(ZERO_GMT_STALLED_SYSTEMS=True,
                                            ZERO_DYNAMIC_STALLED_SYSTEMS=False)
     else:
-        sam = holo.sam.Semi_Analytic_Model(mtot, mrat, redz,
+        sam = sams.Semi_Analytic_Model(mtot, mrat, redz,
                                            ZERO_GMT_STALLED_SYSTEMS=True,
                                            ZERO_DYNAMIC_STALLED_SYSTEMS=False)
     if(print_test):
@@ -1697,7 +1695,7 @@ def example(dur, cad, mtot, mrat, redz, print_test):
     # dynamic_binary_number
 
     # gets differential number of binaries per bin-vol per log freq interval
-    edges, dnum = sam.dynamic_binary_number(holo.hardening.Hard_GW, fobs_orb=fobs_orb_cents, zero_stalled=False)
+    edges, dnum = sam.dynamic_binary_number(hardening.Hard_GW, fobs_orb=fobs_orb_cents, zero_stalled=False)
     edges[-1] = fobs_orb_edges
 
     # integrate (multiply by bin volume) within each bin

@@ -9,8 +9,7 @@ import numpy as np
 import astropy as ap
 import astropy.units
 
-import holodeck as holo
-from holodeck import utils
+from holodeck import utils, ems
 
 
 __all__ = ["Runnoe2012"]
@@ -163,7 +162,7 @@ class Runnoe2012:
         lbol = ap.units.Quantity(lbol, 'erg/s')
         iband = self.lband_from_lbol('5100', lbol)
         if magnitude:
-            iband = holo.ems.bands_sdss['i'].lum_to_abs_mag(iband, type='w')
+            iband = ems.bands_sdss['i'].lum_to_abs_mag(iband, type='w')
         return iband
 
 

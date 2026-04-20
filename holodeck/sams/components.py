@@ -27,8 +27,7 @@ import abc
 
 import numpy as np
 
-import holodeck as holo
-from holodeck import cosmo, utils
+from holodeck import cosmo, utils, log
 from holodeck.constants import GYR, MSOL
 from scipy.stats import norm as stnorm
 
@@ -108,7 +107,7 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
         ndens *= jac
 
         if scatter is not False:
-            ndens = holo.utils.scatter_redistribute_densities(mbh, ndens, scatter=scatter)
+            ndens = utils.scatter_redistribute_densities(mbh, ndens, scatter=scatter)
 
         return ndens
 
@@ -597,7 +596,7 @@ class GPF_Power_Law(_Galaxy_Pair_Fraction):
 
         if (max_frac < 0.0) or (1.0 < max_frac):
             err = f"Given `max_frac`={max_frac:.4f} must be between [0.0, 1.0]!"
-            holo.log.exception(err)
+            log.exception(err)
             raise ValueError(err)
         self._max_frac = max_frac
 

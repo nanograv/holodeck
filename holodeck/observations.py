@@ -11,13 +11,13 @@ import os
 
 import numpy as np
 
-import holodeck as holo
+from holodeck import _PATH_DATA
 
 FNAME_MM2013 = "mcconnell+ma-2013_1211.2816.txt"
 
 
 def load_mcconnell_ma_2013():
-    fname = os.path.join(holo._PATH_DATA, FNAME_MM2013)
+    fname = os.path.join(_PATH_DATA, FNAME_MM2013)
     header = []
     data_raw = []
     hcnt = 0

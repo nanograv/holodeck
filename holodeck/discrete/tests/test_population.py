@@ -7,9 +7,8 @@ import scipy.stats
 
 import pytest
 
-import holodeck as holo
 from holodeck.discrete import population
-import holodeck.host_relations
+from holodeck import host_relations, utils
 from holodeck.constants import MSOL, PC
 
 
@@ -35,7 +34,7 @@ def test_pop_illustris_basic():
     for kk, rr, uu in zip(keys, ranges, units):
         vals = getattr(pop, kk) / uu
         extr = np.array(rr)
-        print(f"key: {kk:10s}, {holo.utils.stats(vals)}, {extr}")
+        print(f"key: {kk:10s}, {utils.stats(vals)}, {extr}")
         assert np.all((extr[0] < vals) & (vals < extr[1])), f"Values for {kk} are not within bounds!"
         assert pop.size == np.shape(vals)[0], f"{kk} size ({np.shape(vals)}) differs from pop.size ({pop.size})!"
 
@@ -274,7 +273,7 @@ def test_resample_basic():
 def test_mass_reset():
     print("test_mass_reset()")
     pop = population.Pop_Illustris()
-    mmbulge_relation = holo.host_relations.MMBulge_MM2013()
+    mmbulge_relation = host_relations.MMBulge_MM2013()
     mod_MM2013 = population.PM_Mass_Reset(mmbulge_relation, scatter=False)
 
     mass_bef = pop.mass
@@ -291,7 +290,7 @@ def test_mass_reset():
     SCATTER = 0.1
     TOL_STD = 1.5 * sp.stats.norm.ppf(1.0 - 1.0 / pop.mass.size)
     print(f"TOL={TOL_STD}")
-    mmbulge_relation = holo.host_relations.MMBulge_MM2013(scatter_dex=SCATTER)
+    mmbulge_relation = host_relations.MMBulge_MM2013(scatter_dex=SCATTER)
     mod_MM2013 = population.PM_Mass_Reset(mmbulge_relation, scatter=True)
     pop.modify(mod_MM2013)
     mass_scatter = pop.mass
@@ -299,10 +298,10 @@ def test_mass_reset():
     bb = np.log10(mass_scatter/MSOL)
     assert not np.all(mass_scatter == mass_aft), "Masses with scatter match without!"
     diff = (bb - aa)
-    print(f"SCATTER={SCATTER:.4f}, TOL={TOL_STD:.3f}, diff={holo.utils.stats(diff)}")
+    print(f"SCATTER={SCATTER:.4f}, TOL={TOL_STD:.3f}, diff={utils.stats(diff)}")
     mean_diff = np.mean(diff)
     assert mean_diff < SCATTER, f"Mean difference ({np.mean(diff)}) exceeds SCATTER ({SCATTER})!"
-    print(f"diff/SCATTER={holo.utils.stats(diff/SCATTER)}")
+    print(f"diff/SCATTER={utils.stats(diff/SCATTER)}")
     assert np.all(np.fabs(diff/SCATTER) < TOL_STD), f"Difference exceeds tolerance ({TOL_STD})!"
 
     return

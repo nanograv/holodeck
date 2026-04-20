@@ -3,11 +3,10 @@ import sys
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 
-import holodeck as holo
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.signal as ssig
-from holodeck import utils
+from holodeck import utils, sams, hardening, host_relations
 from holodeck.constants import GYR, MSOL, PC, YR
 from holodeck.gps import gp_utils as gu
 
@@ -44,18 +43,18 @@ def sam_hard(env_pars, shape=40):
     rchar = (10.0**env_pars["hard_rchar"]) * PC
     mmb_amp = (10.0**env_pars["mmb_amp"]) * MSOL
 
-    gsmf = holo.sam.GSMF_Schechter(phi0=env_pars["gsmf_phi0"])
-    gpf = holo.sam.GPF_Power_Law()
-    gmt = holo.sam.GMT_Power_Law()
-    mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
+    gsmf = sams.GSMF_Schechter(phi0=env_pars["gsmf_phi0"])
+    gpf = sams.GPF_Power_Law()
+    gmt = sams.GMT_Power_Law()
+    mmbulge = host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
-    sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf,
-                                       gpf=gpf,
-                                       gmt=gmt,
-                                       mmbulge=mmbulge,
-                                       shape=shape)
+    sam = sams.Semi_Analytic_Model(gsmf=gsmf,
+                                   gpf=gpf,
+                                   gmt=gmt,
+                                   mmbulge=mmbulge,
+                                   shape=shape)
 
-    hard = holo.hardening.Fixed_Time.from_sam(
+    hard = hardening.Fixed_Time.from_sam(
         sam,
         time,
         rchar=rchar,
