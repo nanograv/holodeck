@@ -1,19 +1,10 @@
 """Semi-Analytic Model - Components
 
-This module provides the key building blocks for the holodeck SAMs.  In particular, the:
-
-* Galaxy Stellar-Mass Function (GSMF) : number-density of galaxies as a function of stellar mass;
-* Galaxy Merger Rate (GMR) : rate of galaxy mergers per galaxy;
-* Galaxy Pair Fraction (GPF) : fraction of galaxy pairs, relative to all galaxies;
-* Galaxy Merger Time (GMT) : duration over which galaxy pairs are observable as pairs.
-
-For more information see the :mod:`holodeck.sams` module, or the :doc:`SAMs getting-started guide
-<../getting_started/index>`.
 
 References
 ----------
 * [Sesana2008]_ Sesana, Vecchio, Colacino 2008.
-* [Rodriguez-Gomez2015]_  Rodriguez-Gomez, Genel, Vogelsberger, et al. 2015
+* [Rodriguez-Gomez+2015]_  Rodriguez-Gomez, Genel, Vogelsberger, et al. 2015
     The merger rate of galaxies in the Illustris simulation: a comparison with observations and semi-empirical models
     https://ui.adsabs.harvard.edu/abs/2015MNRAS.449...49R/abstract
 * [Chen2019]_ Chen, Sesana, Conselice 2019.
@@ -31,7 +22,6 @@ import holodeck as holo
 from holodeck import cosmo, utils
 from holodeck.constants import GYR, MSOL
 from scipy.stats import norm as stnorm
-
 
 # ----    Galaxy Stellar-Mass Function    ----
 
@@ -112,7 +102,7 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
 
         return ndens
 
-    def mbh_mass_func_conv(self, mbh, redz, mmbulge, scatter=None):
+def mbh_mass_func_conv(self, mbh, redz, mmbulge, scatter=None):
         """Convert from the GSMF to a MBH mass function (number density), using a given Mbh-Mbulge relation.
         This version convolves the GSMF with the Mbh-Mbulge relation including scatter.
         This will very minorly underestimate the number density at the high-mass end, but this is negligible for scatter_dex > 0.2
@@ -156,7 +146,6 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
             bhmf_conv[i] = np.trapz(ndens * pdf, mstar_log10)
         
         return bhmf_conv
-
 
 class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
     r"""Single Schechter Function - Galaxy Stellar Mass Function.
@@ -246,7 +235,7 @@ class _GSMF_Single_Schechter(_Galaxy_Stellar_Mass_Function):
     of $[\mathrm{Mpc}^{-3} \, \mathrm{dex}^{-1}]$.
 
     """
-
+    
     def __init__(self, log10_phi_terms, log10_mstar_terms, alpha):
         r"""Initialize a Schechter function GSMF.
 
@@ -413,6 +402,8 @@ class _Galaxy_Merger_Rate(abc.ABC):
         ----------
         mass : (N,) array_like[scalar]
             Mass of the system, units of [grams].
+            NOTE: the definition of mass is ambiguous, i.e. whether it is the primary mass, or the
+            combined system mass.
         mrat : scalar or ndarray,
             Mass-ratio of the system (m2/m1 <= 1.0), dimensionless.
         redz : scalar or ndarray,
@@ -423,50 +414,49 @@ class _Galaxy_Merger_Rate(abc.ABC):
         rv : scalar or ndarray,
             Galaxy merger rate, per unit mass-ratio, in units of [1/sec], i.e.
             $\partial N / \partial q_\star \, \partial t$
-
         """
         return
 
 
-class GMR_Illustris(_Galaxy_Merger_Rate):
+class GMR_Power_Law(_Galaxy_Merger_Rate):
     """Galaxy Merger Rate - based on multiple power-laws.
 
-    See [Rodriguez-Gomez2015]_, Table 1.
+    See [Rodriguez-Gomez+2015], Table 1.
     "merger rate as a function of descendant stellar mass M_star, progenitor stellar mass ratio mu_star"
 
     """
 
-    def __init__(
-        self,
-        norm0_log10=None,
-        normz=None,
-        malpha0=None,
-        malphaz=None,
-        mdelta0=None,
-        mdeltaz=None,
-        qgamma0=None,
-        qgammaz=None,
-        qgammam=None,
-    ):
+    def __init__(self,
+                 norm0_log10=None,
+                 normz=None,
+                 malpha0=None,
+                 malphaz=None,
+                 mdelta0=None,
+                 mdeltaz=None,
+                 qgamma0=None,
+                 qgammaz=None,
+                 ):
 
         if norm0_log10 is None:
-            norm0_log10 = -2.2287      # -2.2287 ± 0.0045    A0 [log10(A*Gyr)]
+            norm0_log10 = -2.2287        # -2.2287 ± 0.0045    [log10(A*Gyr)]  A0 in [RG15]
         if normz is None:
-            normz = +2.4644            # +2.4644 ± 0.0128    eta
+            # normz = +2.4644,           # +2.4644 ± 0.0128    eta in [RG15]
+            normz = 0.0
         if malpha0 is None:
-            malpha0 = +0.2241          # +0.2241 ± 0.0038    alpha0
+            malpha0 = +0.2241            # +0.2241 ± 0.0038    alpha0 in [RG15]
         if malphaz is None:
-            malphaz = -1.1759          # -1.1759 ± 0.0316    alpha1
+            # malphaz = -1.1759,         # -1.1759 ± 0.0316    alpha1 in [RG15]
+            malphaz = 0.0
         if mdelta0 is None:
-            mdelta0 = +0.7668          # +0.7668 ± 0.0202    delta0
+            mdelta0 = +0.7668            # +0.7668 ± 0.0202    delta0 in [RG15]
         if mdeltaz is None:
-            mdeltaz = -0.4695          # -0.4695 ± 0.0440    delta1
+            # mdeltaz = -0.4695,         # -0.4695 ± 0.0440    delta1 in [RG15]
+            mdeltaz = 0.0
         if qgamma0 is None:
-            qgamma0 = -1.2595          # -1.2595 ± 0.0026    beta0
+            qgamma0 = -1.2595            # -1.2595 ± 0.0026    beta0 in [RG15]
         if qgammaz is None:
-            qgammaz = +0.0611          # +0.0611 ± 0.0021    beta1
-        if qgammam is None:
-            qgammam = -0.0477          # -0.0477 ± 0.0013    gamma
+            # qgammaz = +0.0611,         # +0.0611 ± 0.0021    beta1 in [RG15]
+            qgammaz = 0.0
 
         self._norm0 = (10.0 ** norm0_log10) / GYR              # [1/sec]
         self._normz = normz
@@ -477,7 +467,6 @@ class GMR_Illustris(_Galaxy_Merger_Rate):
         self._mdeltaz = mdeltaz
         self._qgamma0 = qgamma0
         self._qgammaz = qgammaz
-        self._qgammam = qgammam
 
         self._mref_delta = 2.0e11 * MSOL   # fixed value
         self._mref = 1.0e10 * MSOL   # fixed value
@@ -496,8 +485,10 @@ class GMR_Illustris(_Galaxy_Merger_Rate):
         return mdelta
 
     def _get_qgamma(self, redz, mtot):
+        """
+        NOTE: `mtot` is needed as an argument as it is used by subclass `GMR_Illustris(GMR_Power_Law)`
+        """
         qgamma = self._qgamma0 * np.power(1.0 + redz, self._qgammaz)
-        qgamma = qgamma + self._qgammam * np.log10(mtot/self._mref)
         return qgamma
 
     def __call__(self, mtot, mrat, redz):
@@ -521,16 +512,75 @@ class GMR_Illustris(_Galaxy_Merger_Rate):
         norm = self._get_norm(redz)
         malpha = self._get_malpha(redz)
         mdelta = self._get_mdelta(redz)
+        # NOTE: `mtot` is not used here, in `GMR_Power_Law`, but is used in subclass `GMR_Illustris`
         qgamma = self._get_qgamma(redz, mtot)
 
         xx = (mtot/self._mref)
         mt = np.power(xx, malpha)
-        yy = mtot/self._mref_delta
-        mp1t = 1.0 + np.power(yy, mdelta)
+        mp1t = np.power(1.0 + (mt/self._mref_delta), mdelta)
         qt = np.power(mrat, qgamma)
 
         rate = norm * mt * mp1t * qt
         return rate
+
+
+class GMR_Illustris(GMR_Power_Law):
+    """Galaxy Merger Rate - based on fits to Illustris cosmological simulations.
+
+    See [Rodriguez-Gomez+2015], Table 1.
+    "merger rate as a function of descendant stellar mass M_star, progenitor stellar mass ratio mu_star"
+
+    """
+
+    def __init__(self,
+                 norm0_log10=None,
+                 normz=None,
+                 malpha0=None,
+                 malphaz=None,
+                 mdelta0=None,
+                 mdeltaz=None,
+                 qgamma0=None,
+                 qgammaz=None,
+                 qgammam=None,
+                 ):
+
+        if norm0_log10 is None:
+            norm0_log10 = -2.2287      # -2.2287 ± 0.0045    [log10(A*Gyr)]  A0 in [RG15]
+        if normz is None:
+            normz = +2.4644            # +2.4644 ± 0.0128    eta in [RG15]
+        if malpha0 is None:
+            malpha0 = +0.2241          # +0.2241 ± 0.0038    alpha0 in [RG15]
+        if malphaz is None:
+            malphaz = -1.1759          # -1.1759 ± 0.0316    alpha1 in [RG15]
+        if mdelta0 is None:
+            mdelta0 = +0.7668          # +0.7668 ± 0.0202    delta0 in [RG15]
+        if mdeltaz is None:
+            mdeltaz = -0.4695          # -0.4695 ± 0.0440    delta1 in [RG15]
+        if qgamma0 is None:
+            qgamma0 = -1.2595          # -1.2595 ± 0.0026    beta0 in [RG15]
+        if qgammaz is None:
+            qgammaz = +0.0611          # +0.0611 ± 0.0021    beta1 in [RG15]
+        if qgammam is None:
+            qgammam = -0.0477          # -0.0477 ± 0.0013    gamma in [RG15]
+
+        super().__init__(
+            norm0_log10=norm0_log10,
+            normz=normz,
+            malpha0=malpha0,
+            malphaz=malphaz,
+            mdelta0=mdelta0,
+            mdeltaz=mdeltaz,
+            qgamma0=qgamma0,
+            qgammaz=qgammaz,
+        )
+
+        self._qgammam = qgammam
+        return
+
+    def _get_qgamma(self, redz, mtot):
+        qgamma = self._qgamma0 * np.power(1.0 + redz, self._qgammaz)
+        qgamma = qgamma + self._qgammam * np.log10(mtot/self._mref)
+        return qgamma
 
 
 # ----    Galaxy Pair Fraction    ----

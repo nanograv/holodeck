@@ -34,7 +34,7 @@ import scipy.stats    # noqa
 import scipy.special  # noqa
 
 from holodeck import log, cosmo
-from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, EDDT
+from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC, EDDT
 
 # [Sesana2004]_ Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
@@ -44,6 +44,7 @@ _GW_DEDT_ECC_CONST = - 304 * np.power(NWTG, 3) / 15 / np.power(SPLC, 5)
 _GW_LUM_CONST = (32.0 / 5.0) * np.power(NWTG, 7.0/3.0) * np.power(SPLC, -5.0)
 
 _AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
+_DFDM_CONST = np.sqrt(NWTG) / (4.0 * np.pi)
 
 
 class _Modifier(abc.ABC):
@@ -72,7 +73,6 @@ class _Modifier(abc.ABC):
         """
         pass
 
-
 # T = TypeVar('T')
 # P = ParamSpec('P')
 # WrappedFuncDeco: TypeAlias = Callable[[Callable[P, T]], Callable[P, T]]
@@ -89,8 +89,6 @@ class _Modifier(abc.ABC):
 #         return func
 
 #     return wrapped
-
-
 # =================================================================================================
 # ====    General Logistical    ====
 # =================================================================================================
@@ -550,6 +548,8 @@ def scatter_redistribute_densities(cents, dens, dist=None, scatter=None, axis=0)
     return dens_new
 
 
+
+
 def eccen_func(cent: float, width: float, size: int) -> np.ndarray:
     """Draw random values between [0.0, 1.0] with a given center and width.
 
@@ -610,7 +610,10 @@ def frac_str(vals, prec=2):
     return rv
 
 
-def interp(xnew, xold, yold, left=np.nan, right=np.nan, xlog=True, ylog=True):
+def interp(
+    xnew: npt.ArrayLike, xold: npt.ArrayLike, yold: npt.ArrayLike,
+    left: float = np.nan, right: float = np.nan, xlog: bool = True, ylog: bool = True,
+) -> npt.ArrayLike:
     """Linear interpolation of the given arguments in log/lin-log/lin space.
 
     Parameters
@@ -735,12 +738,10 @@ def midpoints(vals, axis=-1, log=False):
     mm = np.moveaxis(mm, 0, axis)
     return mm
 
-
 def midpoints_multiax(vals, axis, log=False):
     for aa in axis:
         vals = midpoints(vals, aa, log=log)
     return vals
-
 
 def minmax(vals: npt.ArrayLike, filter: bool = False) -> np.ndarray:
     """Find the minimum and maximum values in the given array.
@@ -966,8 +967,15 @@ def quantile_filtered(values, percs, axis, func=np.isfinite):
     return np.apply_along_axis(lambda xx: np.percentile(np.asarray(xx)[func(xx)], percs*100), axis, values)
 
 
-def quantiles(values, percs=None, sigmas=None, weights=None, axis=None,
-              values_sorted=False, filter=None):
+def quantiles(
+    values: npt.ArrayLike,
+    percs: Optional[npt.ArrayLike] = None,
+    sigmas: Optional[npt.ArrayLike] = None,
+    weights: Optional[npt.ArrayLike] = None,
+    axis: Optional[int] = None,
+    values_sorted: bool = False,
+    filter: Optional[str] = None,
+) -> Union[np.ndarray, np.ma.masked_array]:
     """Compute weighted percentiles.
 
     NOTE: if `values` is a masked array, then only unmasked values are used!
@@ -1043,7 +1051,6 @@ def quantiles(values, percs=None, sigmas=None, weights=None, axis=None,
     percs = np.array(percs)
     return percs
 
-
 def random_power(extr, pdf_index, size=1):
     """Draw from a power-law PDF with the given index, between the given extrema.
 
@@ -1115,7 +1122,7 @@ def rk4_step(func, x0, y0, dx, args=None, check_nan=0, check_nan_max=5):
     return x1, y1
 
 
-def stats(vals, percs=None, prec=2, weights=None) -> str:
+def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int = 2, weights=None) -> str:
     """Return a string giving quantiles of the given input data.
 
     Parameters
@@ -1154,7 +1161,6 @@ def stats(vals, percs=None, prec=2, weights=None) -> str:
     rv = ", ".join(_rv)
     return rv
 
-
 def std(vals, weights):
     """Weighted standard deviation (stdev).
 
@@ -1166,7 +1172,6 @@ def std(vals, weights):
     den = np.sum(weights) * (mm - 1) / mm
     std = np.sqrt(num/den)
     return std
-
 
 def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = True):
     """Perform a cumulative integration along the given axis.
@@ -1193,7 +1198,9 @@ def trapz(yy: npt.ArrayLike, xx: npt.ArrayLike, axis: int = -1, cumsum: bool = T
     if np.ndim(xx) == 1:
         pass
     elif np.ndim(xx) == np.ndim(yy):
-        xx = xx[axis]
+        # this used to be a bug ...
+        # xx = xx[axis]
+        pass
     else:
         err = f"Bad shape for `xx` (xx.shape={np.shape(xx)}, yy.shape={np.shape(yy)})!"
         log.error(err)
@@ -1481,7 +1488,6 @@ def fit_gaussian(xx, yy, guess=None):
         mean = np.sum(xx * yy) / np.sum(yy)
         stdev = std(xx, yy)
         guess = [amp, mean, stdev]
-
     popt, pcov = sp.optimize.curve_fit(_func_gaussian, xx, yy, p0=guess, maxfev=10000)
     return popt, pcov
 
@@ -1623,7 +1629,7 @@ def fit_turnover_psd(xx, yy, fref, init=[-16, -13/3, 0.3/YR, 2.5]):
 # =================================================================================================
 
 
-def dfdt_from_dadt(dadt, sepa, mtot=None, frst_orb=None):
+def dfdt_from_dadt(dadt, sepa, mtot=None, frst_orb=None, mdot=None, dfdt_mdot=False):
     """Convert from hardening rate in separation to hardening rate in frequency.
 
     Parameters
@@ -1655,8 +1661,31 @@ def dfdt_from_dadt(dadt, sepa, mtot=None, frst_orb=None):
     if frst_orb is None:
         frst_orb = kepler_freq_from_sepa(mtot, sepa)
 
-    dfdt = - 1.5 * (frst_orb / sepa) * dadt
+    dfdt = _dfdt_from_dadt(dadt, sepa, frst_orb)
+
+    # Accretion (i.e. dM/dt = mdot) contribution to df/dt
+    if dfdt_mdot:
+        if mdot is None:
+            err = "mdot must be provided when calculating dfdt_mdot!"
+            log.exception(err)
+            raise ValueError(err)
+        if mtot is None:
+            #get mtot from frst_orb
+            mtot = frst_orb**2 * sepa**3 * 4 * np.pi / (NWTG)
+        mdot_tot = np.sum(mdot,axis=-1)
+        dfdt_mdot = _dfdt_from_dmdt(mdot_tot, sepa, mtot)
+        dfdt += dfdt_mdot
+
     return dfdt, frst_orb
+
+
+def _dfdt_from_dadt(dadt, sepa, frst_orb):
+    return - 1.5 * (frst_orb / sepa) * dadt
+
+
+def _dfdt_from_dmdt(mdot, sepa, mtot):
+    dfdm = _DFDM_CONST / np.sqrt(mtot * sepa**3)
+    return dfdm * mdot
 
 
 def mtmr_from_m1m2(m1, m2=None):
@@ -1712,6 +1741,26 @@ def m1m2_from_mtmr(mt: npt.ArrayLike, mr: npt.ArrayLike) -> npt.ArrayLike:
     m1 = mt/(1.0 + mr)
     m2 = mt - m1
     return np.array([m1, m2])
+
+
+def m1m2_ordered(m1, m2):
+    if hasattr(m1, "__len__") and hasattr(m2, "__len__"):
+        #m1 and m2 are both arrays, so we are using old evolution class
+        inds_m1_primary = m1 >= m2  # where first mass is actually primary
+        m1_sorted = np.zeros(np.shape(m1))
+        m1_sorted[inds_m1_primary] = m1[inds_m1_primary]
+        m1_sorted[~inds_m1_primary] = m2[~inds_m1_primary]
+        m1 = m1_sorted
+        inds_m2_primary = m2 >= m1  # where second mass is actually primary
+        m2_sorted = np.zeros(np.shape(m2))
+        m2_sorted[inds_m2_primary] = m1[inds_m2_primary]
+        m2_sorted[~inds_m2_primary] = m2[~inds_m2_primary]
+        m2 = m2_sorted
+        return m1.T, m2.T
+    if m1 >= m2:
+        return m1, m2
+    else:
+        return m2, m1
 
 
 def frst_from_fobs(fobs, redz):
@@ -1820,7 +1869,6 @@ def rad_isco(m1, m2=0.0, factor=3.0):
     """
     return factor * schwarzschild_radius(m1+m2)
 
-
 def frst_isco(m1, m2=0.0, **kwargs):
     """Get rest-frame orbital frequency of ISCO orbit.
 
@@ -1839,24 +1887,22 @@ def frst_isco(m1, m2=0.0, **kwargs):
     risco = rad_isco(m1, m2, **kwargs)
     fisco = kepler_freq_from_sepa(m1+m2, risco)
     return fisco
-
-
 def redz_after(time, redz=None, age=None):
     """Calculate the redshift after the given amount of time has passed.
 
     Parameters
     ----------
-    time : array_like, [s]
-        Amount of time to pass, in units of seconds.
-    redz : None  or  array_like, []
-        Redshift of starting point after which `time` is added.  Unitless.
-    age : None  or  array_like, [s]
-        Age of the Universe at the starting point, after which `time` is added.  Units of seconds.
+    time : array_like in units of [sec]
+        Amount of time to pass.
+    redz : None or array_like,
+        Redshift of starting point after which `time` is added.
+    age : None or array_like, in units of [sec]
+        Age of the Universe at the starting point, after which `time` is added.
 
     Returns
     -------
-    new_redz : array_like, []
-        Redshift of the Universe after the given amount of time.  Unitless
+    new_redz : array_like
+        Redshift of the Universe after the given amount of time.
 
     """
     if (redz is None) == (age is None):
@@ -1903,8 +1949,10 @@ def velocity_orbital(mt, mr, per=None, sepa=None):
     v2 = np.power(NWTG*mt/sepa, 1.0/2.0) / (1 + mr)
     # v2 = np.power(2*np.pi*NWTG*mt/per, 1.0/3.0) / (1 + mr)
     v1 = v2 * mr
-    vels = np.moveaxis([v1, v2], 0, -1)
-    return vels
+    # vels = np.moveaxis([v1, v2], 0, -1)
+    # print("vels = ", vels)
+    # print("np.shape(vels) = ", np.shape(vels))
+    return v1,v2
 
 
 def _get_sepa_freq(mt, sepa, freq):
@@ -1928,7 +1976,7 @@ def lambda_factor_dlnf(frst, dfdt, redz, dcom=None):
     For each binary, calculate the factor: $$\\Lambda \\equiv (dVc/dz) * (dz/dt) * [dt/dln(f)]$$,
     which has units of [Mpc^3].  When multiplied by a number-density [Mpc^-3], it gives the number
     of binaries in the Universe *per log-frequency interval*.  This value must still be multiplied
-    by $\\Delta \\ln(f)$ to get a number of binaries across a frequency in.
+    by $\\Delta \\ln(f)$ to get a number of binaries across a frequency bin.
 
     Parameters
     ----------
@@ -1950,15 +1998,30 @@ def lambda_factor_dlnf(frst, dfdt, redz, dcom=None):
         The differential comoving volume of the universe per log interval of binary frequency.
 
     """
-    zp1 = redz + 1
     if dcom is None:
         dcom = cosmo.z_to_dcom(redz)
+    return _lambda_factor_dlnf(frst, dfdt, redz, dcom)
 
+
+def _lambda_factor_dlnf(frst, dfdt, redz, dcom):
+    zp1 = redz + 1
     # Volume-factor
     # this is `(dVc/dz) * (dz/dt)`,  units of [Mpc^3/s]
     vfac = 4.0 * np.pi * SPLC * zp1 * (dcom**2)
     # Time-factor
     # this is `f / (df/dt) = dt/d ln(f)`,  units of [sec]
+    """ In some cases, dfdt < 0 due to CBD-driven orbital expansion. 
+        In such cases, we take the absolute value of
+        dfdt to account for the length of time the binary spends 
+        _in the current frequency bin_, 
+        regardless whether the frequency moves up towards a higher frequency bin
+        or down towards a lower frequency bin. """
+    if isinstance(dfdt, float):
+        if dfdt < 0:
+            dfdt *= -1
+    else:
+        dfdt[dfdt<0] = -1.*dfdt[dfdt<0]
+    
     tfac = frst / dfdt
 
     # Calculate weighting
@@ -1988,7 +2051,6 @@ def angs_from_sepa(sepa, dcom, redz):
     angs = sepa / dang           # angular-separation [radians]
     return angs
 
-
 def eddington_accretion(mass, eps=0.1):
     """Eddington Accretion rate, $\\dot{M}_{Edd} = L_{Edd}/\\epsilon c^2$.
 
@@ -2013,7 +2075,6 @@ def eddington_accretion(mass, eps=0.1):
 def eddington_luminosity(mass):
     ledd = EDDT * mass
     return ledd
-
 
 # =================================================================================================
 # ====    Gravitational Waves    ====
@@ -2043,7 +2104,12 @@ def chirp_mass(m1, m2=None):
     # (N, 2)  ==>  (N,), (N,)
     if m2 is None:
         m1, m2 = np.moveaxis(m1, -1, 0)
-    mc = np.power(m1 * m2, 3.0/5.0)/np.power(m1 + m2, 1.0/5.0)
+    mc = _chirp_mass_m1m2(m1, m2)
+    return mc
+
+
+def _chirp_mass_m1m2(m1, m2):
+    mc = np.power(m1 * m2, 3.0/5.0) / np.power(m1 + m2, 1.0/5.0)
     return mc
 
 
@@ -2155,9 +2221,9 @@ def gw_dade(sepa, eccen):
     Parameters
     ----------
     sepa : array_like
-        Binary semi-major axis (separation) [grams].
+        Binary semi-major axis (separation) [cm].
     eccen : array_like
-        Binary eccentricity [grams].
+        Binary eccentricity.
 
     Returns
     -------
@@ -2353,8 +2419,11 @@ def gw_strain_source(mchirp, dcom, freq_rest_orb):
     """
     mchirp, dcom, freq_rest_orb = _array_args(mchirp, dcom, freq_rest_orb)
     # The factor of 2 below is to convert from orbital-frequency to GW-frequency
-    hs = _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_rest_orb, 2/3) / dcom
-    return hs
+    return _gw_strain_source(mchirp, dcom, freq_rest_orb)
+
+
+def _gw_strain_source(mchirp, dcom, freq_rest_orb):
+    return _GW_SRC_CONST * mchirp * np.power(2*mchirp*freq_rest_orb, 2/3) / dcom
 
 
 def sep_to_merge_in_time(m1, m2, time):
@@ -2524,19 +2593,131 @@ def scatter_redistribute(cents, dist, dens, axis=0):
     pass
 
 
-#! DEPRECATED
-def nyquist_freqs(dur, cad):
-    """DEPRECATED.  Use `holodeck.utils.pta_freqs` instead.
+@deprecated_warn("use `holodeck.utils.pta_freqs` instead")
+def nyquist_freqs(
+    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
+) -> np.ndarray:
+    """Calculate Nyquist frequencies for the given timing parameters.
+
+    Parameters
+    ----------
+    dur : float,
+        Duration of observations
+    cad : float,
+        Cadence of observations
+    trim : (2,) or None,
+        Specification of minimum and maximum frequencies outside of which to remove values.
+        `None` can be used in place of either boundary, e.g. [0.1, None] would mean removing
+        frequencies below `0.1` (and not trimming values above a certain limit).
+
+    Returns
+    -------
+    freqs : ndarray,
+        Nyquist frequencies
+
     """
-    msg = ""
-    old_name = "nyquist_freqs"
-    new_name = "pta_freqs"
-    _frame = inspect.currentframe().f_back
-    file_name = inspect.getfile(_frame.f_code)
-    fline = _frame.f_lineno
-    msg = f"{file_name}({fline}):{old_name} ==> {new_name}" + (len(msg) > 0) * " | " + msg
-    warnings.warn_explicit(msg, category=DeprecationWarning, filename=file_name, lineno=fline)
-    log.warning(f"DEPRECATION: {msg}", exc_info=True)
-    return pta_freqs(dur=dur, num=None, cad=cad)[0]
+    fmin = 1.0 / dur
+    fmax = 1.0 / cad * 0.5
+    # df = fmin / sample
+    df = fmin
+    freqs = np.arange(fmin, fmax + df/10.0, df)
+    if trim is not None:
+        if np.shape(trim) != (2,):
+            raise ValueError("`trim` (shape: {}) must be (2,) of float!".format(np.shape(trim)))
+        if trim[0] is not None:
+            freqs = freqs[freqs > trim[0]]
+        if trim[1] is not None:
+            freqs = freqs[freqs < trim[1]]
+
+    return freqs
+
+
+@deprecated_warn("use `holodeck.utils.pta_freqs` instead")
+def nyquist_freqs_edges(
+    dur: float = 15.0*YR, cad: float = 0.1*YR, trim: Optional[Tuple[float, float]] = None
+) -> np.ndarray:
+    """Calculate Nyquist frequencies for the given timing parameters.
+
+    Parameters
+    ----------
+    dur : float,
+        Duration of observations
+    cad : float,
+        Cadence of observations
+    trim : (2,) or None,
+        Specification of minimum and maximum frequencies outside of which to remove values.
+        `None` can be used in place of either boundary, e.g. [0.1, None] would mean removing
+        frequencies below `0.1` (and not trimming values above a certain limit).
+
+    Returns
+    -------
+    freqs : ndarray,
+        edges of Nyquist frequency bins
+
+    """
+    fmin = 1.0 / dur
+    fmax = 1.0 / cad * 0.5
+    # df = fmin / sample
+    df = fmin    # bin width
+    freqs = np.arange(fmin, fmax + df/10.0, df)   # centers
+    freqs_edges = freqs - df/2.0    # shift to edges
+    freqs_edges = np.concatenate([freqs_edges, [fmax + df/2.0]])
+
+    if trim is not None:
+        if np.shape(trim) != (2,):
+            raise ValueError("`trim` (shape: {}) must be (2,) of float!".format(np.shape(trim)))
+        if trim[0] is not None:
+            freqs_edges = freqs_edges[freqs_edges > trim[0]]
+        if trim[1] is not None:
+            freqs_edges = freqs_edges[freqs_edges < trim[1]]
+
+    return freqs_edges
+
+
+@deprecated_pass(get_subclass_instance)
+def _get_subclass_instance(value, default, superclass):
+    """Convert the given `value` into a subclass instance.
+
+    `None` ==> instance from `default` class
+    Class ==> instance from that class
+    instance ==> check that this is an instance of a subclass of `superclass`, error if not
+
+    Parameters
+    ----------
+    value : object,
+        Object to convert into a class instance.
+    default : class,
+        Default class constructor to use if `value` is None.
+    superclass : class,
+        Super/parent class to compare against the class instance from `value` or `default`.
+        If the class instance is not a subclass of `superclass`, a ValueError is raised.
+
+    Returns
+    -------
+    value : object,
+        Class instance that is a subclass of `superclass`.
+
+    Raises
+    ------
+    ValueError : if the class instance is not a subclass of `superclass`.
+
+    """
+    import inspect
+
+    # Set `value` to a default, if needed and it is given
+    if (value is None) and (default is not None):
+        value = default
+
+    # If `value` is a class (constructor), then construct an instance from it
+    if inspect.isclass(value):
+        value = value()
+
+    # Raise an error if `value` is not a subclass of `superclass`
+    if not isinstance(value, superclass):
+        err = f"argument ({value}) must be an instance or subclass of `{superclass}`!"
+        log.error(err)
+        raise ValueError(err)
+
+    return value
 
 

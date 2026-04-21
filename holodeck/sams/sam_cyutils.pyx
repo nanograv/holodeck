@@ -120,19 +120,16 @@ def integrate_differential_number_3dx1d(edges, dnum):
     mtot is integrated over `log10(mtot)` and frequency is integrated over `ln(f)`.
 
     Note on array shapes:
-
-    * input  `dnum` is shaped (M, Q, Z, F)
-    * input  `edges` must be (4,) of array_like of lengths:  M, Q, Z, F+1
-    * output `numb` is shaped (M-1, Q-1, Z-1, F)
+    input  `dnum` is shaped (M, Q, Z, F)
+    input  `edges` must be (4,) of array_like of lengths:  M, Q, Z, F+1
+    output `numb` is shaped (M-1, Q-1, Z-1, F)
 
     Arguments
     ---------
     edges : (4,) array_like  w/ lengths M, Q, Z, F+1
-        Grid edges of `mtot`, `mrat`, `redz`, and `freq`.  NOTE:
-
-        * `mtot` should be passed as regular `mtot`, NOT log10(mtot)
-        * `freq` should be passed as regular `freq`, NOT    ln(freq)
-
+        Grid edges of `mtot`, `mrat`, `redz`, and `freq`
+        NOTE: `mtot` should be passed as regular `mtot`, NOT log10(mtot)
+              `freq` should be passed as regular `freq`, NOT    ln(freq)
     dnum : (M, Q, Z, F)
         Differential number of binaries, dN/[dlog10M dq qz dlnf] where 'N' is in units of dimensionless number.
 
@@ -144,10 +141,9 @@ def integrate_differential_number_3dx1d(edges, dnum):
 
     # each edge should have the same length as the corresponding dimension of `dnum`
     shape = [len(ee) for ee in edges]
-    err = f"Shape of edges={shape} does not match dnum={np.shape(dnum)}"
     # except the last edge (freq), where `dnum` should be 1-shorter
     shape[-1] -= 1
-    assert np.shape(dnum) == tuple(shape), err
+    assert np.shape(dnum) == tuple(shape)
     # the number will be shaped as one-less the size of each dimension of `dnum`
     new_shape = [sh-1 for sh in dnum.shape]
     # except for the last dimension (freq) which is the same shape
@@ -419,42 +415,8 @@ def integrate_binary_evolution_2pwl(norm_log10, mtot, mrat, sepa_init, rchar, ga
 
 
 def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
-    """Calculate the differential number of binaries at the given frequencies.
 
-    This function converts from differential binary volume-density to differential number of
-    binaries.  The differential binary volume-density is:
-
-    .. math::
-        d^3 n / [d \log_{10} M  d q  d z]
-
-    Where the number density is $n = d N/d V_c$ for a comoving volume $V_c$.  The differential
-    binary number is:
-
-    .. math::
-        d^4 N / [d \log_{10} M  d q  d z  d \ln f]
-
-    Arguments
-    ---------
-    fobs_orb : (F,) array of float, [1/s]
-        The observer-frame orbital frequencies of interest, in units of inverse seconds.
-    sam : :py:class:`holodeck.sams.sam.Semi_Analytic_Model` instance
-        The semi-analytic model population.
-    hard : :py:class:`holodeck.hardening._Hardening` subclass instance,
-        The binary evolution model to evolve binaries from galaxy merger to the given frequencies.
-    cosmo : :py:class:`astropy.cosmology.core.Cosmology` instance
-        Cosmology object used for calculating cosmological measurements.
-
-    Returns
-    -------
-    redz_final : (M, Q, Z, F) array of float, []
-        The redshifts at which binaries at each grid point reach the frequencies of interest.
-        Unitless.
-    diff_num : (M, Q, Z, F) array of float, []
-        The differential number of binaries at each grid point.  Unitless.
-
-    """
-
-    nden = sam.static_binary_density
+    dens = sam.static_binary_density
 
     shape = sam.shape + (fobs_orb.size,)
     cdef np.ndarray[np.double_t, ndim=4] diff_num = np.zeros(shape)
@@ -472,7 +434,7 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
         _dynamic_binary_number_at_fobs_2pwl(
             fobs_orb, hard._sepa_init, hard._num_steps,
             hard._norm, hard._rchar, hard._gamma_inner, hard._gamma_outer,
-            nden, sam.mtot, sam.mrat, sam.redz, gmt_time,
+            dens, sam.mtot, sam.mrat, sam.redz, gmt_time,
             cosmo._grid_z, cosmo._grid_dcom, cosmo._grid_age,
             # output:
             redz_final, diff_num
@@ -482,15 +444,14 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
 
     elif isinstance(hard, holo.hardening.Hard_GW) or issubclass(hard, holo.hardening.Hard_GW):
         redz_prime = sam._redz_prime
-        # if `sam` doesn't use a galaxy merger time (GMT), then `redz_prime` will be `None`,
-        # set to initial redshift values instead
+        # if `sam` is using galaxy merger rate (GMR), then `redz_prime` will be `None`
         if redz_prime is None:
             sam._log.info("`redz_prime` not calculated in SAM.  Setting to `redz` (initial) values.")
             redz_prime = sam.redz[np.newaxis, np.newaxis, :] * np.ones(sam.shape)
 
         _dynamic_binary_number_at_fobs_gw(
             fobs_orb,
-            nden, sam.mtot, sam.mrat, sam.redz, redz_prime,
+            dens, sam.mtot, sam.mrat, sam.redz, redz_prime,
             cosmo._grid_z, cosmo._grid_dcom,
             # output:
             redz_final, diff_num
@@ -517,7 +478,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
     double hard_gamma_inner,
     double hard_gamma_outer,
 
-    double[:, :, :] nden,
+    double[:, :, :] dens,
     double[:] mtot,
     double[:] mrat,
     double[:] redz,
@@ -531,44 +492,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
     double[:, :, :, :] redz_final,
     double[:, :, :, :] diff_num,
 ) except -1:
-    """Calculate differential binary number at the given frequencies, with phenom 2pl evolution.
-
-    This function converts from differential binary volume-density to differential binary number.
-    Binary evolution follows the 'phenomenological' double power-law model implemented in the
-    :py:func:`_hard_func_2pwl_gw`, which matches the implementation in
-    :py:class:`Fixed_Time_2PL_SAM`.
-
-    See :py:func:`dynamic_binary_number_at_fobs` for more information.
-
-    Arguments
-    ---------
-    target_fobs_orb : (F,) array of float [1/s]
-        The observer-frame orbital frequencies of interest, in units of inverse seconds.
-    nden : (M, Q, Z) array of float [Mpc^{-3}]
-        The differential binary volume-density in units of inverse-cubic comoving-Mpc.
-    mtot : (M,) array of float [g]
-        The edges of the total-mass grid dimension in units of grams.
-    mrat : (Q,) array of float []
-        The edges of the mass-ratio grid dimension.  Unitless.
-    redz : (Z,) array of float []
-        The edges of the redshift grid dimension.  Unitless.
-    redz_prime : (M, Q, Z) array of float []
-        The redshifts of binaries after galaxy merger, but before binary evolution to the
-        frequencies of interest.  Unitless.
-    redz_interp_grid : (Zi,) array of float, []
-        The redshift values at which comoving distances are calculated; used for interpolation.
-    dcom_interp_grid : (Zi,) array of float, [cm]
-        The comoving-distance values at the ``redz_interp_grid`` redshifts, in units of centimeters,
-        used for interpolation.
-
-    Returns
-    -------
-    redz_final : (M, Q, Z, F) array of float, []
-        The redshifts at which binaries at each grid point reach the frequencies of interest.
-        Unitless.
-    diff_num : (M, Q, Z, F) array of float, []
-        The differential number of binaries at each grid point.  Unitless.
-
+    """Convert from binary volume-density (all separations) to binary number at particular frequencies.
     """
 
     cdef int n_mtot = mtot.size
@@ -644,11 +568,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
                 )
 
                 # Find time to move from left- to right- edges:  dt = da / (da/dt)
-                # average da/dt on the left- and right- edges of the bin (i.e. trapezoid rule)
                 dt = 2.0 * (sepa_right - sepa_left) / (dadt_left + dadt_right)
-                # if ii == 8 and jj == 0:
-                #     printf("cy %03d : %.2e ==> %.2e  ==  %.2e\n", step, sepa_left, sepa_right, dt)
-
                 time_evo += dt
 
                 # ---- Iterate over starting redshift bins
@@ -662,8 +582,8 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
 
                     # if we pass the age of the universe, this binary has stalled, no further redshifts will work
                     # NOTE: if `gmt_time` decreases faster than redshift bins increase the universe age,
-                    #       then systems in later `redz` bins may no longer stall, so we still need to calculate them.
-                    #       i.e. we can NOT use a `break` statement here, must use `continue` statement.
+                    #       then systems in later `redz` bins may no longer stall, so we still need to calculate them
+                    #       i.e. we can NOT use a `break` statement here
                     if time_left > age_universe:
                         continue
 
@@ -688,9 +608,6 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
                     # NOTE: at this point `redz_right` could be negative, even though `redz_left` is definitely not
                     if redz_right < 0.0:
                         redz_right = 0.0
-
-                    # if ii == 8 and jj == 0 and kk == 11:
-                    #     printf("cy %03d : t=%.2e z=%.2e\n", step, time_right, redz_right)
 
                     # convert to frequencies
                     fobs_orb_left = frst_orb_left / (1.0 + redz_left)
@@ -732,21 +649,6 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
                         # get comoving distance
                         dcom = interp_at_index(new_interp_idx, new_time, tage_interp_grid, dcom_interp_grid)
 
-                        # if (ii == 0) and (jj == 0) and (kk == 0):
-                        #     printf("cy f=%03d (step=%03d)\n", ff, step)
-                        #     printf(
-                        #         "fl=%.6e, f=%.6e, fr=%.6e ==> tl=%.6e, t=%.6e, tr=%.6e\n",
-                        #         fobs_orb_left, ftarget, fobs_orb_right,
-                        #         time_left, new_time, time_right
-                        #     )
-                        #     printf(
-                        #         "interp (%d) time: %.6e, %.6e, %.6e ==> z: %.6e, %.6e, %.6e\n",
-                        #         new_interp_idx,
-                        #         tage_interp_grid[new_interp_idx], new_time, tage_interp_grid[new_interp_idx+1],
-                        #         redz_interp_grid[new_interp_idx], new_redz, redz_interp_grid[new_interp_idx+1],
-                        #     )
-                        #     printf("======> z=%.6e\n", new_redz)
-
                         # Store redshift
                         redz_final[ii, jj, kk, ff] = new_redz
 
@@ -765,7 +667,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
 
                         # calculate number of binaries
                         cosmo_fact = FOUR_PI_SPLC_OVER_MPC * (1.0 + new_redz) * pow(dcom / MY_MPC, 2)
-                        diff_num[ii, jj, kk, ff] = nden[ii, jj, kk] * tres * cosmo_fact
+                        diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
 
                         # ----------------------
                         # ------------------------------------------------------
@@ -788,7 +690,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
 cdef int _dynamic_binary_number_at_fobs_gw(
     double[:] target_fobs_orb,
 
-    double[:, :, :] nden,
+    double[:, :, :] dens,
     double[:] mtot,
     double[:] mrat,
     double[:] redz,
@@ -801,41 +703,7 @@ cdef int _dynamic_binary_number_at_fobs_gw(
     double[:, :, :, :] redz_final,
     double[:, :, :, :] diff_num,
 ) except -1:
-    """Calculate differential binary number at the given frequencies, under GW-only evolution.
-
-    This function converts from differential binary volume-density to differential binary number.
-
-    See :py:func:`dynamic_binary_number_at_fobs` for more information.
-
-    Arguments
-    ---------
-    target_fobs_orb : (F,) array of float [1/s]
-        The observer-frame orbital frequencies of interest, in units of inverse seconds.
-    nden : (M, Q, Z) array of float [Mpc^{-3}]
-        The differential binary volume-density in units of inverse-cubic comoving-Mpc.
-    mtot : (M,) array of float [g]
-        The edges of the total-mass grid dimension in units of grams.
-    mrat : (Q,) array of float []
-        The edges of the mass-ratio grid dimension.  Unitless.
-    redz : (Z,) array of float []
-        The edges of the redshift grid dimension.  Unitless.
-    redz_prime : (M, Q, Z) array of float []
-        The redshifts of binaries after galaxy merger, but before binary evolution to the
-        frequencies of interest.  Unitless.
-    redz_interp_grid : (Zi,) array of float, []
-        The redshift values at which comoving distances are calculated; used for interpolation.
-    dcom_interp_grid : (Zi,) array of float, [cm]
-        The comoving-distance values at the ``redz_interp_grid`` redshifts, in units of centimeters,
-        used for interpolation.
-
-    Returns
-    -------
-    redz_final : (M, Q, Z, F) array of float, []
-        The redshifts at which binaries at each grid point reach the frequencies of interest.
-        Unitless.
-    diff_num : (M, Q, Z, F) array of float, []
-        The differential number of binaries at each grid point.  Unitless.
-
+    """Convert from binary volume-density (all separations) to binary number at particular frequencies.
     """
 
     cdef int n_mtot = mtot.size
@@ -894,7 +762,199 @@ cdef int _dynamic_binary_number_at_fobs_gw(
 
                     # calculate number of binaries
                     cosmo_fact = FOUR_PI_SPLC_OVER_MPC * (1.0 + rzp) * pow(dcom / MY_MPC, 2)
-                    diff_num[ii, jj, kk, ff] = nden[ii, jj, kk] * tres * cosmo_fact
+                    diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
 
     return 0
+
+
+
+# ==================================================================================================
+# ====    DetStats Functions    ====
+# ==================================================================================================
+
+
+def gamma_of_rho_interp(rho, rsort, rho_interp_grid, gamma_interp_grid):
+    """
+    rho : 1Darray of scalars
+        SNR of single sources, in flat array
+    rsort : 1Darray
+        order of flat rho values smallest to largest
+    rho_interp_grid : 1Darray
+        rho values corresponding to each gamma
+    gamma_interp_grid : 1Darray
+        gamma values corresponding to each rho
+
+    """
+    # pass in the interp grid
+    cdef np.ndarray[np.double_t, ndim=1] gamma = np.zeros(rho.shape)
+
+    _gamma_of_rho_interp(rho, rsort, rho_interp_grid, gamma_interp_grid, gamma)
+
+    return gamma
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef int _gamma_of_rho_interp(
+    double[:] rho, long[:] rsort,
+    double[:] rho_interp_grid, double[:] gamma_interp_grid,
+    # output
+    double[:] gamma
+    ):
+    """ Find gamma of rho by interpolation over rho and gamma grids.
+    """
+
+    cdef int n_rho = rho.size
+    cdef int n_interp = rho_interp_grid.size
+    cdef int ii, kk, rr
+    ii = 0 # get rho in order using rho[rsort[ii]]
+
+    for kk in range(n_rho):
+        rr = rsort[kk] # index of next largest rho, equiv to rev in redz calculation
+        # print('kk =',kk,' rr =', rr, 'rho[rr] =', rho[rr])
+        # get to the right index of the interpolation-grid
+        while (rho_interp_grid[ii+1] < rho[rr]) and (ii < n_interp -2):
+            ii += 1
+        # print('ii =',ii, ' rho_interp[ii] =', rho_interp_grid[ii], ' rho_interp[ii+1] =', rho_interp_grid[ii+1])
+        # interpolate
+        gamma[rr] = interp_at_index(ii, rho[rr], rho_interp_grid, gamma_interp_grid)
+        # print('rho =', rho[rr], ' gamma =', gamma[rr], '\n')\
+
+    return 0
+
+
+def snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
+    """ Calculate single source SNR
+
+
+    Parameters
+    ----------
+    amp : (F,R,L) NDarray
+        Dimensionless strain amplitude of loudest single sources
+    F_iplus : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    F_icross : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    iotas : (F,S,L) NDarray
+        Inclination, used to calculate:
+        a_pol = 1 + np.cos(iotas) **2
+        b_pol = -2 * np.cos(iotas)
+    dur : scalar
+        Duration of observations.
+    Phi_0 : (F,S,L) NDarray
+        Initial GW phase
+    S_i : (P,F,R,L) NDarray
+        Total noise of each pulsar wrt detection of each single source, in s^3
+    freqs : (F,) 1Darray
+        Observed frequency bin centers.
+
+    Returns
+    -------
+    snr_ss : (F,R,S,L) NDarray
+        SNR from the whole PTA for each single source with
+        each realized sky position (S) and realized strain (R)
+
+    """
+    nfreqs, nreals, nloudest = amp.shape[0], amp.shape[1], amp.shape[2]
+    npsrs, nskies = F_iplus.shape[0], F_iplus.shape[2]
+    cdef np.ndarray[np.double_t, ndim=4] snr_ss = np.zeros((nfreqs, nreals, nskies, nloudest))
+    _snr_ss(
+        amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs,
+        npsrs, nfreqs, nreals, nskies, nloudest,
+        snr_ss)
+    return snr_ss
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef int _snr_ss(
+    double[:,:,:] amp,
+    double[:,:,:,:] F_iplus,
+    double[:,:,:,:] F_icross,
+    double[:,:,:] iotas,
+    double dur,
+    double[:,:,:] Phi_0,
+    double[:,:,:,:] S_i,
+    double[:] freqs,
+    long npsrs, long nfreqs, long nreals, long nskies, long nloudest,
+    # output
+    double[:,:,:,:] snr_ss
+    ):
+    """
+
+    Parameters
+    ----------
+    amp : (F,R,L) NDarray
+        Dimensionless strain amplitude of loudest single sources
+    F_iplus : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    F_icross : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    iotas : (F,S,L) NDarray
+        Inclination, used to calculate:
+        a_pol = 1 + np.cos(iotas) **2
+        b_pol = -2 * np.cos(iotas)
+    dur : scalar
+        Duration of observations.
+    Phi_0 : (F,S,L) NDarray
+        Initial GW phase
+    S_i : (P,F,R,L) NDarray
+        Total noise of each pulsar wrt detection of each single source, in s^3
+    freqs : (F,) 1Darray
+        Observed frequency bin centers.
+    snr_ss : (F,R,S,L) NDarray
+        Pointer to single source SNR array, to be calculated.
+
+    NOTE: This may be improved by moving some of the math outside the function.
+    I.e., passing in sin/cos of NDarrays to be used.
+    """
+
+    cdef int pp, ff, rr, ss, ll
+    cdef float a_pol, b_pol, Phi_T, pta_snr_sq, coef, term1, term2, term3
+    # print('npsrs %d, nfreqs %d, nreals %d, nskies %d, nloudest %d' % (npsrs, nfreqs, nreals, nskies, nloudest))
+
+    for ff in range(nfreqs):
+        for ss in range(nskies):
+            for ll in range(nloudest):
+                a_pol = 1 + pow(cos(iotas[ff,ss,ll]), 2.0)
+                b_pol = -2 * cos(iotas[ff,ss,ll])
+                Phi_T = 2 * M_PI * freqs[ff] * dur + Phi_0[ff,ss,ll]
+                for rr in range(nreals):
+                    pta_snr_sq = 0
+                    for pp in range(npsrs):
+                        # calculate coefficient depending on
+                        # function of amp, S_i, and freqs
+                        coef = pow(amp[ff,rr,ll], 2.0) / (S_i[pp,ff,rr,ll] * 8 * pow(M_PI * freqs[ff], 3.0))
+
+                        # calculate terms that depend on p, f, s, and l
+                        # functions of F_iplus, F_icross, a_pol, b_pol, Phi_0, and Phi_T
+                        term1 = (
+                            pow(a_pol * F_iplus[pp,ff,ss,ll], 2.0)
+                            * (Phi_T * (1.0 + 2.0 * pow(sin(Phi_0[ff,ss,ll]), 2.0))
+                                + cos(Phi_T) * (-1.0 * sin(Phi_T) + 4.0 * cos(Phi_0[ff,ss,ll]))
+                                - 4.0 * sin(Phi_0[ff,ss,ll])
+                                )
+                        )
+                        term2 = (
+                            pow(b_pol * F_icross[pp,ff,ss,ll], 2.0)
+                            * (Phi_T * (1.0 + 2.0 * pow(cos(Phi_0[ff,ss,ll]), 2.0))
+                                + sin(Phi_T) * cos(Phi_T) - 4.0 * cos(Phi_0[ff,ss,ll])
+                                )
+                        )
+                        term3 = (
+                            -2.0 * a_pol * b_pol * F_iplus[pp,ff,ss,ll] * F_icross[pp,ff,ss,ll]
+                            * (2.0 * Phi_T * sin(Phi_T) *cos(Phi_0[ff,ss,ll])
+                                + sin(Phi_T) * (sin(Phi_T) - 2.0 * sin(Phi_0[ff,ss,ll])
+                                                + 2.0 * cos(Phi_T) * cos(Phi_0[ff,ss,ll])
+                                                - 2.0 * cos(Phi_0[ff,ss,ll])
+                                                )
+                            )
+                        )
+                        pta_snr_sq += coef*(term1 + term2 + term3) # sum snr^2 of all pulsars for a single source
+
+                    # set snr for a single source, using sum from all pulsars
+                    snr_ss[ff,rr,ss,ll] = sqrt(pta_snr_sq)
+
 

@@ -5,7 +5,6 @@ Currently the components here are used with the 'discrete' / 'illustris' populat
 and not the semi-analytic or observational population models.
 
 """
-
 from typing import Any
 import numba
 import numpy as np
@@ -17,7 +16,7 @@ from holodeck import utils, cosmo, log, hardening
 from holodeck.constants import SPLC, NWTG, MPC
 
 
-_CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen']
+_CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen', 'mdot']
 
 
 class Grav_Waves:
@@ -90,7 +89,6 @@ class GW_Discrete(Grav_Waves):
         self.harms = harms
         return
 
-
 class LISA:
 
     def __init__(self, mission_duration_yrs=5.0, fobs=(1.0e-7, 1.0, 1000)):
@@ -148,6 +146,7 @@ class LISA:
     # @utils.copy_docstring(is_above_hc_curve)
     def __call__(self, ff, hc):
         return self.is_above_hc_curve(ff, hc)
+
 
 
 def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, loudest=5):
@@ -209,6 +208,7 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     harms_2d = np.ones_like(redz, dtype=int) * harm_range[np.newaxis, :]
     harms_1d = harms_2d[valid]
 
+
     # ---- Handle Eccentricities and eccentricity distribution function
 
     # `None`  or  ndarray shape (N, H)
@@ -253,7 +253,14 @@ def _gws_harmonics_at_evo_fobs(fobs_gw, dlnf, evo, harm_range, nreals, box_vol, 
     # Calculate strains from each source
     hs2 = utils.gw_strain_source(mchirp, dcom, frst_orb)**2
 
-    dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], data_harms['sepa'][valid], frst_orb=frst_orb)
+    dfdt_mdot=getattr(evo, 'dfdt_mdot', False) #checks if dfdt_mdot attribute exists in evo
+    dfdt, _ = utils.dfdt_from_dadt(data_harms['dadt'][valid], \
+                                   data_harms['sepa'][valid], \
+                                   mtot = data_harms['mass'][valid].sum(axis=-1),\
+                                   frst_orb=frst_orb,\
+                                   mdot = data_harms['mdot'][valid].sum(axis=-1), \
+                                   dfdt_mdot=dfdt_mdot)
+
     _lambda_fact = utils.lambda_factor_dlnf(frst_orb, dfdt, redz, dcom=dcom) / box_vol
     num_binaries = _lambda_fact * dlnf
 
@@ -610,7 +617,7 @@ def _gws_from_number_grid_integrated(edges, number, realize, sum=True):
 
     # convert from hc^2 to hc
     hc2 = np.sqrt(hc2)
-    # hc is redefined for clarity, note that it does not duplicate the memory
+    # this is for clarity, note that it does not duplicate the memory
     hc = hc2
 
     return hc
@@ -788,8 +795,9 @@ def char_strain_sq_from_bin_edges(edges):
 # ==============================================================================
 
 
-# ! NOTE: THIS IS SLOW PYTHON IMPLEMENTATION FOR TESTING.
+#! NOTE: THIS IS SLOW PYTHON IMPLEMENTATION FOR TESTING.
 # ! USE `holodeck.cytuls.sam_calc_gwb_single_eccen()`
+
 def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=100):
     """
 
@@ -819,8 +827,7 @@ def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=1
     # NOTE: need to check for coalescences and set to zero
     # NOTE: need to check for frequencies below starting separation and set to zero
 
-    frst_orb_evo = utils.kepler_freq_from_sepa(sam.mtot[:, np.newaxis],
-                                               sepa_evo[np.newaxis, :])
+    frst_orb_evo = utils.kepler_freq_from_sepa(sam.mtot[:, np.newaxis], sepa_evo[np.newaxis, :])
 
     assert np.ndim(gwfobs) == 1
     assert np.ndim(frst_orb_evo) == 2
@@ -882,8 +889,7 @@ def _python_sam_calc_gwb_single_eccen(gwfobs, sam, sepa_evo, eccen_evo, nharms=1
                 # interpolate to target (rest-frame) frequency
                 # this is the same for all mass-ratios
                 # () scalar
-                ecc = np.interp(gwfr, frst_evo, eccen_evo,
-                                left=np.nan, right=np.nan)
+                ecc = np.interp(gwfr, frst_evo, eccen_evo, left=np.nan, right=np.nan)
                 # ecc_2 = np.interp(sa, sepa[::-1], eccen_evo[::-1], left=np.nan, right=np.nan)
 
                 # da/dt values are negative, get a positive rate
@@ -970,10 +976,7 @@ def sam_calc_gwb_single_eccen_discrete(gwfobs, sam, sepa_evo, eccen_evo, nharms=
     else:
         squeeze = False
 
-    gwb = holo.cyutils.sam_calc_gwb_single_eccen_discrete(ndens, mt_l10, mr,
-                                                          rz, dc, gwfobs,
-                                                          sepa_evo, eccen_evo,
-                                                          nharms, nreals)
+    gwb = holo.cyutils.sam_calc_gwb_single_eccen_discrete(ndens, mt_l10, mr, rz, dc, gwfobs, sepa_evo, eccen_evo, nharms, nreals)
 
     if squeeze:
         gwb = gwb.squeeze()

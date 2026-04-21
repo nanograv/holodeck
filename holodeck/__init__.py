@@ -47,7 +47,6 @@ import logging
 __all__ = ["log", "cosmo"]
 
 # ---- Define Global Parameters
-
 LOG_SUFFIX = '.log'
 LOG_FILENAME_WITH_TIME_STAMP = False
 
@@ -102,17 +101,16 @@ del cosmopy
 # ---- Import submodules
 
 from . import constants       # noqa
-# from . import evolution       # noqa
-# from . import gps             # noqa
+#from .discrete import evolution       # noqa
+#from . import gps             # noqa
 # from . import gravwaves       # noqa
 # from . import hardening       # noqa
 # from . import librarian       # noqa
 # from . import param_spaces    # noqa
 # from . import plot            # noqa
-# from . import population      # noqa
-# from . import host_relations  # noqa
+# from .discrete import population      # noqa
+# from . import relations       # noqa
 # from . import sams            # noqa
-# from . import librarian       # noqa
 from . import utils           # noqa
 
 # ---- Handle version

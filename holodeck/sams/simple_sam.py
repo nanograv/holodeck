@@ -149,6 +149,7 @@ class Simple_SAM:
         return redz_prime
 
     def gwb_sam(self, fobs_gw, sam, dlog10=True, sum=True, redz_prime=True):
+        # NOTE: dlog10M performs MUCH better than dM
         """GW background semi-analytic model
 
         Parameters
@@ -172,7 +173,6 @@ class Simple_SAM:
         -----
         dlog_{10}M has higher performance than dM
         """
-
         # mg, qg, rz = np.broadcast_arrays(self.mass_gal, self.mrat_gal, self.redz)
 
         mg = self.mass_gal[:, np.newaxis, np.newaxis]    # this is _primary_ galaxy
