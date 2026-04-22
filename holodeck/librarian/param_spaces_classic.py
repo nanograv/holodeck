@@ -1,9 +1,18 @@
 """'Classic' parameter spaces used in the NANOGrav 15yr analysis.
+
+15yr Astrophysics Analysis
+https://ui.adsabs.harvard.edu/abs/2023ApJ...952L..37A/abstract
+
+Notes
+-----
+[1] : The 15yr Astro paper quotes an initial separation (the `hard_sepa_init`) variable of "1e3 pc",
+      this is incorrect and the actual value used in the analysis was 1e4 pc.
+
 """
 
 from holodeck.constants import PC, GYR
-from holodeck.librarian.libraries import _Param_Space, PD_Uniform, PD_Normal
-from holodeck import sams, hardening, relations
+from holodeck.librarian.lib_tools import _Param_Space, PD_Uniform, PD_Normal
+from holodeck import sams, hardening, host_relations
 
 
 class _PS_Classic_Phenom(_Param_Space):
@@ -64,7 +73,7 @@ class _PS_Classic_Phenom(_Param_Space):
             qgamma=params['gmt_qgamma'],
             zbeta=params['gmt_zbeta'],
         )
-        mmbulge = relations.MMBulge_KH2013(
+        mmbulge = host_relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
@@ -96,12 +105,12 @@ class PS_Classic_Phenom_Uniform(_PS_Classic_Phenom):
 
     """
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
         parameters = [
             PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
             PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
-            PD_Uniform("mmb_mamp_log10", +7.5, +9.5),      # [log10(Msol)]
-            PD_Uniform("mmb_scatter_dex", +0.0, +1.2),
+            PD_Uniform("mmb_mamp_log10", +7.6, +9.0),      # [log10(Msol)]
+            PD_Uniform("mmb_scatter_dex", +0.0, +0.9),
             PD_Uniform("hard_time", 0.1, 11.0),            # [Gyr]
             PD_Uniform("hard_gamma_inner", -1.5, +0.0),
         ]
@@ -119,13 +128,13 @@ class PS_Classic_Phenom_Astro_Extended(_PS_Classic_Phenom):
 
     """
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
         parameters = [
             PD_Uniform("hard_time", 0.1, 11.0),   # [Gyr]
             PD_Uniform("hard_gamma_inner", -1.5, +0.5),
 
             # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
-            PD_Normal("gsmf_phi0", -2.56, 0.4),
+            PD_Normal("gsmf_phi0_log10", -2.56, 0.4),
             PD_Normal("gsmf_mchar0_log10", 10.9, 0.4),   # [log10(Msol)]
             PD_Normal("gsmf_alpha0", -1.2, 0.2),
 
@@ -151,7 +160,7 @@ class _PS_Classic_GWOnly(_Param_Space):
 
     DEFAULTS = dict(
         # Parameters are based on `sam-parameters.ipynb` fit to [Tomczak+2014]
-        gsmf_phi0=-2.77,
+        gsmf_phi0_log10=-2.77,
         gsmf_phiz=-0.6,
         gsmf_mchar0_log10=11.24,
         gsmf_mcharz=0.11,
@@ -174,12 +183,12 @@ class _PS_Classic_GWOnly(_Param_Space):
         mmb_scatter_dex=0.3,
     )
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
         parameters = [
-            PD_Uniform("gsmf_phi0", -3.5, -1.5),
+            PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
             PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
-            PD_Uniform("mmb_mamp_log10", +7.5, +9.5),   # [log10(Msol)]
-            PD_Uniform("mmb_scatter", +0.0, +1.2),
+            PD_Uniform("mmb_mamp_log10", +7.6, +9.0),   # [log10(Msol)]
+            PD_Uniform("mmb_scatter_dex", +0.0, +0.9),
         ]
         super().__init__(
             parameters,
@@ -190,7 +199,7 @@ class _PS_Classic_GWOnly(_Param_Space):
     @classmethod
     def _init_sam(cls, sam_shape, params):
         gsmf = sams.GSMF_Schechter(
-            phi0=params['gsmf_phi0'],
+            phi0=params['gsmf_phi0_log10'],
             phiz=params['gsmf_phiz'],
             mchar0_log10=params['gsmf_mchar0_log10'],
             mcharz=params['gsmf_mcharz'],
@@ -210,7 +219,7 @@ class _PS_Classic_GWOnly(_Param_Space):
             qgamma=params['gmt_qgamma'],
             zbeta=params['gmt_zbeta'],
         )
-        mmbulge = relations.MMBulge_KH2013(
+        mmbulge = host_relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
@@ -235,12 +244,12 @@ class PS_Classic_GWOnly_Uniform(_PS_Classic_GWOnly):
 
     """
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
         parameters = [
-            PD_Uniform("gsmf_phi0", -3.5, -1.5),
+            PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
             PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
-            PD_Uniform("mmb_mamp_log10", +7.5, +9.5),   # [log10(Msol)]
-            PD_Uniform("mmb_scatter", +0.0, +1.2),
+            PD_Uniform("mmb_mamp_log10", +7.6, +9.0),   # [log10(Msol)]
+            PD_Uniform("mmb_scatter_dex", +0.0, +0.9),
         ]
         _Param_Space.__init__(
             self, parameters,
@@ -256,10 +265,10 @@ class PS_Classic_GWOnly_Astro_Extended(_PS_Classic_GWOnly):
 
     """
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
         parameters = [
             # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
-            PD_Normal("gsmf_phi0", -2.56, 0.4),
+            PD_Normal("gsmf_phi0_log10", -2.56, 0.4),
             PD_Normal("gsmf_mchar0_log10", 10.9, 0.4),   # [log10(Msol)]
             PD_Normal("gsmf_alpha0", -1.2, 0.2),
 
@@ -280,11 +289,11 @@ class PS_Classic_GWOnly_Astro_Extended(_PS_Classic_GWOnly):
         return
 
 
-class PS_Test(_PS_Classic_Phenom):
+class PS_Classic_Test(_PS_Classic_Phenom):
     """Simple test parameter space in 2D.
     """
 
-    def __init__(self, log, nsamples=None, sam_shape=None, seed=None):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
 
         parameters = [
             PD_Uniform("mmb_mamp_log10", +7.5, +9.5),   # [log10(Msol)]
@@ -299,7 +308,7 @@ class PS_Test(_PS_Classic_Phenom):
 
 
 _param_spaces_dict = {
-    "PS_Test": PS_Test,
+    "PS_Classic_Test": PS_Classic_Test,
     "PS_Classic_Phenom_Uniform": PS_Classic_Phenom_Uniform,    # PS_Uniform_09B
     "PS_Classic_Phenom_Astro_Extended": PS_Classic_Phenom_Astro_Extended,
     "PS_Classic_GWOnly_Uniform": PS_Classic_GWOnly_Uniform,

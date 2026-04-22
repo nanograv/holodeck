@@ -12,7 +12,6 @@ from holodeck.sams import sam_cyutils
 PSPACE = holo.librarian.param_spaces_classic.PS_Classic_Phenom_Uniform
 
 
-
 class Realizer:
 
     def __init__(self, fobs_orb_edges, resample=None, lifetime=2*GYR, dens=None, **mmbulge_kwargs):
@@ -29,7 +28,7 @@ class Realizer:
 
         if len(mmbulge_kwargs):
             log.info(f"Modifying population masses with params: {mmbulge_kwargs}")
-            mmbulge = holo.relations.MMBulge_KH2013(**mmbulge_kwargs)
+            mmbulge = holo.host_relations.MMBulge_KH2013(**mmbulge_kwargs)
             mod_mm13 = holo.population.PM_Mass_Reset(mmbulge, scatter=True)
             mt, _ = holo.utils.mtmr_from_m1m2(pop.mass)
             log.debug(f"mass bef = {holo.utils.stats(mt/MSOL)}")
@@ -60,7 +59,6 @@ class Realizer:
         weights = self._binary_weights
         samples = evo._sample_universe__resample(fobs_orb_edges, vals, weights, down_sample)
         return names, samples
-
 
 class Realizer_SAM:
     def __init__(

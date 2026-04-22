@@ -70,6 +70,10 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+notebooks/*.pkl
+# notebooks for CBD tutorials, will be modified and included after merge with dev
+notebooks/cbd/*.ipynb
+notebooks/cbd/*.py
 
 # pyenv
 .python-version
@@ -116,7 +120,6 @@ output/*
 docs/source/apidoc_modules
 hostfile
 readthedocs.html
-data/
 notes.md
 minos_run_gen_lib_sams.sh
 cyutils.c
@@ -138,3 +141,6 @@ run_gen_lib_sams__*
 # Mac Desktop Services
 .DS_Store
 .history
+
+# Untracked workspace files
+scratch/

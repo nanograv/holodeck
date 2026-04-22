@@ -7,17 +7,31 @@ import matplotlib as plt
 import matplotlib.cm as cm
 
 import kalepy as kale
-import healpy as hp
+#import healpy as hp
 import h5py
 
 import holodeck as holo
-from holodeck import utils, cosmo, log, detstats, plot
+from holodeck import utils, log, detstats, plot
 from holodeck.constants import YR
+
+try:
+    import healpy as hp
+except ImportError as err:
+    SUBMOD = "anisotropy"
+    log.error(f"Failed to import `healpy` packaged used in `{SUBMOD}` submodule!")
+    log.exception(err)
+    log.error(
+        f"Some required packages for `{SUBMOD}` have been temporarily disabled in the "
+        "global 'requirements.txt' file, so they are not installed by default!  Please install "
+        "the required packages manually for now, and feel free to raise a github issue."
+    )
+    raise
+
 
 NSIDE = 32
 NPIX = hp.nside2npix(NSIDE)
 LMAX = 8
-HC_REF15_10YR = 11.2*10**-15 
+HC_REF15_10YR = 11.2*10**-15
 
 
 def healpix_map(hc_ss, hc_bg, nside=NSIDE, seed=None, ret_seed=False):
@@ -53,7 +67,7 @@ def healpix_map(hc_ss, hc_bg, nside=NSIDE, seed=None, ret_seed=False):
     np.random.seed(seed)   
 
     # spread background evenly across pixels in moll_hc
-    moll_hc = np.ones((nfreqs,nreals,npix)) * hc_bg[:,:,np.newaxis]**2/(npix*area) # (frequency, realization, pixel)
+    moll_hc = np.ones((nfreqs,nreals,npix)) * hc_bg[:,:,np.newaxis]**2/(npix/area) # (frequency, realization, pixel)
 
     # choose random pixels to place the single sources
     pix_ss = np.random.randint(0, npix-1, size=nfreqs*nreals*nloudest).reshape(nfreqs, nreals, nloudest)
@@ -62,7 +76,7 @@ def healpix_map(hc_ss, hc_bg, nside=NSIDE, seed=None, ret_seed=False):
             for ll in range(nloudest):
                 moll_hc[ff,rr,pix_ss[ff,rr,ll]] = (moll_hc[ff,rr,pix_ss[ff,rr,ll]] + hc_ss[ff,rr,ll]**2/area)
     if ret_seed:
-        return moll_hc, seed           
+        return moll_hc, seed
     return moll_hc
 
 def healpix_map_oldhc2(hc_ss, hc_bg, nside=NSIDE):

@@ -21,8 +21,8 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.16.2
         env:
-          # Skip CPython 3.6, 3.7, 3.8, 3.12
-          CIBW_SKIP: cp36-* cp37-* cp38-* cp312-* pp*
+          # Skip CPython 3.6, 3.7, 3.8, 3.12, PyPy, 32-bit, and musl
+          CIBW_SKIP: "cp36-* cp37-* cp38-* cp312-* pp* *i686 *musllinux*"
 
       - uses: actions/upload-artifact@v3
         with:
@@ -70,4 +70,4 @@ jobs:
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages_dir: artifact/
+          packages-dir: artifact/

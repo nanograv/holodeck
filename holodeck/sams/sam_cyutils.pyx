@@ -120,19 +120,16 @@ def integrate_differential_number_3dx1d(edges, dnum):
     mtot is integrated over `log10(mtot)` and frequency is integrated over `ln(f)`.
 
     Note on array shapes:
-
-    * input  `dnum` is shaped (M, Q, Z, F)
-    * input  `edges` must be (4,) of array_like of lengths:  M, Q, Z, F+1
-    * output `numb` is shaped (M-1, Q-1, Z-1, F)
+    input  `dnum` is shaped (M, Q, Z, F)
+    input  `edges` must be (4,) of array_like of lengths:  M, Q, Z, F+1
+    output `numb` is shaped (M-1, Q-1, Z-1, F)
 
     Arguments
     ---------
     edges : (4,) array_like  w/ lengths M, Q, Z, F+1
-        Grid edges of `mtot`, `mrat`, `redz`, and `freq`.  NOTE:
-
-        * `mtot` should be passed as regular `mtot`, NOT log10(mtot)
-        * `freq` should be passed as regular `freq`, NOT    ln(freq)
-
+        Grid edges of `mtot`, `mrat`, `redz`, and `freq`
+        NOTE: `mtot` should be passed as regular `mtot`, NOT log10(mtot)
+              `freq` should be passed as regular `freq`, NOT    ln(freq)
     dnum : (M, Q, Z, F)
         Differential number of binaries, dN/[dlog10M dq qz dlnf] where 'N' is in units of dimensionless number.
 
@@ -746,6 +743,10 @@ cdef int _dynamic_binary_number_at_fobs_gw(
                     target_frst_orb = ftarget * (1.0 + rzp)
                     # if target frequency is above ISCO freq, then all future ones will be also, so: break
                     if target_frst_orb > frst_orb_isco:
+                        # but still fill in the final redshifts (redz_final)
+                        for fp in range(ff+1, n_freq):
+                            redz_final[ii, jj, kk, fp] = rzp
+
                         break
 
                     # get comoving distance
@@ -764,4 +765,196 @@ cdef int _dynamic_binary_number_at_fobs_gw(
                     diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
 
     return 0
+
+
+
+# ==================================================================================================
+# ====    DetStats Functions    ====
+# ==================================================================================================
+
+
+def gamma_of_rho_interp(rho, rsort, rho_interp_grid, gamma_interp_grid):
+    """
+    rho : 1Darray of scalars
+        SNR of single sources, in flat array
+    rsort : 1Darray
+        order of flat rho values smallest to largest
+    rho_interp_grid : 1Darray
+        rho values corresponding to each gamma
+    gamma_interp_grid : 1Darray
+        gamma values corresponding to each rho
+
+    """
+    # pass in the interp grid
+    cdef np.ndarray[np.double_t, ndim=1] gamma = np.zeros(rho.shape)
+
+    _gamma_of_rho_interp(rho, rsort, rho_interp_grid, gamma_interp_grid, gamma)
+
+    return gamma
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef int _gamma_of_rho_interp(
+    double[:] rho, long[:] rsort,
+    double[:] rho_interp_grid, double[:] gamma_interp_grid,
+    # output
+    double[:] gamma
+    ):
+    """ Find gamma of rho by interpolation over rho and gamma grids.
+    """
+
+    cdef int n_rho = rho.size
+    cdef int n_interp = rho_interp_grid.size
+    cdef int ii, kk, rr
+    ii = 0 # get rho in order using rho[rsort[ii]]
+
+    for kk in range(n_rho):
+        rr = rsort[kk] # index of next largest rho, equiv to rev in redz calculation
+        # print('kk =',kk,' rr =', rr, 'rho[rr] =', rho[rr])
+        # get to the right index of the interpolation-grid
+        while (rho_interp_grid[ii+1] < rho[rr]) and (ii < n_interp -2):
+            ii += 1
+        # print('ii =',ii, ' rho_interp[ii] =', rho_interp_grid[ii], ' rho_interp[ii+1] =', rho_interp_grid[ii+1])
+        # interpolate
+        gamma[rr] = interp_at_index(ii, rho[rr], rho_interp_grid, gamma_interp_grid)
+        # print('rho =', rho[rr], ' gamma =', gamma[rr], '\n')\
+
+    return 0
+
+
+def snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
+    """ Calculate single source SNR
+
+
+    Parameters
+    ----------
+    amp : (F,R,L) NDarray
+        Dimensionless strain amplitude of loudest single sources
+    F_iplus : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    F_icross : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    iotas : (F,S,L) NDarray
+        Inclination, used to calculate:
+        a_pol = 1 + np.cos(iotas) **2
+        b_pol = -2 * np.cos(iotas)
+    dur : scalar
+        Duration of observations.
+    Phi_0 : (F,S,L) NDarray
+        Initial GW phase
+    S_i : (P,F,R,L) NDarray
+        Total noise of each pulsar wrt detection of each single source, in s^3
+    freqs : (F,) 1Darray
+        Observed frequency bin centers.
+
+    Returns
+    -------
+    snr_ss : (F,R,S,L) NDarray
+        SNR from the whole PTA for each single source with
+        each realized sky position (S) and realized strain (R)
+
+    """
+    nfreqs, nreals, nloudest = amp.shape[0], amp.shape[1], amp.shape[2]
+    npsrs, nskies = F_iplus.shape[0], F_iplus.shape[2]
+    cdef np.ndarray[np.double_t, ndim=4] snr_ss = np.zeros((nfreqs, nreals, nskies, nloudest))
+    _snr_ss(
+        amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs,
+        npsrs, nfreqs, nreals, nskies, nloudest,
+        snr_ss)
+    return snr_ss
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef int _snr_ss(
+    double[:,:,:] amp,
+    double[:,:,:,:] F_iplus,
+    double[:,:,:,:] F_icross,
+    double[:,:,:] iotas,
+    double dur,
+    double[:,:,:] Phi_0,
+    double[:,:,:,:] S_i,
+    double[:] freqs,
+    long npsrs, long nfreqs, long nreals, long nskies, long nloudest,
+    # output
+    double[:,:,:,:] snr_ss
+    ):
+    """
+
+    Parameters
+    ----------
+    amp : (F,R,L) NDarray
+        Dimensionless strain amplitude of loudest single sources
+    F_iplus : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    F_icross : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    iotas : (F,S,L) NDarray
+        Inclination, used to calculate:
+        a_pol = 1 + np.cos(iotas) **2
+        b_pol = -2 * np.cos(iotas)
+    dur : scalar
+        Duration of observations.
+    Phi_0 : (F,S,L) NDarray
+        Initial GW phase
+    S_i : (P,F,R,L) NDarray
+        Total noise of each pulsar wrt detection of each single source, in s^3
+    freqs : (F,) 1Darray
+        Observed frequency bin centers.
+    snr_ss : (F,R,S,L) NDarray
+        Pointer to single source SNR array, to be calculated.
+
+    NOTE: This may be improved by moving some of the math outside the function.
+    I.e., passing in sin/cos of NDarrays to be used.
+    """
+
+    cdef int pp, ff, rr, ss, ll
+    cdef float a_pol, b_pol, Phi_T, pta_snr_sq, coef, term1, term2, term3
+    # print('npsrs %d, nfreqs %d, nreals %d, nskies %d, nloudest %d' % (npsrs, nfreqs, nreals, nskies, nloudest))
+
+    for ff in range(nfreqs):
+        for ss in range(nskies):
+            for ll in range(nloudest):
+                a_pol = 1 + pow(cos(iotas[ff,ss,ll]), 2.0)
+                b_pol = -2 * cos(iotas[ff,ss,ll])
+                Phi_T = 2 * M_PI * freqs[ff] * dur + Phi_0[ff,ss,ll]
+                for rr in range(nreals):
+                    pta_snr_sq = 0
+                    for pp in range(npsrs):
+                        # calculate coefficient depending on
+                        # function of amp, S_i, and freqs
+                        coef = pow(amp[ff,rr,ll], 2.0) / (S_i[pp,ff,rr,ll] * 8 * pow(M_PI * freqs[ff], 3.0))
+
+                        # calculate terms that depend on p, f, s, and l
+                        # functions of F_iplus, F_icross, a_pol, b_pol, Phi_0, and Phi_T
+                        term1 = (
+                            pow(a_pol * F_iplus[pp,ff,ss,ll], 2.0)
+                            * (Phi_T * (1.0 + 2.0 * pow(sin(Phi_0[ff,ss,ll]), 2.0))
+                                + cos(Phi_T) * (-1.0 * sin(Phi_T) + 4.0 * cos(Phi_0[ff,ss,ll]))
+                                - 4.0 * sin(Phi_0[ff,ss,ll])
+                                )
+                        )
+                        term2 = (
+                            pow(b_pol * F_icross[pp,ff,ss,ll], 2.0)
+                            * (Phi_T * (1.0 + 2.0 * pow(cos(Phi_0[ff,ss,ll]), 2.0))
+                                + sin(Phi_T) * cos(Phi_T) - 4.0 * cos(Phi_0[ff,ss,ll])
+                                )
+                        )
+                        term3 = (
+                            -2.0 * a_pol * b_pol * F_iplus[pp,ff,ss,ll] * F_icross[pp,ff,ss,ll]
+                            * (2.0 * Phi_T * sin(Phi_T) *cos(Phi_0[ff,ss,ll])
+                                + sin(Phi_T) * (sin(Phi_T) - 2.0 * sin(Phi_0[ff,ss,ll])
+                                                + 2.0 * cos(Phi_T) * cos(Phi_0[ff,ss,ll])
+                                                - 2.0 * cos(Phi_0[ff,ss,ll])
+                                                )
+                            )
+                        )
+                        pta_snr_sq += coef*(term1 + term2 + term3) # sum snr^2 of all pulsars for a single source
+
+                    # set snr for a single source, using sum from all pulsars
+                    snr_ss[ff,rr,ss,ll] = sqrt(pta_snr_sq)
+
 

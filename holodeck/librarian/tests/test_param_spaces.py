@@ -14,8 +14,8 @@ def _run_param_space(param_space_class):
     # sam, hard = pspace.model_for_sample_number(0)
     sam, hard = pspace.model_for_params(pspace.default_params())
     # Make sure model runs
-    import holodeck.librarian.libraries  # noqa
-    data = librarian.libraries.run_model(sam, hard, singles_flag=True, details_flag=True)
+    import holodeck.librarian.lib_tools  # noqa
+    data = librarian.lib_tools.run_model(sam, hard, singles_flag=True, details_flag=True)
     assert data is not None, "After `run_model` returned data is None!"
     check_keys = ['fobs_cents', 'fobs_edges', 'hc_ss', 'hc_bg', 'gwb', 'static_binary_density', 'number']
     for key in check_keys:

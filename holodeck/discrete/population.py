@@ -58,6 +58,10 @@ Notes
       The changes should be made in-place (i.e. without returning a new copy of the population
       instance).
 
+To-Do
+-----
+
+
 References
 ----------
 * [Genel2014]_ Genel et al. (2014)
@@ -302,7 +306,7 @@ class Pop_Illustris(_Population_Discrete):
 
     """
 
-    def __init__(self, fname=None, **kwargs):
+    def __init__(self, select=None, fname=None, **kwargs):
         """Initialize a binary population using data in the given filename.
 
         Parameters
@@ -314,9 +318,11 @@ class Pop_Illustris(_Population_Discrete):
             Additional keyword-arguments passed to `super().__init__`.
 
         """
+        self._select = select
+
         if fname is None:
             fname = _DEF_ILLUSTRIS_FNAME
-            fname = os.path.join(_PATH_DATA, fname)
+            fname = os.path.join(_PATH_DATA, "illustris", fname)
 
         self._fname = fname             #: Filename for binary data
         super().__init__(**kwargs)
@@ -330,7 +336,7 @@ class Pop_Illustris(_Population_Discrete):
         super()._init()
         fname = self._fname
         header, data = utils.load_hdf5(fname)
-        self._sample_volume_mpc3 = header['box_volume_mpc']            #: comoving-volume of sim [Mpc^3]
+        self._sample_volume_mpc3 = header['box_volume_mpc']  #: comoving-volume of sim [Mpc^3]
         self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3   #: comoving-volume of sim [cm^3]
 
         # Select the stellar radius
@@ -347,6 +353,15 @@ class Pop_Illustris(_Population_Discrete):
         # Get the stellar mass, and take that as bulge mass
         self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :]   #: Stellar mass / stellar-bulge mass [grams]
         self.vdisp = data['SubhaloVelDisp']    #: Velocity dispersion of galaxy [?cm/s?]
+
+        if self._select is not None:
+            print(f"\n=====\nWARNING SELECTING ONLY {self._select} BINARIES FROM DATA\n=====\n")
+            names = ['sepa', 'mass', 'scafa', 'mbulge', 'vdisp']
+            for nam in names:
+                vals = getattr(self, nam)
+                vals = vals[:self._select]
+                setattr(self, nam, vals)
+
         return
 
 
@@ -602,7 +617,7 @@ class PM_Mass_Reset(_Population_Modifier):
 
         Parameters
         ----------
-        mhost : class or instance of `holodeck.relations._Host_Relation`
+        mhost : class or instance of `holodeck.host_relations._BH_Host_Relation`
             The Mbh-MHost scaling relationship with which to reset population masses.
         scatter : bool, optional
             Include random scatter when resetting masses.
@@ -610,10 +625,10 @@ class PM_Mass_Reset(_Population_Modifier):
 
         """
         # if `mhost` is a class (not an instance), then instantiate it; make sure its a subclass
-        # of `_Host_Relation`
-        mhost = utils.get_subclass_instance(mhost, None, holo.relations._Host_Relation)
+        # of `_BH_Host_Relation`
+        mhost = utils.get_subclass_instance(mhost, None, holo.host_relations._BH_Host_Relation)
         # store attributes
-        self.mhost = mhost         #: Scaling relationship between host and MBH (`holo.relations._Host_Relation`)
+        self.mhost = mhost         #: Scaling relationship between host and MBH (`holo.host_relations._BH_Host_Relation`)
         self._scatter = scatter    #: Bool determining whether resampled masses should include statistical scatter
         return
 

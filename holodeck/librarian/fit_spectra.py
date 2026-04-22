@@ -1,4 +1,37 @@
-"""
+"""Script and methods to fit simulated GWB spectra with analytic functions.
+
+Usage (fit_spectra.py)
+----------------------
+For usage information, run the script with the ``-h`` or ``--help`` arguments, i.e.::
+
+    python -m holodeck.librarian.fit_spectra -h
+
+Typically, the only argument required is the path to the folder containing the combined library
+file (``sam_lib.hdf5``).
+
+This script can be run serially (on a single processor) or in parallel.  To run in parallel, MPI and
+``mpi4py`` are required.  For parallel runs, use::
+
+    mpirun -np <NUM_CORES>  python -m holodeck.librarian.fit_spectra  <ARGS>
+
+
+
+Notes
+-----
+As a script, this submodule runs in parallel, with the main processor loading a holodeck library
+(from a single, combined HDF5 file), and distributes simulations to the secondary processors.  The
+secondary processors then perform analytic fits to the GWB spectra.  What functional forms are fit,
+and using how many frequency bins, is easily adjustable.  Currently, the implemented functions are:
+
+* A power-law, with two parameters (amplitude and spectral index),
+* A power-law with turnover model, using four parameters: the normal amplitude and spectral index,
+  in addition to a break frequency, and a spectral index below the break frequency.
+
+A variety of numbers-of-frequency-bins are also fit, which are specified in the ``FITS_NBINS_PLAW``
+and ``FITS_NBINS_TURN`` variables.
+
+The methods used in this submodule are easily adaptable as API methods.
+
 """
 
 import argparse
@@ -10,7 +43,7 @@ import tqdm
 
 import holodeck as holo
 import holodeck.librarian
-from holodeck.librarian import libraries, FITS_NBINS_PLAW, FITS_NBINS_TURN
+from holodeck.librarian import lib_tools, FITS_NBINS_PLAW, FITS_NBINS_TURN
 from holodeck.constants import YR
 
 
@@ -53,7 +86,7 @@ def main():
 
 
 def fit_library_spectra(library_path, log, recreate=False):
-    """Calculate line fits to library spectra using MPI.
+    """Calculate analytic fits to library spectra using MPI.
     """
 
     # make sure MPI is working
@@ -62,9 +95,9 @@ def fit_library_spectra(library_path, log, recreate=False):
         comm = MPI.COMM_WORLD
     except Exception as err:
         comm = None
-        holo.log.error(f"failed to load `mpi4py` in {__file__}: {err}")
-        holo.log.error("`mpi4py` may not be included in the standard `requirements.txt` file")
-        holo.log.error("Check if you have `mpi4py` installed, and if not, please install it")
+        log.error(f"failed to load `mpi4py` in {__file__}: {err}")
+        log.error("`mpi4py` may not be included in the standard `requirements.txt` file")
+        log.error("Check if you have `mpi4py` installed, and if not, please install it.")
         raise err
 
     # ---- setup path
@@ -75,7 +108,7 @@ def fit_library_spectra(library_path, log, recreate=False):
 
         library_path = Path(library_path)
         if library_path.is_dir():
-            library_path = libraries.get_sam_lib_fname(library_path, gwb_only=False)
+            library_path = lib_tools.get_sam_lib_fname(library_path, gwb_only=False)
         if not library_path.exists() or not library_path.is_file():
             err = f"{library_path=} must point to an existing library file!"
             log.exception(err)
@@ -85,7 +118,7 @@ def fit_library_spectra(library_path, log, recreate=False):
 
         # ---- check for existing fits file
 
-        fits_path = libraries.get_fits_path(library_path)
+        fits_path = lib_tools.get_fits_path(library_path)
         return_flag = False
         if fits_path.exists():
             lvl = log.INFO if recreate else log.WARNING
@@ -98,7 +131,7 @@ def fit_library_spectra(library_path, log, recreate=False):
         # ---- load library GWB and convert to PSD
 
         with h5py.File(library_path, 'r') as library:
-            fobs = library['fobs'][()]
+            fobs = library['fobs_cents'][()]
             psd = holo.utils.char_strain_to_psd(fobs[np.newaxis, :, np.newaxis], library['gwb'][()])
 
         nsamps, nfreqs, nreals = psd.shape
@@ -177,7 +210,10 @@ def fit_library_spectra(library_path, log, recreate=False):
         all_psd = all_psd[idx]
 
         # confirm that the resorting worked correctly
-        assert np.all(all_psd == psd)
+        matches = (all_psd == psd)
+        # if values are NaN, then equality check will fail... skip those
+        skips = ~np.isfinite(all_psd)
+        assert np.all(matches | skips)
 
         # reshape arrays to convert back to (Samples, Realizations, ...)
         len_nbins_plaw = len(nbins_plaw)
@@ -193,7 +229,10 @@ def fit_library_spectra(library_path, log, recreate=False):
         all_psd = np.moveaxis(all_psd, 1, -1)
 
         # confirm that reshaping worked correctly
-        assert np.all(all_psd == psd_check)
+        matches = (all_psd == psd_check)
+        # if values are NaN, then equality check will fail... skip those
+        skips = ~np.isfinite(all_psd)
+        assert np.all(matches | skips)
 
         # Report how many fits failed
         fails = np.any(~np.isfinite(fits_plaw), axis=-1)
@@ -241,7 +280,7 @@ def _find_sam_lib_in_path_tree(path, pattern=None):
         if (pattern is not None) and (pattern not in str(path)):
             return []
         # if we find the library file, return it
-        if path.name == "sam_lib.hdf5":
+        if path.name.endswith("sam_lib.hdf5"):
             return [path]
         return []
 
@@ -318,3 +357,5 @@ def fit_spectra_turn(comm, freqs, psd, nbins_list=FITS_NBINS_TURN):
     return nbins_list, fits
 
 
+if __name__ == "__main__":
+    main()

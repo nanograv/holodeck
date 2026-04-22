@@ -93,3 +93,23 @@ version 1.4, available at
 
 [homepage]: http://contributor-covenant.org
 [version]: http://contributor-covenant.org/version/1/4/
+
+
+## Contributors
+
+(List is very likely out-of-date, please bump if you notice someone/yourself missing!)
+
+Bence Becsy  
+Andrew Casey-Clyde  
+Alex Cingoranelli  
+Siyuan Chen  
+Daniel D’Orazio  
+Emiko Gardiner  
+Kayhan Gültekin  
+William Lamb  
+Luke Zoltan Kelley  
+Cayenne Matt  
+Joseph Simon  
+Magdalena Siwek  
+Jeremy Wachter  
+David Wright  

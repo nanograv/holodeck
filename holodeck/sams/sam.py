@@ -12,7 +12,7 @@ components as arguments:
 (3) Galaxy Merger Time (GMT): gives the characteristic time duration for galaxy 'mergers' to occur.
     Implemented as subclasses of the :class:`_Galaxy_Merger_Time` subclass.
 (4) M_bh - M_bulge Relation (mmbulge): gives MBH properties for a given galaxy stellar-bulge mass.
-    Implemented as subcalsses of the :class:`holodeck.relations._MMBulge_Relation` subclass.
+    Implemented as subcalsses of the :class:`holodeck.host_relations._MMBulge_Relation` subclass.
 
 The :class:`Semi_Analytic_Model` class defines a grid in parameter space of total MBH mass ($M=M_1 + M_2$),
 MBH mass ratio ($q \\equiv M_1/M_2$), redshift ($z$), and at times binary separation
@@ -25,8 +25,8 @@ The step of going from a number-density of binaries in $(M, q, z)$ space, to als
 in $a$ or $f$ is subtle, as it requires modeling the binary evolution (i.e. hardening rate).
 
 
-To-Do
------
+To-Do (sam.py)
+--------------
 * Allow SAM class to take M-sigma in addition to M-Mbulge.
 
 References
@@ -47,7 +47,8 @@ import kalepy as kale
 import holodeck as holo
 from holodeck import cosmo, utils, log
 from holodeck.constants import SPLC, MSOL, MPC
-from holodeck import relations, single_sources
+from holodeck import host_relations, single_sources
+from . import sam_cyutils
 from holodeck.sams.components import (
     _Galaxy_Pair_Fraction, _Galaxy_Stellar_Mass_Function, _Galaxy_Merger_Time, _Galaxy_Merger_Rate,
     GSMF_Schechter, GPF_Power_Law, GMT_Power_Law, GMR_Illustris
@@ -66,35 +67,94 @@ GMT_USES_MTOT = False        #: the mass used in the GMT  is interpretted as M=m
 
 
 class Semi_Analytic_Model:
-    """Semi-Analytic Model of MBH Binary populations.
+    """Semi-Analytic Model (SAM) of MBH Binary populations.
 
-    Based on four components:
-    * Galaxy Stellar-Mass Function (GSMF): the distribution of galaxy masses
-    * Galaxy Pair Fraction (GPF): the probability of galaxies having a companion
-    * Galaxy Merger Time (GMT): the expected galaxy-merger timescale for a pair of galaxies
-    * M-MBulge relation: relation between host-galaxy (bulge-mass) and MBH (mass) properties
+    This class produces simulated MBH binary populations using idealized (semi-)analytic functions
+    starting from galaxy populations, to massive black holes, to merger rates.  Using SAMs, MBH
+    binary populations are calculated over a fixed, rectilinear grid of 3 or 4 dimensional
+    parameter-space.  The starting parameter space is total mass, mass ratio, and redshift; but
+    often the distribution of binaries are desired at particular orbital frequencies or separations,
+    which adds a dimension.  Some parameters are calculated at grid edges (e.g. binary number
+    densities), while others are calculated at grid centers (e.g. number of binaries in a universe).
+    Ultimately, what the SAM calculates in the number (or number-density) of binaries at each point
+    in this 3-4 dimensional parameter space.
+
+    Conceptually, three components are required to build SAMs.
+
+    (1) Galaxies and stellar-masses (i.e. how many galaxies there are as a function of stellar mass
+        and redshift).  This component is provided by the Galaxy Stellar-Mass Function (GSMF), which
+        are implemented as subclasses of the
+        :class:`holodeck.sams.components._Galaxy_Stellar_Mass_Function` base-class.
+
+    (2) Galaxy merger rates (GMRs; i.e. how often galaxies merge as a function of stellar mass, mass
+        ratio, and redshift.)  This component can be provided in two ways:
+
+        * Subclasses of :class:`holodeck.sams.components._Galaxy_Merger_Rate`, which provide merger
+          rates directly.
+
+        * Both a galaxy pair fraction (GPF; subclasses of
+          :class:`holodeck.sams.components._Galaxy_Pair_Fraction`) which give the fraction of
+          galaxies in the process of merger, and a galaxy merger time (GMT; subclasses of
+          :class:`holodeck.sams.components._Galaxy_Merger_Time`) which gives the duration of time
+          that galaxies spend in the merger process.
+
+    (3) MBH-Host relationships which determine MBH properties for a given host galaxy.  Currently
+        these relationships are only fully implemented as Mbh-MBulge (MMBulge) relationships, which
+        are subclasses of :class:`holodeck.host_relations._MMBulge_Relation`.
 
     """
 
     def __init__(
-        self, mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91), mrat=(1e-3, 1.0, 81), redz=(1e-3, 10.0, 101),
-        shape=None, log=None,
-        gsmf=GSMF_Schechter, mmbulge=relations.MMBulge_KH2013,
-        gpf=None, gmt=None, gmr=None,
+        self,
+        mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91),
+        mrat=(1e-3, 1.0, 81),
+        redz=(1e-3, 10.0, 101),
+        shape=None,
+        log=None,
+        gsmf=GSMF_Schechter,
+        gpf=None,
+        gmt=None,
+        gmr=None,
+        mmbulge=host_relations.MMBulge_KH2013,
         **kwargs
     ):
-        """Construct a new Semi_Analytic_Model instance.
+        """Construct a new ``Semi_Analytic_Model`` instance.
 
         Parameters
         ----------
-        mtot : list, optional
-        mrat : list, optional
-        redz : list, optional
-        shape : _type_, optional
-        gsmf : _type_, optional
-        gpf : _type_, optional
-        gmt : _type_, optional
-        mmbulge : _type_, optional
+        mtot : (3,) tuple
+            Specification for the domain of the grid in total-mass.
+            Three arguments must be included, the 0th giving the lower-limit [grams], the 1th
+            giving the upper-limit [grams], and the 2th giving the number of bin-edges (i.e. the
+            number-of-bins plus one).
+        mrat : (3,) tuple
+            Specification for the domain of the grid in mass-ratio.
+            Three arguments must be included, the 0th giving the lower-limit, the 1th giving the
+            upper-limit, and the 2th giving the number of bin-edges (i.e. the number-of-bins plus
+            one).
+        redz : (3,) tuple
+            Specification for the domain of the grid in redshift.
+            Three arguments must be included, the 0th giving the lower-limit, the 1th giving the
+            upper-limit, and the 2th giving the number of bin-edges (i.e. the number-of-bins plus
+            one).
+        shape : int  or  (3,) tuple
+            The shape of the grid in total-mass, mass-ratio, and redshift.  This argument specifies
+            the number of grid-edges in each dimension, and overrides the shape arguments of
+            ``mtot``, ``mrat``, and ``redz``.
+
+            * If a single `int` is given, then this is the number of edges for all dimensions.
+
+            * If a (3,) iterable of values is given, then each value specifies the size of the grid
+              in the corresponding dimension.  `None` values can be provided which indicate to use
+              the default sizes (provided by the ``mtot``, ``mrat``, and ``redz`` arguments.)  For
+              example, ``shape=(12, None, 14)`` would produce 12 grid edges in total mass, the
+              default number of grid edges in mass ratio, and 14 grid edges in redshit.
+
+        gsmf : None  or  :class:`_Galaxy_Stellar_Mass_Function` subclass instance
+        gpf : None  or  :class:`_Galaxy_Pair_Fraction` subclass instance
+        gmt : None  or  :class:`_Galaxy_Merger_Time` subclass instance
+        gmr : None  or  :class:`_Galaxy_Merger_Rate` subclass instance
+        mmbulge : None  or  :class:`_MMBulge_Relation` subclass instance
 
         """
         if log is None:
@@ -113,26 +173,27 @@ class Semi_Analytic_Model:
         # ---- Process SAM components
 
         gsmf = utils.get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
-        mmbulge = utils.get_subclass_instance(mmbulge, None, relations._MMBulge_Relation)
-        # if GMR is None, then we need both GMT and GPF
-        if gmr is None:
-            gmt = utils.get_subclass_instance(gmt, GMT_Power_Law, _Galaxy_Merger_Time)
-            gpf = utils.get_subclass_instance(gpf, GPF_Power_Law, _Galaxy_Pair_Fraction)
-        # if GMR is given, GMT can still be used - for calculating stalling
-        else:
+        mmbulge = utils.get_subclass_instance(mmbulge, None, host_relations._MMBulge_Relation)
+        if gpf is None:
+            log.info("No galaxy pair-fraction given, using galaxy merger-rate.")
             gmr = utils.get_subclass_instance(gmr, GMR_Illustris, _Galaxy_Merger_Rate)
             gmt = utils.get_subclass_instance(gmt, None, _Galaxy_Merger_Time, allow_none=True)
-            # if GMR is given, GPF is not used: make sure it is not given
-            if (gpf is not None):
-                err = f"When `GMR` ({gmr}) is provided, do not provide a GPF!"
+        else:
+            if gmr is not None:
+                err = "Can only use one of `gpf` and `gmr`!"
                 log.exception(err)
                 raise ValueError(err)
+            log.info("Galaxy pair-fraction provided, using galaxy pair-fraction and merger-time.")
+            # gpf = utils.get_subclass_instance(gpf, None, _Galaxy_Pair_Fraction)
+            # gmt = utils.get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
+            gmt = utils.get_subclass_instance(gmt, GMT_Power_Law, _Galaxy_Merger_Time)
+            gpf = utils.get_subclass_instance(gpf, GPF_Power_Law, _Galaxy_Pair_Fraction)
 
         self._gsmf = gsmf             #: Galaxy Stellar-Mass Function (`_Galaxy_Stellar_Mass_Function` instance)
-        self._mmbulge = mmbulge       #: Mbh-Mbulge relation (`relations._MMBulge_Relation` instance)
+        self._gmr = gmr               #: Galaxy Merger Rate (`_Galaxy_Merger_Rate` instance)
         self._gpf = gpf               #: Galaxy Pair Fraction (`_Galaxy_Pair_Fraction` instance)
         self._gmt = gmt               #: Galaxy Merger Time (`_Galaxy_Merger_Time` instance)
-        self._gmr = gmr               #: Galaxy Merger Rate (`_Galaxy_Merger_Rate` instance)
+        self._mmbulge = mmbulge       #: Mbh-Mbulge relation (`host_relations._MMBulge_Relation` instance)
         log.debug(f"{gsmf=}, {gmr=}, {gpf=}, {gmt=}, {mmbulge=}")
 
         # ---- Create SAM grid edges
@@ -169,9 +230,9 @@ class Semi_Analytic_Model:
         # These values are calculated as needed by the class when the corresponding methods are called
         self._density = None          #: Binary comoving number-density
         self._shape = None            #: Shape of the parameter-space domain (mtot, mrat, redz)
-        self._gmt_time = None         #: GMT timescale of galaxy mergers [sec]
         self._redz_prime = None       #: redshift following galaxy merger process
-
+        #: GMT timescale of galaxy mergers [sec], set in 'static_binary_density'
+        self._gmt_time = None
         return
 
     @property
@@ -201,6 +262,7 @@ class Semi_Analytic_Model:
         # total-mass, mass-ratio ==> (M1, M2)
         masses = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
         # BH-masses to stellar-masses
+        #masses = self._mmbulge.mstar_from_mbh(masses, scatter=False)
         mbh_pri = masses[0]
         mbh_sec = masses[1]
         args = [mbh_pri[..., np.newaxis], mbh_sec[..., np.newaxis], redz]
@@ -217,17 +279,26 @@ class Semi_Analytic_Model:
         # # Convert to shape (M, Q, Z)
         # mstar_rat = np.broadcast_arrays(*args)
         return mstar_pri, mstar_rat, mstar_tot, redz
+        #return masses
 
     @property
     def static_binary_density(self):
-        """The number-density of binaries at each bin edge, 'd^3 n / [dlog10M dq dz]' in units of [Mpc^-3].
+        r"""The number-density of binaries at the edges of the grid in mtot, mrat, redz.
 
-        This is calculated once and cached.
+        The 'number density' is a density both in terms of volume (i.e. number of binaries per unit
+        comoving-volume, $n = dN/dV_c$), and in terms of binary parameters (e.g. binaries per unit
+        of log10 mass, $d n /d \log_{10} M$).  Specifically, the values returned are:
+
+        .. math::
+            d^3 n / [d \log_{10} M  d q  d z]
+
+        For each :class:`Semi_Analytic_Model` instance, this value is calculated once and cached.
 
         Returns
         -------
-        density : (M, Q, Z) ndarray
-            Number density of binaries, per unit redshift, mass-ratio, and log10 of mass.  Units of [Mpc^-3].
+        density : (M, Q, Z) ndarray [$cMpc^{-3}$]
+            Number density of binaries, per unit redshift, mass-ratio, and log10 of mass.
+            The values are in units of inverse cubic, comoving-Mpc.
 
         Notes
         -----
@@ -240,7 +311,16 @@ class Semi_Analytic_Model:
 
             # ---- convert from MBH ===> mstar
 
+            # `mstar_tot` starts as the secondary mass, sorry
+            # mstar_pri, mstar_tot = self.mass_stellar()
+            # # q = m2 / m1
+            # mstar_rat = mstar_tot / mstar_pri
+            # # M = m1 + m2
+            # mstar_tot = mstar_pri + mstar_tot
             redz = self.redz[np.newaxis, np.newaxis, :]
+            #args = [mstar_pri[..., np.newaxis], mstar_rat[..., np.newaxis], mstar_tot[..., np.newaxis], redz]
+            # Convert to shape (M, Q, Z)
+            #mstar_pri, mstar_rat, mstar_tot, redz = np.broadcast_arrays(*args)
             mstar_pri, mstar_rat, mstar_tot, redz = self.mass_stellar()
 
             # choose whether the primary mass, or total mass, is used in different calculations
@@ -291,7 +371,7 @@ class Semi_Analytic_Model:
             # ==> (dMstar-tot/dMbh-tot) = (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) / (dMstar-pri / dMstar-tot)
             #                           = (dMstar-pri / dMbh-pri) * (1 / (1+q_bh)) / (1 / (1+q_star))
             #                           = (dMstar-pri / dMbh-pri) * ((1+q_star) / (1+q_bh))
-            dmstar_dmbh_pri = self._mmbulge.dmstar_dmbh(mstar_pri)   # [unitless]
+            dmstar_dmbh_pri = self._mmbulge.dmstar_dmbh(mstar_pri, redz=redz)   # [unitless]
             qterm = (1.0 + mstar_rat) / (1.0 + self.mrat[np.newaxis, :, np.newaxis])
             dmstar_dmbh = dmstar_dmbh_pri * qterm
 
@@ -330,22 +410,87 @@ class Semi_Analytic_Model:
 
         return self._density
 
-    def dynamic_binary_number_at_fobs(self, hard, fobs_orb, **kwargs):
+    def dynamic_binary_number_at_fobs(self, hard, fobs_orb, use_cython=True, **kwargs):
+        r"""Calculate the differential number of binaries in at each grid point, at each frequency.
 
-        if hard.CONSISTENT:
-            edges, dnum, redz_final = self._dynamic_binary_number_at_fobs_consistent(hard, fobs_orb, **kwargs)
+        The number of binaries is a differential over binary parameters (e.g. number of binaries
+        per unit of log10 mass, $d N /d \log_{10} M$).  Specifically, the values returned are:
+
+        .. math::
+            d^4 N / [d \log_{10} M  d q  d z d \ln f_{obs}]
+
+        The calculated number of binaries is obtained by converting the number-density (calculated
+        in :meth:`Semi_Analytic_Model.static_binary_density`) using the given binary hardening model
+        (`hard`) to evolve the binaries to the frequencies of interest.
+
+        To convert to the number of binaries (non-differential number), use the method
+        :func:`holodeck.utils.integrate_differential_number_3dx1d`.
+
+        Arguments
+        ---------
+        hard : :class:`holodeck.hardening._Hardening` subclass instance,
+            Binary evolution model used to evolve binaries to the target frequencies.
+        fobs_orb : (F,) array_like [1/s]
+            Observer-frame orbital frequencies at which to evaluate the differential number of
+            binaries, in units of inverse seconds.  Note that the number of binaries are evaluated
+            *at* these frequencies (not between them), so they act as bin centers, not bin edges.
+        use_cython : bool
+
+        Returns
+        -------
+        grid : (4,) list of ndarray
+            The locations of the parameter-space grid at which the differential number of binaries
+            is evaluated.  The elements are: {total mass, mass ratio, redshift, frequency}.
+            The total mass, mass ratio, and redshfit arrays correspond to grid edges, while the
+            frequency array is bin centers.  The frequency values are exactly the same as those
+            that are passed in with the ``fobs_orb`` variable.  The first three edges are the same
+            as the grid edges stored within the :class:`Semi_Analytic_Model` instance, i.e. the
+            attributes: :attr:`Semi_Analytic_Model.mtot`, :attr:`Semi_Analytic_Model.mrat`, and
+            :attr:`Semi_Analytic_Model.redz`.
+        dnum : (M, Q, Z, F) ndarray []
+            The differential number of binaries per unit 4-D parameter-space volume.  Unitless.
+        redz_final : (M, Q, Z, F) ndarray []
+            The redshift at which each grid point reaches the target frequencies.  This is distinct
+            from the :attr:`Semi_Analytic_Model.redz` parameter which gives the redshift at the time
+            of galaxy merger.  Unitless.
+
+        """
+
+        # Use the faster, cython implementation of the calculation
+        if use_cython:
+            # Import the cython module as needed
+            from . import sam_cyutils
+            # calculate dynamic binary number
+            redz_final, dnum = sam_cyutils.dynamic_binary_number_at_fobs(
+                fobs_orb, self, hard, cosmo
+            )
+            # provide the grid locations
+            grid = [self.mtot, self.mrat, self.redz, fobs_orb]
+
+        # Use the slower, but more readable python/numpy implementation of the calculation
         else:
-            edges, dnum, redz_final = self._dynamic_binary_number_at_fobs_inconsistent(hard, fobs_orb, **kwargs)
+            # Calculation for self-consistent binary evolution models
+            if hard.CONSISTENT:
+                grid, dnum, redz_final = self._dynamic_binary_number_at_fobs_consistent(hard, fobs_orb, **kwargs)
+            # Calculation for NOT self-consistent binary evolution models
+            else:
+                grid, dnum, redz_final = self._dynamic_binary_number_at_fobs_inconsistent(hard, fobs_orb, **kwargs)
 
-        return edges, dnum, redz_final
+        return grid, dnum, redz_final
 
     def _dynamic_binary_number_at_fobs_consistent(self, hard, fobs_orb, steps=200, details=False):
-        """Get correct redshifts for full binary-number calculation.
+        r"""Calculate the differential number of binaries in at each grid point, at each frequency.
 
-        Slower but more correct than old `dynamic_binary_number`.
-        Same as new cython implementation `sam_cyutils.dynamic_binary_number_at_fobs`, which is
-        more than 10x faster.
-        LZK 2023-05-11
+        See :meth:`dynamic_binary_number_at_fobs` for general information.
+
+        This is the python implementation for binary evolution (hardening) that is self-consistent,
+        i.e. evolution models that are able to evolve binaries from galaxy merger until the target
+        frequencies.
+
+        This function should produce the same results as the new cython implementation in:
+        :func:`holodeck.sams.sam_cyutils.dynamic_binary_number_at_fobs`, which is more than 10x
+        faster.  This python implementation is maintained for diagnostic purposes, and for
+        functionality when cython is not available.
 
         # BUG doesn't work for Fixed_Time_2PL
 
@@ -354,20 +499,26 @@ class Semi_Analytic_Model:
         edges = self.edges + [fobs_orb, ]
 
         # shape: (M, Q, Z)
-        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [Mpc^-3]
+        dens = self.static_binary_density   # d3n/[dlog10(M) dq dz]  units: [cMpc^-3]
 
+        # ---- Choose the binary separations over which to integrate the binary evolution.
+
+        # Start at large separations (galaxy merger) and evolve to small separations (coalescense).
 
         # start from the hardening model's initial separation
         rmax = hard._sepa_init
-        # (M,) end at the ISCO
+        # end at the ISCO
+        # (M,)
         rmin = utils.rad_isco(self.mtot)
         # Choose steps for each binary, log-spaced between rmin and rmax
         extr = np.log10([rmax * np.ones_like(rmin), rmin])     # (2,M,)
-        rads = np.linspace(0.0, 1.0, steps)[np.newaxis, :]     # (1,X)
-        # (M, S)  =  (M,1) * (1,S)
+        rads = np.linspace(0.0, 1.0, steps+1)[np.newaxis, :]     # (1,S)
+        # (M, S)  <==  (M,1) * (1,S)
         rads = extr[0][:, np.newaxis] + (extr[1] - extr[0])[:, np.newaxis] * rads
         rads = 10.0 ** rads
+        # ---- Calculate binary hardening rate (da/dt) at each separation, for each grid point
 
+        # broadcast arrays to a consistent shape
         # (M, Q, S)
         mt, mr, rads, norm = np.broadcast_arrays(
             self.mtot[:, np.newaxis, np.newaxis],
@@ -375,32 +526,72 @@ class Semi_Analytic_Model:
             rads[:, np.newaxis, :],
             hard._norm[:, :, np.newaxis],
         )
+        # calculate hardening rate (negative values, in units of [cm/s])
         dadt_evo = hard.dadt(mt, mr, rads, norm=norm)
+        # ---- Integrate evolution
+        # to find times and redshifts at which binaries reach each separation
 
         # (M, Q, S-1)
         # Integrate (inverse) hardening rates to calculate total lifetime to each separation
         times_evo = -utils.trapz_loglog(-1.0 / dadt_evo, rads, axis=-1, cumsum=True)
+        # ~~~~ RIEMANN integration ~~~~
+        # times_evo = 2.0 * np.diff(rads, axis=-1) / (dadt_evo[..., 1:] + dadt_evo[..., :-1])
+        # times_evo = np.cumsum(times_evo, axis=-1)
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+        # add array of zero time-delays at starting point (i.e. before the first step)
+        # with same shape as a slice at a single step
+        zpad = np.zeros_like(times_evo[..., 0])
+        times_evo = np.concatenate([zpad[..., np.newaxis], times_evo], axis=-1)
+
+        # ---- Convert from time to redshift
+
+        # initial redshift (of galaxy merger)
+        rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis]    # (1, 1, Z, 1)
+
+        tlbk_init = cosmo.z_to_tlbk(rz)
+        tlbk = tlbk_init - times_evo[:, :, np.newaxis, :]
+        # Combine the binary-evolution time, with the galaxy-merger time (if it is defined)
+        if self._gmt_time is not None:
+            tlbk -= self._gmt_time[:, :, :, np.newaxis]
+
+        # (M, Q, Z, S)
+        redz_evo = cosmo.tlbk_to_z(tlbk)
+
+        #! age of the universe version of calculation is MUCH less accurate !#
+        # Use age-of-the-universe
+        # times_tot = times_evo[:, :, np.newaxis, :]
+        # # Combine the binary-evolution time, with the galaxy-merger time (if it is defined)
+        # if self._gmt_time is not None:
+        #     times_tot += self._gmt_time[:, :, :, np.newaxis]
+        # redz_evo = utils.redz_after(times_tot, redz=rz)
+        #! ---------------------------------------------------------------- !#
+
+        # ---- interpolate to target frequencies
         # Combine the binary-evolution time, with the galaxy-merger time
         # (M, Q, Z, S-1)
-        rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis]
-        times_tot = times_evo[:, :, np.newaxis, :] + self._gmt_time[:, :, :, np.newaxis]
-        redz_evo = utils.redz_after(times_tot, redz=rz)
+        # rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis]
+        # times_tot = times_evo[:, :, np.newaxis, :] + self._gmt_time[:, :, :, np.newaxis]
+        # redz_evo = utils.redz_after(times_tot, redz=rz)
 
         # convert from separations to rest-frame orbital frequencies
         # (M, Q, S)
         frst_orb_evo = utils.kepler_freq_from_sepa(mt, rads)
         # (M, Q, Z, S)
-        fobs_orb_evo = frst_orb_evo[:, :, np.newaxis, :] / (1.0 + rz)
+        fobs_orb_evo = frst_orb_evo[:, :, np.newaxis, :] / (1.0 + redz_evo)
+
+        # (M, Q, Z, S)  ==>  (M*Q*Z, S)
+        fobs_orb_evo, redz_evo = [tt.reshape(-1, steps+1) for tt in [fobs_orb_evo, redz_evo]]
 
         # ---- interpolate to target frequencies
         # `ndinterp` interpolates over 1th dimension
 
         # (M, Q, Z, S-1)  ==>  (M*Q*Z, S-1)
-        fobs_orb_evo, redz_evo = [mm.reshape(-1, steps-1) for mm in [fobs_orb_evo[:, :, :, 1:], redz_evo]]
+        #fobs_orb_evo, redz_evo = [mm.reshape(-1, steps-1) for mm in [fobs_orb_evo[:, :, :, 1:], redz_evo]]
         # (M*Q*Z, X)
         redz_final = utils.ndinterp(fobs_orb, fobs_orb_evo, redz_evo, xlog=True, ylog=False)
 
-        # (M*Q*Z, X) ===> (M, Q, Z, X)
+      # (M, Q, Z, X)  <===  (M*Q*Z, X)
         redz_final = redz_final.reshape(self.shape + (fobs_orb.size,))
         coal = (redz_final > 0.0)
         frst_orb = fobs_orb * (1.0 + redz_final)
@@ -453,7 +644,14 @@ class Semi_Analytic_Model:
         shape = dens.shape
         new_shape = shape + (fobs_orb.size, )
 
-        rz = self._redz_prime[..., np.newaxis] * np.ones(new_shape)
+        # If a galaxy merger-time is being used, then `_redz_prime` gives the redshifts following
+        # galaxy merger.  NOTE: `_redz_prime` values past age of universe are set to `-1.0`.
+        # Use these as final redshifts if available, otherwise use the initial redshifts (`redz`).
+        if self._redz_prime is not None:
+            rz = self._redz_prime[..., np.newaxis] * np.ones(new_shape)
+        else:
+            rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis] * np.ones(new_shape)
+        #rz = self._redz_prime[..., np.newaxis] * np.ones(new_shape)
         coal = (rz > 0.0)
 
         dc = cosmo.comoving_distance(rz[coal]).to('Mpc').value
@@ -461,27 +659,40 @@ class Semi_Analytic_Model:
             fobs_orb[np.newaxis, np.newaxis, np.newaxis, :], rz
         )
 
+        # (M,) ISCO separation
+        risco = utils.rad_isco(self.mtot)
+
         # (Z,) this is `(dVc/dz) * (dz/dt)` in units of [Mpc^3/s]
         cosmo_fact = 4 * np.pi * (SPLC/MPC) * np.square(dc) * (1.0 + rz[coal])
 
-        # # (M, Q) calculate chirp-mass
+       # broadcast to full shape, then take coalescing elements
+        # (M,) ==> (M, 1, 1, 1)
         mt = self.mtot[:, np.newaxis, np.newaxis, np.newaxis]
+        risco = risco[:, np.newaxis, np.newaxis, np.newaxis]
+        # (Q,) ==> (1, Q, 1, 1)
         mr = self.mrat[np.newaxis, :, np.newaxis, np.newaxis]
-        mt, mr = [(mm * np.ones(new_shape))[coal] for mm in [mt, mr]]
+        # These will now be 1D with shape (C,) for 'C' coalescing elements
+        mt, mr, fro, risco = [(mm * np.ones(new_shape))[coal] for mm in [mt, mr, frst_orb, risco]]
 
         # Convert from observer-frame orbital freq, to rest-frame orbital freq
-        sa = utils.kepler_sepa_from_freq(mt, frst_orb[coal])
-        # (X, M*Q*Z), hardening rate, negative values, units of [cm/sec]
+        sa = utils.kepler_sepa_from_freq(mt, fro)
+        # (C,), hardening rate, negative values, units of [cm/sec]
         args = [mt, mr, sa]
         dadt = hard.dadt(*args)
         # Calculate `tau = dt/dlnf_r = f_r / (df_r/dt)`
         # dfdt is positive (increasing frequency)
-        dfdt, _ = utils.dfdt_from_dadt(dadt, sa, frst_orb=frst_orb[coal])
-        tau = frst_orb[coal] / dfdt
+        dfdt, _ = utils.dfdt_from_dadt(dadt, sa, frst_orb=fro)
+        tau = fro / dfdt
 
-        # (M, Q, Z) units: [1/s] i.e. number per second
+        # (M, Q, Z, F) units: [1/s] i.e. number per second
         dnum = np.zeros(new_shape)
-        dnum[coal] = (dens[..., np.newaxis] * np.ones(new_shape))[coal] * cosmo_fact * tau
+
+        # Select only the binaries are separations larger than isco; this is a subset of `coal`
+        live = (sa > risco)
+        coal[coal] = coal[coal] & live
+
+        dnum[coal] = (dens[..., np.newaxis] * np.ones(new_shape))[coal] * cosmo_fact[live] * tau[live]
+        #dnum[coal] = (dens[..., np.newaxis] * np.ones(new_shape))[coal] * cosmo_fact * tau
 
         return edges, dnum, rz
 
@@ -656,6 +867,11 @@ class Semi_Analytic_Model:
         """
         redz = self.redz[np.newaxis, np.newaxis, :]
         mstar_pri, mstar_rat, mstar_tot, redz = self.mass_stellar()
+        # mstar_pri, mstar_tot = self.mass_stellar()
+        # # q = m2 / m1
+        # mstar_rat = mstar_tot / mstar_pri
+        # # M = m1 + m2
+        # mstar_tot = mstar_pri + mstar_tot
 
         # default to using `redz_prime` values if a GMT instance is stored
         if redz_prime is None:
@@ -666,7 +882,12 @@ class Semi_Analytic_Model:
             raise AttributeError(err)
 
         rz = self.redz
+        #rz = rz[np.newaxis, np.newaxis, :]
         if redz_prime:
+            #args = [mstar_pri[..., np.newaxis], mstar_rat[..., np.newaxis], mstar_tot[..., np.newaxis], rz]
+            # Convert to shape (M, Q, Z)
+            #mstar_pri, mstar_rat, mstar_tot, rz = np.broadcast_arrays(*args)
+
             gmt_mass = mstar_tot if GMT_USES_MTOT else mstar_pri
             rz, _ = self._gmt.zprime(gmt_mass, mstar_rat, rz)
             print(f"{self} :: {utils.stats(rz)=}")
@@ -698,6 +919,7 @@ class Semi_Analytic_Model:
         params : Boolean
             Whether or not to return astrophysical parameters of the binaries.
 
+
         Returns
         -------
         hc_ss : (F, R, L) NDarray of scalars
@@ -713,7 +935,6 @@ class Semi_Analytic_Model:
             final redshift, final comoving distance, final separation, final angular separation)
             for background sources at each frequency and realization,
             Returned only if params = True.
-
         """
         from . import sam_cyutils
 
@@ -879,7 +1100,6 @@ class Semi_Analytic_Model:
         integ = 0.5 * (integ[:, :-1, :] + integ[:, 1:, :]) * dq[np.newaxis, :, np.newaxis]
 
         return integ
-
     def _ndens_gal(self, mass_gal, mrat_gal, redz):
         if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
             self._log.warning("{self.__class__}._ndens_gal assumes that primary mass is used for GSMF, GPF and GMT!")
@@ -1110,14 +1330,11 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
     """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
 
     The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
-
-    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.  A 2nd
-          order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
+    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.
+          A 2nd-order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
           In-between, a 1st-order interpolant is used if `linear_interp_backup` is True.
-
-    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2)
-          to account for scatter.
-
+    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2) to
+          account for scatter.
     * (3) The new density distribution is interpolated back to the original (mtot, mrat) grid.
 
     Parameters
