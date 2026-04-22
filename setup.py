@@ -20,9 +20,6 @@ short_description = __doc__.strip().split('\n')[0]
 with open(join('.', "README.md"), "r") as handle:
     long_description = handle.read()
 
-with open(join('.', "requirements.txt"), "r") as handle:
-    requirements = handle.read()
-
 with open(join('.', 'holodeck', 'version.txt')) as handle:
     version = handle.read().strip()
 
@@ -85,8 +82,24 @@ setup(
     license='MIT',
     url="https://github.com/NANOGrav/holodeck/",
 
-    # External dependencies loaded from 'requirements.txt'
-    install_requires=requirements,
+    # Runtime dependencies. Kept in sync with environment.yml (conda path) and
+    # requirements.txt (legacy pip path, still maintained for teammates).
+    install_requires=[
+        "astropy",
+        "cosmopy",
+        "h5py",
+        "ipywidgets",
+        "kalepy",
+        "matplotlib",
+        "numpy",
+        "scipy",
+        "psutil",
+        "tqdm",
+        "cython<3.0.0",
+        "schwimmbad",
+        "emcee",
+        "george",
+    ],
 
     # Which Python importable modules should be included when your package is installed
     # Handled automatically by setuptools. Use 'exclude' to prevent some specific

@@ -1,0 +1,102 @@
+# ==============================================================================
+# holodeck — conda/mamba environment definition
+# ==============================================================================
+#
+# Creates an environment named `holopy` containing every runtime and development
+# dependency, AND performs an editable install of holodeck itself (including the
+# Cython-compiled C extensions) in a single command.
+#
+# USAGE
+# -----
+#   mamba env create -f environment.yml        # recommended (fast solver)
+#   conda env create -f environment.yml        # also works, slower
+#   mamba activate holopy
+#   python -c "import holodeck; print(holodeck.__version__)"
+#
+# WHAT THE `- -e .` LINE DOES
+# ---------------------------
+# The final entry in the `pip:` section, `- -e .`, is the key step that makes
+# this a one-command install. When the env is created it resolves to:
+#
+#     pip install -e .
+#
+# which invokes `setup.py` and:
+#   1. Reads build deps from `pyproject.toml` (setuptools, wheel, Cython<3,
+#      numpy, scipy).
+#   2. Runs `cythonize(...)` on:
+#         holodeck/cyutils.pyx
+#         holodeck/sams/sam_cyutils.pyx
+#      producing compiled `.so` extensions in-place (equivalent of
+#      `python setup.py build_ext -i`).
+#   3. Installs holodeck in EDITABLE mode (equivalent of `python setup.py
+#      develop`): your local repo is the source of truth; edits to `.py` files
+#      take effect immediately, no reinstall needed.
+#
+# If you later edit one of the `.pyx` files, re-run `pip install -e . --no-deps`
+# (or `python setup.py build_ext -i`) to rebuild the C extensions.
+#
+# SYNC WITH requirements*.txt
+# ---------------------------
+# For now, this file duplicates the dependency lists in:
+#     requirements.txt            (runtime)
+#     requirements-dev.txt        (dev / test tooling)
+#     requirements-libraries.txt  (optional: mpi4py)
+# The pip-based files are kept so existing pip-only workflows keep working, but
+# they are not consumed by setup.py or environment.yml. If you add or bump a
+# dependency in one place, update the other so the two paths stay consistent.
+# They are expected to be retired once everyone has migrated to environment.yml.
+#
+# MPI
+# ---
+# `mpi4py` is intentionally commented out — it requires a system-level MPI
+# (openmpi/mpich) and significantly complicates env creation on fresh machines.
+# Install it on demand inside the activated env:
+#     mamba install mpi4py
+# ==============================================================================
+
+name: holopy
+
+channels:
+  - conda-forge
+
+dependencies:
+  # ---- Python ----
+  - python>=3.9,<3.13      # holodeck supports 3.9+ (see setup.py python_requires)
+  - pip                    # needed so the `pip:` section below works
+
+  # ---- Runtime (mirrors requirements.txt) ----
+  - astropy
+  - h5py
+  - ipywidgets             # required for tqdm progress bars to render
+  - kalepy
+  - matplotlib
+  - numpy
+  - scipy
+  - psutil
+  - tqdm
+  - cython<3.0.0           # pinned <3.0.0; see pyproject.toml build-system
+  - schwimmbad
+  - emcee
+  - george
+
+  # ---- Dev / test (mirrors requirements-dev.txt) ----
+  - flake8
+  - jupyter
+  - nbconvert
+  - pytest
+  - pytest-cov
+  - tox
+  - memray
+
+  # ---- Optional (uncomment if needed) ----
+  # - healpy               # some all-sky analysis scripts
+  # - mpi4py               # see note above; prefer `mamba install mpi4py`
+
+  - pip:
+      # PyPI-only packages (not published to conda-forge at the time of writing)
+      - cosmopy
+      - matplotlib-label-lines
+
+      # Editable install of holodeck itself. Triggers the Cython build — see the
+      # header comment "WHAT THE `- -e .` LINE DOES" for details.
+      - -e .

@@ -16,25 +16,61 @@ This package is aimed at providing a comprehensive framework for MBH binary popu
 
 The `holodeck` framework is currently under substantial, active development.  It will not be available on `pypi` (`pip`) or via `conda` install until it has stabilized.  Currently `holodeck` requires `python >= 3.9`, and tests are run on versions `3.9`, `3.10`, `3.11`.
 
-The recommended installation for active development is to:
+Clone the repository first:
 
-0) OPTIONAL: create and activate a new anaconda environment to isolate your build: `conda create --name holo310 python=3.10; conda activate holo310`
-1) Clone the holodeck repository: `git clone https://github.com/nanograv/holodeck.git`
-2) Install the required external packages specified in the requirements file: `pip install -r requirements.txt`.  OPTIONAL: install development requirements: `pip install -r requirements-dev.txt`
-3) Build the required c libraries from holodeck cython code: `cd holodeck; python setup.py build_ext -i`
-4) Perform an development/editable local installation: `python setup.py develop`
+```
+git clone https://github.com/nanograv/holodeck.git
+cd holodeck
+```
+
+Then pick one of the two supported install paths.
+
+### Option A — conda/mamba (recommended)
+
+A single [environment.yml](environment.yml) creates an env named `holopy` with all runtime and development dependencies, and installs `holodeck` in editable mode (including its compiled Cython extensions):
+
+```
+mamba env create -f environment.yml       # fast; use `conda` if you prefer
+mamba activate holopy
+```
+
+If needed, the installation can also be performed with `conda`, however it is much slower 
+to install. In some shells, the environment creation with mamba works but the environment activation
+with mamba does not. In this case, run
+
+```
+conda activate holopy
+```
+
+instead.
+
+If you later edit a `.pyx` file, rerun `pip install -e . --no-deps` to rebuild the C extensions.
+
+### Option B — pip (legacy workflow)
+
+Recommended if you already have a Python env and want to stay on pip. Equivalent to the historical setup:
+
+```
+# optional: isolate with conda
+conda create --name holo310 python=3.10 && conda activate holo310
+
+pip install -r requirements.txt
+pip install -r requirements-dev.txt       # optional, for development
+python setup.py build_ext -i
+python setup.py develop
+```
 
 The 'editable' installation allows the code base to be modified, and have those changes take effect when using the `holodeck` module without having to rebuild/reinstall it.
 
-### MPI
+### MPI (optional, either path)
 
-For some scripts (particularly for generating libraries), an MPI implementation is required (e.g. `openmpi`), along with the [`mpi4py` package](https://github.com/mpi4py/mpi4py).  This is not included as a requirement in the `requirements.txt` file as it significantly increases the installation complexity, and is not needed for many `holodeck` use cases.  If you need the additional functionality, try installing `mpi4py` and if needed an MPI implementation.
+For some scripts (particularly for generating libraries), an MPI implementation is required (e.g. `openmpi`), along with the [`mpi4py` package](https://github.com/mpi4py/mpi4py).  This is not included by default as it significantly increases the installation complexity, and is not needed for many `holodeck` use cases.
+
+- conda/mamba: `mamba install mpi4py` inside the activated `holopy` env
+- homebrew (macOS): `brew install mpi4py` ([includes openmpi](https://mpi4py.readthedocs.io/en/latest/install.html#macos))
+- pip: install an MPI implementation system-wide, then `pip install mpi4py`
 
 To see if you have `mpi4py` installed, run `python -c 'import mpi4py; print(mpi4py.__version__)'` from a terminal.
-
-#### macos
-
-If you are using homebrew on macos, you should be able to simply run: `brew install mpi4py` which will [include the required openmpi implementation](https://mpi4py.readthedocs.io/en/latest/install.html#macos).  If you already have an MPI implementation installed, and you are using anaconda, you should be able to install the `mpy4py` python package with: `conda install mpi4py`.
 
 
 ## Quickstart
