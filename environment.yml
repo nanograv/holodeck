@@ -79,10 +79,11 @@ dependencies:
   - emcee
   - george
 
-  # ---- Dev / test (mirrors requirements-dev.txt) ----
+  # ---- Dev / test (mirrors requirements-dev.txt + nbstripout) ----
   - flake8
   - jupyter
   - nbconvert
+  - nbstripout             # notebook clean filter; see `.git/info/attributes`
   - pytest
   - pytest-cov
   - tox
