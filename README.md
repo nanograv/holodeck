@@ -38,6 +38,8 @@ A single [environment.yml](environment.yml) creates an env named `holopy` with a
 ```
 mamba env create -f environment.yml       # fast; use `conda` if you prefer
 mamba activate holopy
+nbstripout --install
+git config filter.nbstripout.extrakeys 'metadata.kernelspec metadata.language_info.version'
 ```
 
 If needed, the installation can also be performed with `conda`, however it is much slower 
