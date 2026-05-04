@@ -59,7 +59,8 @@ from holodeck.constants import GYR, NWTG, PC, MSOL, SPLC
 _MIN_DENS_RAD__INFL_RAD_MULT = 10.0
 _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 
-# Absolute upper limit on dadt for any hardening method. Invoked only when ENFORCE_SPEED_LIMIT=True
+# Absolute upper limit on dadt for binary hardening
+# Currently implemented only for FixedOuterTime_InnerPL_SAM hardening method.
 _DADT_SPEED_LIMIT = 1.0 * SPLC
 
 class _Hardening(abc.ABC):
@@ -67,7 +68,6 @@ class _Hardening(abc.ABC):
     """
 
     CONSISTENT = None
-    ENFORCE_SPEED_LIMIT = None
 
     @abc.abstractmethod
     def dadt_dedt(self, evo, step, *args, **kwargs):
@@ -92,7 +92,6 @@ class Hard_GW(_Hardening):
     """
 
     CONSISTENT = False
-    ENFORCE_SPEED_LIMIT = False
 
     @staticmethod
     def dadt_dedt(evo, step):
@@ -227,7 +226,6 @@ class CBD_Torques(_Hardening):
     """
 
     CONSISTENT = None
-    ENFORCE_SPEED_LIMIT = False
 
     def __init__(self, f_edd = 0.10, subpc = True):
         """Construct a CBD-Torque instance.
@@ -763,7 +761,6 @@ class Fixed_Time_2PL(_Hardening):
     _INTERP_THRESH_PAD_FACTOR = 5.0      #: allowance for when to use chunking and when to process full array
     _NORM_CHUNK_SIZE = 1e3
     CONSISTENT = True
-    ENFORCE_SPEED_LIMIT = False
     
     def __init__(self, time, mtot, mrat, redz, sepa_init,
                  rchar=100.0*PC, gamma_inner=-1.0, gamma_outer=+1.5,
@@ -1377,7 +1374,6 @@ class Fixed_Time_2PL_SAM(_Hardening):
     """
 
     CONSISTENT = True
-    ENFORCE_SPEED_LIMIT = False
 
     def __init__(self, sam, time, sepa_init=1.0e3*PC, rchar=10.0*PC, gamma_inner=-1.0, gamma_outer=+1.5, num_steps=300):
         """Initialize a `Fixed_Time_2PL_SAM` instance using a provided `Semi_Analytic_Model` instance.
@@ -1414,10 +1410,8 @@ class Fixed_Time_2PL_SAM(_Hardening):
             time, mt, mr,
             sepa_init, rchar, gamma_inner, gamma_outer, num_steps,
         )
-        print(f"before reshape {norm_log10.shape=}")
         # (M*Q,) ==> (M, Q)
         norm_log10 = np.reshape(norm_log10, shape)
-        print(f"after reshape {norm_log10.shape=}, {shape=}")
 
         self._target_time = time
         self._norm = 10.0 ** norm_log10
@@ -1446,28 +1440,21 @@ class Fixed_Time_2PL_SAM(_Hardening):
 
         if norm is None:
             norm = self._norm
-            print(f"before rehshape norm: {mtot.shape=} {norm.shape}")
             # change shape of `norm` from (M,Q) to (M,Q,Z,R)
             mtot, norm = np.broadcast_arrays(
                 mtot, 
                 norm[:, :, np.newaxis, np.newaxis]
             )
 
-        print(f"before defining args: {mtot.shape=} {mrat.shape=} {sepa.shape=} {norm.shape=}")
         args = np.broadcast_arrays(mtot, mrat, sepa, norm)
         shape = args[0].shape
-        print(f"{len(args)=}, {shape=}")
         args = [aa.flatten() for aa in args]
-        print(f"{len(args)=} {args[0].shape=} after flattening")
         mtot, mrat, sepa, norm = args
-        print(f"before function call{mtot.shape=} {mrat.shape=} {sepa.shape=} {norm.shape=}")
         dadt_vals = holo.sams.sam_cyutils.hard_func_2pwl_gw(
             mtot, mrat, sepa, norm,                             # must all be 1darrays of matching size (X,)
             self._rchar, self._gamma_inner, self._gamma_outer   # must all be scalars
         )
-        print(f"after func call {dadt_vals.shape=}")
         dadt_vals = dadt_vals.reshape(shape)
-        print(f"after reshape {dadt_vals.shape=}")
 
         return dadt_vals
     
@@ -1527,7 +1514,7 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
     enforce_physical_params : bool, optional
         If True, require that all model parameters satisfy physical constraints
         (e.g., allowed ranges from `check_params_allowed`). Requires
-        `enforce_speed_limit=True`. Only implemented for inner_model_type=1.
+        `enforce_speed_limit=True`. 
 
     Attributes
     ----------
@@ -1559,8 +1546,6 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
 
     """
     CONSISTENT = True
-    #ENFORCE_SPEED_LIMIT = True
-    #ENFORCE_PHYSICAL_PARAMS = True
     
     def __init__(self, sam, num_steps=300, outer_time=1.0*GYR, rchar=100.0*PC, 
                  nu_inner=-1.0, dadt_rchar=None, inner_time=None,
@@ -1588,11 +1573,6 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
             err = f"enforce_physical_params requires enforce_speed_limit=True"
             log.error(err)
             raise ValueError(err)
-        if enforce_physical_params and inner_model_type !=1:
-            if self._inner_model_type != 1:
-                err = f"enforce_physical_params defined only for inner_model_type=1"
-                log.error(err)
-                raise NotImplementedError(err)
         
         assert np.ndim(outer_time) == 0
         if rchar is None or np.ndim(rchar) != 0:
@@ -1608,8 +1588,6 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
                 log.warning(f"For {inner_model_type=}, setting to None: {dadt_rchar=}, {inner_time=}.")
                 dadt_rchar = None
                 inner_time = None
-            #assert (nu_inner is not None and r_gw_crit_9 is not None and alpha_gw_crit is not None
-            #        and dadt_rchar is None and inner_time is None) 
         elif inner_model_type == 1:
             # set inner hardening using dadt_rchar, r_gw_crit_9, and alpha_gw_crit
             assert np.ndim(dadt_rchar) == 0 and dadt_rchar is not None
@@ -1620,8 +1598,6 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
                 log.warning(f"For {inner_model_type=}, setting to None: {nu_inner=}, {inner_time=}.")
                 nu_inner = None
                 inner_time = None
-            #assert (dadt_rchar is not None and r_gw_crit_9 is not None and alpha_gw_crit is not None
-            #        and nu_inner is None and inner_time is None) 
         elif inner_model_type == 2:
             # set inner hardening using dadt_rchar and nu_inner
             raise NotImplementedError()
@@ -1634,8 +1610,6 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
                 r_gw_crit_9 = None
                 alpha_gw_crit = None
                 inner_time = None
-            #assert (dadt_rchar is not None and nu_inner is not None 
-            #        and r_gw_crit_9 is None and alpha_gw_crit is None and inner_time is None)
         elif inner_model_type == 3:
             # set inner hardening using nu_inner and inner_time
             raise NotImplementedError()
@@ -1668,11 +1642,10 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         print(f"in hardening class: {self._dadt_rchar=}, {self._rchar=}, {self._r_gw_crit_9=}, "
               f"{self._alpha_gw_crit=}, {self._nu_inner=}, {self._inner_time=}") 
 
-        if self._inner_model_type == 1:
-            self._params_allowed = self.check_params_allowed(sam.mtot, sam.mrat)
-            if np.any(self._params_allowed==False):
-                log.warning(f"Found invalid hardening model params!")
-                print(f"{self._params_allowed=}")
+        self._params_allowed = self.check_params_allowed(sam.mtot, sam.mrat)
+        if np.any(self._params_allowed==False):
+            log.warning(f"Found invalid hardening model params!")
+            print(f"{self._params_allowed=}")
 
         if self._enforce_speed_limit:
             if self._enforce_physical_params:
@@ -1681,7 +1654,7 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
                     log.error(err)
                     raise ValueError(err)
             else:
-                log.warning(f'Enforcing speed limit: dadt_max <= {_DADT_SPEED_LIMIT/SPLC}c.')
+                log.warning(f'Enforcing speed limit: |dadt_max| <= {_DADT_SPEED_LIMIT/SPLC}c.')
                 log.warning(f'Checking all dadt values b/c NOT enforcing other physical params (this is slow!)')
                 # (M,) start at rchar, end at the ISCO
                 rmin = utils.rad_isco(sam.mtot)
@@ -1700,7 +1673,7 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
                 )
                 # TO DO: might need to cythonize for performance
                 dadt_vals,rgwc,rzc,rzf = self.dadt(mt, mr, rz, rads)
-                if np.anay(-dadt_vals) > _DADT_SPEED_LIMIT:
+                if np.any(np.abs(dadt_vals)) > _DADT_SPEED_LIMIT:
                     err = f"Invalid hardening model! {np.abs(dadt_vals).max()=:.6g} (>{_DADT_SPEED_LIMIT/SPLC}c)."
                     log.error(err)
                     raise ValueError(err)
@@ -1760,15 +1733,10 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
 
         """        
 
-        if self._enforce_physical_params:
-            self._params_allowed = self.check_params_allowed(sam.mtot, sam.mrat)
-            if np.any(self._params_allowed==False):
-                log.warning(f"Found invalid hardening model params!")
-            
-        #print(f"in dadt class: {self._dadt_rchar=}, {self._rchar=}, {self._r_gw_crit_9=}, "
-        #      f"{self._alpha_gw_crit=}, {self._nu_inner=}, {self._inner_time=}") 
+        if np.any(self._params_allowed==False):
+            log.warning(f"Found invalid hardening model params!")
+            print(f"{self._params_allowed=}")
 
-        #print(f"*** {_sepa.max()=}  {_sepa.min()=} ***")
         m1, m2 = utils.m1m2_from_mtmr(_mtot, _mrat)
 
         redz_char = utils.redz_after(self._outer_time, redz=_redz, age=None)   # redshift at end of 'outer' phase 
@@ -1842,14 +1810,35 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
             raise ValueError(f"{self._inner_model_type=} not defined. valid values are 0-3.")
         
         dadt_vals += dadt_gw
-        
+
+        if self._enforce_speed_limit:
+            if self._enforce_physical_params:
+                if np.any(self._params_allowed==False):
+                    err = f"Invalid hardening model!"
+                    log.error(err)
+                    raise ValueError(err)
+            else:
+                if np.any(np.abs(dadt_vals)) > _DADT_SPEED_LIMIT:
+                    err = f"Invalid hardening model! {np.abs(dadt_vals).max()=:.6g} (>{_DADT_SPEED_LIMIT/SPLC}c)."
+                    log.error(err)
+                    raise ValueError(err)
+
+        if self._enforce_physical_params:
+            self._params_allowed = self.check_params_allowed(sam.mtot, sam.mrat)
+            if np.any(self._params_allowed==False):
+                err = "Found invalid hardening model params!"
+                log.error(err)
+                raise ValueError(err)
+            
+        #print(f"in dadt class: {self._dadt_rchar=}, {self._rchar=}, {self._r_gw_crit_9=}, "
+        #      f"{self._alpha_gw_crit=}, {self._nu_inner=}, {self._inner_time=}")         
         inner_time = -utils.trapz_loglog(-1.0 / dadt_vals, _sepa, axis=-1, cumsum=True)
         inner_time = inner_time[:,:,:,-1]
         redz_final = utils.redz_after(inner_time, redz=redz_char[:,:,:,-1], age=None) # merger redshift 
 
         return dadt_vals, rgw_crit, redz_char, redz_final
 
-    def check_params_allowed(self, _mtot, _mrat, nu_inner_max=10.0):
+    def check_params_allowed(self, _mtot, _mrat, nu_inner_absmax=10.0):
         """
         Return a 2D boolean array specifying which total mass and mass ratio 
         values are allowed for the current set of hardening model params.
@@ -1860,7 +1849,7 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
             Total binary mass values [in grams]. Shape (N,).
         _mrat : array_like
             Mass ratio values (m2/m1 <= 1). Shape (M,).
-        nu_inner_max : float, optional
+        nu_inner_absmax : float, optional
             Maximum allowed absolute value of the inner PL slope (nu_inner). Default: 10.0.
 
         Returns
@@ -1883,22 +1872,36 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
            exceed `_DADT_SPEED_LIMIT`.
         4. Inner slope (nu_inner) constraints:
            The inferred phenomenological hardening rate at r_char must lie
-           within bounds set by ±nu_inner_max.
+           within bounds set by ±nu_inner_absmax.
        
         """
+
+        if nu_inner_absmax < 0:
+            raise ValueError(f"{nu_inner_absmax=} not allowed. Must be > 0.")
 
         mt, mr, = np.broadcast_arrays(
             _mtot[:, np.newaxis],
             _mrat[np.newaxis, :]
         )
-                
-        if self._dadt_rchar >= _DADT_SPEED_LIMIT:
-            log.warning("In check_params_allowed(): self.dadt_rchar >= _DADT_SPEED_LIMIT")
-            modelAllowed = np.zeros_like(mt).astype('bool')
-            return modelAllowed
-        else:
-            modelAllowed = np.ones_like(mt).astype('bool')
 
+        # Check if model params are disallowed for all values of mtot and mrat
+        if self._inner_model_type == 0:
+            if np.abs(self._nu_inner) > nu_inner_absmax:
+                log.warning("In check_params_allowed(): self._nu_inner > nu_inner_absmax")
+                modelAllowed = np.zeros_like(mt).astype('bool')
+                return modelAllowed
+            else:
+                modelAllowed = np.ones_like(mt).astype('bool')        
+        elif self._inner_model_type == 1:
+            if np.abs(self._dadt_rchar) >= _DADT_SPEED_LIMIT:
+                log.warning("In check_params_allowed(): |self.dadt_rchar| >= _DADT_SPEED_LIMIT")
+                modelAllowed = np.zeros_like(mt).astype('bool')
+                return modelAllowed
+            else:
+                modelAllowed = np.ones_like(mt).astype('bool')        
+        else:
+            raise ValueError("`self._inner_model_type` must be 0 or 1.")
+            
         # Normalize total mass to 1e9 solar masses
         m9 = mt / (1.0e9*MSOL)
 
@@ -1918,8 +1921,7 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         modelAllowed[(rgw_crit <= risco)|(rgw_crit >= self._rchar)] = False
         if np.any(modelAllowed == False):
             log.warning("In check_params_allowed(): found rgw_crit <= risco or >= rchar") 
-                
-        #(1-vmax)*lgrdiff + lgadotgw is a min or max depending if dadtrchar > or < dadt_gw_crit
+        
         m1, m2 = utils.m1m2_from_mtmr(mt, mr)
         dadt_gw_crit = utils.gw_hardening_rate_dadt(m1, m2, rgw_crit)
         lgrdiff = np.log10(self._rchar)-np.log10(rgw_crit)
@@ -1927,24 +1929,32 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         # Symmetric mass ratio normalization (η normalized to max=1)
         eta_norm = mr / np.square(1 + mr) * 4
 
-        # Bounds on log10(dadt_rchar) implied by |nu_inner| <= nu_inner_max        
-        min_lgdadtrchar_nuinmax = -1.0*np.log10(eta_norm) + (1-nu_inner_max)*lgrdiff + np.log10(-dadt_gw_crit)
-        max_lgdadtrchar_nuinmax = -1.0*np.log10(eta_norm) + (1+nu_inner_max)*lgrdiff + np.log10(-dadt_gw_crit)
+        # Calculate phenomenological hardning rate at rchar
+        if self._inner_model_type == 0:
+            # calculate dadt_phenom_rchar
+            dadt_phenom_rchar = dadt_gw_crit * ( self._rchar / rgw_crit ) ** (1.0-self._nu_inner)    
+        else:
+            # Scale dadt_phenom_rchar by eta_norm (so derived nu_inner has no mass ratio dependence)
+            dadt_phenom_rchar = self._dadt_rchar * eta_norm
 
-        # Scale dadt_phenom_rchar by eta_norm 
-        dadt_phenom_rchar = self._dadt_rchar * eta_norm
-
-        # check total dadt at rchar against speed limit
+        # Check total dadt at rchar against speed limit
         dadt_gw_rchar = utils.gw_hardening_rate_dadt(m1, m2, self._rchar)
-        if np.any((dadt_gw_rchar+dadt_phenom_rchar) >= _DADT_SPEED_LIMIT):
-            log.warning("found total dadt(rchar) > _DADT_SPEED_LIMIT")
-            modelAllowed[(dadt_gw_rchar+dadt_phenom_rchar)>=_DADT_SPEED_LIMIT] = False
-        
-        # Check if model obeys criterion: |nu_inner| < nu_inner,max
-        modelAllowed[min_lgdadtrchar_nuinmax > max_lgdadtrchar_nuinmax] = False
-        modelAllowed[np.log10(-dadt_phenom_rchar) < min_lgdadtrchar_nuinmax] = False
-        modelAllowed[np.log10(-dadt_phenom_rchar) > max_lgdadtrchar_nuinmax] = False
+        if np.any(np.abs(dadt_gw_rchar+dadt_phenom_rchar) >= _DADT_SPEED_LIMIT):
+            log.warning("found total |dadt(rchar)| > _DADT_SPEED_LIMIT")
+            modelAllowed[np.abs(dadt_gw_rchar+dadt_phenom_rchar)>=_DADT_SPEED_LIMIT] = False
 
+        # We don't need additional checks if inner_model_type=0 b/c we checked nu_inner globally above
+        if self._inner_model_type == 1:
+            # Bounds on log10(dadt_rchar) implied by |nu_inner| <= nu_inner_absmax        
+            # (1-nu)*lgrdiff + lgdadtgw is a min or max depending if dadtrchar > or < dadt_gw_crit
+            min_lgdadtrchar_nuinmax = -1.0*np.log10(eta_norm) + (1-nu_inner_absmax)*lgrdiff + np.log10(-dadt_gw_crit)
+            max_lgdadtrchar_nuinmax = -1.0*np.log10(eta_norm) + (1+nu_inner_absmax)*lgrdiff + np.log10(-dadt_gw_crit)
+        
+            # Check if model obeys criterion: |nu_inner| < nu_inner,max
+            modelAllowed[min_lgdadtrchar_nuinmax > max_lgdadtrchar_nuinmax] = False
+            modelAllowed[np.log10(-dadt_phenom_rchar) < min_lgdadtrchar_nuinmax] = False
+            modelAllowed[np.log10(-dadt_phenom_rchar) > max_lgdadtrchar_nuinmax] = False
+        
         return modelAllowed
 
 # =================================================================================================
@@ -2303,14 +2313,13 @@ def allowed_param_range(mtot, mrat, alpha, rchar, r9rg, inner_model_type=1,
                         risco_in_rg=6.0, nu_inner_absmax=10.0):
     """
     Compute allowed parameter ranges for FixedOuterTime_InnerPL_SAM hardening 
-    with inner_model_types 0 (not implemented yet) or 1.
 
     This function evaluates the physically allowed range of the critical radius for
     transition to the GW regime, for Mtot=1e9 Msun binaries, in gravitational radii (r9rg)
 
-    It also evaluates the physically allowed range of either:
-      - [Model 0] The power-law index (nu_inner) for the phenomenological hardening rate 
-      - [Model 1] The phenomenological hardening rate at rchar (dadt_rchar)
+    It also evaluates the physically allowed range of the power-law index 
+    (nu_inner) for the phenomenological hardening rate and the 
+    phenomenological hardening rate at rchar (dadt_rchar)
 
     under constraints imposed by:
       - The ISCO radius
@@ -2358,9 +2367,9 @@ def allowed_param_range(mtot, mrat, alpha, rchar, r9rg, inner_model_type=1,
 
     """
 
-    # Check for valid inner_model_type
-    if inner_model_type not in (0,1):
-        raise ValueError(f"{inner_model_type=} not defined. Must be 0 or 1.")
+    ## Check for valid inner_model_type
+    #if inner_model_type not in (0,1):
+    #    raise ValueError(f"{inner_model_type=} not defined. Must be 0 or 1.")
 
     # Check for valid nu_inner_absmax (valid range is -nu_inner_absmax to +nu_inner_absmax, 
     # unless constrained by 'speed limit')
@@ -2378,7 +2387,7 @@ def allowed_param_range(mtot, mrat, alpha, rchar, r9rg, inner_model_type=1,
 
     # Invalidate r9rg values outside allowed range (note: modifies r9rg in place)
     if np.any(min_lgr9rg > max_lgr9rg):
-        log.warning(f"{min_lgr9rg=} > {max_lgr9rg=}")
+        log.warning("Found min_lgr9rg > max_lgr9rg.")
 
     r9rg[(np.log10(r9rg)<min_lgr9rg)|(np.log10(r9rg)>max_lgr9rg)] = np.nan
 
@@ -2396,7 +2405,7 @@ def allowed_param_range(mtot, mrat, alpha, rchar, r9rg, inner_model_type=1,
     min_lgdadtgwcrit = np.log10(-utils.gw_hardening_rate_dadt(m1, m2, max_rgw_crit))
     max_lgdadtgwcrit = np.log10(-utils.gw_hardening_rate_dadt(m1, m2, min_rgw_crit))
     if np.any(min_lgdadtgwcrit >= max_lgdadtgwcrit):
-        log.error('something is wrong. min >= max in allowed_param_range().')
+        log.error('something is wrong. min_lgdadtgwcrit >= max_lgdadtgwcrit.')
         raise ValueError()
 
     lgrdiff = np.log10(rchar)-np.log10(rgw_crit)
@@ -2407,34 +2416,52 @@ def allowed_param_range(mtot, mrat, alpha, rchar, r9rg, inner_model_type=1,
     
     # Compute allowed bounds on nu_inner and dadt_rchar
     #(1-vmax)*lgrdiff + lgadotgw is a min or max depending if dadtrchar > or < dadt_gw_crit
-    if inner_model_type == 0:
-        # Allowed dadt_rchar range for given mtot, mrat, rchar, alpha, a & r9rg
-        # and allowed nu_inner range 
-        
-        # max nu_inner corresponds to min log(-dadt(rchar))
-        max_nuin = nu_inner_absmax
-        min_lgdadtrchar = -1.0*np.log10(eta_norm) + (1-nu_inner_absmax)*lgrdiff + lgdadtgwcrit
-        
-        # min nu_inner corresponds to max log(-dadt(rchar))
-        max_lgdadtrchar_nuinmax = -1.0*np.log10(eta_norm) + (1+nu_inner_absmax)*lgrdiff + lgdadtgwcrit
-        if max_lgdadtrchar_nuinmax > np.log10(_DADT_SPEED_LIMIT*eta_norm):
-            max_lgdadtrchar = np.log10(_DADT_SPEED_LIMIT*eta_norm)
-            min_nuin = 1 + ( lgdadtgwcrit - max_lgdadtrchar ) / lgrdiff 
-        else:
-            max_lgdadtrchar = copy(max_lgdadtrchar_nuinmax)
-            min_nuin = -1.0*nu_inner_absmax
 
-    else:
-        # Allowed nu_inner range 
-        max_nuin = nu_inner_absmax 
-        min_nuin = -1.0*nu_inner_absmax
+    # Allowed dadt_rchar range for given mtot, mrat, rchar, alpha, a & r9rg
+    # and allowed nu_inner range 
         
-        # Allowed dadt_rchar range for given mtot, mrat, rchar, alpha, a& r9rg
-        min_lgdadtrchar = -1.0*np.log10(eta_norm) + (1-nu_inner_absmax)*lgrdiff + lgdadtgwcrit
-        max_lgdadtrchar_nuinmax = -1.0*np.log10(eta_norm) + (1+nu_inner_absmax)*lgrdiff + lgdadtgwcrit
-        max_lgdadtrchar = np.minimum(max_lgdadtrchar_nuinmax, np.log10(_DADT_SPEED_LIMIT))
-        if np.any(min_lgdadtrchar > max_lgdadtrchar):
-            log.warning(f"{min_lgdadtrchar=} > {max_lgdadtrchar=}")
+    # max nu_inner corresponds to min log(-dadt(rchar))
+    max_nuin = nu_inner_absmax
+    min_lgdadtrchar = -1.0*np.log10(eta_norm) + (1-nu_inner_absmax)*lgrdiff + lgdadtgwcrit
+
+    # min nu_inner corresponds to max log(-dadt(rchar))
+    max_lgdadtrchar_nuinmax = -1.0*np.log10(eta_norm) + (1+nu_inner_absmax)*lgrdiff + lgdadtgwcrit
+    print(f"{max_lgdadtrchar_nuinmax.shape=}, {eta_norm.shape=}")
+    if np.any(max_lgdadtrchar_nuinmax > np.log10(_DADT_SPEED_LIMIT*eta_norm)):
+        # reducing max dadt_rchar will always increase min_nuin, 
+        # so min_nuin will be > -nu_inner_absmax (less negative) by definition
+        max_lgdadtrchar = np.minimum(max_lgdadtrchar_nuinmax, np.log10(_DADT_SPEED_LIMIT*eta_norm))
+        min_nuin = 1 + ( lgdadtgwcrit - max_lgdadtrchar ) / lgrdiff 
+        print(f"{max_lgdadtrchar.shape=} {min_nuin.shape=}")
+    else:
+        max_lgdadtrchar = copy(max_lgdadtrchar_nuinmax)
+        min_nuin = -1.0*nu_inner_absmax
+    
+    #if inner_model_type == 0:
+    #    # Allowed dadt_rchar range for given mtot, mrat, rchar, alpha, a & r9rg
+    #    # and allowed nu_inner range 
+    #    
+    #    # max nu_inner corresponds to min log(-dadt(rchar))
+    #    #max_nuin = nu_inner_absmax
+    #    #min_lgdadtrchar = -1.0*np.log10(eta_norm) + (1-nu_inner_absmax)*lgrdiff + lgdadtgwcrit
+    #    
+    #    # min nu_inner corresponds to max log(-dadt(rchar))
+    #    #max_lgdadtrchar_nuinmax = -1.0*np.log10(eta_norm) + (1+nu_inner_absmax)*lgrdiff + lgdadtgwcrit
+    #    #if max_lgdadtrchar_nuinmax > np.log10(_DADT_SPEED_LIMIT*eta_norm):
+    #    #    max_lgdadtrchar = np.log10(_DADT_SPEED_LIMIT*eta_norm)
+    #    #    min_nuin = 1 + ( lgdadtgwcrit - max_lgdadtrchar ) / lgrdiff 
+    #    #else:
+    #    #    max_lgdadtrchar = copy(max_lgdadtrchar_nuinmax)
+    #    #    min_nuin = -1.0*nu_inner_absmax
+    #else:
+    #    # Allowed nu_inner range 
+    #    #max_nuin = nu_inner_absmax 
+    #    min_nuin = -1.0*nu_inner_absmax
+    #    
+    #    # Allowed dadt_rchar range for given mtot, mrat, rchar, alpha, a& r9rg
+    #    #min_lgdadtrchar = -1.0*np.log10(eta_norm) + (1-nu_inner_absmax)*lgrdiff + lgdadtgwcrit
+    #    #max_lgdadtrchar_nuinmax = -1.0*np.log10(eta_norm) + (1+nu_inner_absmax)*lgrdiff + lgdadtgwcrit
+    #    max_lgdadtrchar = np.minimum(max_lgdadtrchar_nuinmax, np.log10(_DADT_SPEED_LIMIT))
 
     # Absolute bounds on dadt_rchar for given mtot, mrat, rchar, & alpha (independent of specific r9rg choice)
     absmin_lgdadtrchar = -1.0*np.log10(eta_norm) + (1-max_nuin)*max_lgrdiff + min_lgdadtgwcrit
@@ -2443,12 +2470,12 @@ def allowed_param_range(mtot, mrat, alpha, rchar, r9rg, inner_model_type=1,
 
     # Safety checks
     if np.any(absmin_lgdadtrchar > absmax_lgdadtrchar):
-        log.warning(f"{absmin_lgdadtrchar=} > {absmax_lgdadtrchar=}")
+        log.warning("Found absmin_lgdadtrchar > absmax_lgdadtrchar.")
     if np.any(min_lgdadtrchar > max_lgdadtrchar):
-        log.warning(f"{min_lgdadtrchar=} > {max_lgdadtrchar=}")
+        log.warning("Found min_lgdadtrchar > max_lgdadtrchar.")
     if np.any(min_nuin > max_nuin):
         log.error(f"{min_nuin=} > {max_nuin=}")
-    if np.any(min_nuin) > nu_inner_absmax or np.any(max_nuin) > nu_inner_absmax:
+    if np.any(np.abs(min_nuin)) > nu_inner_absmax or np.any(np.abs(max_nuin)) > nu_inner_absmax:
         log.error(f"{min_nuin=} or {max_nuin=} > {nu_inner_absmax}.")
         
     return (
