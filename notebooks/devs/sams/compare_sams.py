@@ -73,10 +73,12 @@ class Test_SAM:
             self.set_sam_params_grid(tau=hard_t, ai=hard_ai, rc=hard_rc, 
                                      nin=hard_nin, nout=hard_nout, mf = gsmf_flag)
         else:
-            print(f'in TestSAM, defaults: {tout_default=} {nuin_default=} {dadt_default=} {alph_default=} {r9_default=} {rch_default=}')
+            print(f'in TestSAM, defaults: {tout_default=} {nuin_default=} {dadt_default=} '
+                  f'{alph_default=} {r9_default=} {rch_default=}')
             self.set_sam_params_manual(tau=hard_t, var_value=var_value, tout_default=tout_default,
                                        nuin_default=nuin_default, dadt_default=dadt_default,
-                                       alph_default=alph_default, r9_default=r9_default,rch_default=rch_default)
+                                       alph_default=alph_default, r9_default=r9_default,
+                                       rch_default=rch_default)
             print(f"pars: {self.PARS['hard_outer_time']=} {self.PARS['hard_rchar']=} {self.PARS['hard_dadt_rchar']=} "
                   f"{self.PARS['hard_r_gw_crit_9']=} {self.PARS['hard_alpha_gw_crit']=}")
 
@@ -347,16 +349,14 @@ class Test_SAM:
                 hard_inner_model_type=0,
                 hard_outer_time=var_value,     # [Gyr]
                 hard_rchar=rch_default,        # [pc]
-                #hard_nu_inner=-1.0,
                 hard_nu_inner=nuin_default,
                 hard_gw_crit_units='rg',
                 hard_r_gw_crit_9=r9_default, 
-                #hard_alpha_gw_crit=-0.25, 
                 hard_alpha_gw_crit=alph_default, 
                 hard_dadt_rchar=None, 
                 hard_inner_time=None,
                 gsmf = holo.sams.GSMF_Double_Schechter()
-            )
+            )            
         elif self.model_type == 'new_hardening_type0_nuivar':
             # set inner hardening using nu_inner, r_gw_crit_9, and alpha_gw_crit
             self.PARS = dict(
@@ -367,7 +367,6 @@ class Test_SAM:
                 hard_nu_inner=var_value,
                 hard_gw_crit_units='rg',
                 hard_r_gw_crit_9=r9_default, 
-                #hard_alpha_gw_crit=-0.25, 
                 hard_alpha_gw_crit=alph_default, 
                 hard_dadt_rchar=None, 
                 hard_inner_time=None,
@@ -403,6 +402,21 @@ class Test_SAM:
                 hard_inner_time=None,
                 gsmf = holo.sams.GSMF_Double_Schechter()
             )
+        elif self.model_type == 'new_hardening_type0_rchvar':
+            # set inner hardening using dadt_rchar, r_gw_crit_9, and alpha_gw_crit
+            self.PARS = dict(
+                desc='set inner hardening using nu_inner, r_gw_crit_9, and alpha_gw_crit',
+                hard_inner_model_type=0,
+                hard_outer_time=tout_default,     # [Gyr]
+                hard_rchar=var_value,        # [pc]
+                hard_nu_inner=nuin_default,
+                hard_gw_crit_units='rg',
+                hard_r_gw_crit_9=r9_default, 
+                hard_alpha_gw_crit=alph_default, 
+                hard_dadt_rchar=None, 
+                hard_inner_time=None,
+                gsmf = holo.sams.GSMF_Double_Schechter()                
+            )            
         elif self.model_type == 'new_hardening_type1_toutvar':
             # set inner hardening using dadt_rchar, r_gw_crit_9, and alpha_gw_crit
             self.PARS = dict(
@@ -477,8 +491,7 @@ class Test_SAM:
                 hard_nu_inner=None,
                 hard_inner_time=None,
                 gsmf = holo.sams.GSMF_Double_Schechter()                
-            )
-        
+            )    
         else:
             modlist = ['old', 'old_2s', 'old_rc100', 'ph15', 'astr', 'astr_nuo0', 'astr_rc100',
                        'ph15_nuivar', 'ph15_muvar', 'ph15_epsmuvar', 'ph15_phivar', 'ph15_Mphivar',
@@ -486,8 +499,9 @@ class Test_SAM:
                        'astr_rc100_phi10var', 'astr_rc100_phi20var', 
                        'astr_rc100_Mc0var', 'astr_rc100_Mc1var', 'astr_rc100_Mc2var',
                        'new_hardening_type0_toutvar', 'new_hardening_type0_nuivar', 
-                       'new_hardening_type0_r9var', 'new_hardening_type0_alphvar', 
-                       'new_hardening_type1']
+                       'new_hardening_type0_r9var', 'new_hardening_type0_alphvar', 'new_hardening_type0_rchvar',
+                       'new_hardening_type1_toutvar', 'new_hardening_type1_dadtvar', 
+                       'new_hardening_type1_r9var', 'new_hardening_type1_alphvar','new_hardening_type1_rchvar']
 
             raise ValueError(f"{self.model_type=} is not defined. Options are {[m for m in modlist]}.")
 
@@ -705,9 +719,7 @@ def create_sams(nreals=5, nloud=5, fpath=_PATH_DATA, suite_type='grid', hard_typ
 
     elif 'new_hardening' in suite_type:
 
-        if 'type0' in suite_type and hard_type != 'fixed2PL':
-            raise ValueError(f"{suite_type=} requires hard_type='fixed2PL'.")
-        if 'type1' in suite_type and hard_type != 'fixedOuter':
+        if hard_type != 'fixedOuter':
             raise ValueError(f"{suite_type=} requires hard_type='fixedOuter'.")
             
         if gpfflag is not None:
@@ -981,7 +993,7 @@ def sepa_emit(mtot, fgw):
     return ( NWTG * mtot / (fgw * np.pi) **2 )**(1.0/3)
 
 def plot_dadt(sam_data, distance_units='pc', fixedTime='total', 
-              max_to_plot=4, extra_panels=False, verbose=False):
+              max_to_plot=4, extra_panels=False, fname_extra='', verbose=False):
     
     if distance_units == 'pc':
         xlim=[1e-8,1e5]
@@ -995,7 +1007,7 @@ def plot_dadt(sam_data, distance_units='pc', fixedTime='total',
     
     # Make the plot
     if extra_panels:
-        fig = plt.figure(figsize=(12,9))
+        fig = plt.figure(figsize=(12,7))
         first_plot_index = 231
     else:
         fig = plt.figure(figsize=(12,4))
@@ -1123,9 +1135,9 @@ def plot_dadt(sam_data, distance_units='pc', fixedTime='total',
                 print('q=', sam.mrat)
                 print('redz=', sam.redz)
 
-        print(f"in compare_sams.plot_dadt(), plotting data for hard pars: ")
-        print(f"tout={hard._outer_time:.4g} rchar={hard._rchar:.4g} dadt={hard._dadt_rchar:.4g} "
-              f"r9={hard._r_gw_crit_9:.4g} alph={hard._alpha_gw_crit:.4g}")
+            print(f"hard pars in compare_sams.plot_dadt(): "
+                  f"tout={hard._outer_time:.4g} rchar={hard._rchar:.4g} dadt={hard._dadt_rchar:.4g} "
+                  f"r9={hard._r_gw_crit_9:.4g} alph={hard._alpha_gw_crit:.4g}")
 
         i_plot = 0
         for i in np.arange(0,sam.mtot.size,mt_nskip):
@@ -1143,7 +1155,7 @@ def plot_dadt(sam_data, distance_units='pc', fixedTime='total',
                             alpha=0.7,color=colors[i_plot],label=f'frst={frst_min:.2g}Hz')
             #ax2.plot([sepa_em,sepa_em],[1e-3,1e11],ls=fgw_ls[fi],color=colors[i])
             #print(f'{fi=},{fgw_ls[fi]}, {fem}')
-            if i_plot==max_to_plot and n==len(sam_data)-1:
+            if i_plot==max_to_plot-1 and n==len(sam_data)-1:
                 flhandles += [flmi]
                     
             a_late = sepa_emit(sam.mtot[i], 1.0/(30*YR)) 
@@ -1214,4 +1226,13 @@ def plot_dadt(sam_data, distance_units='pc', fixedTime='total',
                      f' nu_in={hard._gamma_inner}, nu_out={hard._gamma_outer}\n'
                      f'Mtot=({sam.mtot.min()/MSOL:.2g},{sam.mtot.max()/MSOL:.2g})Msun, '
                      f'q=({sam.mrat.min():.2g},{sam.mrat.max():.2g})')
+    else:
+        plt.suptitle(fname_extra+"\n"
+                     f"tout={hard._outer_time:.2g}, "
+                     f"rch={hard._rchar:.2g}pc, "
+                     f"r9={hard._r_gw_crit_9:.2g}{hard._gw_crit_units}, "
+                     f"alph={hard._alpha_gw_crit:.2g}, "
+                     f"dadt={hard._dadt_rchar}, "
+                     f"nuin={hard._nu_inner}")
+        
     fig.subplots_adjust(wspace=0.3,top=0.85, right=0.95)

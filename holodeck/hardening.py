@@ -1374,7 +1374,6 @@ class Fixed_Time_2PL_SAM(_Hardening):
     """
 
     CONSISTENT = True
-
     def __init__(self, sam, time, sepa_init=1.0e3*PC, rchar=10.0*PC, gamma_inner=-1.0, gamma_outer=+1.5, num_steps=300):
         """Initialize a `Fixed_Time_2PL_SAM` instance using a provided `Semi_Analytic_Model` instance.
 
