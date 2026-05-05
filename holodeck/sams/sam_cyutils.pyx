@@ -235,7 +235,7 @@ cdef double _hard_func_innerpwl_model0(double mtot, double mrat, double sepa,
 
 @cython.cdivision(True)
 cdef double _hard_func_innerpwl_model1(double mtot, double mrat, double sepa, 
-                                       double dadt_rchar, double rchar, 
+                                       double dadt_rchar, double rchar,
                                        double r9, double alpha_gwcrit):
 
     cdef double r_gwcrit = r9 * pow(mtot/(1.0e9*MY_MSOL), alpha_gwcrit+1)
@@ -249,7 +249,7 @@ cdef double _hard_func_innerpwl_model1(double mtot, double mrat, double sepa,
     if r_gwcrit < rchar:
         dadt_gw_crit = hard_gw(mtot, mrat, r_gwcrit)
         eta_norm = 4 * mrat / (1 + mrat) / (1 + mrat) 
-        nu_inner = 1.0 - (log(-dadt_gw_crit)-log(-dadt_rchar*eta_norm))/(log(r_gwcrit)-log(rchar))
+        nu_inner = 1.0 - (log10(-dadt_gw_crit)-log10(-dadt_rchar*eta_norm))/(log10(r_gwcrit)-log10(rchar))
         dadt = dadt_gw_crit * ( sepa / r_gwcrit ) ** (1.0-nu_inner)
     
     return dadt
@@ -580,8 +580,8 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
             
         _dynamic_binary_number_at_fobs_innerpwl(
             fobs_orb, hard._num_steps, hard._outer_time, 
-            hard._inner_model_type, dadt_rchar, hard._rchar, nu_inner,  
-            hard._r_gw_crit_9, hard_gwcrit_units_rg, hard._alpha_gw_crit,
+            hard._inner_model_type, dadt_rchar, hard._rchar_9, hard._alpha_char, 
+            nu_inner, hard._r_gw_crit_9, hard_gwcrit_units_rg, hard._alpha_gw_crit,
             nden, sam.mtot, sam.mrat, sam.redz, gmt_time,
             cosmo._grid_z, cosmo._grid_dcom, cosmo._grid_age,
             # output:
@@ -627,7 +627,8 @@ cdef int _dynamic_binary_number_at_fobs_innerpwl(
     double hard_outer_time,
     int hard_inner_model_type,
     double hard_dadt_rchar,
-    double hard_rchar,
+    double hard_rchar_9,
+    double hard_alpha_char,
     double hard_nu_inner,  
     double hard_r_gwcrit_9,
     int hard_gwcrit_units_rg,
@@ -693,9 +694,9 @@ cdef int _dynamic_binary_number_at_fobs_innerpwl(
     cdef int n_freq = target_fobs_orb.size
     cdef int n_interp = redz_interp_grid.size
     cdef double age_universe = tage_interp_grid[n_interp - 1]
-    # note: sepa_init not defined for this hardening model; hardening tracked only below hard_rchar
-    cdef double hard_rchar_log10 = log10(hard_rchar)
-
+    ## note: sepa_init not defined for this hardening model; hardening tracked only below hard_rchar
+    cdef double hard_rchar_log10
+    
     cdef int ii, jj, kk, ff, step, interp_left_idx, interp_right_idx, new_interp_idx
     cdef double mt, mr, risco, dx, new_redz, gmt, ftarget, target_frst_orb
     cdef double sepa_log10, sepa, sepa_left, sepa_right, dadt_left, dadt_right
@@ -724,6 +725,8 @@ cdef int _dynamic_binary_number_at_fobs_innerpwl(
 
         # Determine separation step-size, in log10-space, to integrate from hard_rchar to ISCO
         risco = 3.0 * MY_SCHW * mt     # ISCO is 3x combined schwarzschild radius
+        hard_rchar = hard_rchar_9 * pow(mt/(1.0e9*MY_MSOL), hard_alpha_char+1)
+        hard_rchar_log10 = log10(hard_rchar)
         dx = (hard_rchar_log10 - log10(risco)) / num_steps
 
         for jj in range(n_mrat):
