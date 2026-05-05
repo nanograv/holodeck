@@ -1488,20 +1488,23 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
     rchar : float, optional
         Characteristic separation at which the inner hardening model is normalized [cm].
     nu_inner : float, optional
-        Power-law slope of the inner hardening rate. Used only for `inner_model_type=0`.
+        Power-law slope of the inner hardening rate. Default: -0.5.
+        Used only for `inner_model_type=0`.
     dadt_rchar : float, optional
-        Hardening rate for equal=mass binaries at `rchar` [cm/s].
+        Hardening rate for equal=mass binaries at `rchar` [cm/s]. Default: None
         Sets power-law slope for `inner_model_type=1`.
     inner_time : float, optional
-        Total duration of inner evolution phase (not yet implemented).
+        Total duration of inner evolution phase (not yet implemented). Default: None
     gw_crit_units : {'rg', 'pc'}, optional
         Specifies if GW transition radius is in gravitational radii [rg] or parsec [pc].
+        Default: 'rg'.
     r_gw_crit_9 : float, optional
-        GW transition radius for M=1e9 Msun binaries. Units determined by `gw_crit_units`.
+        GW transition radius for M=1e9 Msun binaries. Default: 1e3.
+        Units determined by `gw_crit_units`.
     alpha_gw_crit : float, optional
-        Power-law index governing mass dependence of the GW transition radius.
+        Power-law index governing mass dependence of the GW transition radius. Default: -0.25.
     inner_model_type : int, optional
-        Flag controlling how the inner hardening model is parameterized:
+        Flag controlling how the inner hardening model is parameterized (Default: 0):
         - 0 : Power-law model defined by (`nu_inner`, `r_gw_crit_9`, `alpha_gw_crit`)
         - 1 : Power-law inferred from (`dadt_rchar`, `r_gw_crit_9`, `alpha_gw_crit`)
               (physically safer; avoids superluminal hardening)
@@ -1509,11 +1512,11 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         - 3 : (`nu_inner`, `inner_time`) [not implemented]
     enforce_speed_limit : bool, optional
         If True, returns error if hardening rate exceeds maximum allowed (`_DADT_SPEED_LIMIT`)
-        for any of the binaries evolved.
+        for any of the binaries evolved. Default: False
     enforce_physical_params : bool, optional
         If True, require that all model parameters satisfy physical constraints
         (e.g., allowed ranges from `check_params_allowed`). Requires
-        `enforce_speed_limit=True`. 
+        `enforce_speed_limit=True`. Default: False
 
     Attributes
     ----------
@@ -1546,10 +1549,11 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
     """
     CONSISTENT = True
     
-    def __init__(self, sam, num_steps=300, outer_time=1.0*GYR, rchar=100.0*PC, 
-                 nu_inner=-1.0, dadt_rchar=None, inner_time=None,
-                 gw_crit_units='rg', r_gw_crit_9=1e3, alpha_gw_crit=0.5, 
-                 inner_model_type=0, enforce_speed_limit=False, 
+    def __init__(self, sam, num_steps=300, outer_time=1.0*GYR, 
+                 inner_model_type=0, rchar=10.0*PC, 
+                 nu_inner=-0.5, dadt_rchar=None, inner_time=None,
+                 gw_crit_units='rg', r_gw_crit_9=1e3, alpha_gw_crit=-0.25, 
+                 enforce_speed_limit=False, 
                  enforce_physical_params=False):
         """
         Initialize the binary hardening model.
@@ -1722,7 +1726,6 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
 
         if np.any(self._params_allowed==False):
             log.warning(f"Found invalid hardening model params!")
-            print(f"{self._params_allowed=}")
 
         m1, m2 = utils.m1m2_from_mtmr(_mtot, _mrat)
 
