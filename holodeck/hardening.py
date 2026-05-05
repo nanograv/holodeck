@@ -1549,7 +1549,8 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
     def __init__(self, sam, num_steps=300, outer_time=1.0*GYR, rchar=100.0*PC, 
                  nu_inner=-1.0, dadt_rchar=None, inner_time=None,
                  gw_crit_units='rg', r_gw_crit_9=1e3, alpha_gw_crit=0.5, 
-                 inner_model_type=0, enforce_speed_limit=False, enforce_physical_params=False):
+                 inner_model_type=0, enforce_speed_limit=False, 
+                 enforce_physical_params=False):
         """
         Initialize the binary hardening model.
 
@@ -1569,13 +1570,14 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         import holodeck.sams.sam_cyutils  # noqa
 
         if enforce_physical_params and not enforce_speed_limit:
-            err = f"enforce_physical_params requires enforce_speed_limit=True"
+            err = "enforce_physical_params requires enforce_speed_limit=True"
             log.error(err)
             raise ValueError(err)
         
-        assert np.ndim(outer_time) == 0
+        if np.ndim(outer_time) != 0:
+            raise ValueError("`outer_time` must be a scalar (ndim=0).")
         if rchar is None or np.ndim(rchar) != 0:
-            raise ValueError(f"Keyword `rchar` cannot be None & must have ndim=0.")
+            raise ValueError("`rchar` cannot be None & must be a scalar (ndim=0).")
 
         if inner_model_type == 0:
             # set inner hardening using nu_inner, r_gw_crit_9, and alpha_gw_crit
@@ -1597,34 +1599,17 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
                 log.warning(f"For {inner_model_type=}, setting to None: {nu_inner=}, {inner_time=}.")
                 nu_inner = None
                 inner_time = None
+                
         elif inner_model_type == 2:
             # set inner hardening using dadt_rchar and nu_inner
-            raise NotImplementedError()
+            raise NotImplementedError("inner_model_type=2 is not yet implemented.")
             
-            assert np.ndim(nu_inner) == 0 and nu_inner is not None
-            assert np.ndim(dadt_rchar) == 0 and dadt_rchar is not None
-            if r_gw_crit_9 is not None or alpha_gw_crit is not None or inner_time is not None:
-                msg = f"For {inner_model_type=}, setting to None: {r_gw_crit_9=}, {alpha_gw_crit=}, {inner_time=}."
-                log.warning(msg)
-                r_gw_crit_9 = None
-                alpha_gw_crit = None
-                inner_time = None
         elif inner_model_type == 3:
             # set inner hardening using nu_inner and inner_time
-            raise NotImplementedError()
+            raise NotImplementedError("inner_model_type=3 is not yet implemented.")
 
-            assert np.ndim(nu_inner) == 0 and nu_inner is not None
-            assert np.ndim(inner_time) == 0 and inner_time is not None
-            if r_gw_crit_9 is not None or alpha_gw_crit is not None or dadt_rchar is not None:
-                msg = f"For {inner_model_type=}, setting to None: {r_gw_crit_9=}, {alpha_gw_crit=}, {dadt_rchar=}."
-                log.warning(msg)
-                r_gw_crit_9 = None
-                alpha_gw_crit = None
-                dadt_rchar = None
-            #assert (nu_inner is not None and inner_time is not None 
-            #        and dadt_rchar is None and r_gw_crit_9 is None and alpha_gw_crit is None)      
         else:
-            raise ValueError(f"Invalid {inner_model_type=}. Valid model flags are 0 - 3.")
+            raise ValueError(f"Invalid {inner_model_type=}. Must be one of: 0, 1, 2, 3.")
         
         self._inner_model_type = inner_model_type  
         self._enforce_physical_params = enforce_physical_params # throw error if not physical
@@ -1632,19 +1617,16 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         self._outer_time = outer_time        # [s]
         self._num_steps = num_steps
         self._rchar = rchar                  # [cm]
-        self._nu_inner = nu_inner      # None for model 1
+        self._nu_inner = nu_inner            # None for model 1
         self._dadt_rchar = dadt_rchar        # [cm/s]; None for models 0 and 3
         self._inner_time = inner_time        # [s]; None for models 0-2
         self._r_gw_crit_9 = r_gw_crit_9      # units defined by `gw_crit_units`; None for models 2 & 3
         self._gw_crit_units = gw_crit_units  # 'rg' or 'pc'; None for models 2 & 3
         self._alpha_gw_crit = alpha_gw_crit  # determines mass scaling of r_gw_crit; None for models 2 & 3
-        print(f"in hardening class: {self._dadt_rchar=}, {self._rchar=}, {self._r_gw_crit_9=}, "
-              f"{self._alpha_gw_crit=}, {self._nu_inner=}, {self._inner_time=}") 
 
         self._params_allowed = self.check_params_allowed(sam.mtot, sam.mrat)
         if np.any(self._params_allowed==False):
             log.warning(f"Found invalid hardening model params!")
-            print(f"{self._params_allowed=}")
 
         if self._enforce_speed_limit:
             if self._enforce_physical_params:
@@ -1653,8 +1635,10 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
                     log.error(err)
                     raise ValueError(err)
             else:
-                log.warning(f'Enforcing speed limit: |dadt_max| <= {_DADT_SPEED_LIMIT/SPLC}c.')
-                log.warning(f'Checking all dadt values b/c NOT enforcing other physical params (this is slow!)')
+                log.warning(
+                    f"Enforcing speed limit: |dadt_max| <= {_DADT_SPEED_LIMIT/SPLC:.3g}c."
+                    f"Checking all dadt values b/c NOT enforcing other physical params (this is slow!)"
+                )
                 # (M,) start at rchar, end at the ISCO
                 rmin = utils.rad_isco(sam.mtot)
                 # Choose steps for each binary, log-spaced between rmin and rmax
@@ -1672,8 +1656,12 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
                 )
                 # TO DO: might need to cythonize for performance
                 dadt_vals,rgwc,rzc,rzf = self.dadt(mt, mr, rz, rads)
-                if np.any(np.abs(dadt_vals)) > _DADT_SPEED_LIMIT:
-                    err = f"Invalid hardening model! {np.abs(dadt_vals).max()=:.6g} (>{_DADT_SPEED_LIMIT/SPLC}c)."
+                max_dadt = np.abs(dadt_vals).max()
+                if max_dadt > _DADT_SPEED_LIMIT:
+                    err = (
+                        f"Invalid hardening model! max |dadt| = {max_dadt:.6g} "
+                        f"exceeds limit of {_DADT_SPEED_LIMIT/SPLC}c)."
+                    )
                     log.error(err)
                     raise ValueError(err)
         
