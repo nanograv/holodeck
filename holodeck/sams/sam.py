@@ -784,13 +784,28 @@ class Semi_Analytic_Model:
 
         return edges, dnum, redz_final
 
-    def gwb_new(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100):
+    def gwb_new(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100,
+                enforce_physical_hard_params=False):
         """Calculate GWB using new cython implementation, 10x faster!
         """
         from . import sam_cyutils
 
-        assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
+        #assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
+        if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, 
+                                 holo.hardening.FixedOuterTime_InnerPL_SAM, 
+                                 holo.hardening.Hard_GW)):
+            err = (
+                "`sam_cyutils` methods only work with `Fixed_Time_2PL_SAM`, "
+                "`FixedOuterTime_InnerPL_SAM`, or `Hard_GW` hardening models!  "
+                "Use `gwb_only` for alternative classes!"
+            )
+            self._log.exception(err)
+            raise ValueError(err)
 
+        # check whether hardening params are physical
+        # (only implemented for FixedOuterTime_InnerPL_SAM hardening model)
+        self._check_physical_hard_params(hard, enforce)
+            
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
 
         # convert to orbital-frequency (from GW-frequency)
@@ -869,7 +884,8 @@ class Semi_Analytic_Model:
         gwb = holo.gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
         return gwb
 
-    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100, loudest=1, params=False):
+    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100, loudest=1, params=False,
+           enforce_physical_hard_params=False):
         """Calculate the (smooth/semi-analytic) GWB and CWs at the given observed GW-frequencies.
 
         Parameters
@@ -887,7 +903,10 @@ class Semi_Analytic_Model:
             Number of loudest single sources to distinguish from the background.
         params : Boolean
             Whether or not to return astrophysical parameters of the binaries.
-
+        enforce_physical_hard_params : Boolean
+            If True and if hard is instance of FixedOuterTime_InnerPL_SAM, raise error
+            if hardening model params are not physical (default: False)
+        
         Returns
         -------
         hc_ss : (F, R, L) NDarray of scalars
@@ -907,7 +926,8 @@ class Semi_Analytic_Model:
         """
         from . import sam_cyutils
 
-        if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.FixedOuterTime_InnerPL_SAM, 
+        if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, 
+                                 holo.hardening.FixedOuterTime_InnerPL_SAM, 
                                  holo.hardening.Hard_GW)):
             err = (
                 "`sam_cyutils` methods only work with `Fixed_Time_2PL_SAM`, "
@@ -917,6 +937,10 @@ class Semi_Analytic_Model:
             self._log.exception(err)
             raise ValueError(err)
 
+        # check whether hardening params are physical
+        # (only implemented for FixedOuterTime_InnerPL_SAM hardening model)
+        self._check_physical_hard_params(hard, enforce)
+                
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
 
         # convert to orbital-frequency (from GW-frequency)
@@ -1112,7 +1136,47 @@ class Semi_Analytic_Model:
             integ = integ.sum()
         return integ
 
+    def _check_physical_hard_params(hard, enforce):
+        """
+        Check whether hardening model parameters are physical using `hard._params_allowed`.
 
+        Raises an error if enforce=True or a warning otherwise. Implemented only for 
+        FixedOuterTime_InnerPL_SAM hardening method.
+        
+        Parameters
+        ----------
+        hard : `_Hardening` subclass instance
+        enforce : bool
+
+        Returns
+        -------
+        none.
+        """
+        
+        if enforce:
+            if isinstance(hard, holo.hardening.FixedOuterTime_InnerPL_SAM):
+                if np.any(hard._params_allowed==False):
+                    err = f"Invalid hardening model!"
+                    log.error(err)
+                    raise ValueError(err)
+            else:
+                log.warning(
+                    f"Enforcement of physical hardening params not implemented for "
+                    f"hardening model type {hard.__class__.__name__}."
+                )
+        else:
+            if isinstance(hard, holo.hardening.FixedOuterTime_InnerPL_SAM):
+                if np.any(hard._params_allowed==False):
+                    log.warning(
+                        "Invalid hardening params, but enforce_physical_hard_params=False. "
+                        "This model should not be used for GWB calculations!
+                    )
+            else:
+                # TO DO: add a warning here once `enforce_physical_hard_params`
+                # is more thoroughly implemented and tested 
+                pass
+
+            
 # ===========================================
 # ====    Evolution & Utility Methods    ====
 # ===========================================
