@@ -1485,13 +1485,13 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
     outer_time : float, optional
         Time delay between galaxy merger and the onset of binary hardening [s].
         Default: 1 Gyr.
-    rchar : float, optional
+    rchar_9 : float, optional
         Characteristic separation at which the inner hardening model is normalized [cm].
     nu_inner : float, optional
         Power-law slope of the inner hardening rate. Default: -0.5.
         Used only for `inner_model_type=0`.
     dadt_rchar : float, optional
-        Hardening rate for equal=mass binaries at `rchar` [cm/s]. Default: None
+        Hardening rate for equal=mass binaries at rchar [cm/s]. Default: None
         Sets power-law slope for `inner_model_type=1`.
     inner_time : float, optional
         Total duration of inner evolution phase (not yet implemented). Default: None
@@ -1503,11 +1503,13 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         Units determined by `gw_crit_units`.
     alpha_gw_crit : float, optional
         Power-law index governing mass dependence of the GW transition radius. Default: -0.25.
+    beta_gw_crit : float, optional
+        Power-law index governing dependence of GW transition radius on 
+        normalized symmetric mass ratio. Default: 0.0.
     inner_model_type : int, optional
         Flag controlling how the inner hardening model is parameterized (Default: 0):
         - 0 : Power-law model defined by (`nu_inner`, `r_gw_crit_9`, `alpha_gw_crit`)
         - 1 : Power-law inferred from (`dadt_rchar`, `r_gw_crit_9`, `alpha_gw_crit`)
-              (physically safer; avoids superluminal hardening)
         - 2 : (`dadt_rchar`, `nu_inner`) [not implemented]
         - 3 : (`nu_inner`, `inner_time`) [not implemented]
     enforce_physical_params : bool, optional
@@ -1526,11 +1528,13 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
     _nu_inner : float or None
         Inner power-law slope.
     _dadt_rchar : float or None
-        Hardening rate of equal-mass binaries at rchar [cm/s].
+        Hardening rate of equal-mass binaries at _rchar_9 [cm/s].
     _r_gw_crit_9 : float
         GW transition radius for M=1e9Msun binaries.
     _alpha_gw_crit : float
         Mass scaling of GW transition radius.
+    _beta_gw_crit : float
+        Normalized symmetric mass ratio scaling of GW transition radius.
     _gw_crit_units : str
         Units for GW transition radius.
     _params_allowed : ndarray of bool
@@ -1551,7 +1555,8 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
     def __init__(self, sam, num_steps=300, outer_time=1.0*GYR, 
                  inner_model_type=0, rchar_9=10.0*PC, alpha_char=-1,
                  nu_inner=-0.5, dadt_rchar=None, inner_time=None,
-                 gw_crit_units='rg', r_gw_crit_9=1e3, alpha_gw_crit=-0.25, 
+                 gw_crit_units='rg', r_gw_crit_9=1e3, 
+                 alpha_gw_crit=-0.25, beta_gw_crit=0.0,
                  enforce_physical_params=False):
         """
         Initialize the binary hardening model.
@@ -1571,17 +1576,20 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         import holodeck.sams  # noqa
         import holodeck.sams.sam_cyutils  # noqa
 
-        if np.ndim(outer_time) != 0:
-            raise ValueError("`outer_time` must be a scalar (ndim=0).")
+        if outer_time is None or np.ndim(outer_time) != 0:
+            raise ValueError("`outer_time` cannot be None & must be a scalar (ndim=0).")
         if rchar_9 is None or np.ndim(rchar_9) != 0:
             raise ValueError("`rchar_9` cannot be None & must be a scalar (ndim=0).")
+        if r_gw_crit_9 is None or np.ndim(r_gw_crit_9) != 0:
+            raise ValueError("`r_gw_crit_9` cannot be None & must be a scalar (ndim=0).")
+        if alpha_gw_crit is None or np.ndim(alpha_gw_crit) != 0:
+            raise ValueError("`alpha_gw_crit` cannot be None & must be a scalar (ndim=0).")
+
+        assert gw_crit_units in ('pc','rg')
 
         if inner_model_type == 0:
             # set inner hardening using nu_inner, r_gw_crit_9, and alpha_gw_crit
             assert np.ndim(nu_inner) == 0 and nu_inner is not None
-            assert np.ndim(r_gw_crit_9) == 0 and r_gw_crit_9 is not None
-            assert np.ndim(alpha_gw_crit) == 0 and alpha_gw_crit is not None
-            assert gw_crit_units in ('pc','rg')
             if dadt_rchar is not None or inner_time is not None:
                 log.warning(f"For {inner_model_type=}, setting to None: {dadt_rchar=}, {inner_time=}.")
                 dadt_rchar = None
@@ -1589,9 +1597,6 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         elif inner_model_type == 1:
             # set inner hardening using dadt_rchar, r_gw_crit_9, and alpha_gw_crit
             assert np.ndim(dadt_rchar) == 0 and dadt_rchar is not None
-            assert np.ndim(r_gw_crit_9) == 0 and r_gw_crit_9 is not None
-            assert np.ndim(alpha_gw_crit) == 0 and alpha_gw_crit is not None
-            assert gw_crit_units in ('pc','rg')
             if nu_inner is not None or inner_time is not None:
                 log.warning(f"For {inner_model_type=}, setting to None: {nu_inner=}, {inner_time=}.")
                 nu_inner = None
@@ -1620,12 +1625,13 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         self._r_gw_crit_9 = r_gw_crit_9      # units defined by `gw_crit_units`; None for models 2 & 3
         self._gw_crit_units = gw_crit_units  # 'rg' or 'pc'; None for models 2 & 3
         self._alpha_gw_crit = alpha_gw_crit  # determines mass scaling of r_gw_crit; None for models 2 & 3
+        self._beta_gw_crit = beta_gw_crit  # determines normed symm mass ratio scaling of r_gw_crit; None for models 2 & 3
 
         self._params_allowed = self.check_params_allowed(sam.mtot, sam.mrat)
         if np.any(self._params_allowed==False):
             log.warning(
-                "This hardening model has invalid parameters! "
-                "It should NOT be used for GW calculations!\n"
+                "\n*** This hardening model has invalid parameters! "
+                "It should NOT be used for GW calculations! ***\n"
                 "Set enforce_physical_params=True to "
                 "raise an exception for invalid hardening model parameters."
             )
@@ -1716,7 +1722,7 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         - Model 0: explicit power-law model where ν_inner is specified directly.
         - Model 1: the effective ν_inner is inferred from dadt_rchar and r_gw_crit
         Transition radius between environmental and GW regimes occurs at:
-            r_gw_crit = r9 × (M / 1e9 Msun)^(alpha_gw_crit + 1)
+            r_gw_crit = r9 × (M / 1e9 Msun)^(alpha_gw_crit + 1) × (4 * eta)^beta_gw_crit 
         where r9 is specified in either gravitational radii or parsecs.
         Assumes dadt < 0 everywhere; positive values will lead to invalid logs.
 
@@ -1724,6 +1730,9 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
 
         if np.any(self._params_allowed==False):
             log.warning(f"Found invalid hardening model params!")
+
+        # normalized symmetric mass ratio is 1.0 for equal-mass BHBs
+        eta_norm = _mrat / np.square(1 + _mrat) * 4
 
         m1, m2 = utils.m1m2_from_mtmr(_mtot, _mrat)
 
@@ -1743,7 +1752,7 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
             else:
                 r9 = self._r_gw_crit_9 * PC # convert to cm
                 
-            rgw_crit = r9 * m9**(self._alpha_gw_crit+1)
+            rgw_crit = r9 * m9**(self._alpha_gw_crit+1) * eta_norm**(self._beta_gw_crit)
             #print(f"{rgw_crit.shape=} {rgw_crit.min()=} {rgw_crit.max()=} pc")
 
             #rchar is always assumed to be in cm, no need for conversion
@@ -1767,7 +1776,7 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
             else:
                 r9 = self._r_gw_crit_9 * PC # convert to cm
             
-            rgw_crit = r9 * m9**(self._alpha_gw_crit+1)
+            rgw_crit = r9 * m9**(self._alpha_gw_crit+1) * eta_norm**(self._beta_gw_crit)
 
             #rchar is always assumed to be in cm, no need for conversion
             rchar = self._rchar_9 * m9**(self._alpha_char+1)
@@ -1775,13 +1784,14 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
             dadt_gw_crit = utils.gw_hardening_rate_dadt(m1, m2, rgw_crit)
 
             # "inner" PL and hardening rate
-            eta_norm = _mrat / np.square(1 + _mrat) * 4
+            # multiplied by eta_norm to maintain same nu_inner for a given mtot
             dadt_phenom_rchar = self._dadt_rchar * eta_norm
                             
             nu_inner = ( 1 + ( np.log10(-dadt_gw_crit) - np.log10(-dadt_phenom_rchar) ) / 
                         ( np.log10(rchar) - np.log10(rgw_crit) ) 
                        )
-            # note that nu_inner only has mass dependence, not mrat dependence, by definition since dadt_rchar is multiplied by eta_norm
+            # note that nu_inner only has mass dependence, not mrat dependence, 
+            # by definition since dadt_rchar is multiplied by eta_norm
             dadt_vals = dadt_gw_crit * ( _sepa / rgw_crit ) ** (1.0-nu_inner)
 
             if np.any((rgw_crit>rchar)):
@@ -1889,6 +1899,9 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         # Normalize total mass to 1e9 solar masses
         m9 = mt / (1.0e9*MSOL)
 
+        # Normalized symmetric mass ratio (eta_norm=1 for equal-mass binaries)
+        eta_norm = mr / np.square(1 + mr) * 4
+
         # Convert GW critical radius into cm
         if self._gw_crit_units == 'rg':
             r9 = self._r_gw_crit_9 * utils.gravitational_radius(1.0e9*MSOL) # convert to cm
@@ -1896,7 +1909,7 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
             r9 = self._r_gw_crit_9 * PC # convert to cm
                 
         # GW critical radius scaling
-        rgw_crit = r9 * m9**(self._alpha_gw_crit+1)
+        rgw_crit = r9 * m9**(self._alpha_gw_crit+1) * eta_norm**(self._beta_gw_crit)
 
         #rchar is always assumed to be in cm, no need for conversion
         rchar = self._rchar_9 * m9**(self._alpha_char+1)
@@ -1913,17 +1926,16 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         dadt_gw_crit = utils.gw_hardening_rate_dadt(m1, m2, rgw_crit)
         lgrdiff = np.log10(rchar)-np.log10(rgw_crit)
 
-        # Symmetric mass ratio normalization (η normalized to max=1)
-        eta_norm = mr / np.square(1 + mr) * 4
-
         # Calculate phenomenological hardning rate at rchar
         if self._inner_model_type == 0:
             # calculate dadt_phenom_rchar
             dadt_phenom_rchar = dadt_gw_crit * ( rchar / rgw_crit ) ** (1.0-self._nu_inner)    
-        else:
+        elif self._inner_model_type == 1:
             # Scale dadt_phenom_rchar by eta_norm (so derived nu_inner has no mass ratio dependence)
             dadt_phenom_rchar = self._dadt_rchar * eta_norm
-
+        else:
+            raise NotImplementedError()
+        
         # Check total dadt at rchar against speed limit
         dadt_gw_rchar = utils.gw_hardening_rate_dadt(m1, m2, rchar)
         if np.any(np.abs(dadt_gw_rchar+dadt_phenom_rchar) >= _DADT_SPEED_LIMIT):
@@ -2296,8 +2308,8 @@ def _radius_loss_cone_BBR1980_dehnen(mbh, mstar, gamma=1.0):
     rlc = np.power(mass_of_a_star / mbh, 0.25) * np.power(rbnd/rstar, 2.25) * rstar
     return rlc
 
-def allowed_param_range(mtot, mrat, alpha_char, rchar_9, alpha_gw, r9rg, inner_model_type=1,
-                        risco_in_rg=6.0, nu_inner_absmax=10.0):
+def allowed_param_range(mtot, mrat, alpha_char, rchar_9, alpha_gw, beta_gw, r9rg, 
+                        inner_model_type=1, risco_in_rg=6.0, nu_inner_absmax=10.0):
     """
     Compute allowed parameter ranges for FixedOuterTime_InnerPL_SAM hardening 
 
@@ -2330,7 +2342,11 @@ def allowed_param_range(mtot, mrat, alpha_char, rchar_9, alpha_gw, r9rg, inner_m
         for Mtot=1e9Msun binaries.
     alpha_gw : float
         Power-law index for the scaling of the critical GW transition radius with mass:
-            r_gw_crit ∝ mtot^(alpha_gw + 1)
+            r_gw_crit [cm] ∝ mtot^(alpha_gw + 1) * eta_norm^(beta_gw)
+    beta_gw : float
+        Power-law index for the scaling of the critical GW transition radius 
+        with normed symm mass ratio:
+            r_gw_crit [cm] ∝ mtot^(alpha_gw + 1) * eta_norm^(beta_gw)
     r9rg : array_like
         Critical GW transition radius for Mtot=1e9Msun binaries, in units of gravitational radii
         This array is modified in-place: invalid values are set to NaN.
@@ -2366,14 +2382,18 @@ def allowed_param_range(mtot, mrat, alpha_char, rchar_9, alpha_gw, r9rg, inner_m
     # Normalize mass to 1e9 solar masses
     m9 = mtot / (1.0e9*MSOL)    
     
+    # Symmetric mass ratio normalization
+    eta_norm = mrat / np.square(1 + mrat) * 4    
+
     #rchar is always assumed to be in cm, no need for conversion
     rchar = rchar_9 * m9**(alpha_char+1)
 
     # Compute allowed log10(r9rg) bounds from ISCO and rchar constraints
     # (min depends on mtot & alpha_gw, max depends on mtot, alpha_gw, & rchar)
     lg_risco_in_rg = np.log10(risco_in_rg)
-    min_lgr9rg = lg_risco_in_rg - alpha_gw * np.log10(m9)
-    max_lgr9rg = np.log10(rchar/utils.gravitational_radius(1.0e9*MSOL)) - (alpha_gw+1) * np.log10(m9)
+    min_lgr9rg = lg_risco_in_rg - alpha_gw * np.log10(m9) - beta_gw * np.log10(eta_norm)
+    tmp = np.log10(rchar/utils.gravitational_radius(1.0e9*MSOL))
+    max_lgr9rg = tmp - (alpha_gw+1) * np.log10(m9) - beta_gw * np.log10(eta_norm)
 
     # Invalidate r9rg values outside allowed range (note: modifies r9rg in place)
     if np.any(min_lgr9rg > max_lgr9rg):
@@ -2382,7 +2402,7 @@ def allowed_param_range(mtot, mrat, alpha_char, rchar_9, alpha_gw, r9rg, inner_m
     r9rg[(np.log10(r9rg)<min_lgr9rg)|(np.log10(r9rg)>max_lgr9rg)] = np.nan
 
     # Obtain physical critical GW transition radii from r9rg, min_lgr9rg, and max_lgr9rg:  
-    fac = utils.gravitational_radius(1.0e9*MSOL) * m9**(alpha_gw+1)
+    fac = utils.gravitational_radius(1.0e9*MSOL) * m9**(alpha_gw+1) * eta_norm**beta_gw
     rgw_crit = 10.0**np.log10(r9rg) * fac
     min_rgw_crit = 10.0**min_lgr9rg * fac
     max_rgw_crit = 10.0**max_lgr9rg * fac
@@ -2400,9 +2420,6 @@ def allowed_param_range(mtot, mrat, alpha_char, rchar_9, alpha_gw, r9rg, inner_m
 
     lgrdiff = np.log10(rchar)-np.log10(rgw_crit)
     max_lgrdiff = np.log10(rchar)-np.log10(min_rgw_crit)
-
-    # Symmetric mass ratio normalization
-    eta_norm = mrat / np.square(1 + mrat) * 4    
     
     # Compute allowed bounds on nu_inner and dadt_rchar
     #(1-vmax)*lgrdiff + lgadotgw is a min or max depending if dadtrchar > or < dadt_gw_crit

@@ -804,7 +804,7 @@ class Semi_Analytic_Model:
 
         # check whether hardening params are physical
         # (only implemented for FixedOuterTime_InnerPL_SAM hardening model)
-        self._check_physical_hard_params(hard, enforce)
+        self._check_physical_hard_params(hard, enforce_physical_hard_params)
             
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
 
@@ -939,7 +939,7 @@ class Semi_Analytic_Model:
 
         # check whether hardening params are physical
         # (only implemented for FixedOuterTime_InnerPL_SAM hardening model)
-        self._check_physical_hard_params(hard, enforce)
+        self._check_physical_hard_params(hard, enforce_physical_hard_params)
                 
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
 
@@ -1047,7 +1047,8 @@ class Semi_Analytic_Model:
         fisco_rst = utils.kepler_freq_from_sepa(mt, risco)
         fisco = fisco_rst / (1.0 + redz_final)
 
-        dc = cosmo.z_to_dcom(redz_final)
+        dc = np.ones_like(redz_final) * np.nan
+        dc[valid] = cosmo.z_to_dcom(redz_final[valid])
         hs = utils.gw_strain_source(mc, dc, fisco_rst)
         dadt = utils.gw_hardening_rate_dadt(m1, m2, risco)
         dfdt, _ = utils.dfdt_from_dadt(dadt, risco, mtot=mt, frst_orb=fisco_rst)
@@ -1136,7 +1137,7 @@ class Semi_Analytic_Model:
             integ = integ.sum()
         return integ
 
-    def _check_physical_hard_params(hard, enforce):
+    def _check_physical_hard_params(self, hard, enforce):
         """
         Check whether hardening model parameters are physical using `hard._params_allowed`.
 
@@ -1169,7 +1170,7 @@ class Semi_Analytic_Model:
                 if np.any(hard._params_allowed==False):
                     log.warning(
                         "Invalid hardening params, but enforce_physical_hard_params=False. "
-                        "This model should not be used for GWB calculations!
+                        "This model should not be used for GWB calculations!"
                     )
             else:
                 # TO DO: add a warning here once `enforce_physical_hard_params`
