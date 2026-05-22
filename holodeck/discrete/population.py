@@ -397,7 +397,7 @@ class Pop_Illustris(_Population_Discrete):
                 # get hubble param and comoving volume of sim [cm^3]
                 hubbleParam = header['HubbleParam']
                 self._sample_volume_mpc3 = header['box_volume_mpc']  #: comoving-volume of sim [Mpc^3]
-                self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3 #: comoving-volume of sim [cm^3]
+                self._sample_volume = header['box_volume_mpc'] * (1e6*PC)**3 #: comoving-volume of sim [Mpc^3]
                 
                 # Get stellar parttype index and merger times
                 part_names = header['part_names'].tolist()
@@ -462,7 +462,7 @@ class Pop_Illustris(_Population_Discrete):
                     mask1 = (self.mbulge[:,1]==0)
                     all0count = np.where((mask0)&(mask1))[0].size 
                     msg = (f"Changing mbulge from 0 to 1e5msun for {self.mass[mask0,0].size} first progs "
-                        f"and {self.mass[mask1,1].size} next progs.\n Both BH masses reset for {all0count} mergers.")
+                        f"and {self.mass[mask1,1].size} next progs.\n Both bulge masses reset for {all0count} mergers.")
                     log.warning(msg)
                     warnings.warn(msg)
                     self.mbulge[mask0,0] = 1.0e5 * MSOL ## setting zero-mass bulges to mass of 1e5
@@ -472,7 +472,7 @@ class Pop_Illustris(_Population_Discrete):
                     log.exception(err)
                     raise ValueError(err)
             else:
-                print("No zero-mass BHs found in this merger tree file!")
+                print("No zero-mass bulges found in this merger tree file!")
 
             self.vdisp = data['SubhaloVelDisp']    #: Velocity dispersion of galaxy [cm/s]
             try:
@@ -545,11 +545,156 @@ class Pop_Illustris(_Population_Discrete):
         return
 
 class Pop_cosmosim(_Population_Discrete):
-    '''Placeholder for future population class based on data from any 
-    general cosmological simulation.
-    The data should be the galaxy merger file from the simulation.'''
+    """
+    Population class based on data from any general cosmological simulation.
+    The data should be the galaxy merger file from the simulation.
 
-    pass
+    holodeck requires (all CGS), last axis ordered (FirstProg, NextProg, Descendant):
+        time                   : (N, 3) scale-factor (a)
+        SubhaloBHMass          : (N, 3) BH mass [g]
+        SubhaloHalfmassRadType : (N, 6, 3) half-mass radii by particle type [cm]
+        SubhaloMassInRadType   : (N, 6, 3) mass within half-mass radius by particle type [g]
+        SubhaloMassType        : (N, 6, 3) total mass by particle type [g]
+        SubhaloVelDisp         : (N, 3) velocity dispersion [cm/s]
+    """
+
+    def __init__(self, fname=None, basepath=None, fixed_sepa=None, allow_mbh0=False,use_mstar_tot_as_mbulge=False, **kwargs):
+        """Initialize a binary population using data in the given filename.
+
+        Parameters
+        ----------
+        fname : None or str,
+            Filename for input galaxy merger file.
+            * `None`: default value `_DEF_ILLUSTRIS_TNG_FNAME` is used (TNG100).
+        kwargs : dict,
+            Additional keyword-arguments passed to `super().__init__`.
+
+        """
+
+        if fname is None:
+            fname = _DEF_ILLUSTRIS_TNG_FNAME
+        if basepath is None:
+            fname = os.path.join(_PATH_DATA, fname) # try this first; assumes file in data directory
+        else:
+            fname = os.path.join(basepath, fname) # look for file in user-defined basepath
+        
+        self._fname = fname
+        self._fixed_sepa = fixed_sepa
+        self._allow_mbh0 = allow_mbh0
+        self._kwargs = kwargs
+        self._use_mstar_tot_as_mbulge = use_mstar_tot_as_mbulge
+
+
+        super().__init__(**kwargs)
+
+        if 'eccen' in kwargs:
+            self.eccen = kwargs['eccen']
+        return 
+
+
+    def _init(self):
+        """Populate sepa, mass, scafa, etc. from the CosmoSim file."""
+        super()._init() 
+        # ---- Load file
+        header, data = utils.load_hdf5(self._fname)
+
+        # Get hubble param and comoving volume of sim (cm^3)
+        hubbleParam = header['HubbleParam']
+        self._sample_volume_mpc3 = header['box_volume_mpc'] #: comoving-volume of sim [Mpc^3]
+        self._sample_volume = header['box_volume_mpc'] * (1e6 * PC)**3 #: comoving-volume of sim [cm^3]
+
+        # Get stellar parttype index
+        part_names = header['part_names'].tolist()
+        part_types = header['part_types'].tolist()
+        st_idx = part_types[part_names.index('star')]
+        # Scale factor at descendant snapshot (taken as the merger time)
+        self.scafa = data['time'][:, 2]
+
+
+        #Binary properties
+        # Set initial separation to sum of stellar half-mass radii
+        gal_rads = data['SubhaloHalfmassRadType']
+        gal_rads = gal_rads[:, st_idx, :2] # progenitor galaxy radii
+        # Binary separation (cm), shape (N,)
+        if self._fixed_sepa is not None:
+            self.sepa = np.ones_like(gal_rads[:, 0]) * self._fixed_sepa
+
+        else:
+            self.sepa =  np.sum(gal_rads, axis=-1)       #: Initial binary separation [cm]
+        print(f"{self.sepa.min()=}, {self.sepa.max()=}")
+        self.mass = data['SubhaloBHMass'][:, :2]       #: progenitor BH Masses in subhalo [grams]
+
+        # check for zero BH mass and treat based on `self._allow_mbh0` flag
+        if self.mass.min() == 0.0:
+            if self._allow_mbh0:
+                # identify galaxies with no BH (mbh=0)
+                mask0 = (self.mass[:,0]==0)
+                mask1 = (self.mass[:,1]==0)
+                all0count = np.where((mask0)&(mask1))[0].size 
+                msg = (f"Changing BH mass from 0 to 1e2msun for {self.mass[mask0,0].size} first progs "
+                    f"and {self.mass[mask1,1].size} next progs.\n Both BH masses reset for {all0count} mergers.")
+                log.warning(msg)
+                warnings.warn(msg)
+                self.mass[mask0,0] = 1.0e2 * MSOL ## setting zero-mass BHs to initial mass of 1e2
+                self.mass[mask1,1] = 1.0e2 * MSOL ## setting zero-mass BHs to initial mass of 1e2
+            else:
+                err = f"One or more galaxies have zero BH mass with {self._allow_mbh0=}!"
+                log.exception(err)
+                raise ValueError(err)
+        else:
+            print("No zero-mass BHs found in this merger tree file!")
+
+        # ---- Galaxy Properties
+        # Get the stellar mass, and take that as bulge mass
+        self.mstar_tot = data['SubhaloMassType'][:, st_idx, :]   #: [grams]
+        print(f"{self._use_mstar_tot_as_mbulge=}")
+        if self._use_mstar_tot_as_mbulge:
+            self.mbulge = self.mstar_tot[:,:2] #the total stellat mass of progenitor galaxies is taken as the bulge mass of the galaxy
+        else:
+            self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :2]   #: [grams]
+        print(f"{self.mbulge.min()=}, {self.mbulge.max()=}")
+        print(f"{self.mstar_tot.min()=}, {self.mstar_tot.max()=}")
+
+        # check for zero mbulge and treat based on `self._allow_mbh0` flag
+        if self.mbulge.min() == 0.0:
+            if self._allow_mbh0:
+                #identify galaxies with mbulge=0
+                mask0 = (self.mbulge[:,0]==0)
+                mask1 = (self.mbulge[:,1]==0)
+                all0count = np.where((mask0)&(mask1))[0].size 
+                msg = (f"Changing mbulge from 0 to 1e5msun for {self.mbulge[mask0,0].size} first progs "
+                    f"and {self.mbulge[mask1,1].size} next progs.\n Both bulge masses reset for {all0count} mergers.")
+                log.warning(msg)
+                warnings.warn(msg)
+                self.mbulge[mask0,0] = 1.0e5 * MSOL ## setting zero-mass bulges to mass of 1e5
+                self.mbulge[mask1,1] = 1.0e5 * MSOL ## setting zero-mass bulges to mass of 1e5
+            else:
+                err = f"One or more galaxies have zero mbulge with {self._allow_mbh0=}!"
+                log.exception(err)
+                raise ValueError(err)
+        else:
+            print("No zero-mass bulges found in this merger tree file!")
+
+        self.vdisp = data['SubhaloVelDisp']    #: Velocity dispersion of galaxy [cm/s]
+        try:
+            self.prog_mass_ratio = data['ProgMassRatio'] # progenitor mass ratio at tmax (time of max past mass)
+            if self.prog_mass_ratio.max() > 1.0:
+                msg = "Redefining mass ratio to be always <= 1."
+                log.warning(msg)
+                warnings.warn(msg)
+                self.prog_mass_ratio[self.prog_mass_ratio>1] = 1.0 / self.prog_mass_ratio[self.prog_mass_ratio>1]
+            self.first_prog_mass = data['fpMass'] # first progenitor mass at tmax (time of max past mass)
+            self.next_prog_mass = data['npMass'] # next progenitor mass at tmax (time of max past mass)
+        except:
+            pass
+
+        print(f"sample volume = {self._sample_volume:0.4g} [cgs] = {self._sample_volume_mpc3:0.4g} [Mpc^3];"
+            f" vol^(1/3) = {(self._sample_volume)**(1.0/3.0) / (1.0e6*PC):0.4g} [Mpc]")
+        print(f"Read {self.mass.shape[0]} mergers from file.")
+       
+        return
+
+
 # =========================
 # ====    Modifiers    ====
 # =========================
