@@ -85,7 +85,7 @@ class Accretion:
 
                 return(RectBivariateSpline(np.array(x), np.array(y),
                                            np.array(Z).T, kx=1, ky=1))
-            
+
             self.swk_acc = lambda_qe_interp_2d()
 
     def mdot_eddington(self, mass, eps=0.1):

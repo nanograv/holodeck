@@ -377,6 +377,31 @@ def get_git_hash(short=True) -> str:
 # =================================================================================================
 
 
+def repair_covariance(m):
+    """Find the nearest positive semi-definite matrix.
+
+    This is useful for manually estimated correlation matrices that may not be strictly positive-semidefinite.
+
+    Parameters
+    ----------
+    m : (N, N) array_like
+        The matrix to repair.
+
+    Returns
+    -------
+    repaired : (N, N) ndarray
+        The nearest positive semi-definite matrix to `m`.
+    """
+    # ensure symmetry
+    m = (m + m.T) / 2
+    # eigenvalue decomposition
+    eigval, eigvec = np.linalg.eigh(m)
+    # clip negative eigenvalues to a tiny positive number
+    eigval = np.maximum(eigval, 1e-10)
+    # reconstruct
+    return eigvec @ np.diag(eigval) @ eigvec.T
+
+
 def roll_rows(arr, roll_num):
     """Roll each row (axis=0) of the given array by an amount specified.
 

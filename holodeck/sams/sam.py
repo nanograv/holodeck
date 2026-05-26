@@ -1038,7 +1038,8 @@ class Semi_Analytic_Model:
         fisco_rst = utils.kepler_freq_from_sepa(mt, risco)
         fisco = fisco_rst / (1.0 + redz_final)
 
-        dc = cosmo.z_to_dcom(redz_final)
+        dc = np.ones_like(redz_final) * np.nan
+        dc[valid] = cosmo.z_to_dcom(redz_final[valid])
         hs = utils.gw_strain_source(mc, dc, fisco_rst)
         dadt = utils.gw_hardening_rate_dadt(m1, m2, risco)
         dfdt, _ = utils.dfdt_from_dadt(dadt, risco, mtot=mt, frst_orb=fisco_rst)

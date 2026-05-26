@@ -141,3 +141,6 @@ run_gen_lib_sams__*
 # Mac Desktop Services
 .DS_Store
 .history
+
+# Untracked workspace files
+scratch/
