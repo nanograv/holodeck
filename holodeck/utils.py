@@ -43,7 +43,9 @@ _GW_DEDT_ECC_CONST = - 304 * np.power(NWTG, 3) / 15 / np.power(SPLC, 5)
 # [EN2007]_, Eq.2.2
 _GW_LUM_CONST = (32.0 / 5.0) * np.power(NWTG, 7.0/3.0) * np.power(SPLC, -5.0)
 
-_AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
+@functools.lru_cache(maxsize=1)
+def get_age_universe_gyr():
+    return cosmo.age(0.0).to('Gyr').value
 _DFDM_CONST = np.sqrt(NWTG) / (4.0 * np.pi)
 
 
@@ -1905,6 +1907,7 @@ def redz_after(time, redz=None, age=None):
         Redshift of the Universe after the given amount of time.
 
     """
+    _AGE_UNIVERSE_GYR = get_age_universe_gyr()
     if (redz is None) == (age is None):
         raise ValueError("One of `redz` and `age` must be provided (and not both)!")
 
