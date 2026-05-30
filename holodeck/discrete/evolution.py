@@ -280,11 +280,8 @@ class Evolution:
 
         The behavior of this function is broken into three sub-functions, that are only used here:
         * :meth:`Evolution._at__inputs` : parse the input arguments.
-        * :meth:`Evolution._at__index_frac` : find the indices in the evolutionary tracks bounding
-          the target interpolation locations, and also the fractional distance to interpolate
-          between them.
-        * :meth:`Evolution._at__interpolate_array` : actually interpolate each parameter to a
-          the target location.
+        * :meth:`Evolution._at__index_frac` : find the indices in the evolutionary tracks bounding the target interpolation locations, and also the fractional distance to interpolate between them.
+        * :meth:`Evolution._at__interpolate_array` : actually interpolate each parameter to a the target location.
 
         Parameters
         ----------
@@ -304,8 +301,7 @@ class Evolution:
             Interpolate parameters in linear space.
             * True : all parameters interpolated in lin-lin space.
             * False: all parameters interpolated in log-log space.
-            * None : parameters are interpolated in log-log space, unless they're included in the
-              :attr:`Evolution._LIN_INTERP_PARS` attribute.
+            * None : parameters are interpolated in log-log space, unless they're included in the :attr:`Evolution._LIN_INTERP_PARS` attribute.
 
         Returns
         -------

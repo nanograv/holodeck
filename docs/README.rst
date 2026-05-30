@@ -24,6 +24,12 @@ Building Documentation Locally
 
     make html
 
+(3) Alternate method:
+
+.. code-block:: bash
+
+    pixi run docs-build
+		
 The resulting documentation can be found in the ``docs/build`` directory, in particular the ``docs/build/html/index.html`` file.  A symlink is also created in the local directory: ``docs/readthedocs.html``.
 
 

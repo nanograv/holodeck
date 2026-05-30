@@ -2,7 +2,7 @@
 
 The docs for this project are built with [Sphinx](http://www.sphinx-doc.org/en/master/).
 
-## Building Documentation
+## Building Documentation (pip/conda method)
 
 1) Make sure the requirements are installed:
 
@@ -20,6 +20,13 @@ The docs for this project are built with [Sphinx](http://www.sphinx-doc.org/en/m
 
     ```bash
     ./docs/docgen.sh
+    ```
+## Building Documentation (pixi method)
+
+1) If you have pixi installed you can simply run:
+
+    ```bash
+    pixi run docs-build
     ```
 
 The resulting documentation can be found in the `docs/build` directory, in particular the `docs/build/html/index.html` file.
