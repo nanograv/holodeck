@@ -100,38 +100,8 @@ cython_modules = cythonize(
 # ---- Perform Setup ----
 
 setup(
-    name='holodeck-gw',
-    author='NANOGrav',
-    author_email='luke.kelley@nanograv.org',
-    description=short_description,
-    long_description=long_description,
-    long_description_content_type="text/markdown",
     version=version,
-    license='MIT',
     url="https://github.com/NANOGrav/holodeck/",
-
-    # Runtime dependencies. Kept in sync with environment.yml (conda path) and
-    # requirements.txt (legacy pip path, still maintained for teammates).
-    install_requires=[
-        "astropy",
-        "cosmopy",
-        "h5py",
-        "ipywidgets",
-        "kalepy",
-        "matplotlib",
-        "numpy",
-        "scipy",
-        "psutil",
-        "tqdm",
-        "cython<3.0.0",
-        "schwimmbad",
-        "emcee",
-        "george",
-    ],
-
-    # Which Python importable modules should be included when your package is installed
-    # Handled automatically by setuptools. Use 'exclude' to prevent some specific
-    # subpackage(s) from being added, if needed
     packages=find_packages(),
 
     # Optional include package data to ship with your package
@@ -139,17 +109,6 @@ setup(
     # Comment out this line to prevent the files from being packaged with your software
     include_package_data=True,
 
-    # Additional entries you may want simply uncomment the lines you want and fill in the data
-    # url='http://www.my_package.com',  # Website
-    python_requires=">=3.9",          # Python version restrictions
-
     ext_modules=cython_modules,
-
-    entry_points = {
-        "console_scripts": [
-            'holodeck_lib_gen = holodeck.librarian.gen_lib:main',
-            'holodeck_fit_spec = holodeck.librarian.fit_spectra:main',
-        ],
-    },
 
 )

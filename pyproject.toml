@@ -3,6 +3,25 @@
 requires = ["setuptools >= 40.6.0", "wheel", "Cython<3.0.0", "numpy", "scipy"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "holodeck-gw"
+description = "holodeck: Massive Black-Hole Binary Population Synthesis for Gravitational Wave Calculations ≋●≋●≋"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT" }
+authors = [
+    { name = "NANOGrav" }
+]
+dependencies = [
+    "cosmopy>=3.6,<4",
+    "matplotlib-label-lines>=0.8.1,<0.9"
+]
+dynamic = ["version"]
+
+[project.scripts]
+holodeck_lib_gen = "holodeck.librarian.gen_lib:main"
+holodeck_fit_spec = "holodeck.librarian.fit_spectra:main"
+
 [tool.mypy]
 allow_redefinition = true
 
@@ -41,3 +60,38 @@ select = [
 
 [tool.ruff.mccabe]
 max-complexity = 15
+[tool.pixi.workspace]
+name = "holodeck"
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "osx-64", "linux-64"]
+
+[tool.pixi.dependencies]
+python = ">=3.9,<3.13"
+astropy = ">=7.2.0,<8"
+h5py = ">=3.16.0,<4"
+ipywidgets = ">=8.1.8,<9"
+kalepy = ">=1.4.3,<2"
+matplotlib = ">=3.10.9,<4"
+numpy = ">=2.4.6,<3"
+scipy = ">=1.17.1,<2"
+psutil = ">=7.2.2,<8"
+tqdm = ">=4.67.3,<5"
+cython = "<3"
+schwimmbad = ">=0.4.2,<0.5"
+emcee = ">=3.1.6,<4"
+george = ">=0.4.4,<0.5"
+
+[tool.pixi.pypi-dependencies]
+holodeck-gw = { path = ".", editable = true }
+
+[tool.pixi.tasks]
+
+[tool.pixi.feature.dev.dependencies]
+flake8 = "*"
+jupyter = "*"
+nbconvert = "*"
+nbstripout = "*"
+pytest = "*"
+pytest-cov = "*"
+tox = "*"
+memray = "*"

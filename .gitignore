@@ -173,3 +173,7 @@ holodeck/data/*
 *.tar.gz
 *.zip
 *.pdf
+=======
+# pixi environments
+.pixi/*
+!.pixi/config.toml
