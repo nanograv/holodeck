@@ -25,16 +25,26 @@ from typing import Optional, Tuple, Union, List   #, Callable, TypeVar, Any  # ,
 # except ImportError:
 #     from typing_extensions import ParamSpec
 
-import h5py
-import numba
 import numpy as np
 import numpy.typing as npt
-import scipy as sp
-import scipy.stats    # noqa
-import scipy.special  # noqa
 
 from holodeck import log, cosmo
 from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC, EDDT
+
+class _LazyNJIT:
+    """A lazy proxy decorator for numba.njit to prevent compiler loading at import."""
+    def __init__(self, func):
+        self._func = func
+        self._compiled_func = None
+
+    def __call__(self, *args, **kwargs):
+        # The very first time the function is called, import numba and compile it
+        if self._compiled_func is None:
+            import numba
+            self._compiled_func = numba.njit(self._func)
+        return self._compiled_func(*args, **kwargs)
+def lazy_njit(func):
+    return _LazyNJIT(func)
 
 # [Sesana2004]_ Eq.36
 _GW_SRC_CONST = 8 * np.power(NWTG, 5/3) * np.power(np.pi, 2/3) / np.sqrt(10) / np.power(SPLC, 4)
@@ -196,6 +206,7 @@ def load_hdf5(fname, keys=None):
         specifically everything returned from `hdf5.File.keys()`.
 
     """
+    import h5py
     squeeze = False
     if (keys is not None) and np.isscalar(keys):
         keys = [keys]
@@ -532,11 +543,12 @@ def scatter_redistribute_densities(cents, dens, dist=None, scatter=None, axis=0)
         Array with resitributed values.  Same shape as input `dens`.
 
     """
+    from scipy import stats as _stats
     if (dist is None) == (scatter is None):
         raise ValueError(f"One and only one of `dist` ({dist}) and `scatter` ({scatter}) must be provided!")
 
     if dist is None:
-        dist = sp.stats.norm(loc=0.0, scale=scatter)
+        dist = _stats.norm(loc=0.0, scale=scatter)
 
     log_cents = np.log10(cents)
     num = log_cents.size
@@ -1011,7 +1023,8 @@ def quantiles(
         raise ValueError(err)
 
     if percs is None:
-        percs = sp.stats.norm.cdf(sigmas)
+        from scipy import stats as _stats
+        percs = _stats.norm.cdf(sigmas)
 
     if np.ndim(values) > 1:
         if axis is None:
@@ -1054,7 +1067,7 @@ def quantiles(
     return percs
 
 def random_power(extr, pdf_index, size=1):
-    """Draw from a power-law PDF with the given index, between the given extrema.
+    r"""Draw from a power-law PDF with the given index, between the given extrema.
 
     NOTE: The power-law index must correspond to the power-law index of $\frac{dN}{dx}$.
           You may need to convert, e.g. $dN/dx = \frac{dN}{d \ln x} \frac{1}{x}$.
@@ -1153,7 +1166,7 @@ def stats(vals: npt.ArrayLike, percs: Optional[npt.ArrayLike] = None, prec: int 
         raise TypeError(f"`vals` (shape={np.shape(vals)}) is not iterable!")
 
     if percs is None:
-        percs = [sp.stats.norm.cdf(1), 0.95, 1.0]
+        percs = [0.8413447460685429, 0.95, 1.0] # 0.841... is percentile for 1 sigma above mean in Gaussian
         percs = np.array(percs)
         percs = np.concatenate([1-percs[::-1], [0.5], percs])
 
@@ -1269,7 +1282,8 @@ def trapz_loglog(
             log.error(err)
             raise ValueError(err)
 
-        newy = sp.interpolate.PchipInterpolator(np.log10(xx), np.log10(yy), extrapolate=False)
+        import scipy.interpolate as _interpolate
+        newy = _interpolate.PchipInterpolator(np.log10(xx), np.log10(yy), extrapolate=False)
         newy = newy(bounds)
 
         ii = np.searchsorted(xx, bounds)
@@ -1485,12 +1499,13 @@ def fit_gaussian(xx, yy, guess=None):
         Covariance matrix of best fit parameters.
 
     """
+    import scipy.optimize as _optimize
     if guess is None:
         amp = np.max(yy)
         mean = np.sum(xx * yy) / np.sum(yy)
         stdev = std(xx, yy)
         guess = [amp, mean, stdev]
-    popt, pcov = sp.optimize.curve_fit(_func_gaussian, xx, yy, p0=guess, maxfev=10000)
+    popt, pcov = _optimize.curve_fit(_func_gaussian, xx, yy, p0=guess, maxfev=10000)
     return popt, pcov
 
 
@@ -1508,8 +1523,8 @@ def fit_powerlaw(xx, yy, init=[-15.0, -2.0/3.0]):
     plaw
 
     """
-
-    popt, pcov = sp.optimize.curve_fit(_func_line, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
+    import scipy.optimize as _optimize
+    popt, pcov = _optimize.curve_fit(_func_line, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
     # log10_amp = popt[0]
     # gamma = popt[1]
 
@@ -1532,8 +1547,9 @@ def fit_powerlaw_psd(xx, yy, fref, init=[-15.0, -13.0/3.0]):
         amp = 10.0 ** log10_amp
         yy = _func_powerlaw_psd(xx, fref, amp, index)
         return np.log10(yy)
-
-    popt, pcov = sp.optimize.curve_fit(
+    
+    import scipy.optimize as _optimize
+    popt, pcov = _optimize.curve_fit(
         fit_func, xx, np.log10(yy),
         p0=init, maxfev=10000, full_output=False
     )
@@ -1555,8 +1571,9 @@ def fit_powerlaw_fixed_index(xx, yy, index=-2.0/3.0, init=[-15.0]):
     plaw
 
     """
+    import scipy.optimize as _optimize
     _func_fixed = lambda xx, amp: _func_line(xx, amp, index)
-    popt, pcov = sp.optimize.curve_fit(_func_fixed, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
+    popt, pcov = _optimize.curve_fit(_func_fixed, np.log10(xx), np.log10(yy), p0=init, maxfev=10000)
     log10_amp = popt[0]
     return log10_amp
 
@@ -1612,8 +1629,8 @@ def fit_turnover_psd(xx, yy, fref, init=[-16, -13/3, 0.3/YR, 2.5]):
         amp = 10.0 ** log10_amp
         yy = _func_turnover_psd(xx, fref, amp, *args)
         return np.log10(yy)
-
-    popt, pcov = sp.optimize.curve_fit(
+    import scipy.optimize as _optimize
+    popt, pcov = _optimize.curve_fit(
         fit_func, xx, np.log10(yy),
         p0=init, maxfev=10000, full_output=False
     )
@@ -2266,9 +2283,9 @@ def gw_freq_dist_func(nn, ee=0.0, recursive=True):
         GW Frequency distribution function g(n,e).
 
     """
-
     # Calculate with non-zero eccentrictiy
-    bessel = sp.special.jn
+    import scipy.special as _special
+    bessel = _special.jn
     ne = nn*ee
     n2 = np.square(nn)
     jn_m2 = bessel(nn-2, ne)
@@ -2561,7 +2578,7 @@ def char_strain_to_strain_amp(hc, fc, df):
     return hs
 
 
-@numba.njit
+@lazy_njit
 def _gw_ecc_func(eccen):
     """GW Hardening rate eccentricitiy dependence F(e).
 
