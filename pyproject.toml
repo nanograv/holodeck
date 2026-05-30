@@ -65,7 +65,7 @@ name = "holodeck"
 channels = ["conda-forge"]
 platforms = ["osx-arm64", "osx-64", "linux-64"]
 
-[tools.pixi.environments]
+[tool.pixi.environments]
 dev = { features = ["dev"], solve-group = "default" }
 
 [tool.pixi.dependencies]
