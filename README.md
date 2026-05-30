@@ -29,7 +29,7 @@ git clone https://github.com/nanograv/holodeck.git
 cd holodeck
 ```
 
-Then pick one of the two supported install paths.
+Then pick one of the three supported install paths.
 
 ### Option A — conda/mamba (recommended)
 
@@ -54,7 +54,36 @@ instead.
 
 If you later edit a `.pyx` file, rerun `pip install -e . --no-deps` to rebuild the C extensions.
 
-### Option B — pip (legacy workflow)
+
+### Option B — pixi (experimental but modern workflow)
+
+The `holodeck` development environment is completely managed using [Pixi](https://pixi.sh). This handles both your package dependencies and automatically builds the custom Cython extensions.
+
+1. Install Pixi on your machine if you haven't already:
+   ```bash
+   curl -fsSL https://pixi.sh/install.sh | bash
+   ```
+   *(Or use `brew install pixi` for homebrew users on macOS).*
+
+2. Inside the cloned repository directory install the development environment:
+   ```bash
+   pixi install -e dev
+   ```
+
+3. Whenever you modify a `.pyx` file, run this quick shortcut to re-compile your changes in-place without needing to force a clean environment re-installation.
+   ```bash
+   pixi run build
+   ```
+4. You can run commands in the pixi dev environment via, e.g.:
+   ```bash
+   pixi run -e dev jupyter notebook notebooks/semi-analytical-models.ipynb
+   ```
+   or you can run an interactive shell in the environment (roughly analagous to `conda activate` with:
+   ```bash
+   pixi shell -e dev
+   ````
+
+### Option C — pip (legacy workflow)
 
 Recommended if you already have a Python env and want to stay on pip. Equivalent to the historical setup:
 

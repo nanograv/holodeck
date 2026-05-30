@@ -88,6 +88,7 @@ george = ">=0.4.4,<0.5"
 holodeck-gw = { path = ".", editable = true }
 
 [tool.pixi.tasks]
+build = "python setup.py build_ext -i"
 
 [tool.pixi.feature.dev.dependencies]
 flake8 = "*"
