@@ -89,13 +89,25 @@ george = ">=0.4.4,<0.5"
 holodeck-gw = { path = ".", editable = true }
 
 [tool.pixi.tasks]
-build = "python setup.py build_ext -i"
-test = { cmd = "pytest", default-environment = "dev" }
-notebookdir = "jupyter notebook --notebook-dir=notebooks"
-docs-clean = { cmd = "rm -rf readthedocs.html build/", default-environment = "docs", cwd = "docs" }
-docs-sphinx-apidoc = { cmd = "sphinx-apidoc -e -P -T -f -o ./source/apidoc_modules ../holodeck", default-environment = "docs", cwd = "docs" }
-docs-sphinx-html = { cmd = "sphinx-build -M html source build -v -T -j auto", default-environment = "docs", cwd = "docs" }
-docs-link = { cmd = "ln -sf ./build/html/index.html readthedocs.html", default-environment = "docs", cwd = "docs" }
+build = { cmd = "python setup.py build_ext -i", default-environment = "dev", description = "Compile Cython extensions in-place for active development." }
+
+# Linting
+lint = { cmd = "flake8", default-environment = "dev", description = "Run style and syntax checks using flake8 configurations from tox.ini." }
+lint-check = { cmd = "flake8 --statistics --count", default-environment = "dev", description = "Run flake8 check and output error counts and statistics." }
+
+# Testing
+test = { cmd = "pytest --ignore=holodeck/tests/converted_notebooks/", default-environment = "dev", description = "Run fast, localized unit tests (skips slow notebook tests)." }
+test-all = { cmd = "tox", default-environment = "dev", description = "Run complete test matrix, notebook conversions, and linting across all Python versions via Tox." }
+test-tox-local = { cmd = "tox -e py312", default-environment = "dev", description = "Run localized full test suite in a pristine environment for Python 3.12 only." }
+
+# Convenience
+notebookdir = { cmd = "jupyter notebook --notebook-dir=notebooks", default-environment = "dev", description = "Launch the Jupyter Notebook server anchored directly to the notebooks/ folder." }
+
+# Documentation subtasks
+docs-clean = { cmd = "rm -f readthedocs.html ; sphinx-build -M clean source build", default-environment = "docs", cwd = "docs", description = "Wipe Sphinx build directories and remove the readthedocs.html symlink; must be run in the docs environment." }
+docs-sphinx-apidoc = { cmd = "sphinx-apidoc -e -P -T -f -o ./source/apidoc_modules ../holodeck", default-environment = "docs", cwd = "docs", description = "Generate API reference source files recursively from the codebase; must be run in the docs environment." }
+docs-sphinx-html = { cmd = "sphinx-build -M html source build -v -T -j auto", default-environment = "docs", cwd = "docs", description = "Compile source documentation files into standard HTML using parallel processing; must be run in the docs environment." }
+docs-link = { cmd = "ln -sf ./build/html/index.html readthedocs.html", default-environment = "docs", cwd = "docs", description = "Generate a local shortcut symlink pointing to the compiled HTML index file; must be run in the docs environment." }
 
 [tool.pixi.tasks.docs-build]
 depends-on = [
@@ -104,6 +116,7 @@ depends-on = [
     { task = "docs-sphinx-html", environment = "docs" },
     { task = "docs-link", environment = "docs" }
 ]
+description = "Execute the complete documentation pipeline (clean, generate API modules, build HTML, and update symlink) within the docs environment."
 
 [tool.pixi.feature.dev.dependencies]
 flake8 = "*"
