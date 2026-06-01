@@ -60,10 +60,6 @@ EVOLT = 1.6021766339999997e-12     #: Electronvolt in ergs
 JY = 1e-23                         #: Jansky [erg/s/cm^2/Hz]
 KMPERSEC = 100000.0                #: km/s [cm/s]
 
-# ---- Derived Constants
-SCHW = 1.4852320538237328e-28
-EDDT = 63219.620781981204
-
 DAY = 86400.0                                   #: Day [s]
 MYR = 31557600000000.0                          #: Mega [s]
 GYR = 3.15576e+16                               #: Giga-year [s]
@@ -72,7 +68,9 @@ MPC = 3.0856775814913676e+24                    #: Mega-parsec [cm]
 GPC = 3.085677581491367e+27                    #: Giga-parsec [cm]
 
 
-# ----- Constants as calculated from astropy.constants
+# ----- Constants as calculated from astropy.constants This is a repetition of the above
+# ----- and is provided as a reference for the user in case they want to check the values
+# ----- with astropy themselves.
 # ---- Fundamental Constants
 # NWTG = ap.constants.G.cgs.value             #: Newton's Gravitational Constant [cm^3/g/s^2]
 # SPLC = ap.constants.c.cgs.value             #: Speed of light [cm/s]

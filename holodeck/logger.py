@@ -52,7 +52,6 @@ def get_logger(name=None, level_stream=WARNING, tostr=sys.stdout, tofile=None, l
 
     comm_rank = None
     
-    import os
     env_rank = os.environ.get("OMPI_COMM_WORLD_RANK") or os.environ.get("PMI_RANK") or os.environ.get("PMIX_RANK")
     env_size = os.environ.get("OMPI_COMM_WORLD_SIZE") or os.environ.get("PMI_SIZE") or os.environ.get("PMIX_SIZE")
 
