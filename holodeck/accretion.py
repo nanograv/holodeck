@@ -89,7 +89,7 @@ class Accretion:
             self.swk_acc = lambda_qe_interp_2d()
 
     def mdot_eddington(self, mass, eps=0.1):
-        """ Calculate the total accretion rate based on masses and a fraction of the Eddington limit.
+        r""" Calculate the total accretion rate based on masses and a fraction of the Eddington limit.
 
         Parameters
         ----------
