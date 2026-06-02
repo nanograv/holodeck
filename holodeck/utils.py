@@ -1067,7 +1067,7 @@ def quantiles(
     return percs
 
 def random_power(extr, pdf_index, size=1):
-    rr"""Draw from a power-law PDF with the given index, between the given extrema.
+    r"""Draw from a power-law PDF with the given index, between the given extrema.
 
     NOTE: The power-law index must correspond to the power-law index of $\frac{dN}{dx}$.
           You may need to convert, e.g. $dN/dx = \frac{dN}{d \ln x} \frac{1}{x}$.
