@@ -611,7 +611,7 @@ def draw_sspars_and_bgpars(axs, xx, sspar, bgpar, nsamp=10, cmap=cm.rainbow_r, c
 def plot_pars(fobs, sspar, bgpar, **kwargs):
     xx= fobs * YR
     fig, axs = figax(figsize = (11,6), ncols=2, nrows=2, sharex = True)
-    axs[0,0].set_ylabel('Total Mass $M/M_\odot$')
+    axs[0,0].set_ylabel(r'Total Mass $M/M_\odot$')
     axs[0,1].set_ylabel('Mass Ratio $q$')
     axs[1,0].set_ylabel('Initial Comoving Distance $d_c$ (Mpc)')
     axs[1,1].set_ylabel('Final Comoving Distance $d_c$ (Mpc)')
@@ -1473,7 +1473,7 @@ def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
 # ====    Below Needs Review / Cleaning    ====
 # =================================================================================================
 
-'''
+r'''
 def plot_bin_pop(pop):
     mt, mr = utils.mtmr_from_m1m2(pop.mass)
     redz = cosmo.a_to_z(pop.scafa)
@@ -1666,4 +1666,4 @@ def _draw_gwb_conf(ax, gwb, **kwargs):
     kwargs['alpha'] = 1.0 - 0.5*(1.0 - kwargs['alpha'])
     ax.plot(freqs, conf[1], **kwargs)
     return
-'''
+r'''
