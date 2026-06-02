@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 import logging
 from logging import DEBUG, INFO, WARNING, ERROR  # noqa import these for easier access internally
+import os
 import sys
 from holodeck import LOG_SUFFIX, LOG_FILENAME_WITH_TIME_STAMP, _PATH_LOGS
 logging.getLogger().addHandler(logging.NullHandler())
@@ -50,13 +51,22 @@ def get_logger(name=None, level_stream=WARNING, tostr=sys.stdout, tofile=None, l
     """
 
     comm_rank = None
-    try:
-        from mpi4py import MPI
-        comm = MPI.COMM_WORLD
-        if comm.size > 1:
-            comm_rank = comm.rank
-    except ModuleNotFoundError:
-        pass
+    
+    env_rank = os.environ.get("OMPI_COMM_WORLD_RANK") or os.environ.get("PMI_RANK") or os.environ.get("PMIX_RANK")
+    env_size = os.environ.get("OMPI_COMM_WORLD_SIZE") or os.environ.get("PMI_SIZE") or os.environ.get("PMIX_SIZE")
+
+    if env_size is not None:
+        if int(env_size) > 1 and env_rank is not None:
+            comm_rank = int(env_rank)
+            
+    elif 'mpi4py' in sys.modules:
+        try:
+            from mpi4py import MPI
+            comm = MPI.COMM_WORLD
+            if comm.size > 1:
+                comm_rank = comm.rank
+        except Exception:
+            pass
 
     if name is None:
         name = 'holodeck'

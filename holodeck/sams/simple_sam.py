@@ -5,9 +5,6 @@ import numpy as np
 from holodeck import cosmo, utils, gravwaves
 from holodeck.constants import MSOL, GYR, MPC
 
-_AGE_UNIVERSE_GYR = cosmo.age(0.0).to('Gyr').value  # [Gyr]  ~ 13.78
-
-
 class Simple_SAM:
 
     def __init__(
@@ -144,7 +141,8 @@ class Simple_SAM:
         age = cosmo.age(redz).to('s').value
         new_age = age + tau0
         redz_prime = -1.0 * np.ones_like(new_age)
-        idx = (new_age < _AGE_UNIVERSE_GYR * GYR)
+        age_universe_gyr = cosmo.age(0.0).to('Gyr').value
+        idx = (new_age < age_universe_gyr * GYR)
         redz_prime[idx] = cosmo.tage_to_z(new_age[idx])
         return redz_prime
 
