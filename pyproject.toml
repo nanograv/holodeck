@@ -63,7 +63,7 @@ max-complexity = 15
 [tool.pixi.workspace]
 name = "holodeck"
 channels = ["conda-forge"]
-platforms = ["osx-arm64", "osx-64", "linux-64"]
+platforms = ["osx-arm64", "osx-64", "linux-64", "linux-aarch64"]
 
 [tool.pixi.environments]
 dev = { features = ["dev"], solve-group = "default" }
