@@ -84,6 +84,7 @@ cython = "<3"
 schwimmbad = ">=0.4.2,<0.5"
 emcee = ">=3.1.6,<4"
 george = ">=0.4.4,<0.5"
+pooch = ">=1.9.0,<2"
 
 [tool.pixi.pypi-dependencies]
 holodeck-gw = { path = ".", editable = true }
