@@ -143,3 +143,33 @@ run_gen_lib_sams__*
 
 # Untracked workspace files
 scratch/
+
+# =========================================================================
+# Binary & Heavy Simulation Data Offloading
+# =========================================================================
+# Ignore all contents of the data directory by default
+holodeck/data/*
+
+# Explicitly whitelist documentation, manifests, and lookup text data
+!holodeck/data/README.md
+!holodeck/data/registry.txt
+!holodeck/data/2mass_galaxies.lst
+!holodeck/data/added_Mks.lst
+!holodeck/data/mcconnell+ma-2013_1211.2816.txt
+!holodeck/data/schutzMa_extension.txt
+!holodeck/data/SHM06_scattering_experiments.json
+
+# Whitelist preferential accretion lookup data directories and files
+!holodeck/data/preferential_accretion/
+!holodeck/data/preferential_accretion/siwek+22/
+!holodeck/data/preferential_accretion/siwek+22/*.txt
+
+# Global safety catch for scientific binary formats anywhere in the tree
+*.hdf5
+*.npz
+*.npy
+*.pkl
+*.pickle
+*.tar.gz
+*.zip
+*.pdf

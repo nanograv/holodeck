@@ -79,6 +79,7 @@ References
 
 import abc
 import os
+from pathlib import Path
 from typing import Tuple
 
 import numpy as np
@@ -86,6 +87,7 @@ import numpy as np
 import holodeck as holo
 from holodeck import utils, log, _PATH_DATA, cosmo
 from holodeck.constants import PC, MSOL
+from holodeck.data_manager import get_data_path
 
 _DEF_ECCEN_DIST = (1.0, 0.2)
 _DEF_ILLUSTRIS_FNAME = "illustris-galaxy-mergers_L75n1820FP_gas-100_dm-100_star-100_bh-000.hdf5"
@@ -321,10 +323,10 @@ class Pop_Illustris(_Population_Discrete):
         self._select = select
 
         if fname is None:
-            fname = _DEF_ILLUSTRIS_FNAME
-            fname = os.path.join(_PATH_DATA, "illustris", fname)
-
-        self._fname = fname             #: Filename for binary data
+            registry_key = os.path.join("illustris", _DEF_ILLUSTRIS_FNAME)
+            self._fname = get_data_path(registry_key)
+        else:
+            self._fname = Path(fname)             #: Filename for binary data
         super().__init__(**kwargs)
         if 'eccen' in kwargs:
             self.eccen = kwargs['eccen']

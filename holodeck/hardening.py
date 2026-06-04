@@ -54,6 +54,7 @@ from holodeck import utils, cosmo, log, _PATH_DATA, galaxy_profiles
 from holodeck.host_relations import (
     get_stellar_mass_halo_mass_relation, get_mmbulge_relation, get_msigma_relation
 )
+from holodeck.data_manager import get_data_path
 from holodeck.constants import GYR, NWTG, PC, MSOL
 
 #: number of influence radii to set minimum radius for dens calculation
@@ -1647,7 +1648,7 @@ class _SHM06:
         self._bound_K = [0.0, 0.4]     # See [Sesana2006]_ Fig.4
 
         # Get the data filename
-        fname = os.path.join(_PATH_DATA, _SCATTERING_DATA_FILENAME)
+        fname = get_data_path(_SCATTERING_DATA_FILENAME)
         if not os.path.isfile(fname):
             err = f"file ({fname}) not does exist!"
             log.error(err)
@@ -1823,8 +1824,7 @@ class _Siwek2023:
             Binary hardening rate in units of [cm/s].
 
         """
-        fp_dadt_dedt_pkl = 'cbd_torques/siwek+23/ebdot_abdot_tmin3000Pb_tmax10000Pb.pkl'
-        fp_dadt_dedt_pkl = os.path.join(_PATH_DATA, fp_dadt_dedt_pkl)
+        fp_dadt_dedt_pkl = get_data_path('cbd_torques/siwek+23/ebdot_abdot_tmin3000Pb_tmax10000Pb.pkl')
         fp_mean_ebdot_abdot = open(fp_dadt_dedt_pkl, 'rb')
         mean_ebdot_abdot = pkl.load(fp_mean_ebdot_abdot)
         all_es = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8]

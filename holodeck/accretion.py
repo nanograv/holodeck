@@ -12,6 +12,7 @@ import numpy as np
 from scipy.interpolate import RectBivariateSpline
 from holodeck import _PATH_DATA, utils
 from holodeck.constants import SPLC, EDDT
+from holodeck.data_manager import get_data_path
 
 class Accretion:
     """ Preferential Accretion prescription
@@ -70,8 +71,7 @@ class Accretion:
             def lambda_qe_interp_2d(fp="data/preferential_accretion/siwek+22/", es=[0.0,0.2,0.4,0.6,0.8]):
                 all_lambdas = []
                 for e in es:
-                    fname = 'preferential_accretion/siwek+22/lambda_e=%.2f.txt' % e
-                    fname = os.path.join(_PATH_DATA, fname)
+                    fname = get_data_path('preferential_accretion/siwek+22/lambda_e=%.2f.txt' % e)
                     lambda_e = np.loadtxt(fname)
                     qs = lambda_e[:, 0]
                     lambdas = lambda_e[:, 1]
@@ -272,8 +272,7 @@ class Accretion:
     
     def ebeq(self, qb):
         import pickle as pkl
-        fp_ebeq_pkl = 'cbd_torques/siwek+23/eb_eq_arr.pkl'
-        fp_ebeq_pkl = os.path.join(_PATH_DATA, fp_ebeq_pkl)
+        fp_ebeq_pkl = get_data_path('cbd_torques/siwek+23/eb_eq_arr.pkl')
         fp_ebeq = open(fp_ebeq_pkl, 'rb')
         ebeq_dict = pkl.load(fp_ebeq)
 

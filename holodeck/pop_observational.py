@@ -26,6 +26,7 @@ import os
 import holodeck as holo
 from holodeck import _PATH_DATA, cosmo, log
 from holodeck.constants import MSOL
+from holodeck.data_manager import get_data_path
 
 # physical constants for natural units c = G = 1
 c = 2.99792458*(10**8)
@@ -47,7 +48,7 @@ class BP_Observational(holo.population._Population_Discrete):
 
     def __init__(self, fname=None, *args, **kwargs):
         if fname is None:
-            fname = _DEF_OBSERVATIONAL_FNAME
+            fname = get_data_path(_DEF_OBSERVATIONAL_FNAME)
         if not os.path.isfile(fname):
             fname = os.path.join(_PATH_DATA, fname)
 
@@ -99,12 +100,10 @@ def pipeline(freq_min=1e-9):
     # Main Part of Code
 
     # Choose a galaxy catalog
-    fname = "2mass_galaxies.lst"
-    fname = os.path.join(_PATH_DATA, fname)
+    fname = get_data_path("2mass_galaxies.lst")
     catalog = np.loadtxt(fname, usecols=(1, 2, 3, 4))
 
-    fname = "added_Mks.lst"
-    fname = os.path.join(_PATH_DATA, fname)
+    fname = get_data_path("added_Mks.lst")
     ext_catalog = np.loadtxt(fname, usecols=(1, 2, 3, 4, 5), skiprows=2)
 
     k_mag = catalog[:, 3]

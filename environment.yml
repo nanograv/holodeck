@@ -78,6 +78,7 @@ dependencies:
   - schwimmbad
   - emcee
   - george
+  - pooch
 
   # ---- Dev / test (mirrors requirements-dev.txt + nbstripout) ----
   - flake8
