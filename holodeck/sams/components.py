@@ -102,7 +102,7 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
 
         return ndens
 
-def mbh_mass_func_conv(self, mbh, redz, mmbulge, scatter=None):
+    def mbh_mass_func_conv(self, mbh, redz, mmbulge, scatter=None):
         """Convert from the GSMF to a MBH mass function (number density), using a given Mbh-Mbulge relation.
         This version convolves the GSMF with the Mbh-Mbulge relation including scatter.
         This will very minorly underestimate the number density at the high-mass end, but this is negligible for scatter_dex > 0.2
