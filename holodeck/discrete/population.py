@@ -311,11 +311,13 @@ class Pop_Illustris(_Population_Discrete):
 
     """
 
-    def __init__(self, fname=None, basepath=None, fixed_sepa=None, allow_mbh0=False,use_mstar_tot_as_mbulge=False,bh_merger_data_flag=False, **kwargs):
+    def __init__(self, select=None, fname=None, basepath=None, fixed_sepa=None, allow_mbh0=False,use_mstar_tot_as_mbulge=False,bh_merger_data_flag=False, **kwargs):
         """Initialize a binary population using data in the given filename.
 
         Parameters
         ----------
+        select : None or int,
+            Number of systems to select from the input data.
         fname : None or str,
             Filename for input data.
             * `None`: default value `_DEF_ILLUSTRIS_FNAME` is used.
@@ -323,22 +325,15 @@ class Pop_Illustris(_Population_Discrete):
             Additional keyword-arguments passed to `super().__init__`.
 
         """
+        self._select = select
+
         if fname is None:
             fname = _DEF_ILLUSTRIS_FNAME
+            fname = os.path.join(_PATH_DATA,"illustris",fname) 
 
-        if basepath is None:
-            fname = os.path.join(_PATH_DATA, fname)
-        
         else:
             fname = os.path.join(basepath, fname) # look for file in user-defined basepath
 
-
-        # try: 
-        #     fname = os.path.join(_PATH_DATA, fname) # try this first; assumes file in data directory
-        # except: 
-        #     if basepath is not None:
-        #         fname = os.path.join(basepath, fname) # look for file in user-defined basepath
-            
         self._fname = fname             #: Filename for binary data
 
         self._fixed_sepa = fixed_sepa ####
@@ -354,7 +349,6 @@ class Pop_Illustris(_Population_Discrete):
         self._kwargs = kwargs
         super().__init__(**kwargs)
         
-
         if 'eccen' in kwargs:
             self.eccen = kwargs['eccen']
         return
@@ -491,6 +485,14 @@ class Pop_Illustris(_Population_Discrete):
                 f" vol^(1/3) = {(self._sample_volume)**(1.0/3.0) / (1.0e6*PC):0.4g} [Mpc]")
             print(f"Read {self.mass.shape[0]} mergers from file.")
         
+
+            if self._select is not None:
+                print(f"\n=====\nWARNING SELECTING ONLY {self._select} BINARIES FROM DATA\n=====\n")
+                names = ['sepa', 'mass', 'scafa', 'mbulge', 'vdisp']
+                for nam in names:
+                    vals = getattr(self, nam)
+                    vals = vals[:self._select]
+                    setattr(self, nam, vals)
         else:
             #if black hole merger files are used instead we can extract data as such
             fname = self._fname
@@ -558,7 +560,7 @@ class Pop_cosmosim(_Population_Discrete):
         SubhaloVelDisp         : (N, 3) velocity dispersion [cm/s]
     """
 
-    def __init__(self, fname=None, basepath=None, fixed_sepa=None, allow_mbh0=False,use_mstar_tot_as_mbulge=False, **kwargs):
+    def __init__(self, select=None, fname=None, basepath=None, fixed_sepa=None, allow_mbh0=False,use_mstar_tot_as_mbulge=False, **kwargs):
         """Initialize a binary population using data in the given filename.
 
         Parameters
@@ -570,9 +572,11 @@ class Pop_cosmosim(_Population_Discrete):
             Additional keyword-arguments passed to `super().__init__`.
 
         """
-
+        self._select = select
+        
         if fname is None:
-            fname = _DEF_ILLUSTRIS_TNG_FNAME
+            fname = _DEF_ILLUSTRIS_FNAME
+            fname = os.path.join(_PATH_DATA, "illustris", fname)
         if basepath is None:
             fname = os.path.join(_PATH_DATA, fname) # try this first; assumes file in data directory
         else:
@@ -676,6 +680,15 @@ class Pop_cosmosim(_Population_Discrete):
             print("No zero-mass bulges found in this merger tree file!")
 
         self.vdisp = data['SubhaloVelDisp']    #: Velocity dispersion of galaxy [cm/s]
+
+        if self._select is not None:
+            print(f"\n=====\nWARNING SELECTING ONLY {self._select} BINARIES FROM DATA\n=====\n")
+            names = ['sepa', 'mass', 'scafa', 'mbulge', 'vdisp']
+            for nam in names:
+                vals = getattr(self, nam)
+                vals = vals[:self._select]
+                setattr(self, nam, vals) 
+        
         try:
             self.prog_mass_ratio = data['ProgMassRatio'] # progenitor mass ratio at tmax (time of max past mass)
             if self.prog_mass_ratio.max() > 1.0:

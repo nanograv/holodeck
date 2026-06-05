@@ -1142,6 +1142,7 @@ class cEvolution:
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
     _TIME_STEP_MAX = 0.1 * GYR
+    _ECCEN_MAX = 0.999 # physical ceiling; keeps (1 - e^2) > 0 in hardening rates
 
     def __init__(self, pop, hard, cfl = 0.1, nsteps=10000, mods=None, acc=None, dfdt_mdot=False):
         # --- Store basic parameters to instance
@@ -1176,17 +1177,42 @@ class cEvolution:
         for par in self._STORE_FROM_POP:
             setattr(self, par, getattr(pop, par))
 
+        # redz = cosmo.a_to_z(pop.scafa)
+        # tlook = cosmo.z_to_tlbk(redz)
+        # self._sepa_init = pop.sepa
+        # self._mass_init = pop.mass
+        # self._scafa_init = pop.scafa
+        # self._tlook_init = tlook
+        # self._dfdt_mdot = dfdt_mdot
+        # if pop.eccen is not None:
+        #     self._eccen_init = pop.eccen
+        # else:
+        #     self._eccen_init = None
+
         redz = cosmo.a_to_z(pop.scafa)
         tlook = cosmo.z_to_tlbk(redz)
-        self._sepa_init = pop.sepa
-        self._mass_init = pop.mass
-        self._scafa_init = pop.scafa
-        self._tlook_init = tlook
+
+        # Exclude degenerate present-day binaries (redz <= 1e-3): they fail the
+        # while-loop entry condition in evolve(), take zero integration steps, and
+        # corrupt the contiguous-index bookkeeping -> AssertionError on self.sepa[first_index].
+        keep = redz > 1e-3
+        ndrop = np.count_nonzero(~keep)
+        if ndrop > 0:
+            log.info(f"cEvolution: dropping {ndrop} binaries with initial redz <= 1e-3")
+
+        self._sepa_init = pop.sepa[keep]
+        self._mass_init = pop.mass[keep]
+        self._scafa_init = pop.scafa[keep]
+        self._tlook_init = tlook[keep]
         self._dfdt_mdot = dfdt_mdot
         if pop.eccen is not None:
-            self._eccen_init = pop.eccen
+            self._eccen_init = pop.eccen[keep]
         else:
             self._eccen_init = None
+
+        self._size = np.count_nonzero(keep)   # nbinaries pulls from this in evolve()
+        self._keep = keep                     # mask back to original pop ordering, if needed
+
 
         return
 
@@ -1289,7 +1315,8 @@ class cEvolution:
                 self.sepa[right] = self.sepa[left] + dadt_l * dt_l
                 if self.eccen is not None:
                     self.eccen[right] = self.eccen[left] + dedt_l * dt_l
-
+                    self.eccen[right] = min(self.eccen[right], self._ECCEN_MAX)  
+                    
                 # if there is no accretion, then mdot is zero
                 self.mass[right, :] = self.mass[left] + mdot_l * dt_l
                 self.tlook[right] = self.tlook[left] - dt_l
@@ -1339,6 +1366,7 @@ class cEvolution:
 
                 if self.eccen is not None:
                     self.eccen[right] = self.eccen[left] + dedt * dt
+                    self.eccen[right] = min(self.eccen[right], self._ECCEN_MAX) 
 
                 # if there is no accretion, then mdot is zero
                 self.mass[right, :] = self.mass[left] + mdot * dt
@@ -1444,6 +1472,12 @@ class cEvolution:
         if self.eccen is not None:
             # ecc_cfl = 0.1 * CFL
             dt_dedt = CFL * self.eccen[step] / np.fabs(dedt)
+            
+            # Don't let an Euler step push e across the physical ceiling (e -> 1),
+            # which makes (1 - e^2) < 0 and produces NaN hardening rates.
+            if dedt > 0.0 and self.eccen[step] < self._ECCEN_MAX:
+                dt_emax = (self._ECCEN_MAX - self.eccen[step]) / dedt
+                dt_dedt = np.min([dt_dedt, dt_emax])
 
             # now make sure we are not 'overshooting' the equilibrium eccentricity
             # with current dedt value
