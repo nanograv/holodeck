@@ -225,7 +225,8 @@ cdef void _integrate_differential_number_3dx1d(
 
 @cython.cdivision(True)
 cdef double _hard_func_innerpwl_model0(double mtot, double mrat, double sepa, 
-                                       double nu_inner, double r_gwcrit):
+                                       double nu_inner, double rchar,
+                                       double r_gwcrit):
 
     cdef double dadt = 0.0
 
@@ -276,11 +277,11 @@ cdef double _hard_func_innerpwl_gw(
                                                                 alpha_gwcrit+1)
     
     if inner_model_type == 0:
-        dadt = _hard_func_innerpwl_model0(mtot, mrat, sepa,
-                                          nu_inner, r_gwcrit, alpha_gwcrit)
+        dadt = _hard_func_innerpwl_model0(mtot, mrat, sepa, nu_inner, 
+                                          rchar, r_gwcrit)
     elif inner_model_type == 1:
         dadt = _hard_func_innerpwl_model1(mtot, mrat, sepa, dadt_rchar, 
-                                          rchar, r_gwcrit, alpha_gwcrit)
+                                          rchar, r_gwcrit)
     else: 
         raise ValueError(f"inner_model_type not defined: ", inner_model_type)
 
