@@ -225,31 +225,35 @@ cdef void _integrate_differential_number_3dx1d(
 
 @cython.cdivision(True)
 cdef double _hard_func_innerpwl_model0(double mtot, double mrat, double sepa, 
-                                       double nu_inner, double r9, double alpha_gwcrit):
+                                       double nu_inner, double r_gwcrit):
 
-    cdef double r_gwcrit = r9 * pow(mtot/(1.0e9*MY_MSOL), alpha_gwcrit+1)
-    cdef double dadt = hard_gw(mtot, mrat, r_gwcrit) * pow(sepa/r_gwcrit, 1.0-nu_inner)
+    cdef double dadt = 0.0
+
+    # "inner" PL and hardening rate
+    # if this isn't true, there is no inner hardening phase
+    if r_gwcrit < rchar:
+        dadt = hard_gw(mtot, mrat, r_gwcrit) * pow(sepa/r_gwcrit, 1.0-nu_inner)
     
     return dadt
 
 
 @cython.cdivision(True)
 cdef double _hard_func_innerpwl_model1(double mtot, double mrat, double sepa, 
-                                       double dadt_rchar, double rchar,
-                                       double r9, double alpha_gwcrit):
+                                       double dadt_rchar, double rchar, 
+                                       double r_gwcrit):
 
-    cdef double r_gwcrit = r9 * pow(mtot/(1.0e9*MY_MSOL), alpha_gwcrit+1)
     cdef double dadt = 0.0
     cdef double dadt_gw_crit = 0.0
     cdef double eta_norm = 0.0
     cdef double nu_inner = 0.0
     
     # "inner" PL and hardening rate
-    # if this isn't true, we're in the GW regime anyway
+    # if this isn't true, there is no inner hardening phase
     if r_gwcrit < rchar:
         dadt_gw_crit = hard_gw(mtot, mrat, r_gwcrit)
         eta_norm = 4 * mrat / (1 + mrat) / (1 + mrat) 
-        nu_inner = 1.0 - (log10(-dadt_gw_crit)-log10(-dadt_rchar*eta_norm))/(log10(r_gwcrit)-log10(rchar))
+        nu_inner = 1.0 - ( (log10(-dadt_gw_crit)-log10(-dadt_rchar*eta_norm)) / 
+                          (log10(r_gwcrit)-log10(rchar)) )
         dadt = dadt_gw_crit * ( sepa / r_gwcrit ) ** (1.0-nu_inner)
     
     return dadt
@@ -262,24 +266,27 @@ cdef double _hard_func_innerpwl_gw(
     double r_gwcrit_9, int gwcrit_units_rg, double alpha_gwcrit 
 ):
 
-    cdef double r9 = 0.0
     cdef double dadt = 0.0
+    cdef double r_gwcrit = 0.0
     
     if gwcrit_units_rg == 0:
-        r9 = r_gwcrit_9 * MY_PC 
+        r_gwcrit = (r_gwcrit_9 * MY_PC) * pow(mtot/(1.0e9*MY_MSOL), alpha_gwcrit+1)
     else:
-        r9 = r_gwcrit_9 * MY_RGRV * 1.0e9*MY_MSOL
-
+        r_gwcrit = (r_gwcrit_9 * MY_RGRV * 1.0e9*MY_MSOL) * pow(mtot/(1.0e9*MY_MSOL), 
+                                                                alpha_gwcrit+1)
+    
     if inner_model_type == 0:
         dadt = _hard_func_innerpwl_model0(mtot, mrat, sepa,
-                                          nu_inner, r9, alpha_gwcrit)
+                                          nu_inner, r_gwcrit, alpha_gwcrit)
     elif inner_model_type == 1:
         dadt = _hard_func_innerpwl_model1(mtot, mrat, sepa, dadt_rchar, 
-                                          rchar, r9, alpha_gwcrit)
+                                          rchar, r_gwcrit, alpha_gwcrit)
     else: 
         raise ValueError(f"inner_model_type not defined: ", inner_model_type)
-        
-    dadt += hard_gw(mtot, mrat, sepa)
+
+    # if this isn't true, there is no GW hardening phase
+    if r_gwcrit > (3.0 * MY_SCHW * mtot):
+        dadt += hard_gw(mtot, mrat, sepa)
     
     return dadt
 
