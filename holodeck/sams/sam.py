@@ -1331,6 +1331,7 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
     """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
 
     The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
+
     * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.
           A 2nd-order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
           In-between, a 1st-order interpolant is used if `linear_interp_backup` is True.
@@ -1340,6 +1341,7 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
 
     Parameters
     ----------
+    
     mtot : (M,) ndarray
         Total masses in grams.
     mrat : (Q,) ndarray

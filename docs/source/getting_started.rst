@@ -289,7 +289,7 @@ At times, instead of the finite volume, we wish to calculate the distribution of
 
 First we choose an independent variable of interest to define where we sample our population.  Because GW signals are our primary interest, it is typically natural to pre-define a grid of observer-frame GW frequencies.  Equivalently binary separations can be defined, or redshift intervals, etc, but we typically use observer-frame GW frequencies.  Each binary evolution track is interpolated to find the point in time when the binary reaches each frequency of interest.  For each frequency, and each binary, we then have the binary intrinsic properties (e.g. $M, q, z$) in additional to its hardening rate ($da/dt$ or $df/dt$).  If the corresponding redshift (or scale-factor or age of the Universe) takes place after the current epoch (i.e. $z=0$), then the binary can be discarded at that frequency.
 
-Each binary, at each frequency, is then interpreted as contributing a volume-density of $n_{ij} = 1/V_\mathrm{sim}$ to the total distribution of binaries.  We can then convert from volume-density to number of binaries in the same way as for the semi-analytic-model calculation :math:numref:`eq:N_from_n`,
+Each binary, at each frequency, is then interpreted as contributing a volume-density of :math:`n_{ij} = 1/V_\mathrm{sim}` to the total distribution of binaries.  We can then convert from volume-density to number of binaries in the same way as for the semi-analytic-model calculation :math:numref:`eq:N_from_n`,
 
 .. math::
    \frac{d N}{d\ln X} = n \frac{dV_c}{dz} \frac{dz}{dt} \frac{d t}{d\ln X},

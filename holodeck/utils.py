@@ -935,7 +935,7 @@ def gaussian_freqs(num, fmax, dur=16.03*YR):
         The number of frequency bins, `F` is the argument `num`.
     edges : (F+1,) ndarray
         Bin-edge frequencies for `F` bins, i.e. `F+1` bin edges.  The frequency bin edges are at:
-        ``F_i = (1/dur) + (i+1) * (fmax - 1/dur)/(num-1) `` for i between 0 and `num`.
+        ``F_i = (1/dur) + (i+1) * (fmax - 1/dur)/(num-1)`` for i between 0 and `num`.
         The number of frequency bins, `F` is the argument `num`.
 
     """
@@ -2072,7 +2072,7 @@ def angs_from_sepa(sepa, dcom, redz):
     return angs
 
 def eddington_accretion(mass, eps=0.1):
-    """Eddington Accretion rate, $\\dot{M}_{Edd} = L_{Edd}/\\epsilon c^2$.
+    r"""Eddington Accretion rate, $\dot{M}_{Edd} = L_{Edd}/\epsilon c^2$.
 
     Arguments
     ---------

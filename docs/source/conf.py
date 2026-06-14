@@ -26,28 +26,29 @@ project = 'holodeck'
 
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
     'sphinx.ext.autosectionlabel',  # {path/to/page}:{title-of-section}
     'sphinx.ext.extlinks',
     'sphinx.ext.intersphinx',
     'sphinx.ext.mathjax',
     'sphinx_math_dollar',    # enable dollar-signs to write latex math
-    # 'sphinx.ext.napoleon',
+    'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
-    'numpydoc',     # allow numpy/google style docstrings
+    # 'numpydoc',     # allow numpy/google style docstrings
     # 'sphinxcontrib.bibtex',  # allow bibtex-like citation management
 ]
-
-autosummary_generate = True
+## commented out the following because we use a python script 
+# to automatically generate the api_ref/*.rst files
+# autosummary_generate = True 
 
 source_suffix = ['.rst', '.md']
 
 master_doc = 'index'
 
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'apidoc_modules']
 
 # NOTE: `numpy` is actually needed, otherwise things break
 autodoc_mock_imports = [
+    "hasasia", "healpy",
     # 'pytest', 'kalepy', 'astropy', 'h5py', 'kalepy', 'matplotlib', 'scipy', 'tqdm',
 ]
 
@@ -85,65 +86,83 @@ intersphinx_mapping = {
 autodoc_member_order = 'bysource'
 autodoc_default_options = {"members": True, "undoc-members": True, "private-members": True}
 
-numpydoc_show_class_members = False
+# numpydoc_show_class_members = False
 
 # Report warnings for all validation checks
 # numpydoc_validation_checks = {"all"}
 
 # Report warnings for all checks *except* those listed
-numpydoc_validation_checks = {
-    "all",
-    # "GL08",   # The object does not have a docstring
-    "ES01",   # No extended summary found
-    "PR01",   # Parameters { ... } not documented
-    "PR02",   # Unknown parameters { ... }
-    "PR07",   # Parameter has no description
-    "PR10",   # Parameter "___" requires a space before the colon separating the parameter name and type
-    # "RT01",   # No Returns section found
-    "RT03",   # Return value has no description
-    # "SS01",   # No summary found (a short summary in a single line should be present
-              # at the beginning of the docstring)
+# numpydoc_validation_checks = {
+#     "all",
+#     # "GL08",   # The object does not have a docstring
+#     "ES01",   # No extended summary found
+#     "PR01",   # Parameters { ... } not documented
+#     "PR02",   # Unknown parameters { ... }
+#     "PR07",   # Parameter has no description
+#     "PR10",   # Parameter "___" requires a space before the colon separating the parameter name and type
+#     # "RT01",   # No Returns section found
+#     "RT03",   # Return value has no description
+#     # "SS01",   # No summary found (a short summary in a single line should be present
+#               # at the beginning of the docstring)
 
-    "SA01",   # See Also section not found
-    "EX01",   # No examples section found
+#     "SA01",   # See Also section not found
+#     "EX01",   # No examples section found
 
-    "GL01",   # Docstring text (summary) should start in the line immediately after the opening
-              # quotes (not in the same line, or leaving a blank line in between)
-    "GL02",   # Closing quotes should be placed in the line after the last text in the docstring
-              # (do not close the quotes in the same line as the text, or leave a blank line
-              # between the last text and the quotes)
-    "GL03",   # Double line break found; please use only one blank line to separate sections or
-              # paragraphs, and do not leave blank lines at the end of docstrings
-    "PR05",   # Parameter "___" type should not finish with "."
-    "PR08",   # Parameter "weights" description should start with a capital letter
-    "PR09",   # Parameter "___" description should finish with "."
-    "RT02",   # The first line of the Returns section should contain only the type,
-              # unless multiple values are being returned
+#     "GL01",   # Docstring text (summary) should start in the line immediately after the opening
+#               # quotes (not in the same line, or leaving a blank line in between)
+#     "GL02",   # Closing quotes should be placed in the line after the last text in the docstring
+#               # (do not close the quotes in the same line as the text, or leave a blank line
+#               # between the last text and the quotes)
+#     "GL03",   # Double line break found; please use only one blank line to separate sections or
+#               # paragraphs, and do not leave blank lines at the end of docstrings
+#     "PR05",   # Parameter "___" type should not finish with "."
+#     "PR08",   # Parameter "weights" description should start with a capital letter
+#     "PR09",   # Parameter "___" description should finish with "."
+#     "RT02",   # The first line of the Returns section should contain only the type,
+#               # unless multiple values are being returned
 
-    "RT04",   # Return value description should start with a capital letter
-    "RT05",   # Return value description should finish with ".
-    "SS02",   # Summary does not start with a capital letter
-    "SS03",   # Summary does not end with a period
-    "SS05",   # Summary must start with infinitive verb, not third person (e.g. use "Generate" instead of "Generates")
-}
-
-
-def run_apidoc(_):
-    """
-
-    https://github.com/readthedocs/readthedocs.org/issues/1139#issuecomment-312626491
-
-    """
-    from sphinx.ext.apidoc import main
-    cur_dir = os.path.abspath(os.path.dirname(__file__))
-    sys.path.append(os.path.join(cur_dir, os.path.pardir))
-    output_dir = os.path.join(cur_dir, "apidoc_modules")
-    # docs/source ==> /docs ==> holodeck/
-    input_dir = os.path.join(cur_dir, os.path.pardir, os.path.pardir, "holodeck")
-    main(['-e', '-o', output_dir, input_dir, '--force'])
-    return
+#     "RT04",   # Return value description should start with a capital letter
+#     "RT05",   # Return value description should finish with ".
+#     "SS02",   # Summary does not start with a capital letter
+#     "SS03",   # Summary does not end with a period
+#     "SS05",   # Summary must start with infinitive verb, not third person (e.g. use "Generate" instead of "Generates")
+# }
 
 
+# def run_apidoc(_):
+#     """
+
+#     https://github.com/readthedocs/readthedocs.org/issues/1139#issuecomment-312626491
+
+#     """
+#     from sphinx.ext.apidoc import main
+#     cur_dir = os.path.abspath(os.path.dirname(__file__))
+#     sys.path.append(os.path.join(cur_dir, os.path.pardir))
+#     output_dir = os.path.join(cur_dir, "apidoc_modules")
+#     # docs/source ==> /docs ==> holodeck/
+#     input_dir = os.path.join(cur_dir, os.path.pardir, os.path.pardir, "holodeck")
+#     main(['-e', '-o', output_dir, input_dir, '--force'])
+#     return
+
+
+# def setup(app):
+#     app.connect('builder-inited', run_apidoc)
+#     return
 def setup(app):
-    app.connect('builder-inited', run_apidoc)
-    return
+    # Connect to the skip-member event to stop the duplicate tracking pass
+    app.connect('autodoc-skip-member', skip_gp_duplicate_methods)
+
+def skip_gp_duplicate_methods(app, what, name, obj, skip, options):
+    # Define the specific class methods causing the 5 duplicates
+    duplicate_methods = {
+        "GaussProc": ["lnprior", "lnlike", "lnprob"],
+        "SamModel": ["sam_for_params", "validate_params"]
+    }
+    
+    # Check if the member belongs to our target classes
+    if hasattr(obj, '__qualname__') and '.' in obj.__qualname__:
+        classname, _, methodname = obj.__qualname__.rpartition('.')
+        if classname in duplicate_methods and methodname in duplicate_methods[classname]:
+            return True  # Tell Sphinx to skip documenting this duplicate entry
+            
+    return skip
