@@ -80,6 +80,9 @@ For some scripts (particularly for generating libraries), an MPI implementation 
 
 To see if you have `mpi4py` installed, run `python -c 'import mpi4py; print(mpi4py.__version__)'` from a terminal.
 
+### Windows
+
+Windows compatibility is not a high priority at the moment.  Many users have reported success using [WSL](https://learn.microsoft.com/en-us/windows/wsl/install). If you want to install `holodeck` natively on Windows, check out [information reported here](https://github.com/nanograv/holodeck/pull/121#issuecomment-3563570566).
 
 ## Quickstart
 
