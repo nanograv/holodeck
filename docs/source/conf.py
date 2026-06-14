@@ -48,7 +48,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'apidoc_modules']
 
 # NOTE: `numpy` is actually needed, otherwise things break
 autodoc_mock_imports = [
-    "hasasia", "healpy",
+    "hasasia", "healpy", "sympy",
     # 'pytest', 'kalepy', 'astropy', 'h5py', 'kalepy', 'matplotlib', 'scipy', 'tqdm',
 ]
 
