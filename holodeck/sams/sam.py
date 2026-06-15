@@ -379,12 +379,9 @@ class Semi_Analytic_Model:
 
             # ---- Add scatter from the M-Mbulge relation
             
-            try:
-                scatter = self._mmbulge._scatter_dex + self._mmbulge._zplaw_scatter * np.log10(1 + redz)
-                scatter = scatter[-1][-1]
-            except AttributeError:
-                scatter = self._mmbulge._scatter_dex * (1 + redz)**0
-                scatter = scatter[-1][-1]
+            zplaw_scatter = getattr(self._mmbulge, '_zplaw_scatter', 0)
+            scatter = self._mmbulge._scatter_dex + zplaw_scatter * np.log10(1 + redz)
+            scatter = scatter[-1][-1]
                 
             log.debug(f"mmbulge scatter = {scatter}")
             if scatter[0] > 0.0:
