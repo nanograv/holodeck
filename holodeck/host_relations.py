@@ -685,7 +685,6 @@ class MMBulge_Standard(_MMBulge_Relation):
             mamp_log10 = self.MASS_AMP_LOG10
 
         mamp = MSOL * np.power(10.0, mamp_log10)
-        # mamp = np.power(10.0, mamp_log10)
 
         # ---- Determine other parameters and store to instance
 
