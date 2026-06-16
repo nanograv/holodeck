@@ -102,7 +102,7 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
 
         return ndens
 
-def mbh_mass_func_conv(self, mbh, redz, mmbulge, scatter=None):
+    def mbh_mass_func_conv(self, mbh, redz, mmbulge, scatter=None):
         """Convert from the GSMF to a MBH mass function (number density), using a given Mbh-Mbulge relation.
         This version convolves the GSMF with the Mbh-Mbulge relation including scatter.
         This will very minorly underestimate the number density at the high-mass end, but this is negligible for scatter_dex > 0.2
@@ -128,7 +128,7 @@ def mbh_mass_func_conv(self, mbh, redz, mmbulge, scatter=None):
 
         """
         if scatter in [None, True]:
-            scatter = mmbulge._scatter_dex
+            scatter = mmbulge._scatter_dex + mmbulge._zplaw_scatter * np.log10(1.0 + redz)
 
         mstar = mmbulge.mstar_from_mbh(mbh, redz=redz, scatter=False)
         # This is `dn_star / dlog10(M_star)`
@@ -138,12 +138,16 @@ def mbh_mass_func_conv(self, mbh, redz, mmbulge, scatter=None):
         mbh_log10 = np.log10(mbh/MSOL)
 
         bhmf_conv = np.zeros_like(mbh_log10)
-        logamp = np.log10((mmbulge._mamp * (1.0 + redz)**mmbulge._zplaw)/MSOL)
 
         for i, logMbh in enumerate(mbh_log10):
-            logMbh_mean = logamp + mmbulge._mplaw * (mstar_log10 - 11.0)
+            mamp_z = mmbulge._mamp * (1.0 + redz)**mmbulge._zplaw_amp
+            mplaw_z = mmbulge._mplaw * (1.0 + redz)**mmbulge._zplaw_slope
+
+            logMbh_mean = np.log10(mamp_z/MSOL) + mplaw_z * (mstar_log10 - 11.0)
             pdf = stnorm.pdf(logMbh, loc=logMbh_mean, scale=scatter)
-            bhmf_conv[i] = np.trapz(ndens * pdf, mstar_log10)
+            # bhmf_conv[i] = np.trapezoid(ndens * pdf, mstar_log10)
+            dlogM = mstar_log10[1] - mstar_log10[0]
+            bhmf_conv[i] = np.sum(ndens * pdf) * dlogM
         
         return bhmf_conv
 

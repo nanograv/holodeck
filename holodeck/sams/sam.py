@@ -365,7 +365,7 @@ class Semi_Analytic_Model:
             # so far we have ``dn_gal / [dlog10(M_gal) dq_gal dz]``
 
             # dn / [dM dq dz] = (dn_gal / [dM_gal dq_gal dz]) * (dM_gal/dM_bh) * (dq_gal / dq_bh)
-            mplaw = self._mmbulge._mplaw
+            mplaw = self._mmbulge._mplaw * (1.0 + redz)**self._mmbulge._zplaw_slope
             dqbh_dqgal = mplaw * np.power(mstar_rat, mplaw - 1.0)
             # (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) = (dMstar-pri / dMstar-tot) * (dMstar-tot/dMbh-tot)
             # ==> (dMstar-tot/dMbh-tot) = (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) / (dMstar-pri / dMstar-tot)
@@ -378,11 +378,15 @@ class Semi_Analytic_Model:
             dens *= (self.mtot[:, np.newaxis, np.newaxis] / mstar_tot) * (dmstar_dmbh / dqbh_dqgal)
 
             # ---- Add scatter from the M-Mbulge relation
-
-            scatter = self._mmbulge._scatter_dex
+            
+            zplaw_scatter = getattr(self._mmbulge, '_zplaw_scatter', 0)
+            scatter = self._mmbulge._scatter_dex + zplaw_scatter * np.log10(1 + redz)
+            scatter = scatter[-1][-1]
+                
             log.debug(f"mmbulge scatter = {scatter}")
-            if scatter > 0.0:
-                log.info(f"Adding MMbulge scatter ({scatter:.4e})")
+            if scatter[0] > 0.0:
+                # log.info(f"Adding MMbulge scatter ({scatter[0]:.4e})")
+                log.info(f"Adding MMbulge scatter ({', '.join(f'{ww:.4e}' for ww in scatter)})")
                 log.info(f"\tdens bef: ({utils.stats(dens)})")
                 dur = datetime.now()
                 mass_bef = self._integrated_binary_density(dens, sum=True)
@@ -1117,7 +1121,7 @@ class Semi_Analytic_Model:
         # this is  d^3 n / [dlog10(M_gal-pri) dq_gal dz]
         nd_gal = self._ndens_gal(mass_gal, mrat_gal, redz)
 
-        mplaw = self._mmbulge._mplaw
+        mplaw = self._mmbulge._mplaw * (1.0 + redz)**self._mmbulge._zplaw_slope
         dqbh_dqgal = mplaw * np.power(mrat_gal, mplaw - 1.0)
 
         dmstar_dmbh__pri = self._mmbulge.dmstar_dmbh(mass_gal)   # [unitless]
@@ -1368,7 +1372,6 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
 
     assert np.ndim(dens) == 3
     assert np.shape(dens)[:2] == (mtot.size, mrat.size)
-    dist = sp.stats.norm(loc=0.0, scale=scatter)
     output = np.zeros_like(dens)
 
     # Get the primary and secondary masses corresponding to these total-mass and mass-ratios
@@ -1390,9 +1393,10 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
     # Interpolate from irregular m1m2 space (based on mtmr space), into regular m1m2 grid
     numz = np.shape(dens)[2]
     dlay = None
-    weights = utils._get_rolled_weights(mgrid_log10, dist)
-
+    
     for ii in range(numz):
+        dist = sp.stats.norm(loc=0.0, scale=scatter[ii])
+        weights = utils._get_rolled_weights(mgrid_log10, dist)
         dens_redz = dens[:, :, ii]
         if dlay is None:
             points = m1m2_on_mtmr_grid
