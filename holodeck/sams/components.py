@@ -521,7 +521,7 @@ class GMR_Power_Law(_Galaxy_Merger_Rate):
 
         xx = (mtot/self._mref)
         mt = np.power(xx, malpha)
-        mp1t = np.power(1.0 + (mt/self._mref_delta), mdelta)
+        mp1t = 1.0 + np.power(mtot/self._mref_delta, mdelta)
         qt = np.power(mrat, qgamma)
 
         rate = norm * mt * mp1t * qt
