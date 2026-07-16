@@ -74,7 +74,7 @@ dependencies:
   - scipy
   - psutil
   - tqdm
-  - cython<3.0.0           # pinned <3.0.0; see pyproject.toml build-system
+  - cython>=3.0.0           # pinned <3.0.0; see pyproject.toml build-system
   - schwimmbad
   - emcee
   - george
