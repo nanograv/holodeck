@@ -53,7 +53,9 @@ class Test_SAM:
                  nuin_default=None, dadt_default=None, 
                  alphgw_default=None, betagw_default=None, 
                  rgw9_default=None,
-                 alphch_default=None, rch9_default=None):
+                 alphch_default=None, rch9_default=None,
+                 gwb_params=False,
+                 mtrange=None):
 
         if hard_type not in ('fixed2PL','fixedOuter'):
             raise ValueError(f"{hard_type=} note defined, must be 'fixed2PL' or 'fixedOuter'.")
@@ -74,6 +76,9 @@ class Test_SAM:
                 
             if None in (hard_t, hard_ai, hard_rc, hard_nin, hard_nout, gsmf_flag):
                 raise ValueError(f"cannot set grid elem for sam params if any keyword is None.")
+
+            if mtrange is not None:
+                log.warning("Ignoring keyword `mtrange` for model_type=='grid'.")
                 
             self.set_sam_params_grid(tau=hard_t, ai=hard_ai, rc=hard_rc, 
                                      nin=hard_nin, nout=hard_nout, mf = gsmf_flag)
@@ -82,7 +87,7 @@ class Test_SAM:
                                                     shape = gridshape)
             else: 
                 self.sam = sams.Semi_Analytic_Model(gpf = None, shape = gridshape)
-                
+
         else:
             print(f"in TestSAM, defaults: {tout_default=} {nuin_default=} {dadt_default=} "
                   f"{alphgw_default=} {rgw9_default=} {alphch_default=} {rch9_default=}")
@@ -111,12 +116,26 @@ class Test_SAM:
                 print(f"creating SAM using GMR with {self.model_type=}...")
                 self.lbl = model_type+'_gmr'
 
-            self.sam = sams.Semi_Analytic_Model(gsmf = self.PARS['gsmf'], 
-                                                gpf = self.PARS['gpf'],
-                                                gmt = self.PARS['gmt'],
-                                                gmr = self.PARS['gmr'],
-                                                mmbulge = self.PARS['mmbulge'],
-                                                shape = gridshape)
+            if mtrange is not None:
+                if  len(mtrange) != 2:
+                    raise ValueError("len(mtrange) must be 2")
+                _mt = (10.0**mtrange[0]*MSOL, 10.0**mtrange[1]*MSOL, gridshape)
+                print(f"in Test_SAM: {_mt=}")
+                log.info(f'{_mt=}')
+                self.sam = sams.Semi_Analytic_Model(gsmf = self.PARS['gsmf'], 
+                                                    gpf = self.PARS['gpf'],
+                                                    gmt = self.PARS['gmt'],
+                                                    gmr = self.PARS['gmr'],
+                                                    mmbulge = self.PARS['mmbulge'],
+                                                    shape = gridshape,
+                                                    mtot=_mt)
+            else:
+                self.sam = sams.Semi_Analytic_Model(gsmf = self.PARS['gsmf'], 
+                                                    gpf = self.PARS['gpf'],
+                                                    gmt = self.PARS['gmt'],
+                                                    gmr = self.PARS['gmr'],
+                                                    mmbulge = self.PARS['mmbulge'],
+                                                    shape = gridshape)
         
         print(f"    ...calculating hardening for GPF SAM with {self.model_type=}")
         if self.hard_type == 'fixed2PL':
@@ -166,17 +185,29 @@ class Test_SAM:
                 self.gwb_sam = None
             else:
                 print("    ...creating gwb for SAM")
-                self.gwb_sam = self.sam.gwb(self.PARS['freqs_edges'], self.hard,
-                                            realize=self.PARS['NREALS'], 
-                                            loudest=self.PARS['NLOUD'], params=True)  
+                if gwb_params:
+                    self.gwb_sam = self.sam.gwb(self.PARS['freqs_edges'], self.hard,
+                                                realize=self.PARS['NREALS'], 
+                                                loudest=self.PARS['NLOUD'], params=True)
+                else:
+                    # use the faster version if we don't need the binary param info 
+                    # from the gwb calculation
+                    self.gwb_sam = self.sam.gwb_new(self.PARS['freqs_edges'], self.hard,
+                                                    realize=self.PARS['NREALS'])
 
         else:
             log.warning(f"No check is performed on allowed param space for old hardening type "
                         f"{self.model_type}! GWB results should be interpreted with caution!")
             print("    ...creating gwb for SAM")
-            self.gwb_sam = self.sam.gwb(self.PARS['freqs_edges'], self.hard,
-                                        realize=self.PARS['NREALS'], 
-                                        loudest=self.PARS['NLOUD'], params=True)  
+            if gwb_params:
+                    self.gwb_sam = self.sam.gwb(self.PARS['freqs_edges'], self.hard,
+                                                realize=self.PARS['NREALS'], 
+                                                loudest=self.PARS['NLOUD'], params=True)
+            else:
+                # use the faster version if we don't need the binary param info 
+                # from the gwb calculation
+                self.gwb_sam = self.sam.gwb_new(self.PARS['freqs_edges'], self.hard,
+                                                realize=self.PARS['NREALS'])  
 
     
     def set_sam_params_manual(self, gpf_flag=0, tau=None, galaxy_pars_type=None, var_value=None, 
@@ -600,13 +631,23 @@ class Test_SAM:
 def create_sams(nreals=5, nloud=5, gridshape=None,
                 fpath=_PATH_DATA, suite_type='grid', hard_type='fixed2PL',
                 sparse_param_sweep=False, _gal_pars_type=None,
+                _gwb_params=True,
                 ai=None, tau=None, gsmf=None, gpfflag=None, _tout_default=None,
                 _nuin_default=None, _dadt_default=None, 
                 _alphgw_default=None, _betagw_default=None, _rgw9_default=None, 
                 _alphch_default=None, _rch9_default=None, 
+                _mtrange=None,
                 pickle_sams=True, pickle_name=None, pickle_name_extra=None):
 
     all_sams = []
+
+    if nloud > 0 and not _gwb_params:
+        # setting up this code to use function gwb() if nloud>0 and gwb_new() if nloud=0. 
+        # gwb_new() is faster but doesnt return info about loudest single sources.
+        log.warning("Cannot currently set nloud>0 and _gwb_params=False. "
+                    "Overriding to set _gwb_params=True "
+                    "(will use slower `gwb()` function intead of `gwb_new()`.")
+        _gwb_params = True
     
     if suite_type == 'grid':
         if hard_type != 'fixed2PL':
@@ -618,7 +659,9 @@ def create_sams(nreals=5, nloud=5, gridshape=None,
                     for nout in [0.0, +2.5]:
                         #for mf in [1,2]:
 
-                        s = Test_SAM(hard_type=hard_type, model_type='grid', nreals=nreals, nloud=nloud, 
+                        s = Test_SAM(hard_type=hard_type, model_type='grid', 
+                                     gwb_params=_gwb_params,
+                                     nreals=nreals, nloud=nloud, 
                                      hard_t=t, hard_ai=ai, hard_rc=rc, 
                                      hard_nin=nin, hard_nout=nout,
                                      gsmf_flag = gsmf, gpf_flag=gpfflag)
@@ -645,8 +688,8 @@ def create_sams(nreals=5, nloud=5, gridshape=None,
                 tau = 1.0
                 
             print(f'Creating test SAM for model_type {mod} with gpf_flag={gpfflag} & tau={tau}.')
-            s = Test_SAM(hard_type=hard_type, model_type=mod, nreals=nreals, nloud=nloud, 
-                         gpf_flag=gpfflag, hard_t=tau)
+            s = Test_SAM(hard_type=hard_type, model_type=mod, gwb_params=_gwb_params,
+                         nreals=nreals, nloud=nloud, gpf_flag=gpfflag, hard_t=tau)
 
             all_sams = all_sams + [s]
                 
@@ -670,7 +713,8 @@ def create_sams(nreals=5, nloud=5, gridshape=None,
                 tau = 5.55
                 
             print(f'Creating test SAM for model_type {mod} with gpf_flag={gpf_list[i]} & tau={tau}.')
-            s = Test_SAM(hard_type=hard_type, model_type=mod, nreals=nreals, nloud=nloud, 
+            s = Test_SAM(hard_type=hard_type, model_type=mod, gwb_params=_gwb_params,
+                         nreals=nreals, nloud=nloud, 
                          gpf_flag=gpf_list[i], hard_t=tau)
 
             all_sams = all_sams + [s]
@@ -704,11 +748,13 @@ def create_sams(nreals=5, nloud=5, gridshape=None,
             for i in range(len(varied_values[m])):
                 if m=='astr_rc100':
                     print(f'Creating test SAM for model_type {m} w/ tau={tau_vals[i]}.')
-                    s = Test_SAM(hard_type=hard_type, model_type=m, nreals=nreals, nloud=nloud, 
+                    s = Test_SAM(hard_type=hard_type, model_type=m, gwb_params=_gwb_params,
+                                 nreals=nreals, nloud=nloud, 
                                  gpf_flag=gpfflag, hard_t=varied_values[m][i])
                 else:
                     print(f'Creating test SAM for model_type {m} w/ {tau_vals[1]=} & {varied_values[m][i]=}.')
-                    s = Test_SAM(hard_type=hard_type, model_type=m, nreals=nreals, nloud=nloud, 
+                    s = Test_SAM(hard_type=hard_type, model_type=m, gwb_params=_gwb_params,
+                                 nreals=nreals, nloud=nloud, 
                                  gpf_flag=gpfflag, var_value=varied_values[m][i])
 
                 all_sams = all_sams + [s]
@@ -742,11 +788,13 @@ def create_sams(nreals=5, nloud=5, gridshape=None,
             for i in range(len(varied_values[m])):
                 if m=='astr_rc100':
                     print(f'Creating test SAM for model_type {m} w/ tau={tau_vals[i]}.')
-                    s = Test_SAM(hard_type=hard_type, model_type=m, nreals=nreals, nloud=nloud, 
+                    s = Test_SAM(hard_type=hard_type, model_type=m, gwb_params=_gwb_params,
+                                 nreals=nreals, nloud=nloud, 
                                  gpf_flag=gpfflag, hard_t=varied_values[m][i])
                 else:
                     print(f'Creating test SAM for model_type {m} w/ {tau_vals[1]=} & {varied_values[m][i]=}.')
-                    s = Test_SAM(hard_type=hard_type, model_type=m, nreals=nreals, nloud=nloud, 
+                    s = Test_SAM(hard_type=hard_type, model_type=m, gwb_params=_gwb_params,
+                                 nreals=nreals, nloud=nloud, 
                                  gpf_flag=gpfflag, var_value=varied_values[m][i])
 
                 all_sams = all_sams + [s]
@@ -784,7 +832,8 @@ def create_sams(nreals=5, nloud=5, gridshape=None,
                 tau = 5.55
                 
             print(f'Creating test SAM for model_type {mod} with tau={tau}.')
-            s = Test_SAM(hard_type=hard_type, model_type=mod, nreals=nreals, nloud=nloud, 
+            s = Test_SAM(hard_type=hard_type, model_type=mod, gwb_params=_gwb_params,
+                         nreals=nreals, nloud=nloud, 
                          gridshape=gridshape, gpf_flag=gpfflag, galaxy_pars_type=_gal_pars_type, hard_t=tau)
             all_sams = all_sams + [s]
                 
@@ -813,19 +862,25 @@ def create_sams(nreals=5, nloud=5, gridshape=None,
                 alphgw=np.linspace(-0.5, 0.0, 3).tolist(),
                 betagw=np.linspace(-0.5, 0.5, 3).tolist(),
                 rch9=np.logspace(-1.0, 2.0, 4).tolist(),
-                alphch=np.linspace(-1.0, 0.0, 3).tolist()
+                alphch=np.linspace(-1.0, 0.0, 4).tolist()
             )
         else:
             varied_values = dict(
                 tout=np.logspace(-1, 1, 5).tolist(),
                 nui=np.arange(-1, 2.5, 0.5).tolist(),
                 dadt=(-1.0*np.logspace(3, 9, 7)).tolist(),
-                rgw9=np.logspace(1.5, 3.5, 9).tolist(),
+                # TMP: testing the no-GW-phase model variants:
+                ###rgw9=np.logspace(0, 2.5, 11).tolist(), #fid model is invalid for <~ 10^1.5Rg, no GWs for >10^3.5Rg.
+                rgw9=np.logspace(1.25, 3.75, 11).tolist(), #fid model is invalid for <~ 10^1.5Rg, no GWs for >10^3.5Rg.
                 #alphgw=np.linspace(-0.5, 0.0, 7).tolist(),
-                alphgw=np.linspace(-0.75, +0.25, 9).tolist(),
+                #alphgw=np.linspace(-0.75, +0.25, 9).tolist(),
+                #alphgw=np.linspace(-0.75, -0.5, 7).tolist(), # temp - testing gwb spikes
+                alphgw=np.linspace(-0.5, 0.25, 7).tolist(), 
                 betagw=np.linspace(-0.5, 0.5, 5).tolist(),
                 rch9=np.logspace(-1.0, 2.0, 7).tolist(),
-                alphch=np.linspace(-1.0, 0.0, 5).tolist()
+                #alphch=np.linspace(-1.0, 0.0, 5).tolist()
+                # includes -2/3 and -1/2:
+                alphch=np.linspace(-1.0, 0.0, 7).tolist()
         )
         
         varName = [m for m in varied_values.keys() if m in suite_type]
@@ -840,13 +895,15 @@ def create_sams(nreals=5, nloud=5, gridshape=None,
                 f"Defaults params are: {_tout_default=} {_nuin_default=} {_dadt_default=} "
                 f"{_alphgw_default=} {_betagw_default=} {_rgw9_default=} {_alphch_default=} {_rch9_default=}"
             )
-            s = Test_SAM(hard_type=hard_type, model_type=suite_type, nreals=nreals, nloud=nloud, 
+            s = Test_SAM(hard_type=hard_type, model_type=suite_type, gwb_params=_gwb_params,
+                         nreals=nreals, nloud=nloud, 
                          gridshape=gridshape, gpf_flag=gpfflag, 
                          galaxy_pars_type=_gal_pars_type,
                          tout_default=_tout_default, nuin_default=_nuin_default, dadt_default=_dadt_default, 
                          alphgw_default=_alphgw_default, betagw_default=_betagw_default, rgw9_default=_rgw9_default, 
                          alphch_default=_alphch_default, rch9_default=_rch9_default,
-                         var_value=varied_values[varName][i], hard_t=tau)
+                         var_value=varied_values[varName][i], hard_t=tau,
+                         mtrange=_mtrange)
 
             all_sams = all_sams + [s]
 
@@ -863,6 +920,8 @@ def create_sams(nreals=5, nloud=5, gridshape=None,
     
     if pickle_sams:
         nfreqs = all_sams[0].PARS['freqs'].size
+        if _mtrange is not None:
+            pickle_name += f"_M{_mtrange[0]}-{_mtrange[1]}"
         pkl_fname = f"test_sam_nfreqs{nfreqs}_nreals{nreals}_nloud{nloud}_{pickle_name}.pkl"
 
         print(f"creating pkl file: {pkl_fname}")
@@ -1116,9 +1175,18 @@ def sepa_emit(mtot, fgw):
     return ( NWTG * mtot / (fgw * np.pi) **2 )**(1.0/3)
 
 def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total', 
-              max_to_plot=4, var_name=None, extra_panels=False, 
+              max_m_to_plot=4, max_q_to_plot=4, 
+              dadt_idx_to_plot=None, nsams_total=None, idx_fiducial=0,
+              var_name=None, extra_panels=False, 
+              pubstyle=False, twopanel=False, Tobs_yr = 100.0,
+              model_labels=None, cmap_arr=None, time_ylim=None, rate_ylim=None,
+              vary_linestyle=None, vary_lw_for_mass=True, color_by_mass=False,
+              show_legends=True, shading=0.7,
               fname_extra='', fpath='', save=False, verbose=False):
 
+    if pubstyle and extra_panels:
+        raise ValueError("must set keyword `pubstyle`=False if `extra_panels`=True")
+        
     plt.rc('axes', titlesize=12)     # Title size
     plt.rc('axes', labelsize=12)     # X and Y label size
     plt.rc('xtick', labelsize=10)    # X-axis tick size
@@ -1127,72 +1195,186 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
 
     tHubble = 13.7e9 * YR
 
-    valid_models = 0
-    for sd in sam_data:
+    valid_models = []
+    for i_sam,sd in enumerate(sam_data):
         if sd[1] is not None:
-            valid_models += 1 
-    if valid_models == 0:
+            valid_models += [i_sam] 
+    if len(valid_models) == 0:
         log.warning("No elements in `sam_data` had valid hardening models. Nothing to plot.")
         return
+    if nsams_total is None:
+        nsams_total = len(valid_models)
     
     if gwcrit_units == 'pc':
-        xlim=[1e-8,1e5]
+        #xlim=[1e-8,1e5]
+        xlim=[10**-6,100]
+        xlbl = r'Binary separation $a$ [pc]'
     elif gwcrit_units == 'rg':
-        xlim=[1,1e13]
+        #xlim=[1,1e13]
+        xlim=[10**0.5,10**9]
+        xlbl = r'Binary separation $a$ [${\rm R_g}$]'
     else:
         raise ValueError(f"invalid keyword {gwcrit_units=}. must be 'pc' or 'rg'.")
     
     if fixedTime not in ['total','outer']:
         raise ValueError(f"keyword `fixedTime` must be 'total' or 'outer'.")
-    
+
+    if model_labels is not None and len(model_labels)!=len(sam_data):
+        raise ValueError(f"model_labels must be None or equal in length to sam_data.")
+        
     # Make the plot
     if extra_panels:
         fig = plt.figure(figsize=(12,7))
         first_plot_index = 231
     else:
-        fig = plt.figure(figsize=(12,4))
-        first_plot_index = 131
+        if pubstyle:
+            if twopanel:
+                fig, (ax_dadt,ax_tau) = plt.subplots(nrows=2, ncols=1, sharex=True, figsize=[4.5,5])
+                first_plot_index = 211
+            else:
+                fig, (ax_t,ax_dadt,ax_tau) = plt.subplots(nrows=3, ncols=1, sharex=True, figsize=[4.5,6])
+                first_plot_index = 311
+        else:
+            fig = plt.figure(figsize=(12,4))
+            first_plot_index = 131
+            
 
-    if gwcrit_units == 'pc':
-        xlbl = r'Binary separation $a$ [pc]'
+    if pubstyle:
+        kwargs = dict(xscale='log', yscale='log', xlim=xlim)
     else:
-        xlbl = r'Binary separation $a$ [${\rm R_g}$]'
-        
-    kwargs = dict(xscale='log', yscale='log', xlim=xlim,
-                  xlabel=xlbl)
-    ax1 = fig.add_subplot(first_plot_index, **kwargs)
-    ax1.xaxis.set_inverted(True)
-    plt.ylabel(r'Hardening timescale ($a/\dot a$) [yr]')
+        kwargs = dict(xscale='log', yscale='log', xlim=xlim, xlabel=xlbl)
 
-    ax2 = fig.add_subplot(first_plot_index+1, **kwargs)
-    ax2.xaxis.set_inverted(True)
-    ax2.set_ylabel(r'Hardening rate ($\dot a$) [cm/s]')
+    if time_ylim is None:
+        time_ylim = [0.15,1e14]
+    if rate_ylim is None:
+        rate_ylim = [0.15,2e11]
 
-    ax3 = fig.add_subplot(first_plot_index+2, **kwargs)
-    ax3.xaxis.set_inverted(True)
-    ax3.set_ylabel('Cumulative inner hardening time [yr]')
-    
+    if not twopanel:
+        ax_t.set(ylabel=r'$a / (da/dt)$ [yr]',ylim=time_ylim, **kwargs)
+        ax_t.xaxis.set_inverted(True)
+    ax_dadt.set(ylabel=r'$da/dt$ [cm/s]', ylim=rate_ylim, **kwargs)
+    if pubstyle:
+        ax_tau.set(ylabel=r'$\tau_{in+gw}$ [yr]', xlabel=xlbl, 
+                ylim=time_ylim, **kwargs)
+    else:
+        ax_tau.set(ylabel=r'$\tau_{in+gw}$ [yr]', **kwargs)
+    ax_dadt.xaxis.set_inverted(True)
+    ax_tau.xaxis.set_inverted(True)
+
     if extra_panels:
         ax4 = fig.add_subplot(first_plot_index+3, **kwargs)
         ax4.xaxis.set_inverted(True)
-        plt.ylabel(r's (hardening parameter) ')
+        ax4.set(ylabel=r's (hardening parameter) ')
 
         ax5 = fig.add_subplot(first_plot_index+4)
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.xlabel(r'<s_inner> [pc Myr]$^{-1}$')
-        plt.ylabel('cumulative time [yr]')
+        ax5.set(xscale='log',yscale='log',xlabel=r'<s_inner> [pc Myr]$^{-1}$',
+                ylabel='cumulative time [yr]')
+
+    #if cmap_arr is None:
+    #    cm = plot._get_cmap('viridis')
+    #    colors = cm(np.linspace(0, 1, nsams_total))
+    #    #cm = plot._get_cmap('tab20b')
+    #    #cm2 = plot._get_cmap('tab20c')
+    #    #cm3 = plot._get_cmap('tab20')
+    #    #if len(sam_data)<=14:
+    #    #    colors= np.vstack([cm(np.arange(0,20,4)),
+    #    #                      cm2(np.arange(0,16,4)),
+    #    #                      cm3(np.array([6,12,16,18,10]))]).reshape(14,4)
+    #    #elif len(sam_data)>14 and len(sam_data)<=60:
+    #    #    colors= np.vstack(cm(np.arange(20)),
+    #    #                      cm2(np.arange(20)),
+    #    #                      cm3(np.arange(20))).reshape(60,4)
+    #    #else:
+    #    #    raise ValueError()
+    #    #cmap_arr = ['Blues', 'Oranges',  'Greens', 'Reds', 'Purples', 'GnBu',
+    #    #            'RdPu', 'YlGnBu', 'YlGn','PuBuGn', 'OrRd', 'PuRd', 'YlOrRd', 'BuPu',
+    #    #            'PuBu', 'YlGnBu_r']*5        
+    #    #cmap_arr = ['Blues', 'Oranges',  'Greens', 'Reds', 'Purples',
+    #    #            'Greys', 'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+    #    #            'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']*2
+    #elif len(cmap)>1:
+    #    log.warning(f'using only index 0 element of cmap_arr with length {len(cmap_arr)}.')
+    #    cm = plot._get_cmap(cmap_arr[0])
+    #    #colors = cmap(np.linspace(0.3, 1, max_to_plot+1))
+    #    #colors = cmap(np.linspace(0.2, 1, max_to_plot+1))
+    #    colors = cm(np.linspace(0.2, 1, nsams_total))
+    #    #lw = np.arange(0.5,max_to_plot+1, 0.6)
+
+    if not isinstance(cmap_arr, list):
+        if cmap_arr is None:
+            cmap_arr = ['viridis']
+        elif isinstance(cmap_arr, str):
+            cmap_arr = [cmap_arr]
+        else:
+            raise ValueError("keyword `cmap_arr` must be of type None, str, or list.")
+
+    colors = None
+    if color_by_mass:
+        if len(cmap_arr) == nsams_total:
+            colors = np.zeros((nsams_total, max_m_to_plot+1, 4))
+            for n in range(nsams_total):
+                cm = plot._get_cmap(cmap_arr[n])
+                colors[n,::] = cm(np.linspace(0.3, 1, max_m_to_plot+1))
+        else:
+            if len(cmap_arr) > 1:
+                print(f"{cmap_arr=}")
+                log.warning(f'using only index 0 element of {cmap_arr=}.')
+            cm = plot._get_cmap(cmap_arr[0])
+            colors = cm(np.linspace(0, 1, max_m_to_plot+1))
+    else:
+        if len(cmap_arr) > 1:
+            log.warning(f'using only index 0 element of {cmap_arr=}.')
+        cm = plot._get_cmap(cmap_arr[0])
+        colors = cm(np.linspace(0, 1, nsams_total))
+            
     
-    cmap_arr = ['Blues', 'Oranges',  'Greens', 'Reds', 'Purples',
-                'Greys', 'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
-                'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']*2
-    ls_arr = ['-','--','-.',':']*9
+    if dadt_idx_to_plot is not None:
+        if len(dadt_idx_to_plot) != len(sam_data):
+            raise ValueError("length mismatch: dadt_idx_to_plot and sam_data.")
+    else:
+        dadt_idx_to_plot = np.arange(len(sam_data))
+    if vary_linestyle=='mods':
+        ls_arr = ['-',(0, (5, 1)),(0, (3, 1, 1, 1))]*12
+    elif vary_linestyle=='q':
+        ls_arr = [':','-','-.','--']*9
+    elif vary_linestyle==None: 
+        ls_arr = ['-']
+    else: 
+        raise ValueError(f"invalid value for keyword {vary_linestyle=}. must be 'mods', 'q', or None.")
+        
     #fgw_ls = ['-','-.',':']
     mlhandles = []
     flhandles = []
     qlhandles = []
     plhandles = []    
     nu_mrk = ['s','^','o','*']
+
+    if vary_lw_for_mass:
+        lw = np.arange(1,max_m_to_plot+1, 1)
+    else:
+        if max_q_to_plot<=3:
+            lw = np.arange(1,max_m_to_plot+1, 1)
+        else:
+            lw = np.arange(0.7,max_q_to_plot+1, 0.5)
+            
+
+    if model_labels is None:
+        if var_name=='hard_r_gw_crit_9':
+            ptitle=r'log$_{10}$(a$_{\rm GW,9}/{\rm R_g})$'
+        elif var_name=='hard_nu_inner':
+            ptitle = r'$\nu_{\rm inner}$'
+        elif var_name=='hard_alpha_gw_crit':
+            ptitle = r'$\alpha_{\rm GW}$'
+        elif var_name=='hard_beta_gw_crit':
+            ptitle = r'$\beta_{\rm GW}$'
+        elif var_name=='hard_rchar_9':
+            ptitle = r'a$_{\rm char,9}$/pc'
+        elif var_name=='hard_outer_time':
+            ptitle = r'${\rm \tau_{out}/Gyr}$'           
+        else:
+            raise ValueError(f"invalid value of {var_name=}")
+    else:
+        ptitle = 'Model type'
 
     log.info(f"{len(sam_data)=}")
     for n,sd in enumerate(sam_data):
@@ -1222,8 +1404,9 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
                 raise ValueError(f"sam_data has unexpected length {len(sd)}. "
                                  f"must be 7 or 8 for `fixedTime`='outer'")
         
-        mt_nskip = int((sam.mtot.size-1)/(max_to_plot-1)) if sam.mtot.size>max_to_plot else 1
-        mr_nskip = int((sam.mrat.size-1)/(max_to_plot-1)) if sam.mrat.size>max_to_plot else 1
+        mt_nskip = int((sam.mtot.size-1)/(max_m_to_plot-1)) if sam.mtot.size>max_m_to_plot else 1
+        mr_nskip = int((sam.mrat.size-1)/(max_q_to_plot-1)) if sam.mrat.size>max_q_to_plot else 1
+        zord = 2 if (pubstyle and n==valid_models[0]) else 1.9
 
         times_evo = calc_cumulative_thard(sd, rads[0,0,0,0], rads[0,0,0,-1],fixedTime=fixedTime)
         #times_evo = -utils.trapz_loglog(-1.0 / dadt[:,:,0,:], rads[:,:,0,:], axis=2, cumsum=True)
@@ -1232,14 +1415,11 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
                 sam.mtot[:, np.newaxis],
                 sam.mrat[np.newaxis, :]
             )    
-            tau_inner, rgw_crit = calc_total_tau_inner(hard, mt, mr)
+            #tau_inner, rgw_crit = calc_total_tau_inner(hard, mt, mr)
             risco = utils.rad_isco(sam.mtot)
-            print(f"min/max tau_inner: {np.min(tau_inner/YR):.4g} {np.max(tau_inner/YR):.4g}")
+            #print(f"min/max tau_inner: {np.min(tau_inner/YR):.4g} {np.max(tau_inner/YR):.4g}")
 
-        cmap = plot._get_cmap(cmap_arr[n])
-        colors = cmap(np.linspace(0.3, 1, max_to_plot+1))
-        lw = np.arange(0.5,max_to_plot+1, 0.5)
-
+        
         freqs, freqs_edges = utils.pta_freqs()
 
         if verbose:
@@ -1257,7 +1437,7 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
                     f"rgw9={hard._r_gw_crit_9:.4g} "
                     f"alphgw={hard._alpha_gw_crit:.4g} betagw={hard._beta_gw_crit:.4g} "
                 )
-                
+
         i_plot = 0
         for i in np.arange(0,sam.mtot.size,mt_nskip):
             
@@ -1267,14 +1447,9 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
                 dunits = NWTG * sam.mtot[i] / SPLC**2
             
             #frst_min = utils.frst_from_fobs(freqs_edges.min(), sam.redz.min())
-            Tobs_yr = 100.0
             frst_min = 1 / (Tobs_yr*YR)
             sepa_obs_max = sepa_emit(sam.mtot[i],frst_min) / dunits
-            flmi, = ax1.plot([sepa_obs_max,sepa_obs_max],[1e-4,1e10],ls=':',
-                             alpha=0.7,color=colors[i_plot], lw=2,
-                             label=r'$f_{\rm obs}$'+f'=1/({Tobs_yr:g} yr)')
-            if i_plot==max_to_plot-1 and n==len(sam_data)-1:
-                flhandles += [flmi]
+
             #ax2.plot([sepa_em,sepa_em],[1e-3,1e11],ls=fgw_ls[fi],color=colors[i])
             #if i_plot==max_to_plot-1 and n==len(sam_data)-1:
             #    flmi,= ax1.plot([sepa_obs_max,sepa_obs_max],[1e-4,1e10],ls=':',
@@ -1289,35 +1464,106 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
             j_plot=0
             for j in np.arange(0,sam.mrat.size,mr_nskip):
                 
+                #this_lw=lw[i_plot]+2 if n==idx_fiducial else lw[i_plot]
+                
+                this_shading = 1.0 if n==idx_fiducial else shading 
+                if color_by_mass:
+                    this_lw = lw[j_plot]
+                    if len(colors.shape)>2:
+                        this_color = colors[n,i_plot,:]
+                    else:
+                        this_color = colors[i_plot]
+                else:
+                    this_lw = lw[i_plot]
+                    this_color = colors[dadt_idx_to_plot[n]]
+                if vary_linestyle=='mods':
+                    this_ls = ls_arr[n]
+                    zord += n*0.05
+                elif vary_linestyle=='q':
+                    this_ls = ls_arr[j_plot]
+                else:
+                    this_ls = ls_arr[0]
+                
+                if j_plot==max_q_to_plot-1 and n==idx_fiducial:
+                    if not twopanel:
+                        # linestyle=(0, (3, 1, 1, 1)) is densely dash-dotted
+                        flmi, = ax_t.plot([sepa_obs_max,sepa_obs_max],time_ylim, color=this_color,
+                                         #alpha=0.7,color=colors[i_plot], lw=2,
+                                         alpha=this_shading, lw=this_lw, ls='-',
+                                         label=r'$f_{\rm obs}$'+f'=1/({Tobs_yr:g} yr)',zorder=zord-0.2)
+                        #if i_plot==max_to_plot-1 and n==len(sam_data)-1:
+                        if i_plot==max_m_to_plot-1 and n==idx_fiducial: #valid_models[0]:
+                            flhandles += [flmi]
+                    ax_dadt.plot([sepa_obs_max,sepa_obs_max],rate_ylim, color=this_color,
+                             #alpha=0.7,color=colors[i_plot], lw=2,zorder=zord-0.1)
+                             alpha=this_shading,lw=this_lw,ls='-',zorder=zord-0.2)
+                    ax_tau.plot([sepa_obs_max,sepa_obs_max],time_ylim, color=this_color,
+                                 #alpha=0.7,color=colors[i_plot], lw=2,zorder=zord-0.1)
+                                 alpha=this_shading,lw=this_lw,ls='-',zorder=zord-0.2)
+                
+                #ax1.plot(rads[i,j,0,:]/dunits, -rads[i,j,0,:]/dadt[i,j,0,:]/YR, 
+                #         alpha=shading, color='k', lw=lw[i_plot]+1, 
+                #         label=f'{np.log10(sam.mtot[i]/MSOL):.2g}',zorder=zord)
+                if twopanel:
+                    if j_plot==max_q_to_plot-1 and n==idx_fiducial: ##valid_models[0]: #n==len(sam_data)-1:
+                        lm,= ax_dadt.plot(rads[i,j,0,:]/dunits, -dadt[i,j,0,:], 
+                                          #alpha=shading, color=colors[i_plot], lw=lw[j_plot], 
+                                          alpha=this_shading, color=this_color,  
+                                          lw=this_lw, ls=this_ls,
+                                          label=f'{np.log10(sam.mtot[i]/MSOL):.2g}',zorder=zord)    
+                        mlhandles += [lm]
                     
-                lm,= ax1.plot(rads[i,j,0,:]/dunits, -rads[i,j,0,:]/dadt[i,j,0,:]/YR, 
-                             alpha=0.5, color=colors[i_plot], lw=lw[j_plot], 
-                             label=f'M={sam.mtot[i]/MSOL:.2g}'+r'${\rm M_{\odot}}$')
-                if j_plot==max_to_plot-1 and n==len(sam_data)-1:
-                    mlhandles += [lm]
+                else:
+                    lm,= ax_t.plot(rads[i,j,0,:]/dunits, -rads[i,j,0,:]/dadt[i,j,0,:]/YR, 
+                                   #alpha=shading, color=colors[i_plot], lw=lw[j_plot], 
+                                   alpha=this_shading, color=this_color, 
+                                   lw=this_lw, ls=this_ls,
+                                   label=f'{np.log10(sam.mtot[i]/MSOL):.2g}',zorder=zord)
+                                   #label=f'M={sam.mtot[i]/MSOL:.2g}'+r'${\rm M_{\odot}}$')
+                    #if j_plot==max_to_plot-1 and n==len(sam_data)-1:
+                    if j_plot==max_q_to_plot-1 and n==idx_fiducial: ##valid_models[0]: #n==len(sam_data)-1:
+                        mlhandles += [lm]
 
-                lq,= ax2.plot(rads[i,j,0,:]/dunits, -dadt[i,j,0,:], 
-                              alpha=0.5, color=colors[i_plot], lw=lw[j_plot], 
-                              label=fr'$q={sam.mrat[j]:.2g}$')
-                if i_plot==max_to_plot-1 and n==len(sam_data)-1:
+                lq,= ax_dadt.plot(rads[i,j,0,:]/dunits, -dadt[i,j,0,:], 
+                              #alpha=shading, color=colors[i_plot], lw=lw[j_plot], 
+                              alpha=this_shading, color=this_color,  
+                              lw=this_lw, ls=this_ls,
+                              label=f'{np.log10(sam.mrat[j]):.2g}',zorder=zord)
+                              #label=fr'$q={sam.mrat[j]:.2g}$')
+                #if i_plot==max_to_plot-1 and n==len(sam_data)-1:
+                if i_plot==max_m_to_plot-1 and n==idx_fiducial:  #valid_models[0]:
                     qlhandles += [lq]
 
                 if var_name is not None:
-                    lp, = ax3.plot(rads[i,j,0,:-1]/dunits, times_evo[i,j,:]/YR, 
-                                   alpha=0.5, color=colors[i_plot], lw=lw[j_plot], 
-                                   label = f"{var_name}={pars[n][var_name]:.2g}")
-                    if i_plot==max_to_plot-1 and j_plot==max_to_plot-1:
+                    if model_labels is None:
+                        if var_name=='hard_r_gw_crit_9':
+                            plbl = f"{np.log10(pars[n][var_name]):.2g}"
+                        else:
+                            plbl = f"{pars[n][var_name]:.2g}"
+                    else:
+                        plbl = model_labels[n]
+                    lp, = ax_tau.plot(rads[i,j,0,:-1]/dunits, times_evo[i,j,:]/YR, 
+                                      #alpha=shading, color=colors[i_plot], lw=lw[j_plot], 
+                                      alpha=this_shading, color=this_color, 
+                                      lw=this_lw, ls=this_ls,
+                                      label = plbl,zorder=zord)
+                    if i_plot==max_m_to_plot-1 and j_plot==max_q_to_plot-1:
                         plhandles += [lp]
-                        if fixedTime == 'outer':
-                            ax3.plot(xlim, [(tHubble-hard._outer_time)/YR, (tHubble-hard._outer_time)/YR], 
-                                     ':', color=colors[i_plot])
-
+                    if fixedTime == 'outer':
+                        if not twopanel:
+                            ax_t.plot(xlim, [(tHubble)/YR,(tHubble)/YR], ls="--",lw=0.7, color='k')
+                        ax_tau.plot(xlim, [(tHubble)/YR,(tHubble)/YR], ls="--",lw=0.7,color='k')
+                        #ax3.plot(xlim, [(tHubble-hard._outer_time)/YR, 
+                        #                (tHubble-hard._outer_time)/YR], "k--")
+                        #         ':', color=colors[i_plot])
                 else:
-                    ax3.plot(rads[i,j,0,:-1]/dunits, times_evo[i,j,:]/YR, 
-                             alpha=0.5, color=colors[i_plot], lw=lw[j_plot])
-                if fixedTime=='outer':
-                    ax3.scatter([risco[i]/dunits], [tau_inner[i,j]/YR], 
-                                marker='o', color='k', s=5)
+                    ax_tau.plot(rads[i,j,0,:-1]/dunits, times_evo[i,j,:]/YR, 
+                                #alpha=shading, color=colors[i_plot], lw=lw[j_plot],zorder=zord)
+                                alpha=shading, color=this_color, 
+                                lw=this_lw, ls=this_ls, zorder=zord)
+                #if fixedTime=='outer':
+                #    ax3.scatter([risco[i]/dunits], [tau_inner[i,j]/YR], 
+                #                marker='o', color='k', s=5)
                 
                 j_plot += 1
 
@@ -1327,48 +1573,68 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
                 
                     if j_plot==max_to_plot and n==len(sam_data)-1:
                         ax4.plot(rads[i,j,0,:]/dunits, hard_param_s, 
-                                 alpha=0.5, color=colors[i_plot], lw=lw[j_plot],
-                                 label=f'mtot={sam.mtot[i]/MSOL:.2g}')
+                                 #alpha=shading, color=colors[i_plot], lw=lw[j_plot],
+                                 alpha=shading, color=this_color, 
+                                 lw=this_lw, ls=this_ls,
+                                 label=f'mtot={sam.mtot[i]/MSOL:.2g}',zorder=zord)
                     else:
                         ax4.plot(rads[i,j,0,:]/dunits, hard_param_s, 
-                                 alpha=0.5, color=colors[i_plot], lw=lw[j_plot],label=None)
+                                 #alpha=shading, color=colors[i_plot], lw=lw[j_plot],label=None,zorder=zord)
+                                 alpha=shading, color=this_color, 
+                                 lw=this_lw,ls=this_ls,
+                                 label=None,zorder=zord)
                     ax5.scatter(avg_hard_param_s, times_evo[i,j,-1]/YR)
 
             i_plot += 1
         
         if fixedTime=='total':
-            ax1.plot(xlim, [hard._target_time/YR, hard._target_time/YR], '--', color='darkgray')
-            if gwcrit_units=='pc': ax1.plot([hard._rchar/dunits, hard._rchar/dunits], [1e-2,1e10],'k--')
-            if gwcrit_units=='pc': ax2.plot([hard._rchar/dunits, hard._rchar/dunits], [10,1e11],'k--')
-    ax2.plot(xlim, [3.0e10,3.0e10], color='magenta')
-    if fixedTime=='total':
-        ax3.plot(xlim, [tHubble/YR, tHubble/YR], 'k:')
-    leg2 = ax1.legend(handles=flhandles, loc='upper right')
-    ax1.legend(handles=mlhandles, loc='lower left')
-    ax1.add_artist(leg2)
-    ax2.legend(handles=qlhandles, loc='lower left')
-    ax3.legend(handles=plhandles, loc='lower left')
-        
-    if fixedTime=='total':
-        plt.suptitle(f'ai={hard._sepa_init/PC:.2g}pc, '
-                     f'rc={hard._rchar/PC:.2g}pc,'
-                     f' nu_in={hard._gamma_inner}, nu_out={hard._gamma_outer}\n'
-                     f'Mtot=({sam.mtot.min()/MSOL:.2g},{sam.mtot.max()/MSOL:.2g})Msun, '
-                     f'q=({sam.mrat.min():.2g},{sam.mrat.max():.2g})')
-    else:
-        plt.suptitle(fname_extra+"\n"
-                     f"tout={hard._outer_time:.2g}, "
-                     f"rch9={hard._rchar_9:.2g}pc, "
-                     f"alphch={hard._alpha_char:.2g}, "
-                     f"rgw9={hard._r_gw_crit_9:.2g}{hard._gw_crit_units}, "
-                     f"alphgw={hard._alpha_gw_crit:.2g}, "
-                     f"betagw={hard._beta_gw_crit:.2g}, "
-                     f"dadt={hard._dadt_rchar}, "
-                     f"nuin={hard._nu_inner}")
-    
-    fig.subplots_adjust(wspace=0.3,top=0.85, right=0.95)
+            if not twopanel:
+                ax_t.plot(xlim, [hard._target_time/YR, hard._target_time/YR], '--', color='darkgray')
+                if gwcrit_units=='pc': ax_t.plot([hard._rchar/dunits, hard._rchar/dunits], [1e-2,1e10],'k--')
+            if gwcrit_units=='pc': ax_dadt.plot([hard._rchar/dunits, hard._rchar/dunits], [10,1e11],'k--')
+            ax_tau.plot(xlim, [tHubble/YR, tHubble/YR], 'k:')
+                
+    ax_dadt.fill_between(xlim, [SPLC,SPLC], 
+                         [rate_ylim[1],rate_ylim[1]], hatch='XXXX', facecolor='none',
+                         edgecolor='darkgray',lw=1)
+    if show_legends:
+        if twopanel:
+            leg2 = ax_dadt.legend(handles=qlhandles, loc='lower left',title=r"log$_{\rm 10}(q)$")
+            ax_dadt.add_artist(leg2)    
+            ax_dadt.legend(handles=mlhandles, loc='upper left',title=r"log$_{\rm 10}(M/M_{\odot})$")
+        else:
+            #leg2 = ax_t.legend(handles=flhandles, loc='upper left')
+            ax_t.legend(handles=mlhandles, loc='lower left',title=r"log$_{\rm 10}(M/M_{\odot})$")
+            #ax_t.add_artist(leg2)
+            ax_dadt.legend(handles=qlhandles, loc='lower left',title=r"log$_{\rm 10}(q)$")
+        ax_tau.legend(handles=plhandles, loc='lower left',title=ptitle)
 
+    if not pubstyle:
+        if fixedTime=='total':
+            plt.suptitle(f'ai={hard._sepa_init/PC:.2g}pc, '
+                         f'rc={hard._rchar/PC:.2g}pc,'
+                         f' nu_in={hard._gamma_inner}, nu_out={hard._gamma_outer}\n'
+                         f'Mtot=({sam.mtot.min()/MSOL:.2g},{sam.mtot.max()/MSOL:.2g})Msun, '
+                         f'q=({sam.mrat.min():.2g},{sam.mrat.max():.2g})')
+        else:
+            plt.suptitle(fname_extra+"\n"
+                         f"tout={hard._outer_time:.2g}, "
+                         f"rch9={hard._rchar_9:.2g}pc, "
+                         f"alphch={hard._alpha_char:.2g}, "
+                         f"rgw9={hard._r_gw_crit_9:.2g}{hard._gw_crit_units}, "
+                         f"alphgw={hard._alpha_gw_crit:.2g}, "
+                         f"betagw={hard._beta_gw_crit:.2g}, "
+                         f"dadt={hard._dadt_rchar}, "
+                         f"nuin={hard._nu_inner}")
+
+    if pubstyle:
+        bottom=0.08 if not twopanel else 0.1
+        fig.subplots_adjust(hspace=0,top=0.98,right=0.98,left=0.15,bottom=bottom) #,top=0.85, right=0.95)
+    else:
+        fig.subplots_adjust(wspace=0.3,top=0.85, right=0.95)
+        
     if save:
+        print(f"{fpath=}")
         fig.savefig(f'{fpath}/dadt_{fname_extra}_{gwcrit_units}.png', dpi=300)
     
     return

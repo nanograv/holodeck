@@ -804,7 +804,7 @@ class Semi_Analytic_Model:
 
         # check whether hardening params are physical
         # (only implemented for FixedOuterTime_InnerPL_SAM hardening model)
-        self._check_physical_hard_params(hard, enforce_physical_hard_params)
+        self._check_physical_hard_params(hard, fobs_gw_edges, enforce_physical_hard_params)
             
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
 
@@ -939,7 +939,7 @@ class Semi_Analytic_Model:
 
         # check whether hardening params are physical
         # (only implemented for FixedOuterTime_InnerPL_SAM hardening model)
-        self._check_physical_hard_params(hard, enforce_physical_hard_params)
+        self._check_physical_hard_params(hard, fobs_gw_edges, enforce_physical_hard_params)
                 
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
 
@@ -1137,7 +1137,7 @@ class Semi_Analytic_Model:
             integ = integ.sum()
         return integ
 
-    def _check_physical_hard_params(self, hard, enforce):
+    def _check_physical_hard_params(self, hard, freq_edges, enforce):
         """
         Check whether hardening model parameters are physical using `hard._params_allowed`.
 
@@ -1156,6 +1156,13 @@ class Semi_Analytic_Model:
         
         if enforce:
             if isinstance(hard, holo.hardening.FixedOuterTime_InnerPL_SAM):
+                if (hard._fobs_min) is None or (hard._fobs_min > freq_edges.min()):
+                    err = (
+                        f"Hardening model has invalid _fobs_min={hard._fobs_min}!" 
+                        f"Must be <= {freq_edges.min()}"
+                    )
+                    log.error(err)
+                    raise ValueError(err)
                 if np.any(hard._params_allowed==False):
                     err = f"Invalid hardening model!"
                     log.error(err)
@@ -1167,14 +1174,23 @@ class Semi_Analytic_Model:
                 )
         else:
             if isinstance(hard, holo.hardening.FixedOuterTime_InnerPL_SAM):
+                if hard._fobs_min is None or hard._fobs_min > freq_edges.min():
+                    warn = (
+                        f"Hardening model has invalid _fobs_min={hard._fobs_min}! "
+                        f"Must be <= {freq_edges.min()}. "
+                        f"This model should not be used for GWB calculations!"
+                    )
+                    log.warning(warn)
                 if np.any(hard._params_allowed==False):
                     log.warning(
                         "Invalid hardening params, but enforce_physical_hard_params=False. "
                         "This model should not be used for GWB calculations!"
                     )
             else:
-                # TO DO: add a warning here once `enforce_physical_hard_params`
-                # is more thoroughly implemented and tested 
+                log.warning(
+                    f"Check for physical hardening params not implemented for "
+                    f"hardening model type {hard.__class__.__name__}."
+                )
                 pass
 
             
