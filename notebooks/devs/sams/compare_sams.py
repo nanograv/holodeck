@@ -869,16 +869,10 @@ def create_sams(nreals=5, nloud=5, gridshape=None,
                 tout=np.logspace(-1, 1, 5).tolist(),
                 nui=np.arange(-1, 2.5, 0.5).tolist(),
                 dadt=(-1.0*np.logspace(3, 9, 7)).tolist(),
-                # TMP: testing the no-GW-phase model variants:
-                ###rgw9=np.logspace(0, 2.5, 11).tolist(), #fid model is invalid for <~ 10^1.5Rg, no GWs for >10^3.5Rg.
                 rgw9=np.logspace(1.25, 3.75, 11).tolist(), #fid model is invalid for <~ 10^1.5Rg, no GWs for >10^3.5Rg.
-                #alphgw=np.linspace(-0.5, 0.0, 7).tolist(),
-                #alphgw=np.linspace(-0.75, +0.25, 9).tolist(),
-                #alphgw=np.linspace(-0.75, -0.5, 7).tolist(), # temp - testing gwb spikes
                 alphgw=np.linspace(-0.5, 0.25, 7).tolist(), 
                 betagw=np.linspace(-0.5, 0.5, 5).tolist(),
                 rch9=np.logspace(-1.0, 2.0, 7).tolist(),
-                #alphch=np.linspace(-1.0, 0.0, 5).tolist()
                 # includes -2/3 and -1/2:
                 alphch=np.linspace(-1.0, 0.0, 7).tolist()
         )
