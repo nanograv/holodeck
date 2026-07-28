@@ -23,6 +23,37 @@ To-Do (Hardening)
         functional form to implement would be GW + log-uniform hardening time, the same as the
         current phenomenological model but with both power-laws set to 0.
 
+
+TODO: (cosmosim) use simulation-measured host properties instead of this mbh -> mstar -> mhalo chain.
+        
+        *Dynamical_Friction_NFW: Discrete cosmosims provide the stellar mass directly (`pop.mstar_tot`) and the halo mass
+        is recoverable from the merger/group catalog, removing two inferential hops before
+        the NFW profile is built.  Same optional-argument pattern as suggested in
+        Sesana_Scattering.
+
+        *Sesana_Scattering: use simulation-measured `mbulge` and `vdisp` when available, instead of
+        re-deriving them from `mtot` via the M-Mbulge / M-sigma relations.
+        The discrete populations already carry these per-binary (`pop.mbulge` from
+        `SubhaloMassInRadType`, `pop.vdisp` from `SubhaloVelDisp`), and `Evolution`
+        keeps a reference to the population as `evo._pop`.
+        
+        Suggested approach: add optional `mbulge=None, vdisp=None` arguments here and
+        fall back to the scaling relations only when they are not supplied; have
+        `dadt_dedt()` pass `evo._pop.mbulge` / `evo._pop.vdisp` when present.
+        
+        NOTE: with `PM_Mass_Reset(scatter=True)` (the default), `pop.mass` was itself
+        drawn from `pop.mbulge` through `mmbulge` *with* scatter, so the round-trip
+        mbulge_sim -> mbh -> mbulge_inferred below does NOT recover the sim value.
+        
+        CAUTION: `pop.mbulge` is measured inside a stellar half-mass radius, which is
+        not the same quantity the M-Mbulge relation was calibrated against.
+    
+        CAUTION: indexing. In `cEvolution` the host arrays must be indexed by `bin`,
+        which only aligns with `pop` if no binaries were dropped in `cEvolution.__init__`.
+
+
+
+
 References
 ----------
 * [BBR1980]_ Begelman, Blandford & Rees 1980.
