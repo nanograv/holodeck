@@ -1634,50 +1634,20 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         self._beta_gw_crit = beta_gw_crit  # determines normed symm mass ratio scaling of r_gw_crit; None for models 2 & 3
 
         self._params_allowed = self.check_params_allowed(sam.mtot, sam.mrat)
-        if np.any(self._params_allowed==False):
-            log.warning(
-                "\n*** This hardening model has invalid parameters! "
-                "It probably should not be used for GW calculations. ***\n"
-                "Set enforce_physical_params=True to "
-                "raise an exception for invalid hardening model parameters."
-            )
-
         if self._enforce_physical_params:
             if np.any(self._params_allowed==False):
-                err = f"Invalid hardening model!"
+                err = ("Invalid hardening model! It probably should not be "
+                       "used for GW calculations.\nSet enforce_physical_params=False "
+                       "to generate this model without raising an exception.")
                 log.error(err)
                 raise ValueError(err)
-        # deprecated self._enforce_speed_limit as a separate check.
-        #        log.warning(
-        #            f"Enforcing speed limit: |dadt_max| <= {_DADT_SPEED_LIMIT/SPLC:.3g}c."
-        #            f"Checking all dadt values b/c NOT enforcing other physical params (this is slow!)"
-        #        )
-        #        # (M,) start at rchar, end at the ISCO
-        #        rmin = utils.rad_isco(sam.mtot)
-        #        rchar = self._rchar_9 * (sam.mtot/1.0e9*MSOL)**(self._alpha_char+1)
-        #        # Choose steps for each binary, log-spaced between rmin and rmax
-        #        extr = np.log10([rchar * np.ones_like(rmin), rmin])
-        #        radii = np.linspace(0.0, 1.0, num_steps)[np.newaxis, :]
-        #        # (M, X)
-        #        radii = extr[0][:, np.newaxis] + (extr[1] - extr[0])[:, np.newaxis] * radii
-        #        radii = 10.0 ** radii
-        #        # (M, Q, Z, X)
-        #        mt, mr, rz, rads = np.broadcast_arrays(
-        #            sam.mtot[:, np.newaxis, np.newaxis, np.newaxis],
-        #            sam.mrat[np.newaxis, :, np.newaxis, np.newaxis],
-        #            sam.redz[np.newaxis, np.newaxis, :, np.newaxis],
-        #            radii[:, np.newaxis, np.newaxis, :]
-        #        )
-        #        # TO DO: might need to cythonize for performance
-        #        dadt_vals,rgwc,rzc,rzf = self.dadt(mt, mr, rz, rads)
-        #        max_dadt = np.abs(dadt_vals).max()
-        #        if max_dadt > _DADT_SPEED_LIMIT:
-        #            err = (
-        #                f"Invalid hardening model! max |dadt| = {max_dadt:.6g} "
-        #                f"exceeds limit of {_DADT_SPEED_LIMIT/SPLC}c)."
-        #            )
-        #            log.error(err)
-        #            raise ValueError(err)
+        else:
+            if np.any(self._params_allowed==False):
+                warn = ("\n*** This hardening model has invalid parameters! "
+                        "It probably should not be used for GW calculations. ***\n"
+                        "Set enforce_physical_params=True to "
+                        "raise an exception for invalid hardening model parameters.")
+                log.warning(warn)
         
         return
 
