@@ -44,7 +44,6 @@ KMPERSEC = (ap.units.km / ap.units.s).to(ap.units.cm/ap.units.s)   #: km/s [cm/s
 
 # ---- Derived Constants
 SCHW = 2*NWTG/(SPLC*SPLC)                        #: Schwarzschild Constant (2*G/c^2) [cm]
-RGRV = NWTG/(SPLC*SPLC)                          #: Gravitational radius prefactor (G/c^2) [cm]
 EDDT = 4.0*np.pi*NWTG*SPLC*MPRT/SIGMA_T          #: Eddington Luminosity prefactor factor [erg/s/g]
 
 # Electron-Scattering Opacity ($\kappa_{es} = n_e \sigma_T / \rho = \mu_e \sigma_T / m_p$)
