@@ -482,7 +482,7 @@ class Semi_Analytic_Model:
 
         return grid, dnum, redz_final
 
-    def _dynamic_binary_number_at_fobs_consistent(self, hard, fobs_orb, steps=200, details=False):
+    def _dynamic_binary_number_at_fobs_consistent(self, hard, fobs_orb, steps=300, details=False):
         r"""Calculate the differential number of binaries in at each grid point, at each frequency.
 
         See :meth:`dynamic_binary_number_at_fobs` for general information.
