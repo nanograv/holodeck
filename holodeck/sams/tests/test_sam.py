@@ -235,8 +235,26 @@ def test_dbn_phenom():
     num_py = holo.sams.sam_cyutils.integrate_differential_number_3dx1d(edges_py, dnum_py)
     num_cy = holo.sams.sam_cyutils.integrate_differential_number_3dx1d(edges_cy, dnum_cy)
 
+    # Integration uses 3D trapezoid rule over (mtot, mrat, redz), so each integrated bin
+    # is computed by averaging dnum at 8 corner vertices of a cube.
+    # For integrated bin [mm, qq, zz, ff], the 8 vertices are at positions:
+    #   [mm:mm+2, qq:qq+2, zz:zz+2, ff]  (all combinations of +-1 offsets in mtot, mrat, redz)
+    #
+    # We've already decided to allow differences at low redshifts. So, the below mask
+    # excludes bins where any contributing vertex has redz_not_ignore=False.
+    num_not_ignore = (
+        redz_not_ignore[:-1, :-1, :-1, :] &  # [mtot, mrat, redz, freq]
+        redz_not_ignore[1:,  :-1, :-1, :] &  # [mtot+1, mrat, redz, freq]
+        redz_not_ignore[:-1, 1:,  :-1, :] &  # [mtot, mrat+1, redz, freq]
+        redz_not_ignore[1:,  1:,  :-1, :] &  # [mtot+1, mrat+1, redz, freq]
+        redz_not_ignore[:-1, :-1, 1:,  :] &  # [mtot, mrat, redz+1, freq]
+        redz_not_ignore[1:,  :-1, 1:,  :] &  # [mtot+1, mrat, redz+1, freq]
+        redz_not_ignore[:-1, 1:,  1:,  :] &  # [mtot, mrat+1, redz+1, freq]
+        redz_not_ignore[1:,  1:,  1:,  :]    # [mtot+1, mrat+1, redz+1, freq]
+    )
+
     # Make sure that `atol` is also set to a reasonable value
-    bads = ~np.isclose(num_py, num_cy, rtol=1e-2, atol=1.0e-1)
+    bads = ~np.isclose(num_py, num_cy, rtol=1e-2, atol=1.0e-1) & num_not_ignore
     if np.any(bads):
         print(f"{utils.frac_str(bads)=}")
         print(f"{num_py[bads][:10]=}")
