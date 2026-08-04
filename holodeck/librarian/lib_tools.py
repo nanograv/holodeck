@@ -1047,8 +1047,13 @@ def run_model(
     data["fobs_cents"] = fobs_cents
     data["fobs_edges"] = fobs_edges
 
-    if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
-        err = f"`holo.hardening.Fixed_Time_2PL_SAM` must be used here!  Not {hard}!"
+    if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, 
+                             holo.hardening.FixedOuterTime_InnerPL_SAM,
+                             holo.hardening.Hard_GW)):
+        err = (
+            f"`sam_cyutils` methods only work with `Fixed_Time_2PL_SAM`, "
+            f"`FixedOuterTime_InnerPL_SAM`, or `Hard_GW` hardening models!  Not {hard}!"
+        )
         if log is not None:
             log.exception(err)
         raise RuntimeError(err)

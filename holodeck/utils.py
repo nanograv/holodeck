@@ -1964,6 +1964,24 @@ def schwarzschild_radius(mass):
     return rs
 
 
+def gravitational_radius(mass):
+    """Return the gravitational radius [cm] for the given mass [grams].
+
+    Parameters
+    ----------
+    m1 : array_like
+        Mass [grams]
+
+    Returns
+    -------
+    rg : array_like,
+        Gravitational radius for this mass.
+
+    """
+    rg = 0.5 * SCHW * mass
+    return rg
+
+
 def velocity_orbital(mt, mr, per=None, sepa=None):
     sepa, per = _get_sepa_freq(mt, sepa, per)
     v2 = np.power(NWTG*mt/sepa, 1.0/2.0) / (1 + mr)

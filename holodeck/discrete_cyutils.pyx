@@ -36,10 +36,10 @@ cdef double POISSON_THRESHOLD = 1.0e8
 
 # ---- Define Constants
 
-cdef double MY_NWTG = 6.6742999e-08
-cdef double MY_MSOL = 1.988409870698e+33
+cdef double MY_NWTG = 6.674299999999999e-08
+cdef double MY_MSOL = 1.988409870698051e+33
 cdef double MY_SPLC = 29979245800.0
-cdef double MY_MPC = 3.08567758e+24
+cdef double MY_MPC = 3.0856775814913674e+24
 cdef double MY_YR = 31557600.0
 
 # freq = KEPLER_CONST * sqrt(mass) / pow(sepa, 1.5)

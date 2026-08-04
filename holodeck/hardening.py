@@ -54,12 +54,15 @@ from holodeck import utils, cosmo, log, _PATH_DATA, galaxy_profiles
 from holodeck.host_relations import (
     get_stellar_mass_halo_mass_relation, get_mmbulge_relation, get_msigma_relation
 )
-from holodeck.constants import GYR, NWTG, PC, MSOL
+from holodeck.constants import GYR, NWTG, PC, MSOL, SPLC
 
 #: number of influence radii to set minimum radius for dens calculation
 _MIN_DENS_RAD__INFL_RAD_MULT = 10.0
 _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 
+# Absolute upper limit on dadt for binary hardening
+# Currently implemented only for FixedOuterTime_InnerPL_SAM hardening method.
+_DADT_SPEED_LIMIT = 1.0 * SPLC
 
 # =================================================================================================
 # ====    Hardening Classes    ====
@@ -824,7 +827,7 @@ class Fixed_Time_2PL(_Hardening):
     _INTERP_THRESH_PAD_FACTOR = 5.0      #: allowance for when to use chunking and when to process full array
     _NORM_CHUNK_SIZE = 1e3
     CONSISTENT = True
-
+    
     def __init__(self, time, mtot, mrat, redz, sepa_init,
                  rchar=100.0*PC, gamma_inner=-1.0, gamma_outer=+1.5,
                  progress=False, interpolate_norm=False):
@@ -930,7 +933,6 @@ class Fixed_Time_2PL(_Hardening):
         else:
             log.info("calculating normalization exactly")
             norm = self._get_norm_chunk(time, mtot, mrat, rchar, gamma_inner, gamma_outer, sepa_init, progress=progress)
-
         self._gamma_inner = gamma_inner
         self._gamma_outer = gamma_outer
         self._time = time
@@ -1299,7 +1301,6 @@ class Fixed_Time_2PL(_Hardening):
             cut = slice(lo, hi)
             # calculate normalizations for this chunk
             norm[cut] = cls._get_norm(target_time[cut], *[aa[cut] for aa in args], **kwargs)
-
         return norm
 
     @classmethod
@@ -1486,7 +1487,6 @@ class Fixed_Time_2PL_SAM(_Hardening):
     """
 
     CONSISTENT = True
-
     def __init__(self, sam, time, sepa_init=1.0e3*PC, rchar=10.0*PC, gamma_inner=-1.0, gamma_outer=+1.5, num_steps=300):
         """Initialize a `Fixed_Time` instance using a provided `Semi_Analytic_Model` instance.
 
@@ -1547,6 +1547,11 @@ class Fixed_Time_2PL_SAM(_Hardening):
     def dadt(self, mtot, mrat, sepa, norm=None):
         if norm is None:
             norm = self._norm
+            # change shape of `norm` from (M,Q) to (M,Q,Z,R)
+            mtot, norm = np.broadcast_arrays(
+                mtot, 
+                norm[:, :, np.newaxis, np.newaxis]
+            )
 
         args = np.broadcast_arrays(mtot, mrat, sepa, norm)
         shape = args[0].shape
@@ -1557,8 +1562,546 @@ class Fixed_Time_2PL_SAM(_Hardening):
             self._rchar, self._gamma_inner, self._gamma_outer   # must all be scalars
         )
         dadt_vals = dadt_vals.reshape(shape)
-        return dadt_vals
 
+        return dadt_vals
+    
+
+
+# ====    New hardening implementation    ====
+class FixedOuterTime_InnerPL_SAM(_Hardening):
+    """
+    Semi-analytic binary evolution model with a fixed 'outer' inspiral time and
+    a single power-law 'inner' hardening rate, prior to the GW-dominated regime.
+
+    **Outer phase (galaxy-scale evolution)**:
+    A fixed time delay (`outer_time`) is imposed between galaxy merger and the onset
+    of efficient binary hardening. Binary separation is not explicitly evolved here.
+
+    **Inner phase (binary hardening)**:
+    Once the binary reaches a characteristic separation (`rchar`), its evolution
+    is modeled as a combination of GW emission and phenomenological power-law hardening.
+
+    The transition between environmental hardening and GW-dominated evolution is
+    controlled by a critical radius (`r_gw_crit`) with a mass-dependent scaling.
+
+    Parameters
+    ----------
+    sam : `holodeck.sam.Semi_Analytic_Model`
+        Input semi-analytic model providing binary total mass, mass ratio, redshift
+    num_steps : int, optional
+        Number of binary separations at which hardening is calculated. Default: 300.
+    inner_model_type : int, optional
+        Flag controlling how the inner hardening is parameterized (Default: 0):
+        - 0 : Power-law model defined by (`nu_inner`, `r_gw_crit_9`, `alpha_gw_crit`)
+        - 1 : Power-law inferred from (`dadt_rchar`, `r_gw_crit_9`, `alpha_gw_crit`)
+        - 2 : (`dadt_rchar`, `nu_inner`) [not implemented]
+        - 3 : (`nu_inner`, `inner_time`) [not implemented]
+    outer_time : float, optional
+        Time delay between galaxy merger and the onset of inner binary hardening [s].
+        Default: 1.0*GYR.
+    rchar_9 : float, optional
+        Characteristic separation at which the inner hardening begins,
+        for 1e9 Msun BHs [cm]. Default: 1.0*PC.
+    alpha_char : float, optional
+        Power-law index governing mass dependence of rchar. Default: -2.0/3.0.
+    nu_inner : float, optional
+        Power-law slope of the inner hardening timescale. Default: 0.0.
+        Used only for `inner_model_type=0`.
+    dadt_rchar : float, optional
+        Hardening rate for equal=mass binaries at rchar [cm/s]. Default: None
+        Sets power-law slope for `inner_model_type=1`.
+    inner_time : float, optional
+        Total duration of inner evolution phase (not yet implemented). Default: None.
+    gw_crit_units : {'rg', 'pc'}, optional
+        Specifies if GW transition radius is in gravitational radii [rg] or parsec [pc].
+        Default: 'rg'.
+    r_gw_crit_9 : float, optional
+        GW transition radius for M=1e9 Msun binaries. Default: 10**2.5.
+        Units determined by `gw_crit_units`.
+    alpha_gw_crit : float, optional
+        Power-law index governing mass dependence of the GW transition radius. Default: -0.25.
+    beta_gw_crit : float, optional
+        Power-law index governing dependence of GW transition radius on 
+        normalized symmetric mass ratio. Default: +0.25.
+    fobs_min : float, optional
+        Minimum observed GW frequency to consider [Hz]. All binaries must have 
+        2*forb(rchar) < fobs_min if `enforce_physical_params`=True. Default: 9.0e-10.
+    enforce_physical_params : bool, optional
+        If True, require that all model parameters satisfy physical constraints
+        (e.g., allowed ranges from `check_params_allowed`). Default: False.
+    require_inner_and_gw_phases : bool, optional
+        if True, require that all binaries have rISCO < aGW < rchar. Default: False.
+
+    Attributes
+    ----------
+    _inner_model_type : int
+        Flag controlling how the inner hardening is parameterized.
+    _fobs_min : float
+        Defines low-frequency edge of PTA band [Hz].
+    _enforce_physical_params : bool
+        Require all model params to satisfy physical constraints from
+        `check_params_allowed`.
+    _require_inner_and_gw_phases : bool
+        Require all binaries to satisfy rISCO < aGW < rchar.
+    _outer_time : float
+        Outer phase duration [s].
+    _num_steps : int
+        Number of steps at which to calculate hardening. Currently unused.
+    _rchar_9 : float
+        Characteristic radius at which a 1e9Msun binary transitions from 
+        'outer' to 'inner' hardening [cm].
+    _alpha_char : float
+        mass scaling of characteristic radius. _alpha_char=-1 yields no mass scaling
+        when _rchar_9 is in physical (not gravitational) units.
+    _nu_inner : float or None
+        Inner power-law slope.
+    _dadt_rchar : float or None
+        Hardening rate of equal-mass binaries at _rchar_9 [cm/s].
+    _inner_time : float or None
+        Not used for currently defined inner model types.
+    _r_gw_crit_9 : float
+        GW transition radius for M=1e9Msun binaries.
+    _gw_crit_units : str
+        Units for GW transition radius ('pc' or 'rg').
+    _alpha_gw_crit : float
+        Mass scaling of GW transition radius. _alpha_gw_crit=-1 yields no mass scaling
+        when _r_gw_crit_9 is in physical (not gravitational) units.
+    _beta_gw_crit : float
+        Normalized symmetric mass ratio scaling of GW transition radius.
+    _params_allowed : ndarray of bool
+        Mask indicating which (mass, mass ratio) combinations satisfy
+        physical constraints.
+
+    Notes
+    -----
+    - The total hardening rate is the sum of the GW and inner hardening rates.
+    - For `inner_model_type=1`, the inner slope ν_inner is inferred from:
+          dadt(rchar) = dadt_rchar × η_norm
+      where η_norm = 4q / (1+q)^2 is the symmetric mass ratio normalization.
+    - The model assumes dadt < 0 at all times.
+
+    """
+    CONSISTENT = True
+    
+    def __init__(self, sam, num_steps=300, outer_time=1.0*GYR, 
+                 inner_model_type=0, rchar_9=1.0*PC, alpha_char=-2.0/3.0,
+                 nu_inner=0.0, dadt_rchar=None, inner_time=None,
+                 gw_crit_units='rg', r_gw_crit_9=10**2.5, 
+                 alpha_gw_crit=-0.25, beta_gw_crit=+0.25,
+                 fobs_min=9.0e-10,
+                 enforce_physical_params=False,
+                 require_inner_and_gw_phases=False):
+        """
+        Initialize the binary hardening model.
+
+        See class docstring for full parameter descriptions and model details.
+
+        Notes
+        -----
+        - Only `inner_model_type` 0 and 1 are currently supported.
+        - If `enforce_physical_params=True`, invalid parameter combinations
+          will raise an exception instead of issuing warnings.
+        - Allowed parameter regions are precomputed using `check_params_allowed()`.
+
+        """
+
+        import holodeck.sams  # noqa
+        import holodeck.sams.sam_cyutils  # noqa
+
+        if outer_time is None or np.ndim(outer_time) != 0:
+            raise ValueError("`outer_time` cannot be None & must be a scalar (ndim=0).")
+        if rchar_9 is None or np.ndim(rchar_9) != 0:
+            raise ValueError("`rchar_9` cannot be None & must be a scalar (ndim=0).")
+        if r_gw_crit_9 is None or np.ndim(r_gw_crit_9) != 0:
+            raise ValueError("`r_gw_crit_9` cannot be None & must be a scalar (ndim=0).")
+        if alpha_gw_crit is None or np.ndim(alpha_gw_crit) != 0:
+            raise ValueError("`alpha_gw_crit` cannot be None & must be a scalar (ndim=0).")
+
+        assert gw_crit_units in ('pc','rg')
+
+        if inner_model_type == 0:
+            # set inner hardening using nu_inner, r_gw_crit_9, and alpha_gw_crit
+            assert np.ndim(nu_inner) == 0 and nu_inner is not None
+            if dadt_rchar is not None or inner_time is not None:
+                log.warning(f"For {inner_model_type=}, setting to None: {dadt_rchar=}, {inner_time=}.")
+                dadt_rchar = None
+                inner_time = None
+        elif inner_model_type == 1:
+            # set inner hardening using dadt_rchar, r_gw_crit_9, and alpha_gw_crit
+            assert np.ndim(dadt_rchar) == 0 and dadt_rchar is not None
+            if nu_inner is not None or inner_time is not None:
+                log.warning(f"For {inner_model_type=}, setting to None: {nu_inner=}, {inner_time=}.")
+                nu_inner = None
+                inner_time = None
+                
+        elif inner_model_type == 2:
+            # set inner hardening using dadt_rchar and nu_inner
+            raise NotImplementedError("inner_model_type=2 is not yet implemented.")
+            
+        elif inner_model_type == 3:
+            # set inner hardening using nu_inner and inner_time
+            raise NotImplementedError("inner_model_type=3 is not yet implemented.")
+
+        else:
+            raise ValueError(f"Invalid {inner_model_type=}. Must be one of: 0, 1, 2, 3.")
+        
+        self._inner_model_type = inner_model_type  
+        self._fobs_min = fobs_min # if not None, ensure all binaries start outside the PTA band
+        self._enforce_physical_params = enforce_physical_params # throw error if not physical
+        self._require_inner_and_gw_phases = require_inner_and_gw_phases # rISCO < aGW < rchar
+        self._outer_time = outer_time        # [s]
+        self._num_steps = num_steps
+        self._rchar_9 = rchar_9              # [cm]; rchar for a 1e9 Msun BH
+        self._alpha_char = alpha_char        # determines mass scaling of rchar
+        self._nu_inner = nu_inner            # None for model 1
+        self._dadt_rchar = dadt_rchar        # [cm/s]; None for models 0 and 3
+        self._inner_time = inner_time        # [s]; None for models 0-2
+        self._r_gw_crit_9 = r_gw_crit_9      # units defined by `gw_crit_units`
+        self._gw_crit_units = gw_crit_units  # 'rg' or 'pc'
+        self._alpha_gw_crit = alpha_gw_crit  # determines mass scaling of r_gw_crit
+        self._beta_gw_crit = beta_gw_crit  # determines normed symm mass ratio scaling of r_gw_crit
+
+        self._params_allowed = self.check_params_allowed(sam.mtot, sam.mrat)
+        if self._enforce_physical_params:
+            if np.any(self._params_allowed==False):
+                err = ("Invalid hardening model! It probably should not be "
+                       "used for GW calculations.\nSet enforce_physical_params=False "
+                       "to generate this model without raising an exception.")
+                log.error(err)
+                raise ValueError(err)
+        else:
+            if np.any(self._params_allowed==False):
+                warn = ("\n*** This hardening model has invalid parameters! "
+                        "It probably should not be used for GW calculations. ***\n"
+                        "Set enforce_physical_params=True to "
+                        "raise an exception for invalid hardening model parameters.")
+                log.warning(warn)
+        
+        return
+
+    def __str__(self):
+        msg = (
+            f"{super().__str__()} :: "
+            f"outer_time/Gyr={self._outer_time/GYR:.2e} num_steps={self._num_steps} "
+            f"rchar_9/pc={self._rchar_9/PC:.2e} "
+            f"nu_inner={self._nu_inner:.2e} "
+        )
+        return msg
+
+    def dadt_dedt(self, evo, step, *args, **kwargs):
+        raise NotImplementedError()
+
+    def dadt(self, _mtot, _mrat, _redz, _sepa):
+        """
+        Compute the binary hardening rate and associated evolution quantities.
+    
+        Inputs are broadcast to a common shape: (N_mtot, N_mrat, N_redshift, N_radii)
+    
+        Parameters
+        ----------
+        _mtot : ndarray
+            Total binary mass [g].
+        _mrat : ndarray
+            Mass ratio q = m2/m1 ≤ 1.
+        _redz : ndarray
+            Cosmological redshift at the start of the inner evolution phase.
+        _sepa : ndarray
+            Array of binary separations in [cm] at which to calculate the
+            hardening rate dadt.
+
+        Returns
+        -------
+        dadt_vals : ndarray
+            Total hardening rate [cm/s] evaluated at each separation (GW + phenom):    
+        rgw_crit : ndarray
+            GW transition radius [cm]
+        redz_char : ndarray
+            Redshift at the start of the inner phase (i.e., after `outer_time` delay).
+        redz_final : ndarray
+            Final redshift at binary coalescence.
+    
+        Notes
+        -----
+        The 'inner' hardening is defined differently depending on `inner_model_type`:
+        - Model 0: explicit power-law model where ν_inner is specified directly.
+        - Model 1: the effective ν_inner is inferred from dadt_rchar and r_gw_crit
+        Transition radius between environmental and GW regimes occurs at:
+            r_gw_crit = r9 × (M / 1e9 Msun)^(alpha_gw_crit + 1) × (4 * eta)^beta_gw_crit 
+        where r9 is specified in either gravitational radii or parsecs.
+        Assumes dadt < 0 everywhere; positive values will lead to invalid logs.
+
+        """        
+
+        if np.any(self._params_allowed==False):
+            log.warning(f"Found invalid hardening model params!")
+
+        m9 = _mtot / (1.0e9*MSOL)
+
+        # normalized symmetric mass ratio is 1.0 for equal-mass BHBs
+        eta_norm = _mrat / np.square(1 + _mrat) * 4
+
+        # Convert GW critical radius into cm
+        if self._gw_crit_units == 'rg':
+            r9 = self._r_gw_crit_9 * utils.gravitational_radius(1.0e9*MSOL)
+        else:
+            r9 = self._r_gw_crit_9 * PC
+
+        # ISCO radius
+        risco = utils.rad_isco(_mtot)
+
+        # rchar is always assumed to be in cm, no need for conversion
+        rchar = self._rchar_9 * m9**(self._alpha_char+1)
+
+        # transition radius from inner to GW regime
+        rgw_crit = r9 * m9**(self._alpha_gw_crit+1) * eta_norm**(self._beta_gw_crit)
+
+        # set rgw_crit to risco for any binaries that don't have a GW hardening phase
+        if np.any(rgw_crit<=risco):
+            log.warning("found rgw_crit<=risco. Setting to risco for these binaries with no GW phase.")
+            rgw_crit[rgw_crit<risco] = risco[rgw_crit<risco]
+
+        # set rgw_crit to rchar for any binaries that don't have an inner hardening phase
+        if np.any(rgw_crit>=rchar):
+            log.warning("found rgw_crit>=rchar. Setting to rchar for these binaries with no inner phase.")
+            rgw_crit[rgw_crit>rchar] = rchar[rgw_crit>rchar]
+        
+        m1, m2 = utils.m1m2_from_mtmr(_mtot, _mrat)
+
+        dadt_gw_crit = utils.gw_hardening_rate_dadt(m1, m2, rgw_crit)
+
+        redz_char = utils.redz_after(self._outer_time, redz=_redz, age=None)   # redshift at end of 'outer' phase 
+
+        # define a mask for binaries with no GW hardening phase
+        gw_mask = (rgw_crit>risco)        
+        dadt_gw_vals = np.zeros_like(dadt_gw_crit)
+        dadt_gw_vals[gw_mask] = utils.gw_hardening_rate_dadt(m1[gw_mask], m2[gw_mask], _sepa[gw_mask])
+
+        # define a mask for binaries with no inner hardening phase 
+        in_mask = (rgw_crit<rchar)
+        dadt_phenom_vals = np.zeros_like(dadt_gw_crit)
+
+        if self._inner_model_type == 0:
+            # set inner hardening using nu_inner, r_gw_crit_9 (in units of rg or pc), and alpha_gw_crit
+            # alpha_gw_crit = 0 corresponds to no mass dependence of r_gw_crit in units of Rg
+            # alpha_gw_crit = -1 corresponds to no mass dependence of r_gw_crit in physical units
+                
+            # "inner" PL hardening rate
+            dadt_phenom_vals[in_mask] = (
+                dadt_gw_crit[in_mask] * ( _sepa[in_mask] / rgw_crit[in_mask] ) ** (1.0-self._nu_inner)
+            )
+            
+        elif self._inner_model_type == 1:
+            # set inner hardening using dadt_rchar, r_gw_crit_9 (in units of rg or pc), and alpha_gw_crit
+            # naturally avoids superluminal hardening by setting dadt_rchar)
+
+            # "inner" PL and hardening rate
+            # multiplied by eta_norm to maintain same nu_inner for a given mtot
+            dadt_phenom_rchar = np.zeros_like(dadt_gw_crit)
+            dadt_phenom_rchar[in_mask] = self._dadt_rchar * eta_norm[in_mask]
+
+            nu_inner = np.nan * np.ones_like(dadt_gw_crit)
+            nu_inner[in_mask] = ( 
+                1 + ( np.log10(-dadt_gw_crit[in_mask]) - np.log10(-dadt_phenom_rchar[in_mask]) ) / 
+                ( np.log10(rchar[in_mask]) - np.log10(rgw_crit[in_mask]) ) 
+            )
+            # note that nu_inner only has mass dependence, not mrat dependence, 
+            # by definition since dadt_rchar is multiplied by eta_norm
+            dadt_phenom_vals[in_mask] = (
+                dadt_gw_crit[in_mask] * ( _sepa[in_mask] / rgw_crit[in_mask] ) ** (1.0-nu_inner[in_mask])
+            )
+
+        elif self._inner_model_type == 2:
+            # set inner hardening using dadt_rchar and nu_inner (lowest priority for testing)
+            raise NotImplementedError()
+
+        elif self._inner_model_type == 3:
+            # set inner hardening using nu_inner and inner_time (closest analogue to 2PL model)
+            raise NotImplementedError()
+            
+        else:
+            raise ValueError(f"{self._inner_model_type=} not defined. valid values are 0-3.")
+
+
+        dadt_vals = dadt_phenom_vals + dadt_gw_vals
+
+        if self._enforce_physical_params:
+            if np.any(self._params_allowed==False):
+                err = "Invalid hardening model parameters!"
+                log.error(err)
+                raise ValueError(err)
+            else:
+                # additional check on dadt_vals
+                if np.any(np.abs(dadt_vals)) > _DADT_SPEED_LIMIT:
+                    err = ("Hardening model exceeds dadt speed limit despite passing "
+                           "`self._params_allowed` check! Something has gone wrong.")
+                    log.error(err)
+                    raise ValueError(err)
+            
+        inner_time = -utils.trapz_loglog(-1.0 / dadt_vals, _sepa, axis=-1, cumsum=True)
+        inner_time = inner_time[:,:,:,-1]
+        redz_final = utils.redz_after(inner_time, redz=redz_char[:,:,:,-1], age=None) # merger redshift 
+
+        return dadt_vals, rgw_crit, redz_char, redz_final
+
+    def check_params_allowed(self, _mtot, _mrat, nu_inner_absmax=4.0):
+        """
+        Return a 2D boolean array specifying which total mass and mass ratio 
+        values are allowed for the current set of hardening model params.
+
+        Parameters
+        ----------
+        _mtot : array_like
+            Total binary mass values [in grams]. Shape (N,).
+        _mrat : array_like
+            Mass ratio values (m2/m1 <= 1). Shape (M,).
+        nu_inner_absmax : float, optional
+            Maximum allowed absolute value of the inner PL slope (nu_inner). Default: 4.0.
+
+        Returns
+        -------
+        modelAllowed : ndarray of bool
+            Boolean array of shape (N, M), where True indicates that the
+            corresponding (mtot, mrat) combo satisfies all model constraints.
+    
+        Notes
+        -----
+        The following conditions are enforced:
+        1. Hardening rate 'speed limit' check:
+           If the phenomenological hardening rate at rchar (`self._dadt_rchar`) exceeds
+           the global speed limit (`_DADT_SPEED_LIMIT`), all models are rejected.
+        2. Constraints on critical radius for transition to the GW regime: 
+           - r_gw_crit must be greater rISCO.
+           - r_gw_crit must be less than rchar.
+        3. Total hardening rate at rchar:
+           The sum of GW and phenomenological hardening rates must not
+           exceed `_DADT_SPEED_LIMIT`.
+        4. Inner slope (nu_inner) constraints:
+           The inferred phenomenological hardening rate at rchar must lie
+           within bounds set by ±nu_inner_absmax.
+       
+        """
+
+        if nu_inner_absmax < 0:
+            raise ValueError(f"{nu_inner_absmax=} not allowed. Must be > 0.")
+
+        mt, mr, = np.broadcast_arrays(
+            _mtot[:, np.newaxis],
+            _mrat[np.newaxis, :]
+        )
+
+        # CHECK: are model params disallowed for all values of mtot and mrat?
+        if self._inner_model_type == 0:
+            if np.abs(self._nu_inner) > nu_inner_absmax:
+                log.warning("In check_params_allowed(): self._nu_inner > nu_inner_absmax")
+                modelAllowed = np.zeros_like(mt).astype('bool')
+                return modelAllowed
+            else:
+                modelAllowed = np.ones_like(mt).astype('bool')        
+        elif self._inner_model_type == 1:
+            if np.abs(self._dadt_rchar) >= _DADT_SPEED_LIMIT:
+                log.warning("In check_params_allowed(): |self.dadt_rchar| >= _DADT_SPEED_LIMIT")
+                modelAllowed = np.zeros_like(mt).astype('bool')
+                return modelAllowed
+            else:
+                modelAllowed = np.ones_like(mt).astype('bool')        
+        else:
+            raise ValueError("`self._inner_model_type` must be 0 or 1.")
+            
+        # Normalize total mass to 1e9 solar masses
+        m9 = mt / (1.0e9*MSOL)
+
+        # Normalized symmetric mass ratio (eta_norm=1 for equal-mass binaries)
+        eta_norm = mr / np.square(1 + mr) * 4
+
+        # Convert GW critical radius into cm
+        if self._gw_crit_units == 'rg':
+            r9 = self._r_gw_crit_9 * utils.gravitational_radius(1.0e9*MSOL)
+        else:
+            r9 = self._r_gw_crit_9 * PC
+                
+        # ISCO radius    
+        risco = utils.rad_isco(mt)
+
+        #rchar is always assumed to be in cm, no need for conversion
+        rchar = self._rchar_9 * m9**(self._alpha_char+1)
+        
+        # CHECK: is rchar > rISCO?
+        modelAllowed[(rchar <= risco)] = False
+        if np.any(modelAllowed == False):
+            log.warning("In check_params_allowed(): found rchar <= risco!")
+
+        # CHECK: is rchar > r(fobs_min) for circular binaries?
+        if self._fobs_min is not None:
+            r_fobsmin = ( NWTG * mt / (self._fobs_min * np.pi) **2 )**(1.0/3)
+            modelAllowed[(rchar < r_fobsmin)] = False
+            if np.any(modelAllowed == False):
+                log.warning("In check_params_allowed(): found rchar <= r(fobs_min) for circular binaries!")
+        else:
+            log.warning("self._fobs_min is None! No check performed to ensure rchar <= r(fobs_min). "
+                        "These results probably shouldnt be used for GWB calculations.")
+        
+        # GW critical radius scaling
+        rgw_crit = r9 * m9**(self._alpha_gw_crit+1) * eta_norm**(self._beta_gw_crit)
+        #CHECK: does model obey criterion: rcritGW > rISCO ?
+        # NOTE: this criterion only flags modelAllowed=False *if* self._require_inner_and_gw_phases = True
+        if np.any(rgw_crit<=risco):
+            log.warning("In check_params_allowed(): found rgw_crit <= risco. ") 
+            if self._require_inner_and_gw_phases:
+                modelAllowed[(rgw_crit <= risco)] = False
+            log.warning("Setting rgw_crit=risco for these binaries with no GW hardening phase.")            
+            rgw_crit[rgw_crit<risco] = risco[rgw_crit<risco]
+        
+        # CHECK: does model obey criterion: rcritGW < rchar ?
+        # NOTE: this criterion only flags modelAllowed=False *if* self._require_inner_and_gw_phases = True
+        if np.any(rgw_crit >= rchar):            
+            log.warning("In check_params_allowed(): found rgw_crit >= rchar.") 
+            if self._require_inner_and_gw_phases:
+                modelAllowed[(rgw_crit >= rchar)] = False
+            log.warning("Setting rgw_crit=rchar for these binaries with no inner hardening phase.")         
+            rgw_crit[rgw_crit>rchar] = rchar[rgw_crit>rchar]
+        
+        m1, m2 = utils.m1m2_from_mtmr(mt, mr)
+        dadt_gw_crit = utils.gw_hardening_rate_dadt(m1, m2, rgw_crit)
+        rch_rgw_ratio = rchar / rgw_crit
+
+        # Calculate phenomenological hardning rate at rchar
+        if self._inner_model_type == 0:
+            # calculate dadt_phenom_rchar
+            dadt_phenom_rchar = dadt_gw_crit * ( rchar / rgw_crit ) ** (1.0-self._nu_inner)    
+        elif self._inner_model_type == 1:
+            # Scale dadt_phenom_rchar by eta_norm (so derived nu_inner has no mass ratio dependence)
+            dadt_phenom_rchar = self._dadt_rchar * eta_norm
+        else:
+            raise NotImplementedError()
+        # Set dadt_phenom_rchar to zero for any binaries with no inner hardening phase
+        dadt_phenom_rchar[rchar==rgw_crit] = 0.0
+        
+        # CHECK: is total dadt at rchar less than speed limit?
+        dadt_gw_rchar = utils.gw_hardening_rate_dadt(m1, m2, rchar)
+        if np.any(np.abs(dadt_gw_rchar+dadt_phenom_rchar) >= _DADT_SPEED_LIMIT):
+            log.warning("found total |dadt(rchar)| > _DADT_SPEED_LIMIT")
+            modelAllowed[np.abs(dadt_gw_rchar+dadt_phenom_rchar)>=_DADT_SPEED_LIMIT] = False
+
+        # We don't need additional checks if inner_model_type=0 b/c we checked nu_inner globally above
+        if self._inner_model_type == 1:
+            # Bounds on log10(dadt_rchar) implied by |nu_inner| <= nu_inner_absmax        
+            # (1-nu)*lgrdiff + lgdadtgw is a min or max depending if dadtrchar > or < dadt_gw_crit
+            min_lgdadtrchar_nuinmax = ( -1.0*np.log10(eta_norm) + 
+                                       (1-nu_inner_absmax)*np.log10(rch_rgw_ratio) + 
+                                       np.log10(-dadt_gw_crit) )
+            max_lgdadtrchar_nuinmax = ( -1.0*np.log10(eta_norm) + 
+                                       (1+nu_inner_absmax)*np.log10(rch_rgw_ratio) + 
+                                       np.log10(-dadt_gw_crit) )
+        
+            # CHECK: does model obey criterion: |nu_inner| < nu_inner,max?
+            # (ignore the ones with no inner phase for which dadt_phenom_rchar=0)
+            modelAllowed[min_lgdadtrchar_nuinmax > max_lgdadtrchar_nuinmax] = False
+            modelAllowed[(np.log10(-dadt_phenom_rchar) < min_lgdadtrchar_nuinmax)&
+                         (dadt_phenom_rchar<0)] = False
+            modelAllowed[(np.log10(-dadt_phenom_rchar) > max_lgdadtrchar_nuinmax)&
+                         (dadt_phenom_rchar<0)] = False
+        
+        return modelAllowed
 
 # =================================================================================================
 # ====    Utility Classes and Functions    ====
@@ -1938,3 +2481,159 @@ def _radius_loss_cone_BBR1980_dehnen(mbh, mstar, gamma=1.0):
     rstar = _radius_stellar_characteristic_dabringhausen_2008(mstar, gamma)
     rlc = np.power(mass_of_a_star / mbh, 0.25) * np.power(rbnd/rstar, 2.25) * rstar
     return rlc
+
+def allowed_param_range(mtot, mrat, alpha_char, rchar_9, alpha_gw, beta_gw, r9rg, 
+                        risco_in_rg=6.0, nu_inner_absmax=4.0):
+    """
+    Compute allowed parameter ranges for FixedOuterTime_InnerPL_SAM hardening 
+
+    This function evaluates the physically allowed ranges of aGW,9, nu_inner, and dadt(rchar),
+    under constraints imposed by:
+      - The ISCO radius
+      - The characteristic radius rchar
+      - A maximum allowed inner slope parameter (nu_inner_absmax)
+      - A global hardening rate speed limit (_DADT_SPEED_LIMIT)
+
+    It is meant primarily for exploring the valid ranges for given hardening params,
+    and it is not currently part of any GWB calculation workflow. It should not be confused with
+    the FixedOuterTime_InnerPL_SAM.check_params_allowed() function, which is called when the 
+    FixedOuterTime_InnerPL_SAM class is initialized
+
+    The function modifies `r9rg` in-place by setting invalid values to NaN.
+
+    Parameters
+    ----------
+    mtot : array_like
+        Total binary mass [grams].
+    mrat : array_like
+        Mass ratio (m2/m1 ≤ 1).
+    alpha_char : float
+        Power-law index for the scaling of the characteristic radius rchar with mass:
+            rchar ∝ mtot^(alpha_char + 1)
+    rchar_9 : float
+        Characteristic radius (cm) where 'inner' phenomenological hardening regime begins,
+        for Mtot=1e9Msun binaries.
+    alpha_gw : float
+        Power-law index for the scaling of the critical GW transition radius with mass:
+            r_gw_crit [cm] ∝ mtot^(alpha_gw + 1) * eta_norm^(beta_gw)
+    beta_gw : float
+        Power-law index for the scaling of the critical GW transition radius 
+        with normed symm mass ratio:
+            r_gw_crit [cm] ∝ mtot^(alpha_gw + 1) * eta_norm^(beta_gw)
+    r9rg : array_like
+        Critical GW transition radius for Mtot=1e9Msun binaries, in units of gravitational radii
+        This array is modified in-place: invalid values are set to NaN.
+    risco_in_rg : float, optional
+        ISCO radius in units of gravitational radius (default: 6.0).
+    nu_inner_absmax : float, optional
+        Maximum allowed absolute value of the inner hardening PL slope nu_inner (default: 4.0).
+
+    Returns
+    -------
+    (min_lgr9rg, max_lgr9rg) : tuple of ndarray
+        Allowed range of log10(r9rg) from geometric constraints: r_ISCO < r_gw_crit < rchar
+    (min_nuin, max_nuin) : tuple of ndarray
+        Allowed range of nu_inner        
+    (min_lgdadtrchar, max_lgdadtrchar) : tuple of ndarray
+        Allowed range of log10(-dadt_rchar) at each r_gw_crit, constrained by:
+            - GW hardening rate at r_gw_crit
+            - Maximum |nu_inner|
+            - Maximum total hardening rate `_DADT_SPEED_LIMIT`.
+    (absmin_lgdadtrchar, absmax_lgdadtrchar) : tuple of ndarray
+        Absolute allowed bounds on log10(-dadt_rchar) for extremal allowed values of r_gw_crit.
+
+    """
+
+    # Check for valid nu_inner_absmax (valid range is -nu_inner_absmax to +nu_inner_absmax, 
+    # unless constrained by 'speed limit')
+    if nu_inner_absmax < 0:
+        raise ValueError(f"{nu_inner_absmax=} not allowed. Must be > 0.")
+        
+    # Normalize mass to 1e9 solar masses
+    m9 = mtot / (1.0e9*MSOL)    
+    
+    # Symmetric mass ratio normalization
+    eta_norm = mrat / np.square(1 + mrat) * 4    
+
+    #rchar is always assumed to be in cm, no need for conversion
+    rchar = rchar_9 * m9**(alpha_char+1)
+
+    # Compute allowed log10(r9rg) bounds from ISCO and rchar constraints
+    # (min depends on mtot & alpha_gw, max depends on mtot, alpha_gw, & rchar)
+    lg_risco_in_rg = np.log10(risco_in_rg)
+    min_lgr9rg = lg_risco_in_rg - alpha_gw * np.log10(m9) - beta_gw * np.log10(eta_norm)
+    tmp = np.log10(rchar/utils.gravitational_radius(1.0e9*MSOL))
+    max_lgr9rg = tmp - (alpha_gw+1) * np.log10(m9) - beta_gw * np.log10(eta_norm)
+
+    # Invalidate r9rg values outside allowed range (note: modifies r9rg in place)
+    if np.any(min_lgr9rg > max_lgr9rg):
+        log.warning("Found min_lgr9rg > max_lgr9rg.")
+
+    r9rg[(np.log10(r9rg)<min_lgr9rg)|(np.log10(r9rg)>max_lgr9rg)] = np.nan
+
+    # Obtain physical critical GW transition radii from r9rg, min_lgr9rg, and max_lgr9rg:  
+    fac = utils.gravitational_radius(1.0e9*MSOL) * m9**(alpha_gw+1) * eta_norm**beta_gw
+    rgw_crit = 10.0**np.log10(r9rg) * fac
+    min_rgw_crit = 10.0**min_lgr9rg * fac
+    max_rgw_crit = 10.0**max_lgr9rg * fac
+
+    # Component masses
+    m1, m2 = utils.m1m2_from_mtmr(mtot, mrat)
+
+    # Calculate dadt at rgw_crit (larger rgw_crit = slower hardening in GW phase)
+    lgdadtgwcrit = np.log10(-utils.gw_hardening_rate_dadt(m1, m2, rgw_crit))
+    min_lgdadtgwcrit = np.log10(-utils.gw_hardening_rate_dadt(m1, m2, max_rgw_crit))
+    max_lgdadtgwcrit = np.log10(-utils.gw_hardening_rate_dadt(m1, m2, min_rgw_crit))
+    if np.any(min_lgdadtgwcrit >= max_lgdadtgwcrit):
+        log.error('something is wrong. min_lgdadtgwcrit >= max_lgdadtgwcrit.')
+        raise ValueError()
+
+    lgrdiff = np.log10(rchar)-np.log10(rgw_crit)
+    max_lgrdiff = np.log10(rchar)-np.log10(min_rgw_crit)
+    
+    # Compute allowed bounds on nu_inner and dadt_rchar
+    #(1-vmax)*lgrdiff + lgadotgw is a min or max depending if dadtrchar > or < dadt_gw_crit
+
+    # Allowed dadt_rchar range for given mtot, mrat, rchar, alpha_gw, a & r9rg
+    # and allowed nu_inner range 
+        
+    # max nu_inner corresponds to min log(-dadt(rchar))
+    max_nuin = nu_inner_absmax
+    min_lgdadtrchar = -1.0*np.log10(eta_norm) + (1-nu_inner_absmax)*lgrdiff + lgdadtgwcrit
+
+    # min nu_inner corresponds to max log(-dadt(rchar))
+    max_lgdadtrchar_nuinmax = -1.0*np.log10(eta_norm) + (1+nu_inner_absmax)*lgrdiff + lgdadtgwcrit
+    print(f"{max_lgdadtrchar_nuinmax.shape=}, {eta_norm.shape=}")
+    if np.any(max_lgdadtrchar_nuinmax > np.log10(_DADT_SPEED_LIMIT*eta_norm)):
+        # reducing max dadt_rchar will always increase min_nuin, 
+        # so min_nuin will be > -nu_inner_absmax (less negative) by definition
+        max_lgdadtrchar = np.minimum(max_lgdadtrchar_nuinmax, np.log10(_DADT_SPEED_LIMIT*eta_norm))
+        min_nuin = np.maximum(-1.0*nu_inner_absmax, 1 + ( lgdadtgwcrit - max_lgdadtrchar ) / lgrdiff)
+        print(f"{max_lgdadtrchar.shape=} {min_nuin.shape=}")
+    else:
+        max_lgdadtrchar = copy(max_lgdadtrchar_nuinmax)
+        min_nuin = -1.0*nu_inner_absmax
+    
+    # Absolute bounds on dadt_rchar for given mtot, mrat, rchar, & alpha_gw 
+    # (independent of specific r9rg choice)
+    absmin_lgdadtrchar = -1.0*np.log10(eta_norm) + (1-max_nuin)*max_lgrdiff + min_lgdadtgwcrit
+    absmax_lgdadtrchar_nuinmax = -1.0*np.log10(eta_norm) + (1+min_nuin)*max_lgrdiff + max_lgdadtgwcrit    
+    absmax_lgdadtrchar = np.minimum(absmax_lgdadtrchar_nuinmax, np.log10(_DADT_SPEED_LIMIT))
+
+    # Safety checks
+    if np.any(absmin_lgdadtrchar > absmax_lgdadtrchar):
+        log.warning("Found absmin_lgdadtrchar > absmax_lgdadtrchar.")
+    if np.any(min_lgdadtrchar > max_lgdadtrchar):
+        log.warning("Found min_lgdadtrchar > max_lgdadtrchar.")
+    if np.any(min_nuin > max_nuin):
+        log.error(f"{min_nuin=} > {max_nuin=}")
+    if np.any(np.abs(min_nuin)) > nu_inner_absmax or np.any(np.abs(max_nuin)) > nu_inner_absmax:
+        log.error(f"{min_nuin=} or {max_nuin=} > {nu_inner_absmax}.")
+        
+    return (
+        (min_lgr9rg, max_lgr9rg), 
+        (min_nuin, max_nuin),
+        (min_lgdadtrchar, max_lgdadtrchar), 
+        (absmin_lgdadtrchar, absmax_lgdadtrchar)
+    )
+
