@@ -9,7 +9,7 @@ scipy
 pydoe
 psutil
 tqdm
-cython<3.0.0
+cython>=3.0.0
 nbstripout 
 # nbstripout removes metadata from jupyter notebooks, for merge conflict resolution
 # schwimmbad  # used in the `gps` submodule
