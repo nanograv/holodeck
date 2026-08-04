@@ -27,9 +27,9 @@ from holodeck.cyutils cimport interp_at_index, _interp_between_vals
 
 # ---- Define Constants
 
-cdef double MY_NWTG = 6.6742999e-08
+cdef double MY_NWTG = 6.674299999999999e-08
 cdef double MY_SPLC = 29979245800.0
-cdef double MY_MPC = 3.08567758e+24
+cdef double MY_MPC = 3.0856775814913674e+24
 cdef double MY_MSOL = 1.988409870698051e+33
 cdef double MY_YR = 31557600.0
 cdef double MY_SCHW = 1.4852320538237328e-28     #: Schwarzschild Constant  2*G/c^2  [cm]

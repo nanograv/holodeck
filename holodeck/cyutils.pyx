@@ -40,9 +40,9 @@ cdef double ECCEN_ZERO_LIMIT = 1.0e-12   #: below this value, strains are calcul
 
 # ---- Define Constants
 
-cdef double MY_NWTG = 6.6742999e-08
+cdef double MY_NWTG = 6.674299999999999e-08
 cdef double MY_SPLC = 29979245800.0
-cdef double MY_MPC = 3.08567758e+24
+cdef double MY_MPC = 3.0856775814913674e+24
 cdef double MY_YR = 31557600.0
 cdef double GW_DADT_SEP_CONST = - 64.0 * pow(MY_NWTG, 3) / 5.0 / pow(MY_SPLC, 5)
 cdef double GW_SRC_CONST = 8.0 * pow(MY_NWTG, 5.0/3.0) * pow(M_PI, 2.0/3.0) / sqrt(10.0) / pow(MY_SPLC, 4.0)
