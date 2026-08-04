@@ -552,7 +552,7 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
             fobs_orb, hard._num_steps, hard._outer_time, 
             hard._inner_model_type, dadt_rchar, hard._rchar_9, hard._alpha_char, 
             nu_inner, hard._r_gw_crit_9, hard_gwcrit_units_rg, hard._alpha_gw_crit,
-            nden, sam.mtot, sam.mrat, sam.redz, gmt_time,
+            dens, sam.mtot, sam.mrat, sam.redz, gmt_time,
             cosmo._grid_z, cosmo._grid_dcom, cosmo._grid_age,
             # output:
             redz_final, diff_num
@@ -603,7 +603,7 @@ cdef int _dynamic_binary_number_at_fobs_innerpwl(
     int hard_gwcrit_units_rg,
     double hard_alpha_gwcrit, 
 
-    double[:, :, :] nden,
+    double[:, :, :] dens,
     double[:] mtot,
     double[:] mrat,
     double[:] redz,
@@ -630,7 +630,7 @@ cdef int _dynamic_binary_number_at_fobs_innerpwl(
     ---------
     target_fobs_orb : (F,) array of float [1/s]
         The observer-frame orbital frequencies of interest, in units of inverse seconds.
-    nden : (M, Q, Z) array of float [Mpc^{-3}]
+    dens : (M, Q, Z) array of float [Mpc^{-3}]
         The differential binary volume-density in units of inverse-cubic comoving-Mpc.
     mtot : (M,) array of float [g]
         The edges of the total-mass grid dimension in units of grams.
@@ -859,7 +859,7 @@ cdef int _dynamic_binary_number_at_fobs_innerpwl(
 
                         # calculate number of binaries
                         cosmo_fact = FOUR_PI_SPLC_OVER_MPC * (1.0 + new_redz) * pow(dcom / MY_MPC, 2)
-                        diff_num[ii, jj, kk, ff] = nden[ii, jj, kk] * tres * cosmo_fact
+                        diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
 
                         # ----------------------
                         # ------------------------------------------------------
