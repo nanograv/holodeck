@@ -1169,18 +1169,22 @@ def sepa_emit(mtot, fgw):
     return ( NWTG * mtot / (fgw * np.pi) **2 )**(1.0/3)
 
 def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total', 
-              max_m_to_plot=4, max_q_to_plot=4, 
+              max_m_to_plot=4, max_q_to_plot=4, manual_mt_to_plot=None,
               dadt_idx_to_plot=None, nsams_total=None, idx_fiducial=0,
               var_name=None, extra_panels=False, 
-              pubstyle=False, twopanel=False, Tobs_yr = 100.0,
-              model_labels=None, cmap_arr=None, time_ylim=None, rate_ylim=None,
+              pubstyle=False, twopanel=False, onepanel=False, Tobs_yr = 100.0,
+              model_labels=None, cmap_arr=None, cmap_name=None, maxc=1,
+              time_ylim=None, rate_ylim=None,
               vary_linestyle=None, vary_lw_for_mass=True, color_by_mass=False,
               show_legends=True, shading=0.7,
               fname_extra='', fpath='', save=False, verbose=False):
 
     if pubstyle and extra_panels:
         raise ValueError("must set keyword `pubstyle`=False if `extra_panels`=True")
-        
+
+    if twopanel and onepanel:
+        raise ValueError("only one of keywords `twopanel` and `onepanel` can be True.")
+    
     plt.rc('axes', titlesize=12)     # Title size
     plt.rc('axes', labelsize=12)     # X and Y label size
     plt.rc('xtick', labelsize=10)    # X-axis tick size
@@ -1205,7 +1209,10 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
         xlbl = r'Binary separation $a$ [pc]'
     elif gwcrit_units == 'rg':
         #xlim=[1,1e13]
-        xlim=[10**0.5,10**9]
+        if onepanel:
+            xlim=[10**0.5,10**6]
+        else:
+            xlim=[10**0.5,10**9]
         xlbl = r'Binary separation $a$ [${\rm R_g}$]'
     else:
         raise ValueError(f"invalid keyword {gwcrit_units=}. must be 'pc' or 'rg'.")
@@ -1225,6 +1232,9 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
             if twopanel:
                 fig, (ax_dadt,ax_tau) = plt.subplots(nrows=2, ncols=1, sharex=True, figsize=[4.5,5])
                 first_plot_index = 211
+            elif onepanel:
+                fig, ax_dadt = plt.subplots(nrows=1, ncols=1, figsize=[6.5,4])
+                first_plot_index = 111                
             else:
                 fig, (ax_t,ax_dadt,ax_tau) = plt.subplots(nrows=3, ncols=1, sharex=True, figsize=[4.5,6])
                 first_plot_index = 311
@@ -1243,17 +1253,21 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
     if rate_ylim is None:
         rate_ylim = [0.15,2e11]
 
-    if not twopanel:
-        ax_t.set(ylabel=r'$a / (da/dt)$ [yr]',ylim=time_ylim, **kwargs)
-        ax_t.xaxis.set_inverted(True)
-    ax_dadt.set(ylabel=r'$da/dt$ [cm/s]', ylim=rate_ylim, **kwargs)
-    if pubstyle:
-        ax_tau.set(ylabel=r'$\tau_{in+gw}$ [yr]', xlabel=xlbl, 
-                ylim=time_ylim, **kwargs)
+    if not onepanel:
+        if not twopanel:
+            ax_t.set(ylabel=r'$t_{\rm hard}$ [yr]',ylim=time_ylim, **kwargs)
+            ax_t.xaxis.set_inverted(True)
+        if pubstyle:
+            ax_tau.set(ylabel=r'$\tau_{in+gw}$ [yr]', xlabel=xlbl, 
+                    ylim=time_ylim, **kwargs)
+        else:
+            ax_tau.set(ylabel=r'$\tau_{in+gw}$ [yr]', **kwargs)
+        ax_tau.xaxis.set_inverted(True)
+        ax_dadt.set(ylabel=r'$|da/dt|$ [cm/s]', ylim=rate_ylim, **kwargs)
     else:
-        ax_tau.set(ylabel=r'$\tau_{in+gw}$ [yr]', **kwargs)
+        ax_dadt.set(ylabel=r'$|da/dt|$ [cm/s]', xlabel=xlbl, 
+                    ylim=rate_ylim, **kwargs)
     ax_dadt.xaxis.set_inverted(True)
-    ax_tau.xaxis.set_inverted(True)
 
     if extra_panels:
         ax4 = fig.add_subplot(first_plot_index+3, **kwargs)
@@ -1296,7 +1310,10 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
 
     if not isinstance(cmap_arr, list):
         if cmap_arr is None:
-            cmap_arr = ['viridis']
+            if cmap_name is None:
+                cmap_arr = ['viridis']
+            else:
+                cmap_arr = [cmap_name]
         elif isinstance(cmap_arr, str):
             cmap_arr = [cmap_arr]
         else:
@@ -1314,12 +1331,12 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
                 print(f"{cmap_arr=}")
                 log.warning(f'using only index 0 element of {cmap_arr=}.')
             cm = plot._get_cmap(cmap_arr[0])
-            colors = cm(np.linspace(0, 1, max_m_to_plot+1))
+            colors = cm(np.linspace(0, maxc, max_m_to_plot+1))
     else:
         if len(cmap_arr) > 1:
             log.warning(f'using only index 0 element of {cmap_arr=}.')
         cm = plot._get_cmap(cmap_arr[0])
-        colors = cm(np.linspace(0, 1, nsams_total))
+        colors = cm(np.linspace(0, maxc, nsams_total))
             
     
     if dadt_idx_to_plot is not None:
@@ -1347,7 +1364,7 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
         lw = np.arange(1,max_m_to_plot+1, 1)
     else:
         if max_q_to_plot<=3:
-            lw = np.arange(1,max_m_to_plot+1, 1)
+            lw = np.arange(1,max_m_to_plot+1, 2)
         else:
             lw = np.arange(0.7,max_q_to_plot+1, 0.5)
             
@@ -1356,7 +1373,7 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
         if var_name=='hard_r_gw_crit_9':
             ptitle=r'log$_{10}$(a$_{\rm GW,9}/{\rm R_g})$'
         elif var_name=='hard_nu_inner':
-            ptitle = r'$\nu_{\rm inner}$'
+            ptitle = r'$\nu_{\rm in}$'
         elif var_name=='hard_alpha_gw_crit':
             ptitle = r'$\alpha_{\rm GW}$'
         elif var_name=='hard_beta_gw_crit':
@@ -1399,6 +1416,18 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
                                  f"must be 7 or 8 for `fixedTime`='outer'")
         
         mt_nskip = int((sam.mtot.size-1)/(max_m_to_plot-1)) if sam.mtot.size>max_m_to_plot else 1
+        if manual_mt_to_plot is not None:
+            ii = []
+            for xx in manual_mt_to_plot:
+                diff = np.abs(sam.mtot-10.0**xx*MSOL)
+                ii += [np.where(diff==diff.min())[0].item()]
+                if xx == 9:
+                    idx_9 = np.where(diff==diff.min())[0].item()
+            print(f"{ii=}, {sam.mtot[ii]}")
+            idx_mt = np.array(ii)
+        else:
+            idx_mt = np.arange(0,sam.mtot.size,mt_nskip) 
+
         mr_nskip = int((sam.mrat.size-1)/(max_q_to_plot-1)) if sam.mrat.size>max_q_to_plot else 1
         zord = 2 if (pubstyle and n==valid_models[0]) else 1.9
 
@@ -1433,7 +1462,7 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
                 )
 
         i_plot = 0
-        for i in np.arange(0,sam.mtot.size,mt_nskip):
+        for i in idx_mt: #np.arange(0,sam.mtot.size,mt_nskip):
             
             if gwcrit_units == 'pc':
                 dunits = PC
@@ -1479,26 +1508,31 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
                     this_ls = ls_arr[0]
                 
                 if j_plot==max_q_to_plot-1 and n==idx_fiducial:
-                    if not twopanel:
-                        # linestyle=(0, (3, 1, 1, 1)) is densely dash-dotted
-                        flmi, = ax_t.plot([sepa_obs_max,sepa_obs_max],time_ylim, color=this_color,
-                                         #alpha=0.7,color=colors[i_plot], lw=2,
-                                         alpha=this_shading, lw=this_lw, ls='-',
-                                         label=r'$f_{\rm obs}$'+f'=1/({Tobs_yr:g} yr)',zorder=zord-0.2)
-                        #if i_plot==max_to_plot-1 and n==len(sam_data)-1:
-                        if i_plot==max_m_to_plot-1 and n==idx_fiducial: #valid_models[0]:
-                            flhandles += [flmi]
+                    if not onepanel:
+                        if not twopanel:
+                            # linestyle=(0, (3, 1, 1, 1)) is densely dash-dotted
+                            flmi, = ax_t.plot([sepa_obs_max,sepa_obs_max],time_ylim, color=this_color,
+                                             #alpha=0.7,color=colors[i_plot], lw=2,
+                                             alpha=this_shading, lw=this_lw, ls='-',
+                                             label=r'$f_{\rm obs}$'+f'=1/({Tobs_yr:g} yr)',zorder=zord-0.2)
+                            #if i_plot==max_to_plot-1 and n==len(sam_data)-1:
+                            if i_plot==max_m_to_plot-1 and n==idx_fiducial: #valid_models[0]:
+                                flhandles += [flmi]
+                        ax_tau.plot([sepa_obs_max,sepa_obs_max],time_ylim, color=this_color,
+                                     #alpha=0.7,color=colors[i_plot], lw=2,zorder=zord-0.1)
+                                     alpha=this_shading,lw=this_lw,ls='-',zorder=zord-0.2)
+                    if onepanel and i==idx_9:
+                        ax_dadt.plot([sepa_obs_max,sepa_obs_max],rate_ylim,  color='k',
+                                     alpha=this_shading,lw=this_lw+3,ls='-',zorder=zord-0.25)
                     ax_dadt.plot([sepa_obs_max,sepa_obs_max],rate_ylim, color=this_color,
                              #alpha=0.7,color=colors[i_plot], lw=2,zorder=zord-0.1)
                              alpha=this_shading,lw=this_lw,ls='-',zorder=zord-0.2)
-                    ax_tau.plot([sepa_obs_max,sepa_obs_max],time_ylim, color=this_color,
-                                 #alpha=0.7,color=colors[i_plot], lw=2,zorder=zord-0.1)
-                                 alpha=this_shading,lw=this_lw,ls='-',zorder=zord-0.2)
+
                 
                 #ax1.plot(rads[i,j,0,:]/dunits, -rads[i,j,0,:]/dadt[i,j,0,:]/YR, 
                 #         alpha=shading, color='k', lw=lw[i_plot]+1, 
                 #         label=f'{np.log10(sam.mtot[i]/MSOL):.2g}',zorder=zord)
-                if twopanel:
+                if twopanel or onepanel:
                     if j_plot==max_q_to_plot-1 and n==idx_fiducial: ##valid_models[0]: #n==len(sam_data)-1:
                         lm,= ax_dadt.plot(rads[i,j,0,:]/dunits, -dadt[i,j,0,:], 
                                           #alpha=shading, color=colors[i_plot], lw=lw[j_plot], 
@@ -1518,6 +1552,9 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
                     if j_plot==max_q_to_plot-1 and n==idx_fiducial: ##valid_models[0]: #n==len(sam_data)-1:
                         mlhandles += [lm]
 
+                if onepanel and i==idx_9:
+                    ax_dadt.plot(rads[i,j,0,:]/dunits, -dadt[i,j,0,:],  color='k',
+                                 alpha=this_shading,lw=this_lw+3,ls='-',zorder=zord-0.15)
                 lq,= ax_dadt.plot(rads[i,j,0,:]/dunits, -dadt[i,j,0,:], 
                               #alpha=shading, color=colors[i_plot], lw=lw[j_plot], 
                               alpha=this_shading, color=this_color,  
@@ -1536,28 +1573,25 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
                             plbl = f"{pars[n][var_name]:.2g}"
                     else:
                         plbl = model_labels[n]
-                    lp, = ax_tau.plot(rads[i,j,0,:-1]/dunits, times_evo[i,j,:]/YR, 
-                                      #alpha=shading, color=colors[i_plot], lw=lw[j_plot], 
-                                      alpha=this_shading, color=this_color, 
-                                      lw=this_lw, ls=this_ls,
-                                      label = plbl,zorder=zord)
-                    if i_plot==max_m_to_plot-1 and j_plot==max_q_to_plot-1:
-                        plhandles += [lp]
+                    if not onepanel:
+                        lp, = ax_tau.plot(rads[i,j,0,:-1]/dunits, times_evo[i,j,:]/YR, 
+                                          #alpha=shading, color=colors[i_plot], lw=lw[j_plot], 
+                                          alpha=this_shading, color=this_color, 
+                                          lw=this_lw, ls=this_ls,
+                                          label = plbl,zorder=zord)
+                        if i_plot==max_m_to_plot-1 and j_plot==max_q_to_plot-1:
+                            plhandles += [lp]
                     if fixedTime == 'outer':
-                        if not twopanel:
-                            ax_t.plot(xlim, [(tHubble)/YR,(tHubble)/YR], ls="--",lw=0.7, color='k')
-                        ax_tau.plot(xlim, [(tHubble)/YR,(tHubble)/YR], ls="--",lw=0.7,color='k')
-                        #ax3.plot(xlim, [(tHubble-hard._outer_time)/YR, 
-                        #                (tHubble-hard._outer_time)/YR], "k--")
-                        #         ':', color=colors[i_plot])
+                        if not twopanel and not onepanel:
+                            ax_t.plot(xlim, [(tHubble)/YR,(tHubble)/YR], ls="--",lw=1.2, color='k')
+                        if not onepanel:
+                            ax_tau.plot(xlim, [(tHubble)/YR,(tHubble)/YR], ls="--",lw=1.2,color='k')
                 else:
-                    ax_tau.plot(rads[i,j,0,:-1]/dunits, times_evo[i,j,:]/YR, 
-                                #alpha=shading, color=colors[i_plot], lw=lw[j_plot],zorder=zord)
-                                alpha=shading, color=this_color, 
-                                lw=this_lw, ls=this_ls, zorder=zord)
-                #if fixedTime=='outer':
-                #    ax3.scatter([risco[i]/dunits], [tau_inner[i,j]/YR], 
-                #                marker='o', color='k', s=5)
+                    if not onepanel:
+                        ax_tau.plot(rads[i,j,0,:-1]/dunits, times_evo[i,j,:]/YR, 
+                                    #alpha=shading, color=colors[i_plot], lw=lw[j_plot],zorder=zord)
+                                    alpha=shading, color=this_color, 
+                                    lw=this_lw, ls=this_ls, zorder=zord)
                 
                 j_plot += 1
 
@@ -1582,26 +1616,33 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
             i_plot += 1
         
         if fixedTime=='total':
-            if not twopanel:
+            if not twopanel and not onepanel:
                 ax_t.plot(xlim, [hard._target_time/YR, hard._target_time/YR], '--', color='darkgray')
                 if gwcrit_units=='pc': ax_t.plot([hard._rchar/dunits, hard._rchar/dunits], [1e-2,1e10],'k--')
             if gwcrit_units=='pc': ax_dadt.plot([hard._rchar/dunits, hard._rchar/dunits], [10,1e11],'k--')
-            ax_tau.plot(xlim, [tHubble/YR, tHubble/YR], 'k:')
+            if not onepanel:
+                ax_tau.plot(xlim, [tHubble/YR, tHubble/YR], 'k:')
                 
     ax_dadt.fill_between(xlim, [SPLC,SPLC], 
                          [rate_ylim[1],rate_ylim[1]], hatch='XXXX', facecolor='none',
                          edgecolor='darkgray',lw=1)
     if show_legends:
-        if twopanel:
-            leg2 = ax_dadt.legend(handles=qlhandles, loc='lower left',title=r"log$_{\rm 10}(q)$")
+        if twopanel or onepanel:
+            leg2 = ax_dadt.legend(handles=qlhandles, loc='lower left',title=r"log$_{\rm 10}(q)$",
+                                  labelspacing=0.2) #,handlelength=1.5)
             ax_dadt.add_artist(leg2)    
-            ax_dadt.legend(handles=mlhandles, loc='upper left',title=r"log$_{\rm 10}(M/M_{\odot})$")
+            ax_dadt.legend(handles=mlhandles, loc='upper left',title=r"log$_{\rm 10}(M/M_{\odot})$",
+                           labelspacing=0.2) #,handlelength=1.5)
         else:
             #leg2 = ax_t.legend(handles=flhandles, loc='upper left')
-            ax_t.legend(handles=mlhandles, loc='lower left',title=r"log$_{\rm 10}(M/M_{\odot})$")
+            ax_t.legend(handles=mlhandles, loc='lower left',title=r"log$_{\rm 10}(M/M_{\odot})$",
+                        labelspacing=0.2) #,handlelength=1.5)
             #ax_t.add_artist(leg2)
-            ax_dadt.legend(handles=qlhandles, loc='lower left',title=r"log$_{\rm 10}(q)$")
-        ax_tau.legend(handles=plhandles, loc='lower left',title=ptitle)
+            ax_dadt.legend(handles=qlhandles, loc='lower left',title=r"log$_{\rm 10}(q)$",
+                           labelspacing=0.2) #,handlelength=1.5)
+        if not onepanel:
+            ax_tau.legend(handles=plhandles, loc='lower left',title=ptitle,
+                          labelspacing=0.2) #,handlelength=1.5)
 
     if not pubstyle:
         if fixedTime=='total':
@@ -1622,7 +1663,12 @@ def plot_dadt(sam_data, pars, gwcrit_units='pc', fixedTime='total',
                          f"nuin={hard._nu_inner}")
 
     if pubstyle:
-        bottom=0.08 if not twopanel else 0.1
+        if twopanel:
+            bottom=0.1
+        elif onepanel:
+            bottom=0.2
+        else:
+            bottom=0.08
         fig.subplots_adjust(hspace=0,top=0.98,right=0.98,left=0.15,bottom=bottom) #,top=0.85, right=0.95)
     else:
         fig.subplots_adjust(wspace=0.3,top=0.85, right=0.95)
