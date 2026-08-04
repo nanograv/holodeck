@@ -1482,44 +1482,63 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         Input semi-analytic model providing binary total mass, mass ratio, redshift
     num_steps : int, optional
         Number of binary separations at which hardening is calculated. Default: 300.
+    inner_model_type : int, optional
+        Flag controlling how the inner hardening is parameterized (Default: 0):
+        - 0 : Power-law model defined by (`nu_inner`, `r_gw_crit_9`, `alpha_gw_crit`)
+        - 1 : Power-law inferred from (`dadt_rchar`, `r_gw_crit_9`, `alpha_gw_crit`)
+        - 2 : (`dadt_rchar`, `nu_inner`) [not implemented]
+        - 3 : (`nu_inner`, `inner_time`) [not implemented]
     outer_time : float, optional
-        Time delay between galaxy merger and the onset of binary hardening [s].
-        Default: 1 Gyr.
+        Time delay between galaxy merger and the onset of inner binary hardening [s].
+        Default: 1.0*GYR.
     rchar_9 : float, optional
-        Characteristic separation at which the inner hardening model is normalized [cm].
+        Characteristic separation at which the inner hardening begins,
+        for 1e9 Msun BHs [cm]. Default: 1.0*PC.
+    alpha_char : float, optional
+        Power-law index governing mass dependence of rchar. Default: -2.0/3.0.
     nu_inner : float, optional
-        Power-law slope of the inner hardening rate. Default: -0.5.
+        Power-law slope of the inner hardening timescale. Default: 0.0.
         Used only for `inner_model_type=0`.
     dadt_rchar : float, optional
         Hardening rate for equal=mass binaries at rchar [cm/s]. Default: None
         Sets power-law slope for `inner_model_type=1`.
     inner_time : float, optional
-        Total duration of inner evolution phase (not yet implemented). Default: None
+        Total duration of inner evolution phase (not yet implemented). Default: None.
     gw_crit_units : {'rg', 'pc'}, optional
         Specifies if GW transition radius is in gravitational radii [rg] or parsec [pc].
         Default: 'rg'.
     r_gw_crit_9 : float, optional
-        GW transition radius for M=1e9 Msun binaries. Default: 1e3.
+        GW transition radius for M=1e9 Msun binaries. Default: 10**2.5.
         Units determined by `gw_crit_units`.
     alpha_gw_crit : float, optional
         Power-law index governing mass dependence of the GW transition radius. Default: -0.25.
     beta_gw_crit : float, optional
         Power-law index governing dependence of GW transition radius on 
-        normalized symmetric mass ratio. Default: 0.0.
-    inner_model_type : int, optional
-        Flag controlling how the inner hardening model is parameterized (Default: 0):
-        - 0 : Power-law model defined by (`nu_inner`, `r_gw_crit_9`, `alpha_gw_crit`)
-        - 1 : Power-law inferred from (`dadt_rchar`, `r_gw_crit_9`, `alpha_gw_crit`)
-        - 2 : (`dadt_rchar`, `nu_inner`) [not implemented]
-        - 3 : (`nu_inner`, `inner_time`) [not implemented]
+        normalized symmetric mass ratio. Default: +0.25.
+    fobs_min : float, optional
+        Minimum observed GW frequency to consider [Hz]. All binaries must have 
+        2*forb(rchar) < fobs_min if `enforce_physical_params`=True. Default: 9.0e-10.
     enforce_physical_params : bool, optional
         If True, require that all model parameters satisfy physical constraints
-        (e.g., allowed ranges from `check_params_allowed`). Default: False
+        (e.g., allowed ranges from `check_params_allowed`). Default: False.
+    require_inner_and_gw_phases : bool, optional
+        if True, require that all binaries have rISCO < aGW < rchar. Default: False.
 
     Attributes
     ----------
+    _inner_model_type : int
+        Flag controlling how the inner hardening is parameterized.
+    _fobs_min : float
+        Defines low-frequency edge of PTA band [Hz].
+    _enforce_physical_params : bool
+        Require all model params to satisfy physical constraints from
+        `check_params_allowed`.
+    _require_inner_and_gw_phases : bool
+        Require all binaries to satisfy rISCO < aGW < rchar.
     _outer_time : float
         Outer phase duration [s].
+    _num_steps : int
+        Number of steps at which to calculate hardening. Currently unused.
     _rchar_9 : float
         Characteristic radius at which a 1e9Msun binary transitions from 
         'outer' to 'inner' hardening [cm].
@@ -1530,18 +1549,20 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         Inner power-law slope.
     _dadt_rchar : float or None
         Hardening rate of equal-mass binaries at _rchar_9 [cm/s].
+    _inner_time : float or None
+        Not used for currently defined inner model types.
     _r_gw_crit_9 : float
         GW transition radius for M=1e9Msun binaries.
+    _gw_crit_units : str
+        Units for GW transition radius ('pc' or 'rg').
     _alpha_gw_crit : float
         Mass scaling of GW transition radius. _alpha_gw_crit=-1 yields no mass scaling
         when _r_gw_crit_9 is in physical (not gravitational) units.
     _beta_gw_crit : float
         Normalized symmetric mass ratio scaling of GW transition radius.
-    _gw_crit_units : str
-        Units for GW transition radius.
     _params_allowed : ndarray of bool
         Mask indicating which (mass, mass ratio) combinations satisfy
-        physical constraints (only for `inner_model_type=1`).
+        physical constraints.
 
     Notes
     -----
@@ -1549,16 +1570,16 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
     - For `inner_model_type=1`, the inner slope ν_inner is inferred from:
           dadt(rchar) = dadt_rchar × η_norm
       where η_norm = 4q / (1+q)^2 is the symmetric mass ratio normalization.
-    - The model assumes dadt < 0
+    - The model assumes dadt < 0 at all times.
 
     """
     CONSISTENT = True
     
     def __init__(self, sam, num_steps=300, outer_time=1.0*GYR, 
-                 inner_model_type=0, rchar_9=10.0*PC, alpha_char=-1,
-                 nu_inner=-0.5, dadt_rchar=None, inner_time=None,
-                 gw_crit_units='rg', r_gw_crit_9=1e3, 
-                 alpha_gw_crit=-0.25, beta_gw_crit=0.0,
+                 inner_model_type=0, rchar_9=1.0*PC, alpha_char=-2.0/3.0,
+                 nu_inner=0.0, dadt_rchar=None, inner_time=None,
+                 gw_crit_units='rg', r_gw_crit_9=10**2.5, 
+                 alpha_gw_crit=-0.25, beta_gw_crit=+0.25,
                  fobs_min=9.0e-10,
                  enforce_physical_params=False,
                  require_inner_and_gw_phases=False):
@@ -1572,8 +1593,7 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         - Only `inner_model_type` 0 and 1 are currently supported.
         - If `enforce_physical_params=True`, invalid parameter combinations
           will raise an exception instead of issuing warnings.
-        - For `inner_model_type=1`, allowed parameter regions are precomputed
-          using `check_params_allowed()`.
+        - Allowed parameter regions are precomputed using `check_params_allowed()`.
 
         """
 
@@ -1618,9 +1638,9 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
             raise ValueError(f"Invalid {inner_model_type=}. Must be one of: 0, 1, 2, 3.")
         
         self._inner_model_type = inner_model_type  
-        self._fobs_min = fobs_min # if not None, used to ensure all binaries start outside the PTA band
+        self._fobs_min = fobs_min # if not None, ensure all binaries start outside the PTA band
         self._enforce_physical_params = enforce_physical_params # throw error if not physical
-        self._require_inner_and_gw_phases = require_inner_and_gw_phases # require risco < agw < rchar for all binaries
+        self._require_inner_and_gw_phases = require_inner_and_gw_phases # rISCO < aGW < rchar
         self._outer_time = outer_time        # [s]
         self._num_steps = num_steps
         self._rchar_9 = rchar_9              # [cm]; rchar for a 1e9 Msun BH
@@ -1628,10 +1648,10 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         self._nu_inner = nu_inner            # None for model 1
         self._dadt_rchar = dadt_rchar        # [cm/s]; None for models 0 and 3
         self._inner_time = inner_time        # [s]; None for models 0-2
-        self._r_gw_crit_9 = r_gw_crit_9      # units defined by `gw_crit_units`; None for models 2 & 3
-        self._gw_crit_units = gw_crit_units  # 'rg' or 'pc'; None for models 2 & 3
-        self._alpha_gw_crit = alpha_gw_crit  # determines mass scaling of r_gw_crit; None for models 2 & 3
-        self._beta_gw_crit = beta_gw_crit  # determines normed symm mass ratio scaling of r_gw_crit; None for models 2 & 3
+        self._r_gw_crit_9 = r_gw_crit_9      # units defined by `gw_crit_units`
+        self._gw_crit_units = gw_crit_units  # 'rg' or 'pc'
+        self._alpha_gw_crit = alpha_gw_crit  # determines mass scaling of r_gw_crit
+        self._beta_gw_crit = beta_gw_crit  # determines normed symm mass ratio scaling of r_gw_crit
 
         self._params_allowed = self.check_params_allowed(sam.mtot, sam.mrat)
         if self._enforce_physical_params:
@@ -1714,9 +1734,9 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
 
         # Convert GW critical radius into cm
         if self._gw_crit_units == 'rg':
-            r9 = self._r_gw_crit_9 * utils.gravitational_radius(1.0e9*MSOL) # convert to cm
+            r9 = self._r_gw_crit_9 * utils.gravitational_radius(1.0e9*MSOL)
         else:
-            r9 = self._r_gw_crit_9 * PC # convert to cm
+            r9 = self._r_gw_crit_9 * PC
 
         # ISCO radius
         risco = utils.rad_isco(_mtot)
@@ -1815,7 +1835,7 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
 
         return dadt_vals, rgw_crit, redz_char, redz_final
 
-    def check_params_allowed(self, _mtot, _mrat, nu_inner_absmax=10.0):
+    def check_params_allowed(self, _mtot, _mrat, nu_inner_absmax=4.0):
         """
         Return a 2D boolean array specifying which total mass and mass ratio 
         values are allowed for the current set of hardening model params.
@@ -1827,7 +1847,7 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         _mrat : array_like
             Mass ratio values (m2/m1 <= 1). Shape (M,).
         nu_inner_absmax : float, optional
-            Maximum allowed absolute value of the inner PL slope (nu_inner). Default: 10.0.
+            Maximum allowed absolute value of the inner PL slope (nu_inner). Default: 4.0.
 
         Returns
         -------
@@ -1887,9 +1907,9 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
 
         # Convert GW critical radius into cm
         if self._gw_crit_units == 'rg':
-            r9 = self._r_gw_crit_9 * utils.gravitational_radius(1.0e9*MSOL) # convert to cm
+            r9 = self._r_gw_crit_9 * utils.gravitational_radius(1.0e9*MSOL)
         else:
-            r9 = self._r_gw_crit_9 * PC # convert to cm
+            r9 = self._r_gw_crit_9 * PC
                 
         # ISCO radius    
         risco = utils.rad_isco(mt)
@@ -1959,15 +1979,19 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
             # Bounds on log10(dadt_rchar) implied by |nu_inner| <= nu_inner_absmax        
             # (1-nu)*lgrdiff + lgdadtgw is a min or max depending if dadtrchar > or < dadt_gw_crit
             min_lgdadtrchar_nuinmax = ( -1.0*np.log10(eta_norm) + 
-                                       (1-nu_inner_absmax)*np.log10(rch_rgw_ratio) + np.log10(-dadt_gw_crit) )
+                                       (1-nu_inner_absmax)*np.log10(rch_rgw_ratio) + 
+                                       np.log10(-dadt_gw_crit) )
             max_lgdadtrchar_nuinmax = ( -1.0*np.log10(eta_norm) + 
-                                       (1+nu_inner_absmax)*np.log10(rch_rgw_ratio) + np.log10(-dadt_gw_crit) )
+                                       (1+nu_inner_absmax)*np.log10(rch_rgw_ratio) + 
+                                       np.log10(-dadt_gw_crit) )
         
-            # CHECK: does model obey criterion: |nu_inner| < nu_inner,max for binaries with an inner phase?
+            # CHECK: does model obey criterion: |nu_inner| < nu_inner,max?
             # (ignore the ones with no inner phase for which dadt_phenom_rchar=0)
             modelAllowed[min_lgdadtrchar_nuinmax > max_lgdadtrchar_nuinmax] = False
-            modelAllowed[(np.log10(-dadt_phenom_rchar) < min_lgdadtrchar_nuinmax)&(dadt_phenom_rchar<0)] = False
-            modelAllowed[(np.log10(-dadt_phenom_rchar) > max_lgdadtrchar_nuinmax)&(dadt_phenom_rchar<0)] = False
+            modelAllowed[(np.log10(-dadt_phenom_rchar) < min_lgdadtrchar_nuinmax)&
+                         (dadt_phenom_rchar<0)] = False
+            modelAllowed[(np.log10(-dadt_phenom_rchar) > max_lgdadtrchar_nuinmax)&
+                         (dadt_phenom_rchar<0)] = False
         
         return modelAllowed
 
@@ -2324,22 +2348,21 @@ def _radius_loss_cone_BBR1980_dehnen(mbh, mstar, gamma=1.0):
     return rlc
 
 def allowed_param_range(mtot, mrat, alpha_char, rchar_9, alpha_gw, beta_gw, r9rg, 
-                        inner_model_type=1, risco_in_rg=6.0, nu_inner_absmax=10.0):
+                        risco_in_rg=6.0, nu_inner_absmax=4.0):
     """
     Compute allowed parameter ranges for FixedOuterTime_InnerPL_SAM hardening 
 
-    This function evaluates the physically allowed range of the critical radius for
-    transition to the GW regime, for Mtot=1e9 Msun binaries, in gravitational radii (r9rg)
-
-    It also evaluates the physically allowed range of the power-law index 
-    (nu_inner) for the phenomenological hardening rate and the 
-    phenomenological hardening rate at rchar (dadt_rchar)
-
+    This function evaluates the physically allowed ranges of aGW,9, nu_inner, and dadt(rchar),
     under constraints imposed by:
       - The ISCO radius
       - The characteristic radius rchar
       - A maximum allowed inner slope parameter (nu_inner_absmax)
       - A global hardening rate speed limit (_DADT_SPEED_LIMIT)
+
+    It is meant primarily for exploring the valid ranges for given hardening params,
+    and it is not currently part of any GWB calculation workflow. It should not be confused with
+    the FixedOuterTime_InnerPL_SAM.check_params_allowed() function, which is called when the 
+    FixedOuterTime_InnerPL_SAM class is initialized
 
     The function modifies `r9rg` in-place by setting invalid values to NaN.
 
@@ -2365,13 +2388,10 @@ def allowed_param_range(mtot, mrat, alpha_char, rchar_9, alpha_gw, beta_gw, r9rg
     r9rg : array_like
         Critical GW transition radius for Mtot=1e9Msun binaries, in units of gravitational radii
         This array is modified in-place: invalid values are set to NaN.
-    inner_model_type : int, optional
-        sets type of inner model, varies which parameters are input values. 
-        only 0 and 1 defined (default: 1)
     risco_in_rg : float, optional
         ISCO radius in units of gravitational radius (default: 6.0).
     nu_inner_absmax : float, optional
-        Maximum allowed absolute value of the inner hardening PL slope nu_inner (default: 10.0).
+        Maximum allowed absolute value of the inner hardening PL slope nu_inner (default: 4.0).
 
     Returns
     -------
@@ -2459,7 +2479,8 @@ def allowed_param_range(mtot, mrat, alpha_char, rchar_9, alpha_gw, beta_gw, r9rg
         max_lgdadtrchar = copy(max_lgdadtrchar_nuinmax)
         min_nuin = -1.0*nu_inner_absmax
     
-    # Absolute bounds on dadt_rchar for given mtot, mrat, rchar, & alpha_gw (independent of specific r9rg choice)
+    # Absolute bounds on dadt_rchar for given mtot, mrat, rchar, & alpha_gw 
+    # (independent of specific r9rg choice)
     absmin_lgdadtrchar = -1.0*np.log10(eta_norm) + (1-max_nuin)*max_lgrdiff + min_lgdadtgwcrit
     absmax_lgdadtrchar_nuinmax = -1.0*np.log10(eta_norm) + (1+min_nuin)*max_lgrdiff + max_lgdadtgwcrit    
     absmax_lgdadtrchar = np.minimum(absmax_lgdadtrchar_nuinmax, np.log10(_DADT_SPEED_LIMIT))
