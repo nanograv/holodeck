@@ -1193,6 +1193,13 @@ class Semi_Analytic_Model:
                 )
                 pass
 
+    @utils.deprecated_fail("`dynamic_binary_number_at_fobs` or `sam_cyutils.dynamic_binary_number_at_fobs`")
+    def dynamic_binary_number(self, *args, **kwargs):
+        pass
+
+    @utils.deprecated_fail("`gwb_new`")
+    def new_gwb(self, *args, **kwargs):
+        pass
             
 # ===========================================
 # ====    Evolution & Utility Methods    ====
