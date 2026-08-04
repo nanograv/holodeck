@@ -415,6 +415,7 @@ def integrate_binary_evolution_2pwl(norm_log10, mtot, mrat, sepa_init, rchar, ga
 
 
 def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
+    cdef double foo = 0.0
 
     dens = sam.static_binary_density
 
@@ -422,6 +423,8 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
     cdef np.ndarray[np.double_t, ndim=4] diff_num = np.zeros(shape)
     cdef np.ndarray[np.double_t, ndim=4] redz_final = -1.0 * np.ones(shape)
 
+    sam._log.info("new variable foo defined but does not do anything.")
+    
     # ---- Fixed_Time_2pwl_SAM
 
     if isinstance(hard, holo.hardening.Fixed_Time_2PL_SAM):
