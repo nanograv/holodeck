@@ -70,6 +70,10 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+notebooks/*.pkl
+# notebooks for CBD tutorials, will be modified and included after merge with dev
+notebooks/cbd/*.ipynb
+notebooks/cbd/*.py
 
 # pyenv
 .python-version
@@ -131,9 +135,11 @@ run_gen_lib_sams__*
 *.ini
 *.c
 *.html
-.gitattributes
 *.slurm
 
 # Mac Desktop Services
 .DS_Store
 .history
+
+# Untracked workspace files
+scratch/

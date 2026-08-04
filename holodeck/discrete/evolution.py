@@ -73,12 +73,13 @@ from __future__ import annotations
 
 import numpy as np
 
-# import kalepy as kale
+import kalepy as kale
 
-# import holodeck as holo
+import holodeck as holo
+import holodeck.discrete_cyutils
 from holodeck import utils, cosmo, log
 from holodeck.discrete import population
-# from holodeck.constants import PC
+from holodeck.constants import PC, GYR, MSOL, YR
 from holodeck.hardening import _Hardening
 # from holodeck import accretion
 
@@ -136,7 +137,7 @@ class Evolution:
     _SELF_CONSISTENT = None
     _STORE_FROM_POP = ['_sample_volume']
 
-    def __init__(self, pop, hard, nsteps: int = 100, mods=None, debug: bool = False, acc=None):
+    def __init__(self, pop, hard, nsteps=100, mods=None, debug=False, acc=None):
         """Initialize a new Evolution instance.
 
         Parameters
@@ -278,13 +279,10 @@ class Evolution:
         argument.
 
         The behavior of this function is broken into three sub-functions, that are only used here:
-
         * :meth:`Evolution._at__inputs` : parse the input arguments.
-
         * :meth:`Evolution._at__index_frac` : find the indices in the evolutionary tracks bounding
           the target interpolation locations, and also the fractional distance to interpolate
           between them.
-
         * :meth:`Evolution._at__interpolate_array` : actually interpolate each parameter to a
           the target location.
 
@@ -294,10 +292,8 @@ class Evolution:
             String specifying the variable of interpolation.
         targets : array_like,
             Locations to interpolate to:
-
             * if ``xpar == sepa`` : binary separation, units of [cm],
             * if ``xpar == fobs`` : binary orbital freq, observer-frame, units of [1/sec],
-
         params : None or (list of str)
             Names of the parameters that should be interpolated.
             If `None`, defaults to :attr:`Evolution._EVO_PARS` attribute.
@@ -306,7 +302,6 @@ class Evolution:
             Interpolated values for other binaries are set to `np.nan`.
         lin_interp : None or bool,
             Interpolate parameters in linear space.
-
             * True : all parameters interpolated in lin-lin space.
             * False: all parameters interpolated in log-log space.
             * None : parameters are interpolated in log-log space, unless they're included in the
@@ -598,7 +593,7 @@ class Evolution:
 
         return ynew
 
-    def sample_universe(self, fobs_orb_edges, down_sample=None):
+    def sample_universe(self, fobs_orb_edges, dfdt_mdot=False, down_sample=None):
         """Construct a full universe of binaries based on resampling this population.
 
         Parameters
@@ -611,17 +606,17 @@ class Evolution:
 
         Returns
         -------
-        names : (4,) list of str,
-            Names of the returned binary parameters (i.e. each array in `samples` and `vals`).
-        samples : (4, S) ndarray,
-            Sampled binary data.  For each binary samples S, 4 parameters are returned:
-            ['mtot', 'mrat', 'redz', 'fobs'] (these are listed in the `names` returned value.)
+        names : list[str], size (7,)
+            Names of the returned data arrays in `samples`.
+        samples : np.ndarray, shape (7, S)
+            Sampled binary data.  For each binary samples S, 7 parameters are returned:
+            ['mtot', 'mrat', 'redz', 'fobs', 'eccen'] (these are listed in the `names` returned value.)
             NOTE: `fobs` is *observer*-frame *orbital*-frequencies.
             These values correspond to all of the binaries in an observer's Universe
             (i.e. light-cone), within the given frequency bins.  The number of samples `S` is
             roughly the sum of the `weights` --- but the specific number is drawn from a Poisson
             distribution around the sum of the `weights`.
-        vals : (4,) list of (V,) ndarrays or float
+        vals : (7,) list of (V,) ndarrays or float
             Binary parameters (log10 of parameters specified in the `names` return values) at each
             frequency bin.  Binaries not reaching the target frequency bins before redshift zero,
             or before coalescing, are not returned.  Thus the number of values `V` may be less than
@@ -637,7 +632,7 @@ class Evolution:
         """
 
         # these are `log10(values)` where values are in CGS units
-        # names = ['mtot', 'mrat', 'redz', 'fobs']
+        # names = ['mtot', 'mrat', 'redz', 'fobs', 'eccen', 'dadt', 'dedt']
         names, vals, weights = self._sample_universe__at_values_weights(fobs_orb_edges)
 
         samples = self._sample_universe__resample(fobs_orb_edges, vals, weights, down_sample)
@@ -645,6 +640,11 @@ class Evolution:
         # Convert back to normal-space
         samples = np.asarray([10.0 ** ss for ss in samples])
         vals = np.asarray([10.0 ** vv for vv in vals])
+        #but then take log10 of eccentricity, dadt and dedt again, because we don't take the log10 of eccen initially.
+        #this is because kale.resample() in _sample_universe__resample returns NaNs when using log10(eccen)
+        for v_ind in [4,5,6]:
+            vals[v_ind] = np.log10(vals[v_ind]) #because we don't take log10 of eccen, dadt and dedt before interpolating
+            samples[v_ind] = np.log10(samples[v_ind]) #because we don't take log10 of eccen, dadt and dedt before interpolating
         return names, samples, vals, weights
 
     def _sample_universe__at_values_weights(self, fobs_orb_edges):
@@ -662,9 +662,9 @@ class Evolution:
 
         Returns
         -------
-        names : (4,) list of str,
+        names : (7,) list of str,
             Names of the returned binary parameters (i.e. each array in `vals`).
-        vals : (4,) list of (V,) ndarrays or float
+        vals : (7,) list of (V,) ndarrays or float
             Binary parameters (log10 of parameters specified in the `names` return values) at each
             frequency bin.  Binaries not reaching the target frequency bins before redshift zero,
             or before coalescing, are not returned.  Thus the number of values `V` may be less than
@@ -674,11 +674,11 @@ class Evolution:
             corresponding to this binary in the simulation, at the target frequency.
 
         """
-        fobs_orb_cents = utils.midpoints(fobs_orb_edges, log=False)
+        fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges, log=False)
         dlnf = np.diff(np.log(fobs_orb_edges))
 
         # Interpolate binaries to given frequencies; these are the needed parameters
-        PARAMS = ['mass', 'sepa', 'dadt', 'scafa']
+        PARAMS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen', 'dadt', 'dedt'] #added eccentricity, dadt, dedt
         # each array within `data_fobs` is shaped (N, F) for N-binaries and F-frequencies (`fobs`)
         data_fobs = self.at('fobs', fobs_orb_cents, params=PARAMS)
 
@@ -707,14 +707,20 @@ class Evolution:
         redz = redz[valid]
         weights = num_binaries[valid]
         log.debug(f"Weights (lambda values) at targets: {utils.stats(weights)}")
+        #select only valid entries for eccen and sepa
+        eccen = data_fobs['eccen'][valid]
+        dadt = data_fobs['dadt'][valid]
+        dedt = data_fobs['dedt'][valid]
 
-        # Convert to log-space
-        vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo)]
-        names = ['mtot', 'mrat', 'redz', 'fobs']
+        # Convert to log-space, except for eccen, dadt and dedt
+        vals = [np.log10(mt), np.log10(mr), np.log10(redz), np.log10(fo), eccen, dadt, dedt]
+
+        #the order of these variables matters, look at end of sample_universe() function where we take log10(eccen)
+        names = ['mtot', 'mrat', 'redz', 'fobs', 'eccen', 'dadt', 'dedt']
+
         return names, vals, weights
 
     def _sample_universe__resample(self, fobs_orb_edges, vals, weights, down_sample):
-        import kalepy as kale
         # down-sample weights to decrease the number of sample points
         prev_sum = weights.sum()
         log.info(f"Total weights (number of binaries in the universe): {prev_sum:.8e}")
@@ -727,9 +733,9 @@ class Evolution:
         # TODO/FIX: Consider sampling in comoving-volume instead of redz (like in sam.py)
         #           can also return dcom instead of redz for easier strain calculation
         nsamp = np.random.poisson(weights.sum())
-        reflect = [None, [None, 0.0], None, np.log10([fobs_orb_edges[0], fobs_orb_edges[-1]])]
+        # eccentricity boundaries should be between [0,1]
+        reflect = [None, [None, 0.0], None, np.log10([fobs_orb_edges[0], fobs_orb_edges[-1]]), [0,1.0], None, None]
         samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
-        # samples = np.power(10.0, samples)
         num_samp = samples[0].size
         log.debug(f"Sampled {num_samp:.8e} binaries in the universe")
         return samples
@@ -777,7 +783,8 @@ class Evolution:
                 setattr(self, f"_dedt_{ii}", np.zeros_like(self.dadt))
 
         # ---- Initialize hardening rate at first step
-        dadt_init, dedt_init = self._hardening_rate(step=0)
+        step0 = 0
+        dadt_init, dedt_init = self._hardening_rate(step0)
 
         self.dadt[:, 0] = dadt_init
         if (pop.eccen is not None):
@@ -829,6 +836,29 @@ class Evolution:
             ecc_r = self.eccen[:, left] + de
             ecc_r = np.clip(ecc_r, 0.0, 1.0 - _MAX_ECCEN_ONE_MINUS)
             self.eccen[:, right] = ecc_r
+
+        # masses at right egde are updated with tentative timestep.
+        # this is crucial to ensure correct hardening rates, because up until now,
+        # masses at next step ('right') are INITIAL masses!!!
+        # at the end of this function, masses at step are eventually updated with the final timestep.
+        if self._acc is not None:
+            """ An instance of the accretion class has been supplied,
+                and binary masses are evolved through accretion
+                First, get total accretion rates """
+
+            mdot_t = self._acc.mdot_total(self, left, None)
+            """ A preferential accretion model is called to divide up
+                total accretion rates into primary and secondary accretion rates """
+            #set bin = None
+            self.mdot[:,left,:] = self._acc.pref_acc(mdot_t, self, None, left)
+            """ Accreted mass is calculated and added to primary and secondary masses """
+            if self._acc.evol_mass:
+                #this switch helps to separate out accretion effects from other cbd effects
+                self.mass[:, right, 0] = self.mass[:, left, 0] + dt * self.mdot[:,left,0]
+                self.mass[:, right, 1] = self.mass[:, left, 1] + dt * self.mdot[:,left,1]
+            else:
+                self.mass[:, right, 0] = self.mass[:, left, 0]
+                self.mass[:, right, 1] = self.mass[:, left, 1]
 
         # Update lookback time based on duration of this step
         tlook = self.tlook[:, left] - dt
@@ -895,13 +925,20 @@ class Evolution:
                 and binary masses are evolved through accretion
                 First, get total accretion rates """
 
-            mdot_t = self._acc.mdot_total(self, step)
+            #set bin = None
+            mdot_t = self._acc.mdot_total(self, step-1, None)
             """ A preferential accretion model is called to divide up
                 total accretion rates into primary and secondary accretion rates """
-            self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_t, self, step)
+            #set bin = None
+            self.mdot[:,step-1,:] = self._acc.pref_acc(mdot_t, self,step-1, None)
             """ Accreted mass is calculated and added to primary and secondary masses """
-            self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:,step-1,0]
-            self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:,step-1,1]
+            if self._acc.evol_mass:
+                #this switch helps to separate out accretion effects from other cbd effects
+                self.mass[:, step, 0] = self.mass[:, step-1, 0] + dt * self.mdot[:,step-1,0]
+                self.mass[:, step, 1] = self.mass[:, step-1, 1] + dt * self.mdot[:,step-1,1]
+            else:
+                self.mass[:, step, 0] = self.mass[:, step-1, 0]
+                self.mass[:, step, 1] = self.mass[:, step-1, 1]
 
         return
 
@@ -935,6 +972,9 @@ class Evolution:
         dedt = None if self.eccen is None else np.zeros_like(dadt)
 
         for ii, hard in enumerate(self._hard):
+            # [MSS 2023/09/29]: New hard.dadt_dedt takes
+            # 'bin' as well as 'step' argument, (see new evolution class)
+            # so we set bin = None here
             _hard_dadt, _ecc = hard.dadt_dedt(self, step)
             dadt[:] += _hard_dadt
             if self._debug:    # nocov
@@ -952,7 +992,7 @@ class Evolution:
                     log.error(f"BAD sepa = {self.sepa[bads, step]}")
                     log.error(f"BAD mass = {self.sepa[bads, step]}")
                     raise ValueError(err)
-
+                
             if (self.eccen is not None):
                 if _ecc is None:
                     log.warning(f"`Evolution.eccen` is not None, but `dedt` is None!  {step} {hard}")
@@ -1089,3 +1129,543 @@ class Evolution:
         if self._evolved is not True:
             raise RuntimeError("This instance has not been evolved yet!")
         return
+
+
+class cEvolution:
+    """
+        New evolution class that uses time, rather than binary separation, as the free parameter.
+        This allows the full circumbinary disk module, including +ve abdot values, 
+        to be used in the evolution calculation.
+    """
+    _SELF_CONSISTENT = None
+    _STORE_FROM_POP = ['_sample_volume']
+    _TIME_STEP_MAX = 0.1 * GYR
+
+    def __init__(self, pop, hard, cfl = 0.1, nsteps=10000, mods=None, acc=None, dfdt_mdot=False):
+        # --- Store basic parameters to instance
+        self._pop = pop                       #: initial binary population instance
+        self._mods = mods                     #: modifiers to be applied after evolution is completed
+        self._acc = acc
+        self._size = pop.size
+        self.cfl = cfl
+        self._NSTEPS = nsteps
+
+        # Store hardening instances as a list
+        if not np.iterable(hard):
+            hard = [hard, ]
+        self._hard = hard
+        self._nhards = len(hard)
+
+        # Make sure types look right
+        if not isinstance(pop, population._Population_Discrete):
+            err = f"`pop` is {pop}, must be subclass of `population._Population_Discrete`!"
+            log.exception(err)
+            raise TypeError(err)
+
+        for hh in self._hard:
+            good = isinstance(hh, _Hardening) or issubclass(hh, _Hardening)
+            if not good:
+                err = f"hardening instance is {hh}, must be subclass of `{_Hardening}`!"
+                err += " NOTE: sometimes jupyter notebooks must be restarted to avoid this error.  🤷🏻‍♂️"
+                log.warning(err)
+                # raise TypeError(err)
+
+        # Store additional parameters
+        for par in self._STORE_FROM_POP:
+            setattr(self, par, getattr(pop, par))
+
+        redz = cosmo.a_to_z(pop.scafa)
+        tlook = cosmo.z_to_tlbk(redz)
+        self._sepa_init = pop.sepa
+        self._mass_init = pop.mass
+        self._scafa_init = pop.scafa
+        self._tlook_init = tlook
+        self._dfdt_mdot = dfdt_mdot
+        if pop.eccen is not None:
+            self._eccen_init = pop.eccen
+        else:
+            self._eccen_init = None
+
+        return
+
+    def evolve(self, progress=False, break_after=None):
+        nbinaries = self._size
+        nsteps = self._NSTEPS * nbinaries
+        nhards = self._nhards
+        MAX_BIN_STEPS = 100*nsteps
+        CFL = self.cfl
+
+        self.sepa = np.zeros(nsteps)
+        self.dadt = np.zeros((nsteps, nhards))
+        self.mass = np.zeros((nsteps, 2))
+        self.redz = np.zeros(nsteps)
+        self.tlook = np.zeros(nsteps)
+
+        if self._eccen_init is not None:
+            self.eccen = np.zeros(nsteps)
+            self.dedt = np.zeros_like(self.dadt)
+        else:
+            self.eccen = None
+            self.dedt = None
+        self.mdot = np.zeros((nsteps, 2))
+
+        arr_size = nsteps
+        last_index = np.zeros(nbinaries, dtype=int)
+        idx = 0
+        left = 0
+        right = 0
+        dedt_l = None
+        dedt_r = None
+        dedt = None
+        for bin in utils.tqdm(range(nbinaries)):
+
+            if (break_after is not None) and (bin > break_after):
+                print("BREAK 12412351324")
+                break
+
+            # print(f"\n----Starting {bin=} at {idx=} ({left=}, {right=})----")
+
+            risco = utils.rad_isco(*self.mass[idx, :])
+
+            # ---- initialize first step
+
+            self.sepa[idx] = self._sepa_init[bin]
+            self.mass[idx, :] = self._mass_init[bin, :]
+            self.tlook[idx] = self._tlook_init[bin]
+            self.redz[idx] = cosmo.tlbk_to_z(self.tlook[idx])
+            if self.eccen is not None:
+                self.eccen[idx] = self._eccen_init[bin]
+
+            my_steps = 0
+
+            left = idx
+            dadt_l_list, dedt_l_list, mdot_l = self._hardening_rate(bin, left, store_debug=False)
+
+            # ---- Integrate until coalescence or redshift zero
+
+            while (self.sepa[idx] > risco*1.001) and (self.tlook[idx] > 0.0) and (self.redz[idx] > 1e-3):
+
+                idx += 1
+                right = idx
+
+                # print(f"\n{bin=}, step={my_steps} | {left} ==> {right}")
+                # print(f"mass={self.mass[left, 0]/MSOL:.4e}, {self.mass[left, 1]/MSOL:.4e}")
+                # print(f"sepa={self.sepa[left]/PC:.4e}, eccen={self.eccen[left]:.4e}")
+                # print(f"look={self.tlook[left]/GYR:.8e}")
+                # print(f"redz={self.redz[left]:.8e}")
+                if my_steps > MAX_BIN_STEPS:
+                    raise RuntimeError(f"Failed to finish evolution after {my_steps} steps for binary {bin}!")
+
+                # - expand arrays as needed
+
+                if right >= arr_size:
+                    self.sepa = np.concatenate([self.sepa, np.zeros(nsteps)], axis=0)
+                    self.dadt = np.concatenate([self.dadt, np.zeros((nsteps, nhards))], axis=0)
+                    self.mass = np.concatenate([self.mass, np.zeros((nsteps, 2))], axis=0)
+                    self.mdot = np.concatenate([self.mdot, np.zeros((nsteps, 2))], axis=0)
+                    self.redz = np.concatenate([self.redz, np.zeros(nsteps)], axis=0)
+                    self.tlook = np.concatenate([self.tlook, np.zeros(nsteps)], axis=0)
+                    if self.eccen is not None:
+                        self.eccen = np.concatenate([self.eccen, np.zeros(nsteps)], axis=0)
+                        self.dedt = np.concatenate([self.dedt, np.zeros((nsteps, nhards))], axis=0)
+
+                    arr_size += nsteps
+                    print(f"Expanded arrays {(arr_size//nsteps-1):04d} times to {arr_size:.2e}")
+
+                # - determine timestep
+                # print("left  = ", dadt_l, dedt_l, mdot_l)
+                dadt_l = np.sum(dadt_l_list)
+                if self.eccen is not None:
+                    dedt_l = np.sum(dedt_l_list)
+
+                dt_l_list = self._get_timestep_from_rates(left, dadt_l, dedt_l, mdot_l, CFL)
+                dt_l = np.min(dt_l_list + [self.tlook[left], self._TIME_STEP_MAX])
+                # print(f"{dt_l/YR=:.4e}")
+
+                # - guess right-edge
+
+                self.sepa[right] = self.sepa[left] + dadt_l * dt_l
+                if self.eccen is not None:
+                    self.eccen[right] = self.eccen[left] + dedt_l * dt_l
+
+                # if there is no accretion, then mdot is zero
+                self.mass[right, :] = self.mass[left] + mdot_l * dt_l
+                self.tlook[right] = self.tlook[left] - dt_l
+                self.redz[right] = cosmo.tlbk_to_z(self.tlook[right])
+
+                # - guess right-edge evolution rates
+                # print("right: ", self.sepa[right], self.eccen[right], self.mass[right])
+
+                dadt_r_list, dedt_r_list, mdot_r = self._hardening_rate(bin, right, store_debug=False)
+                # print("right = ", dadt_l, dedt_l, mdot_l)
+                dadt_r = np.sum(dadt_r_list)
+                if self.eccen is not None:
+                    dedt_r = np.sum(dedt_r_list)
+                dt_r_list = self._get_timestep_from_rates(right, dadt_r, dedt_r, mdot_r, CFL)
+                # msg = ", ".join([f"{dd:.4e}" for dd in dt_r])
+                # print(f"dt: {msg}")
+                dt_r = np.min(dt_r_list + [self.tlook[left], self._TIME_STEP_MAX])
+                # print(f"{dt_r/YR=:.4e}")
+
+                # - take average evolution rate
+
+                dadt_list = 0.5 * (dadt_l_list + dadt_r_list)
+                dadt = np.sum(dadt_list)
+                if self.eccen is not None:
+                    dedt_list = 0.5 * (dedt_l_list + dedt_r_list)
+                    dedt = np.sum(dedt_list)
+                mdot = 0.5 * (mdot_l + mdot_r)
+                dt = np.min([dt_l, dt_r])
+                # print(f"{dt/YR=:.4e}")
+
+                # - increment
+
+                self.sepa[right] = self.sepa[left] + dadt * dt
+                # Do not go past ISCO, if timestep is too large, reset to smaller value
+                if self.sepa[right] < risco:
+                    dt = (self.sepa[right] - self.sepa[left])/dadt
+                    self.sepa[right] = self.sepa[left] + dadt * dt
+
+                # if self.sepa[right] > self.sepa[left]:
+                #     print(f"SOFTENING OCCURED FOR {bin=} {idx=} {my_steps=}")
+
+                if dt <= 0.0 or ~np.isfinite(dt):
+                    print(f"{dt_l=}, {dt_r=}")
+                    print(f"{dt_l_list=}")
+                    print(f"{dt_r_list=}")
+                    raise RuntimeError(f"Next timestep is invalid!  {dt=}")
+
+                if self.eccen is not None:
+                    self.eccen[right] = self.eccen[left] + dedt * dt
+
+                # if there is no accretion, then mdot is zero
+                self.mass[right, :] = self.mass[left] + mdot * dt
+                self.tlook[right] = self.tlook[left] - dt
+                self.redz[right] = cosmo.tlbk_to_z(self.tlook[right])
+
+                # if dadt > 0.0:
+                #     print(f"{dadt=}")
+
+                self.dadt[right, :] = dadt_list
+                self.mdot[right] = mdot
+                if self.eccen is not None:
+                    self.dedt[right, :] = dedt_list
+
+                left = right
+                dadt_l_list = dadt_list
+                dedt_l_list = dedt_list
+                mdot_l = mdot
+                my_steps += 1
+                risco = utils.rad_isco(*self.mass[right, :])
+
+            # print(f"\n====Finished binary {bin} after {my_steps}, {idx=}====\n")
+            last_index[bin] = right
+            idx += 1
+
+        # store the first and last indices for each binary, and make sure they look okay
+        first_index = np.concatenate([[0,], last_index[:-1]+1])
+        self._last_index = last_index
+        self._first_index = first_index
+        assert np.all(self.sepa[first_index] == self._sepa_init)
+        minit = self._mass_init
+        assert np.all(self.mass[first_index] == minit)
+        mfinal = self.mass[self._last_index]
+        assert np.all(mfinal >= minit)
+
+        # trim unused parts of initialized arrays
+        end = last_index[-1] + 1
+        self.sepa = self.sepa[:end]
+        self.mass = self.mass[:end]
+        self.tlook = self.tlook[:end]
+        self.redz = self.redz[:end]
+        self.dadt = self.dadt[:end]
+        self.mdot = self.mdot[:end]
+        if self.eccen is not None:
+            self.eccen = self.eccen[:end]
+            self.dedt = self.dedt[:end]
+
+        return
+
+    def at(self, xpar, targets, params=None, coal=None, lin_interp=None):
+        if xpar != 'fobs':
+            raise NotImplementedError("Only 'fobs' ({xpar=}) is implemented in cEvolution!")
+
+        if (params is not None) or (coal is not None) or (lin_interp is not None):
+            raise NotImplementedError(f"{params=} {coal=} {lin_interp=} are not implemented in cEvolution!")
+
+        if np.any(np.diff(targets) < 0.0):
+            raise RuntimeError("`targets` must be monotonically increasing!")
+
+        vals = holodeck.discrete_cyutils.interp_at_fobs(self, targets)
+        bin, interp_idx, m1, m2, mdot1, mdot2, redz, sepa, eccen, dadt, dedt = vals
+        mass = np.stack([m1, m2], axis=1)
+        mdot = np.stack([mdot1, mdot2], axis=1)
+        # get the indices to sort first by interp_idx (fobs), then by bin(ary)
+        idx = np.lexsort([bin, interp_idx])
+        bin = bin[idx]
+        interp_idx = interp_idx[idx]
+        mass = mass[idx]
+        mdot = mdot[idx]
+        redz = redz[idx]
+        sepa = sepa[idx]
+        eccen = eccen[idx]
+        dadt = dadt[idx]
+        dedt = dedt[idx]
+        fobs = targets[interp_idx]
+
+        vals = dict(
+            mass=mass, mdot=mdot, redz=redz, sepa=sepa, eccen=eccen, dadt=dadt, dedt=dedt,
+            binary=bin, interp_idx=interp_idx, fobs=fobs
+        )
+        return vals
+
+    def _hardening_rate(self, bin, step, store_debug=False):
+
+        dadt = np.zeros(self._nhards)
+        dedt = None if (self.eccen is None) else np.zeros_like(dadt)
+        for ii, hard in enumerate(self._hard):
+            dadt[ii], _hard_dedt = hard.dadt_dedt(self, step, bin=bin)
+            if (dedt is not None):
+                dedt[ii] = _hard_dedt
+
+        if self._acc is not None:
+            _mdot_tot = self._acc.mdot_total(self, step, bin)
+            mdot = self._acc.pref_acc(_mdot_tot, self, step, bin)
+        else:
+            mdot = 0.0
+
+        return dadt, dedt, mdot
+
+    def _get_timestep_from_rates(self, step, dadt, dedt, mdot, CFL):
+        dt_dadt = CFL * self.sepa[step] / np.fabs(dadt)
+
+        if self.eccen is not None:
+            # ecc_cfl = 0.1 * CFL
+            dt_dedt = CFL * self.eccen[step] / np.fabs(dedt)
+
+            # now make sure we are not 'overshooting' the equilibrium eccentricity
+            # with current dedt value
+
+            # qb = self.mass[step, 0]/self.mass[step, 1]
+            # if qb > 1:
+            #     qb = 1./qb
+            # # equilibrium eccentricity
+            # eb_eq = self._acc.ebeq(qb)
+
+            # dt_ebeq_lim = (eb_eq-self.eccen[step])/(dedt)
+
+            # #if dt_ebeq_lim is < 0, we are moving away from the equilibrium value
+            # # and the above test does not matter.
+            # # However, if dt_ebeq_lim > 0, timestep should be limited
+            # # so we do not exceed equilibrium eccentricity in this timestep.
+
+            # if dt_ebeq_lim > 0:
+            #     print("dt_ebeq_lim = %.2e " %dt_ebeq_lim)
+            #     print("dt_dedt = %.2e " %dt_dedt)
+            #     dt_dedt = np.min([dt_ebeq_lim, dt_dedt])
+
+        else:
+            dt_dedt = np.inf
+
+        if self._acc is not None:
+            dt_mdot = CFL * np.min(self.mass[step, :] / mdot)
+        else:
+            dt_mdot = np.inf
+
+        dt = [dt_dadt, dt_dedt, dt_mdot]
+        if np.any(np.isnan(dt) | np.less(dt, 0.0)):
+            print("BAD DT in `_get_timestep_from_rates()`!")
+            print(f"{dt_dadt=} | {self.sepa[step]=} {dadt=}")
+            print(f"{dt_dedt=} | {self.eccen[step]=} {dedt=}")
+            print(f"{dt_mdot=} | {self.mass[step]=} {mdot=}")
+        return dt
+
+    def gwb(self, fobs_edges, nreals=100, nharms=103, dfdt_mdot=None):
+
+        if self._eccen_init is not None:
+            harm_range = np.arange(1, nharms+1)
+        else:
+            harm_range = np.asarray([2])
+            nharms = 1
+
+        if dfdt_mdot is None:
+            dfdt_mdot = self._dfdt_mdot
+
+        # ---- Interpolate data to all harmonics of this frequency
+
+        fobs_cents = 0.5 * (fobs_edges[:-1] + fobs_edges[1:])
+        nfreqs = fobs_cents.size
+        assert fobs_cents.ndim == 1
+        # get each harmonic of each frequency, (F, H)
+        fobs_orb = fobs_cents[:, np.newaxis] / harm_range[np.newaxis, :]
+        # (F, H) ==> (F*H,)
+        # print(f"{fobs_orb*YR=}")
+        fobs_orb = fobs_orb.flatten()
+        fobs_index = np.arange(nfreqs)[:, np.newaxis] * np.ones((nfreqs, nharms), dtype=int)
+        harm_index = np.arange(nharms)[np.newaxis, :] * np.ones((nfreqs, nharms), dtype=int)
+        # print(f"{fobs_orb.shape=} {fobs_index.shape=} {harm_index.shape=}")
+        fobs_index = fobs_index.flatten()
+        harm_index = harm_index.flatten()
+        # print(f"{fobs_index=}")
+        sort_fobs_harm = np.argsort(fobs_orb)
+        # print(f"{sort_fobs_harm=}")
+        fobs_orb = fobs_orb[sort_fobs_harm]
+        fobs_index = fobs_index[sort_fobs_harm]
+        harm_index = harm_index[sort_fobs_harm]
+        # print(f"{fobs_index=}")
+        # print(f"{harm_index=}")
+
+        # interpolate binary evolution tracks to these frequencies
+        data_harms = self.at('fobs', fobs_orb)
+        data_harms['dcom'] = cosmo.z_to_dcom(data_harms['redz'])
+
+        gwb = holo.discrete_cyutils.gwb_from_harmonics_data(
+            fobs_edges, harm_range, fobs_index, harm_index, data_harms, nreals,
+            self._sample_volume, int(dfdt_mdot),
+        )
+        return gwb
+
+    def sample_universe(self, fobs_orb_edges, down_sample=None, dfdt_mdot=False):
+        """Construct a full universe of binaries based on resampling this population.
+
+        Parameters
+        ----------
+        fobs : array_like,
+            Observer-frame *orbital*-frequencies at which to sample population. Units of [1/sec].
+        down_sample : None or float,
+            Factor by which to downsample the resulting population.
+            For example, `10.0` will produce 10x fewer output binaries.
+
+        Returns
+        -------
+        names : list[str], size (7,)
+            Names of the returned data arrays in `samples`.
+        samples : np.ndarray, shape (7, S)
+            Sampled binary data.  For each binary samples S, 7 parameters are returned:
+            ['mtot', 'mrat', 'redz', 'fobs', 'eccen', 'dadt', 'dedt']
+            (these are listed in the `names` returned value.)
+            NOTE: `fobs` is *observer*-frame *orbital*-frequencies.
+            These values correspond to all of the binaries in an observer's Universe
+            (i.e. light-cone), within the given frequency bins.  The number of samples `S` is
+            roughly the sum of the `weights` --- but the specific number is drawn from a Poisson
+            distribution around the sum of the `weights`.
+        vals : (7,) list of (V,) ndarrays or float
+            Binary parameters (log10 of parameters specified in the `names` return values) at each
+            frequency bin.  Binaries not reaching the target frequency bins before redshift zero,
+            or before coalescing, are not returned.  Thus the number of values `V` may be less than
+            F*N for F frequency bins and N binaries.
+        weights : (V,) ndarray of float
+            The weight of each binary-frequency sample.  i.e. number of observer-universe binaries
+            corresponding to this binary in the simulation, at the target frequency.
+
+        To-Do
+        -----
+        * This should sample in volume instead of `redz`, see how it's done in sam module.
+
+        """
+
+        # these are `log10(values)` where values are in CGS units
+        # names = ['mtot', 'mrat', 'redz', 'fobs', 'eccen', 'dadt', 'dedt']
+        names, vals, weights = self._sample_universe__at_values_weights(fobs_orb_edges, dfdt_mdot=dfdt_mdot)
+
+        samples = self._sample_universe__resample(fobs_orb_edges, vals, weights, down_sample)
+
+        # Convert back to normal-space
+        samples = np.asarray([10.0 ** ss for ss in samples])
+        vals = np.asarray([10.0 ** vv for vv in vals])
+        # but then take log10 of eccentricity, dadt and dedt again,
+        # because we don't take the log10 of eccen,dadt and dedt initially.
+        # this is because kale.resample() in _sample_universe__resample returns NaNs when using log10(eccen)
+        for v_ind in [4,5,6]:
+            vals[v_ind] = np.log10(vals[v_ind]) #because we don't take log10 of eccen, dadt and dedt before interpolating
+            samples[v_ind] = np.log10(samples[v_ind]) #because we don't take log10 of eccen, dadt and dedt before interpolating
+        return names, samples, vals, weights
+
+    def _sample_universe__at_values_weights(self, fobs_orb_edges, dfdt_mdot=False):
+        """Interpolate binary histories to target frequency bins, obtaining parameters and weights.
+
+        The `weights` correspond to the number of binaries in an observer's Universe (light-cone)
+        corresponding to each simulated binary sample.
+
+        Arguments
+        ---------
+        fobs_orb_edges : (F+1,) arraylike
+            Edges of target frequency bins to sample population.  These are observer-frame orbital
+            frequencies.  Binaries are interpolated to frequency bin centers, calculated from the
+            midpoints of the provided bin edges.
+
+        Returns
+        -------
+        names : (7,) list of str,
+            Names of the returned binary parameters (i.e. each array in `vals`).
+        vals : (7,) list of (V,) ndarrays or float
+            Binary parameters (log10 of parameters specified in the `names` return values) at each
+            frequency bin.  Binaries not reaching the target frequency bins before redshift zero,
+            or before coalescing, are not returned.  Thus the number of values `V` may be less than
+            F*N for F frequency bins and N binaries.
+        weights : (V,) ndarray of float
+            The weight of each binary-frequency sample.  i.e. number of observer-universe binaries
+            corresponding to this binary in the simulation, at the target frequency.
+
+        """
+
+        fobs_orb_cents_bins = kale.utils.midpoints(fobs_orb_edges, log=False)
+
+        # Interpolate binaries to given frequencies
+        data_fobs = self.at('fobs', fobs_orb_cents_bins)
+
+        #get observed and rest frequencies of binaries
+        fobs_orb_cents = data_fobs['fobs']
+        frst_orb_cents = utils.frst_from_fobs(fobs_orb_cents, data_fobs['redz'])
+        m1, m2 = np.moveaxis(data_fobs['mass'], -1, 0)
+        mt, mr = utils.mtmr_from_m1m2(m1, m2)
+        mdot = np.sum(data_fobs['mdot'], axis=-1)
+        dcom = cosmo.z_to_dcom(data_fobs['redz'])
+
+        dfdt, _ = utils.dfdt_from_dadt(data_fobs['dadt'], data_fobs['sepa'], \
+                                        frst_orb=frst_orb_cents,\
+                                        mdot = data_fobs['mdot'], \
+                                        dfdt_mdot=dfdt_mdot)
+
+        # note that the `dfdt`` can be positive or negative, it is handled in `lambda_factor_dlnf`
+        _lambda_factor = utils.lambda_factor_dlnf(frst_orb_cents, dfdt, \
+                                data_fobs['redz'], dcom=dcom) / self._sample_volume
+
+        # use interp_idx (bin index for fobs_orb_edges) to find dlnf
+        dlnf_all = np.diff(np.log(fobs_orb_edges))
+        dlnf = dlnf_all[data_fobs['interp_idx']-1]
+
+        #calculate number of binaries
+        num_binaries = _lambda_factor * dlnf
+        weights = num_binaries
+
+        # Convert to log-space, except for eccen, dadt and dedt
+        vals = [np.log10(mt), np.log10(mr), np.log10(data_fobs['redz']), \
+                np.log10(fobs_orb_cents), data_fobs['eccen'], \
+                data_fobs['dadt'], data_fobs['dedt']]
+
+        #the order of these variables matters, look at end of sample_universe() function where we take log10(eccen)
+        names = ['mtot', 'mrat', 'redz', 'fobs', 'eccen', 'dadt', 'dedt']
+
+        return names, vals, weights
+
+    def _sample_universe__resample(self, fobs_orb_edges, vals, weights, down_sample):
+        # down-sample weights to decrease the number of sample points
+        prev_sum = weights.sum()
+        log.info(f"Total weights (number of binaries in the universe): {prev_sum:.8e}")
+        if down_sample is not None:
+            weights = weights / down_sample
+            next_sum = weights.sum()
+            msg = f"downsampling artificially: down_sample={down_sample:g} :: total: {prev_sum:.4e}==>{next_sum:.4e}"
+            log.warning(msg)
+
+        # TODO/FIX: Consider sampling in comoving-volume instead of redz (like in sam.py)
+        #           can also return dcom instead of redz for easier strain calculation
+        nsamp = np.random.poisson(weights.sum())
+        # eccentricity boundaries should be between [0,1]
+        reflect = [None, [None, 0.0], None, np.log10([fobs_orb_edges[0], fobs_orb_edges[-1]]), [0,1.0], None, None]
+        samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
+        num_samp = samples[0].size
+        log.debug(f"Sampled {num_samp:.8e} binaries in the universe")
+        return samples
+

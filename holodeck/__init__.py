@@ -47,7 +47,6 @@ import logging
 __all__ = ["log", "cosmo"]
 
 # ---- Define Global Parameters
-
 LOG_SUFFIX = '.log'
 LOG_FILENAME_WITH_TIME_STAMP = False
 
@@ -89,30 +88,49 @@ def log_to_file(**kwargs):
 def set_log_level(level):
     log.setLevel(level)
 
-# ---- Load cosmology instance
+# ---- DEFERRED Import of cosmology instance for faster import of holodeck
+class _CosmoProxy:
+    def __init__(self):
+        self._real_cosmo = None
 
-# NOTE: Must load and initialize cosmology before importing other submodules!
-import cosmopy   # noqa
-cosmo = cosmopy.Cosmology(
-    h=Parameters.HubbleParam, Om0=Parameters.Omega0, Ob0=Parameters.OmegaBaryon,
-    size=200,
-)
-del cosmopy
+    def _get_real_cosmo(self):
+        if self._real_cosmo is None:
+            import cosmopy
+            
+            self._real_cosmo = cosmopy.Cosmology(
+                h=Parameters.HubbleParam, 
+                Om0=Parameters.Omega0, 
+                Ob0=Parameters.OmegaBaryon,
+                size=200,
+            )
+        return self._real_cosmo
+
+    def __getattr__(self, name):
+        return getattr(self._get_real_cosmo(), name)
+
+    def __call__(self, *args, **kwargs):
+        return self._get_real_cosmo()(*args, **kwargs)
+
+    def __repr__(self):
+        if self._real_cosmo is None:
+            return "<_CosmoProxy (Uninitialized)>"
+        return repr(self._real_cosmo)
+
+cosmo = _CosmoProxy()
 
 # ---- Import submodules
 
 from . import constants       # noqa
-# from . import evolution       # noqa
-# from . import gps             # noqa
+#from .discrete import evolution       # noqa
+#from . import gps             # noqa
 # from . import gravwaves       # noqa
 # from . import hardening       # noqa
 # from . import librarian       # noqa
 # from . import param_spaces    # noqa
 # from . import plot            # noqa
-# from . import population      # noqa
-# from . import host_relations  # noqa
+# from .discrete import population      # noqa
+# from . import relations       # noqa
 # from . import sams            # noqa
-# from . import librarian       # noqa
 from . import utils           # noqa
 
 # ---- Handle version

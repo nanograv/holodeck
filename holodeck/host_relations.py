@@ -700,7 +700,9 @@ class MMBulge_Standard(_MMBulge_Relation):
         self._mplaw = mplaw                 #: Mass Power-law index
         self._mref = mref                   #: Reference Mass (argument normalization)
         self._scatter_dex = scatter_dex
-        self._zplaw = 0.0
+        self._zplaw_amp = 0.0               #: Mass-Amplitude evolution parameter (0 for no evolution)
+        self._zplaw_slope = 0.0             #: Mass Power-law index (0 for no evolution)
+        self._zplaw_scatter = 0.0
 
         if len(kwargs) > 0:
             warn = f"Unused parameters passed to {self}!  {kwargs=}"
@@ -802,11 +804,15 @@ class MMBulge_MM2013(MMBulge_Standard):
 
 
 class MMBulge_Redshift(MMBulge_Standard):
-    """Mbh-Mbulge relation with an additional redshift power-law dependence.
+    """Mbh-Mbulge relation with an additional redshift power-law dependence. See Matt et al. (2026a) for testing of evolving normalization
+    and Matt et al. (2026b) for testing of evolving scatter.
 
-    Provides black hole mass as a function of galaxy bulge mass and redshift with a normalization
-    that depends on redshift. ``zplaw=0`` (default) is identical to MMBulge_Standard.
-    ``mamp = mamp0 * (1 + z)**zplaw``.
+    Provides black hole mass as a function of galaxy bulge mass and redshift with normalization, slope, and scatter which can
+    depends on redshift. ``zplaw_amp=0``, ``zplaw_slope=0``, ``zplaw_scatter=0`` (default) is identical to MMBulge_Standard.
+    ``mamp = mamp0 * (1 + z)**zplaw_amp``.
+    ``mplaw = mplaw0 * (1 + z)**zplaw_slope``
+    ``log10(10**_scatter_dex * (1.0 + z)**_zplaw_scatter)``..
+    All zplaw_* values evolution can be positive, negative, or zero
 
     TODO: make sure all of the inherited methods from `MMBulge_Standard` are appropriate for
           redshift dependencies!!  In particular, check `dmstar_dmbh`
@@ -819,17 +825,26 @@ class MMBulge_Redshift(MMBulge_Standard):
     MASS_PLAW = 1.0
     MASS_REF = 1.0e11 * MSOL
     SCATTER_DEX = 0.0
-    Z_PLAW = 0.0
+    Z_PLAW_AMP = 0.0
+    Z_PLAW_SLOPE = 0.0
+    Z_PLAW_SCATTER = 0.0
 
     _PROPERTIES = ['mbulge', 'redz']
 
-    def __init__(self, *args, zplaw=None, **kwargs):
+    def __init__(self, *args, zplaw_amp=None, zplaw_slope=None, zplaw_scatter=None, **kwargs):
         super().__init__(*args, **kwargs)
 
-        if zplaw is None:
-            zplaw = self.Z_PLAW
+        if zplaw_amp is None:
+            zplaw_amp = self.Z_PLAW_AMP
+        if zplaw_slope is None:
+            zplaw_slope = self.Z_PLAW_SLOPE
 
-        self._zplaw = zplaw
+        if zplaw_scatter is None:
+            zplaw_scatter = self.Z_PLAW_SCATTER
+
+        self._zplaw_amp = zplaw_amp
+        self._zplaw_slope = zplaw_slope
+        self._zplaw_scatter = zplaw_scatter
         return
 
     def mbh_from_host(self, pop, scatter):
@@ -839,23 +854,24 @@ class MMBulge_Redshift(MMBulge_Standard):
         return self.mbh_from_mbulge(mbulge, redz=redz, scatter=scatter)
 
     def mbh_from_mbulge(self, mbulge, redz, scatter):
-        scatter_dex = self._scatter_dex if scatter else None
+        self._scatter_dex_z = self._scatter_dex + self._zplaw_scatter * np.log10(1.0 + redz) if scatter else None
         # Broadcast `redz` to match shape of `mbulge`, if needed
         # NOTE: this will work for (N,) ==> (N,)    or   (N,) ==> (N,X)
         try:
             redz = np.broadcast_to(redz, mbulge.T.shape).T
         except:
             redz = redz
-        zmamp = self._mamp * (1.0 + redz)**self._zplaw
-        mbh = _log10_relation(mbulge, zmamp, self._mplaw, scatter_dex, x0=self._mref)
+        mamp_z = self._mamp * (1.0 + redz)**self._zplaw_amp
+        mplaw_z = self._mplaw * (1.0 + redz)**self._zplaw_slope
+        mbh = _log10_relation(mbulge, mamp_z, mplaw_z, self._scatter_dex_z, x0=self._mref)
         return mbh
 
     def mbulge_from_mbh(self, mbh, redz, scatter):
-        scatter_dex = self._scatter_dex if scatter else None
-        zmamp = self._mamp * (1.0 + redz)**self._zplaw
-        mbulge = _log10_relation_reverse(mbh, zmamp, self._mplaw, scatter_dex, x0=self._mref)
+        self._scatter_dex_z = self._scatter_dex + self._zplaw_scatter * np.log10(1.0 + redz) if scatter else None
+        mamp_z = self._mamp * (1.0 + redz)**self._zplaw_amp
+        mplaw_z = self._mplaw * (1.0 + redz)**self._zplaw_slope
+        mbulge = _log10_relation_reverse(mbh, mamp_z, mplaw_z, self._scatter_dex_z, x0=self._mref)
         return mbulge
-
 
 class MMBulge_Redshift_MM2013(MMBulge_Redshift):
     """Mbh-MBulge Relation from McConnell & Ma 2013 for z=0 plus redshift evolution of the normalization
@@ -869,7 +885,9 @@ class MMBulge_Redshift_MM2013(MMBulge_Redshift):
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.05                  # 1.05 ± 0.11
     SCATTER_DEX = 0.34
-    Z_PLAW = 0.0
+    Z_PLAW_AMP = 0.0
+    Z_PLAW_SLOPE = 0.0
+    Z_PLAW_SCATTER = 0.0
 
 
 class MMBulge_Redshift_KH2013(MMBulge_Redshift):
@@ -884,7 +902,9 @@ class MMBulge_Redshift_KH2013(MMBulge_Redshift):
     MASS_REF = MSOL * 1e11            # 1e11 Msol
     MASS_PLAW = 1.17                  # 1.17 ± 0.08
     SCATTER_DEX = 0.28
-    Z_PLAW = 0.0
+    Z_PLAW_AMP = 0.0
+    Z_PLAW_SLOPE = 0.0
+    Z_PLAW_SCATTER = 0.0
 
 
 def get_mmbulge_relation(mmbulge: Union[_MMBulge_Relation, Type[_MMBulge_Relation]] = None) -> _MMBulge_Relation:

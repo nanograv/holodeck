@@ -13,8 +13,8 @@ import matplotlib.cm as cm
 import kalepy as kale
 
 import holodeck as holo
-from holodeck import utils, log
-from holodeck.constants import MSOL, YR
+from holodeck import cosmo, utils, observations, log
+from holodeck.constants import MSOL, PC, YR
 
 FIGSIZE = 6
 FONTSIZE = 13
@@ -372,7 +372,7 @@ def _get_norm(data, midpoint=None, log=False):
     else:
         try:
             min, max = utils.minmax(data, filter=log)
-        except Exception:
+        except:
             err = f"Input `data` ({type(data)}) must be an integer, (2,) of scalar, or ndarray of scalar!"
             log.exception(err)
             raise ValueError(err)
@@ -611,7 +611,7 @@ def draw_sspars_and_bgpars(axs, xx, sspar, bgpar, nsamp=10, cmap=cm.rainbow_r, c
 def plot_pars(fobs, sspar, bgpar, **kwargs):
     xx= fobs * YR
     fig, axs = figax(figsize = (11,6), ncols=2, nrows=2, sharex = True)
-    axs[0,0].set_ylabel('Total Mass $M/M_\odot$')
+    axs[0,0].set_ylabel(r'Total Mass $M/M_\odot$')
     axs[0,1].set_ylabel('Mass Ratio $q$')
     axs[1,0].set_ylabel('Initial Comoving Distance $d_c$ (Mpc)')
     axs[1,1].set_ylabel('Final Comoving Distance $d_c$ (Mpc)')
@@ -753,8 +753,7 @@ def draw_med_conf(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill=
 
     return (hh, gg)
 
-def draw_med_conf_color(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={},
-                        filter=False, color=None, linestyle='-'):
+def draw_med_conf_color(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={}, fill={}, filter=False, color=None, linestyle='-'):
     plot.setdefault('alpha', 0.75)
     fill.setdefault('alpha', 0.2)
     percs = np.atleast_1d(fracs)
@@ -775,7 +774,7 @@ def draw_med_conf_color(ax, xx, vals, fracs=[0.50, 0.90], weights=None, plot={},
         rv = kale.utils.quantiles(vals, percs=inter_percs, weights=weights, axis=-1)
 
     med, *conf = rv.T
-
+    
     # plot median
     if color is not None:
         hh, = ax.plot(xx, med, color=color, linestyle=linestyle, **plot)
@@ -1460,7 +1459,6 @@ def _contour2d(ax, edges, hist, levels, outline=True, **kwargs):
 
     return edges, hist, cont
 
-
 def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
     '''
     https://stackoverflow.com/a/18926541
@@ -1471,12 +1469,11 @@ def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
         'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
         cmap(np.linspace(minval, maxval, n)))
     return new_cmap
-
 # =================================================================================================
 # ====    Below Needs Review / Cleaning    ====
 # =================================================================================================
 
-'''
+r'''
 def plot_bin_pop(pop):
     mt, mr = utils.mtmr_from_m1m2(pop.mass)
     redz = cosmo.a_to_z(pop.scafa)
@@ -1669,4 +1666,4 @@ def _draw_gwb_conf(ax, gwb, **kwargs):
     kwargs['alpha'] = 1.0 - 0.5*(1.0 - kwargs['alpha'])
     ax.plot(freqs, conf[1], **kwargs)
     return
-'''
+r'''

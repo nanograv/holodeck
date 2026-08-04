@@ -55,7 +55,6 @@ def test_init_generic_evolution():
 def evolution_illustris_fixed_time_circ():
     resamp = population.PM_Resample(0.2)
     pop = population.Pop_Illustris(mods=resamp)
-
     fixed = Fixed_Time_2PL.from_pop(pop, TIME)
     evo = evolution.Evolution(pop, fixed, nsteps=30)
     evo.evolve()
