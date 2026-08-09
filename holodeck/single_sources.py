@@ -29,8 +29,8 @@ log = holo.log
 log.setLevel(logging.INFO)
 
 par_names = np.array(['mtot', 'mrat', 'redz_init', 'redz_final', 'dcom_final', 'sepa_final', 'angs_final'])
-par_labels = np.array(['Total Mass $M$ ($M_\odot$)', 'Mass Ratio $q$', 'Initial Redshift $z_i$', 'Final Redshift $z_f$',
-                   'Final Comoving Distance $d_c$ (Mpc)', 'Final Separation (pc)', 'Final Angular Separation (rad)'])
+par_labels = np.array([r'Total Mass $M$ ($M_\odot$)', r'Mass Ratio $q$', r'Initial Redshift $z_i$', r'Final Redshift $z_f$',
+                   r'Final Comoving Distance $d_c$ (Mpc)', r'Final Separation (pc)', r'Final Angular Separation (rad)'])
 par_units = np.array([1/MSOL, 1, 1, 1, 1/MPC,  1/PC, 1])
 
 ###################################################
@@ -39,7 +39,7 @@ par_units = np.array([1/MSOL, 1, 1, 1, 1/MPC,  1/PC, 1])
 
 def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
        
-    """ Calculate strain from the loudest single sources and background.
+    r"""Calculate strain from the loudest single sources and background.
 
 
     Parameters
@@ -56,8 +56,10 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
         `dnum` over each bin.
     realize : int
         Specification of how many discrete realizations to construct.
-    loudest : int
+    loudest : int, optional (default: 1)
         Number of loudest single sources to separate from background.
+    params : bool, optional (default: False)
+        Whether to return the astrophysical parameter arrays.
     
 
     Returns
@@ -67,12 +69,13 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
     hc_bg : (F, R) NDarray of scalars
         Characteristic strain of the GWB.
     sspar : (4, F, R, L) NDarray of scalars
-        Astrophysical parametes (total mass, mass ratio, initial redshift, final redshift) of each
+        Astrophysical parameters (total mass, mass ratio, initial redshift, final redshift) of each
         loud single sources, for each frequency and realization.
         Returned only if params = True.
     bgpar : (7, F, R) NDarray of scalars
         Average effective binary astrophysical parameters (total mass, mass ratio, initial redshift,
-        final redshift, final comoving distances, final separation, final angular separation) for background sources at each frequency and realization,
+        final redshift, final comoving distances, final separation, final angular separation) for 
+        background sources at each frequency and realization,
         Returned only if params = True.
     """
  
@@ -178,7 +181,7 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
 # version for running libraries
 def ss_gws(edges, number, realize, loudest = 1, params = False):
        
-    """ Calculate strain from the loudest single sources and background.
+    r"""Calculate strain from the loudest single sources and background.
 
 
     Parameters
@@ -190,11 +193,13 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
     number : (M, Q, Z, F) ndarray of scalars
         The number of binaries in each bin of parameter space.  This is calculated by integrating
         `dnum` over each bin.
-    realize : int,
+    realize : int
         Specification of how many discrete realizations to construct.
-    loudest : int
+    loudest : int, optional (default: 1)
         Number of loudest single sources to separate from background.
-    
+    params : bool, optional (default: False)
+        Whether to return the astrophysical parameter arrays.
+
 
     Returns
     -------
@@ -282,8 +287,7 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
 
 def loudest_by_cython(edges, number, realize, loudest, round = True, params = False):
        
-    """ More efficient way to calculate strain from numbered
-    grid integrated
+    r"""More efficient way to calculate strain from numbered grid integrated
 
 
     Parameters
@@ -295,16 +299,17 @@ def loudest_by_cython(edges, number, realize, loudest, round = True, params = Fa
     number : (M, Q, Z, F) ndarray of scalars
         The number of binaries in each bin of parameter space.  This is calculated by integrating
         `dnum` over each bin.
-    realize : int,
+    realize : int
         Specification of how many discrete realizations to construct.
         TODO: Set up option for `bool` value, to get multiple sources without realizing. That makes no sense though.
     loudest : int
         Number of loudest single sources to separate from background.
-    round : bool
+    round : bool, optional (default: True)
         Specification of whether to discretize the sample if realize is False, 
         by rounding number of binaries in each bin to integers.
         Does nothing if realize is True.
-    
+    params : bool, optional (default: False)
+        Whether to return the astrophysical parameter arrays.
 
     Returns
     -------
@@ -388,8 +393,7 @@ def loudest_by_cython(edges, number, realize, loudest, round = True, params = Fa
 
 def ss_by_cdefs(edges, number, realize, round = True, params = False):
        
-    """ More efficient way to calculate strain from numbered 
-    grid integrated
+    r"""More efficient way to calculate strain from numbered grid integrated
 
 
     Parameters
@@ -401,15 +405,16 @@ def ss_by_cdefs(edges, number, realize, round = True, params = False):
     number : (M, Q, Z, F) ndarray of scalars
         The number of binaries in each bin of parameter space.  This is calculated by integrating
         `dnum` over each bin.
-    realize : bool or int,
+    realize : bool or int
         Specification of how to construct one or more discrete realizations.
         If a `bool` value, then whether or not to construct a realization.
         If a `int` value, then how many discrete realizations to construct.
-    round : bool
+    round : bool, optional (default: True)
         Specification of whether to discretize the sample if realize is False, 
         by rounding number of binaries in each bin to integers. 
         Does nothing if realize is True.
-    
+    params : bool, optional (default: False)
+        Whether to return the astrophysical parameter arrays.
 
     Returns
     -------
@@ -426,11 +431,11 @@ def ss_by_cdefs(edges, number, realize, round = True, params = False):
     hsamp : (M, Q, Z, F) NDarray
         Strain amplitude of a single source in every bin (regardless of if that bin
         actually has any sources.)
-    bgpar : (3, F, R) NDarray of scalars
+    bgpar : (3, F, R) NDarray of scalars, optional
         Average effective binary astrophysical parameters for background
         sources at each frequency and realization, returned only if 
         params = True.
-    sspar : (3, F, R) NDarray of scalars
+    sspar : (3, F, R) NDarray of scalars, optional
         Astrophysical parametes of single sources at each frequency
         for each realizations, returned only if params = True.
 
@@ -520,8 +525,7 @@ def ss_by_cdefs(edges, number, realize, round = True, params = False):
 
 def ss_by_ndars(edges, number, realize, round = True):
        
-    """ More efficient way to calculate strain from numbered 
-    grid integrated
+    r"""More efficient way to calculate strain from numbered grid integrated
 
 
     Parameters
@@ -537,17 +541,10 @@ def ss_by_ndars(edges, number, realize, round = True):
         Specification of how to construct one or more discrete realizations.
         If a `bool` value, then whether or not to construct a realization.
         If a `int` value, then how many discrete realizations to construct.
-    round : bool
+    round : bool, optional (default: True)
         Specification of whether to discretize the sample if realize is False, 
         by rounding number of binaries in each bin to integers. 
         Does nothing if realize is True.
-    ss : bool 
-        Whether or not to separate the loudest single source in each frequency bin.
-    sum : bool
-        Whether or not to sum the strain at a given frequency over all bins.
-    print_test : bool
-        Whether or not to print variable as they are calculated, for dev purposes.
-
 
     Returns
     -------
@@ -569,7 +566,8 @@ def ss_by_ndars(edges, number, realize, round = True):
         The number of binaries in each bin after the loudest single source
         at each frequency is subtracted out.
     
-
+    Notes
+    -----
     In the unlikely scenario that there are two equal hsmaxes 
     (at same OR dif frequencies), ssidx calculation will go wrong
     Could avoid this by using argwhere for each f_idx column separately.
@@ -736,8 +734,7 @@ def ss_by_ndars(edges, number, realize, round = True):
 
 def h2fdf(edges):
        
-    """ More efficient way to calculate strain from numbered 
-    grid integrated
+    r"""More efficient way to calculate strain from numbered grid integrated
 
 
     Parameters
@@ -750,9 +747,9 @@ def h2fdf(edges):
 
     Returns
     -------
-    h2fdf : (4,) ndarray of scalars
+    h2fdf : (M, Q, Z, F) ndarray of scalars
         strain amplitude squared x frequency x frequency bin width for a single
-        source in each bing
+        source in each bin
 
     """
 
@@ -805,20 +802,20 @@ def h2fdf(edges):
 
 
 def all_sspars(fobs_gw_cents, sspar):
-    """ Calculate all single source parameters incl.
-    ['mtot' 'mrat' 'redz_init' 'redz_final' 'dcom_final' 'sepa_final' 'angs_final']
+    r"""Calculate all single source parameters.
+    Includes 'mtot', 'mrat', 'redz_init', 'redz_final', 'dcom_final', 'sepa_final', 'angs_final'.
 
     Parameters
     ----------
     fobs_gw_cents : (F,) 1Darray of scalars
         Observed gw frequency bin centers.
-    sspar : (4, F,R,L) NDarray
+    sspar : (4, F, R, L) NDarray
         Single source parameters as calculated by ss_gws_redz(). 
         Includes mtot, mrat, redz_init, redz_final.
 
     Returns
     -------
-    sspar_all : (7,F,R,L) NDarray
+    sspar_all : (7, F, R, L) NDarray
         All single source parameters, corresponding to those in bgpar as calculated by ss_gws_redz().
         Includes mtot, mrat, redz_init, redz_final, dcom_final, sepa_final (cm), and angs_final.
     """
@@ -842,22 +839,26 @@ def parameters_from_indices(edges, ssidx):
     frequency given their indices and edges.
 
     Parameters
-    -----------    
+    ----------
     edges : (4,) list of 1darrays
         A list containing the edges along each dimension.  The four dimensions correspond to
         total mass, mass ratio, redshift, and observer-frame orbital frequency.
         The length of each of the four arrays is M+1, Q+1, Z+1, F+1.
-    ssidx : (3, F, R) or (3,F) ndarray
+    ssidx : (3, F, R) or (3, F) ndarray
         The indices of loudest single sources at each frequency of each realization
         in the format: [[M indices], [q indices], [z indices], [f indices], [r indices]] 
     
 
     Returns
-    ----------
-    m_arr : (F,) or (F,R) Ndarray of scalars
-    q_arr : (F,) or (F,R) Ndarray of scalars
-    z_arr : (F,) or (F,R) Ndarray of scalars
-    f_arr : (F,) or (F,R) Ndarray of scalars
+    -------
+    m_arr : (F,) or (F, R) Ndarray of scalars
+        Total masses.
+    q_arr : (F,) or (F, R) Ndarray of scalars
+        Mass ratios.
+    z_arr : (F,) or (F, R) Ndarray of scalars
+        Redshifts.
+    f_arr : (F,) or (F, R) Ndarray of scalars
+        Frequencies.
 
     """
     # Frequency bin midpoints
@@ -879,8 +880,7 @@ def parameters_from_indices(edges, ssidx):
     
 def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
        
-    """ Inefficient way to calculate strain from numbered 
-    grid integrated
+    r"""Inefficient way to calculate strain from numbered grid integrated
 
     Parameters
     ----------
@@ -891,14 +891,14 @@ def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
     number : (M, Q, Z, F) ndarray
         The number of binaries in each bin of parameter space.  This is calculated by integrating
         `dnum` over each bin.
-    realize : bool or int,
+    realize : bool or int, optional (default=False)
         Specification of how to construct one or more discrete realizations.
         If a `bool` value, then whether or not to construct a realization.
         If a `int` value, then how many discrete realizations to construct.
-    round : bool
+    round : bool, optional (default=True)
         Specification of whether to discretize the sample if realize is False, 
         by rounding number of binaries in each bin to integers. 
-    print_test : bool
+    print_test : bool, optional (default=False)
         Whether or not to print variable as they are calculated, for dev purposes.
 
 
@@ -1076,8 +1076,7 @@ def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
 
 def gws_by_ndars(edges, number, realize, round = True, sum = True, print_test = False):
        
-    """ More efficient way to calculate strain from numbered 
-    grid integrated
+    r"""More efficient way to calculate strain from numbered grid integrated
 
     Parameters
     ----------
@@ -1092,14 +1091,14 @@ def gws_by_ndars(edges, number, realize, round = True, sum = True, print_test = 
         Specification of how to construct one or more discrete realizations.
         If a `bool` value, then whether or not to construct a realization.
         If an `int` value, then how many discrete realizations to construct.
-    round : bool
+    round : bool, optional (default=True)
         Specification of whether to discretize the sample if realize is False, 
         by rounding number of binaries in each bin to integers. This has no impact 
         if realize is true.
         NOTE: should add a warning if round and realize are both True
-    sum : bool
+    sum : bool, optional (default=True)
         Whether or not to sum the strain at a given frequency over all bins.
-    print_test : bool
+    print_test : bool, optional (default=False)
         Whether or not to print variable as they are calculated, for dev purposes.
 
 
@@ -1211,8 +1210,7 @@ def gws_by_ndars(edges, number, realize, round = True, sum = True, print_test = 
 
 def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = False):
        
-    """ More efficient way to calculate strain from numbered 
-    grid integrated
+    r"""More efficient way to calculate strain from numbered grid integrated
 
 
     Parameters
@@ -1224,19 +1222,15 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
     number : (M, Q, Z, F) ndarray of scalars
         The number of binaries in each bin of parameter space.  This is calculated by integrating
         `dnum` over each bin.
-    realize : bool or int,
+    realize : bool or int
         Specification of how to construct one or more discrete realizations.
         If a `bool` value, then whether or not to construct a realization.
         If a `int` value, then how many discrete realizations to construct.
-    round : bool
+    round : bool, optional (default=True)
         Specification of whether to discretize the sample if realize is False, 
         by rounding number of binaries in each bin to integers. 
         Does nothing if realize is True.
-    ss : bool 
-        Whether or not to separate the loudest single source in each frequency bin.
-    sum : bool
-        Whether or not to sum the strain at a given frequency over all bins.
-    print_test : bool
+    print_test : bool, optional (default=False)
         Whether or not to print variable as they are calculated, for dev purposes.
 
 
@@ -1266,7 +1260,8 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
         format: [[M indices], [q indices], [z indices], [f indices]]
 
         
-
+    Notes
+    -----
     Potential BUG: In the unlikely scenario that there are two equal hsmaxes 
     (at same OR dif frequencies), ssidx calculation will go wrong
     Could avoid this by using argwhere for each f_idx column separately.
@@ -1274,9 +1269,10 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
     values for that hsmax and raises a warning/assertion error
 
 
-    TODO: Calculate sspar
-    TODO: Implement realizations
-    TODO: Implement not summing, or remove option
+    * TODO: Calculate sspar
+    * TODO: Implement realizations
+    * TODO: Implement not summing, or remove option
+
     """
 
     if(print_test):
@@ -1465,8 +1461,7 @@ def max_test(hsmax, hsamp):
     print('max_test passed')
 
 def ssidx_test(hsmax, hsamp, ssidx, print_test):
-    """ 
-    Test ssidx in hsamp gives the same values as hsmax
+    r"""Test ssidx in hsamp gives the same values as hsmax
 
     Parameters
     ----------
@@ -1474,7 +1469,10 @@ def ssidx_test(hsmax, hsamp, ssidx, print_test):
         Maximum strain amplitude of a single source at each frequency.
     hsamp : (M, Q, Z, F,) ndarray of scalar
         Strain amplitude of a source in each bin
-    ssidx : (F, 4) ndarray 
+    ssidx : (5, F, R) ndarray 
+        Single source indices.
+    print_test : bool
+        Whether to print output variables during test.
         
 
     """
@@ -1490,8 +1488,7 @@ def ssidx_test(hsmax, hsamp, ssidx, print_test):
 
 
 def ssnew_test(hsmax, hsamp, ssnew, print_test):
-    """ 
-    Test ssnew in hsamp gives the same values as hsmax
+    r"""Test ssnew in hsamp gives the same values as hsmax
 
     Parameters
     ----------
@@ -1500,8 +1497,9 @@ def ssnew_test(hsmax, hsamp, ssnew, print_test):
     hsamp : (M, Q, Z, F,) ndarray of scalar
         Strain amplitude of a source in each bin
     ssnew : (4, F) ndarray 
-        
-
+        Unraveled single source indices.
+    print_test : bool
+        Whether to print details.
     """
     maxes = hsamp[ssnew[0], ssnew[1], ssnew[2], ssnew[3]]
     if(print_test):
@@ -1514,8 +1512,7 @@ def ssnew_test(hsmax, hsamp, ssnew, print_test):
 
 
 def number_test(num, bgnum, fobs, exname='', plot_test=False):
-    ''' 
-    Plots num - bgnum, where number is the ndarray of 
+    r"""Plots num - bgnum, where number is the ndarray of 
     integer number of sources in each bin, i.e. after 
     rounding or Poisson sampling
 
@@ -1527,19 +1524,13 @@ def number_test(num, bgnum, fobs, exname='', plot_test=False):
     bgnum : (M, Q, Z, F) array
         number of background sources in each bin, 
         after single source subtraction
-    fobs : (F) array
+    fobs : (F,) array
         frequencies of each F, for ax titles
-    exname : String
+    exname : String, optional (Default='')
         name of example
-    plot_test : Bool
-        whether or not to print values a
-
-
-    Returns
-    -----------
-    None 
-    
-    '''   
+    plot_test : Bool, optional (Default=False)
+        Whether or not to plot the results
+    """   
     if np.all(num%1 == 0) != True: warnings.warn("num contains at least one non-integer value")
     difs = num - bgnum
     assert len(difs[np.where(difs>0)]) == len(difs[0,0,0,:]), "More than one bin per frequency found with a single source subtracted."
@@ -1554,7 +1545,7 @@ def number_test(num, bgnum, fobs, exname='', plot_test=False):
         # print(num[...,0].shape)
         for f in range(len(fobs)):
             ax[f].scatter(bins, (num[...,f] - bgnum[...,f]))
-            ax[f].set_title('$f_\mathrm{obs}$ = %dnHz' % (fobs[f]*10**9))
+            ax[f].set_title(rf'$f_{{\mathrm{{obs}}}}$ = {fobs[f]*10e9:.0f}nHz')
             ax[f].set_xlabel('bin')
         fig.tight_layout()
     print('number test passed')
@@ -1589,11 +1580,11 @@ def quadratic_sum_test(hc_bg, hc_ss, hc_tt, print_test):
 
 
 
-def run_ndars_tests(edges,number, fobs, exname='', print_test=False, 
+def run_ndars_tests(edges, number, fobs, exname='', print_test=False, 
                      loop_comparison = True):
-    '''
-    Call tests for some edges, number
-    Paramaters
+    r"""Call tests for some edges, number.
+
+    Parameters
     ----------
     edges : (4,) list of 1D arrays
         Mass, ratio, redshift, and frequency edges of bins
@@ -1601,16 +1592,24 @@ def run_ndars_tests(edges,number, fobs, exname='', print_test=False,
         Number of binaries in each bin
     fobs : (F,) array of scalars
         Observed frequency bin centers
-    exname : String
+    exname : String, optional (Default='')
         Name of example (used for number plots)
 
     Returns
-    ------
-    hsamp
-    hsmax
-    ssidx
-    bgnum
-    '''
+    -------
+    hc_bg : array_like
+        Background characteristic strain.
+    hc_ss : array_like
+        Single-source characteristic strain.
+    hsamp : array_like
+        Strain amplitude.
+    ssidx : array_like
+        Single-source indices.
+    hsmax : array_like
+        Maximum strain.
+    bgnum : array_like
+        Background count.
+    """
     hc_bg, hc_ss, hsamp, ssidx, hsmax, bgnum = ss_by_ndars(edges, number, realize=False, round=True)
     max_test(hsmax, hsamp)
 
@@ -1640,15 +1639,16 @@ def run_ndars_tests(edges,number, fobs, exname='', print_test=False,
 ###################################################
 
 def example(dur, cad, mtot, mrat, redz, print_test):
-    ''' 
+    r"""Example for single sources.
+
     1) Choose the frequency bins at which to calculate the GWB, same as in semi-analytic-models.ipynb
     2) Build Semi-Analytic-Model with super simple parameters 
     3) Get SAM edges and numbers as in sam.gwb()
 
     Parameters
-    ----------oiuyuiuytd
+    ----------
     dur : scalar
-        Duration of observation in secnods (multiply by YR)
+        Duration of observation in seconds (multiply by YR)
     cad : scalar
         Cadence of observations in seconds (multiply by YR)
     mtot : (3,) list of scalars
@@ -1657,7 +1657,8 @@ def example(dur, cad, mtot, mrat, redz, print_test):
         Min, max, and steps for mass ratio.
     redz : (3,) list of scalars
         Min, max, and steps for redshift.
-    print_test :
+    print_test : bool, optional (Default=False)
+        Whether or not to print values.
 
     Returns
     -------
@@ -1666,11 +1667,11 @@ def example(dur, cad, mtot, mrat, redz, print_test):
         total mass, mass ratio, redshift, and observer-frame orbital frequency.
         The length of each of the four arrays is M+1, Q+1, Z+1, F+1.
     number : (M, Q, Z, F) array
-        The number of binaries in each bin of parameter space.  This is calculated by integrating
+        The number of binaries in each bin of parameter space. This is calculated by integrating
         `dnum` over each bin.
-    fobs : (F) array
-        observed frequency bin centers
-    '''
+    fobs : (F,) array
+        Observed frequency bin centers
+    """
     # 1) Choose the frequency bins at which to calculate the GWB, same as in semi-analytic-models.ipynb
     fobs = utils.nyquist_freqs(dur,cad)
     fobs_edges = utils.nyquist_freqs_edges(dur,cad)
@@ -1710,20 +1711,27 @@ def example(dur, cad, mtot, mrat, redz, print_test):
 
 
 def example2(print_test = True, exname='Example 2'):
-    ''' 
+    r"""Run Example 2.
+
     Parameters
-    ---------
-    print_test : Bool
+    ----------
+    print_test : Bool, optional (Default=True)
         Whether to print frequencies and edges
+    exname : String, optional (Default='Example 2')
+        Name of example
 
 
     Returns
-    ---------
+    -------
     edges : (M,Q,Z,F) array
+        Edges.
     number : (M, Q, Z, F) array
+        Number counts.
     fobs : (F) array
-        observed frequency bin centers
-    '''
+        Observed frequency bin centers.
+    exname : str
+        Name of example.
+    """
     
     dur = 5.0*YR/3.1557600
     cad = .5*YR/3.1455145557600
@@ -1736,20 +1744,24 @@ def example2(print_test = True, exname='Example 2'):
     return edges, number, fobs, exname
 
 def example3(print_test = True, exname = 'Example 3'):
-    ''' 
-    Parameters
-    ---------
-    print_test : Bool
-        Whether to print frequencies and edges
+    r"""Run Example 3.
 
+    Parameters
+    ----------
+    print_test : Bool, optional (Default=True)
+        Whether to print frequencies and edges
+    exname : str, optional (Default='Example 3')
+        Name of example
 
     Returns
-    ---------
-    edges : (M,Q,Z,F) array
+    -------
+    edges : (M, Q, Z, F) array
     number : (M, Q, Z, F) array
     fobs : (F) array
         observed frequency bin centers
-    '''
+    exname : str
+        Name of example.
+    """
     dur = 5.0*YR/3.1557600
     cad = .5*YR/3.1557600
     
@@ -1763,20 +1775,26 @@ def example3(print_test = True, exname = 'Example 3'):
 
 
 def example4(print_test = True, exname = 'Example 4'):
-    ''' 
-    Parameters
-    ---------
-    print_test : Bool
-        Whether to print frequencies and edges
+    r"""Run Example 4.
 
+    Parameters
+    ----------
+    print_test : Bool, optional (Default=True)
+        Whether to print frequencies and edges.
+    exname : str, optional (Default='Example 4')
+        Name of example.
 
     Returns
-    ---------
-    edges : (M,Q,Z,F) array
+    -------
+    edges : (M, Q, Z, F) array
+        Edges.
     number : (M, Q, Z, F) array
+        Number counts.
     fobs : (F) array
-        observed frequency bin centers
-    '''
+        Observed frequency bin centers.
+    exname : str
+        Name of example.
+    """
     dur = 5.0*YR/3.1557600
     cad = .2*YR/3.1557600
 
@@ -1789,20 +1807,26 @@ def example4(print_test = True, exname = 'Example 4'):
 
 
 def example5(print_test = True, exname = 'Example 5'):
-    ''' 
-    Parameters
-    ---------
-    print_test : Bool
-        Whether to print frequencies and edges
+    r"""Run Example 5.
 
+    Parameters
+    ----------
+    print_test : Bool, optional (Default=True)
+        Whether to print frequencies and edges.
+    exname : str, optional (Default='Example 5')
+        Name of example.
 
     Returns
-    ---------
-    edges : (M,Q,Z,F) array
+    -------
+    edges : (M, Q, Z, F) array
+        Edges.
     number : (M, Q, Z, F) array
+        Number counts.
     fobs : (F) array
-        observed frequency bin centers
-    '''
+        Observed frequency bin centers.
+    exname : str
+        Name of example.
+    """
     dur = 10.0*YR
     cad = .2*YR
 
@@ -1821,15 +1845,28 @@ def example5(print_test = True, exname = 'Example 5'):
 def plot_medians(ax, xx, BG=None, SS=None, LABEL='', 
                  BG_COLOR='k', BG_ERRORS = False, 
                  SS_COLOR='k', SS_ERRORS = True):
-    """
-    Parameters:
-    ax
-    xx
-    BG
-    SS
-    REALS
-    label
-    COLOR
+    r"""Plot median lines with optional errorbars.
+
+    Parameters
+    ----------
+    ax : pyplot ax object
+        Axes on which to plot.
+    xx : (F,) array_like
+        Frequencies.
+    BG : (F, R) array_like, optional
+        Background values across realizations.
+    SS : (F, R) array_like, optional
+        Single source values across realizations.
+    LABEL : str, optional
+        Label extension string.
+    BG_COLOR : str, optional
+        Background plot color.
+    BG_ERRORS : bool, optional
+        Whether to display background standard deviation errorbars.
+    SS_COLOR : str, optional
+        Single-source plot color.
+    SS_ERRORS : bool, optional
+        Whether to display single-source standard deviation errorbars.
     """
     # plot median bg of samples
     if(BG is not None and BG_ERRORS == False):
@@ -1853,22 +1890,25 @@ def plot_medians(ax, xx, BG=None, SS=None, LABEL='',
 
 
 def plot_BG(ax, xx, BG, LABEL, REALS=0, median=False, COLOR='b', rand=False):
-    """
-    Plot the background median, middle 50% and 98% confidence intervals,
-    and optionally several realizations. All plotted in same color.
+    r"""Plot the background median, middle 50% and 98% confidence intervals.
 
     Parameters
-    ------------
+    ----------
     ax : pyplot ax object
+        Axes to draw on.
     xx : (F,) 1darray of scalars
+        Frequencies.
     BG : (F,R) Ndarray of scalars
+        Background characteristic strain arrays.
     LABEL : String
-    REALS : int
-        How many bg realizations to plot
-    median : bool
-        Whether or not to plot the bg median (same color)
-    COLOR : String
-    rand : bool
+        Label description.
+    REALS : int, optional (Default=0)
+        How many bg realizations to plot.
+    median : bool, optional (Default=False)
+        Whether or not to plot the bg median (same color).
+    COLOR : String, optional (Default='b')
+        Plotting color.
+    rand : bool, optional (Default=False)
         Whether to randomize which realizations are plotted (True)
         or plots the 0th to REALS-th realizations.
     """
@@ -1891,18 +1931,24 @@ def plot_BG(ax, xx, BG, LABEL, REALS=0, median=False, COLOR='b', rand=False):
 
 
 def plot_samples(ax, xx, BG=None, SS=None, REALS=1, LABEL=''):
-    """
-    Plot the background and/or single sources for the first 'REALS' 
+    r"""Plot the background and/or single sources for the first 'REALS' 
     number of realizations, with each color corresponding to a difference 
     realization.
 
     Parameters
     ----------
     ax : pyplot ax object
+        Axes object.
     xx : (F,) array of scalars
-    BG : (F,R) ndarray or None
-    SS : (F,R) ndarray or None
-    REALS : int
+        Frequencies.
+    BG : (F, R) ndarray, optional
+        Background realizations.
+    SS : (F, R) ndarray, optional
+        Single source realizations.
+    REALS : int, optional
+        Number of realizations to plot.
+    LABEL : str, optional
+        Label extension suffix.
     """
     colors = cm.rainbow(np.linspace(0,1,REALS))
     for rr in range(REALS):
@@ -1921,22 +1967,30 @@ def plot_samples(ax, xx, BG=None, SS=None, REALS=1, LABEL=''):
                     edgecolor='k', alpha=0.5)
 
 def plot_std(ax, xx, BG, SS, COLOR='b', LABEL=''):
-    """ 
-    Plot the standard deviations of the bg and ss characteristic strains.
+    r"""Plot standard deviations of background and single sources characteristic strain.
 
     Parameters
-    --------
+    ----------
     ax : pyplot ax object
+        Axes to draw on.
     xx : (F,) array of scalars
+        Frequencies.
     BG : (F, R) Ndarray of scalars
+        Background strain values.
     SS : (F, R) Ndarray of scalars
-    COLOR : string
-    LABEL : string
+        Single source strain values.
+    COLOR : string, optional (Default='b')
+        Color.
+    LABEL : string, optional (Default='')
+        Label suffix.
+
 
     Returns
     -------
     std_bg : (F,) array of scalars
+        Background standard deviations.
     std_ss : (F,) array of scalars
+        Single-source standard deviations.
     """
     std_bg = np.std(BG, axis=1)
     # med_bg = np.median(BG, axis=1)
@@ -1950,20 +2004,22 @@ def plot_std(ax, xx, BG, SS, COLOR='b', LABEL=''):
     return std_bg, std_ss
     
 def plot_IQR(ax, xx, BG=None, SS=None, COLOR='r', LABEL=''):
-    """ 
-    Plot the IQR of the bg and ss characteristic strains.
+    r"""Plot the IQR of the background and single source characteristic strains.
 
     Parameters
     ----------
     ax : pyplot ax object
+        Axes to draw on.
     xx : (F,) array of scalars
-    BG : (F, R) Ndarray of scalars
-    SS : (F, R) Ndarray of scalars
-    COLOR : string
-    LABEL : string
-
-    Returns
-    -------
+        Frequencies.
+    BG : (F, R) Ndarray of scalars, optional
+        Background values.
+    SS : (F, R) Ndarray of scalars, optional
+        Single source values.
+    COLOR : string, optional (Default='r')
+        Color of lines.
+    LABEL : string, optional (Default='')
+        Label extension suffix.
     """
 
     if (BG is not None):
@@ -1983,22 +2039,32 @@ def plot_percentiles(ax, xx, BG=None, SS=None, LABEL='',
                      BG_COLOR='b', SS_COLOR='r',
                      BG_MARKER=None, SS_MARKER=None,
                      BG_LINESTYLE='solid', SS_LINESTYLE='solid'):
-    """ 
-    Plots 25th and 75th percentiles, and IQR region between 
-    (50% confidence interval).
+    r"""Plot 25th and 75th percentiles, and IQR region between.
 
     Parameters
-    ---------
+    ----------
     ax : pyplot ax object
+        Axes object.
     xx : (F,) 1darray of scalars
-    BG : (F, R) Ndarray of scalars or None
-    SS : (F, R) Ndarray of scalars or None
-    BG_COLOR : string
-    SS_COLOR : string
-    BG_MARKER : string
-    SS_MARKER : string
-    BG_LINESTYLE : string
-    SS_LINESTYLE : string
+        Frequencies.
+    BG : (F, R) Ndarray of scalars, optional
+        Background realizations.
+    SS : (F, R) Ndarray of scalars, optional
+        Single-source realizations.
+    LABEL : str, optional
+        Label extension.
+    BG_COLOR : str, optional
+        Background line color.
+    SS_COLOR : str, optional
+        Single source line color.
+    BG_MARKER : str, optional
+        Background marker.
+    SS_MARKER : str, optional
+        Single source marker.
+    BG_LINESTYLE : str, optional
+        Background line style.
+    SS_LINESTYLE : str, optional
+        Single source line style.
     """
 
     if (BG is not None):
@@ -2027,23 +2093,46 @@ def plot_params(axs, xx, REALS=1, LABEL='', grid=None,
                 BG_MEDIAN=True, SS_MEDIAN=True,
                 BG_ERRORS=True, SS_ERRORS=True,
                 BG_COLOR='k', SS_COLOR='mediumorchid',
-                TITLES = np.array([['Total Mass $M/M_\odot$', 'Mass Ratio $q$'], 
-                                   ['Redshift $z$', 'Characteristic Strain $h_c$']]),
-                XLABEL = 'Frequency $f_\mathrm{obs}$ (1/yr)',
+                TITLES = np.array([[r'Total Mass $M/M_\odot$', r'Mass Ratio $q$'], 
+                                   [r'Redshift $z$', r'Characteristic Strain $h_c$']]),
+                XLABEL = r'Frequency $f_{\mathrm{obs}}$ (1/yr)',
                 SHOW_LEGEND = True):             
-    """
-    Plot mass, ratio, redshift, and strain in 4 separate subplots.
+    r"""Plot mass, ratio, redshift, and strain in 4 separate subplots.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     axs : (2,2) array of pyplot ax object
+        Axes grid.
     xx : (F,) 1d array of scalars
-    params : (4,) 1Darray of (F,R,) NDarrays
-    titles : (4,) array of strings
-    xlabel : string
-    legend : bool
-        Whether or not to include a legend in each subplot
-
+        Frequencies.
+    REALS : int, optional
+        Number of realizations to plot.
+    LABEL : str, optional
+        Label extension suffix.
+    grid : array_like, optional
+        Grid boundary values.
+    BG_PARAMS : array_like, optional
+        Background parameters.
+    SS_PARAMS : array_like, optional
+        Single source parameters.
+    BG_MEDIAN : bool, optional (Default=True)
+        Whether to plot the median background values.
+    SS_MEDIAN : bool, optional (Default=True)
+        Whether to plot the median single-source values.
+    BG_ERRORS : bool, optional (Default=True)
+        Whether to display background standard deviation limits.
+    SS_ERRORS : bool, optional (Default=True)
+        Whether to display single-source standard deviation limits.
+    BG_COLOR : str, optional (Default='k')
+        Background color line value.
+    SS_COLOR : str, optional (Default='mediumorchid')
+        Single source color value.
+    TITLES : array_like, optional 
+        Label values for axes.
+    XLABEL : str, optional (Default=r'Frequency $f_{\mathrm{obs}}$ (1/yr)')
+        Independent variable label name.
+    SHOW_LEGEND : bool, optional (Default=True)
+        Whether to show the legend in each subpanel.
     """
     colors = cm.rainbow(np.linspace(0,1,REALS))
     for ii in range(len(axs)):
@@ -2148,8 +2237,15 @@ def plot_params(axs, xx, REALS=1, LABEL='', grid=None,
 
 
 def threshold_hc():
-    """
-    Rosado+ 2015, SNR calculation
+    r"""[Rosado2015]_ SNR calculation.
+
+    Returns
+    -------
+    int: 0
+        Hardcoded to return 0 for now.
+
+    Notes
+    -----
     S := cross correlation between pulsars 
     S = \int_{-T/2}^{T/2} dt \int dt' s_i(t) s_j(t') Q(t,t')
     where T is the observation time, s_i(t) and s_j(t) are the data 
@@ -2162,25 +2258,47 @@ def threshold_hc():
 
 
 def ss_occurence_rate(hc_ss, S_T):
-    """
-    Parameters:
-    ------------
+    r"""Calculate single-source occurence rate.
+
+    Parameters
+    ----------
     hc_ss : (F, R) NDarray of scalars
         characteristic strain of single sources 
     S_T : float
         threshold strain? 
 
+    Returns
+    ------
+    int: 0
+        Hardcoded to return 0 for now.
     """
     return 0
 
 def bg_occurence_rate():
-    """ 
-    According to Rosado+ 2015
-    Universe may contain GWB if S >= S_T
+    r"""Calculate background occurence rate.
+
+    Returns
+    ------
+    int : 0
+        Hardcoded to return 0 for now.
+
+    Notes
+    -----
+    According to [Rosado2015]
+    Universe may contain GWB if `S \ge S_T`
+
     """
+    return 0
 
 def false_alarm_probability():
-    """
+    r"""Placeholder for false alarm probability.
+
+    Returns
+    -------
+    prob : float
+
+    Notes
+    -----
     TODO
     """
     return 0

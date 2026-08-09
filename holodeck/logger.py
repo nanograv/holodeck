@@ -147,11 +147,11 @@ def get_logger(name=None, level_stream=WARNING, tostr=sys.stdout, tofile=None, l
 def log_to_file(logger, file_level=DEBUG, file_name=None, base_name='holodeck', path=None):
     """Add a `FileHandler` to the given logger, to log to an output (text) file.
 
-    If `file_name` IS given, then it is used as the output filename.
-        If `file_name` is NOT an absolute path, then the file is placed in the `path` directory.
-        If `file_name` IS an absolute path, then that's where the file is placed.
-    If `file_name` is NOT given, then a filename is constructed based on the `base_name`, the logging level, and
-    the processor rank (if this is a parallel job).
+    * If `file_name` IS given, then it is used as the output filename.
+        * If `file_name` is NOT an absolute path, then the file is placed in the `path` directory.
+        * If `file_name` IS an absolute path, then that's where the file is placed.
+    * If `file_name` is NOT given, then a filename is constructed based on the `base_name`, the logging level, and
+      the processor rank (if this is a parallel job).
 
     """
 

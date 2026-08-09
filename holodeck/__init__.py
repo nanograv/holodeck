@@ -33,7 +33,7 @@ In general, `holodeck` calculations proceed in three stages:
 
 References
 ----------
-* [WMAP9] Hinshaw, Larson, Komatsu et al. 2013
+* [WMAP9]_ Hinshaw, Larson, Komatsu et al. 2013
 
 """
 
