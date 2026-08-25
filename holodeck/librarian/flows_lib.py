@@ -89,13 +89,18 @@ DEF_NUM_RANK = 20
 #: Statistic used to rank sources across the band.  See :func:`cw_rank_stat`.
 DEF_RANKBY = 'hc'
 
-#: Default frequency bin width [Hz].  4x finer than the standard PTA Nyquist spacing, so that every
-#  4th bin lands exactly on the real ``DEF_PTA_DUR``-year PTA grid.  A finer grid changes the prior,
-#  not the data: what it buys is the ability to represent a CW *between* real PTA bins.
-DEF_DF = 1.0 / (4.0 * DEF_PTA_DUR * YR)
+#: Number of frequency sub-bins per PTA Fourier bin.  Must be an INTEGER: the grid is anchored at
+#  ``1/T`` (see :func:`flow_freqs`), so the real PTA frequency ``k/T`` is bin index ``(k-1)*nsub``
+#  exactly, with no tolerance check -- which is what lets the CW columns and a PTA-convention GWB
+#  free spectrum index the same grid.  A finer grid changes the prior, not the data: what it buys
+#  is the ability to represent a CW *between* real PTA bins.
+DEF_NSUB = 4
 
-#: Default number of frequency bins.  With ``DEF_DF`` this gives f_max = 29.65 nHz.
-DEF_NUM_FBINS = 60
+#: Highest PTA harmonic on the default grid: the band runs from ``1/T`` to ``DEF_KMAX/T``.
+DEF_KMAX = 15
+
+#: Default number of frequency bins; f_max = 29.65 nHz over 57 bins at ``DEF_PTA_DUR``.
+DEF_NUM_FBINS = DEF_NSUB * (DEF_KMAX - 1) + 1
 
 #: The CW columns the flow trains on, in order.  Distance, never strain amplitude: h0 is a
 #  deterministic function of (Mc, d, f), so a flow over (mc, h0, fo) would fit a density on a
@@ -206,7 +211,8 @@ def main():   # noqa : ignore complexity warning
     log.info(
         f"param_space={args.param_space}, parameters={space.nparameters}, samples={args.nsamples}, "
         f"sam_shape={args.sam_shape}, nreals={args.nreals}, "
-        f"nfreqs={args.nfreqs}, df={args.df*1e9:.4f} [nHz], "
+        f"nfreqs={args.nfreqs}, nsub={args.nsub}, dur={args.dur_yr} [yr], "
+        f"df={args.df*1e9:.4f} [nHz], "
         f"nloudest={args.nloudest}, nrank={args.nrank}, rankby={args.rankby}"
     )
 
@@ -278,13 +284,15 @@ def _setup_argparse(*args, **kwargs):
 
     # ---- frequency grid
     #
-    # NOTE: given as a bin WIDTH, not as an observing duration.  `utils.pta_freqs` derives the
-    # spacing from the duration (df = 1/dur) and its `cad` argument only sets the number of bins
-    # (the Nyquist cutoff), so a 4x finer grid there requires claiming a 4x longer observation.
-    # Nothing downstream needs a duration -- `integrate_differential_number_3dx1d` and
-    # `char_strain_sq_from_bin_edges_redz` take bin-edge arrays -- so specify the grid directly.
-    parser.add_argument('--df', action='store', dest='df_nhz', type=float, default=DEF_DF*1e9,
-                        help='Frequency bin width [nHz]')
+    # NOTE: the anchor and the resolution are set SEPARATELY.  `utils.pta_freqs` derives its
+    # spacing from the duration (df = 1/dur), so reaching a finer grid there means claiming a
+    # longer observation -- which drags the lowest frequency down with it.  Here `dur` fixes the
+    # lowest frequency at 1/dur and `nsub` subdivides, so a finer grid never invents bins below
+    # what the PTA can resolve.  See `flow_freqs`.
+    parser.add_argument('--dur', action='store', dest='dur_yr', type=float, default=DEF_PTA_DUR,
+                        help='PTA observing duration [yr]; sets the lowest frequency, 1/dur')
+    parser.add_argument('--nsub', action='store', dest='nsub', type=int, default=DEF_NSUB,
+                        help='Frequency sub-bins per PTA Fourier bin (1 = the real PTA grid)')
     parser.add_argument('-f', '--nfreqs', action='store', dest='nfreqs', type=int,
                         help='Number of frequency bins', default=DEF_NUM_FBINS)
 
@@ -324,6 +332,9 @@ def _setup_argparse(*args, **kwargs):
     # mode and no per-simulation plotting here, but those functions are reused as-is.
     args.domain = False
     args.plot = False
+
+    if args.nsub < 1:
+        raise ValueError(f"`nsub`={args.nsub} must be a positive integer!")
 
     if args.nrank > args.nfreqs * args.nloudest:
         raise ValueError(
@@ -366,8 +377,9 @@ def _setup_argparse(*args, **kwargs):
         if args.resume:
             raise RuntimeError("Cannot use `resume` in TEST mode!")
 
-    # convert the human-facing [nHz] to [Hz] once, here
-    args.df = args.df_nhz * 1e-9
+    # convert the human-facing [yr] to [sec] and derive the bin width once, here
+    args.dur = args.dur_yr * YR
+    args.df = 1.0 / (args.nsub * args.dur)
 
     # ---- Create output directories as needed
 
@@ -404,7 +416,7 @@ def load_config_from_path(path, log):
         log.info(f"\t{pk}={val}")
 
     # these are derived inside `_setup_argparse`; passing them back in would shadow the derivation
-    for pk in ['df', 'domain', 'plot', 'output_sims', 'output_logs']:
+    for pk in ['df', 'dur', 'domain', 'plot', 'output_sims', 'output_logs']:
         config.pop(pk, None)
 
     pspace = config.pop('param_space')
@@ -420,33 +432,31 @@ def load_config_from_path(path, log):
 # ==============================================================================
 
 
-def flow_freqs(df, nfreqs):
-    """Observed GW frequency bin centers and edges for a grid of the given bin width.
+def flow_freqs(nfreqs, nsub=DEF_NSUB, dur=DEF_PTA_DUR*YR):
+    """Observed GW frequency bin centers and edges, anchored to the PTA's lowest frequency.
 
     Arguments
     ---------
-    df : float
-        Frequency bin width [Hz].
     nfreqs : int
         Number of frequency bins.
+    nsub : int
+        Number of sub-bins per PTA Fourier bin; the bin width is ``df = 1/(nsub*dur)``.
+        ``nsub=1`` is the real PTA grid.
+    dur : float
+        PTA observing duration [sec].  Sets the lowest frequency, ``f_0 = 1/dur``.
 
     Returns
     -------
     cents : (F,) ndarray
-        Bin centers, ``f_i = (i+1) * df`` for ``i`` in ``[0, nfreqs)`` [Hz].
+        Bin centers, ``f_i = (1 + i/nsub) / dur`` for ``i`` in ``[0, nfreqs)`` [Hz].
     edges : (F+1,) ndarray
-        Bin edges, ``(i+0.5) * df`` [Hz].
-
-    Notes
-    -----
-    Numerically identical to ``utils.pta_freqs(dur=1/df, num=nfreqs)``, but parameterized by the
-    quantity that actually matters here.  Note that ``h_c^2 = h_s^2 * f/df``, so the number of
-    single sources resolved per unit frequency scales with the bin width: ``nloudest`` is applied
-    per bin, so a 4x finer grid separates 4x more single sources from the background.
+        Bin edges, ``(1 + (j - 0.5)/nsub) / dur`` for ``j`` in ``[0, nfreqs]`` [Hz].
 
     """
-    cents = np.arange(1, nfreqs + 1) * df
-    edges = (np.arange(nfreqs + 1) + 0.5) * df
+    f0 = 1.0 / dur
+    df = f0 / nsub
+    cents = f0 + np.arange(nfreqs) * df
+    edges = f0 + (np.arange(nfreqs + 1) - 0.5) * df
     return cents, edges
 
 
@@ -505,7 +515,7 @@ def run_cws_at_pspace_params(args, space, pnum, params):
         log.debug("Selecting `sam` and `hard` instances")
         sam, hard = space.model_for_params(params)
 
-        fobs_cents, fobs_edges = flow_freqs(args.df, args.nfreqs)
+        fobs_cents, fobs_edges = flow_freqs(args.nfreqs, nsub=args.nsub, dur=args.dur)
         # Offset the seed by the simulation number, so that realizations are reproducible without
         # every simulation in the library sharing one Poisson realization.
         seed = None if (args.seed is None) else (args.seed + pnum)
@@ -1103,6 +1113,8 @@ def flows_lib_combine(path_output, log, recreate=False):
         h5.attrs['nloudest'] = args.nloudest
         h5.attrs['rankby'] = args.rankby
         h5.attrs['df'] = args.df
+        h5.attrs['nsub'] = args.nsub
+        h5.attrs['pta_dur'] = args.dur
         h5.attrs['seed'] = -1 if (args.seed is None) else args.seed
         h5.attrs['holodeck_version'] = holo.__version__
         try:
