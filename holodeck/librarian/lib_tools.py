@@ -1069,6 +1069,7 @@ def run_model(
 
         gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final = _calc_model_details(edges, redz_final, number)
 
+
         data["gwb_params"] = gwb_pars
         data["num_params"] = num_pars
         data["gwb_mtot_redz_final"] = gwb_mtot_redz_final
