@@ -121,6 +121,42 @@ class PS_Classic_Phenom_Uniform(_PS_Classic_Phenom):
         )
 
 
+class PS_Classic_Phenom_Astro(_PS_Classic_Phenom):
+    """Classic 6D phenomenological parameter space with astro-informed priors.
+
+    NOTE: this parameter space is NEW, it was not used in any published analysis.  It is the
+    parameter *list* of :class:`PS_Classic_Phenom_Uniform` (the 6D 'phenom-uniform' space) carrying
+    the *priors* of :class:`PS_Classic_Phenom_Astro_Extended` (the 12D 'phenom-astro+extended'
+    space) on the four parameters the two have in common.  It exists to give the ``cw-flows``
+    normalizing flows a 6-dimensional astrophysical conditioning vector, rather than the 12
+    dimensions of the extended space.
+
+    Do not confuse this with `PS_New_Astro_02B`: that space is 12D, and it is now
+    :class:`PS_Classic_Phenom_Astro_Extended` (see that class's docstring).
+
+    """
+
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
+            # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
+            PD_Normal("gsmf_phi0_log10", -2.56, 0.4),
+            PD_Normal("gsmf_mchar0_log10", 10.9, 0.4),   # [log10(Msol)]
+
+            PD_Normal("mmb_mamp_log10", +8.6, 0.2),      # [log10(Msol)]
+            PD_Normal("mmb_scatter_dex", +0.32, 0.15),
+
+            PD_Uniform("hard_time", 0.1, 11.0),          # [Gyr]
+            # NOTE: upper bound is +0.5 (the astro-extended value), not the +0.0 used by
+            #       `PS_Classic_Phenom_Uniform`.
+            PD_Uniform("hard_gamma_inner", -1.5, +0.5),
+        ]
+
+        super().__init__(
+            parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+        )
+
+
 class PS_Classic_Phenom_Astro_Extended(_PS_Classic_Phenom):
     """Classic 12D phenomenological, uniform parameter space used in 15yr analysis.
 
@@ -310,6 +346,7 @@ class PS_Classic_Test(_PS_Classic_Phenom):
 _param_spaces_dict = {
     "PS_Classic_Test": PS_Classic_Test,
     "PS_Classic_Phenom_Uniform": PS_Classic_Phenom_Uniform,    # PS_Uniform_09B
+    "PS_Classic_Phenom_Astro": PS_Classic_Phenom_Astro,        # NEW, not from a published analysis
     "PS_Classic_Phenom_Astro_Extended": PS_Classic_Phenom_Astro_Extended,
     "PS_Classic_GWOnly_Uniform": PS_Classic_GWOnly_Uniform,
     "PS_Classic_GWOnly_Astro_Extended": PS_Classic_GWOnly_Astro_Extended,
