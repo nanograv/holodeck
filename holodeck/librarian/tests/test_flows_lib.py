@@ -308,7 +308,7 @@ def _small_model():
 def test_run_cws_reproducible(_small_model):
     """The same seed must give byte-identical output; different seeds must not."""
     sam, hard = _small_model
-    cents, edges = flows_lib.flow_freqs(flows_lib.DEF_DF, 5)
+    cents, edges = flows_lib.flow_freqs(5)
     kw = dict(nreals=4, nloudest=3, nrank=3, log=holo.log)
 
     aa = flows_lib.run_cws(sam, hard, cents, edges, seed=7, **kw)
@@ -326,7 +326,7 @@ def test_run_cws_shapes_and_ranges(_small_model):
     """Output must have the documented shapes, and physically sane values."""
     sam, hard = _small_model
     nreals, nrank, nfreqs = 4, 3, 5
-    cents, edges = flows_lib.flow_freqs(flows_lib.DEF_DF, nfreqs)
+    cents, edges = flows_lib.flow_freqs(nfreqs)
     data = flows_lib.run_cws(sam, hard, cents, edges, nreals=nreals, nloudest=3,
                              nrank=nrank, seed=7, log=holo.log)
 
@@ -347,31 +347,15 @@ def test_run_cws_shapes_and_ranges(_small_model):
     assert np.allclose(10.0**data['log10_fo'][0][live[0]], cents[data['cw_fidx'][0][live[0]]])
 
 
-def test_run_cws_gwb_reconstruction(_small_model):
-    """`hc_rest` plus the kept sources must add back up to the population total, exactly.
-
-    `hc_rest` is defined as everything the library does NOT store as a CW: the sub-threshold
-    background plus every per-bin loudest source that lost the across-band ranking.  So adding the
-    kept sources back must recover the same total the population had.
-    """
+def test_run_cws_gwb_is_total_power(_small_model):
+    """`half_log10rho` must be the free spectrum of the whole population, every source in."""
     sam, hard = _small_model
     nreals, nrank, nfreqs, nloudest = 4, 4, 5, 6
-    cents, edges = flows_lib.flow_freqs(flows_lib.DEF_DF, nfreqs)
+    cents, edges = flows_lib.flow_freqs(nfreqs)
     data = flows_lib.run_cws(sam, hard, cents, edges, nreals=nreals, nloudest=nloudest,
                              nrank=nrank, seed=11, save_gwb=True, log=holo.log)
 
-    assert data['hc_rest'].shape == (nfreqs, nreals)
-    assert np.all(np.isfinite(data['hc_rest']))
-    assert np.all(data['hc_rest'] >= 0.0)
-
-    # re-accumulate the kept sources into their frequency bins
-    fidx = data['cw_fidx'][0]            # (K, R)
-    hcs = data['cw_hc'][0]
-    live = fidx >= 0
-    sel2 = np.zeros((nfreqs, nreals))
-    r_ix = np.broadcast_to(np.arange(nreals)[np.newaxis, :], fidx.shape)
-    np.add.at(sel2, (fidx[live], r_ix[live]), hcs[live]**2)
-    total = data['hc_rest']**2 + sel2
+    assert data['half_log10rho'].shape == (nfreqs, nreals)
 
     # the same population, recomputed from the same seed
     from holodeck import gravwaves
@@ -383,18 +367,19 @@ def test_run_cws_gwb_reconstruction(_small_model):
     h2fdf = gravwaves.char_strain_sq_from_bin_edges_redz(grid, redz_final)
     hc2ss, _b, hc2rest = flows_lib.loudest_per_bin(
         number, h2fdf, nreals, nloudest, np.random.default_rng(11), totals=True)
-    want = hc2rest + hc2ss.sum(axis=-1)
 
-    assert np.allclose(total, want, rtol=1e-12), "hc_rest + kept sources != population total"
+    want = flows_lib.gwb_free_spectrum(
+        np.sqrt(hc2rest + hc2ss.sum(axis=-1)), cents, edges[1] - edges[0])
+    assert np.allclose(data['half_log10rho'], want, rtol=1e-12, equal_nan=True)
 
 
 def test_flow_freqs_matches_pta_freqs():
-    """The explicit grid must be numerically identical to the duration-derived one."""
-    df, nfreqs = flows_lib.DEF_DF, 60
-    cents, edges = flows_lib.flow_freqs(df, nfreqs)
-    want_cents, want_edges = utils.pta_freqs(dur=1.0/df, num=nfreqs)
+    """`nsub=1` must be numerically identical to the duration-derived PTA grid."""
+    dur, nfreqs = holo.librarian.DEF_PTA_DUR * YR, 15
+    cents, edges = flows_lib.flow_freqs(nfreqs, nsub=1, dur=dur)
+    want_cents, want_edges = utils.pta_freqs(dur=dur, num=nfreqs)
     assert np.allclose(cents, want_cents)
     assert np.allclose(edges, want_edges)
-    # 4x finer than the standard PTA grid: every 4th bin lands on a real PTA frequency
-    pta_cents, _ = utils.pta_freqs(dur=holo.librarian.DEF_PTA_DUR*YR, num=nfreqs // 4)
-    assert np.allclose(cents[3::4], pta_cents)
+    # every `nsub`-th bin lands on a real PTA frequency
+    cents, _ = flows_lib.flow_freqs(nfreqs, nsub=4, dur=dur)
+    assert np.allclose(cents[::4], want_cents[:len(cents[::4])])

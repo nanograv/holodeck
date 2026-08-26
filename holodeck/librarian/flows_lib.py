@@ -48,11 +48,15 @@ training array is built by broadcasting the astro parameters against the CW colu
 
     cw   = np.concatenate([f[k][:] for k in f.attrs['cw_keys']], axis=0)   # (3, K, R, S)
     ast  = np.broadcast_to(f['theta_ast'][:], (nastro,) + cw.shape[1:])    # (6, K, R, S)
-    rows = np.concatenate([ast, cw], axis=0).reshape(nastro + 3, -1).T     # (N, 9)
+    gwb  = np.broadcast_to(f['half_log10rho'][:], (nfreqs,) + cw.shape[1:])
+    ncol = nastro + len(cw_keys) + nfreqs
+    rows = np.concatenate([ast, cw, gwb], axis=0).reshape(ncol, -1).T      # (N, ncol)
     rows = rows[np.isfinite(rows).all(axis=1)]
 
 Empty source slots (realizations holding fewer than ``nrank`` live sources) are stored as ``NaN``,
-so that final ``isfinite`` mask is the only cleanup needed.
+so that final ``isfinite`` mask is the only cleanup needed.  ``half_log10rho`` carries a length-1
+rank axis so it broadcasts the way ``theta_ast`` does: every CW source of a realization sees that
+realization's background.
 
 """
 
@@ -114,6 +118,10 @@ PROV_KEYS = ('cw_mtot', 'cw_mrat', 'cw_redz', 'cw_hc')
 
 #: Diagnostic index arrays, stored as int16.
 IDX_KEYS = ('cw_fidx', 'cw_lidx')
+
+#: The GWB columns the flow trains on: the free spectrum in the enterprise/pandora convention,
+#  one value per frequency bin of the library's own grid.  See :func:`gwb_free_spectrum`.
+GWB_KEYS = ('half_log10rho',)
 
 DIRNAME_FLOWS_SIMS = "flows_sims"
 FNAME_FLOWS_SIM_FILE = "flows__p{pnum:06d}.npz"
@@ -302,8 +310,8 @@ def _setup_argparse(*args, **kwargs):
     parser.add_argument('--rankby', action='store', dest='rankby', type=str, default=DEF_RANKBY,
                         choices=['hc', 'resid'],
                         help='Statistic used to rank CWs across the band (frozen into library)')
-    parser.add_argument('--save-gwb', dest='save_gwb', default=False, action='store_true',
-                        help="also store `hc_rest`, the background plus all non-selected sources")
+    parser.add_argument('--no-gwb', dest='save_gwb', default=True, action='store_false',
+                        help="skip the `half_log10rho` free-spectrum columns (CW columns only)")
 
     # how to run
     parser.add_argument('--resume', action='store_true', default=False,
@@ -460,6 +468,46 @@ def flow_freqs(nfreqs, nsub=DEF_NSUB, dur=DEF_PTA_DUR*YR):
     return cents, edges
 
 
+def gwb_free_spectrum(hc, fobs_cents, df):
+    """Convert a characteristic strain per frequency bin into the PTA free-spectrum parameter.
+
+    Arguments
+    ---------
+    hc : (F, ...) ndarray
+        Characteristic strain per bin.
+    fobs_cents : (F,) ndarray
+        Bin centers [Hz].
+    df : float
+        Bin width [Hz].  This is what ``rho`` is defined against, and it is the same ``df`` the
+        likelihood must be handed -- pandora's GWB models all take it as a free argument rather
+        than assuming ``1/Tspan``.
+
+    Returns
+    -------
+    half_log10rho : (F, ...) ndarray
+        ``log10(rho_i)``, or ``NaN`` for a bin holding no binaries at all.
+
+    Notes
+    -----
+    ``rho_i^2 = h_c,i^2 / (12 pi^2 f_i^3) * df`` is the power in bin ``i`` -- the prior variance
+    of the corresponding Fourier coefficient of the timing residuals.
+
+    The grid is deliberately finer than ``1/Tspan``.  The data alone cannot separate modes spaced
+    more finely than that -- they are not orthogonal over the observing span -- but an
+    astrophysically informed prior over the whole vector, which is what this library is for, can.
+    A coarser convention would also force the CW and GWB columns onto different grids.
+
+    """
+    ff = fobs_cents.reshape((-1,) + (1,) * (hc.ndim - 1))
+    rho2 = hc**2 * df / (12.0 * np.pi**2 * ff**3)
+    # An empty bin becomes NaN, never a sentinel value: the same choice `cw_columns` makes for
+    # empty source slots, and for the same reason -- a finite stand-in orders of magnitude below
+    # the real values would survive the training array's `isfinite` mask and then dominate any
+    # per-column normalization.  Empty bins cluster in degenerate parameter samples rather than
+    # scattering, so this drops bad samples, not good rows.
+    return np.where(rho2 > 0.0, 0.5 * np.log10(np.where(rho2 > 0.0, rho2, 1.0)), np.nan)
+
+
 def run_cws_at_pspace_params(args, space, pnum, params):
     """Run simulation number ``pnum`` of the ``space`` parameter-space and save its CW data.
 
@@ -553,7 +601,7 @@ def run_cws(
     nrank=DEF_NUM_RANK,
     rankby=DEF_RANKBY,
     seed=None,
-    save_gwb=False,
+    save_gwb=True,
     log=None,
 ):
     """Build a binary population and return its top-ranked CW sources, in the flow's columns.
@@ -580,14 +628,15 @@ def run_cws(
     seed : int or None
         Seed for the Poisson realizations.  Given a seed, the output is reproducible.
     save_gwb : bool
-        Also return ``hc_rest``, the background plus every source not kept.
+        Also return ``half_log10rho``, the free spectrum of the whole population.
     log : ``logging.Logger`` instance
 
     Returns
     -------
     data : dict
-        Arrays shaped ``(1, nrank, nreals)``, plus ``fobs_cents``/``fobs_edges``.  See the module
-        docstring for the layout, and :func:`cw_columns` for the column definitions.
+        Arrays shaped ``(1, nrank, nreals)``, plus ``fobs_cents``/``fobs_edges``, plus
+        ``half_log10rho`` shaped ``(nfreqs, nreals)`` when ``save_gwb``.  See the module docstring
+        for the layout, and :func:`cw_columns` for the column definitions.
 
     """
 
@@ -650,16 +699,13 @@ def run_cws(
     data['fobs_edges'] = fobs_edges
 
     if save_gwb:
-        # Everything that is NOT one of the `nrank` kept sources: the sub-threshold background,
-        # plus every per-bin loudest source that did not win a global slot.  Built by ADDING the
-        # unselected singles, never by subtracting the selected ones from a total -- that
-        # difference cancels catastrophically in bins where the singles are most of the
-        # population.
-        live = ranked['fidx'] >= 0
-        r_ix = np.broadcast_to(np.arange(nreals)[:, np.newaxis], live.shape)
-        taken = np.zeros(hc2ss.shape, dtype=bool)                       # (F, R, L)
-        taken[ranked['fidx'][live], r_ix[live], ranked['lidx'][live]] = True
-        data['hc_rest'] = np.sqrt(hc2rest + np.sum(np.where(taken, 0.0, hc2ss), axis=-1))
+        # The TOTAL power in each bin: background plus every single source, the kept CWs
+        # included.  They are not subtracted -- the free spectrum a real analysis recovers holds
+        # whatever is in the band, and this library supplies a prior, not a likelihood.  One
+        # consequence is that `nloudest` does not enter here at all: it only controls how the
+        # same total is split between `hc2rest` and `hc2ss`.
+        hc_total = np.sqrt(hc2rest + np.sum(hc2ss, axis=-1))            # (F, R)
+        data['half_log10rho'] = gwb_free_spectrum(hc_total, fobs_cents, fobs_edges[1] - fobs_edges[0])
 
     return data
 
@@ -1059,7 +1105,7 @@ def flows_lib_combine(path_output, log, recreate=False):
 
     float_keys = list(CW_KEYS) + list(PROV_KEYS)
     idx_keys = list(IDX_KEYS)
-    gwb_shape = (len(fobs_cents), nreals)
+    gwb_shape = (len(fobs_cents), 1, nreals)
 
     # ---- stream all simulation files into the output file
 
@@ -1080,8 +1126,9 @@ def flows_lib_combine(path_output, log, recreate=False):
             dsets[key] = h5.create_dataset(
                 key, shape=shape + (nsamp_all,), dtype='i2', chunks=shape + (1,))
         if args.save_gwb:
-            dsets['hc_rest'] = h5.create_dataset(
-                'hc_rest', shape=gwb_shape + (nsamp_all,), dtype='f8', chunks=gwb_shape + (1,))
+            for key in GWB_KEYS:
+                dsets[key] = h5.create_dataset(
+                    key, shape=gwb_shape + (nsamp_all,), dtype='f8', chunks=gwb_shape + (1,))
 
         for ii in tqdm.trange(nsamp_all):
             temp = np.load(_get_sim_fname(path_sims, ii))
@@ -1092,13 +1139,15 @@ def flows_lib_combine(path_output, log, recreate=False):
                 for key in idx_keys:
                     dsets[key][..., ii] = -1
                 if args.save_gwb:
-                    dsets['hc_rest'][..., ii] = np.nan
+                    for key in GWB_KEYS:
+                        dsets[key][..., ii] = np.nan
                 continue
 
             for key in float_keys + idx_keys:
                 dsets[key][..., ii] = temp[key]
             if args.save_gwb:
-                dsets['hc_rest'][..., ii] = temp['hc_rest']
+                for key in GWB_KEYS:
+                    dsets[key][..., ii] = temp[key][:, np.newaxis, :]
 
         param_samples[bad_files] = np.nan
         h5.create_dataset('sample_params', data=param_samples)
@@ -1107,6 +1156,8 @@ def flows_lib_combine(path_output, log, recreate=False):
 
         h5.attrs['param_names'] = np.array(param_names).astype('S')
         h5.attrs['cw_keys'] = np.array(CW_KEYS).astype('S')
+        if args.save_gwb:
+            h5.attrs['gwb_keys'] = np.array(GWB_KEYS).astype('S')
         h5.attrs['parameter_space_class_name'] = pspace.name
         h5.attrs['nrank'] = nrank
         h5.attrs['nreals'] = nreals
