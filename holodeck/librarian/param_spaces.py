@@ -728,6 +728,201 @@ class PS_Astro_Strong_Covariant_All(_PS_Astro_Strong):
         return
 
 
+# ==============================================================================
+# ====    NG20 Flagship / Fiducial Parameter Spaces    ====
+# ==============================================================================
+
+
+class _PS_NG20_Base(_Param_Space):
+    """Base parameter space class for NANOGrav 20-year (NG20) astrophysical modeling.
+
+    Components:
+    - Blecha Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 1)
+    - Double-Schechter GSMF with Leja+2020 11-D covariance matrix
+    - Illustris Galaxy Merger Rate (`GMR_Illustris`, Rodriguez-Gomez+2015)
+    - Kormendy & Ho (2013) M-Mbulge with Matt et al. (2026a) redshift-evolving amplitude
+    """
+
+    __version__ = "1.0"
+
+    DEFAULTS = dict(
+        # BIO Hardening (FixedOuterTime_InnerPL_SAM) - Model 1 (boundary rate dadt_rchar)
+        hard_inner_model_type=1,
+        hard_outer_time=1.0,  # [Gyr]
+        hard_rchar_9=1.0,  # [pc]
+        hard_log10_dadt_rchar=5.0,  # [log10(cm/s)], magnitude |dadt| at rchar for equal-mass 1e9 Msun
+        hard_alpha_char=-2.0 / 3.0,
+        hard_gw_crit_units="rg",
+        hard_r_gw_crit_9=10**2.5,
+        hard_alpha_gw_crit=-0.25,
+        hard_beta_gw_crit=+0.25,
+
+        # Galaxy stellar-mass Function (``GSMF_Double_Schechter``)
+        # Parameters based on conversions from [Leja2020]_
+        gsmf_log10_phi_one_z0=-2.386,
+        gsmf_log10_phi_one_z1=-0.259,
+        gsmf_log10_phi_one_z2=-0.110,
+        gsmf_log10_phi_two_z0=-2.821,
+        gsmf_log10_phi_two_z1=-0.368,
+        gsmf_log10_phi_two_z2=+0.046,
+        gsmf_log10_mstar_z0=+10.765,
+        gsmf_log10_mstar_z1=+0.130,
+        gsmf_log10_mstar_z2=-0.034,
+        gsmf_alpha_one=-0.278,
+        gsmf_alpha_two=-1.479,
+
+        # Galaxy merger rate (``GMR_Illustris``)
+        # Parameters from [Rodriguez-Gomez2015]_
+        gmr_norm0_log10=-2.2287,  # -2.2287 ± 0.0045    A0 [log10(A*Gyr)]
+        gmr_normz=+2.4644,  # +2.4644 ± 0.0128    eta
+        gmr_malpha0=+0.2241,  # +0.2241 ± 0.0038    alpha0
+        gmr_malphaz=-1.1759,  # -1.1759 ± 0.0316    alpha1
+        gmr_mdelta0=+0.7668,  # +0.7668 ± 0.0202    delta0
+        gmr_mdeltaz=-0.4695,  # -0.4695 ± 0.0440    delta1
+        gmr_qgamma0=-1.2595,  # -1.2595 ± 0.0026    beta0
+        gmr_qgammaz=+0.0611,  # +0.0611 ± 0.0021    beta1
+        gmr_qgammam=-0.0477,  # -0.0477 ± 0.0013    gamma
+
+        # M-MBulge Relationship (``MMBulge_Redshift_KH2013``)
+        # Kormendy & Ho (2013) z=0 plus Matt et al. (2026a) redshift evolution
+        mmb_mamp_log10=8.69,  # 8.69 ± 0.05 [log10(M/Msol)]
+        mmb_plaw=1.17,  # 1.17 ± 0.08
+        mmb_scatter_dex=0.28,  # 0.28 ± 0.05
+        mmb_zplaw_amp=0.0,  # Redshift power-law exponent on normalization (Matt et al.)
+
+        # Bulge fraction (``BF_Sigmoid``)
+        bf_frac_lo=0.4,
+        bf_frac_hi=0.8,
+        bf_mstar_crit=11.0,  # [log10(M_star/M_Sol)]
+        bf_width_dex=1.0,  # [dex]
+    )
+
+    def _init_sam(self, sam_shape, params):
+        log10_phi_one = [
+            params["gsmf_log10_phi_one_z0"],
+            params["gsmf_log10_phi_one_z1"],
+            params["gsmf_log10_phi_one_z2"],
+        ]
+        log10_phi_two = [
+            params["gsmf_log10_phi_two_z0"],
+            params["gsmf_log10_phi_two_z1"],
+            params["gsmf_log10_phi_two_z2"],
+        ]
+        log10_mstar = [
+            params["gsmf_log10_mstar_z0"],
+            params["gsmf_log10_mstar_z1"],
+            params["gsmf_log10_mstar_z2"],
+        ]
+        gsmf = holo.sams.GSMF_Double_Schechter(
+            log10_phi1=log10_phi_one,
+            log10_phi2=log10_phi_two,
+            log10_mstar=log10_mstar,
+            alpha1=params["gsmf_alpha_one"],
+            alpha2=params["gsmf_alpha_two"],
+        )
+
+        gmr = holo.sams.GMR_Illustris(
+            norm0_log10=params["gmr_norm0_log10"],
+            normz=params["gmr_normz"],
+            malpha0=params["gmr_malpha0"],
+            malphaz=params["gmr_malphaz"],
+            mdelta0=params["gmr_mdelta0"],
+            mdeltaz=params["gmr_mdeltaz"],
+            qgamma0=params["gmr_qgamma0"],
+            qgammaz=params["gmr_qgammaz"],
+            qgammam=params["gmr_qgammam"],
+        )
+
+        bulge_frac = holo.host_relations.BF_Sigmoid(
+            bulge_frac_lo=params["bf_frac_lo"],
+            bulge_frac_hi=params["bf_frac_hi"],
+            mstar_char_log10=params["bf_mstar_crit"],
+            width_dex=params["bf_width_dex"],
+        )
+        mmbulge = holo.host_relations.MMBulge_Redshift_KH2013(
+            mamp_log10=params["mmb_mamp_log10"],
+            mplaw=params["mmb_plaw"],
+            scatter_dex=params["mmb_scatter_dex"],
+            zplaw_amp=params["mmb_zplaw_amp"],
+            bulge_frac=bulge_frac,
+        )
+
+        sam = holo.sams.Semi_Analytic_Model(
+            gsmf=gsmf,
+            gmr=gmr,
+            mmbulge=mmbulge,
+            shape=sam_shape,
+            log=self._log,
+        )
+        return sam
+
+    def _init_hard(self, sam, params):
+        dadt_rchar = -10.0 ** params["hard_log10_dadt_rchar"]
+        hard = holo.hardening.FixedOuterTime_InnerPL_SAM(
+            sam,
+            outer_time=params["hard_outer_time"] * GYR,
+            inner_model_type=int(params.get("hard_inner_model_type", 1)),
+            rchar_9=params["hard_rchar_9"] * PC,
+            dadt_rchar=dadt_rchar,
+            alpha_char=params.get("hard_alpha_char", -2.0 / 3.0),
+            gw_crit_units=params.get("hard_gw_crit_units", "rg"),
+            r_gw_crit_9=params.get("hard_r_gw_crit_9", 10**2.5),
+            alpha_gw_crit=params.get("hard_alpha_gw_crit", -0.25),
+            beta_gw_crit=params.get("hard_beta_gw_crit", +0.25),
+            enforce_physical_params=False,
+        )
+        return hard
+
+
+class PS_NG20_Fiducial(_PS_NG20_Base):
+    """NG20 Fiducial Parameter Space for Astrophysical Interpretation.
+
+    Components:
+    - Blecha Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 1)
+    - Double-Schechter GSMF with Leja+2020 11-D covariance matrix (`PD_MVNormal`)
+    - Illustris Galaxy Merger Rate (`GMR_Illustris`)
+    - Kormendy & Ho (2013) M-Mbulge with Matt et al. (2026a) redshift-evolving amplitude
+    """
+
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
+            # Hardening model (BIO-hardening / FixedOuterTime_InnerPL_SAM)
+            PD_Uniform("hard_outer_time", 0.1, 10.0, default=1.0),  # [Gyr]
+            PD_Uniform_Log("hard_rchar_9", 0.1, 10.0, default=1.0),  # [pc]
+            PD_Uniform("hard_log10_dadt_rchar", 1.0, 7.0, default=5.0),  # [log10(cm/s)]
+            # GSMF (Leja+2020 11-D Covariance)
+            PD_MVNormal(GSMF_COV_NAMES, GSMF_COV_MEANS, np.array(GSMF_COV_MATRIX)),
+            # GMR (Illustris)
+            PD_Normal("gmr_norm0_log10", -2.2287, 0.0045),
+            PD_Normal("gmr_normz", +2.4644, 0.0128),
+            PD_Normal("gmr_malpha0", +0.2241, 0.0038),
+            PD_Normal("gmr_malphaz", -1.1759, 0.0316),
+            PD_Normal("gmr_mdelta0", +0.7668, 0.0202),
+            PD_Normal("gmr_mdeltaz", -0.4695, 0.0440),
+            PD_Normal("gmr_qgamma0", -1.2595, 0.0026),
+            PD_Normal("gmr_qgammaz", +0.0611, 0.0021),
+            PD_Normal("gmr_qgammam", -0.0477, 0.0013),
+            # MMBulge (KH2013 + Matt et al. redshift evolution)
+            PD_Normal("mmb_mamp_log10", 8.69, 0.05),
+            PD_Normal("mmb_plaw", 1.17, 0.08),
+            PD_Normal("mmb_scatter_dex", 0.28, 0.05),
+            PD_Uniform("mmb_zplaw_amp", -2.0, +2.0, default=0.0),
+            # Bulge Fraction
+            PD_Uniform("bf_frac_lo", 0.1, 0.4, default=0.4),
+            PD_Uniform("bf_frac_hi", 0.6, 1.0, default=0.8),
+            PD_Uniform("bf_width_dex", 0.5, 1.5, default=1.0),
+        ]
+        _Param_Space.__init__(
+            self,
+            parameters,
+            log=log,
+            nsamples=nsamples,
+            sam_shape=sam_shape,
+            seed=seed,
+        )
+        return
+
+
 _param_spaces_dict = {
     "PS_Test": PS_Test,
     "PS_Astro_Strong_All": PS_Astro_Strong_All,
@@ -740,4 +935,6 @@ _param_spaces_dict = {
     "PS_Test_Astro_Strong_Covariant_MMBulge": PS_Test_Astro_Strong_Covariant_MMBulge,
     "PS_Astro_Strong_Covariant_All": PS_Astro_Strong_Covariant_All,
     "PS_Astro_Strong_Covariant_GSMF": PS_Astro_Strong_Covariant_GSMF,
+    "PS_NG20_Fiducial": PS_NG20_Fiducial,
 }
+
