@@ -21,8 +21,10 @@ unit conversions, and the cosmology to a downstream preprocessing pass.  That is
 simulation, of which the flow uses ~100 KB.
 
 Here, each simulation is reduced at generation time to the ``nrank`` loudest sources of each
-realization, ranked **across the whole band**, and written as ``log10_mc``, ``log10_dc``,
-``log10_fo``.  Training-time preprocessing is then a broadcast and a reshape (see 'Stored layout').
+realization, ranked **across the whole band**, and written as ``log10_mc``, ``log10_fo``, and BOTH
+amplitude parameterizations -- ``log10_h0`` (strain, what the ``cw_keys`` attr declares by default)
+and ``log10_dc`` (comoving distance).  Training-time preprocessing is then a broadcast and a
+reshape (see 'Stored layout').
 
 Three things are deliberately *not* computed, which is where the speedup comes from:
 
@@ -74,7 +76,7 @@ import tqdm
 
 import holodeck as holo
 from holodeck import cosmo, gravwaves
-from holodeck.constants import YR, MSOL, MPC
+from holodeck.constants import YR, MSOL, MPC, NWTG, SPLC
 import holodeck.librarian
 from holodeck import log
 from holodeck.librarian import lib_tools, gen_lib, ARGS_CONFIG_FNAME, DEF_PTA_DUR
@@ -106,14 +108,34 @@ DEF_KMAX = 15
 #: Default number of frequency bins; f_max = 29.65 nHz over 57 bins at ``DEF_PTA_DUR``.
 DEF_NUM_FBINS = DEF_NSUB * (DEF_KMAX - 1) + 1
 
-#: The CW columns the flow trains on, in order.  Distance, never strain amplitude: h0 is a
-#  deterministic function of (Mc, d, f), so a flow over (mc, h0, fo) would fit a density on a
-#  manifold the physics already pins down.  See the ``cw_mtot``/``cw_mrat``/``cw_redz`` provenance
-#  arrays if you need to recover h0.
-CW_KEYS = ('log10_mc', 'log10_dc', 'log10_fo')
+#: Every CW column stored in a library: BOTH amplitude parameterizations alongside the mass and
+#  frequency columns they share.  Which of the two a flow trains on is a modelling choice, and it
+#  is cheap to keep both -- one extra float64 array, ~8% of a library -- so the file carries both
+#  and the ``cw_keys`` attr says which one it declares.
+STORED_CW_KEYS = ('log10_mc', 'log10_dc', 'log10_h0', 'log10_fo')
 
-#: Provenance arrays: not used by the flow, but they make the CW columns re-derivable and are what
-#  ``h0`` would have to be reconstructed from.  ~half the library size.
+#: The two interchangeable CW triples.  They are exact transforms of each other, but neither is a
+#  function of the other two columns alone: ``log10_dc`` is COMOVING while ``log10_mc`` is
+#  REDSHIFTED and ``log10_fo`` OBSERVED, so the map runs through ``D_L = (1+z) D_c`` and needs the
+#  redshift in ``cw_redz``.  See :func:`strain_amplitude_h0`.
+CW_KEYS_DCOM = ('log10_mc', 'log10_dc', 'log10_fo')
+CW_KEYS_STRAIN = ('log10_mc', 'log10_h0', 'log10_fo')
+
+#: What a new library DECLARES in its ``cw_keys`` attr, i.e. what a flow trains on by default.
+#
+#  Strain, as of 2026-08-27.  The argument for distance is real -- h0 is a deterministic function
+#  of (Mc, d, f), so a flow over (mc, h0, fo) carries the chirp-mass and frequency dependence a
+#  second time, on a manifold the physics already pins down -- but it loses to a practical one:
+#  the samplers these priors feed (QuickCW's ``0_log10_h``, ATLAS's ``log10_h``) parameterize the
+#  CW by strain, so a prior in strain is a density in the sampler's own variable and needs no
+#  change of variables at sample time.  Pass ``--cw-keys dcom`` to declare distance instead; the
+#  column is there either way.
+CW_KEYS = CW_KEYS_STRAIN
+
+#: Provenance arrays: not used by the flow, but they make the CW columns re-derivable.  ``cw_redz``
+#  is what relates the two amplitude columns, and ``cw_hc`` is an INDEPENDENT route to h0 (through
+#  ``h_s = h_c sqrt(df/f)``, no cosmology) that cross-checks the one :func:`strain_amplitude_h0` takes.
+#  ~half the library size.
 PROV_KEYS = ('cw_mtot', 'cw_mrat', 'cw_redz', 'cw_hc')
 
 #: Diagnostic index arrays, stored as int16.
@@ -310,6 +332,12 @@ def _setup_argparse(*args, **kwargs):
     parser.add_argument('--rankby', action='store', dest='rankby', type=str, default=DEF_RANKBY,
                         choices=['hc', 'resid'],
                         help='Statistic used to rank CWs across the band (frozen into library)')
+    parser.add_argument('--cw-keys', dest='cw_keys', choices=('strain', 'dcom'), default='strain',
+                        help="which CW triple the library DECLARES in its `cw_keys` attr, i.e. what "
+                             "a flow trains on by default: 'strain' is (log10_mc, log10_h0, "
+                             "log10_fo), 'dcom' the COMOVING distance (log10_mc, log10_dc, "
+                             "log10_fo).  Both columns are always stored; this only sets the "
+                             "default. [strain]")
     parser.add_argument('--no-gwb', dest='save_gwb', default=True, action='store_false',
                         help="skip the `half_log10rho` free-spectrum columns (CW columns only)")
 
@@ -940,6 +968,46 @@ def rank_cws(hc_ss, bidx, fobs_cents, nrank=DEF_NUM_RANK, rankby=DEF_RANKBY):
     )
 
 
+#: Geometrized ("light-travel time in seconds") units, derived from the CGS primitives rather than
+#  imported, so this module does not depend on which holodeck branch defines them.
+_TSUN = NWTG * MSOL / SPLC ** 3       #: G*Msol/c^3 [s], the chirp-mass unit
+_MPC2S = MPC / SPLC                   #: Mpc in light-seconds [s/Mpc]
+
+
+def strain_amplitude_h0(mc_msol, dlum_mpc, fobs):
+    r"""CW strain amplitude ``h0``, in the convention PTA CW SAMPLERS use.
+
+    .. math::
+        h_0 = \frac{2 (G \mathcal{M}_c)^{5/3} (\pi f_\mathrm{gw})^{2/3}}{c^4 D_L}
+
+    **This is not holodeck's strain convention.**  :func:`holodeck.utils.gw_strain_source` returns
+    the sky- and polarization-averaged (Sesana / Enoki) amplitude
+    ``h_s = (8/sqrt(10)) (G Mc)^(5/3) (pi f)^(2/3) / (c^4 D_L)``, which is larger by
+    ``sqrt(8/5)`` = +0.1021 dex, because it folds the orientation average into the amplitude.  The
+    form here leaves inclination and polarization to the waveform instead.  ``cw_hc`` in the same
+    library is in holodeck's convention; converting between them is that ``sqrt(8/5)``.
+
+    Arguments
+    ---------
+    mc_msol : array_like
+        REDSHIFTED chirp mass, ``Mc*(1+z)`` [Msol] -- the pairing that goes with `fobs`.
+    dlum_mpc : array_like
+        LUMINOSITY distance [Mpc].  NOT the comoving distance ``log10_dc`` stores: multiply that
+        by ``(1+z)`` first.
+    fobs : array_like
+        OBSERVED GW frequency [Hz].
+
+    Returns
+    -------
+    h0 : array_like
+        Dimensionless strain amplitude.
+
+    """
+    h0 = (2.0 * (mc_msol * _TSUN) ** (5.0 / 3.0) * (np.pi * fobs) ** (2.0 / 3.0)
+            / (dlum_mpc * _MPC2S))
+    return h0
+
+
 def cw_columns(ranked, mt, mr, redz, fobs_cents):
     """Turn ranked sources into the flow's columns, shaped ``(1, nrank, nreals)``.
 
@@ -963,6 +1031,9 @@ def cw_columns(ranked, mt, mr, redz, fobs_cents):
                        pairs with the observed frequency in the waveform.
         ``log10_dc`` : log10 of the COMOVING distance [Mpc], from the source's final redshift --
                        this is the distance holodeck's strain was built from.
+        ``log10_h0`` : log10 of the strain amplitude in the PTA-sampler convention, derived from
+                       the three columns above plus the redshift.  See :func:`strain_amplitude_h0`;
+                       note it is NOT holodeck's sky-averaged convention, which ``cw_hc`` is in.
         ``log10_fo`` : log10 of the observed GW frequency [Hz].
         ``cw_mtot``, ``cw_mrat``, ``cw_redz``, ``cw_hc`` : provenance, in cgs.
         ``cw_fidx``, ``cw_lidx`` : int16 diagnostics.
@@ -995,9 +1066,13 @@ def cw_columns(ranked, mt, mr, redz, fobs_cents):
     nan = lambda arr: np.where(live, arr, np.nan)                       # noqa: E731
     with np.errstate(divide='ignore', invalid='ignore'):
         dcom = np.asarray(cosmo.z_to_dcom(np.where(live, zfin, 1.0)))
-        log10_mc = nan(np.log10(mchirp * (1.0 + zfin) / MSOL))
+        mc_msol = mchirp * (1.0 + zfin) / MSOL          # REDSHIFTED, pairs with the observed f
+        dlum_mpc = (1.0 + zfin) * dcom / MPC            # D_L = (1+z) D_c, what h0 divides by
+        fobs = fobs_cents[safe_fidx]
+        log10_mc = nan(np.log10(mc_msol))
         log10_dc = nan(np.log10(dcom / MPC))
-        log10_fo = nan(np.log10(fobs_cents[safe_fidx]))
+        log10_h0 = nan(np.log10(strain_amplitude_h0(mc_msol, dlum_mpc, fobs)))
+        log10_fo = nan(np.log10(fobs))
 
     # (R, K) -> (1, K, R): parameter axis first, sample axis appended at combine time
     slab = lambda arr: np.asarray(arr).T[np.newaxis, :, :]              # noqa: E731
@@ -1005,6 +1080,7 @@ def cw_columns(ranked, mt, mr, redz, fobs_cents):
     return dict(
         log10_mc=slab(log10_mc),
         log10_dc=slab(log10_dc),
+        log10_h0=slab(log10_h0),
         log10_fo=slab(log10_fo),
         cw_mtot=slab(nan(mtot)),
         cw_mrat=slab(nan(mrat)),
@@ -1094,6 +1170,9 @@ def flows_lib_combine(path_output, log, recreate=False):
         fobs_cents = temp['fobs_cents']
         fobs_edges = temp['fobs_edges']
         shape = temp['log10_mc'].shape           # (1, nrank, nreals)
+        # Which CW columns these simulations actually carry.  `log10_h0` arrived after some
+        # libraries were generated, so re-combining an older run must not demand it.
+        stored_cw = [key for key in STORED_CW_KEYS if key in temp]
 
     if shape is None:
         err = f"Every one of the {nsamp_all} simulation files is a failure!"
@@ -1103,7 +1182,12 @@ def flows_lib_combine(path_output, log, recreate=False):
     nrank, nreals = shape[1], shape[2]
     log.info(f"nfreqs={len(fobs_cents)}, {nrank=}, {nreals=}, save_gwb={args.save_gwb}")
 
-    float_keys = list(CW_KEYS) + list(PROV_KEYS)
+    missing_cw = [key for key in STORED_CW_KEYS if key not in stored_cw]
+    if missing_cw:
+        log.warning(f"simulation files carry no {missing_cw}; combining without them.  "
+                    f"Regenerate (or run `add_cw_columns.py`) if the flow needs those columns.")
+
+    float_keys = list(stored_cw) + list(PROV_KEYS)
     idx_keys = list(IDX_KEYS)
     gwb_shape = (len(fobs_cents), 1, nreals)
 
@@ -1155,7 +1239,15 @@ def flows_lib_combine(path_output, log, recreate=False):
         h5.create_dataset('theta_ast', data=param_samples.T[:, np.newaxis, np.newaxis, :])
 
         h5.attrs['param_names'] = np.array(param_names).astype('S')
-        h5.attrs['cw_keys'] = np.array(CW_KEYS).astype('S')
+        # What the flow trains on by default.  Declaring a triple whose column is absent would
+        # produce a file that cannot be loaded, so fall back to whichever one is present.
+        declared = CW_KEYS_STRAIN if getattr(args, 'cw_keys', 'strain') == 'strain' else CW_KEYS_DCOM
+        if not all(key in stored_cw for key in declared):
+            other = CW_KEYS_DCOM if declared is CW_KEYS_STRAIN else CW_KEYS_STRAIN
+            log.warning(f"cannot declare {declared} -- not all columns are stored; "
+                        f"declaring {other} instead")
+            declared = other
+        h5.attrs['cw_keys'] = np.array(declared).astype('S')
         if args.save_gwb:
             h5.attrs['gwb_keys'] = np.array(GWB_KEYS).astype('S')
         h5.attrs['parameter_space_class_name'] = pspace.name
