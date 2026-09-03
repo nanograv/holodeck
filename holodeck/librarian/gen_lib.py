@@ -314,7 +314,9 @@ def run_sam_at_pspace_params(args, space, pnum, params):
                 err = f"Mismatch between space param names and loaded parmeter names!  {sim_fname=}"
                 log.exception(err)
                 log.exception(f"{space.param_names=}")
+                log.exception(f"{params_array=}")
                 log.exception(f"{file_param_names=}")
+                log.exception(f"{file_params=}")
                 raise RuntimeError(err)
 
             return True, sim_fname

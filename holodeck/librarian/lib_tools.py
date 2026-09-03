@@ -921,6 +921,46 @@ class PD_Log_Lin(_Param_Dist):
         return yy
 
 
+class PD_Uniform_Variable_Bounds(_Param_Dist):
+    """Use one uniform variate with static bounds to set variable bounds on another uniform variate."""
+
+    def __init__(self, static_name, vari_name, 
+                 static_lo, static_hi, vari_lo, vari_hi,
+                 bounds_func, rescale=True, **kwargs):
+
+        super().__init__(name=(static_name, vari_name), **kwargs)
+        self._static_lo = static_lo
+        self._static_hi = static_hi
+        self._vari_lo = vari_lo
+        self._vari_hi = vari_hi
+        self._bounds_func = bounds_func
+        self._rescale = rescale
+
+    def _dist_func(self, xx):
+        """xx is expected to be a (n_samples, 2) array of uniform [0, 1] variables."""
+
+        yy = np.zeros_like(xx)
+
+        # generate variates for param with static bounds
+        yy[:,0] = self._static_lo + (self._static_hi - self._static_lo) * xx[:,0]
+
+        # generate variates for param with variably bounds
+        min_xx, max_xx = self._bounds_func(yy[:,0])
+        for ii in range(xx.shape[0]):
+            log.debug(f"{xx[ii,:]=} {yy[ii,:]=} {min_xx[ii]=}, {max_xx[ii]=}")
+        if self._rescale:
+            if min_xx < self._vari_lo:
+                self._vari_lo = min_xx
+            if max_xx > self._hi:
+                self._vari_hi = max_xx
+            yy[:,1] = self._vari_lo + (self._vari_hi - self._vari_lo) * xx[:,1]
+        else:
+            yy[:,1] = self._vari_lo + (self._vari_hi - self._vari_lo) * xx[:,1]
+            idx = (xx[:,1] >= min_xx)&(xx[:,1] <= max_xx)
+            yy[~idx,1] = 0.0
+
+        return yy
+
 class PD_Piecewise_Uniform_Mass(_Param_Dist):
     def __init__(self, name, edges, weights, **kwargs):
         super().__init__(name, **kwargs)
@@ -1039,7 +1079,9 @@ def run_model(
 
     data = {}
 
+    log.debug(f"{pta_dur=} {nfreqs=}")
     fobs_cents, fobs_edges = utils.pta_freqs(dur=pta_dur * YR, num=nfreqs)
+    log.debug(f"{fobs_cents=} {fobs_edges=}")
     # convert from GW to orbital frequencies
     fobs_orb_cents = fobs_cents / 2.0
     fobs_orb_edges = fobs_edges / 2.0

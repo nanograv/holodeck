@@ -2482,6 +2482,34 @@ def _radius_loss_cone_BBR1980_dehnen(mbh, mstar, gamma=1.0):
     rlc = np.power(mass_of_a_star / mbh, 0.25) * np.power(rbnd/rstar, 2.25) * rstar
     return rlc
 
+def allowed_nu_inner(mt_arr, mr_arr, r9rg_log10, 
+                     alpha_gw=-0.25, beta_gw=0.25,
+                     alpha_char=-2.0/3, rchar9=1.0*PC):
+
+    # valid range is -nu_inner_absmax to +nu_inner_absmax, 
+    # unless constrained by 'speed limit')
+        
+    mtot, mrat = np.broadcast_arrays(
+            mt_arr[:, np.newaxis],
+            mr_arr[np.newaxis, :]
+        )        
+    # Normalize mass to 1e9 solar masses
+    m9 = mtot / (1.0e9*MSOL)    
+    
+    # Symmetric mass ratio normalization
+    eta_norm = mrat / np.square(1 + mrat) * 4    
+
+    #rchar is always assumed to be in cm, no need for conversion
+    rchar = rchar_9 * m9**(alpha_char+1)
+
+    # Compute allowed log10(r9rg) bounds from ISCO and rchar constraints
+    # (min depends on mtot & alpha_gw, max depends on mtot, alpha_gw, & rchar)
+    lg_risco_in_rg = np.log10(risco_in_rg)
+    min_lgr9rg = lg_risco_in_rg - alpha_gw * np.log10(m9) - beta_gw * np.log10(eta_norm)
+    tmp = np.log10(rchar/utils.gravitational_radius(1.0e9*MSOL))
+    max_lgr9rg = tmp - (alpha_gw+1) * np.log10(m9) - beta_gw * np.log10(eta_norm)
+
+
 def allowed_param_range(mtot, mrat, alpha_char, rchar_9, alpha_gw, beta_gw, r9rg, 
                         risco_in_rg=6.0, nu_inner_absmax=4.0):
     """
