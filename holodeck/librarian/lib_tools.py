@@ -921,45 +921,52 @@ class PD_Log_Lin(_Param_Dist):
         return yy
 
 
-class PD_Uniform_Variable_Bounds(_Param_Dist):
-    """Use one uniform variate with static bounds to set variable bounds on another uniform variate."""
+class PD_2D_Uniform_Variable_Ymin(_Param_Dist):
+    """Distribute x and y uniformly within a region with a variable lower bound on the second variate, y"""
 
-    def __init__(self, static_name, vari_name, 
-                 static_lo, static_hi, vari_lo, vari_hi,
-                 bounds_func, rescale=True, **kwargs):
+    def __init__(self, x_name, y_name, x_lo, x_hi, 
+                 y_abs_lo, y_hi, y_lo_interp_func, 
+                 n_cdf_grid_min=1000, **kwargs):
 
-        super().__init__(name=(static_name, vari_name), **kwargs)
-        self._static_lo = static_lo
-        self._static_hi = static_hi
-        self._vari_lo = vari_lo
-        self._vari_hi = vari_hi
-        self._bounds_func = bounds_func
-        self._rescale = rescale
+        interp_kwargs = {}
+        if 'mtot' in kwargs:
+            interp_kwargs['mtot'] = kwargs.pop('mtot')
+        if 'mrat' in kwargs:
+            interp_kwargs['mrat'] = kwargs.pop('mrat')
 
-    def _dist_func(self, xx):
-        """xx is expected to be a (n_samples, 2) array of uniform [0, 1] variables."""
+        super().__init__(name=(x_name, y_name), **kwargs)
+        self._x_lo = x_lo
+        self._x_hi = x_hi
+        self._y_abs_lo = y_abs_lo
+        self._y_hi = y_hi
+        self._y_lo_interp_func = y_lo_interp_func
+        self._n_cdf_grid_min = n_cdf_grid_min
+        self._interp_kwargs = interp_kwargs
 
-        yy = np.zeros_like(xx)
+    def _dist_func(self, uu):
+        """uu is expected to be a (n_samples, n_dims) array of uniform [0, 1] variables."""
 
-        # generate variates for param with static bounds
-        yy[:,0] = self._static_lo + (self._static_hi - self._static_lo) * xx[:,0]
+        n_cdf_grid = np.maximum(self._n_cdf_grid_min, int(uu.shape[0] / 10))
 
-        # generate variates for param with variably bounds
-        min_xx, max_xx = self._bounds_func(yy[:,0])
-        for ii in range(xx.shape[0]):
-            log.debug(f"{xx[ii,:]=} {yy[ii,:]=} {min_xx[ii]=}, {max_xx[ii]=}")
-        if self._rescale:
-            if min_xx < self._vari_lo:
-                self._vari_lo = min_xx
-            if max_xx > self._hi:
-                self._vari_hi = max_xx
-            yy[:,1] = self._vari_lo + (self._vari_hi - self._vari_lo) * xx[:,1]
-        else:
-            yy[:,1] = self._vari_lo + (self._vari_hi - self._vari_lo) * xx[:,1]
-            idx = (xx[:,1] >= min_xx)&(xx[:,1] <= max_xx)
-            yy[~idx,1] = 0.0
+        x_grid = np.linspace(self._x_lo, self._x_hi, n_cdf_grid)
+        # `y_height` should be the larger of nu_max - nu_min, or 0
+        y_lo_interp = self._y_lo_interp_func(x_grid, absmin=self._y_abs_lo, **self._interp_kwargs)
+        y_height = np.clip(self._y_hi - y_lo_interp(x_grid), 0.0, None)
 
-        return yy
+        # integrate to get CDF over x (trapezoid rule)
+        cdf = np.concatenate([[0.0], np.cumsum(0.5*(y_height[1:]+y_height[:-1])*np.diff(x_grid))])  
+        if cdf[-1] <= 0:
+            raise ValueError(f"No positive-width region found in x range {self._x_lo}-{self._x_hi}.")
+        cdf /= cdf[-1]
+
+        # inverse-CDF sample x
+        xx = np.interp(uu[:,0], cdf, x_grid)
+
+        # uniform y within the strip at each sampled x
+        y_lo = y_lo_interp(xx)
+        yy = y_lo + (self._y_hi - y_lo) * uu[:,1]
+
+        return np.vstack([xx, yy]).T
 
 class PD_Piecewise_Uniform_Mass(_Param_Dist):
     def __init__(self, name, edges, weights, **kwargs):
