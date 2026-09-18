@@ -731,6 +731,8 @@ class PS_Astro_Strong_Covariant_All(_PS_Astro_Strong):
         return
 
 
+##############################################
+
 class _PS_ClassicPlusBIO_NoLims(_Param_Space):
     """Base class for classic phenom param space but with FixedOuterTime_InnerPL_SAM hardening.
 
@@ -821,7 +823,7 @@ class _PS_ClassicPlusBIO_NoLims(_Param_Space):
         )
         return hard
 
-class PS_ClassicPlusBIO_Hard_NoLims(_PS_ClassicPlusBIO_NoLims):
+class PS_ClassicPlusBIO_Hard_NoLims_Uniform(_PS_ClassicPlusBIO_NoLims):
     """Classic 6D phenom, uniform param space used in 15yr but with FixedOuterTime_InnerPL_SAM hardening
 
     Varies hardening params r_gw_crit_9 and nu_inner. Uses base class _PS_ClassicPlusBIO_NoLims 
@@ -1036,7 +1038,7 @@ class PS_ClassicPlusBIO_HardTauOut01_Uniform(_PS_ClassicPlusBIO_WithLims):
     instead of default tau_out=1 Gyr.
     """
 
-    DEFAULTS = dict(_PS_ClassicPlus_NewHard_NoLims.DEFAULTS)
+    DEFAULTS = dict(_PS_ClassicPlusBIO_WithLims.DEFAULTS)
     DEFAULTS["hard_outer_time"] = 0.1       # [Gyr]
     
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
@@ -1077,7 +1079,7 @@ class PS_ClassicPlusBIO_HardTauOut3_Uniform(_PS_ClassicPlusBIO_WithLims):
     instead of default tau_out=1 Gyr.
     """
 
-    DEFAULTS = dict(_PS_ClassicPlus_NewHard_NoLims.DEFAULTS)
+    DEFAULTS = dict(_PS_ClassicPlusBIO_WithLims.DEFAULTS)
     DEFAULTS["hard_outer_time"] = 3.0       # [Gyr]
     
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
@@ -1118,7 +1120,7 @@ class PS_ClassicPlusBIO_HardTauOut10_Uniform(_PS_ClassicPlusBIO_WithLims):
     instead of default tau_out=1 Gyr.
     """
 
-    DEFAULTS = dict(_PS_ClassicPlus_NewHard_NoLims.DEFAULTS)
+    DEFAULTS = dict(_PS_ClassicPlusBIO_WithLims.DEFAULTS)
     DEFAULTS["hard_outer_time"] = 10.0       # [Gyr]
     
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
@@ -1197,7 +1199,7 @@ class PS_ClassicPlusBIO_HardRchar1pc_Uniform(_PS_ClassicPlusBIO_WithLims):
     default value rchar_9=0.1pc.
     """
 
-    DEFAULTS = dict(_PS_ClassicPlus_NewHard_NoLims.DEFAULTS)
+    DEFAULTS = dict(_PS_ClassicPlusBIO_WithLims.DEFAULTS)
     DEFAULTS["hard_rchar_9"] = 1.0       # [pc]
 
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
@@ -1340,6 +1342,321 @@ class PS_ClassicPlusBIO_EpsMuFixed_Hard3Par_Uniform(_PS_ClassicPlusBIO_WithLims)
             seed=seed,
         )
         return
+    
+    
+
+class PS_ClassicPlusBIO_Astro_Extended(_PS_ClassicPlusBIO_WithLims):
+    """Classic 12D phenom 15yr param space with astro-informed priors & FixedOuterTime_InnerPL_SAM hardening.
+
+    Varies hardening params r_gw_crit_9 and nu_inner. Uses base class _PS_ClassicPlusBIO_WithLims
+    that excludes unphysical hardening params (as defined in Blecha (2026)).
+    """
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+
+        # NOTE: these values should match the ranges and shapes used in the SAM!
+        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
+        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+
+        parameters = [
+            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
+                                       0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
+                                       -4.0, +4.0, # largest allowed range of nu_inner
+                                       holo.utils.create_nu_min_interp, 
+                                       mtot=self.mtot_for_nuin_lims, 
+                                       mrat=self.mrat_for_nuin_lims),
+            # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
+            PD_Normal("gsmf_phi0_log10", -2.56, 0.4),
+            PD_Normal("gsmf_mchar0_log10", 10.9, 0.4),   # [log10(Msol)]
+            PD_Normal("gsmf_alpha0", -1.2, 0.2),
+
+            PD_Normal("gpf_zbeta", +0.8, 0.4),
+            PD_Normal("gpf_qgamma", +0.5, 0.3),
+
+            PD_Uniform("gmt_norm", 0.2, 5.0),    # [Gyr]
+            PD_Uniform("gmt_zbeta", -2.0, +0.0),
+
+            PD_Normal("mmb_mamp_log10", +8.6, 0.2),   # [log10(Msol)]
+            PD_Normal("mmb_plaw", +1.2, 0.2),
+            PD_Normal("mmb_scatter_dex", +0.32, 0.15),
+        ]
+        super().__init__(
+            parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+        )
+
+class PS_ClassicPlusBIO_Astro(_PS_ClassicPlusBIO_WithLims):
+    """Classic 6D phenom 15yr param space with astro-informed priors & FixedOuterTime_InnerPL_SAM hardening.
+
+    Varies hardening params r_gw_crit_9 and nu_inner. Uses base class _PS_ClassicPlusBIO_WithLims
+    that excludes unphysical hardening params (as defined in Blecha (2026)).
+    """
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+
+        # NOTE: these values should match the ranges and shapes used in the SAM!
+        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
+        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+
+        parameters = [
+            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
+                                       0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
+                                       -4.0, +4.0, # largest allowed range of nu_inner
+                                       holo.utils.create_nu_min_interp, 
+                                       mtot=self.mtot_for_nuin_lims, 
+                                       mrat=self.mrat_for_nuin_lims),
+            # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
+            PD_Normal("gsmf_phi0_log10", -2.56, 0.4),
+            PD_Normal("gsmf_mchar0_log10", 10.9, 0.4),   # [log10(Msol)]
+
+            PD_Normal("mmb_mamp_log10", +8.6, 0.2),   # [log10(Msol)]
+            PD_Normal("mmb_scatter_dex", +0.32, 0.15),
+        ]
+        super().__init__(
+            parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+        )
+
+class _PS_AstroStrongBIO(_Param_Space):
+    """SAM Model with strongly astrophysically-motivated parameters.
+
+    This model uses a double-Schechter GSMF, an Illustris-derived galaxy merger rate, a Kormendy+Ho
+    M-MBulge relationship, and the inside-out hardening model.
+
+    """
+
+    __version__ = "0.3b"
+
+    DEFAULTS = dict(
+        # Hardening model ('inside-out' Blecha 2026)
+        hard_outer_time=1.0,          # [Gyr]
+        hard_r_gw_crit_9_log10=2.5,     # [log10(Rg)]
+        hard_nu_inner=0.0,       
+        hard_rchar_9=0.1,             # [pc] 
+        hard_alpha_gw_crit=-0.25,
+        hard_beta_gw_crit=0.25,
+        hard_alpha_char=-2.0/3.0,
+        # Galaxy stellar-mass Function (``GSMF_Double_Schechter``)
+        # Parameters are based on `double-schechter.ipynb` conversions from [Leja2020]_
+        gsmf_log10_phi_one_z0=-2.383,  # - 2.383 ± 0.028
+        gsmf_log10_phi_one_z1=-0.264,  # - 0.264 ± 0.072
+        gsmf_log10_phi_one_z2=-0.107,  # - 0.107 ± 0.031
+        gsmf_log10_phi_two_z0=-2.818,  # - 2.818 ± 0.050
+        gsmf_log10_phi_two_z1=-0.368,  # - 0.368 ± 0.070
+        gsmf_log10_phi_two_z2=+0.046,  # + 0.046 ± 0.020
+        gsmf_log10_mstar_z0=+10.767,  # +10.767 ± 0.026
+        gsmf_log10_mstar_z1=+0.124,  # + 0.124 ± 0.045
+        gsmf_log10_mstar_z2=-0.033,  # - 0.033 ± 0.015
+        gsmf_alpha_one=-0.28,  # - 0.280 ± 0.070
+        gsmf_alpha_two=-1.48,  # - 1.480 ± 0.0150
+        # Galaxy merger rate (``GMR_Illustris``)
+        # Parameters are taken directly from [Rodriguez-Gomez2015]_
+        gmr_norm0_log10=-2.2287,  # -2.2287 ± 0.0045    A0 [log10(A*Gyr)]
+        gmr_normz=+2.4644,  # +2.4644 ± 0.0128    eta
+        gmr_malpha0=+0.2241,  # +0.2241 ± 0.0038    alpha0
+        gmr_malphaz=-1.1759,  # -1.1759 ± 0.0316    alpha1
+        gmr_mdelta0=+0.7668,  # +0.7668 ± 0.0202    delta0
+        gmr_mdeltaz=-0.4695,  # -0.4695 ± 0.0440    delta1
+        gmr_qgamma0=-1.2595,  # -1.2595 ± 0.0026    beta0
+        gmr_qgammaz=+0.0611,  # +0.0611 ± 0.0021    beta1
+        gmr_qgammam=-0.0477,  # -0.0477 ± 0.0013    gamma
+        # M-MBulge Relationship (``MMBulge_KH2013``)
+        # From [KH2013]_
+        mmb_mamp_log10=8.69,  # 8.69±0.05  [log10(M/Msol)]  approx uncertainties!
+        mmb_plaw=1.17,  # 1.17 ± 0.08
+        mmb_scatter_dex=0.28,  # no uncertainties given
+        # bulge fraction
+        bf_frac_lo=0.4,
+        bf_frac_hi=0.8,
+        bf_mstar_crit=11.0,  # [log10(M_star/M_Sol)]
+        bf_width_dex=1.0,  # [dex]
+    )
+
+    def _init_sam(self, sam_shape, params):
+        log10_phi_one = [
+            params["gsmf_log10_phi_one_z0"],
+            params["gsmf_log10_phi_one_z1"],
+            params["gsmf_log10_phi_one_z2"],
+        ]
+        log10_phi_two = [
+            params["gsmf_log10_phi_two_z0"],
+            params["gsmf_log10_phi_two_z1"],
+            params["gsmf_log10_phi_two_z2"],
+        ]
+        log10_mstar = [
+            params["gsmf_log10_mstar_z0"],
+            params["gsmf_log10_mstar_z1"],
+            params["gsmf_log10_mstar_z2"],
+        ]
+        gsmf = holo.sams.GSMF_Double_Schechter(
+            log10_phi1=log10_phi_one,
+            log10_phi2=log10_phi_two,
+            log10_mstar=log10_mstar,
+            alpha1=params["gsmf_alpha_one"],
+            alpha2=params["gsmf_alpha_two"],
+        )
+
+        # Illustris Galaxy Merger Rate
+        gmr = holo.sams.GMR_Illustris(
+            norm0_log10=params["gmr_norm0_log10"],
+            normz=params["gmr_normz"],
+            malpha0=params["gmr_malpha0"],
+            malphaz=params["gmr_malphaz"],
+            mdelta0=params["gmr_mdelta0"],
+            mdeltaz=params["gmr_mdeltaz"],
+            qgamma0=params["gmr_qgamma0"],
+            qgammaz=params["gmr_qgammaz"],
+            qgammam=params["gmr_qgammam"],
+        )
+
+        # Mbh-MBulge relationship (and bulge-fractions)
+        bulge_frac = holo.host_relations.BF_Sigmoid(
+            bulge_frac_lo=params["bf_frac_lo"],
+            bulge_frac_hi=params["bf_frac_hi"],
+            mstar_char_log10=params["bf_mstar_crit"],
+            width_dex=params["bf_width_dex"],
+        )
+        mmbulge = holo.host_relations.MMBulge_KH2013(
+            mamp_log10=params["mmb_mamp_log10"],
+            mplaw=params["mmb_plaw"],
+            scatter_dex=params["mmb_scatter_dex"],
+            bulge_frac=bulge_frac,
+        )
+
+        sam = holo.sams.Semi_Analytic_Model(
+            gsmf=gsmf,
+            gmr=gmr,
+            mmbulge=mmbulge,
+            shape=sam_shape,
+            log=self._log,
+        )
+        return sam
+
+    @classmethod
+    def _init_hard(cls, sam, params):
+        hard = holo.hardening.FixedOuterTime_InnerPL_SAM(
+            sam,
+            outer_time=params['hard_outer_time']*GYR,
+            r_gw_crit_9=np.power(10.0, params['hard_r_gw_crit_9_log10']),
+            nu_inner=params['hard_nu_inner'],
+            rchar_9=params['hard_rchar_9']*PC,
+            alpha_gw_crit=params['hard_alpha_gw_crit'],
+            beta_gw_crit=params['hard_beta_gw_crit'],
+            alpha_char=params['hard_alpha_char'],
+            enforce_physical_params=True,
+        )
+        return hard
+    
+
+class PS_AstroStrongBIO_Hard(_PS_AstroStrongBIO):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+
+        # NOTE: these values should match the ranges and shapes used in the SAM!
+        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
+        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+
+        parameters = [
+            # Inside-out hardening
+            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
+                                       0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
+                                       -4.0, +4.0, # largest allowed range of nu_inner
+                                       holo.utils.create_nu_min_interp, 
+                                       mtot=self.mtot_for_nuin_lims, 
+                                       mrat=self.mrat_for_nuin_lims),
+            PD_Uniform("hard_outer_time", 0.1, 11.0),
+        ]
+        _Param_Space.__init__(
+            self,
+            parameters,
+            log=log,
+            nsamples=nsamples,
+            sam_shape=sam_shape,
+            seed=seed,
+        )
+        return
+
+    
+class PS_AstroStrongBIO_Covariant_All(_PS_AstroStrongBIO):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+
+        # NOTE: these values should match the ranges and shapes used in the SAM!
+        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
+        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+
+        parameters = [
+            # Inside-out hardening
+            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
+                                       0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
+                                       -4.0, +4.0, # largest allowed range of nu_inner
+                                       holo.utils.create_nu_min_interp, 
+                                       mtot=self.mtot_for_nuin_lims, 
+                                       mrat=self.mrat_for_nuin_lims),
+            PD_Uniform("hard_outer_time", 0.1, 11.0),
+            # GSMF
+            PD_MVNormal(GSMF_COV_NAMES, GSMF_COV_MEANS, np.array(GSMF_COV_MATRIX)),
+            # GMR ## This could become covariant, but Kayhan will have to look harder at the papers
+            PD_Normal("gmr_norm0_log10", -2.2287, 0.0045),  # -2.2287 ± 0.0045    A0 [log10(A*Gyr)]
+            PD_Normal("gmr_normz", +2.4644, 0.0128),  # +2.4644 ± 0.0128    eta
+            PD_Normal("gmr_malpha0", +0.2241, 0.0038),  # +0.2241 ± 0.0038    alpha0
+            PD_Normal("gmr_malphaz", -1.1759, 0.0316),  # -1.1759 ± 0.0316    alpha1
+            PD_Normal("gmr_mdelta0", +0.7668, 0.0202),  # +0.7668 ± 0.0202    delta0
+            PD_Normal("gmr_mdeltaz", -0.4695, 0.0440),  # -0.4695 ± 0.0440    delta1
+            PD_Normal("gmr_qgamma0", -1.2595, 0.0026),  # -1.2595 ± 0.0026    beta0
+            PD_Normal("gmr_qgammaz", +0.0611, 0.0021),  # +0.0611 ± 0.0021    beta1
+            PD_Normal("gmr_qgammam", -0.0477, 0.0013),  # -0.0477 ± 0.0013    gamma
+            # MMBulge
+            # From [KH2013]_
+            PD_Normal("mmb_mamp_log10", 8.69, 0.05),  # 8.69 ± 0.05  [log10(M/Msol)]
+            PD_Normal("mmb_plaw", 1.17, 0.08),  # 1.17 ± 0.08
+            # Extra
+            PD_Normal("mmb_scatter_dex", 0.28, 0.05),  # no uncertainties given
+            PD_Uniform("bf_frac_lo", 0.1, 0.4),
+            PD_Uniform("bf_frac_hi", 0.6, 1.0),
+            PD_Uniform("bf_width_dex", 0.5, 1.5),  # [dex]
+        ]
+        _Param_Space.__init__(
+            self,
+            parameters,
+            log=log,
+            nsamples=nsamples,
+            sam_shape=sam_shape,
+            seed=seed,
+        )
+        return
+
+    
+class PS_AstroStrongBIO_Hard_MMbulge_Covariant_GSMF(_PS_AstroStrongBIO):
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+
+        # NOTE: these values should match the ranges and shapes used in the SAM!
+        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
+        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+
+        parameters = [
+            # Inside-out hardening
+            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
+                                       0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
+                                       -4.0, +4.0, # largest allowed range of nu_inner
+                                       holo.utils.create_nu_min_interp, 
+                                       mtot=self.mtot_for_nuin_lims, 
+                                       mrat=self.mrat_for_nuin_lims),
+            # GSMF
+            PD_MVNormal(GSMF_COV_NAMES, GSMF_COV_MEANS, np.array(GSMF_COV_MATRIX)),
+            # MMBulge
+            # From [KH2013]_
+            PD_Normal("mmb_mamp_log10", 8.69, 0.05),  # 8.69 ± 0.05  [log10(M/Msol)]
+            PD_Normal("mmb_scatter_dex", 0.28, 0.05),  # no uncertainties given
+        ]
+        _Param_Space.__init__(
+            self,
+            parameters,
+            log=log,
+            nsamples=nsamples,
+            sam_shape=sam_shape,
+            seed=seed,
+        )
+        return
+
+
+    
 
 
 _param_spaces_dict = {
@@ -1363,5 +1680,10 @@ _param_spaces_dict = {
     "PS_ClassicPlusBIO_HardRchar1pc_Uniform": PS_ClassicPlusBIO_HardRchar1pc_Uniform,
     "PS_ClassicPlusBIO_Phi0Fixed_Hard3Par_Uniform": PS_ClassicPlusBIO_Phi0Fixed_Hard3Par_Uniform,    
     "PS_ClassicPlusBIO_MuFixed_Hard3Par_Uniform": PS_ClassicPlusBIO_MuFixed_Hard3Par_Uniform,    
-    "PS_ClassicPlusBIO_EpsMuFixed_Hard3Par_Uniform": PS_ClassicPlusBIO_EpsMuFixed_Hard3Par_Uniform  
+    "PS_ClassicPlusBIO_EpsMuFixed_Hard3Par_Uniform": PS_ClassicPlusBIO_EpsMuFixed_Hard3Par_Uniform,
+    "PS_ClassicPlusBIO_Astro": PS_ClassicPlusBIO_Astro,
+    "PS_ClassicPlusBIO_Astro_Extended": PS_ClassicPlusBIO_Astro_Extended,
+    "PS_AstroStrongBIO_Hard": PS_AstroStrongBIO_Hard,
+    "PS_AstroStrongBIO_Covariant_All": PS_AstroStrongBIO_Covariant_All,
+    "PS_AstroStrongBIO_Hard_MMbulge_Covariant_GSMF": PS_AstroStrongBIO_Hard_MMbulge_Covariant_GSMF,
 }

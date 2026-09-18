@@ -27,6 +27,7 @@ from typing import Optional, Tuple, Union, List   #, Callable, TypeVar, Any  # ,
 
 import numpy as np
 import numpy.typing as npt
+from scipy.interpolate import PchipInterpolator
 
 from holodeck import log, cosmo
 from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC, EDDT
@@ -2594,6 +2595,61 @@ def char_strain_to_strain_amp(hc, fc, df):
     """
     hs = hc * np.sqrt(df/fc)
     return hs
+
+
+def get_nuin_min(lgr9rg, DEFAULTS, isco_in_rg=6.0, nu_inner_absmin=-4.0, speed_limit=SPLC,
+                 mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91), mrat=(1e-3, 1.0, 81)):
+    """
+    Return the min allowed nu_inner for a given r_gw_crit_9, for FixedOuterTime_InnerPL_SAM hardening.
+    """
+
+    mtot_arr = np.logspace(*np.log10(mtot[:2]),mtot[2])
+    mrat_arr = np.logspace(*np.log10(mrat[:2]),mrat[2])
+    mt, mr = np.broadcast_arrays(mtot_arr[:, np.newaxis], mrat_arr[np.newaxis, :])
+
+    m9 = mt / (1.0e9 * MSOL)
+    m1, m2 = holo.utils.m1m2_from_mtmr(mt, mr)
+    eta_norm = 4.0 * mr / np.square(1 + mr)
+
+    rchar = (DEFAULTS['hard_rchar_9'] * PC) * m9**(DEFAULTS['hard_alpha_char'] + 1)
+    grav_radii = holo.utils.gravitational_radius(mt)
+
+    r9cm = (10.0**lgr9rg) * holo.utils.gravitational_radius(1.0e9 * MSOL)
+    rgw_crit = (r9cm * m9**(DEFAULTS['hard_alpha_gw_crit'] + 1) * 
+                eta_norm**DEFAULTS['hard_beta_gw_crit'])
+
+    mask_inner = rgw_crit < rchar
+    mask_isco = rgw_crit >= isco_in_rg * grav_radii
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        # only pay for gw_hardening_rate_dadt where it's actually needed
+        dadt_gw_crit = np.zeros_like(rgw_crit)
+        idx = np.nonzero(mask_isco)
+        dadt_gw_crit[idx] = holo.utils.gw_hardening_rate_dadt(m1[idx], m2[idx], rgw_crit[idx])
+
+        lgrdiff = np.log10(rchar) - np.log10(rgw_crit)
+        nuin_min_calc = 1.0 - (np.log10(speed_limit) - np.log10(-dadt_gw_crit)) / lgrdiff
+        nuin_min_calc = np.maximum(nu_inner_absmin, nuin_min_calc)
+
+    if np.any(lgrdiff[mask_inner] < 0):
+        raise ValueError(f"something went wrong: negative lgrdiff for {lgr9rg=}")
+
+    nuin_min = np.where(mask_inner, nuin_min_calc, np.nan)
+
+    if np.any(nuin_min > 1):
+        raise ValueError(f"something went wrong. {np.nanmax(nuin_min)=}")
+
+    return np.nanmax(nuin_min)
+
+def create_nu_min_interp(lgr9rg_arr, DEFAULTS, absmin=-4.0, **kwargs):
+    """
+    Interpolate to get min nu_inner for array of r_gw_crit_9 values, for FixedOuterTime_InnerPL_SAM hardening.
+    """
+    nuin_min_arr = np.array([holo.utils.get_nuin_min(x, DEFAULTS, nu_inner_absmin=absmin, 
+                                                     **kwargs) for x in lgr9rg_arr])
+    # Pchip only needs lgr9rg_arr sorted increasing; 
+    # nuin_min can be any shape (non-monotonic, kinked, etc.)
+    return PchipInterpolator(lgr9rg_arr, nuin_min_arr)
 
 
 @lazy_njit
