@@ -731,7 +731,10 @@ class PS_Astro_Strong_Covariant_All(_PS_Astro_Strong):
         return
 
 
-##############################################
+###############################################################################
+### "Classic Plus" param spaces use classic NG15 methods but with one new model
+### (thus far, only classic NG15 + new hardening param spaces are defined)
+###############################################################################
 
 class _PS_ClassicPlusBIO_NoLims(_Param_Space):
     """Base class for classic phenom param space but with FixedOuterTime_InnerPL_SAM hardening.
@@ -940,58 +943,6 @@ class _PS_ClassicPlusBIO_WithLims(_Param_Space):
         )
         return hard
 
-
-    def get_nuin_min(self, lgr9rg, isco_in_rg=6.0, nu_inner_absmin=-4.0, speed_limit=SPLC,
-                     mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91), mrat=(1e-3, 1.0, 81)):
-        """
-        Return the min allowed nu_inner for a given r9.
-        """
-
-        mtot_arr = np.logspace(*np.log10(mtot[:2]),mtot[2])
-        mrat_arr = np.logspace(*np.log10(mrat[:2]),mrat[2])
-        mt, mr = np.broadcast_arrays(mtot_arr[:, np.newaxis], mrat_arr[np.newaxis, :])
-
-        m9 = mt / (1.0e9 * MSOL)
-        m1, m2 = holo.utils.m1m2_from_mtmr(mt, mr)
-        eta_norm = 4.0 * mr / np.square(1 + mr)
-
-        rchar = (self.DEFAULTS['hard_rchar_9'] * PC) * m9**(self.DEFAULTS['hard_alpha_char'] + 1)
-        grav_radii = holo.utils.gravitational_radius(mt)
-
-        r9cm = (10.0**lgr9rg) * holo.utils.gravitational_radius(1.0e9 * MSOL)
-        rgw_crit = (r9cm * m9**(self.DEFAULTS['hard_alpha_gw_crit'] + 1) * 
-                    eta_norm**self.DEFAULTS['hard_beta_gw_crit'])
-
-        mask_inner = rgw_crit < rchar
-        mask_isco = rgw_crit >= isco_in_rg * grav_radii
-
-        with np.errstate(divide='ignore', invalid='ignore'):
-            # only pay for gw_hardening_rate_dadt where it's actually needed
-            dadt_gw_crit = np.zeros_like(rgw_crit)
-            idx = np.nonzero(mask_isco)
-            dadt_gw_crit[idx] = holo.utils.gw_hardening_rate_dadt(m1[idx], m2[idx], rgw_crit[idx])
-
-            lgrdiff = np.log10(rchar) - np.log10(rgw_crit)
-            nuin_min_calc = 1.0 - np.log10(speed_limit/np.abs(dadt_gw_crit)-1) / lgrdiff
-            nuin_min_calc = np.maximum(nu_inner_absmin, nuin_min_calc)
-
-        if np.any(lgrdiff[mask_inner] < 0):
-            raise ValueError(f"something went wrong: negative lgrdiff for {lgr9rg=}")
-
-        nuin_min = np.where(mask_inner, nuin_min_calc, np.nan)
-
-        if np.any(nuin_min > 1):
-            raise ValueError(f"something went wrong. {np.nanmax(nuin_min)=}")
-
-        return np.nanmax(nuin_min)
-
-    def create_nuin_min_interp(self, lgr9rg_arr, absmin=-4.0, **kwargs):
-        nuin_min_arr = np.array([self.get_nuin_min(x, nu_inner_absmin=absmin, 
-                                                   **kwargs) for x in lgr9rg_arr])
-        # Pchip only needs lgr9rg_arr sorted increasing; 
-        # nuin_min can be any shape (non-monotonic, kinked, etc.)
-        return PchipInterpolator(lgr9rg_arr, nuin_min_arr)
-
     
 class PS_ClassicPlusBIO_Hard_Uniform(_PS_ClassicPlusBIO_WithLims):
     """Classic 6D phenom, uniform param space used in 15yr but with FixedOuterTime_InnerPL_SAM hardening
@@ -1014,7 +965,7 @@ class PS_ClassicPlusBIO_Hard_Uniform(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nuin_min_interp, 
+                                       utils.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims)
         ]
@@ -1030,46 +981,6 @@ class PS_ClassicPlusBIO_Hard_Uniform(_PS_ClassicPlusBIO_WithLims):
 
         return
 
-class PS_ClassicPlusBIO_HardTauOut01_Uniform(_PS_ClassicPlusBIO_WithLims):
-    """Classic 6D phenom, uniform param space used in 15yr but with FixedOuterTime_InnerPL_SAM hardening
-
-    Varies hardening params r_gw_crit_9 and nu_inner. Uses base class _PS_ClassicPlus_NewHard_WithLims 
-    that excludes unphysical hardening params (as defined in Blecha (2026)). Uses tau_out=0.1 Gyr 
-    instead of default tau_out=1 Gyr.
-    """
-
-    DEFAULTS = dict(_PS_ClassicPlusBIO_WithLims.DEFAULTS)
-    DEFAULTS["hard_outer_time"] = 0.1       # [Gyr]
-    
-    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
-
-        # NOTE: these values should match the ranges and shapes used in the SAM!
-        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
-        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
-
-        parameters = [
-            PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
-            PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
-            PD_Uniform("mmb_mamp_log10", +7.6, +9.0),      # [log10(Msol)]
-            PD_Uniform("mmb_scatter_dex", +0.0, +0.9),
-            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
-                                       0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
-                                       -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nuin_min_interp, 
-                                       mtot=self.mtot_for_nuin_lims, 
-                                       mrat=self.mrat_for_nuin_lims)
-        ]
-        
-        _Param_Space.__init__(
-            self,
-            parameters,
-            log=log,
-            nsamples=nsamples,
-            sam_shape=sam_shape,
-            seed=seed,
-        )
-
-        return
 
 class PS_ClassicPlusBIO_HardTauOut3_Uniform(_PS_ClassicPlusBIO_WithLims):
     """Classic 6D phenom, uniform param space used in 15yr but with FixedOuterTime_InnerPL_SAM hardening
@@ -1096,7 +1007,7 @@ class PS_ClassicPlusBIO_HardTauOut3_Uniform(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nuin_min_interp, 
+                                       utils.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims)
         ]
@@ -1112,46 +1023,6 @@ class PS_ClassicPlusBIO_HardTauOut3_Uniform(_PS_ClassicPlusBIO_WithLims):
 
         return
 
-class PS_ClassicPlusBIO_HardTauOut10_Uniform(_PS_ClassicPlusBIO_WithLims):
-    """Classic 6D phenom, uniform param space used in 15yr but with FixedOuterTime_InnerPL_SAM hardening
-
-    Varies hardening params r_gw_crit_9 and nu_inner. Uses base class _PS_ClassicPlus_NewHard_WithLims 
-    that excludes unphysical hardening params (as defined in Blecha (2026)). Uses tau_out=10 Gyr 
-    instead of default tau_out=1 Gyr.
-    """
-
-    DEFAULTS = dict(_PS_ClassicPlusBIO_WithLims.DEFAULTS)
-    DEFAULTS["hard_outer_time"] = 10.0       # [Gyr]
-    
-    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
-
-        # NOTE: these values should match the ranges and shapes used in the SAM!
-        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
-        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
-
-        parameters = [
-            PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
-            PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
-            PD_Uniform("mmb_mamp_log10", +7.6, +9.0),      # [log10(Msol)]
-            PD_Uniform("mmb_scatter_dex", +0.0, +0.9),
-            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
-                                       0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
-                                       -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nuin_min_interp, 
-                                       mtot=self.mtot_for_nuin_lims, 
-                                       mrat=self.mrat_for_nuin_lims)
-        ]
-        
-        _Param_Space.__init__(
-            self,
-            parameters,
-            log=log,
-            nsamples=nsamples,
-            sam_shape=sam_shape,
-            seed=seed,
-        )
-
-        return
     
 class PS_ClassicPlusBIO_Hard3Par_Uniform(_PS_ClassicPlusBIO_WithLims):
     """7D variant of Classic 6D phenom, uniform 15yr param space with FixedOuterTime_InnerPL_SAM hardening
@@ -1175,7 +1046,7 @@ class PS_ClassicPlusBIO_Hard3Par_Uniform(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nuin_min_interp, 
+                                       utils.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),
             PD_Uniform("hard_outer_time", 0.1, 11.0),
@@ -1191,159 +1062,9 @@ class PS_ClassicPlusBIO_Hard3Par_Uniform(_PS_ClassicPlusBIO_WithLims):
         )
         return    
 
-class PS_ClassicPlusBIO_HardRchar1pc_Uniform(_PS_ClassicPlusBIO_WithLims):
-    """Classic 6D phenom, uniform param space used in 15yr but with FixedOuterTime_InnerPL_SAM hardening
 
-    Varies hardening params r_gw_crit_9 and nu_inner. Uses base class _PS_ClassicPlus_NewHard_WithLims 
-    that excludes unphysical hardening params (as defined in Blecha (2026)). Uses rchar_9=1pc instead of
-    default value rchar_9=0.1pc.
-    """
 
-    DEFAULTS = dict(_PS_ClassicPlusBIO_WithLims.DEFAULTS)
-    DEFAULTS["hard_rchar_9"] = 1.0       # [pc]
 
-    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
-
-        # NOTE: these values should match the ranges and shapes used in the SAM!
-        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
-        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
-
-        parameters = [
-            PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
-            PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
-            PD_Uniform("mmb_mamp_log10", +7.6, +9.0),      # [log10(Msol)]
-            PD_Uniform("mmb_scatter_dex", +0.0, +0.9),
-            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
-                                       0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
-                                       -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nuin_min_interp, 
-                                       mtot=self.mtot_for_nuin_lims, 
-                                       mrat=self.mrat_for_nuin_lims)
-        ]
-        
-        _Param_Space.__init__(
-            self,
-            parameters,
-            log=log,
-            nsamples=nsamples,
-            sam_shape=sam_shape,
-            seed=seed,
-        )
-
-        return
-
-class PS_ClassicPlusBIO_Phi0Fixed_Hard3Par_Uniform(_PS_ClassicPlusBIO_WithLims):
-    """Classic 6D phenom, uniform 15yr param space with FixedOuterTime_InnerPL_SAM hardening and phi0 fixed
-
-    Varies hardening params r_gw_crit_9, nu_inner, and outer_time. GSMF phi0 is fixed to default. 
-    Uses base class _PS_ClassicPlus_NewHard_WithLims that excludes unphysical hardening params 
-    (as defined in Blecha (2026)).
-    """
-
-    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
-
-        # NOTE: these values should match the ranges and shapes used in the SAM!
-        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
-        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
-
-        parameters = [
-            PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
-            PD_Uniform("mmb_mamp_log10", +7.6, +9.0),      # [log10(Msol)]
-            PD_Uniform("mmb_scatter_dex", +0.0, +0.9),
-            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
-                                       0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
-                                       -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nuin_min_interp, 
-                                       mtot=self.mtot_for_nuin_lims, 
-                                       mrat=self.mrat_for_nuin_lims),
-            PD_Uniform("hard_outer_time", 0.1, 11.0),
-        ]
-
-        _Param_Space.__init__(
-            self,
-            parameters,
-            log=log,
-            nsamples=nsamples,
-            sam_shape=sam_shape,
-            seed=seed,
-        )
-        return
-
-class PS_ClassicPlusBIO_MuFixed_Hard3Par_Uniform(_PS_ClassicPlusBIO_WithLims):
-    """Classic 6D phenom, uniform 15yr param space with FixedOuterTime_InnerPL_SAM hardening and mu fixed
-
-    Varies hardening params r_gw_crit_9, nu_inner, and outer_time. MMbulge norm (mu) is fixed to default. 
-    Uses base class _PS_ClassicPlus_NewHard_WithLims that excludes unphysical hardening params 
-    (as defined in Blecha (2026)).
-    """
-
-    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
-
-        # NOTE: these values should match the ranges and shapes used in the SAM!
-        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
-        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
-
-        parameters = [
-            PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
-            PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
-            PD_Uniform("mmb_scatter_dex", +0.0, +0.9),
-            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
-                                       0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
-                                       -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nuin_min_interp, 
-                                       mtot=self.mtot_for_nuin_lims, 
-                                       mrat=self.mrat_for_nuin_lims),
-            PD_Uniform("hard_outer_time", 0.1, 11.0),
-        ]
-
-        _Param_Space.__init__(
-            self,
-            parameters,
-            log=log,
-            nsamples=nsamples,
-            sam_shape=sam_shape,
-            seed=seed,
-        )
-        return
-
-class PS_ClassicPlusBIO_EpsMuFixed_Hard3Par_Uniform(_PS_ClassicPlusBIO_WithLims):
-    """Classic 6D phenom, uniform 15yr param space with FixedOuterTime_InnerPL_SAM hardening and eps_mu fixed
-
-    Varies hardening params r_gw_crit_9, nu_inner, and outer_time. MMbulge scatter (eps_mu) is fixed to default. 
-    Uses base class _PS_ClassicPlus_NewHard_WithLims that excludes unphysical hardening params 
-    (as defined in Blecha (2026)).
-    """
-
-    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
-
-        # NOTE: these values should match the ranges and shapes used in the SAM!
-        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
-        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
-
-        parameters = [
-            PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
-            PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
-            PD_Uniform("mmb_mamp_log10", +7.6, +9.0),      # [log10(Msol)]
-            PD_Uniform("hard_r_gw_crit_9_log10", 0.778, 4.0),   # [Rg] (lower bound 0.778 is rISCO=6Rg)
-            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
-                                       0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
-                                       -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nuin_min_interp, 
-                                       mtot=self.mtot_for_nuin_lims, 
-                                       mrat=self.mrat_for_nuin_lims),
-        ]
-
-        _Param_Space.__init__(
-            self,
-            parameters,
-            log=log,
-            nsamples=nsamples,
-            sam_shape=sam_shape,
-            seed=seed,
-        )
-        return
-    
-    
 
 class PS_ClassicPlusBIO_Astro_Extended(_PS_ClassicPlusBIO_WithLims):
     """Classic 12D phenom 15yr param space with astro-informed priors & FixedOuterTime_InnerPL_SAM hardening.
@@ -1673,14 +1394,8 @@ _param_spaces_dict = {
     "PS_Astro_Strong_Covariant_GSMF": PS_Astro_Strong_Covariant_GSMF,
     "PS_ClassicPlusBIO_Hard_NoLims_Uniform": PS_ClassicPlusBIO_Hard_NoLims_Uniform,
     "PS_ClassicPlusBIO_Hard_Uniform": PS_ClassicPlusBIO_Hard_Uniform,
-    "PS_ClassicPlusBIO_HardTauOut01_Uniform": PS_ClassicPlusBIO_HardTauOut01_Uniform,
     "PS_ClassicPlusBIO_HardTauOut3_Uniform": PS_ClassicPlusBIO_HardTauOut3_Uniform,
-    "PS_ClassicPlusBIO_HardTauOut10_Uniform": PS_ClassicPlusBIO_HardTauOut10_Uniform,
     "PS_ClassicPlusBIO_Hard3Par_Uniform": PS_ClassicPlusBIO_Hard3Par_Uniform,     
-    "PS_ClassicPlusBIO_HardRchar1pc_Uniform": PS_ClassicPlusBIO_HardRchar1pc_Uniform,
-    "PS_ClassicPlusBIO_Phi0Fixed_Hard3Par_Uniform": PS_ClassicPlusBIO_Phi0Fixed_Hard3Par_Uniform,    
-    "PS_ClassicPlusBIO_MuFixed_Hard3Par_Uniform": PS_ClassicPlusBIO_MuFixed_Hard3Par_Uniform,    
-    "PS_ClassicPlusBIO_EpsMuFixed_Hard3Par_Uniform": PS_ClassicPlusBIO_EpsMuFixed_Hard3Par_Uniform,
     "PS_ClassicPlusBIO_Astro": PS_ClassicPlusBIO_Astro,
     "PS_ClassicPlusBIO_Astro_Extended": PS_ClassicPlusBIO_Astro_Extended,
     "PS_AstroStrongBIO_Hard": PS_AstroStrongBIO_Hard,
