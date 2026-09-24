@@ -1086,9 +1086,7 @@ def run_model(
 
     data = {}
 
-    log.debug(f"{pta_dur=} {nfreqs=}")
     fobs_cents, fobs_edges = utils.pta_freqs(dur=pta_dur * YR, num=nfreqs)
-    log.debug(f"{fobs_cents=} {fobs_edges=}")
     # convert from GW to orbital frequencies
     fobs_orb_cents = fobs_cents / 2.0
     fobs_orb_edges = fobs_edges / 2.0
