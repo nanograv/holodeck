@@ -252,7 +252,9 @@ class _Param_Space(abc.ABC):
 
         sam = self._init_sam(sam_shape, settings)
         hard = self._init_hard(sam, settings)
-
+if hasattr(self, mtot_for_nuin_lims) and hasattr(self, mrat_for_nuin_lims):
+    if np.any(sam.mtot != self.mtot_for_nuin_lims) or np.any(sam.mrat != self.mrat_for_nuin_lims):
+        log.warning(f"SAM and nu_inner interpolator grid shape mismatch: \n{sam.mtot=}, {self.mtot_for_nuin_lims=}, {sam.mrat=}, {self.mrat_for_nuin_lims=}")
         return sam, hard
 
     # @classmethod
@@ -922,7 +924,53 @@ class PD_Log_Lin(_Param_Dist):
 
 
 class PD_2D_Uniform_Variable_Ymin(_Param_Dist):
-    """Distribute x and y uniformly within a region with a variable lower bound on the second variate, y"""
+    """Uniform distribution over a 2D region whose lower y-boundary varies with x.
+
+    Samples (x, y) uniformly (in area) from the region
+        x_lo <= x <= x_hi,    y_lo(x) <= y <= y_hi,
+    where y_lo(x) is a lower boundary supplied by the interpolator``y_lo_interp_func``. 
+    The upper bound ``y_hi`` is constant. Where y_lo(x) >= y_hi the region has zero 
+    height and no probability.
+
+    Sampling is done by inverse-CDF in two steps:
+
+    1. The density of x is proportional to the local height of the region, 
+       h(x) = max(y_hi - y_lo(x), 0). Its CDF is built numerically on a
+       grid (trapezoid rule) and inverted with linear interpolation to draw x.
+    2. Conditional on x, y is uniform on [y_lo(x), y_hi].
+
+    Parameters
+    ----------
+    x_name : str
+        Name of the first parameter (x).
+    y_name : str
+        Name of the second parameter (y).
+    x_lo, x_hi : float
+        Lower and upper bounds of x.
+    y_abs_lo : float
+        Absolute minimum of y. Passed to ``y_lo_interp_func`` as ``absmin``
+        so the interpolated lower bound can be floored at this value.
+    y_hi : float
+        Constant upper bound of y.
+    y_lo_interp_func : callable
+        Function with signature ``y_lo_interp_func(x_grid, absmin=..., **interp_kwargs)``
+        that calculates y_lo for each element of x_grid and returns an interpolator for
+        calculating ``y_lo(x)`` to give the lower y-bound at each x
+        (vectorized over arrays).
+    n_cdf_grid_min : int, optional
+        Minimum number of grid points used to build the x CDF (default 1000).
+        The actual grid size is ``max(n_cdf_grid_min, n_samples // 10)``.
+    **kwargs
+        Passed to ``_Param_Dist.__init__``. The keys ``mtot`` and ``mrat`` are
+        removed first and forwarded to ``y_lo_interp_func`` instead (only if
+        present).
+
+    Notes
+    -----
+    The x CDF is a piecewise-linear approximation, so accuracy improves with
+    the grid size. If y_lo(x) exceeds y_hi over part of the x range, that part
+    gets zero probability. The CDF is flat there, so ``np.interp`` skips it.
+    """
 
     def __init__(self, x_name, y_name, x_lo, x_hi, 
                  y_abs_lo, y_hi, y_lo_interp_func, 
