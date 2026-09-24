@@ -2468,7 +2468,7 @@ def _gw_strain_source(mchirp, dcom, freq_rest_orb):
 def sep_to_merge_in_time(m1, m2, time):
     """The initial separation required to merge within the given time.
 
-    See: [Peters1964]_
+    See: [Peters1964]_ (Equation 5.10).
 
     Parameters
     ----------
@@ -2486,7 +2486,8 @@ def sep_to_merge_in_time(m1, m2, time):
 
     """
     m1, m2, time = _array_args(m1, m2, time)
-    GW_CONST = 64*np.power(NWTG, 3.0)/(5.0*np.power(SPLC, 5.0))
+    # GW_CONST is 4*beta in Peters 1964 eqn 5.10:
+    GW_CONST = 256*np.power(NWTG, 3.0)/(5.0*np.power(SPLC, 5.0))
     a1 = rad_isco(m1, m2)
     return np.power(GW_CONST*m1*m2*(m1+m2)*time - np.power(a1, 4.0), 1./4.)
 
@@ -2494,7 +2495,7 @@ def sep_to_merge_in_time(m1, m2, time):
 def time_to_merge_at_sep(m1, m2, sepa):
     """The time required to merge starting from the given initial separation.
 
-    See: [Peters1964]_.
+    See: [Peters1964]_ (Equation 5.10).
 
     Parameters
     ----------
@@ -2512,7 +2513,8 @@ def time_to_merge_at_sep(m1, m2, sepa):
 
     """
     m1, m2, sepa = _array_args(m1, m2, sepa)
-    GW_CONST = 64*np.power(NWTG, 3.0)/(5.0*np.power(SPLC, 5.0))
+    # GW_CONST is 4*beta in Peters 1964 eqn 5.10:
+    GW_CONST = 256*np.power(NWTG, 3.0)/(5.0*np.power(SPLC, 5.0))
     a1 = rad_isco(m1, m2)
     delta_sep = np.power(sepa, 4.0) - np.power(a1, 4.0)
     return delta_sep/(GW_CONST*m1*m2*(m1+m2))
