@@ -972,7 +972,7 @@ class _PS_ClassicPlusBIO_WithLims(_Param_Space):
             dadt_gw_crit[idx] = holo.utils.gw_hardening_rate_dadt(m1[idx], m2[idx], rgw_crit[idx])
 
             lgrdiff = np.log10(rchar) - np.log10(rgw_crit)
-            nuin_min_calc = 1.0 - (np.log10(speed_limit) - np.log10(-dadt_gw_crit)) / lgrdiff
+            nuin_min_calc = 1.0 - np.log10(speed_limit/np.abs(dadt_gw_crit)-1) / lgrdiff
             nuin_min_calc = np.maximum(nu_inner_absmin, nuin_min_calc)
 
         if np.any(lgrdiff[mask_inner] < 0):
