@@ -985,7 +985,7 @@ class _PS_ClassicPlusBIO_WithLims(_Param_Space):
 
         return np.nanmax(nuin_min)
 
-    def create_nu_min_interp(self, lgr9rg_arr, absmin=-4.0, **kwargs):
+    def create_nuin_min_interp(self, lgr9rg_arr, absmin=-4.0, **kwargs):
         nuin_min_arr = np.array([self.get_nuin_min(x, nu_inner_absmin=absmin, 
                                                    **kwargs) for x in lgr9rg_arr])
         # Pchip only needs lgr9rg_arr sorted increasing; 
@@ -1014,7 +1014,7 @@ class PS_ClassicPlusBIO_Hard_Uniform(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nu_min_interp, 
+                                       self.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims)
         ]
@@ -1055,7 +1055,7 @@ class PS_ClassicPlusBIO_HardTauOut01_Uniform(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nu_min_interp, 
+                                       self.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims)
         ]
@@ -1096,7 +1096,7 @@ class PS_ClassicPlusBIO_HardTauOut3_Uniform(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nu_min_interp, 
+                                       self.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims)
         ]
@@ -1137,7 +1137,7 @@ class PS_ClassicPlusBIO_HardTauOut10_Uniform(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nu_min_interp, 
+                                       self.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims)
         ]
@@ -1175,7 +1175,7 @@ class PS_ClassicPlusBIO_Hard3Par_Uniform(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nu_min_interp, 
+                                       self.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),
             PD_Uniform("hard_outer_time", 0.1, 11.0),
@@ -1216,7 +1216,7 @@ class PS_ClassicPlusBIO_HardRchar1pc_Uniform(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nu_min_interp, 
+                                       self.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims)
         ]
@@ -1253,7 +1253,7 @@ class PS_ClassicPlusBIO_Phi0Fixed_Hard3Par_Uniform(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nu_min_interp, 
+                                       self.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),
             PD_Uniform("hard_outer_time", 0.1, 11.0),
@@ -1290,7 +1290,7 @@ class PS_ClassicPlusBIO_MuFixed_Hard3Par_Uniform(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nu_min_interp, 
+                                       self.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),
             PD_Uniform("hard_outer_time", 0.1, 11.0),
@@ -1328,7 +1328,7 @@ class PS_ClassicPlusBIO_EpsMuFixed_Hard3Par_Uniform(_PS_ClassicPlusBIO_WithLims)
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       self.create_nu_min_interp, 
+                                       self.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),
         ]
@@ -1361,7 +1361,7 @@ class PS_ClassicPlusBIO_Astro_Extended(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       holo.utils.create_nu_min_interp, 
+                                       holo.utils.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),
             # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
@@ -1400,7 +1400,7 @@ class PS_ClassicPlusBIO_Astro(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       holo.utils.create_nu_min_interp, 
+                                       holo.utils.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),
             # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
@@ -1558,7 +1558,7 @@ class PS_AstroStrongBIO_Hard(_PS_AstroStrongBIO):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       holo.utils.create_nu_min_interp, 
+                                       holo.utils.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),
             PD_Uniform("hard_outer_time", 0.1, 11.0),
@@ -1586,7 +1586,7 @@ class PS_AstroStrongBIO_Covariant_All(_PS_AstroStrongBIO):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       holo.utils.create_nu_min_interp, 
+                                       holo.utils.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),
             PD_Uniform("hard_outer_time", 0.1, 11.0),
@@ -1635,7 +1635,7 @@ class PS_AstroStrongBIO_Hard_MMbulge_Covariant_GSMF(_PS_AstroStrongBIO):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       holo.utils.create_nu_min_interp, 
+                                       holo.utils.create_nuin_min_interp, 
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),
             # GSMF

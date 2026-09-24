@@ -30,7 +30,7 @@ import numpy.typing as npt
 from scipy.interpolate import PchipInterpolator
 
 from holodeck import log, cosmo
-from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC, EDDT
+from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC, EDDT, MSOL
 
 class _LazyNJIT:
     """A lazy proxy decorator for numba.njit to prevent compiler loading at import."""
@@ -2641,7 +2641,7 @@ def get_nuin_min(lgr9rg, DEFAULTS, isco_in_rg=6.0, nu_inner_absmin=-4.0, speed_l
 
     return np.nanmax(nuin_min)
 
-def create_nu_min_interp(lgr9rg_arr, DEFAULTS, absmin=-4.0, **kwargs):
+def create_nuin_min_interp(lgr9rg_arr, DEFAULTS, absmin=-4.0, **kwargs):
     """
     Interpolate to get min nu_inner for array of r_gw_crit_9 values, for FixedOuterTime_InnerPL_SAM hardening.
     """
