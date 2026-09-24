@@ -3,7 +3,7 @@
 import numpy as np
 import holodeck as holo
 from holodeck.constants import GYR, PC, MSOL
-from holodeck.librarian.lib_tools import _Param_Space, PD_Uniform, PD_Normal, PD_Uniform_Log, PD_MVNormal
+from holodeck.librarian.lib_tools import _Param_Space, PD_Uniform, PD_Normal, PD_Uniform_Log, PD_MVNormal, PD_2D_Uniform_Variable_Ymin
 
 
 # Define a new Parameter-Space class by subclassing the base class:
@@ -737,7 +737,7 @@ class _PS_NG20_Base(_Param_Space):
     """Base parameter space class for NANOGrav 20-year (NG20) astrophysical modeling.
 
     Components:
-    - Blecha Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 1)
+    - Blecha Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0, with physical limits on hard_nu_inner)
     - Double-Schechter GSMF with Leja+2020 11-D covariance matrix
     - Illustris Galaxy Merger Rate (`GMR_Illustris`, Rodriguez-Gomez+2015)
     - Kormendy & Ho (2013) M-Mbulge with Matt et al. (2026a) redshift-evolving amplitude
@@ -746,16 +746,18 @@ class _PS_NG20_Base(_Param_Space):
     __version__ = "1.0"
 
     DEFAULTS = dict(
-        # BIO Hardening (FixedOuterTime_InnerPL_SAM) - Model 1 (boundary rate dadt_rchar)
-        hard_inner_model_type=1,
+        # BIO Hardening (FixedOuterTime_InnerPL_SAM) - Model 0
+        hard_inner_model_type=0,
         hard_outer_time=1.0,  # [Gyr]
-        hard_rchar_9=1.0,  # [pc]
-        hard_log10_dadt_rchar=5.0,  # [log10(cm/s)], magnitude |dadt| at rchar for equal-mass 1e9 Msun
-        hard_alpha_char=-2.0 / 3.0,
-        hard_gw_crit_units="rg",
-        hard_r_gw_crit_9=10**2.5,
+        hard_nu_inner=0.0,       
+        hard_r_gw_crit_9_log10=2.5,     # [log10(Rg)]
         hard_alpha_gw_crit=-0.25,
         hard_beta_gw_crit=+0.25,
+        hard_gw_crit_units="rg",
+        hard_rchar_9=0.1,             # [pc] 
+        hard_alpha_char=-2.0/3.0,
+        hard_dadt_rchar=None,    # unused for Model 0
+        fobs_min=9.0e-10,        # [Hz]
 
         # Galaxy stellar-mass Function (``GSMF_Double_Schechter``)
         # Parameters based on conversions from [Leja2020]_
@@ -857,19 +859,20 @@ class _PS_NG20_Base(_Param_Space):
         return sam
 
     def _init_hard(self, sam, params):
-        dadt_rchar = -10.0 ** params["hard_log10_dadt_rchar"]
         hard = holo.hardening.FixedOuterTime_InnerPL_SAM(
             sam,
+            inner_model_type=int(params.get("hard_inner_model_type", 0)),
             outer_time=params["hard_outer_time"] * GYR,
-            inner_model_type=int(params.get("hard_inner_model_type", 1)),
-            rchar_9=params["hard_rchar_9"] * PC,
-            dadt_rchar=dadt_rchar,
-            alpha_char=params.get("hard_alpha_char", -2.0 / 3.0),
-            gw_crit_units=params.get("hard_gw_crit_units", "rg"),
-            r_gw_crit_9=params.get("hard_r_gw_crit_9", 10**2.5),
+            nu_inner=params.get("hard_nu_inner",0.0),
+            r_gw_crit_9=np.power(10.0, params.get("hard_r_gw_crit_9_log10",2.5)),
             alpha_gw_crit=params.get("hard_alpha_gw_crit", -0.25),
             beta_gw_crit=params.get("hard_beta_gw_crit", +0.25),
-            enforce_physical_params=False,
+            gw_crit_units=params.get("hard_gw_crit_units", "rg"),
+            rchar_9=params.get("hard_rchar_9",0.1) * PC,
+            alpha_char=params.get("hard_alpha_char", -2.0 / 3.0),
+            dadt_rchar=params.get("hard_dadt_rchar",None),
+            fobs_min=params.get("fobs_min",9.0e-10),
+            enforce_physical_params=True,
         )
         return hard
 
@@ -878,18 +881,28 @@ class PS_NG20_Fiducial(_PS_NG20_Base):
     """NG20 Fiducial Parameter Space for Astrophysical Interpretation.
 
     Components:
-    - Blecha Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 1)
+    - Blecha (2026) Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0)
     - Double-Schechter GSMF with Leja+2020 11-D covariance matrix (`PD_MVNormal`)
     - Illustris Galaxy Merger Rate (`GMR_Illustris`)
     - Kormendy & Ho (2013) M-Mbulge with Matt et al. (2026a) redshift-evolving amplitude
     """
 
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+
+        # NOTE: the ranges should match those in SAM, and shapes should 
+        # not be smaller than SAM shape for robust interpolation
+        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
+        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+        
         parameters = [
             # Hardening model (BIO-hardening / FixedOuterTime_InnerPL_SAM)
             PD_Uniform("hard_outer_time", 0.1, 10.0, default=1.0),  # [Gyr]
-            PD_Uniform_Log("hard_rchar_9", 0.1, 10.0, default=1.0),  # [pc]
-            PD_Uniform("hard_log10_dadt_rchar", 1.0, 7.0, default=5.0),  # [log10(cm/s)]
+            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
+                                       0.778, 4.0, # [log10(Rg)] (0.778 is rISCO=6Rg)
+                                       -4.0, +4.0, # largest allowed range of nu_inner
+                                       utils.create_nuin_min_interp, 
+                                       mtot=self.mtot_for_nuin_lims, 
+                                       mrat=self.mrat_for_nuin_lims),            
             # GSMF (Leja+2020 11-D Covariance)
             PD_MVNormal(GSMF_COV_NAMES, GSMF_COV_MEANS, np.array(GSMF_COV_MATRIX)),
             # GMR (Illustris)
