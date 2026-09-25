@@ -1780,11 +1780,13 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         return
 
     def __str__(self):
+        nu_str = f"{self._nu_inner:.2e}" if self._nu_inner is not None else f"dadt_rchar={self._dadt_rchar:.2e}" if self._dadt_rchar is not None else "None"
         msg = (
             f"{super().__str__()} :: "
             f"outer_time/Gyr={self._outer_time/GYR:.2e} num_steps={self._num_steps} "
             f"rchar_9/pc={self._rchar_9/PC:.2e} "
-            f"nu_inner={self._nu_inner:.2e} "
+            f"inner_model_type={self._inner_model_type} "
+            f"{nu_str} "
         )
         return msg
 
