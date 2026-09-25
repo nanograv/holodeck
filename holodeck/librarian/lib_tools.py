@@ -252,6 +252,9 @@ class _Param_Space(abc.ABC):
 
         sam = self._init_sam(sam_shape, settings)
         hard = self._init_hard(sam, settings)
+        if hasattr(self, "mtot_for_nuin_lims") and hasattr(self, "mrat_for_nuin_lims"):
+            if np.any(sam.mtot != self.mtot_for_nuin_lims) or np.any(sam.mrat != self.mrat_for_nuin_lims):
+                log.warning(f"SAM and nu_inner interpolator grid shape mismatch: \n{sam.mtot=}, {self.mtot_for_nuin_lims=}, {sam.mrat=}, {self.mrat_for_nuin_lims=}")
 
         return sam, hard
 
@@ -920,6 +923,105 @@ class PD_Log_Lin(_Param_Dist):
         yy[hiidx] = crit + (hi - crit) * (xx[hiidx] - lofrac) / (1.0 - lofrac)
         return yy
 
+
+class PD_2D_Uniform_Variable_Ymin(_Param_Dist):
+    """Uniform distribution over a 2D region whose lower y-boundary varies with x.
+
+    Samples (x, y) uniformly (in area) from the region
+        x_lo <= x <= x_hi,    y_lo(x) <= y <= y_hi,
+    where y_lo(x) is a lower boundary supplied by the interpolator``y_lo_interp_func``. 
+    The upper bound ``y_hi`` is constant. Where y_lo(x) >= y_hi the region has zero 
+    height and no probability.
+
+    Sampling is done by inverse-CDF in two steps:
+
+    1. The density of x is proportional to the local height of the region, 
+       h(x) = max(y_hi - y_lo(x), 0). Its CDF is built numerically on a
+       grid (trapezoid rule) and inverted with linear interpolation to draw x.
+    2. Conditional on x, y is uniform on [y_lo(x), y_hi].
+
+    Parameters
+    ----------
+    x_name : str
+        Name of the first parameter (x).
+    y_name : str
+        Name of the second parameter (y).
+    x_lo, x_hi : float
+        Lower and upper bounds of x.
+    y_abs_lo : float
+        Absolute minimum of y. Passed to ``y_lo_interp_func`` as ``absmin``
+        so the interpolated lower bound can be floored at this value.
+    y_hi : float
+        Constant upper bound of y.
+    y_lo_interp_func : callable
+        Function with signature ``y_lo_interp_func(x_grid, absmin=..., **interp_kwargs)``
+        that calculates y_lo for each element of x_grid and returns an interpolator for
+        calculating ``y_lo(x)`` to give the lower y-bound at each x
+        (vectorized over arrays).
+    parspace_defaults : dict
+        Dictionary of default parameters for the underlying _Param_Space to which this
+        parameter distribution is being applied. It is passed to self._y_lo_interp_func().
+    n_cdf_grid_min : int, optional
+        Minimum number of grid points used to build the x CDF (default 1000).
+        The actual grid size is ``max(n_cdf_grid_min, n_samples // 10)``.
+    **kwargs
+        Passed to ``_Param_Dist.__init__``. The keys ``mtot`` and ``mrat`` are
+        removed first and forwarded to ``y_lo_interp_func`` instead (only if
+        present).
+
+    Notes
+    -----
+    The x CDF is a piecewise-linear approximation, so accuracy improves with
+    the grid size. If y_lo(x) exceeds y_hi over part of the x range, that part
+    gets zero probability. The CDF is flat there, so ``np.interp`` skips it.
+    """
+
+    def __init__(self, x_name, y_name, x_lo, x_hi, 
+                 y_abs_lo, y_hi, y_lo_interp_func, 
+                 parspace_defaults,
+                 n_cdf_grid_min=1000, **kwargs):
+
+        interp_kwargs = {}
+        if 'mtot' in kwargs:
+            interp_kwargs['mtot'] = kwargs.pop('mtot')
+        if 'mrat' in kwargs:
+            interp_kwargs['mrat'] = kwargs.pop('mrat')
+
+        super().__init__(name=(x_name, y_name), **kwargs)
+        self._x_lo = x_lo
+        self._x_hi = x_hi
+        self._y_abs_lo = y_abs_lo
+        self._y_hi = y_hi
+        self._y_lo_interp_func = y_lo_interp_func
+        self._parspace_defaults = parspace_defaults
+        self._n_cdf_grid_min = n_cdf_grid_min
+        self._interp_kwargs = interp_kwargs
+
+    def _dist_func(self, uu):
+        """uu is expected to be a (n_samples, n_dims) array of uniform [0, 1] variables."""
+
+        n_cdf_grid = np.maximum(self._n_cdf_grid_min, int(uu.shape[0] / 10))
+
+        x_grid = np.linspace(self._x_lo, self._x_hi, n_cdf_grid)
+        # `y_height` should be the larger of nu_max - nu_min, or 0
+        y_lo_interp = self._y_lo_interp_func(x_grid, self._parspace_defaults, 
+                                             absmin=self._y_abs_lo, **self._interp_kwargs)
+        y_height = np.clip(self._y_hi - y_lo_interp(x_grid), 0.0, None)
+
+        # integrate to get CDF over x (trapezoid rule)
+        cdf = np.concatenate([[0.0], np.cumsum(0.5*(y_height[1:]+y_height[:-1])*np.diff(x_grid))])  
+        if cdf[-1] <= 0:
+            raise ValueError(f"No positive-width region found in x range {self._x_lo}-{self._x_hi}.")
+        cdf /= cdf[-1]
+
+        # inverse-CDF sample x
+        xx = np.interp(uu[:,0], cdf, x_grid)
+
+        # uniform y within the strip at each sampled x
+        y_lo = y_lo_interp(xx)
+        yy = y_lo + (self._y_hi - y_lo) * uu[:,1]
+
+        return np.vstack([xx, yy]).T
 
 class PD_Piecewise_Uniform_Mass(_Param_Dist):
     def __init__(self, name, edges, weights, **kwargs):

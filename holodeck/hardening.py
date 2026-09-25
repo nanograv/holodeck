@@ -2484,6 +2484,7 @@ def _radius_loss_cone_BBR1980_dehnen(mbh, mstar, gamma=1.0):
     rlc = np.power(mass_of_a_star / mbh, 0.25) * np.power(rbnd/rstar, 2.25) * rstar
     return rlc
 
+
 def allowed_param_range(mtot, mrat, alpha_char, rchar_9, alpha_gw, beta_gw, r9rg, 
                         risco_in_rg=6.0, nu_inner_absmax=4.0):
     """
@@ -2610,7 +2611,8 @@ def allowed_param_range(mtot, mrat, alpha_char, rchar_9, alpha_gw, beta_gw, r9rg
         # reducing max dadt_rchar will always increase min_nuin, 
         # so min_nuin will be > -nu_inner_absmax (less negative) by definition
         max_lgdadtrchar = np.minimum(max_lgdadtrchar_nuinmax, np.log10(_DADT_SPEED_LIMIT*eta_norm))
-        min_nuin = np.maximum(-1.0*nu_inner_absmax, 1 + ( lgdadtgwcrit - max_lgdadtrchar ) / lgrdiff)
+        numerator = np.log10(10.0**max_lgdadtrchar/10.0**lgdadtgwcrit - 1)
+        min_nuin = np.maximum(-1.0*nu_inner_absmax, 1 - numerator / lgrdiff)
         print(f"{max_lgdadtrchar.shape=} {min_nuin.shape=}")
     else:
         max_lgdadtrchar = copy(max_lgdadtrchar_nuinmax)
