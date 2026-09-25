@@ -2646,7 +2646,7 @@ def get_nuin_min(lgr9rg, DEFAULTS, isco_in_rg=6.0, nu_inner_absmin=-4.0, speed_l
     speed_limit : float, optional
         Maximum allowed hardening speed |da/dt| (default ``SPLC``, the speed
         of light). Same units as the output of
-        ``holo.utils.gw_hardening_rate_dadt``.
+        ``gw_hardening_rate_dadt``.
     mtot : tuple (float, float, int), optional
         ``(min, max, n)`` for the log-spaced grid of total masses, in grams
         (default 1e4 to 1e12 Msun, 91 points).
@@ -2673,13 +2673,13 @@ def get_nuin_min(lgr9rg, DEFAULTS, isco_in_rg=6.0, nu_inner_absmin=-4.0, speed_l
     mt, mr = np.broadcast_arrays(mtot_arr[:, np.newaxis], mrat_arr[np.newaxis, :])
 
     m9 = mt / (1.0e9 * MSOL)
-    m1, m2 = holo.utils.m1m2_from_mtmr(mt, mr)
+    m1, m2 = m1m2_from_mtmr(mt, mr)
     eta_norm = 4.0 * mr / np.square(1 + mr)
 
     rchar = (DEFAULTS['hard_rchar_9'] * PC) * m9**(DEFAULTS['hard_alpha_char'] + 1)
-    grav_radii = holo.utils.gravitational_radius(mt)
+    grav_radii = gravitational_radius(mt)
 
-    r9cm = (10.0**lgr9rg) * holo.utils.gravitational_radius(1.0e9 * MSOL)
+    r9cm = (10.0**lgr9rg) * gravitational_radius(1.0e9 * MSOL)
     rgw_crit = (r9cm * m9**(DEFAULTS['hard_alpha_gw_crit'] + 1) * 
                 eta_norm**DEFAULTS['hard_beta_gw_crit'])
 
@@ -2690,7 +2690,7 @@ def get_nuin_min(lgr9rg, DEFAULTS, isco_in_rg=6.0, nu_inner_absmin=-4.0, speed_l
         # only pay for gw_hardening_rate_dadt where it's actually needed
         dadt_gw_crit = np.zeros_like(rgw_crit)
         idx = np.nonzero(mask_isco)
-        dadt_gw_crit[idx] = holo.utils.gw_hardening_rate_dadt(m1[idx], m2[idx], rgw_crit[idx])
+        dadt_gw_crit[idx] = gw_hardening_rate_dadt(m1[idx], m2[idx], rgw_crit[idx])
 
         lgrdiff = np.log10(rchar) - np.log10(rgw_crit)
         nuin_min_calc = 1.0 - np.log10(speed_limit/np.abs(dadt_gw_crit)-1) / lgrdiff
@@ -2753,8 +2753,8 @@ def create_nuin_min_interp(lgr9rg_arr, DEFAULTS, absmin=-4.0, **kwargs):
     will corrupt the neighboring intervals. Choose ``lgr9rg_arr`` so this
     doesn't happen, or filter NaNs before interpolating.
     """
-    nuin_min_arr = np.array([holo.utils.get_nuin_min(x, DEFAULTS, nu_inner_absmin=absmin, 
-                                                     **kwargs) for x in lgr9rg_arr])
+    nuin_min_arr = np.array([get_nuin_min(x, DEFAULTS, nu_inner_absmin=absmin, 
+                                          **kwargs) for x in lgr9rg_arr])
     # Pchip only needs lgr9rg_arr sorted increasing; 
     # nuin_min can be any shape (non-monotonic, kinked, etc.)
     return PchipInterpolator(lgr9rg_arr, nuin_min_arr)
