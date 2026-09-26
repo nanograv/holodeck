@@ -23,7 +23,7 @@ The |holodeck| framework simulates populations of MBH binaries, and calculates t
 
    Additional information can be very useful.  In particular, information about the host galaxy of the MBH pair can be used in the binary evolution calculation.
 
-(2) :ref:`Binary Evolution`: Evolve the binary population from their initial conditions (i.e. large separations) until they reach the regime of interest (i.e. small separations).  In the simplest models, binaries are assumed to coalesce instantaneously, and are assumed to evolve purely due to GW emission.  Note that these two assumptions are contradictory.  More complex, self-consistent evolution models are recommended.  These models typically involve interactions between MBH binaries and their host galaxies ('environmental' interactions).  Note that the effects of binary evolution can be broken up into two distinct effects:
+(2) :ref:`Binary-Evolution`: Evolve the binary population from their initial conditions (i.e. large separations) until they reach the regime of interest (i.e. small separations).  In the simplest models, binaries are assumed to coalesce instantaneously, and are assumed to evolve purely due to GW emission.  Note that these two assumptions are contradictory.  More complex, self-consistent evolution models are recommended.  These models typically involve interactions between MBH binaries and their host galaxies ('environmental' interactions).  Note that the effects of binary evolution can be broken up into two distinct effects:
 
    (a) The redshift at which binaries reach the given frequencies (or separations) of interest, and similarly which binaries are able to reach those frequencies before redshift zero, and
 
@@ -35,7 +35,7 @@ The |holodeck| framework simulates populations of MBH binaries, and calculates t
 
    (a) Discretization: whether binaries are treated as discrete objects, i.e. there can only be an integer number of binaries in a given frequency bin (this often relates to whether the number-density, or total-number of binaries is used in the calculation).  One can also consider the effects of cosmic variance in this category as well.
 
-   (b) Evolution: whether self-consistent models of binary evolution are considered, or if purely GW-driven evolution is assumed (see :ref:`Binary Evolution`).
+   (b) Evolution: whether self-consistent models of binary evolution are considered, or if purely GW-driven evolution is assumed (see :ref:`Binary-Evolution`).
 
    (c) Eccentricity: whether binaries are restricted to circular orbits, or allowed to have eccentric evolution.  Eccentricity has multiple effects on binary evolution, mostly (i) by changing the rate of binary hardening, and (ii) by changing the GW frequencies corresponding to each orbital frequency.  Circular binaries emit GWs at only the :math:`n=2` harmonic of the orbital frequency, while eccentric binaries emit at all integer harmonics.
 

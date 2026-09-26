@@ -279,6 +279,7 @@ class Evolution:
         argument.
 
         The behavior of this function is broken into three sub-functions, that are only used here:
+
         * :meth:`Evolution._at__inputs` : parse the input arguments.
         * :meth:`Evolution._at__index_frac` : find the indices in the evolutionary tracks bounding
           the target interpolation locations, and also the fractional distance to interpolate
@@ -292,6 +293,7 @@ class Evolution:
             String specifying the variable of interpolation.
         targets : array_like,
             Locations to interpolate to:
+            
             * if ``xpar == sepa`` : binary separation, units of [cm],
             * if ``xpar == fobs`` : binary orbital freq, observer-frame, units of [1/sec],
         params : None or (list of str)
@@ -302,10 +304,11 @@ class Evolution:
             Interpolated values for other binaries are set to `np.nan`.
         lin_interp : None or bool,
             Interpolate parameters in linear space.
+            
             * True : all parameters interpolated in lin-lin space.
             * False: all parameters interpolated in log-log space.
             * None : parameters are interpolated in log-log space, unless they're included in the
-              :attr:`Evolution._LIN_INTERP_PARS` attribute.
+                     :attr:`Evolution._LIN_INTERP_PARS` attribute.
 
         Returns
         -------

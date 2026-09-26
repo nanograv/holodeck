@@ -172,7 +172,7 @@ def train_gp(spectra_file,
              y_is_variance=False,
              kernel="ExpSquaredKernel",
              mpi=True):
-    """Train gaussian processes on the first `nfreqs` of the GWB in `spectra_file`.
+    """Train gaussian processes on the first `nfreqs` of the GWB in ``spectra_file``.
 
     Parameters
     ----------
@@ -195,7 +195,7 @@ def train_gp(spectra_file,
     kernel : str, optional
         The type of kernel to use for the GP
     kernel_opts : dict, optional
-        The options to pass when constructing the kernel. Unpacks as **kwargs to george.kernels
+        The options to pass when constructing the kernel. Unpacks as ``**kwargs`` to george.kernels
     mpi : bool, optional
         Whether to use MPI or Python's multiprocessing module
 
