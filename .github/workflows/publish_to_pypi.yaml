@@ -22,7 +22,7 @@ jobs:
         uses: pypa/cibuildwheel@v2.21.3
         env:
           CIBW_BUILD: "cp39-* cp310-* cp311-*"
-          CIBW_SKIP: "pp* *i686 *musllinux*"
+          CIBW_SKIP: "pp* *i686 *musllinux* cp39-*linux*"
 
       - name: Upload wheel
         uses: actions/upload-artifact@v4
