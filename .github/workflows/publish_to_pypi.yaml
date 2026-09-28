@@ -19,10 +19,10 @@ jobs:
           python-version: 3.11
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.16.2
+        uses: pypa/cibuildwheel@v2.21.3
         env:
-          # Skip CPython 3.6, 3.7, 3.8, 3.12, PyPy, 32-bit, and musl
-          CIBW_SKIP: "cp36-* cp37-* cp38-* cp312-* pp* *i686 *musllinux*"
+          CIBW_BUILD: "cp39-* cp310-* cp311-*"
+          CIBW_SKIP: "pp* *i686 *musllinux*"
 
       - name: Upload wheel
         uses: actions/upload-artifact@v4
