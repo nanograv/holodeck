@@ -12,9 +12,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macOS-latest]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v3
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.11
 
@@ -24,8 +24,10 @@ jobs:
           # Skip CPython 3.6, 3.7, 3.8, 3.12, PyPy, 32-bit, and musl
           CIBW_SKIP: "cp36-* cp37-* cp38-* cp312-* pp* *i686 *musllinux*"
 
-      - uses: actions/upload-artifact@v3
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
         with:
+          name: wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
 
   make_sdist:
@@ -33,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: git checkout repository main
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: check github reference for tags
       run: |
@@ -41,7 +43,7 @@ jobs:
         echo "github.repository = ${{ github.repository }}, github.event_name = ${{ github.event_name }} "
 
     - name: Set up Python 3.10
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: "3.10"
 
@@ -51,8 +53,10 @@ jobs:
     - name: Build a source tarball
       run: python -m build --sdist --outdir dist/ .
 
-    - uses: actions/upload-artifact@v3
+    - name: Upload source distribution
+      uses: actions/upload-artifact@v4
       with:
+        name: sdist
         path: ./dist/*.tar.gz
 
   pypi-publish:
@@ -65,9 +69,14 @@ jobs:
       # IMPORTANT: this permission is mandatory for trusted publishing
       id-token: write
     steps:
-      - uses: actions/download-artifact@v3
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
 
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: artifact/
+          packages-dir: dist/
