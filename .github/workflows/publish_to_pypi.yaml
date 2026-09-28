@@ -19,7 +19,7 @@ jobs:
           python-version: 3.11
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.16.2
+        uses: pypa/cibuildwheel@v2.21.3
         env:
           # Build only supported CPython versions.
 +          CIBW_BUILD: "cp311-* cp312-*"
