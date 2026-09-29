@@ -9,6 +9,10 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools_scm]
+# writes the resolved version into a file your package can import at runtime
+write_to = "holodeck/_version.py"
+
 [tool.mypy]
 allow_redefinition = true
 

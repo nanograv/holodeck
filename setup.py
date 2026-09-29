@@ -27,9 +27,6 @@ with open(join('.', "requirements.txt"), "r") as handle:
         if line.strip() and not line.lstrip().startswith("#")
     ]
 
-with open(join('.', 'holodeck', 'version.txt')) as handle:
-    version = handle.read().strip()
-
 
 # ---- Handle cython submodules ----
 
@@ -85,7 +82,6 @@ setup(
     description=short_description,
     long_description=long_description,
     long_description_content_type="text/markdown",
-    version=version,
     license='MIT',
     url="https://github.com/NANOGrav/holodeck/",
 
