@@ -22,8 +22,8 @@ jobs:
         uses: pypa/cibuildwheel@v2.21.3
         env:
           # Build only supported CPython versions.
-+          CIBW_BUILD: "cp311-* cp312-*"
-+          CIBW_SKIP: "pp* *i686 *musllinux*"
+          CIBW_BUILD: "cp311-* cp312-*"
+          CIBW_SKIP: "pp* *i686 *musllinux*"
 
       - name: Upload wheel
         uses: actions/upload-artifact@v4
