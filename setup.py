@@ -21,10 +21,11 @@ with open(join('.', "README.md"), "r") as handle:
     long_description = handle.read()
 
 with open(join('.', "requirements.txt"), "r") as handle:
-    requirements = handle.read()
-
-with open(join('.', 'holodeck', 'version.txt')) as handle:
-    version = handle.read().strip()
+    requirements = [
+        line.strip()
+        for line in handle
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
 
 
 # ---- Handle cython submodules ----
@@ -81,7 +82,6 @@ setup(
     description=short_description,
     long_description=long_description,
     long_description_content_type="text/markdown",
-    version=version,
     license='MIT',
     url="https://github.com/NANOGrav/holodeck/",
 
@@ -100,7 +100,7 @@ setup(
 
     # Additional entries you may want simply uncomment the lines you want and fill in the data
     # url='http://www.my_package.com',  # Website
-    python_requires=">=3.9",          # Python version restrictions
+    python_requires=">=3.11",          # Python version restrictions
 
     ext_modules=cython_modules,
 

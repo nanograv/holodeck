@@ -1,7 +1,17 @@
 [build-system]
 # cython/numpy/scipy are required to build cython extensions.  The build steps are specified in `setup.py`
-requires = ["setuptools >= 40.6.0", "wheel", "Cython>=3.0.0", "numpy", "scipy"]
+requires = [
+    "setuptools>=40.6.0",
+    "wheel",
+    "Cython<3.0.0",
+    "numpy>=1.23.5,<2.0",
+    "scipy>=1.9,<1.14",
+]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+# writes the resolved version into a file your package can import at runtime
+write_to = "holodeck/_version.py"
 
 [tool.mypy]
 allow_redefinition = true

@@ -17,13 +17,13 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macOS-latest]
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.11', '3.12']
         # mpi: [ 'mpich', 'openmpi', 'intelmpi']
         # mpi: ['openmpi']
 
     steps:
     - name: Check out repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         fetch-depth: 2
 
@@ -35,7 +35,7 @@ jobs:
     #       mpi: ${{ matrix.mpi }}
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -50,16 +50,13 @@ jobs:
 
     - name: Install dependencies
       run: |
-        which python
-        python --version
-        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install --upgrade pip
         python -m pip install -r requirements.txt
         python -m pip install -r requirements-dev.txt
 
     - name: Install package
       run: |
-        python setup.py build_ext -i
-        python setup.py develop
+        python -m pip install -e .
 
     - name: Report environment information
       run: |
