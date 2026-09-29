@@ -418,8 +418,8 @@ class PM_Eccentricity(_Population_Modifier):
 class PM_Resample(_Population_Modifier):
     """Population Modifier to resample a population instance to a new number of binaries.
 
-    Uses `kalepy` kernel density estimation (KDE) to resample the original population into a new
-    one, changing the total number of binaries by some factor (usually increasing the population).
+    Uses weighted bootstrap sampling to resample the original population into a new one, changing
+    the total number of binaries by some factor (usually increasing the population).
 
     Notes
     -----
@@ -482,8 +482,6 @@ class PM_Resample(_Population_Modifier):
             Binary population to be modified.
 
         """
-        import kalepy as kale
-
         # ---- Package data for resampling
 
         # Store basic quantities
@@ -531,10 +529,10 @@ class PM_Resample(_Population_Modifier):
         old_size = pop.size
         new_size = old_size * resample
 
-        # construct a `kalepy` Kernel Density Estimator instance
-        kde = kale.KDE(old_data, reflect=reflect, bw_rescale=0.25)
         # resample the population data
-        new_data = kde.resample(new_size)
+        new_size = int(np.round(new_size))
+        rand_idx = np.random.randint(0, old_size, size=new_size)
+        new_data = [vals[rand_idx] for vals in old_data]
 
         # Convert back to desired quantities
         mt = MSOL * 10**new_data[0]
@@ -571,26 +569,37 @@ class PM_Resample(_Population_Modifier):
     def plot(self):
         """Plot a comparison of the old and new data, before and after resampling.
 
-        A `kalepy.Corner` plot is generated.
-
         Returns
         -------
         `mpl.figure.Figure` instance,
             The figure object containing the plot.
 
         """
-        import kalepy as kale
         dold = self._old_data
         dnew = self._new_data
         labels = self._labels
         if (dold is None) or (dnew is None):
             raise ValueError("Stored data is empty!")
 
-        corner = kale.Corner(len(dold), labels=labels)
-        kw = dict(scatter=False, contour=True, probability=True)
-        corner.plot_clean(dnew, color='blue', **kw)
-        corner.plot_clean(dold, color='red', **kw)
-        return corner.fig
+        npar = len(dold)
+        fig, axes = plt.subplots(npar, npar, figsize=(8, 8))
+        for ii in range(npar):
+            for jj in range(npar):
+                ax = axes[ii, jj]
+                if ii == jj:
+                    ax.hist(dold[ii], bins=40, density=True, histtype='step', color='red')
+                    ax.hist(dnew[ii], bins=40, density=True, histtype='step', color='blue')
+                elif ii > jj:
+                    ax.scatter(dold[jj], dold[ii], s=1, alpha=0.05, color='red')
+                    ax.scatter(dnew[jj], dnew[ii], s=1, alpha=0.05, color='blue')
+                else:
+                    ax.axis('off')
+                if ii == npar - 1 and jj < npar:
+                    ax.set_xlabel(labels[jj])
+                if jj == 0 and ii < npar:
+                    ax.set_ylabel(labels[ii])
+        fig.tight_layout()
+        return fig
 
 
 class PM_Mass_Reset(_Population_Modifier):

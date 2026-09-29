@@ -10,8 +10,6 @@ from typing import Any
 import numba
 import numpy as np
 
-import kalepy as kale
-
 import holodeck as holo
 from holodeck import utils, cosmo, log, hardening
 from holodeck.constants import SPLC, NWTG, MPC
@@ -697,20 +695,20 @@ def char_strain_sq_from_bin_edges_redz(edges, redz):
 
     foo = edges[-1]                   #: should be observer-frame orbital-frequencies
     df = np.diff(foo)                 #: frequency bin widths
-    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+    fc = utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
 
     # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)
     #    where M, Q, Z are edges and Fc is frequency centers
     # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
     for dd in range(3):
         redz = np.moveaxis(redz, dd, 0)
-        redz = kale.utils.midpoints(redz, axis=0)
+        redz = utils.midpoints(redz, axis=0)
         redz = np.moveaxis(redz, 0, dd)
 
     # ---- calculate GW strain ----
-    mt = kale.utils.midpoints(edges[0])
-    mr = kale.utils.midpoints(edges[1])
-    # rz = kale.utils.midpoints(edges[2])
+    mt = utils.midpoints(edges[0])
+    mr = utils.midpoints(edges[1])
+    # rz = utils.midpoints(edges[2])
     mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
     mc = mc[:, :, np.newaxis, np.newaxis]
     dc = +np.inf * np.ones_like(redz)
@@ -732,20 +730,20 @@ def strain_amp_from_bin_edges_redz(edges, redz):
 
     foo = edges[-1]                   #: should be observer-frame orbital-frequencies
     # df = np.diff(foo)                 #: frequency bin widths
-    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+    fc = utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
 
     # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)
     #    where M, Q, Z are edges and Fc is frequency centers
     # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
     for dd in range(3):
         redz = np.moveaxis(redz, dd, 0)
-        redz = kale.utils.midpoints(redz, axis=0)
+        redz = utils.midpoints(redz, axis=0)
         redz = np.moveaxis(redz, 0, dd)
 
     # ---- calculate GW strain ----
-    mt = kale.utils.midpoints(edges[0])
-    mr = kale.utils.midpoints(edges[1])
-    # rz = kale.utils.midpoints(edges[2])
+    mt = utils.midpoints(edges[0])
+    mr = utils.midpoints(edges[1])
+    # rz = utils.midpoints(edges[2])
     mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
     mc = mc[:, :, np.newaxis, np.newaxis]
     dc = +np.inf * np.ones_like(redz)
@@ -765,12 +763,12 @@ def char_strain_sq_from_bin_edges(edges):
 
     foo = edges[-1]                   #: should be observer-frame orbital-frequencies
     df = np.diff(foo)                 #: frequency bin widths
-    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+    fc = utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
 
     # ---- calculate GW strain ----
-    mt = kale.utils.midpoints(edges[0])
-    mr = kale.utils.midpoints(edges[1])
-    rz = kale.utils.midpoints(edges[2])
+    mt = utils.midpoints(edges[0])
+    mr = utils.midpoints(edges[1])
+    rz = utils.midpoints(edges[2])
     mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
     mc = mc[:, :, np.newaxis, np.newaxis]
     dc = cosmo.comoving_distance(rz).cgs.value
@@ -1040,12 +1038,12 @@ def _gws_from_number_grid_centroids(edges, dnum, number, realize):
 
     # # ---- find weighted bin centers
     # # get unweighted centers
-    # cent = kale.utils.midpoints(dnum, log=False, axis=(0, 1, 2, 3))
+    # cent = utils.midpoints(dnum, log=False, axis=(0, 1, 2, 3))
     # # get weighted centers for each dimension
     # for ii, cc in enumerate(coms):
-    #     coms[ii] = kale.utils.midpoints(dnum * cc, log=False, axis=(0, 1, 2, 3)) / cent
+    #     coms[ii] = utils.midpoints(dnum * cc, log=False, axis=(0, 1, 2, 3)) / cent
     # print(f"{kale.utils.jshape(edges)=}, {dnum.shape=}")
-    coms = kale.utils.centroids(edges, dnum)
+    coms = np.meshgrid(*[utils.midpoints(ee, log=False) for ee in edges], indexing='ij')
 
     # ---- calculate GW strain at bin centroids
     mc = utils.chirp_mass(*utils.m1m2_from_mtmr(coms[0], coms[1]))

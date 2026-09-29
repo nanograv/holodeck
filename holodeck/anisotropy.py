@@ -6,7 +6,6 @@ import numpy as np
 # import matplotlib as plt
 import matplotlib.cm as cm
 
-import kalepy as kale
 import h5py
 
 import holodeck as holo
@@ -437,7 +436,7 @@ def Cl_analytic_from_num(fobs_orb_edges, number, hs, realize = False, floor = Fa
     """
 
     df = np.diff(fobs_orb_edges)                 #: frequency bin widths
-    fc = kale.utils.midpoints(fobs_orb_edges)    #: frequency-bin centers
+    fc = utils.midpoints(fobs_orb_edges)    #: frequency-bin centers
 
     # df = fobs_orb_widths[np.newaxis, np.newaxis, np.newaxis, :] # (M,Q,Z,F) NDarray
     # fc = fobs_orb_cents[np.newaxis, np.newaxis, np.newaxis, :]  # (M,Q,Z,F) NDarray
@@ -474,7 +473,7 @@ def strain_amp_at_bin_edges_redz(edges, redz=None):
 
     foo = edges[-1]                   #: should be observer-frame orbital-frequencies
     # df = np.diff(foo)                 #: frequency bin widths
-    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+    fc = utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
 
 
     if redz is not None:
@@ -507,7 +506,7 @@ def strain_amp_at_bin_centers_redz(edges, redz=None):
 
     foo = edges[-1]                   #: should be observer-frame orbital-frequencies
     df = np.diff(foo)                 #: frequency bin widths
-    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+    fc = utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
 
     # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)
     #    where M, Q, Z are edges and Fc is frequency centers
@@ -515,19 +514,19 @@ def strain_amp_at_bin_centers_redz(edges, redz=None):
     if redz is not None:
         for dd in range(3):
             redz = np.moveaxis(redz, dd, 0)
-            redz = kale.utils.midpoints(redz, axis=0)
+            redz = utils.midpoints(redz, axis=0)
             redz = np.moveaxis(redz, 0, dd)
         dc = +np.inf * np.ones_like(redz)
         sel = (redz > 0.0)
         dc[sel] = holo.cosmo.comoving_distance(redz[sel]).cgs.value
     else:
-        redz = kale.utils.midpoints(edges[2])[np.newaxis,np.newaxis,:,np.newaxis]
+        redz = utils.midpoints(edges[2])[np.newaxis,np.newaxis,:,np.newaxis]
         dc = holo.cosmo.comoving_distance(redz).cgs.value
 
 
     # ---- calculate GW strain ----
-    mt = kale.utils.midpoints(edges[0])
-    mr = kale.utils.midpoints(edges[1])
+    mt = utils.midpoints(edges[0])
+    mr = utils.midpoints(edges[1])
     mc = utils.chirp_mass_mtmr(mt[:, np.newaxis], mr[np.newaxis, :])
     mc = mc[:, :, np.newaxis, np.newaxis]
 
@@ -554,7 +553,7 @@ def Cl_analytic_from_dnum(edges, dnum, redz=None, realize=False):
     fobs_gw_edges = fobs_orb_edges * 2.0
 
     df = np.diff(fobs_orb_edges)                 #: frequency bin widths
-    fc = kale.utils.midpoints(fobs_orb_edges)    #: use frequency-bin centers for strain (more accurate!)
+    fc = utils.midpoints(fobs_orb_edges)    #: use frequency-bin centers for strain (more accurate!)
 
 
     if realize is False:

@@ -41,8 +41,6 @@ import numpy as np
 import scipy as sp
 import scipy.interpolate  # noqa
 
-import kalepy as kale
-
 import holodeck as holo
 from holodeck import cosmo, utils, log
 from holodeck.constants import SPLC, MSOL, MPC
@@ -791,7 +789,7 @@ class Semi_Analytic_Model:
 
         assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
 
-        fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
+        fobs_gw_cents = utils.midpoints(fobs_gw_edges)
 
         # convert to orbital-frequency (from GW-frequency)
         fobs_orb_edges = fobs_gw_edges / 2.0
@@ -817,7 +815,7 @@ class Semi_Analytic_Model:
         """
 
         fobs_gw_edges = np.atleast_1d(fobs_gw_edges)
-        fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
+        fobs_gw_cents = utils.midpoints(fobs_gw_edges)
         # convert to orbital-frequency (from GW-frequency)
         fobs_orb_edges = fobs_gw_edges / 2.0
         fobs_orb_cents = fobs_gw_cents / 2.0
@@ -915,7 +913,7 @@ class Semi_Analytic_Model:
             self._log.exception(err)
             raise ValueError(err)
 
-        fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
+        fobs_gw_cents = utils.midpoints(fobs_gw_edges)
 
         # convert to orbital-frequency (from GW-frequency)
         fobs_orb_edges = fobs_gw_edges / 2.0
@@ -1201,6 +1199,41 @@ def sample_sam_with_hardening(
     # NOTE: this needs to be done manually, instead of within kalepy, because of log-spacings
     mass = utils._integrate_grid_differential_number(edges_integrate, dnum, freq=True)
 
+    def _sample_grid(edges_sample, mass):
+        counts = np.floor(mass).astype(int)
+        frac = np.clip(mass - counts, 0.0, 1.0)
+        counts = counts + np.random.binomial(1, frac)
+        flat_idx = np.repeat(np.arange(counts.size), counts.ravel())
+        vals = np.zeros((len(edges_sample), flat_idx.size))
+        if flat_idx.size == 0:
+            return vals
+        unr = np.array(np.unravel_index(flat_idx, counts.shape))
+        for ii, edge in enumerate(edges_sample):
+            cents = utils.midpoints(edge, log=False)
+            vals[ii] = cents[unr[ii]]
+        return vals
+
+    def _sample_outliers(edges_sample, mass, threshold):
+        mass = np.asarray(mass)
+        cents = np.meshgrid(*[utils.midpoints(ee, log=False) for ee in edges_sample], indexing='ij')
+        cents = np.asarray(cents)
+        flat_cents = cents.reshape(len(edges_sample), -1)
+        flat_mass = mass.ravel()
+
+        keep = (flat_mass >= threshold) & (flat_mass > 0.0)
+        vals_hi = flat_cents[:, keep]
+        weights_hi = flat_mass[keep]
+
+        draws = np.random.poisson(flat_mass)
+        draws[keep] = 0
+        idx_lo = np.repeat(np.arange(flat_mass.size), draws.astype(int))
+        vals_lo = flat_cents[:, idx_lo] if idx_lo.size else np.zeros((len(edges_sample), 0))
+        weights_lo = np.ones(idx_lo.size)
+
+        vals = np.concatenate([vals_hi, vals_lo], axis=1)
+        weights = np.concatenate([weights_hi, weights_lo]).astype(float)
+        return vals, weights
+
     # ---- sample binaries from distribution
     if (sample_threshold is None) or (sample_threshold == 0.0):
         msg = (
@@ -1208,12 +1241,10 @@ def sample_sam_with_hardening(
             "Set `sample_threshold` to only sample outliers."
         )
         log.warning(msg)
-        vals = kale.sample_grid(edges_sample, dnum, mass=mass, **sample_kwargs)
+        vals = _sample_grid(edges_sample, mass)
         weights = np.ones(vals.shape[1], dtype=int)
     else:
-        vals, weights = kale.sample_outliers(
-            edges_sample, dnum, sample_threshold, mass=mass, **sample_kwargs
-        )
+        vals, weights = _sample_outliers(edges_sample, mass, sample_threshold)
 
     vals[0] = 10.0 ** vals[0]
     vals[3] = np.e ** vals[3]
@@ -1392,4 +1423,3 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
         output[:, :, ii] = m1m2_dens[...]
 
     return output
-

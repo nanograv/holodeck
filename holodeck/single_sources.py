@@ -11,9 +11,6 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
 
-import kalepy as kale # noqa
-# import kalepy.plot
-
 import holodeck as holo
 import holodeck.cyutils
 from holodeck import cosmo, utils, plot, gravwaves
@@ -77,9 +74,9 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
     """
 
     # All other bin midpoints
-    mt = kale.utils.midpoints(edges[0]) #: total mass
-    mr = kale.utils.midpoints(edges[1]) #: mass ratio
-    rz = kale.utils.midpoints(edges[2]) #: initial redshift
+    mt = utils.midpoints(edges[0]) #: total mass
+    mr = utils.midpoints(edges[1]) #: mass ratio
+    rz = utils.midpoints(edges[2]) #: initial redshift
 
 
     # hsfdf = hsamp^2 * f/df # this is same as hc^2
@@ -111,12 +108,12 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
             # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
             for dd in range(3):
                 redz = np.moveaxis(redz, dd, 0)
-                redz = kale.utils.midpoints(redz, axis=0)
+                redz = utils.midpoints(redz, axis=0)
                 redz = np.moveaxis(redz, 0, dd)
 
             # if np.any(np.logical_and(redz<0, redz!=-1)):
             #     err = np.sum(np.logical_and(redz<0, redz!=-1))
-            #     err = f"{err} redz < 0 and !=-1 found in redz, in ss_gws_redz() after kale.utils.midpoints"
+            #     err = f"{err} redz < 0 and !=-1 found in redz, in ss_gws_redz() after utils.midpoints"
             #     raise ValueError(err)
 
             dcom_final = +np.inf*np.ones_like(redz)
@@ -131,7 +128,7 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
             # redz[redz<0] = -1
 
             fobs_orb_edges = edges[-1]
-            fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges)
+            fobs_orb_cents = utils.midpoints(fobs_orb_edges)
             frst_orb_cents = utils.frst_from_fobs(fobs_orb_cents[np.newaxis,np.newaxis,np.newaxis,:], redz) # (M,Q,Z,F,), final
 
 
@@ -213,13 +210,13 @@ def ss_gws(edges, number, realize, loudest = 1, params = False):
     # Frequency bin midpoints
     foo = edges[-1]                   #: should be observer-frame orbital-frequencies
     df = np.diff(foo)                 #: frequency bin widths
-    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+    fc = utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
     F = len(fc)                       #: number of frequencies
 
     # All other bin midpoints
-    mt = kale.utils.midpoints(edges[0]) #: total mass
-    mr = kale.utils.midpoints(edges[1]) #: mass ratio
-    rz = kale.utils.midpoints(edges[2]) #: redshift
+    mt = utils.midpoints(edges[0]) #: total mass
+    mr = utils.midpoints(edges[1]) #: mass ratio
+    rz = utils.midpoints(edges[2]) #: redshift
 
 
     # --- Chirp Masses --- in shape (M, Q)
@@ -327,13 +324,13 @@ def loudest_by_cython(edges, number, realize, loudest, round = True, params = Fa
     # Frequency bin midpoints
     foo = edges[-1]                   #: should be observer-frame orbital-frequencies
     df = np.diff(foo)                 #: frequency bin widths
-    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+    fc = utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
     F = len(fc)                       #: number of frequencies
 
     # All other bin midpoints
-    mt = kale.utils.midpoints(edges[0]) #: total mass
-    mr = kale.utils.midpoints(edges[1]) #: mass ratio
-    rz = kale.utils.midpoints(edges[2]) #: redshift
+    mt = utils.midpoints(edges[0]) #: total mass
+    mr = utils.midpoints(edges[1]) #: mass ratio
+    rz = utils.midpoints(edges[2]) #: redshift
 
 
     # --- Chirp Masses --- in shape (M, Q)
@@ -437,13 +434,13 @@ def ss_by_cdefs(edges, number, realize, round = True, params = False):
     # Frequency bin midpoints
     foo = edges[-1]                   #: should be observer-frame orbital-frequencies
     df = np.diff(foo)                 #: frequency bin widths
-    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+    fc = utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
     F = len(fc)                       #: number of frequencies
 
     # All other bin midpoints
-    mt = kale.utils.midpoints(edges[0]) #: total mass
-    mr = kale.utils.midpoints(edges[1]) #: mass ratio
-    rz = kale.utils.midpoints(edges[2]) #: redshift
+    mt = utils.midpoints(edges[0]) #: total mass
+    mr = utils.midpoints(edges[1]) #: mass ratio
+    rz = utils.midpoints(edges[2]) #: redshift
 
 
     # --- Chirp Masses --- in shape (M, Q)
@@ -579,13 +576,13 @@ def ss_by_ndars(edges, number, realize, round = True):
     # Frequency bin midpoints
     foo = edges[-1]                   #: should be observer-frame orbital-frequencies
     df = np.diff(foo)                 #: frequency bin widths
-    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+    fc = utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
     F = len(fc)                       #: number of frequencies
 
     # All other bin midpoints
-    mt = kale.utils.midpoints(edges[0]) #: total mass
-    mr = kale.utils.midpoints(edges[1]) #: mass ratio
-    rz = kale.utils.midpoints(edges[2]) #: redshift
+    mt = utils.midpoints(edges[0]) #: total mass
+    mr = utils.midpoints(edges[1]) #: mass ratio
+    rz = utils.midpoints(edges[2]) #: redshift
 
 
     # --- Chirp Masses ---
@@ -757,13 +754,13 @@ def h2fdf(edges):
     # Frequency bin midpoints
     foo = edges[-1]                   #: should be observer-frame orbital-frequencies
     df = np.diff(foo)                 #: frequency bin widths
-    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+    fc = utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
     F = len(fc)                       #: number of frequencies
 
     # All other bin midpoints
-    mt = kale.utils.midpoints(edges[0]) #: total mass
-    mr = kale.utils.midpoints(edges[1]) #: mass ratio
-    rz = kale.utils.midpoints(edges[2]) #: redshift
+    mt = utils.midpoints(edges[0]) #: total mass
+    mr = utils.midpoints(edges[1]) #: mass ratio
+    rz = utils.midpoints(edges[2]) #: redshift
 
 
     # --- Chirp Masses ---
@@ -860,12 +857,12 @@ def parameters_from_indices(edges, ssidx):
     """
     # Frequency bin midpoints
     foo = edges[-1]                   #: should be observer-frame orbital-frequencies
-    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+    fc = utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
 
     # All other bin midpoints
-    mt = kale.utils.midpoints(edges[0]) #: total mass
-    mr = kale.utils.midpoints(edges[1]) #: mass ratio
-    rz = kale.utils.midpoints(edges[2]) #: redshift
+    mt = utils.midpoints(edges[0]) #: total mass
+    mr = utils.midpoints(edges[1]) #: mass ratio
+    rz = utils.midpoints(edges[2]) #: redshift
 
     m_arr = mt[ssidx[0,...]]
     q_arr = mr[ssidx[1,...]]
@@ -930,12 +927,12 @@ def ss_by_loops(edges, number, realize=False, round=True,  print_test = False):
     # Frequency bin midpoints
     foo = edges[-1]                   #: should be observer-frame orbital-frequencies
     df = np.diff(foo)                 #: frequency bin widths
-    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+    fc = utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
 
     # All other bin midpoints
-    mt = kale.utils.midpoints(edges[0]) #: total mass
-    mr = kale.utils.midpoints(edges[1]) #: mass ratio
-    rz = kale.utils.midpoints(edges[2]) #: redshift
+    mt = utils.midpoints(edges[0]) #: total mass
+    mr = utils.midpoints(edges[1]) #: mass ratio
+    rz = utils.midpoints(edges[2]) #: redshift
 
 
 
@@ -1120,12 +1117,12 @@ def gws_by_ndars(edges, number, realize, round = True, sum = True, print_test = 
     # Frequency bin midpoints
     foo = edges[-1]                   #: should be observer-frame orbital-frequencies
     df = np.diff(foo)                 #: frequency bin widths
-    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+    fc = utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
 
     # All other bin midpoints
-    mt = kale.utils.midpoints(edges[0]) #: total mass
-    mr = kale.utils.midpoints(edges[1]) #: mass ratio
-    rz = kale.utils.midpoints(edges[2]) #: redshift
+    mt = utils.midpoints(edges[0]) #: total mass
+    mr = utils.midpoints(edges[1]) #: mass ratio
+    rz = utils.midpoints(edges[2]) #: redshift
 
 
     # --- Chirp Masses ---
@@ -1284,12 +1281,12 @@ def unrealized_ss_by_ndars(edges, number, realize, round = True, print_test = Fa
     # Frequency bin midpoints
     foo = edges[-1]                   #: should be observer-frame orbital-frequencies
     df = np.diff(foo)                 #: frequency bin widths
-    fc = kale.utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
+    fc = utils.midpoints(foo)    #: use frequency-bin centers for strain (more accurate!)
 
     # All other bin midpoints
-    mt = kale.utils.midpoints(edges[0]) #: total mass
-    mr = kale.utils.midpoints(edges[1]) #: mass ratio
-    rz = kale.utils.midpoints(edges[2]) #: redshift
+    mt = utils.midpoints(edges[0]) #: total mass
+    mr = utils.midpoints(edges[1]) #: mass ratio
+    rz = utils.midpoints(edges[2]) #: redshift
 
 
     # --- Chirp Masses ---
@@ -1691,7 +1688,7 @@ def example(dur, cad, mtot, mrat, redz, print_test):
     # get observed orbital frequency bin edges and centers
     # from observed GW frequency bin edges
     fobs_orb_edges = fobs_edges / 2.0 # f_orb = f_GW/2
-    fobs_orb_cents = kale.utils.midpoints(fobs_edges) / 2.0
+    fobs_orb_cents = utils.midpoints(fobs_edges) / 2.0
 
     # 3) Get SAM edges and numbers as in sam.gwb()
     # dynamic_binary_number
@@ -2153,7 +2150,6 @@ def resample_loudest(hc_ss, hc_bg, nloudest):
     new_hc_ss = hc_ss[...,0:nloudest]
 
     return new_hc_ss, new_hc_bg
-
 
 
 
