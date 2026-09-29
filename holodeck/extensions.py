@@ -6,7 +6,6 @@ from holodeck import log, cosmo, gravwaves
 from holodeck.constants import MSOL, GYR
 import holodeck.librarian
 import numpy as np
-import kalepy as kale
 from holodeck.sams import sam_cyutils
 
 PSPACE = holo.librarian.param_spaces_classic.PS_Classic_Phenom_Uniform
@@ -131,7 +130,7 @@ class Realizer_SAM:
         hard = self._hard
         fobs_orb_edges = self._fobs_orb_edges
 
-        fobs_orb_cents = kale.utils.midpoints(fobs_orb_edges)
+        fobs_orb_cents = holo.utils.midpoints(fobs_orb_edges)
         fobs = 2.0 * fobs_orb_cents
 
 
@@ -191,14 +190,14 @@ def get_samples_from_edges(edges, redz, number_shape, flatten=True):
     """
 
      # ---- Find bin center properties
-    mtot = kale.utils.midpoints(edges[0]) #: total mass
-    mrat = kale.utils.midpoints(edges[1]) #: mass ratio
-    fobs_orb_cents = kale.utils.midpoints(edges[3])
+    mtot = holo.utils.midpoints(edges[0]) #: total mass
+    mrat = holo.utils.midpoints(edges[1]) #: mass ratio
+    fobs_orb_cents = holo.utils.midpoints(edges[3])
     fobs = 2.0 * fobs_orb_cents           #: gw fobs
 
     for dd in range(3):
         redz = np.moveaxis(redz, dd, 0)
-        redz = kale.utils.midpoints(redz, axis=0) # get final redz at bin centers
+        redz = holo.utils.midpoints(redz, axis=0) # get final redz at bin centers
         redz = np.moveaxis(redz, 0, dd)
     sel = (redz > 0.0) # identify emitting sources
     redz[~sel] = -1.0 # set all other redshifts to zero

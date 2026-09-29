@@ -27,6 +27,7 @@ To-Do (posterior_populations.py)
 import argparse
 from pathlib import Path
 import numpy as np
+from scipy import stats as sp_stats
 
 import holodeck as holo
 import holodeck.librarian
@@ -330,7 +331,7 @@ def sample_pars_from_chains(chains=None):
 def get_maxlike_pars_from_chains(chains=None):
     """Load the maximum-likelihood (ML) parameters from the given chains (i.e. parameter posteriors).
 
-    KDEs from `kalepy` are used to construct the ML parameters.
+    Gaussian KDEs are used to construct the ML parameters.
 
     Arguments
     ---------
@@ -349,7 +350,6 @@ def get_maxlike_pars_from_chains(chains=None):
             'mmb_mamp_log10', 'mmb_scatter_dex', 'hard_gamma_inner']
 
     """
-    import kalepy as kale
     if chains is None:
         chains = load_chains(PATH_DATA)
 
@@ -357,7 +357,10 @@ def get_maxlike_pars_from_chains(chains=None):
     mlpars = {}
     for name, vals in chains.items():
         extr = holo.utils.minmax(vals)
-        xx, yy = kale.density(vals, reflect=extr)
+        lo, hi = extr
+        ref_vals = np.concatenate([vals, 2.0*lo - vals, 2.0*hi - vals])
+        xx = np.linspace(lo, hi, 512)
+        yy = sp_stats.gaussian_kde(ref_vals)(xx)
         idx = np.argmax(yy)
         xmax = xx[idx]
         mlpars[name] = xmax

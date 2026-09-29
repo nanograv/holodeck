@@ -714,7 +714,6 @@ class Evolution:
         return names, vals, weights
 
     def _sample_universe__resample(self, fobs_orb_edges, vals, weights, down_sample):
-        import kalepy as kale
         # down-sample weights to decrease the number of sample points
         prev_sum = weights.sum()
         log.info(f"Total weights (number of binaries in the universe): {prev_sum:.8e}")
@@ -727,9 +726,13 @@ class Evolution:
         # TODO/FIX: Consider sampling in comoving-volume instead of redz (like in sam.py)
         #           can also return dcom instead of redz for easier strain calculation
         nsamp = np.random.poisson(weights.sum())
-        reflect = [None, [None, 0.0], None, np.log10([fobs_orb_edges[0], fobs_orb_edges[-1]])]
-        samples = kale.resample(vals, size=nsamp, reflect=reflect, weights=weights, bw_rescale=0.5)
-        # samples = np.power(10.0, samples)
+        vals = np.asarray(vals)
+        samples = np.zeros((vals.shape[0], 0))
+        if nsamp > 0:
+            probs = np.asarray(weights, dtype=float)
+            probs = probs / probs.sum()
+            idx = np.random.choice(probs.size, size=nsamp, replace=True, p=probs)
+            samples = vals[:, idx]
         num_samp = samples[0].size
         log.debug(f"Sampled {num_samp:.8e} binaries in the universe")
         return samples
