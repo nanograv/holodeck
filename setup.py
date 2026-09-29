@@ -21,7 +21,11 @@ with open(join('.', "README.md"), "r") as handle:
     long_description = handle.read()
 
 with open(join('.', "requirements.txt"), "r") as handle:
-    requirements = handle.read()
+    requirements = [
+        line.strip()
+        for line in handle
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
 
 with open(join('.', 'holodeck', 'version.txt')) as handle:
     version = handle.read().strip()
