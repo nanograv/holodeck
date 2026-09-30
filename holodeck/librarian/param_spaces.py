@@ -1509,7 +1509,16 @@ class PS_AstroStrongBIO_Hard_MMbulge_Covariant_GSMF(_PS_AstroStrongBIO):
             # From [KH2013]_
             PD_Normal("mmb_mamp_log10", 8.69, 0.05),  # 8.69 ± 0.05  [log10(M/Msol)]
             PD_Normal("mmb_scatter_dex", 0.28, 0.05),  # no uncertainties given
-
+        ]
+        _Param_Space.__init__(
+            self,
+            parameters,
+            log=log,
+            nsamples=nsamples,
+            sam_shape=sam_shape,
+            seed=seed,
+        )
+        return
 
 
 class PS_NG20_Fiducial(_PS_NG20_Base):
