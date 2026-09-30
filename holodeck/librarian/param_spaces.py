@@ -1,11 +1,9 @@
 """Parameter-Space definitions for holodeck libraries."""
 
-from unittest.mock import DEFAULT
 
 import numpy as np
-from scipy.interpolate import PchipInterpolator
 import holodeck as holo
-from holodeck.constants import GYR, PC, MSOL, SPLC
+from holodeck.constants import GYR, PC, MSOL
 from holodeck.librarian.lib_tools import _Param_Space, PD_Uniform, PD_Normal, PD_Uniform_Log, PD_MVNormal, PD_2D_Uniform_Variable_Ymin
 
 
@@ -776,8 +774,7 @@ class _PS_ClassicPlusBIO_NoLims(_Param_Space):
         mmb_scatter_dex=0.3,
     )
 
-    @classmethod
-    def _init_sam(cls, sam_shape, params):
+    def _init_sam(self, sam_shape, params):
         gsmf = holo.sams.GSMF_Schechter(
             phi0=params['gsmf_phi0_log10'],
             phiz=params['gsmf_phiz'],
@@ -811,8 +808,7 @@ class _PS_ClassicPlusBIO_NoLims(_Param_Space):
         )
         return sam
 
-    @classmethod
-    def _init_hard(cls, sam, params):
+    def _init_hard(self, sam, params):
         hard = holo.hardening.FixedOuterTime_InnerPL_SAM(
             sam,
             outer_time=params['hard_outer_time']*GYR,
@@ -893,8 +889,7 @@ class _PS_ClassicPlusBIO_WithLims(_Param_Space):
         mmb_scatter_dex=0.3,
     )
 
-    @classmethod
-    def _init_sam(cls, sam_shape, params):
+    def _init_sam(self, sam_shape, params):
         gsmf = holo.sams.GSMF_Schechter(
             phi0=params['gsmf_phi0_log10'],
             phiz=params['gsmf_phiz'],
@@ -928,8 +923,7 @@ class _PS_ClassicPlusBIO_WithLims(_Param_Space):
         )
         return sam
 
-    @classmethod
-    def _init_hard(cls, sam, params):
+    def _init_hard(self, sam, params):
         hard = holo.hardening.FixedOuterTime_InnerPL_SAM(
             sam,
             outer_time=params['hard_outer_time']*GYR,
@@ -1170,6 +1164,101 @@ class _PS_AstroStrongBIO(_Param_Space):
         gsmf_alpha_two=-1.48,  # - 1.480 ± 0.0150
         # Galaxy merger rate (``GMR_Illustris``)
         # Parameters are taken directly from [Rodriguez-Gomez2015]_
+        gmr_norm0_log10=-2.2287,  # -2.2287 ± 0.0045    A0 [log10(A*Gyr)]
+        gmr_normz=+2.4644,  # +2.4644 ± 0.0128    eta
+        gmr_malpha0=+0.2241,  # +0.2241 ± 0.0038    alpha0
+        gmr_malphaz=-1.1759,  # -1.1759 ± 0.0316    alpha1
+        gmr_mdelta0=+0.7668,  # +0.7668 ± 0.0202    delta0
+        gmr_mdeltaz=-0.4695,  # -0.4695 ± 0.0440    delta1
+        gmr_qgamma0=-1.2595,  # -1.2595 ± 0.0026    beta0
+        gmr_qgammaz=+0.0611,  # +0.0611 ± 0.0021    beta1
+        gmr_qgammam=-0.0477,  # -0.0477 ± 0.0013    gamma
+        # M-MBulge Relationship (``MMBulge_KH2013``)
+        # From [KH2013]_
+        mmb_mamp_log10=8.69,  # 8.69±0.05  [log10(M/Msol)]  approx uncertainties!
+        mmb_plaw=1.17,  # 1.17 ± 0.08
+        mmb_scatter_dex=0.28,  # no uncertainties given
+        # bulge fraction
+        bf_frac_lo=0.4,
+        bf_frac_hi=0.8,
+        bf_mstar_crit=11.0,  # [log10(M_star/M_Sol)]
+        bf_width_dex=1.0,  # [dex]
+    )
+
+    def _init_sam(self, sam_shape, params):
+        log10_phi_one = [
+            params["gsmf_log10_phi_one_z0"],
+            params["gsmf_log10_phi_one_z1"],
+            params["gsmf_log10_phi_one_z2"],
+        ]
+        log10_phi_two = [
+            params["gsmf_log10_phi_two_z0"],
+            params["gsmf_log10_phi_two_z1"],
+            params["gsmf_log10_phi_two_z2"],
+        ]
+        log10_mstar = [
+            params["gsmf_log10_mstar_z0"],
+            params["gsmf_log10_mstar_z1"],
+            params["gsmf_log10_mstar_z2"],
+        ]
+        gsmf = holo.sams.GSMF_Double_Schechter(
+            log10_phi1=log10_phi_one,
+            log10_phi2=log10_phi_two,
+            log10_mstar=log10_mstar,
+            alpha1=params["gsmf_alpha_one"],
+            alpha2=params["gsmf_alpha_two"],
+        )
+
+        # Illustris Galaxy Merger Rate
+        gmr = holo.sams.GMR_Illustris(
+            norm0_log10=params["gmr_norm0_log10"],
+            normz=params["gmr_normz"],
+            malpha0=params["gmr_malpha0"],
+            malphaz=params["gmr_malphaz"],
+            mdelta0=params["gmr_mdelta0"],
+            mdeltaz=params["gmr_mdeltaz"],
+            qgamma0=params["gmr_qgamma0"],
+            qgammaz=params["gmr_qgammaz"],
+            qgammam=params["gmr_qgammam"],
+        )
+
+        # Mbh-MBulge relationship (and bulge-fractions)
+        bulge_frac = holo.host_relations.BF_Sigmoid(
+            bulge_frac_lo=params["bf_frac_lo"],
+            bulge_frac_hi=params["bf_frac_hi"],
+            mstar_char_log10=params["bf_mstar_crit"],
+            width_dex=params["bf_width_dex"],
+        )
+        mmbulge = holo.host_relations.MMBulge_KH2013(
+            mamp_log10=params["mmb_mamp_log10"],
+            mplaw=params["mmb_plaw"],
+            scatter_dex=params["mmb_scatter_dex"],
+            bulge_frac=bulge_frac,
+        )
+
+        sam = holo.sams.Semi_Analytic_Model(
+            gsmf=gsmf,
+            gmr=gmr,
+            mmbulge=mmbulge,
+            shape=sam_shape,
+            log=self._log,
+        )
+        return sam
+
+    def _init_hard(self, sam, params):
+        hard = holo.hardening.FixedOuterTime_InnerPL_SAM(
+            sam,
+            outer_time=params['hard_outer_time']*GYR,
+            r_gw_crit_9=np.power(10.0, params['hard_r_gw_crit_9_log10']),
+            nu_inner=params['hard_nu_inner'],
+            rchar_9=params['hard_rchar_9']*PC,
+            alpha_gw_crit=params['hard_alpha_gw_crit'],
+            beta_gw_crit=params['hard_beta_gw_crit'],
+            alpha_char=params['hard_alpha_char'],
+            enforce_physical_params=True,
+        )
+        return hard
+
 # ==============================================================================
 # ====    NG20 Flagship / Fiducial Parameter Spaces    ====
 # ==============================================================================
@@ -1285,10 +1374,11 @@ class _PS_NG20_Base(_Param_Space):
             mstar_char_log10=params["bf_mstar_crit"],
             width_dex=params["bf_width_dex"],
         )
-        mmbulge = holo.host_relations.MMBulge_KH2013(
+        mmbulge = holo.host_relations.MMBulge_Redshift_KH2013(
             mamp_log10=params["mmb_mamp_log10"],
             mplaw=params["mmb_plaw"],
             scatter_dex=params["mmb_scatter_dex"],
+            zplaw_amp=params["mmb_zplaw_amp"],
             bulge_frac=bulge_frac,
         )
 
@@ -1301,8 +1391,7 @@ class _PS_NG20_Base(_Param_Space):
         )
         return sam
 
-    @classmethod
-    def _init_hard(cls, sam, params):
+    def _init_hard(self, sam, params):
         hard = holo.hardening.FixedOuterTime_InnerPL_SAM(
             sam,
             inner_model_type=int(params.get("hard_inner_model_type", 0)),
