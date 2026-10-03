@@ -892,12 +892,12 @@ def pta_freqs(dur=16.03*YR, num=40, cad=None):
     -------
     cents : (F,) ndarray
         Bin-center frequencies for `F` bins.  The frequency bin centers are at:
-        ``F_i = (i + 1.5) / dur`` for i between 0 and `num-1`.
+        ``F_i = (i + 1) / dur`` for i between 0 and `num-1`.
         The number of frequency bins, `F` is the argument `num`,
         or determined by `cad` if it is given.
     edges : (F+1,) ndarray
         Bin-edge frequencies for `F` bins, i.e. `F+1` bin edges.  The frequency bin edges are at:
-        ``F_i = (i + 1) / dur`` for i between 0 and `num`.
+        ``F_i = (i + 0.5) / dur`` for i between 0 and `num`.
         The number of frequency bins, `F` is the argument `num`,
         or determined by `cad` if it is given.
 
