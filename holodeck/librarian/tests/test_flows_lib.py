@@ -19,7 +19,7 @@ import pytest
 
 import holodeck as holo
 from holodeck import utils
-from holodeck.constants import MSOL, MPC, YR
+from holodeck.constants import MSOL, MPC
 from holodeck.librarian import flows_lib
 
 
@@ -129,7 +129,7 @@ def test_loudest_per_bin_rest():
                        [0, 1, 0, 0, 4, 0, 0, 0]])
 
     rng = _FakeRNG([counts])
-    hc2ss, _bidx, hc2rest = flows_lib.loudest_per_bin(number, h2, R, L, rng, totals=True)
+    hc2ss, _bidx, hc2rest = flows_lib.loudest_per_bin(number, h2, R, L, rng)
     h2_flat = h2.reshape(8, F)[:, 0]
     total = counts @ h2_flat
     assert np.allclose(hc2rest[0] + hc2ss[0].sum(axis=-1), total)
@@ -153,7 +153,7 @@ def test_loudest_per_bin_rest_is_exactly_zero():
                        [0, 0, 0, 0, 0, 0, 0, 1]])
 
     rng = _FakeRNG([counts])
-    hc2ss, _bidx, hc2rest = flows_lib.loudest_per_bin(number, h2, R, L, rng, totals=True)
+    hc2ss, _bidx, hc2rest = flows_lib.loudest_per_bin(number, h2, R, L, rng)
     assert np.all(counts.sum(axis=1) <= L), "test setup: every binary must be extractable"
     assert np.array_equal(hc2rest[0], np.zeros(R)), f"expected exact zeros, got {hc2rest[0]}"
 
@@ -190,37 +190,32 @@ def test_rank_cws_matches_reference():
     bidx[:, 0, :] = -1
     bidx[0, 0, 0] = 5
 
-    fobs = np.arange(1, F + 1) * 1e-9
+    got = flows_lib.rank_cws(hc_ss, bidx, nrank=K)
 
-    for rankby in ['hc', 'resid']:
-        got = flows_lib.rank_cws(hc_ss, bidx, fobs, nrank=K, rankby=rankby)
-        stat = flows_lib.cw_rank_stat(hc_ss, fobs, rankby)
+    for rr in range(R):
+        # brute force: every (f, l) candidate of this realization, best first
+        cands = [(hc_ss[ff, rr, ll], ff, ll)
+                 for ff in range(F) for ll in range(L) if bidx[ff, rr, ll] >= 0]
+        cands.sort(key=lambda t: -t[0])
+        nlive = min(K, len(cands))
 
-        for rr in range(R):
-            # brute force: every (f, l) candidate of this realization, best first
-            cands = [(stat[ff, rr, ll], ff, ll)
-                     for ff in range(F) for ll in range(L) if bidx[ff, rr, ll] >= 0]
-            cands.sort(key=lambda t: -t[0])
-            nlive = min(K, len(cands))
+        for kk in range(nlive):
+            _s, ff, ll = cands[kk]
+            assert got['fidx'][rr, kk] == ff, f"r={rr} k={kk}"
+            assert got['lidx'][rr, kk] == ll, f"r={rr} k={kk}"
+            assert got['hc'][rr, kk] == hc_ss[ff, rr, ll]
+            assert got['bidx'][rr, kk] == bidx[ff, rr, ll]
 
-            for kk in range(nlive):
-                _s, ff, ll = cands[kk]
-                assert got['fidx'][rr, kk] == ff, f"{rankby} r={rr} k={kk}"
-                assert got['lidx'][rr, kk] == ll, f"{rankby} r={rr} k={kk}"
-                assert got['hc'][rr, kk] == hc_ss[ff, rr, ll]
-                assert got['bidx'][rr, kk] == bidx[ff, rr, ll]
-
-            # any remaining slots are dead
-            assert np.all(got['fidx'][rr, nlive:] == -1), f"{rankby} r={rr}"
-            assert np.all(got['bidx'][rr, nlive:] == -1), f"{rankby} r={rr}"
+        # any remaining slots are dead
+        assert np.all(got['fidx'][rr, nlive:] == -1), f"r={rr}"
+        assert np.all(got['bidx'][rr, nlive:] == -1), f"r={rr}"
 
 
 def test_rank_cws_rejects_too_many():
     hc_ss = np.ones((2, 3, 4))
     bidx = np.zeros((2, 3, 4), dtype=int)
-    fobs = np.array([1e-9, 2e-9])
     with pytest.raises(ValueError):
-        flows_lib.rank_cws(hc_ss, bidx, fobs, nrank=9)
+        flows_lib.rank_cws(hc_ss, bidx, nrank=9)
 
 
 # ==============================================================================
@@ -308,7 +303,7 @@ def _small_model():
 def test_run_cws_reproducible(_small_model):
     """The same seed must give byte-identical output; different seeds must not."""
     sam, hard = _small_model
-    cents, edges = flows_lib.flow_freqs(5)
+    cents, edges = utils.pta_freqs(num=5)
     kw = dict(nreals=4, nloudest=3, nrank=3, log=holo.log)
 
     aa = flows_lib.run_cws(sam, hard, cents, edges, seed=7, **kw)
@@ -326,14 +321,14 @@ def test_run_cws_shapes_and_ranges(_small_model):
     """Output must have the documented shapes, and physically sane values."""
     sam, hard = _small_model
     nreals, nrank, nfreqs = 4, 3, 5
-    cents, edges = flows_lib.flow_freqs(nfreqs)
+    cents, edges = utils.pta_freqs(num=nfreqs)
     data = flows_lib.run_cws(sam, hard, cents, edges, nreals=nreals, nloudest=3,
                              nrank=nrank, seed=7, log=holo.log)
 
     for key in flows_lib.CW_KEYS + flows_lib.PROV_KEYS + flows_lib.IDX_KEYS:
         assert data[key].shape == (1, nrank, nreals), f"{key}: {data[key].shape}"
 
-    assert np.allclose(data['fobs_cents'], cents)
+    assert np.allclose(data['fobs_cents'], cents, rtol=1e-12, atol=0.0)
     live = data['cw_fidx'] >= 0
     assert live.any(), "no live sources at all"
 
@@ -344,16 +339,17 @@ def test_run_cws_shapes_and_ranges(_small_model):
         assert np.all(np.diff(vals) <= 0), f"realization {rr} is not sorted loudest-first"
 
     # frequencies must be on the grid we asked for
-    assert np.allclose(10.0**data['log10_fo'][0][live[0]], cents[data['cw_fidx'][0][live[0]]])
+    assert np.allclose(10.0**data['log10_fo'][0][live[0]], cents[data['cw_fidx'][0][live[0]]],
+                       rtol=1e-12, atol=0.0)
 
 
 def test_run_cws_gwb_is_total_power(_small_model):
     """`half_log10rho` must be the free spectrum of the whole population, every source in."""
     sam, hard = _small_model
     nreals, nrank, nfreqs, nloudest = 4, 4, 5, 6
-    cents, edges = flows_lib.flow_freqs(nfreqs)
+    cents, edges = utils.pta_freqs(num=nfreqs)
     data = flows_lib.run_cws(sam, hard, cents, edges, nreals=nreals, nloudest=nloudest,
-                             nrank=nrank, seed=11, save_gwb=True, log=holo.log)
+                             nrank=nrank, seed=11, log=holo.log)
 
     assert data['half_log10rho'].shape == (nfreqs, nreals)
 
@@ -366,20 +362,9 @@ def test_run_cws_gwb_is_total_power(_small_model):
     number = sam_cyutils.integrate_differential_number_3dx1d(grid, diff_num)
     h2fdf = gravwaves.char_strain_sq_from_bin_edges_redz(grid, redz_final)
     hc2ss, _b, hc2rest = flows_lib.loudest_per_bin(
-        number, h2fdf, nreals, nloudest, np.random.default_rng(11), totals=True)
+        number, h2fdf, nreals, nloudest, np.random.default_rng(11))
 
     want = flows_lib.gwb_free_spectrum(
         np.sqrt(hc2rest + hc2ss.sum(axis=-1)), cents, edges[1] - edges[0])
     assert np.allclose(data['half_log10rho'], want, rtol=1e-12, equal_nan=True)
 
-
-def test_flow_freqs_matches_pta_freqs():
-    """`nsub=1` must be numerically identical to the duration-derived PTA grid."""
-    dur, nfreqs = holo.librarian.DEF_PTA_DUR * YR, 15
-    cents, edges = flows_lib.flow_freqs(nfreqs, nsub=1, dur=dur)
-    want_cents, want_edges = utils.pta_freqs(dur=dur, num=nfreqs)
-    assert np.allclose(cents, want_cents)
-    assert np.allclose(edges, want_edges)
-    # every `nsub`-th bin lands on a real PTA frequency
-    cents, _ = flows_lib.flow_freqs(nfreqs, nsub=4, dur=dur)
-    assert np.allclose(cents[::4], want_cents[:len(cents[::4])])
