@@ -959,7 +959,7 @@ class PS_ClassicPlusBIO_Hard_Uniform(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       holo.utils.create_nuin_min_interp, self.DEFAULTS,
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims)
         ]
@@ -1001,7 +1001,7 @@ class PS_ClassicPlusBIO_HardTauOut3_Uniform(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       holo.utils.create_nuin_min_interp, self.DEFAULTS,
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims)
         ]
@@ -1040,7 +1040,7 @@ class PS_ClassicPlusBIO_Hard3Par_Uniform(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       holo.utils.create_nuin_min_interp, self.DEFAULTS,
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),
             PD_Uniform("hard_outer_time", 0.1, 11.0),
@@ -1076,7 +1076,7 @@ class PS_ClassicPlusBIO_Astro_Extended(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       holo.utils.create_nuin_min_interp, self.DEFAULTS,
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),
             # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
@@ -1115,7 +1115,7 @@ class PS_ClassicPlusBIO_Astro(_PS_ClassicPlusBIO_WithLims):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       holo.utils.create_nuin_min_interp, self.DEFAULTS,
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),
             # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
@@ -1274,7 +1274,7 @@ class PS_AstroStrongBIO_Hard(_PS_AstroStrongBIO):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       holo.utils.create_nuin_min_interp, self.DEFAULTS,
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),
             PD_Uniform("hard_outer_time", 0.1, 11.0),
@@ -1302,7 +1302,7 @@ class PS_AstroStrongBIO_Covariant_All(_PS_AstroStrongBIO):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       holo.utils.create_nuin_min_interp, self.DEFAULTS,
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),
             PD_Uniform("hard_outer_time", 0.1, 11.0),
@@ -1351,7 +1351,7 @@ class PS_AstroStrongBIO_Hard_MMbulge_Covariant_GSMF(_PS_AstroStrongBIO):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (lower bound 0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       holo.utils.create_nuin_min_interp, self.DEFAULTS,
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),
             # GSMF
@@ -1436,6 +1436,8 @@ class _PS_NG20_Base(_Param_Space):
         mmb_plaw=1.17,  # 1.17 ± 0.08
         mmb_scatter_dex=0.28,  # 0.28 ± 0.05
         mmb_zplaw_amp=0.0,  # Redshift power-law exponent on normalization (Matt et al.)
+        mmb_zplaw_slope=0.0, # Redshift power-law exponent on slope (Matt et al.)
+        mmb_zplaw_scatter=0.0, # Redshift power-law exponent on scatter (Matt et al.)
 
         # Bulge fraction (``BF_Sigmoid``)
         bf_frac_lo=0.4,
@@ -1527,6 +1529,10 @@ class _PS_NG20_Base(_Param_Space):
 class PS_NG20_Fiducial(_PS_NG20_Base):
     """NG20 Fiducial Parameter Space for Astrophysical Interpretation.
 
+    In addition to parameters that use astro-informed priors with means and uncertainties from 
+    empirical EM data, parameters are varied that control binary hardening and the redshift 
+    evolution of the M-Mbulge normalization.
+
     Components:
     - Blecha (2026) Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0)
     - Double-Schechter GSMF with Leja+2020 11-D covariance matrix (`PD_MVNormal`)
@@ -1547,7 +1553,7 @@ class PS_NG20_Fiducial(_PS_NG20_Base):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       holo.utils.create_nuin_min_interp, self.DEFAULTS,
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),            
             # GSMF (Leja+2020 11-D Covariance)
@@ -1566,8 +1572,6 @@ class PS_NG20_Fiducial(_PS_NG20_Base):
             PD_Normal("mmb_mamp_log10", 8.69, 0.05),
             PD_Normal("mmb_plaw", 1.17, 0.08),
             PD_Normal("mmb_scatter_dex", 0.28, 0.05),
-            ### TO DO: decide if we want to vary z evolution in 
-            ###        primary fiducial model or only in extended model
             PD_Uniform("mmb_zplaw_amp", -2.0, +2.0, default=0.0),
         ]
         _Param_Space.__init__(
@@ -1580,9 +1584,11 @@ class PS_NG20_Fiducial(_PS_NG20_Base):
         )
         return
 
+class PS_NG20_Fiducial_Hard(_PS_NG20_Base):
+    """NG20 'Hard' Fiducial Parameter Space for Astrophysical Interpretation.
 
-class PS_NG20_Fiducial_Extended(_PS_NG20_Base):
-    """NG20 Extended Fiducial Parameter Space for Astrophysical Interpretation.
+    In addition to parameters that use astro-informed priors with means and uncertainties from 
+    empirical EM data, parameters are varied that control binary hardening.
 
     Components:
     - Blecha (2026) Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0)
@@ -1604,7 +1610,65 @@ class PS_NG20_Fiducial_Extended(_PS_NG20_Base):
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
                                        0.778, 4.0, # [log10(Rg)] (0.778 is rISCO=6Rg)
                                        -4.0, +4.0, # largest allowed range of nu_inner
-                                       holo.utils.create_nuin_min_interp, self.DEFAULTS,
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
+                                       mtot=self.mtot_for_nuin_lims, 
+                                       mrat=self.mrat_for_nuin_lims),            
+            # GSMF (Leja+2020 11-D Covariance)
+            PD_MVNormal(GSMF_COV_NAMES, GSMF_COV_MEANS, np.array(GSMF_COV_MATRIX)),
+            # GMR (Illustris)
+            PD_Normal("gmr_norm0_log10", -2.2287, 0.0045),
+            PD_Normal("gmr_normz", +2.4644, 0.0128),
+            PD_Normal("gmr_malpha0", +0.2241, 0.0038),
+            PD_Normal("gmr_malphaz", -1.1759, 0.0316),
+            PD_Normal("gmr_mdelta0", +0.7668, 0.0202),
+            PD_Normal("gmr_mdeltaz", -0.4695, 0.0440),
+            PD_Normal("gmr_qgamma0", -1.2595, 0.0026),
+            PD_Normal("gmr_qgammaz", +0.0611, 0.0021),
+            PD_Normal("gmr_qgammam", -0.0477, 0.0013),
+            # MMBulge (KH2013 + Matt et al. redshift evolution)
+            PD_Normal("mmb_mamp_log10", 8.69, 0.05),
+            PD_Normal("mmb_plaw", 1.17, 0.08),
+            PD_Normal("mmb_scatter_dex", 0.28, 0.05),
+        ]
+        _Param_Space.__init__(
+            self,
+            parameters,
+            log=log,
+            nsamples=nsamples,
+            sam_shape=sam_shape,
+            seed=seed,
+        )
+        return
+
+
+class PS_NG20_Fiducial_Extended(_PS_NG20_Base):
+    """NG20 Extended Fiducial Parameter Space for Astrophysical Interpretation.
+
+    In addition to parameters that use astro-informed priors with means and uncertainties from 
+    empirical EM data, parameters are varied that control binary hardening, the redshift evolution 
+    of the M-Mbulge relation, and the stellar bulge fraction in galaxies.
+
+    Components:
+    - Blecha (2026) Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0)
+    - Double-Schechter GSMF with Leja+2020 11-D covariance matrix (`PD_MVNormal`)
+    - Illustris Galaxy Merger Rate (`GMR_Illustris`)
+    - Kormendy & Ho (2013) M-Mbulge with Matt et al. (2026a) redshift-evolving amplitude
+    """
+
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+
+        # NOTE: the ranges should match those in SAM, and shapes should 
+        # not be smaller than SAM shape for robust interpolation
+        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
+        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+        
+        parameters = [
+            # Hardening model (BIO-hardening / FixedOuterTime_InnerPL_SAM)
+            PD_Uniform("hard_outer_time", 0.1, 10.0, default=1.0),  # [Gyr]
+            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
+                                       0.778, 4.0, # [log10(Rg)] (0.778 is rISCO=6Rg)
+                                       -4.0, +4.0, # largest allowed range of nu_inner
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
                                        mtot=self.mtot_for_nuin_lims, 
                                        mrat=self.mrat_for_nuin_lims),            
             # GSMF (Leja+2020 11-D Covariance)
@@ -1626,8 +1690,8 @@ class PS_NG20_Fiducial_Extended(_PS_NG20_Base):
             PD_Uniform("mmb_zplaw_amp", -2.0, +2.0, default=0.0),
             ### TO DO: decide if we want to vary mmb_zplaw_slope and/or
             ###        mmb_zplaw_scatter parameters in extended model       
-            # PD_Uniform("mmb_zplaw_slope", -2.0, +2.0, default=0.0),
-            # PD_Uniform("mmb_zplaw_scatter", -2.0, +2.0, default=0.0),
+            PD_Uniform("mmb_zplaw_slope", -2.0, +2.0, default=0.0),
+            PD_Uniform("mmb_zplaw_scatter", -2.0, +2.0, default=0.0),
             # Bulge Fraction
             PD_Uniform("bf_frac_lo", 0.1, 0.4, default=0.4),
             PD_Uniform("bf_frac_hi", 0.6, 1.0, default=0.8),
@@ -1666,6 +1730,7 @@ _param_spaces_dict = {
     "PS_AstroStrongBIO_Covariant_All": PS_AstroStrongBIO_Covariant_All,
     "PS_AstroStrongBIO_Hard_MMbulge_Covariant_GSMF": PS_AstroStrongBIO_Hard_MMbulge_Covariant_GSMF,
     "PS_NG20_Fiducial": PS_NG20_Fiducial,
+    "PS_NG20_Fiducial_Hard": PS_NG20_Fiducial_Hard,
     "PS_NG20_Fiducial_Extended": PS_NG20_Fiducial_Extended,
 }
 
