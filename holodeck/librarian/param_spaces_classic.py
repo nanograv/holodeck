@@ -370,6 +370,7 @@ _param_spaces_dict = {
     "PS_Classic_Test": PS_Classic_Test,
     "PS_Classic_Phenom_Uniform": PS_Classic_Phenom_Uniform,    # PS_Uniform_09B
     "PS_Classic_Phenom_Astro": PS_Classic_Phenom_Astro,        # NEW, not from a published analysis
+    "PS_Flows_Phenom_Astro": PS_Flows_Phenom_Astro,        # NEW, used for cw-flows
     "PS_Classic_Phenom_Astro_Extended": PS_Classic_Phenom_Astro_Extended,
     "PS_Classic_GWOnly_Uniform": PS_Classic_GWOnly_Uniform,
     "PS_Classic_GWOnly_Astro_Extended": PS_Classic_GWOnly_Astro_Extended,
