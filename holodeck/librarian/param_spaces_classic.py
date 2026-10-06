@@ -124,15 +124,11 @@ class PS_Classic_Phenom_Uniform(_PS_Classic_Phenom):
 class PS_Classic_Phenom_Astro(_PS_Classic_Phenom):
     """Classic 6D phenomenological parameter space with astro-informed priors.
 
-    NOTE: this parameter space is NEW, it was not used in any published analysis.  It is the
-    parameter *list* of :class:`PS_Classic_Phenom_Uniform` (the 6D 'phenom-uniform' space) carrying
-    the *priors* of :class:`PS_Classic_Phenom_Astro_Extended` (the 12D 'phenom-astro+extended'
-    space) on the four parameters the two have in common.  It exists to give the ``cw-flows``
-    normalizing flows a 6-dimensional astrophysical conditioning vector, rather than the 12
-    dimensions of the extended space.
-
-    Do not confuse this with `PS_New_Astro_02B`: that space is 12D, and it is now
-    :class:`PS_Classic_Phenom_Astro_Extended` (see that class's docstring).
+    This parameter space is NEW (2026), matching the table in the NG15astro paper and the 
+    extended astro analysis. However, the manuscript table had a BUG and gave a 
+    hard_gamma_inner range inconsistent with the published analysis.  
+    The table and this parameter space use a hard_gamma_inner range of (-1.5, 0.5)
+    whereas the published analysis used a range of (-1.5, 0.0).
 
     """
 
@@ -146,9 +142,36 @@ class PS_Classic_Phenom_Astro(_PS_Classic_Phenom):
             PD_Normal("mmb_scatter_dex", +0.32, 0.15),
 
             PD_Uniform("hard_time", 0.1, 11.0),          # [Gyr]
-            # NOTE: upper bound is +0.5 (the astro-extended value), not the +0.0 used by
+            # BUG: upper bound is +0.5 (the astro-extended value), not the +0.0 used by
             #       `PS_Classic_Phenom_Uniform`.
             PD_Uniform("hard_gamma_inner", -1.5, +0.5),
+        ]
+
+        super().__init__(
+            parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+        )
+
+class PS_Flows_Phenom_Astro(_PS_Classic_Phenom):
+    """Classic 6D phenomenological parameter space with astro-informed priors.
+
+    This parameter space is NEW, matching the phenom astro analysis in NG15astro, 
+    Laal et al. 2026., and Gardiner et al. 2027. This corrects the hard_gamma_inner 
+    bug in PS_Classic_Phenom_Astro 
+
+    """
+
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
+            # from `sam-parameters.ipynb` fits to [Tomczak+2014] with 4x stdev values
+            PD_Normal("gsmf_phi0_log10", -2.56, 0.4),
+            PD_Normal("gsmf_mchar0_log10", 10.9, 0.4),   # [log10(Msol)]
+
+            PD_Normal("mmb_mamp_log10", +8.6, 0.2),      # [log10(Msol)]
+            PD_Normal("mmb_scatter_dex", +0.32, 0.15),
+
+            PD_Uniform("hard_time", 0.1, 11.0),          # [Gyr]
+            PD_Uniform("hard_gamma_inner", -1.5, +0.0),
         ]
 
         super().__init__(
