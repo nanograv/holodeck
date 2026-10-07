@@ -1594,7 +1594,7 @@ class PS_NG20_Fiducial_Hard(_PS_NG20_Base):
     - Blecha (2026) Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0)
     - Double-Schechter GSMF with Leja+2020 11-D covariance matrix (`PD_MVNormal`)
     - Illustris Galaxy Merger Rate (`GMR_Illustris`)
-    - Kormendy & Ho (2013) M-Mbulge with Matt et al. (2026a) redshift-evolving amplitude
+    - Kormendy & Ho (2013) M-Mbulge with no redshift evolution
     """
 
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
@@ -1652,7 +1652,8 @@ class PS_NG20_Fiducial_Extended(_PS_NG20_Base):
     - Blecha (2026) Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0)
     - Double-Schechter GSMF with Leja+2020 11-D covariance matrix (`PD_MVNormal`)
     - Illustris Galaxy Merger Rate (`GMR_Illustris`)
-    - Kormendy & Ho (2013) M-Mbulge with Matt et al. (2026a) redshift-evolving amplitude
+    - Kormendy & Ho (2013) M-Mbulge with Matt et al. (2026a) redshift-evolving amplitude, slope, and scatter
+    - Variable bulge fraction and scatter
     """
 
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
