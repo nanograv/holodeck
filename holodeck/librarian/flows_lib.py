@@ -35,6 +35,10 @@ The frequency grid is :func:`holodeck.utils.pta_freqs` at ``--dur`` and ``--nfre
 ``k/dur`` for ``k = 1..nfreqs``, bin width ``1/dur``.  The file records it in the ``fobs_cents`` and
 ``fobs_edges`` datasets and the ``pta_dur`` [sec] and ``df`` [Hz] attrs.
 
+``--rank-exclude-bins`` leaves frequency bins out of the CW ranking (e.g. a bin below ``1/Tspan``
+of the data the flow is for), recorded in the ``rank_exclude_bins`` attr.  ``half_log10rho`` still
+covers every bin.
+
 """
 
 import argparse
@@ -164,7 +168,7 @@ def main():   # noqa : ignore complexity warning
         f"param_space={args.param_space}, parameters={space.nparameters}, samples={args.nsamples}, "
         f"sam_shape={args.sam_shape}, nreals={args.nreals}, "
         f"nfreqs={args.nfreqs}, dur={args.dur_yr} [yr], df={args.df*1e9:.4f} [nHz], "
-        f"nloudest={args.nloudest}, nrank={args.nrank}"
+        f"nloudest={args.nloudest}, nrank={args.nrank}, rank_exclude_bins={args.rank_exclude_bins}"
     )
 
     # ---- distribute jobs to processors
@@ -233,6 +237,9 @@ def _setup_argparse(*args, **kwargs):
     # ---- what to keep
     parser.add_argument('--nrank', action='store', dest='nrank', type=int, default=DEF_NUM_RANK,
                         help='Number of top-ranked CWs kept per realization')
+    parser.add_argument('--rank-exclude-bins', nargs='+', type=int, default=[], metavar='BIN',
+                        dest='rank_exclude_bins',
+                        help='Frequency bins (0-based) left out of the CW ranking; the GWB keeps them')
 
     # how to run
     parser.add_argument('--resume', action='store_true', default=False,
@@ -256,10 +263,19 @@ def _setup_argparse(*args, **kwargs):
     args.domain = False
     args.plot = False
 
-    if args.nrank > args.nfreqs * args.nloudest:
+    # sorted and unique, so the config and the attr hold one canonical list
+    args.rank_exclude_bins = sorted(set(args.rank_exclude_bins))
+    outside = [bb for bb in args.rank_exclude_bins if not 0 <= bb < args.nfreqs]
+    if outside:
+        raise ValueError(f"`rank_exclude_bins` {outside} are outside bins 0..{args.nfreqs - 1}!")
+    nranked = args.nfreqs - len(args.rank_exclude_bins)
+    if nranked == 0:
+        raise ValueError("`rank_exclude_bins` excludes every frequency bin!")
+
+    if args.nrank > nranked * args.nloudest:
         raise ValueError(
-            f"`nrank`={args.nrank} exceeds the {args.nfreqs*args.nloudest} available candidates "
-            f"({args.nfreqs} freqs x {args.nloudest} loudest)!"
+            f"`nrank`={args.nrank} exceeds the {nranked*args.nloudest} available candidates "
+            f"({nranked} ranked freqs x {args.nloudest} loudest)!"
         )
     if args.nrank > args.nloudest:
         log.warning(
@@ -420,7 +436,8 @@ def run_cws_at_pspace_params(args, space, pnum, params):
 
         data = run_cws(
             sam, hard, fobs_cents, fobs_edges,
-            nreals=args.nreals, nloudest=args.nloudest, nrank=args.nrank, seed=seed, log=log,
+            nreals=args.nreals, nloudest=args.nloudest, nrank=args.nrank,
+            rank_exclude_bins=args.rank_exclude_bins, seed=seed, log=log,
         )
         data['params'] = np.array([params[pn] for pn in space.param_names])
         data['param_names'] = space.param_names
@@ -448,6 +465,7 @@ def run_cws(
     nreals=holo.librarian.DEF_NUM_REALS,
     nloudest=DEF_NUM_RANK,
     nrank=DEF_NUM_RANK,
+    rank_exclude_bins=(),
     seed=None,
     log=None,
 ):
@@ -467,6 +485,8 @@ def run_cws(
         Number of loudest binaries kept in each frequency bin, the pool ``nrank`` is chosen from.
     nrank : int
         Number of sources kept per realization, ranked across the whole band.
+    rank_exclude_bins : sequence of int
+        Frequency bins left out of the ranking.  Their sources still count in ``half_log10rho``.
     seed : int or None
         Seed for the Poisson realizations.
     log : ``logging.Logger`` instance
@@ -527,7 +547,7 @@ def run_cws(
 
     # ---- rank across the band, and reduce to the flow's columns
 
-    ranked = rank_cws(np.sqrt(hc2ss), bidx, nrank=nrank)
+    ranked = rank_cws(np.sqrt(hc2ss), bidx, nrank=nrank, exclude_bins=rank_exclude_bins)
     data = cw_columns(ranked, mt, mr, redz, fobs_cents)
 
     data['fobs_cents'] = fobs_cents
@@ -631,7 +651,7 @@ def loudest_per_bin(number, h2fdf, nreals, nloudest, rng):
     return hc2ss, bidx, hc2rest
 
 
-def rank_cws(hc_ss, bidx, nrank=DEF_NUM_RANK):
+def rank_cws(hc_ss, bidx, nrank=DEF_NUM_RANK, exclude_bins=()):
     """Keep the top ``nrank`` sources of each realization, ranked across the whole band.
 
     Arguments
@@ -642,6 +662,8 @@ def rank_cws(hc_ss, bidx, nrank=DEF_NUM_RANK):
         Flat ``(M, Q, Z)`` cell index of each candidate; ``-1`` where empty.
     nrank : int
         Number of sources to keep per realization.
+    exclude_bins : sequence of int
+        Frequency bins whose candidates are left out of the ranking, as if their slots were empty.
 
     Returns
     -------
@@ -664,8 +686,16 @@ def rank_cws(hc_ss, bidx, nrank=DEF_NUM_RANK):
         raise ValueError(f"nrank={nrank} exceeds {ncand} available candidates "
                          f"({nfreq} freqs x {nloud} loudest)")
 
-    # empty slots rank last
-    stat = np.where(bidx >= 0, hc_ss, -np.inf)
+    exclude_bins = np.asarray(exclude_bins, dtype=int)
+    if np.any((exclude_bins < 0) | (exclude_bins >= nfreq)):
+        raise ValueError(f"exclude_bins={exclude_bins.tolist()} are outside bins 0..{nfreq - 1}")
+
+    # a candidate competes if its slot holds a source and its bin is ranked
+    ok = bidx >= 0
+    ok[exclude_bins] = False
+
+    # empty slots and excluded bins rank last
+    stat = np.where(ok, hc_ss, -np.inf)
 
     # (F, R, L) -> (R, F*L) so all candidates in a realization share one axis.  Flat candidate
     # index c encodes (freq, loudest) as c = f*nloud + l.
@@ -683,13 +713,13 @@ def rank_cws(hc_ss, bidx, nrank=DEF_NUM_RANK):
     r_ix = np.arange(nreal)[:, np.newaxis]
     gather = lambda arr: arr[freq_idx, r_ix, loud_idx]      # noqa: E731
 
-    out_bidx = gather(bidx)
-    # a realization with fewer than `nrank` live candidates fills the remainder with dead slots
-    live = out_bidx >= 0
+    # A realization with fewer than `nrank` live candidates fills the remainder with dead slots.
+    # Liveness comes from `ok`, not `bidx`, so those slots are never filled from excluded bins.
+    live = gather(ok)
 
     return dict(
         hc=np.where(live, gather(hc_ss), 0.0),
-        bidx=out_bidx,
+        bidx=np.where(live, gather(bidx), -1),
         fidx=np.where(live, freq_idx, -1),
         lidx=np.where(live, loud_idx, -1),
     )
@@ -939,6 +969,8 @@ def flows_lib_combine(path_output, log, recreate=False):
         h5.attrs['nrank'] = nrank
         h5.attrs['nreals'] = nreals
         h5.attrs['nloudest'] = args.nloudest
+        # always written, empty when every bin is ranked; older libraries have no such attr
+        h5.attrs['rank_exclude_bins'] = np.array(args.rank_exclude_bins, dtype=np.int16)
         # ranking is always by hc; recorded for readers of older libraries
         h5.attrs['rankby'] = 'hc'
         h5.attrs['df'] = args.df
