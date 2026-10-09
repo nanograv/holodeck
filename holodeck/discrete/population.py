@@ -442,11 +442,18 @@ class Pop_Illustris(_Population_Discrete):
                 print("No zero-mass BHs found in this merger tree file!")
             
             # ---- Galaxy Properties
-            # Get the stellar mass, and take that as bulge mass
-            self.mstar_tot = data['SubhaloMassType'][:, st_idx, :]   #: [grams]
-            print(f"{self._use_mstar_tot_as_mbulge=}")
+            # NOTE: `SubhaloMassType` is only present in the newer file format
+            self.mstar_tot = None
+            if 'SubhaloMassType' in data:
+                self.mstar_tot = data['SubhaloMassType'][:, st_idx, :]   #: [grams]
+
             if self._use_mstar_tot_as_mbulge:
-                self.mbulge = self.mstar_tot[:,:2]
+                # Get the stellar mass, and take that as bulge mass
+                if self.mstar_tot is None:
+                    err = f"`use_mstar_tot_as_mbulge=True`, but '{fname}' has no 'SubhaloMassType'!"
+                    log.exception(err)
+                    raise KeyError(err)
+                self.mbulge = self.mstar_tot[:, :2]
             else:
                 self.mbulge = data['SubhaloMassInRadType'][:, st_idx, :2]   #: [grams]
             print(f"{self.mbulge.min()=}, {self.mbulge.max()=}")

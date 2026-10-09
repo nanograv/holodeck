@@ -51,9 +51,6 @@ TODO: (cosmosim) use simulation-measured host properties instead of this mbh -> 
         CAUTION: indexing. In `cEvolution` the host arrays must be indexed by `bin`,
         which only aligns with `pop` if no binaries were dropped in `cEvolution.__init__`.
 
-
-
-
 References
 ----------
 * [BBR1980]_ Begelman, Blandford & Rees 1980.
