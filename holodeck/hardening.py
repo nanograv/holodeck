@@ -1037,7 +1037,7 @@ class Fixed_Time_2PL(_Hardening):
 
     @classmethod
     def _dadt_dedt(cls, mtot, mrat, sepa, norm, rchar, gamma_inner, gamma_outer):
-        """Calculate hardening rate for the given raw parameters.
+        r"""Calculate hardening rate for the given raw parameters.
 
         Parameters
         ----------
@@ -1080,7 +1080,7 @@ class Fixed_Time_2PL(_Hardening):
 
     @classmethod
     def function(cls, norm, xx, gamma_inner, gamma_outer):
-        """Hardening rate given the parameters for this hardening model.
+        r"""Hardening rate given the parameters for this hardening model.
 
         The functional form is,
 
@@ -1088,8 +1088,8 @@ class Fixed_Time_2PL(_Hardening):
 
             \dot{a} = - A * (1.0 + x)^{-g_out + g_in} / x^{g_in - 1},
 
-        Where $A$ is an overall normalization, and x \\equiv a / r_\\mathrm{char}$ is the binary
-        separation scaled to a characteristic transition radius ($r_\\mathrm{char}$) between two
+        Where $A$ is an overall normalization, and x \equiv a / r_\mathrm{char}$ is the binary
+        separation scaled to a characteristic transition radius ($r_\mathrm{char}$) between two
         power-law indices $g_inner$ and $g_outer$.
 
         Parameters
@@ -1359,7 +1359,7 @@ class Fixed_Time_2PL(_Hardening):
 
     @classmethod
     def _time_total(cls, norm, mt, mr, rchar, gamma_inner, gamma_outer, sepa_init, num=123):
-        """For the given parameters, integrate the binary evolution to find total lifetime.
+        r"""For the given parameters, integrate the binary evolution to find total lifetime.
 
         Parameters
         ----------
@@ -1870,7 +1870,7 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         # warn if any binary separations are < risco
         if np.any(_sepa < risco):
             num_below = np.sum(_sepa < risco)
-            log.warning(f"Found {} binary separations below r_ISCO! (_sepa < risco)".format(num_below))
+            log.warning(f"Found {num_below} binary separations below r_ISCO! (_sepa < risco)")
             
         # rchar is always assumed to be in cm, no need for conversion
         rchar = self._rchar_9 * m9**(self._alpha_char+1)
@@ -2390,7 +2390,7 @@ class _SHM06:
 
 
 class _Siwek2023:
-    """ Hardening rates from circumbinary disk simulations as in [Siwek2023]_.
+    r""" Hardening rates from circumbinary disk simulations as in [Siwek2023]_.
 
         Mass ratios and eccentricities must be provided.
 
