@@ -253,8 +253,13 @@ class _Param_Space(abc.ABC):
         sam = self._init_sam(sam_shape, settings)
         hard = self._init_hard(sam, settings)
         if hasattr(self, "mtot_for_nuin_lims") and hasattr(self, "mrat_for_nuin_lims"):
-            if np.any(sam.mtot != self.mtot_for_nuin_lims) or np.any(sam.mrat != self.mrat_for_nuin_lims):
-                log.warning(f"SAM and nu_inner interpolator grid shape mismatch: \n{sam.mtot=}, {self.mtot_for_nuin_lims=}, {sam.mrat=}, {self.mrat_for_nuin_lims=}")
+            mt_tup = (sam.mtot[0],sam.mtot[-1],sam.mtot.size)
+            mr_tup = (sam.mrat[0],sam.mrat[-1],sam.mrat.size)
+            if (not np.allclose(mt_tup,self.mtot_for_nuin_lims) or 
+                not np.allclose(mr_tup,self.mrat_for_nuin_lims)):
+                warn = (f"SAM and nu_inner interpolator grid shape mismatch: \n{mt_tup=}, "
+                        f"{self.mtot_for_nuin_lims=}, {mr_tup=}, {self.mrat_for_nuin_lims=}")
+                log.warning(warn)
 
         return sam, hard
 
@@ -977,25 +982,27 @@ class PD_2D_Uniform_Variable_Ymin(_Param_Dist):
     """
 
     def __init__(self, x_name, y_name, x_lo, x_hi, 
-                 y_abs_lo, y_hi, y_lo_interp_func, 
+                 y_abs_lo, y_hi, y_lo_func, 
                  parspace_defaults,
                  n_cdf_grid_min=1000, **kwargs):
 
-        interp_kwargs = {}
+        y_lo_kwargs = {}
         if 'mtot' in kwargs:
-            interp_kwargs['mtot'] = kwargs.pop('mtot')
+            y_lo_kwargs['mtot'] = kwargs.pop('mtot')
         if 'mrat' in kwargs:
-            interp_kwargs['mrat'] = kwargs.pop('mrat')
+            y_lo_kwargs['mrat'] = kwargs.pop('mrat')
 
         super().__init__(name=(x_name, y_name), **kwargs)
         self._x_lo = x_lo
         self._x_hi = x_hi
         self._y_abs_lo = y_abs_lo
         self._y_hi = y_hi
-        self._y_lo_interp_func = y_lo_interp_func
+        #self._y_lo_interp_func = y_lo_interp_func
+        self._y_lo_func = y_lo_func
         self._parspace_defaults = parspace_defaults
         self._n_cdf_grid_min = n_cdf_grid_min
-        self._interp_kwargs = interp_kwargs
+        #self._interp_kwargs = interp_kwargs
+        self._y_lo_kwargs = y_lo_kwargs
 
     def _dist_func(self, uu):
         """uu is expected to be a (n_samples, n_dims) array of uniform [0, 1] variables."""
@@ -1004,9 +1011,12 @@ class PD_2D_Uniform_Variable_Ymin(_Param_Dist):
 
         x_grid = np.linspace(self._x_lo, self._x_hi, n_cdf_grid)
         # `y_height` should be the larger of nu_max - nu_min, or 0
-        y_lo_interp = self._y_lo_interp_func(x_grid, self._parspace_defaults, 
-                                             absmin=self._y_abs_lo, **self._interp_kwargs)
-        y_height = np.clip(self._y_hi - y_lo_interp(x_grid), 0.0, None)
+        #y_lo_interp = self._y_lo_interp_func(x_grid, self._parspace_defaults, 
+        #                                     absmin=self._y_abs_lo, **self._interp_kwargs)
+        y_lo_grid = self._y_lo_func(x_grid, self._parspace_defaults, 
+                                    absmin=self._y_abs_lo, **self._y_lo_kwargs)
+
+        y_height = np.clip(self._y_hi - y_lo_grid, 0.0, None)
 
         # integrate to get CDF over x (trapezoid rule)
         cdf = np.concatenate([[0.0], np.cumsum(0.5*(y_height[1:]+y_height[:-1])*np.diff(x_grid))])  
@@ -1018,7 +1028,9 @@ class PD_2D_Uniform_Variable_Ymin(_Param_Dist):
         xx = np.interp(uu[:,0], cdf, x_grid)
 
         # uniform y within the strip at each sampled x
-        y_lo = y_lo_interp(xx)
+        #y_lo = y_lo_interp(xx)
+        y_lo = self._y_lo_func(xx, self._parspace_defaults, 
+                               absmin=self._y_abs_lo, **self._y_lo_kwargs)
         yy = y_lo + (self._y_hi - y_lo) * uu[:,1]
 
         return np.vstack([xx, yy]).T

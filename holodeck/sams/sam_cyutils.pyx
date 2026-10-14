@@ -271,7 +271,11 @@ cdef double _hard_func_innerpwl_gw(
     else:
         r_gwcrit = (r_gwcrit_9 * MY_RGRV * 1.0e9*MY_MSOL) * pow(mtot/(1.0e9*MY_MSOL), 
                                                                 alpha_gwcrit+1)
-    
+
+    # set r_gwcrit = risco for any rgw_crit<risco
+    if r_gwcrit < 3.0 * MY_SCHW * mtot:
+        r_gw_crit = 3.0 * MY_SCHW * mtot
+
     if inner_model_type == 0:
         dadt = _hard_func_innerpwl_model0(mtot, mrat, sepa, nu_inner, 
                                           rchar, r_gwcrit)
@@ -281,9 +285,8 @@ cdef double _hard_func_innerpwl_gw(
     else: 
         raise ValueError(f"inner_model_type not defined: ", inner_model_type)
 
-    # if this isn't true, there is no GW hardening phase
-    if r_gwcrit > (3.0 * MY_SCHW * mtot):
-        dadt += hard_gw(mtot, mrat, sepa)
+
+    dadt += hard_gw(mtot, mrat, sepa)
     
     return dadt
 
