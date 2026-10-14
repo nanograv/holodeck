@@ -1869,7 +1869,8 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
 
         # warn if any binary separations are < risco
         if np.any(_sepa < risco):
-            log.warning(f"Found _sepa < risco!")
+            num_below = np.sum(_sepa < risco)
+            log.warning(f"Found {} binary separations below r_ISCO! (_sepa < risco)".format(num_below))
             
         # rchar is always assumed to be in cm, no need for conversion
         rchar = self._rchar_9 * m9**(self._alpha_char+1)

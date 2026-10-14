@@ -2730,6 +2730,32 @@ def get_nuin_min(_lgr9rg, DEFAULTS, absmin=-4.0, speed_limit=SPLC,
         #print(f"{nuin_min.shape=}, {np.nanmax(nuin_min,axis=(-2,-1)).shape=}")
         return np.nanmax(nuin_min,axis=(-2,-1))
 
+def default_sam_grid(var):
+    """Returns default SAM grid min, max, & shape for mtot, mrat, or redz.
+    
+    Parameters
+    -----------
+    var : str
+        Must be 'mtot', 'mrat', or 'redz'. Will return a tuple of the specifications (min, max, and shape) 
+        of the grid to be used for creating a semi-analytic black hole binary population model.
+        
+    Returns
+    --------
+    default_specs : tuple, shape (3,)
+        Tuple of integers specifying the minimum, maximum, and shape of the grid for this SAM variable.
+    """
+    
+    if var=='mtot':
+        default_specs = (1.0e4*MSOL, 1.0e12*MSOL, 91)
+    elif var=='mrat':
+        default_specs = (1e-3, 1.0, 81)
+    elif var=='redz':
+        default_specs = (1e-3, 10.0, 101)
+    else:
+        raise ValueError(f"{var=} must be 'mtot', 'mrat', or 'redz'.")
+    
+    return default_specs
+    
 @deprecated_warn("use `holodeck.utils.get_nuin_min` instead to get exact, not interpolated, values)")
 def create_nuin_min_interp(lgr9rg_arr, DEFAULTS, absmin=-4.0, **kwargs):
     """

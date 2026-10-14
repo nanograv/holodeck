@@ -948,8 +948,8 @@ class PS_ClassicPlusBIO_Hard_Uniform(_PS_ClassicPlusBIO_WithLims):
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
 
         # NOTE: these values should match the ranges and shapes used in the SAM!
-        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
-        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+        self.mtot_for_nuin_lims = default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = default_sam_grid(var='mrat')
 
         parameters = [
             PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
@@ -990,8 +990,8 @@ class PS_ClassicPlusBIO_HardTauOut3_Uniform(_PS_ClassicPlusBIO_WithLims):
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
 
         # NOTE: these values should match the ranges and shapes used in the SAM!
-        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
-        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+        self.mtot_for_nuin_lims =  holo.utils.default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = holo.utils.default_sam_grid(var='mrat')
 
         parameters = [
             PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
@@ -1029,8 +1029,8 @@ class PS_ClassicPlusBIO_Hard3Par_Uniform(_PS_ClassicPlusBIO_WithLims):
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
 
         # NOTE: these values should match the ranges and shapes used in the SAM!
-        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
-        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+        self.mtot_for_nuin_lims = holo.utils.default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = holo.utils.default_sam_grid(var='mrat')
 
         parameters = [
             PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
@@ -1069,8 +1069,8 @@ class PS_ClassicPlusBIO_Astro_Extended(_PS_ClassicPlusBIO_WithLims):
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
 
         # NOTE: these values should match the ranges and shapes used in the SAM!
-        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
-        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+        self.mtot_for_nuin_lims = holo.utils.default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = holo.utils.default_sam_grid(var='mrat')
 
         parameters = [
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
@@ -1108,8 +1108,8 @@ class PS_ClassicPlusBIO_Astro(_PS_ClassicPlusBIO_WithLims):
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
 
         # NOTE: these values should match the ranges and shapes used in the SAM!
-        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
-        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+        self.mtot_for_nuin_lims = holo.utils.default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = holo.utils.default_sam_grid(var='mrat')
 
         parameters = [
             PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
@@ -1266,8 +1266,8 @@ class PS_AstroStrongBIO_Hard(_PS_AstroStrongBIO):
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
 
         # NOTE: these values should match the ranges and shapes used in the SAM!
-        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
-        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+        self.mtot_for_nuin_lims = holo.utils.default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = holo.utils.default_sam_grid(var='mrat')
 
         parameters = [
             # Inside-out hardening
@@ -1343,8 +1343,8 @@ class PS_AstroStrongBIO_Hard_MMbulge_Covariant_GSMF(_PS_AstroStrongBIO):
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
 
         # NOTE: these values should match the ranges and shapes used in the SAM!
-        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
-        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+        self.mtot_for_nuin_lims = holo.utils.default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = holo.utils.default_sam_grid(var='mrat')
 
         parameters = [
             # Inside-out hardening
@@ -1544,8 +1544,8 @@ class PS_NG20_Fiducial(_PS_NG20_Base):
 
         # NOTE: the ranges should match those in SAM, and shapes should 
         # not be smaller than SAM shape for robust interpolation
-        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
-        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+        self.mtot_for_nuin_lims = holo.utils.default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = holo.utils.default_sam_grid(var='mrat')
         
         parameters = [
             # Hardening model (BIO-hardening / FixedOuterTime_InnerPL_SAM)
@@ -1594,15 +1594,15 @@ class PS_NG20_Fiducial_Hard(_PS_NG20_Base):
     - Blecha (2026) Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0)
     - Double-Schechter GSMF with Leja+2020 11-D covariance matrix (`PD_MVNormal`)
     - Illustris Galaxy Merger Rate (`GMR_Illustris`)
-    - Kormendy & Ho (2013) M-Mbulge with Matt et al. (2026a) redshift-evolving amplitude
+    - Kormendy & Ho (2013) M-Mbulge with no redshift evolution
     """
 
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
 
         # NOTE: the ranges should match those in SAM, and shapes should 
         # not be smaller than SAM shape for robust interpolation
-        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
-        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+        self.mtot_for_nuin_lims = holo.utils.default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = holo.utils.default_sam_grid(var='mrat')
         
         parameters = [
             # Hardening model (BIO-hardening / FixedOuterTime_InnerPL_SAM)
@@ -1625,7 +1625,7 @@ class PS_NG20_Fiducial_Hard(_PS_NG20_Base):
             PD_Normal("gmr_qgamma0", -1.2595, 0.0026),
             PD_Normal("gmr_qgammaz", +0.0611, 0.0021),
             PD_Normal("gmr_qgammam", -0.0477, 0.0013),
-            # MMBulge (KH2013 + Matt et al. redshift evolution)
+            # MMBulge (KH2013, no redshift evolution)
             PD_Normal("mmb_mamp_log10", 8.69, 0.05),
             PD_Normal("mmb_plaw", 1.17, 0.08),
             PD_Normal("mmb_scatter_dex", 0.28, 0.05),
