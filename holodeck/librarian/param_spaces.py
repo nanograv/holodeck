@@ -1659,8 +1659,8 @@ class PS_NG20_Fiducial_Extended(_PS_NG20_Base):
 
         # NOTE: the ranges should match those in SAM, and shapes should 
         # not be smaller than SAM shape for robust interpolation
-        self.mtot_for_nuin_lims = (1.0e4*MSOL, 1.0e12*MSOL, 91)
-        self.mrat_for_nuin_lims = (1e-3, 1.0, 81)
+        self.mtot_for_nuin_lims = holo.utils.default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = holo.utils.default_sam_grid(var='mrat')
         
         parameters = [
             # Hardening model (BIO-hardening / FixedOuterTime_InnerPL_SAM)
