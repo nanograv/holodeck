@@ -44,9 +44,12 @@ jobs:
     #   run: sudo apt-get update
     #   run: sudo apt-get install libopenmpi-dev
 
-    # - if: matrix.os == 'macOS-latest'
-    #   run: |
-    #         brew install mpich
+    - name: Set up macOS-latest conda
+      if: matrix.os == 'macOS-latest'
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        auto-activate: false
+        activate-environment: ""
 
     - name: Install dependencies
       run: |
