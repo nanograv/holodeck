@@ -17,7 +17,7 @@ import warnings
 import holodeck as holo
 from holodeck import utils, log, plot  # , cosmo, anisotropy
 from holodeck.constants import MPC, YR
-from holodeck.sams import cyutils as sam_cyutils
+from holodeck.sams import sam_cyutils
 
 try:
     from sympy import nsolve, Symbol
@@ -137,7 +137,7 @@ def _orf_ij(i, j, theta_ij):
 def _orf_pta(pulsars):
     """ Calculate the overlap reduction function matrix Gamma for a list of hasasia.Pulsar objects
 
-    Paramters
+    Parameters
     ---------
     pulsars : (P,) list of hasasia.Pulsar objects.
 
@@ -274,7 +274,7 @@ def _sigma0_Bstatistic(noise, Gamma, Sh0_bg):
     return sigma_0B
 
 def _sigma1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
-    """ Calculate sigma_1 for the background, by summing over all pulsars and frequencies.
+    r"""Calculate sigma_1 for the background, by summing over all pulsars and frequencies.
     Assuming the B statistic, which maximizes S/N_B = mu_1/sigma_1
 
     Parameters
@@ -287,7 +287,7 @@ def _sigma1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg):
         Spectral density in the background.
     Sh0_bg : (F,R) 1Darray of scalars
         Value of spectral density used to construct the statistic.
-s
+
     Returns
     -------
     sigma_1B : (R,) 1Darray
@@ -759,7 +759,7 @@ def _n_unitary_vector(theta, phi, xi):
     """ Calculate the unitary vector n-hat for the antenna pattern functions
     for each of S sky realizations.
 
-    Paramters
+    Parameters
     ---------
     theta : (F,S,L) NDarray
         Spherical coordinate position of each single source.
@@ -788,7 +788,7 @@ def _Omega_unitary_vector(theta, phi):
     """ Calculate the unitary vector n-hat for the antenna pattern functions
     for each of S sky realizations.
 
-    Paramters
+    Parameters
     ---------
     theta : (F,S,L) NDarray
         Spherical coordinate position of each single source.
@@ -835,23 +835,22 @@ def _pi_unitary_vector(phi_i, theta_i):
 ###################### Antenna Pattern Functions  ######################
 
 def dotprod(vec1, vec2):
-    """ Calculate the dot product for NDarrays of 3D vectors, with
-     vector elements specified by the first index.
+    r"""Calculate the dot product for NDarrays of 3D vectors, with vector elements specified by the first index.
 
-     Parameters
-     ----------
-     vec1 : (3,N1,N2,N3,...N) NDarray
-     vec2 : (3,N1,N2,N3,...N) NDarray
+    Parameters
+    ----------
+    vec1 : (3,N1,N2,N3,...N) NDarray
+    vec2 : (3,N1,N2,N3,...N) NDarray
 
-     Returns
-     -------
-     dotted : (N1,N2,N3,...N) NDarray
-        The dot product of the vectors specified by the first dimension,
-        for every N1, N2, N3,...N.
+    Returns
+    -------
+    dotted : (N1,N2,N3,...N) NDarray
+       The dot product of the vectors specified by the first dimension,
+       for every N1, N2, N3,...N.
 
     Example: find the dot product of 3D vectors for every P,F,R, using NDarrays
     of shape (3,P,F,R)
-     """
+    """
 
     dotted = vec1[0,...]*vec2[0,...] + vec1[1,...]*vec2[1,...] + vec1[2,...]*vec2[2,...]
     return dotted
@@ -1140,11 +1139,11 @@ def _amplitude(hc_ss, fobs, dfobs):
 ####################### SS Signal to Noise Ratio  #######################
 
 def _snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
-    """ Calculate the SNR for each pulsar wrt each single source detection,
+    r"""Calculate the SNR for each pulsar wrt each single source detection,
     for S sky realizations and R strain realizations.
 
-    Paramters
-    ---------
+    Parameters
+    ----------
     amp : (F,R,L) NDarray
         Dimensionless strain amplitude for loudest source at each frequency.
     F_iplus : (P,F,S,L) NDarray
@@ -1163,6 +1162,7 @@ def _snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
     freqs : (F,) 1Darray
         Observed frequency bin centers.
 
+
     Returns
     -------
     snr_ss : (F,R,S,L) NDarray
@@ -1176,11 +1176,11 @@ def _snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
     return snr_ss
 
 def _snr_ss_5dim(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
-    """ Calculate the SNR for each pulsar wrt each single source detection,
+    r"""Calculate the SNR for each pulsar wrt each single source detection,
     for S sky realizations and R strain realizations.
 
-    Paramters
-    ---------
+    Parameters
+    ----------
     amp : (F,R,L) NDarray
         Dimensionless strain amplitude for loudest source at each frequency.
     F_iplus : (P,F,S,L) NDarray
@@ -2216,7 +2216,7 @@ def plot_sample_nn(fobs, hc_ss, hc_bg, dp_ss, dp_bg, df_ss, df_bg, nn):
 def plot_detprob(dp_ss_all, dp_bg_all, nsamps):
     """ Plot detection probability for many samples.
 
-    Paramaters
+    Parameters
     ----------
     dp_ss_all : (N,R, S) NDarray
         Single source detection probably of each strain and sky realization of each sample.
@@ -2230,7 +2230,7 @@ def plot_detprob(dp_ss_all, dp_bg_all, nsamps):
     """
     fig, ax = plt.subplots(figsize=(6.5,4))
     ax.set_xlabel('Param Space Sample')
-    ax.set_ylabel('Detection Probability, $\gamma$')
+    ax.set_ylabel(r'Detection Probability, $\gamma$')
     ax.errorbar(np.arange(nsamps), np.mean(dp_bg_all, axis=1),
                 yerr = np.std(dp_bg_all, axis=1), linestyle='',
                 marker='d', capsize=5, color='cornflowerblue', alpha=0.5,
@@ -2251,7 +2251,7 @@ def plot_detprob(dp_ss_all, dp_bg_all, nsamps):
 def plot_detfrac(df_ss, df_bg, nsamps, thresh):
     """ Plot detection fraction for many samples.
 
-    Paramaters
+    Parameters
     ----------
     df_all : (N,) NDarray
         Fraction of strain and sky realization with a 'dp_ss'>'thresh'.

@@ -41,7 +41,7 @@ Contents of Documentation
    Calculating Gravitational Waves <calc_gws>
    Definitions and Abbreviations <defs_abbrevs>
    Annotated Bibliography <biblio>
-   Full Package Documentation <holodeck>
+   Full Package Documentation <api_ref/holodeck>
 
 
 .. toctree::
@@ -63,8 +63,17 @@ Contents of Documentation
    holodeck.plot <api_ref/holodeck.plot>
    holodeck.host_relations <api_ref/holodeck.host_relations>
    holodeck.utils <api_ref/holodeck.utils>
+   holodeck.ems <api_ref/holodeck.ems>
 
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Getting Started
+
+   getting_started/index
+   getting_started/libraries
+   getting_started/nanograv_15yr
+   
 Getting Started
 ===============
 

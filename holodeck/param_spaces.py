@@ -3,7 +3,7 @@
 
 import holodeck as holo
 from holodeck.constants import PC, GYR, MSOL
-from holodeck.librarian import (
+from holodeck.librarian.lib_tools import (
     _Param_Space, PD_Uniform, PD_Piecewise_Uniform_Density,
     PD_Normal,
     # PD_Uniform_Log,

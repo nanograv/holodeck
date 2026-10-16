@@ -73,7 +73,36 @@ References
 ==========
 These are provided here for easy copy-and-paste usage in other files.
 
-.. [Behroozi2013] : Behroozi, Wechsler & Conroy 2013.  ApJ, 770, 1.
+
+.. [N15NP] Afzal et al. (2023),  ApJL, 951, L11.
+    The NANOGrav 15 yr Data Set: Search for Signals from New Physics
+    https://ui.adsabs.harvard.edu/abs/2023ApJ...951L..11A/abstract
+
+.. [N15GWB] Agazie et al. (2023),  ApJL, 951, L8.
+    The NANOGrav 15 yr Data Set: Evidence for a Gravitational-wave Background
+    https://ui.adsabs.harvard.edu/abs/2023ApJ...951L...8A/abstract
+    
+.. [N15data] Agazie et al. (2023),  ApJL, 951, L9.
+    The NANOGrav 15 yr Data Set: Observations and Timing of 68 Millisecond Pulsars
+    https://ui.adsabs.harvard.edu/abs/2023ApJ...951L...9A/abstract
+
+.. [N15detchar] Agazie et al. (2023),  ApJL, 951, L10.
+    The NANOGrav 15 yr Data Set: Detector Characterization and Noise Budget
+    https://ui.adsabs.harvard.edu/abs/2023ApJ...951L..10A/abstract
+
+.. [N15CWs] Agazie et al. (2023), ApJL, 951, L50.
+    The NANOGrav 15 yr Data Set: Continuous Wave Signals from Individual Spinning Supermassive Black Holes
+    https://ui.adsabs.harvard.edu/abs/2023ApJ...951L..50A/abstract
+
+.. [N15astro] Agazie et al. (2023), ApJL, 952, L37.
+    The NANOGrav 15 yr Data Set: Constraints on Supermassive Black Hole Binaries from the Gravitational-wave Background
+    https://ui.adsabs.harvard.edu/abs/2023ApJ...952L..37A/abstract
+
+.. [N15anisotropy] Agazie et al. (2023), ApJL, 956, L3.
+    The NANOGrav 15 yr Data Set: Anisotropy and Spatial Variation in the Gravitational-wave Background
+    https://ui.adsabs.harvard.edu/abs/2023ApJ...956L...3A/abstract
+
+.. [Behroozi2013] Behroozi, Wechsler & Conroy 2013.  ApJ, 770, 1.
     The Average Star Formation Histories of Galaxies in Dark Matter Halos from z = 0-8
     https://ui.adsabs.harvard.edu/abs/2013ApJ...770...57B/abstract
 
@@ -143,6 +172,10 @@ These are provided here for easy copy-and-paste usage in other files.
     Coevolution (Or Not) of Supermassive Black Holes and Host Galaxies
     https://ui.adsabs.harvard.edu/abs/2013ARA%26A..51..511K/abstract
 
+.. [Leja2020] Leja et al. 2020, ApJ, 893, 111.
+    A New Census of the 0.2 < z < 3.0 Universe. I. The Stellar Mass Function
+    https://ui.adsabs.harvard.edu/abs/2020ApJ...893..111L/abstract
+
 .. [MM2013] McConnell & Ma 2013.  ApJ, 764, 2.
     Revisiting the Scaling Relations of Black Hole Masses and Host Galaxy Properties
     https://ui.adsabs.harvard.edu/abs/2013ApJ...764..184M/abstract
@@ -151,7 +184,7 @@ These are provided here for easy copy-and-paste usage in other files.
     A Universal Density Profile from Hierarchical Clustering
     https://ui.adsabs.harvard.edu/abs/1997ApJ...490..493N/abstract
 
-.. [Nelson2015] Nelson et al. (2015), A&C, 13,.
+.. [Nelson2015] Nelson et al. 2015, A&C, 13,.
    The illustris simulation: Public data release
    https://ui.adsabs.harvard.edu/abs/2015A&C....13...12N
 
@@ -167,9 +200,13 @@ These are provided here for easy copy-and-paste usage in other files.
     The dynamical evolution of massive black hole binaries I. Hardening in a fixed stellar background
     https://ui.adsabs.harvard.edu/abs/1996NewA....1...35Q/abstract
 
-.. [Rodriguez-Gomez2015] : Rodriguez-Gomez et al. (2015), MNRAS, 449, 1.
+.. [Rodriguez-Gomez2015] Rodriguez-Gomez et al. 2015, MNRAS, 449, 1.
    The merger rate of galaxies in the Illustris simulation: a comparison with observations and semi-empirical models
    https://ui.adsabs.harvard.edu/abs/2015MNRAS.449...49R
+
+.. [Rosado2015] Rosado, Sesana, & Gair (2015), MNRAS, 451, 2417.
+   Expected properties of the first gravitational wave signal detected with pulsar timing arrays
+   https://ui.adsabs.harvard.edu/abs/2015MNRAS.451.2417R
 
 .. [Sesana2004] Sesana, Haardt, Madau, & Volonteri 2004.  ApJ, 611, 2.  astro-ph/0401543.
     Low-Frequency Gravitational Radiation from Coalescing Massive Black Hole Binaries in Hierarchical Cosmologies
@@ -189,15 +226,19 @@ These are provided here for easy copy-and-paste usage in other files.
     Implications for Gravitational Wave Observations
     https://ui.adsabs.harvard.edu/abs/2010ApJ...719..851S/abstract
 
-.. [Sijacki2015] Sijacki et al. (2015), MNRAS, 452, 1.
+.. [Sijacki2015] Sijacki et al. 2015, MNRAS, 452, 1.
    The Illustris simulation: the evolving population of black holes across cosmic time
    https://ui.adsabs.harvard.edu/abs/2015MNRAS.452..575S
 
-.. [Springel2010] Springel (2010), MNRAS, 401, 2.
+.. [Siwek2023] Siwek et al. 2023.  MNRAS, 522, 2.
+   Binary orbital evolution in circumbinary discs
+   https://ui.adsabs.harvard.edu/abs/2023MNRAS.522.2707S/abstract
+
+.. [Springel2010] Springel 2010, MNRAS, 401, 2.
    E pur si muove: Galilean-invariant cosmological hydrodynamical simulations on a moving mesh
    https://ui.adsabs.harvard.edu/abs/2010MNRAS.401..791S
 
-.. [Vogelsberger2014] Vogelsberger et al. (2014), MNRAS, 444, 2.
+.. [Vogelsberger2014] Vogelsberger et al. 2014, MNRAS, 444, 2.
    Introducing the Illustris Project: simulating the coevolution of dark and visible matter in the Universe
    https://ui.adsabs.harvard.edu/abs/2014MNRAS.444.1518V
 

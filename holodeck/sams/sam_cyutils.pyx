@@ -127,9 +127,11 @@ def integrate_differential_number_3dx1d(edges, dnum):
     Arguments
     ---------
     edges : (4,) array_like  w/ lengths M, Q, Z, F+1
-        Grid edges of `mtot`, `mrat`, `redz`, and `freq`
-        NOTE: `mtot` should be passed as regular `mtot`, NOT log10(mtot)
-              `freq` should be passed as regular `freq`, NOT    ln(freq)
+        Grid edges of ``mtot``, ``mrat``, ``redz``, and ``freq``.
+
+        * NOTE: ``mtot`` should be passed as regular ``mtot``, NOT ``log10(mtot)``.
+        * NOTE: ``freq`` should be passed as regular ``freq``, NOT ``ln(freq)``.
+
     dnum : (M, Q, Z, F)
         Differential number of binaries, dN/[dlog10M dq qz dlnf] where 'N' is in units of dimensionless number.
 
@@ -1251,8 +1253,8 @@ def snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
         Antenna pattern function for each pulsar.
     iotas : (F,S,L) NDarray
         Inclination, used to calculate:
-        a_pol = 1 + np.cos(iotas) **2
-        b_pol = -2 * np.cos(iotas)
+        ``a_pol = 1 + np.cos(iotas) **2``
+        ``b_pol = -2 * np.cos(iotas)``
     dur : scalar
         Duration of observations.
     Phi_0 : (F,S,L) NDarray
@@ -1307,8 +1309,8 @@ cdef int _snr_ss(
         Antenna pattern function for each pulsar.
     iotas : (F,S,L) NDarray
         Inclination, used to calculate:
-        a_pol = 1 + np.cos(iotas) **2
-        b_pol = -2 * np.cos(iotas)
+        ``a_pol = 1 + np.cos(iotas) **2``
+        ``b_pol = -2 * np.cos(iotas)``
     dur : scalar
         Duration of observations.
     Phi_0 : (F,S,L) NDarray

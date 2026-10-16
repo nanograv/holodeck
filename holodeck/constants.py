@@ -7,6 +7,7 @@ whenever possible.  Constants and units should only be added when they are frequ
 DEVELOPER NOTE:
 To preserve fast module import times across holodeck, do NOT import `astropy` or `numpy` 
 in this file to calculate constants at module initialization. If you need to add a new constant:
+
   1. Open a temporary terminal or notebook.
   2. Run your astropy conversion (e.g., `import astropy as ap; print(ap.constants.m_e.cgs.value)`).
   3. Copy the raw float literal value and paste it directly below.
