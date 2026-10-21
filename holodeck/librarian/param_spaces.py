@@ -948,8 +948,8 @@ class PS_ClassicPlusBIO_Hard_Uniform(_PS_ClassicPlusBIO_WithLims):
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
 
         # NOTE: these values should match the ranges and shapes used in the SAM!
-        self.mtot_for_nuin_lims = default_sam_grid(var='mtot')
-        self.mrat_for_nuin_lims = default_sam_grid(var='mrat')
+        self.mtot_for_nuin_lims = holo.utils.default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = holo.utils.default_sam_grid(var='mrat')
 
         parameters = [
             PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
