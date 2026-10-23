@@ -260,21 +260,26 @@ cdef double _hard_func_innerpwl_model1(double mtot, double mrat, double sepa,
 cdef double _hard_func_innerpwl_gw(
     double mtot, double mrat, double sepa, int inner_model_type, 
     double dadt_rchar, double rchar, double nu_inner, 
-    double r_gwcrit_9, int gwcrit_units_rg, double alpha_gwcrit 
+    double r_gwcrit_9, int gwcrit_units_rg, double alpha_gwcrit, double beta_gwcrit
 ):
 
     cdef double dadt = 0.0
     cdef double r_gwcrit = 0.0
+    # normalized symmetric mass ratio is 1.0 for equal-mass binaries
+    cdef double eta_norm = 4.0 * mrat / ((1.0 + mrat) * (1.0 + mrat))
     
     if gwcrit_units_rg == 0:
-        r_gwcrit = (r_gwcrit_9 * MY_PC) * pow(mtot/(1.0e9*MY_MSOL), alpha_gwcrit+1)
+        r_gwcrit = (r_gwcrit_9 * MY_PC) 
     else:
-        r_gwcrit = (r_gwcrit_9 * MY_RGRV * 1.0e9*MY_MSOL) * pow(mtot/(1.0e9*MY_MSOL), 
-                                                                alpha_gwcrit+1)
+        r_gwcrit = (r_gwcrit_9 * MY_RGRV * 1.0e9*MY_MSOL) 
+
+    # mass and mass-ratio scaling of r_gwcrit, as in `FixedOuterTime_InnerPL_SAM.dadt` 
+    # (note that alpha_gwcrit+1 must be used here b/c r_gwcrit is converted to [cm] in both cases above)
+    r_gwcrit *= (pow(mtot/(1.0e9*MY_MSOL), alpha_gwcrit+1) * pow(eta_norm, beta_gwcrit))
 
     # set r_gwcrit = risco for any rgw_crit<risco
     if r_gwcrit < 3.0 * MY_SCHW * mtot:
-        r_gw_crit = 3.0 * MY_SCHW * mtot
+        r_gwcrit = 3.0 * MY_SCHW * mtot
 
     if inner_model_type == 0:
         dadt = _hard_func_innerpwl_model0(mtot, mrat, sepa, nu_inner, 
@@ -289,6 +294,28 @@ cdef double _hard_func_innerpwl_gw(
     dadt += hard_gw(mtot, mrat, sepa)
     
     return dadt
+
+
+def hard_func_innerpwl_gw(
+    mtot, mrat, sepa, inner_model_type, dadt_rchar, rchar, nu_inner,
+    r_gwcrit_9, gwcrit_units_rg, alpha_gwcrit, beta_gwcrit
+):
+    """Wrapper of `_hard_func_innerpwl_gw`, to compare with `FixedOuterTime_InnerPL_SAM.dadt`.
+
+    NOTE: this function will be somewhat slow, because of the explicit broadcasting!
+
+    """
+    # `mtot`, `mrat`, `sepa` and `rchar` are broadcast together; the model parameters are scalars
+    args = np.broadcast_arrays(mtot, mrat, sepa, rchar)
+    shape = args[0].shape
+    mtot, mrat, sepa, rchar = [np.asarray(aa, dtype=float).flatten() for aa in args]
+    dadt = np.zeros(mtot.size)
+    for ii in range(mtot.size):
+        dadt[ii] = _hard_func_innerpwl_gw(
+            mtot[ii], mrat[ii], sepa[ii], inner_model_type, dadt_rchar, rchar[ii], nu_inner,
+            r_gwcrit_9, gwcrit_units_rg, alpha_gwcrit, beta_gwcrit
+        )
+    return dadt.reshape(shape)
 
 
 
@@ -555,6 +582,7 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
             fobs_orb, hard._num_steps, hard._outer_time, 
             hard._inner_model_type, dadt_rchar, hard._rchar_9, hard._alpha_char, 
             nu_inner, hard._r_gw_crit_9, hard_gwcrit_units_rg, hard._alpha_gw_crit,
+            hard._beta_gw_crit,
             dens, sam.mtot, sam.mrat, sam.redz, gmt_time,
             cosmo._grid_z, cosmo._grid_dcom, cosmo._grid_age,
             # output:
@@ -605,6 +633,7 @@ cdef int _dynamic_binary_number_at_fobs_innerpwl(
     double hard_r_gwcrit_9,
     int hard_gwcrit_units_rg,
     double hard_alpha_gwcrit, 
+    double hard_beta_gwcrit,
 
     double[:, :, :] dens,
     double[:] mtot,
@@ -714,7 +743,7 @@ cdef int _dynamic_binary_number_at_fobs_innerpwl(
             dadt_left =  _hard_func_innerpwl_gw(
                 mt, mr, sepa_left, hard_inner_model_type, 
                 hard_dadt_rchar, hard_rchar, hard_nu_inner, 
-                hard_r_gwcrit_9, hard_gwcrit_units_rg, hard_alpha_gwcrit 
+                hard_r_gwcrit_9, hard_gwcrit_units_rg, hard_alpha_gwcrit, hard_beta_gwcrit
             )
 
             # get rest-frame orbital frequency of binary at left edge
@@ -735,7 +764,7 @@ cdef int _dynamic_binary_number_at_fobs_innerpwl(
                 dadt_right =  _hard_func_innerpwl_gw(
                     mt, mr, sepa_right, hard_inner_model_type, 
                     hard_dadt_rchar, hard_rchar, hard_nu_inner, 
-                    hard_r_gwcrit_9, hard_gwcrit_units_rg, hard_alpha_gwcrit 
+                    hard_r_gwcrit_9, hard_gwcrit_units_rg, hard_alpha_gwcrit, hard_beta_gwcrit
                 )
 
                 # Find time to move from left- to right- edges:  dt = da / (da/dt)
@@ -854,7 +883,7 @@ cdef int _dynamic_binary_number_at_fobs_innerpwl(
                         dadt =  _hard_func_innerpwl_gw(
                             mt, mr, sepa, hard_inner_model_type, 
                             hard_dadt_rchar, hard_rchar, hard_nu_inner, 
-                            hard_r_gwcrit_9, hard_gwcrit_units_rg, hard_alpha_gwcrit 
+                            hard_r_gwcrit_9, hard_gwcrit_units_rg, hard_alpha_gwcrit, hard_beta_gwcrit
                         )
 
                         # calculate residence/hardening time = f/[df/dt] = -(2/3) a/[da/dt]
