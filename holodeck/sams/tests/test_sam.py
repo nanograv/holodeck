@@ -251,21 +251,26 @@ def test_dbn_phenom():
 def test_innerpwl_dadt_cython_vs_python():
     """Check the cython inner power-law hardening rate against `FixedOuterTime_InnerPL_SAM.dadt`.
 
-    Covers both inner models, the mass-ratio scaling of r_gw_crit (`beta_gw_crit`), and r_gw_crit
-    below ISCO (where it is set to ISCO).
+    Covers both inner models, the mass-ratio scaling of r_gw_crit (`beta_gw_crit`), r_gw_crit
+    below ISCO (where it is set to ISCO), and r_gw_crit above rchar (no inner phase).
 
     """
     sam = holo.sams.Semi_Analytic_Model(shape=(20, 15, 3))
     mt = sam.mtot[:, np.newaxis, np.newaxis, np.newaxis]
     mr = sam.mrat[np.newaxis, :, np.newaxis, np.newaxis]
 
-    # low `r_gw_crit_9` puts r_gw_crit below ISCO for the most massive binaries
+    # `r_gw_crit_9` = 10**0.8 Rg is just above ISCO for an equal-mass 1e9 Msun binary, but the mass
+    # and mass-ratio scalings put r_gw_crit below ISCO for about half of this grid.
+    # `r_gw_crit_9` = 10**4 Rg (top of the PS_NG20_Fiducial range) puts r_gw_crit above rchar
+    # for about half of this grid.
     cases = [
         dict(inner_model_type=0),
         dict(inner_model_type=0, beta_gw_crit=0.0),
         dict(inner_model_type=0, r_gw_crit_9=10**0.8, nu_inner=-1.0),
+        dict(inner_model_type=0, r_gw_crit_9=10**4.0),
         dict(inner_model_type=1, dadt_rchar=-1.0e3, nu_inner=None),
         dict(inner_model_type=1, dadt_rchar=-1.0e3, nu_inner=None, r_gw_crit_9=10**0.8),
+        dict(inner_model_type=1, dadt_rchar=-1.0e3, nu_inner=None, r_gw_crit_9=10**4.0),
     ]
     for kw in cases:
         hard = holo.hardening.FixedOuterTime_InnerPL_SAM(sam, rchar_9=0.1*PC, **kw)
