@@ -11,8 +11,8 @@ Stored layout
 Arrays are ``(nparam, nrank, nreal, nsamp)``, i.e. the *sample* axis is last, so that the flow's
 training array is built by broadcasting the astro parameters against the CW columns::
 
-    cw   = np.concatenate([f[k][:] for k in f.attrs['cw_keys']], axis=0)   # (3, K, R, S)
-    ast  = np.broadcast_to(f['theta_ast'][:], (nastro,) + cw.shape[1:])    # (6, K, R, S)
+    cw   = np.concatenate([f[k][:] for k in f.attrs['cw_keys']], axis=0)   # (3, nrank, nreal, nsamp)
+    ast  = np.broadcast_to(f['theta_ast'][:], (nastro,) + cw.shape[1:])    # (nholo, nrank, nreal, nsamp)
     gwb  = np.broadcast_to(f['half_log10rho'][:], (nfreqs,) + cw.shape[1:])
     ncol = nastro + len(cw_keys) + nfreqs
     rows = np.concatenate([ast, cw, gwb], axis=0).reshape(ncol, -1).T      # (N, ncol)
