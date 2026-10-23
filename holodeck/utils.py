@@ -27,9 +27,10 @@ from typing import Optional, Tuple, Union, List   #, Callable, TypeVar, Any  # ,
 
 import numpy as np
 import numpy.typing as npt
+from scipy.interpolate import PchipInterpolator
 
 from holodeck import log, cosmo
-from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC, EDDT
+from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC, EDDT, MSOL
 
 class _LazyNJIT:
     """A lazy proxy decorator for numba.njit to prevent compiler loading at import."""
@@ -2467,7 +2468,7 @@ def _gw_strain_source(mchirp, dcom, freq_rest_orb):
 def sep_to_merge_in_time(m1, m2, time):
     """The initial separation required to merge within the given time.
 
-    See: [Peters1964]_
+    See: [Peters1964]_ (Equation 5.10).
 
     Parameters
     ----------
@@ -2485,7 +2486,8 @@ def sep_to_merge_in_time(m1, m2, time):
 
     """
     m1, m2, time = _array_args(m1, m2, time)
-    GW_CONST = 64*np.power(NWTG, 3.0)/(5.0*np.power(SPLC, 5.0))
+    # GW_CONST is 4*beta in Peters 1964 eqn 5.10:
+    GW_CONST = 256*np.power(NWTG, 3.0)/(5.0*np.power(SPLC, 5.0))
     a1 = rad_isco(m1, m2)
     return np.power(GW_CONST*m1*m2*(m1+m2)*time - np.power(a1, 4.0), 1./4.)
 
@@ -2493,7 +2495,7 @@ def sep_to_merge_in_time(m1, m2, time):
 def time_to_merge_at_sep(m1, m2, sepa):
     """The time required to merge starting from the given initial separation.
 
-    See: [Peters1964]_.
+    See: [Peters1964]_ (Equation 5.10).
 
     Parameters
     ----------
@@ -2511,7 +2513,8 @@ def time_to_merge_at_sep(m1, m2, sepa):
 
     """
     m1, m2, sepa = _array_args(m1, m2, sepa)
-    GW_CONST = 64*np.power(NWTG, 3.0)/(5.0*np.power(SPLC, 5.0))
+    # GW_CONST is 4*beta in Peters 1964 eqn 5.10:
+    GW_CONST = 256*np.power(NWTG, 3.0)/(5.0*np.power(SPLC, 5.0))
     a1 = rad_isco(m1, m2)
     delta_sep = np.power(sepa, 4.0) - np.power(a1, 4.0)
     return delta_sep/(GW_CONST*m1*m2*(m1+m2))
@@ -2594,6 +2597,218 @@ def char_strain_to_strain_amp(hc, fc, df):
     """
     hs = hc * np.sqrt(df/fc)
     return hs
+
+
+def get_nuin_min(_lgr9rg, DEFAULTS, absmin=-4.0, speed_limit=SPLC,
+                 mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91), mrat=(1e-3, 1.0, 81)):
+    """
+    Minimum allowed inner hardening power-law index, nu_inner, for a given r_gw_crit_9.
+
+    For the ``FixedOuterTime_InnerPL_SAM`` hardening model, finds the smallest
+    ``nu_inner`` that keeps the hardening rate at r_gw_crit_9 below the max da/dt
+    (the ``speed_limit``). The result is the most restrictive
+    (largest) lower bound over a grid of binary total masses and mass ratios,
+    so a single value is valid for the whole population.
+
+    Method
+    ------
+    On a log-spaced (mtot, mrat) grid:
+
+    1. Compute the characteristic radius ``rchar`` and critical separation 
+       ``rgw_crit`` at which the binary transitions to the GW regime, using the 
+       scalings in ``DEFAULTS``. ``rgw_crit`` is defined for a 1e9 Msun binary 
+       by ``lgr9rg`` (in gravitational units) and scales with mass and symmetric
+       mass ratio.
+    2. Only binaries with ``rgw_crit < rchar`` have an 'inner' hardening regime;
+       the rest are set to NaN.
+    3. Evaluate the GW-driven ``|da/dt|`` at ``rgw_crit`` and solve for the
+       ``nu_inner`` at which the hardening rate reaches the max da/dt,
+       clipped from below at ``absmin``.
+    4. Return the maximum over the grid, ignoring NaNs.
+
+    Parameters
+    ----------
+    _lgr9rg : float or array-like
+        log10 of r_gw_crit_9 (transition separation for an equal-mass 1e9 Msun 
+	binary, in units of gravitational radii).
+    DEFAULTS : dict
+        Hardening-model parameters. Must contain:
+        - ``hard_rchar_9`` : characteristic radius for a 1e9 Msun binary [pc]
+        - ``hard_alpha_char`` : mass scaling exponent of ``rchar``
+        - ``hard_alpha_gw_crit`` : mass scaling exponent of ``rgw_crit``
+        - ``hard_beta_gw_crit`` : mass ratio scaling exponent of``rgw_crit``
+    absmin : float, optional
+        Absolute floor on ``nu_inner`` (default -4.0). Binaries where the
+        speed-limit constraint is not binding return this value.
+    speed_limit : float, optional
+        Maximum allowed hardening speed |da/dt| (default ``SPLC``, the speed
+        of light). Same units as the output of
+        ``gw_hardening_rate_dadt``.
+    mtot : tuple (float, float, int), optional
+        ``(min, max, n)`` for the log-spaced grid of total masses, in grams
+        (default 1e4 to 1e12 Msun, 91 points).
+    mrat : tuple (float, float, int), optional
+        ``(min, max, n)`` for the log-spaced grid of mass ratios
+        (default 1e-3 to 1, 81 points).
+
+    Returns
+    -------
+    float or array-like
+        The largest (most restrictive) minimum ``nu_inner`` across the grid,
+        ignoring NaNs. NaN if no grid point has ``rgw_crit < rchar``. Shape
+        is the same as lgr9rg.
+
+    Raises
+    ------
+    ValueError
+        If ``log10(rchar / rgw_crit)`` is negative for any constrained binary,
+        or if any computed minimum ``nu_inner`` exceeds 1. Both indicate an
+        internal inconsistency.
+    """
+
+    mtot_arr = np.logspace(*np.log10(mtot[:2]),mtot[2])
+    mrat_arr = np.logspace(*np.log10(mrat[:2]),mrat[2])
+    if np.isscalar(_lgr9rg):
+        lgr9rg = _lgr9rg
+        mt, mr = np.broadcast_arrays(mtot_arr[:, np.newaxis], mrat_arr[np.newaxis, :])
+    else:
+        lgr9rg, mt, mr = np.broadcast_arrays(_lgr9rg[:, np.newaxis, np.newaxis], 
+                                             mtot_arr[np.newaxis, :, np.newaxis], 
+                                             mrat_arr[np.newaxis, np.newaxis, :]) 
+    m9 = mt / (1.0e9 * MSOL)
+    m1, m2 = m1m2_from_mtmr(mt, mr)
+    eta_norm = 4.0 * mr / np.square(1 + mr)
+
+    rchar = (DEFAULTS['hard_rchar_9'] * PC) * m9**(DEFAULTS['hard_alpha_char'] + 1)
+    risco = rad_isco(m1,m2)
+
+    r9cm = (10.0**lgr9rg) * gravitational_radius(1.0e9 * MSOL)
+    rgw_crit = (r9cm * m9**(DEFAULTS['hard_alpha_gw_crit'] + 1) * 
+                eta_norm**DEFAULTS['hard_beta_gw_crit'])
+
+    # mask to identify binaries with an inner hardening phase
+    mask_inner = rgw_crit < rchar
+    # mask to identify binaries with a GW-dominated phase
+    mask_isco = rgw_crit > risco
+
+    # set rgw_crit to isco for any rgw_crit<risco
+    if np.any(~mask_isco):
+        rgw_crit[~mask_isco] = risco[~mask_isco]
+        warn="found rgw_crit<=risco. Setting to risco for these binaries with no GW phase."
+        log.warning(warn)
+
+    # calculate dadt_gw_crit and lgrdiff 
+    dadt_gw_crit = gw_hardening_rate_dadt(m1, m2, rgw_crit)
+    lgrdiff = np.log10(rchar) - np.log10(rgw_crit)
+
+    # calculate min allowed nuin for each mt,mr
+    nuin_min_calc = 1.0 - np.log10(speed_limit/np.abs(dadt_gw_crit)-1) / lgrdiff
+    nuin_min_calc = np.maximum(absmin, nuin_min_calc)
+
+    # set nuin_min = nan if rgw > rchar
+    nuin_min = np.where(mask_inner, nuin_min_calc, np.nan)
+
+    # perform checks
+    if np.any(lgrdiff[mask_inner] < 0):
+        err = f"something went wrong: negative lgrdiff for {lgr9rg=}"
+        log.error(err)
+        raise ValueError(err)
+    if np.any(nuin_min > 1):
+        err=f"something went wrong. {np.nanmax(nuin_min)=}"
+        log.error(err)
+        raise ValueError(err)
+    if np.any(dadt_gw_crit * (1 + (rchar/rgw_crit)**(1.0-nuin_min)) >= speed_limit):
+        err=("something went wrong. "
+             f"max dadt={dadt_gw_crit * (1 + (rchar/rgw_crit)**(1.0-nuin_min))}, "
+             f"{speed_limit=}, {np.nanmax(nuin_min)=}")
+        log.error(err)
+        raise ValueError(err)        
+
+    if np.isscalar(_lgr9rg):
+        return np.nanmax(nuin_min)
+    else:
+        #print(f"{nuin_min.shape=}, {np.nanmax(nuin_min,axis=(-2,-1)).shape=}")
+        return np.nanmax(nuin_min,axis=(-2,-1))
+
+def default_sam_grid(var):
+    """Returns default SAM grid min, max, & shape for mtot, mrat, or redz.
+    
+    Parameters
+    -----------
+    var : str
+        Must be 'mtot', 'mrat', or 'redz'. Will return a tuple of the specifications (min, max, and shape) 
+        of the grid to be used for creating a semi-analytic black hole binary population model.
+        
+    Returns
+    --------
+    default_specs : tuple, shape (3,)
+        Tuple of integers specifying the minimum, maximum, and shape of the grid for this SAM variable.
+    """
+    
+    if var=='mtot':
+        default_specs = (1.0e4*MSOL, 1.0e12*MSOL, 91)
+    elif var=='mrat':
+        default_specs = (1e-3, 1.0, 81)
+    elif var=='redz':
+        default_specs = (1e-3, 10.0, 101)
+    else:
+        raise ValueError(f"{var=} must be 'mtot', 'mrat', or 'redz'.")
+    
+    return default_specs
+    
+@deprecated_warn("use `holodeck.utils.get_nuin_min` instead to get exact, not interpolated, values)")
+def create_nuin_min_interp(lgr9rg_arr, DEFAULTS, absmin=-4.0, **kwargs):
+    """
+    Build an interpolator for the minimum allowed nu_inner vs. r_gw_crit_9.
+
+    For the ``FixedOuterTime_InnerPL_SAM`` hardening model, evaluates
+    ``get_nuin_min`` on a grid of ``lgr9rg`` values and wraps the results in a
+    PCHIP interpolator, so the minimum ``nu_inner`` can be looked up cheaply at
+    arbitrary ``lgr9rg`` (e.g. when sampling parameters in a prior distribution).
+
+    Parameters
+    ----------
+    lgr9rg_arr : array_like, shape (n,)
+        Grid of log10(r_gw_crit_9) values, where r_gw_crit_9 is the critical at 
+	which an equal-mass, 10^9 Msun binary transitions to the GW regime,
+	in units of gravitational radii. Must be strictly increasing (required 
+	by ``PchipInterpolator``).
+    DEFAULTS : dict
+        Hardening-model parameters, passed through to ``get_nuin_min``. See
+        that function for the required keys (``hard_rchar_9``,
+        ``hard_alpha_char``, ``hard_alpha_gw_crit``, ``hard_beta_gw_crit``).
+    absmin : float, optional
+        Absolute floor on ``nu_inner`` (default -4.0). Passed to
+        ``get_nuin_min`` so the interpolated minimum is never below 
+        this value (up to PCHIP behavior between grid points).
+    **kwargs
+        Additional keyword arguments forwarded to ``get_nuin_min``, e.g.
+        ``speed_limit``, ``mtot``, ``mrat``.
+
+    Returns
+    -------
+    scipy.interpolate.PchipInterpolator
+        Callable ``f(lgr9rg)`` returning the minimum allowed ``nu_inner``.
+        Accepts scalars or arrays.
+
+    Notes
+    -----
+    PCHIP (piecewise cubic Hermite) is monotonicity-preserving within each
+    interval and does not overshoot the data, so it stays within the range of
+    neighboring grid values. It only requires ``lgr9rg_arr`` to be increasing;
+    the ``nu_inner`` values themselves can be non-monotonic or have kinks
+    (e.g. where the floor ``absmin`` becomes active).
+
+    If ``get_nuin_min`` returns NaN for some grid points (no binary satisfies
+    ``rgw_crit < rchar``), those NaNs propagate into the interpolator and
+    will corrupt the neighboring intervals. Choose ``lgr9rg_arr`` so this
+    doesn't happen, or filter NaNs before interpolating.
+    """
+    nuin_min_arr = np.array([get_nuin_min(x, DEFAULTS, absmin=absmin, 
+                                          **kwargs) for x in lgr9rg_arr])
+    # Pchip only needs lgr9rg_arr sorted increasing; 
+    # nuin_min can be any shape (non-monotonic, kinked, etc.)
+    return PchipInterpolator(lgr9rg_arr, nuin_min_arr)
 
 
 @lazy_njit
