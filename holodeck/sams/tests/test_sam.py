@@ -247,3 +247,54 @@ def test_dbn_phenom():
 
     return
 
+
+def test_innerpwl_dadt_cython_vs_python():
+    """Check the cython inner power-law hardening rate against `FixedOuterTime_InnerPL_SAM.dadt`.
+
+    Covers both inner models, the mass-ratio scaling of r_gw_crit (`beta_gw_crit`), and r_gw_crit
+    below ISCO (where it is set to ISCO).
+
+    """
+    sam = holo.sams.Semi_Analytic_Model(shape=(20, 15, 3))
+    mt = sam.mtot[:, np.newaxis, np.newaxis, np.newaxis]
+    mr = sam.mrat[np.newaxis, :, np.newaxis, np.newaxis]
+
+    # low `r_gw_crit_9` puts r_gw_crit below ISCO for the most massive binaries
+    cases = [
+        dict(inner_model_type=0),
+        dict(inner_model_type=0, beta_gw_crit=0.0),
+        dict(inner_model_type=0, r_gw_crit_9=10**0.8, nu_inner=-1.0),
+        dict(inner_model_type=1, dadt_rchar=-1.0e3, nu_inner=None),
+        dict(inner_model_type=1, dadt_rchar=-1.0e3, nu_inner=None, r_gw_crit_9=10**0.8),
+    ]
+    for kw in cases:
+        hard = holo.hardening.FixedOuterTime_InnerPL_SAM(sam, rchar_9=0.1*PC, **kw)
+
+        # separations spanning ISCO to rchar at each total mass
+        risco = utils.rad_isco(mt)
+        rchar = hard._rchar_9 * (mt / (1.0e9*MSOL))**(hard._alpha_char + 1)
+        sepa = risco * (rchar / risco)**np.linspace(0.02, 0.98, 9)
+
+        # `hard.dadt` indexes with boolean masks, so it needs fully broadcast (M, Q, Z, S) inputs
+        args = np.broadcast_arrays(mt, mr, 1.0, sepa, rchar)
+        mt_bc, mr_bc, redz_bc, sepa_bc, rchar_bc = [np.array(aa) for aa in args]
+        dadt_py = hard.dadt(mt_bc, mr_bc, redz_bc, sepa_bc)[0]
+
+        # parameters not used by this inner model are NaN, as in `dynamic_binary_number_at_fobs`
+        nu_inner = np.nan if hard._nu_inner is None else hard._nu_inner
+        dadt_rchar = np.nan if hard._dadt_rchar is None else hard._dadt_rchar
+        dadt_cy = holo.sams.sam_cyutils.hard_func_innerpwl_gw(
+            mt_bc, mr_bc, sepa_bc, hard._inner_model_type, dadt_rchar, rchar_bc, nu_inner,
+            hard._r_gw_crit_9, int(hard._gw_crit_units == 'rg'), hard._alpha_gw_crit, hard._beta_gw_crit
+        )
+
+        bads = ~np.isclose(dadt_py, dadt_cy, rtol=1e-8, atol=0.0)
+        if np.any(bads):
+            print(f"{kw=}")
+            print(f"{utils.frac_str(bads)=}")
+            print(f"{dadt_py[bads][:10]=}")
+            print(f"{dadt_cy[bads][:10]=}")
+            assert not np.any(bads), f"Found {utils.frac_str(bads)} inconsistent `dadt` b/t python and cython for {kw}!"
+
+    return
+
