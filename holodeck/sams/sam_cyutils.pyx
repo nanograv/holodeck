@@ -273,7 +273,8 @@ cdef double _hard_func_innerpwl_gw(
     else:
         r_gwcrit = (r_gwcrit_9 * MY_RGRV * 1.0e9*MY_MSOL) 
 
-    # mass-ratio scaling of r_gwcrit, as in `FixedOuterTime_InnerPL_SAM.dadt`
+    # mass and mass-ratio scaling of r_gwcrit, as in `FixedOuterTime_InnerPL_SAM.dadt` 
+    # (note that alpha_gwcrit+1 must be used here b/c r_gwcrit is converted to [cm] in both cases above)
     r_gwcrit *= (pow(mtot/(1.0e9*MY_MSOL), alpha_gwcrit+1) * pow(eta_norm, beta_gwcrit))
 
     # set r_gwcrit = risco for any rgw_crit<risco
