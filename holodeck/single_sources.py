@@ -29,7 +29,7 @@ log = holo.log
 log.setLevel(logging.INFO)
 
 par_names = np.array(['mtot', 'mrat', 'redz_init', 'redz_final', 'dcom_final', 'sepa_final', 'angs_final'])
-par_labels = np.array(['Total Mass $M$ ($M_\odot$)', 'Mass Ratio $q$', 'Initial Redshift $z_i$', 'Final Redshift $z_f$',
+par_labels = np.array([r'Total Mass $M$ ($M_\odot$)', 'Mass Ratio $q$', 'Initial Redshift $z_i$', 'Final Redshift $z_f$',
                    'Final Comoving Distance $d_c$ (Mpc)', 'Final Separation (pc)', 'Final Angular Separation (rad)'])
 par_units = np.array([1/MSOL, 1, 1, 1, 1/MPC,  1/PC, 1])
 
@@ -1554,7 +1554,7 @@ def number_test(num, bgnum, fobs, exname='', plot_test=False):
         # print(num[...,0].shape)
         for f in range(len(fobs)):
             ax[f].scatter(bins, (num[...,f] - bgnum[...,f]))
-            ax[f].set_title('$f_\mathrm{obs}$ = %dnHz' % (fobs[f]*10**9))
+            ax[f].set_title(r'$f_\mathrm{obs}$ = %dnHz' % (fobs[f]*10**9))
             ax[f].set_xlabel('bin')
         fig.tight_layout()
     print('number test passed')
@@ -2027,9 +2027,9 @@ def plot_params(axs, xx, REALS=1, LABEL='', grid=None,
                 BG_MEDIAN=True, SS_MEDIAN=True,
                 BG_ERRORS=True, SS_ERRORS=True,
                 BG_COLOR='k', SS_COLOR='mediumorchid',
-                TITLES = np.array([['Total Mass $M/M_\odot$', 'Mass Ratio $q$'], 
+                TITLES = np.array([[r'Total Mass $M/M_\odot$', 'Mass Ratio $q$'], 
                                    ['Redshift $z$', 'Characteristic Strain $h_c$']]),
-                XLABEL = 'Frequency $f_\mathrm{obs}$ (1/yr)',
+                XLABEL = r'Frequency $f_\mathrm{obs}$ (1/yr)',
                 SHOW_LEGEND = True):             
     """
     Plot mass, ratio, redshift, and strain in 4 separate subplots.
@@ -2148,7 +2148,7 @@ def plot_params(axs, xx, REALS=1, LABEL='', grid=None,
 
 
 def threshold_hc():
-    """
+    r"""
     Rosado+ 2015, SNR calculation
     S := cross correlation between pulsars 
     S = \int_{-T/2}^{T/2} dt \int dt' s_i(t) s_j(t') Q(t,t')
