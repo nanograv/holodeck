@@ -17,6 +17,7 @@ from holodeck.constants import SPLC, NWTG, MPC
 
 
 _CALC_MC_PARS = ['mass', 'sepa', 'dadt', 'scafa', 'eccen', 'mdot']
+REDZ_CENTERS_METHOD = 'weighted'
 
 
 class Grav_Waves:
@@ -698,7 +699,72 @@ def poisson_as_needed(values, thresh=1e10):
     return output
 
 
-def char_strain_sq_from_bin_edges_redz(edges, redz):
+def redz_at_bin_centers(redz, method, dnum=None):
+    """  Get redshifts at bin centers handling stalled corners by the specified method,
+
+    Parameters
+    ----------
+    redz : (M,Q,Z,F) ndarray
+        Redshift values defined on the edges of the bins.
+    method : str
+        Method to average corners..
+        `weighted` : Average corners weighted by their dnum, zero-ing out stalled corners.
+        `legacy`   : Average all corners regardless of stalled status, including negative ones.
+        `drop`     : Drop entire bins with any stalled corners by setting them to -inf.
+    dnum : (M,Q,Z,F) ndarry or None
+        Differential number of binaries at grid edges. Required for `weighted' method.
+
+
+    Returns
+    -------
+    redz_cents : (M-1, Q-1, Z-1, F) ndarray
+        Redshift values at the bin centers.
+    """
+
+
+    # Drop method matches the April 2026 fix (96728a3) applied only to lib_tools.run_model's gwb
+    # Stalled corners are set to -inf. Entire bins with those corners will be averaged to -inf
+    if method == 'drop':
+        redz_cents = np.where(redz < 0.0, -np.inf, redz)
+        redz_cents = utils.midpoints_multiax(redz_cents, axis=(0, 1, 2))
+        return redz_cents
+
+    # Unweighted average for legacy methods, assuming stalled redz is already -1.0
+    # from sam_cyutils.dynamic_binary_number_at_fobs
+    elif method == 'legacy':
+        redz_cents = utils.midpoints_multiax(redz, axis=(0, 1, 2))
+        return redz_cents
+
+    elif method == 'weighted':
+        if dnum is None:
+            raise ValueError(
+                "dnum must be provided when using 'weighted' method." \
+                "To keep the old mean of corners instead, pass method='legacy' or set "
+                "holodeck.gravwaves.REDZ_CENTERS_METHOD = 'legacy''.")
+        if np.shape(dnum) != np.shape(redz):
+            raise ValueError(
+                f"dnum shape {np.shape(dnum)} != redz shape {np.shape(redz)}; "
+                "pass the differential number (diff_num), not the integrated number.")
+
+
+        # Weighted average over corners with valid redshifts (#165).
+        # Stalled corners should already have dnum=0.0 from sam_cyutils.dynamic_binary_number_at_fobs
+        good = redz > 0.0 # stalled corners will be -1.0 or -inf, depending on call sight
+        weights = np.where(good, dnum, 0.0) # ensure stalled corners have zero weight
+        numer = np.where(good, redz, 0.0) # set negative redz to 0, to avoid -inf redz * 0.0 dnum = np.nan
+        numer *= weights
+        numer = utils.midpoints_multiax(numer, axis=(0, 1, 2))
+        denom = utils.midpoints_multiax(weights, axis=(0, 1, 2))
+        redz_cents = np.divide(numer, denom, out=np.full_like(numer, -1.0), where=denom > 0.0)
+        return redz_cents
+
+    else:
+        raise ValueError(f"Unknown method: {method}. Must be one of 'weighted', 'legacy', or 'drop'.")
+
+
+
+
+def char_strain_sq_from_bin_edges_redz(edges, redz, dnum=None, redz_method=None):
     assert len(edges) == 4
     assert np.all([np.ndim(ee) == 1 for ee in edges])
 
@@ -709,10 +775,12 @@ def char_strain_sq_from_bin_edges_redz(edges, redz):
     # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)
     #    where M, Q, Z are edges and Fc is frequency centers
     # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
-    for dd in range(3):
-        redz = np.moveaxis(redz, dd, 0)
-        redz = kale.utils.midpoints(redz, axis=0)
-        redz = np.moveaxis(redz, 0, dd)
+    # for dd in range(3):
+    #     redz = np.moveaxis(redz, dd, 0)
+    #     redz = kale.utils.midpoints(redz, axis=0)
+    #     redz = np.moveaxis(redz, 0, dd)
+    redz_method = REDZ_CENTERS_METHOD if redz_method is None else redz_method
+    redz = redz_at_bin_centers(redz, method=redz_method, dnum=dnum)
 
     # ---- calculate GW strain ----
     mt = kale.utils.midpoints(edges[0])
@@ -733,7 +801,7 @@ def char_strain_sq_from_bin_edges_redz(edges, redz):
     hc2 = (hs ** 2) * (fc / df)
     return hc2
 
-def strain_amp_from_bin_edges_redz(edges, redz):
+def strain_amp_from_bin_edges_redz(edges, redz, dnum=None, redz_method=None):
     assert len(edges) == 4
     assert np.all([np.ndim(ee) == 1 for ee in edges])
 
@@ -744,10 +812,8 @@ def strain_amp_from_bin_edges_redz(edges, redz):
     # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)
     #    where M, Q, Z are edges and Fc is frequency centers
     # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
-    for dd in range(3):
-        redz = np.moveaxis(redz, dd, 0)
-        redz = kale.utils.midpoints(redz, axis=0)
-        redz = np.moveaxis(redz, 0, dd)
+    redz_method = REDZ_CENTERS_METHOD if redz_method is None else redz_method
+    redz = redz_at_bin_centers(redz, dnum=dnum, method=redz_method)
 
     # ---- calculate GW strain ----
     mt = kale.utils.midpoints(edges[0])
