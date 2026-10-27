@@ -37,7 +37,7 @@ par_units = np.array([1/MSOL, 1, 1, 1, 1/MPC,  1/PC, 1])
 ############## STRAIN CALCULATIONS ################
 ###################################################
 
-def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
+def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False, dnum=None, redz_method=None):
        
     """ Calculate strain from the loudest single sources and background.
 
@@ -58,7 +58,13 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
         Specification of how many discrete realizations to construct.
     loudest : int
         Number of loudest single sources to separate from background.
-    
+    dnum : (M, Q, Z, F) NDarray or None
+        Differential number of binaries on the same grid as `redz`, used to weight redshifts
+        when averaging to bin centers. Required for the `weighted` method.
+    redz_method : str or None
+        Method passed to `gravwaves.redz_at_bin_centers`. None uses
+        `gravwaves.REDZ_CENTERS_METHOD`.
+
 
     Returns
     -------
@@ -83,7 +89,7 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
 
 
     # hsfdf = hsamp^2 * f/df # this is same as hc^2
-    h2fdf = gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz)
+    h2fdf = gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz, dnum=dnum, redz_method=redz_method)
 
     # indices of bins sorted by h2fdf
     indices = np.argsort(-h2fdf[...,0].flatten()) # just sort for first frequency
@@ -111,10 +117,7 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
             # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)
             #    where M, Q, Z are edges and Fc is frequency centers
             # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
-            for dd in range(3):
-                redz = np.moveaxis(redz, dd, 0)
-                redz = kale.utils.midpoints(redz, axis=0)
-                redz = np.moveaxis(redz, 0, dd)
+            redz = gravwaves.redz_at_bin_centers(redz, method=redz_method, dnum=dnum)
 
             # if np.any(np.logical_and(redz<0, redz!=-1)):
             #     err = np.sum(np.logical_and(redz<0, redz!=-1))
