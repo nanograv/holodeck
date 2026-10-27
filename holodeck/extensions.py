@@ -142,7 +142,7 @@ class Realizer_SAM:
         edges = [sam.mtot, sam.mrat, sam.redz, fobs_orb_edges]
         number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num) # fractional number per bin
 
-        samples = get_samples_from_edges(edges, redz, number.shape, flatten=True)
+        samples = get_samples_from_edges(edges, redz, number.shape, flatten=True, dnum=diff_num)
         names = ['mtot', 'mrat', 'redz', 'fobs']
         number = number.flatten()
         shape = (number.size, nreals)
@@ -168,7 +168,7 @@ class Realizer_SAM:
         return names, samples, weights
 
 
-def get_samples_from_edges(edges, redz, number_shape, flatten=True):
+def get_samples_from_edges(edges, redz, number_shape, flatten=True, dnum=None, redz_method=None):
     """ Get the sample parameters for every bin center and return as flattened arrays.
 
     Parameters
@@ -181,6 +181,12 @@ def get_samples_from_edges(edges, redz, number_shape, flatten=True):
         Shape [M,Q,Z,F]
     flatten : boolean
         Whether or not to flatten each sample array
+    dnum : NDarray or None
+        Differential number of binaries on the same grid as `redz`, used to weight redshifts
+        when averaging to bin centers. Required for the `weighted` method.
+    redz_method : str or None
+        Method passed to `gravwaves.redz_at_bin_centers`. None uses
+        `gravwaves.REDZ_CENTERS_METHOD`.
 
     Returns
     -------
@@ -194,10 +200,7 @@ def get_samples_from_edges(edges, redz, number_shape, flatten=True):
     fobs_orb_cents = kale.utils.midpoints(edges[3])
     fobs = 2.0 * fobs_orb_cents           #: gw fobs
 
-    for dd in range(3):
-        redz = np.moveaxis(redz, dd, 0)
-        redz = kale.utils.midpoints(redz, axis=0) # get final redz at bin centers
-        redz = np.moveaxis(redz, 0, dd)
+    redz = gravwaves.redz_at_bin_centers(redz, method=redz_method, dnum=dnum) # get final redz at bin centers
     sel = (redz > 0.0) # identify emitting sources
     redz[~sel] = -1.0 # set all other redshifts to zero
     redz[redz<0] = -1.0

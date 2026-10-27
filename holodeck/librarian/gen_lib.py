@@ -562,6 +562,8 @@ def _save_config(args):
     # Add additional entries
     config['holodeck_version'] = holo.__version__
     config['holodeck_librarian_version'] = holo.librarian.__version__
+    # how redshifts were averaged to bin centers (#165); absent from libraries made before this fix, equivalent to the 'legacy' method
+    config['redz_centers_method'] = holo.gravwaves.REDZ_CENTERS_METHOD
     config['holodeck_git_hash'] = holo.utils.get_git_hash()
     config['created'] = str(datetime.now())
 

@@ -475,7 +475,7 @@ def sampled_gws_from_sam(sam, fobs_gw, hard=hardening.Hard_GW, **kwargs):
     return gff, gwf, gwb
 
 
-def _gws_from_number_grid_integrated_redz(edges, redz, number, realize, sum=True):
+def _gws_from_number_grid_integrated_redz(edges, redz, number, realize, sum=True, dnum=None, redz_method=None):
     """
 
     Parameters
@@ -494,6 +494,11 @@ def _gws_from_number_grid_integrated_redz(edges, redz, number, realize, sum=True
         If an `int` value, then how many discrete realizations to construct.
     sum : bool,
         Whether or not to sum over axes {0, 1, 2}.
+    dnum : (M, Q, Z, F) ndarray or None
+        Differential number of binaries on the same grid as `redz`, used to weight redshifts
+        when averaging to bin centers. Required for the `weighted` method.
+    redz_method : str or None
+        Method passed to `redz_at_bin_centers`. None uses `REDZ_CENTERS_METHOD`.
 
     Returns
     -------
@@ -505,7 +510,7 @@ def _gws_from_number_grid_integrated_redz(edges, redz, number, realize, sum=True
 
     """
 
-    hc2 = char_strain_sq_from_bin_edges_redz(edges, redz)
+    hc2 = char_strain_sq_from_bin_edges_redz(edges, redz, dnum=dnum, redz_method=redz_method)
 
     # Create a single realization
     if realize is True:
@@ -699,21 +704,20 @@ def poisson_as_needed(values, thresh=1e10):
     return output
 
 
-def redz_at_bin_centers(redz, method, dnum=None):
-    """  Get redshifts at bin centers handling stalled corners by the specified method,
+def redz_at_bin_centers(redz, method=None, dnum=None):
+    """Get redshifts at bin centers, handling stalled corners by the specified method.
 
     Parameters
     ----------
     redz : (M,Q,Z,F) ndarray
         Redshift values defined on the edges of the bins.
-    method : str
-        Method to average corners..
+    method : str or None
+        Method to average corners. None uses `REDZ_CENTERS_METHOD`.
         `weighted` : Average corners weighted by their dnum, zero-ing out stalled corners.
         `legacy`   : Average all corners regardless of stalled status, including negative ones.
         `drop`     : Drop entire bins with any stalled corners by setting them to -inf.
-    dnum : (M,Q,Z,F) ndarry or None
-        Differential number of binaries at grid edges. Required for `weighted' method.
-
+    dnum : (M,Q,Z,F) ndarray or None
+        Differential number of binaries at grid edges. Required for `weighted` method.
 
     Returns
     -------
@@ -721,6 +725,8 @@ def redz_at_bin_centers(redz, method, dnum=None):
         Redshift values at the bin centers.
     """
 
+    if method is None:
+        method = REDZ_CENTERS_METHOD
 
     # Drop method matches the April 2026 fix (96728a3) applied only to lib_tools.run_model's gwb
     # Stalled corners are set to -inf. Entire bins with those corners will be averaged to -inf
@@ -738,18 +744,17 @@ def redz_at_bin_centers(redz, method, dnum=None):
     elif method == 'weighted':
         if dnum is None:
             raise ValueError(
-                "dnum must be provided when using 'weighted' method." \
+                "dnum must be provided when using 'weighted' method. "
                 "To keep the old mean of corners instead, pass method='legacy' or set "
-                "holodeck.gravwaves.REDZ_CENTERS_METHOD = 'legacy''.")
+                "holodeck.gravwaves.REDZ_CENTERS_METHOD = 'legacy'.")
         if np.shape(dnum) != np.shape(redz):
             raise ValueError(
                 f"dnum shape {np.shape(dnum)} != redz shape {np.shape(redz)}; "
                 "pass the differential number (diff_num), not the integrated number.")
 
-
         # Weighted average over corners with valid redshifts (#165).
         # Stalled corners should already have dnum=0.0 from sam_cyutils.dynamic_binary_number_at_fobs
-        good = redz > 0.0 # stalled corners will be -1.0 or -inf, depending on call sight
+        good = redz > 0.0 # stalled corners will be -1.0 or -inf, depending on call site
         weights = np.where(good, dnum, 0.0) # ensure stalled corners have zero weight
         numer = np.where(good, redz, 0.0) # set negative redz to 0, to avoid -inf redz * 0.0 dnum = np.nan
         numer *= weights
@@ -760,8 +765,6 @@ def redz_at_bin_centers(redz, method, dnum=None):
 
     else:
         raise ValueError(f"Unknown method: {method}. Must be one of 'weighted', 'legacy', or 'drop'.")
-
-
 
 
 def char_strain_sq_from_bin_edges_redz(edges, redz, dnum=None, redz_method=None):
@@ -775,11 +778,6 @@ def char_strain_sq_from_bin_edges_redz(edges, redz, dnum=None, redz_method=None)
     # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)
     #    where M, Q, Z are edges and Fc is frequency centers
     # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
-    # for dd in range(3):
-    #     redz = np.moveaxis(redz, dd, 0)
-    #     redz = kale.utils.midpoints(redz, axis=0)
-    #     redz = np.moveaxis(redz, 0, dd)
-    redz_method = REDZ_CENTERS_METHOD if redz_method is None else redz_method
     redz = redz_at_bin_centers(redz, method=redz_method, dnum=dnum)
 
     # ---- calculate GW strain ----
@@ -812,8 +810,7 @@ def strain_amp_from_bin_edges_redz(edges, redz, dnum=None, redz_method=None):
     # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)
     #    where M, Q, Z are edges and Fc is frequency centers
     # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
-    redz_method = REDZ_CENTERS_METHOD if redz_method is None else redz_method
-    redz = redz_at_bin_centers(redz, dnum=dnum, method=redz_method)
+    redz = redz_at_bin_centers(redz, method=redz_method, dnum=dnum)
 
     # ---- calculate GW strain ----
     mt = kale.utils.midpoints(edges[0])
@@ -827,6 +824,8 @@ def strain_amp_from_bin_edges_redz(edges, redz, dnum=None, redz_method=None):
 
     # convert from observer-frame to rest-frame; still using frequency-bin centers
     fr = utils.frst_from_fobs(fc[np.newaxis, np.newaxis, np.newaxis, :], redz)
+    # 'drop' bins have redz = -inf, which makes fr negative and hs nan; zero them as char_strain_sq does
+    fr[fr<0] = 0.0
 
     hs = utils.gw_strain_source(mc, dc, fr)
     return hs

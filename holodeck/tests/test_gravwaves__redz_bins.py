@@ -5,6 +5,8 @@ import numpy as np
 import pytest
 
 from holodeck import gravwaves as grav
+from holodeck import hardening, librarian, sams, utils
+from holodeck.constants import GYR, YR
 
 
 # Corner redshifts from nanograv/holodeck#165: one stalled corner in an otherwise normal cell
@@ -72,4 +74,37 @@ class Test__redz_at_bin_centers:
         with pytest.raises(ValueError):
             # integrated `number` instead of diff_num; on a single bin it broadcasts silently
             grav.redz_at_bin_centers(redz, method='weighted', dnum=np.ones((1, 1, 1, 1)))
+        return
+
+
+@pytest.fixture(scope="module")
+def sam_hard():
+    # small grid, with a hardening time long enough that some binaries stall
+    sam = sams.Semi_Analytic_Model(shape=10)
+    hard = hardening.Fixed_Time_2PL_SAM(sam, 3.0 * GYR)
+    return sam, hard
+
+
+class Test__redz_call_sites:
+    # a call site that doesn't pass dnum raises under the default 'weighted' method
+
+    def test_sam(self, sam_hard):
+        sam, hard = sam_hard
+        _, fobs_gw_edges = utils.pta_freqs(dur=16.0 * YR, num=3)
+        gwb = sam.gwb_new(fobs_gw_edges, hard=hard, realize=2)
+        assert np.all(np.isfinite(gwb))
+        # params=True also exercises the second redshift average in ss_gws_redz
+        hc_ss, hc_bg, sspar, bgpar = sam.gwb(fobs_gw_edges, hard=hard, realize=2, params=True)
+        for vals in (hc_ss, hc_bg, sspar, bgpar):
+            assert np.all(np.isfinite(vals))
+        return
+
+    def test_run_model(self, sam_hard):
+        sam, hard = sam_hard
+        data = librarian.run_model(
+            sam, hard, nfreqs=3, nreals=2, nloudest=2,
+            gwb_flag=True, singles_flag=True, details_flag=True, params_flag=True,
+        )
+        for key in ['gwb', 'hc_ss', 'hc_bg']:
+            assert np.all(np.isfinite(data[key])), key
         return

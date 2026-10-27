@@ -1181,7 +1181,8 @@ def run_model(
         data["number"] = number
         data["redz_final"] = redz_final
 
-        gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final = _calc_model_details(edges, redz_final, number)
+        gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final = _calc_model_details(
+            edges, redz_final, number, dnum=diff_num)
 
         data["gwb_params"] = gwb_pars
         data["num_params"] = num_pars
@@ -1199,6 +1200,7 @@ def run_model(
             realize=nreals,
             loudest=nloudest,
             params=params_flag,
+            dnum=diff_num,
         )
         if params_flag:
             hc_ss, hc_bg, sspar, bgpar = vals
@@ -1213,14 +1215,16 @@ def run_model(
 
     if gwb_flag:
         negative_mask = use_redz < 0.0 # galaxy mergers that stall
-        use_redz[negative_mask] = -np.inf # set to -inf so they can't contribute to GWB
-        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, nreals)
+        # set to -inf so they can't contribute to GWB; this only matters for the 'legacy' method,
+        # since 'weighted' gives -1 and -inf corners zero weight alike
+        use_redz[negative_mask] = -np.inf
+        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, nreals, dnum=diff_num)
         data["gwb"] = gwb
 
     return data
 
 
-def _calc_model_details(edges, redz_final, number):
+def _calc_model_details(edges, redz_final, number, dnum=None, redz_method=None):
     """Calculate derived properties from the given populations.
 
     Parameters
@@ -1231,6 +1235,12 @@ def _calc_model_details(edges, redz_final, number):
         Redshift final (redshift at the given frequencies).
     number : (M-1, Q-1, Z-1, F)
         Absolute number of binaries in the given bin (dimensionless).
+    dnum : (M,Q,Z,F) or None
+        Differential number of binaries on the same grid as `redz_final`, used to weight
+        redshifts when averaging to bin centers. Required for the `weighted` method.
+    redz_method : str or None
+        Method passed to `holo.gravwaves.redz_at_bin_centers`. None uses
+        `holo.gravwaves.REDZ_CENTERS_METHOD`.
 
     Returns
     -------
@@ -1246,7 +1256,8 @@ def _calc_model_details(edges, redz_final, number):
     nzbins = len(redz) - 1
     nfreqs = len(edges[3]) - 1
     # (M-1, Q-1, Z-1, F) characteristic-strain squared for each bin
-    hc2 = holo.gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz_final)
+    hc2 = holo.gravwaves.char_strain_sq_from_bin_edges_redz(
+        edges, redz_final, dnum=dnum, redz_method=redz_method)
     # strain-squared weighted number of binaries
     hc2_num = hc2 * number
     # (F,) total GWB in each frequency bin
@@ -1278,9 +1289,7 @@ def _calc_model_details(edges, redz_final, number):
     # ---- calculate redz_final based distributions
 
     # get final-redshift at bin centers
-    rz = redz_final.copy()
-    for ii in range(3):
-        rz = utils.midpoints(rz, axis=ii)
+    rz = holo.gravwaves.redz_at_bin_centers(redz_final, method=redz_method, dnum=dnum)
 
     gwb_mtot_redz_final = np.zeros((nmbins, nzbins, nfreqs))
     num_mtot_redz_final = np.zeros((nmbins, nzbins, nfreqs))
