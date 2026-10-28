@@ -360,7 +360,7 @@ def test_run_cws_gwb_is_total_power(_small_model):
         cents / 2.0, sam, hard, holo.cosmo)
     grid = [sam.mtot, sam.mrat, sam.redz, edges / 2.0]
     number = sam_cyutils.integrate_differential_number_3dx1d(grid, diff_num)
-    h2fdf = gravwaves.char_strain_sq_from_bin_edges_redz(grid, redz_final)
+    h2fdf = gravwaves.char_strain_sq_from_bin_edges_redz(grid, redz_final, dnum=diff_num)
     hc2ss, _b, hc2rest = flows_lib.loudest_per_bin(
         number, h2fdf, nreals, nloudest, np.random.default_rng(11))
 

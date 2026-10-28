@@ -524,16 +524,12 @@ def run_cws(
     number = sam_cyutils.integrate_differential_number_3dx1d(edges, diff_num)
 
     # h2fdf = hs^2 * f/df, i.e. the characteristic strain squared of a single source in each bin
-    h2fdf = gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz_final)
+    h2fdf = gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz_final, dnum=diff_num)
 
     # ---- bin-center the redshifts  (identical to `single_sources.ss_gws_redz`)
 
-    # `redz_final` is on the (M, Q, Z) grid edges; midpoints put it on the grid of `number`
-    redz = redz_final
-    for dd in range(3):
-        redz = np.moveaxis(redz, dd, 0)
-        redz = kale.utils.midpoints(redz, axis=0)
-        redz = np.moveaxis(redz, 0, dd)
+    # `redz_final` is on the (M, Q, Z) grid edges; average onto the grid of `number`, leaving out stalled corners (#165)
+    redz = gravwaves.redz_at_bin_centers(redz_final, dnum=diff_num)
     # -1 marks a stalled binary (`cw_columns` turns it into NaN); `~(redz > 0)` also catches NaN
     redz[~(redz > 0.0)] = -1.0
 
