@@ -848,7 +848,7 @@ class Semi_Analytic_Model:
 
         # ---- Get the GWB spectrum from number of binaries over grid
 
-        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
+        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize, dnum=diff_num)
 
         return gwb
 
@@ -870,7 +870,7 @@ class Semi_Analytic_Model:
 
         # ---- Get the GWB spectrum from number of binaries over grid
 
-        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize)
+        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, redz_final, number, realize, dnum=dnum)
 
         return gwb
 
@@ -993,7 +993,8 @@ class Semi_Analytic_Model:
         # ---- Get the Single Source and GWB spectrum from number of binaries over grid
 
         ret_vals = single_sources.ss_gws_redz(edges, redz_final, number,
-                                              realize=realize, loudest=loudest, params=params)
+                                              realize=realize, loudest=loudest, params=params,
+                                              dnum=diff_num)
 
         hc_ss = ret_vals[0]
         hc_bg = ret_vals[1]
