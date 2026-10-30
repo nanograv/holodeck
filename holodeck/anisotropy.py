@@ -500,9 +500,8 @@ def strain_amp_at_bin_edges_redz(edges, redz=None):
     return hs_edges
 
 
-def strain_amp_at_bin_centers_redz(edges, redz=None):
+def strain_amp_at_bin_centers_redz(edges, redz=None, dnum=None, redz_method=None):
     """ Calculate strain amplitude at bin centers, with final or initial redz.
-    
     """
     assert len(edges) == 4
     assert np.all([np.ndim(ee) == 1 for ee in edges])
@@ -515,10 +514,7 @@ def strain_amp_at_bin_centers_redz(edges, redz=None):
     #    where M, Q, Z are edges and Fc is frequency centers
     # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
     if redz is not None:
-        for dd in range(3):
-            redz = np.moveaxis(redz, dd, 0)
-            redz = kale.utils.midpoints(redz, axis=0)
-            redz = np.moveaxis(redz, 0, dd)
+        redz = holo.gravwaves.redz_at_bin_centers(redz, method=redz_method, dnum=dnum)
         dc = +np.inf * np.ones_like(redz)
         sel = (redz > 0.0)
         dc[sel] = holo.cosmo.comoving_distance(redz[sel]).cgs.value
@@ -583,7 +579,7 @@ def Cl_analytic_from_dnum(edges, dnum, redz=None, realize=False):
 
     elif utils.isinteger(realize):
         # add reals axis
-        hs_cents = strain_amp_at_bin_centers_redz(edges, redz)[...,np.newaxis]
+        hs_cents = strain_amp_at_bin_centers_redz(edges, redz, dnum=dnum)[...,np.newaxis]
         df = df[:,np.newaxis] 
         fc = fc[:,np.newaxis] 
 

@@ -252,6 +252,14 @@ class _Param_Space(abc.ABC):
 
         sam = self._init_sam(sam_shape, settings)
         hard = self._init_hard(sam, settings)
+        if hasattr(self, "mtot_for_nuin_lims") and hasattr(self, "mrat_for_nuin_lims"):
+            mt_tup = (sam.mtot[0],sam.mtot[-1],sam.mtot.size)
+            mr_tup = (sam.mrat[0],sam.mrat[-1],sam.mrat.size)
+            if (not np.allclose(mt_tup,self.mtot_for_nuin_lims) or 
+                not np.allclose(mr_tup,self.mrat_for_nuin_lims)):
+                warn = (f"SAM and nu_inner interpolator grid shape mismatch: \n{mt_tup=}, "
+                        f"{self.mtot_for_nuin_lims=}, {mr_tup=}, {self.mrat_for_nuin_lims=}")
+                log.warning(warn)
 
         return sam, hard
 
@@ -921,6 +929,112 @@ class PD_Log_Lin(_Param_Dist):
         return yy
 
 
+class PD_2D_Uniform_Variable_Ymin(_Param_Dist):
+    """Uniform distribution over a 2D region whose lower y-boundary varies with x.
+
+    Samples (x, y) uniformly (in area) from the region
+        x_lo <= x <= x_hi,    y_lo(x) <= y <= y_hi,
+    where y_lo(x) is a lower boundary supplied by the interpolator``y_lo_interp_func``. 
+    The upper bound ``y_hi`` is constant. Where y_lo(x) >= y_hi the region has zero 
+    height and no probability.
+
+    Sampling is done by inverse-CDF in two steps:
+
+    1. The density of x is proportional to the local height of the region, 
+       h(x) = max(y_hi - y_lo(x), 0). Its CDF is built numerically on a
+       grid (trapezoid rule) and inverted with linear interpolation to draw x.
+    2. Conditional on x, y is uniform on [y_lo(x), y_hi].
+
+    Parameters
+    ----------
+    x_name : str
+        Name of the first parameter (x).
+    y_name : str
+        Name of the second parameter (y).
+    x_lo, x_hi : float
+        Lower and upper bounds of x.
+    y_abs_lo : float
+        Absolute minimum of y. Passed to ``y_lo_interp_func`` as ``absmin``
+        so the interpolated lower bound can be floored at this value.
+    y_hi : float
+        Constant upper bound of y.
+    y_lo_interp_func : callable
+        Function with signature ``y_lo_interp_func(x_grid, absmin=..., **interp_kwargs)``
+        that calculates y_lo for each element of x_grid and returns an interpolator for
+        calculating ``y_lo(x)`` to give the lower y-bound at each x
+        (vectorized over arrays).
+    parspace_defaults : dict
+        Dictionary of default parameters for the underlying _Param_Space to which this
+        parameter distribution is being applied. It is passed to self._y_lo_interp_func().
+    n_cdf_grid_min : int, optional
+        Minimum number of grid points used to build the x CDF (default 1000).
+        The actual grid size is ``max(n_cdf_grid_min, n_samples // 10)``.
+    **kwargs
+        Passed to ``_Param_Dist.__init__``. The keys ``mtot`` and ``mrat`` are
+        removed first and forwarded to ``y_lo_interp_func`` instead (only if
+        present).
+
+    Notes
+    -----
+    The x CDF is a piecewise-linear approximation, so accuracy improves with
+    the grid size. If y_lo(x) exceeds y_hi over part of the x range, that part
+    gets zero probability. The CDF is flat there, so ``np.interp`` skips it.
+    """
+
+    def __init__(self, x_name, y_name, x_lo, x_hi, 
+                 y_abs_lo, y_hi, y_lo_func, 
+                 parspace_defaults,
+                 n_cdf_grid_min=1000, **kwargs):
+
+        y_lo_kwargs = {}
+        if 'mtot' in kwargs:
+            y_lo_kwargs['mtot'] = kwargs.pop('mtot')
+        if 'mrat' in kwargs:
+            y_lo_kwargs['mrat'] = kwargs.pop('mrat')
+
+        super().__init__(name=(x_name, y_name), **kwargs)
+        self._x_lo = x_lo
+        self._x_hi = x_hi
+        self._y_abs_lo = y_abs_lo
+        self._y_hi = y_hi
+        #self._y_lo_interp_func = y_lo_interp_func
+        self._y_lo_func = y_lo_func
+        self._parspace_defaults = parspace_defaults
+        self._n_cdf_grid_min = n_cdf_grid_min
+        #self._interp_kwargs = interp_kwargs
+        self._y_lo_kwargs = y_lo_kwargs
+
+    def _dist_func(self, uu):
+        """uu is expected to be a (n_samples, n_dims) array of uniform [0, 1] variables."""
+
+        n_cdf_grid = np.maximum(self._n_cdf_grid_min, int(uu.shape[0] / 10))
+
+        x_grid = np.linspace(self._x_lo, self._x_hi, n_cdf_grid)
+        # `y_height` should be the larger of nu_max - nu_min, or 0
+        #y_lo_interp = self._y_lo_interp_func(x_grid, self._parspace_defaults, 
+        #                                     absmin=self._y_abs_lo, **self._interp_kwargs)
+        y_lo_grid = self._y_lo_func(x_grid, self._parspace_defaults, 
+                                    absmin=self._y_abs_lo, **self._y_lo_kwargs)
+
+        y_height = np.clip(self._y_hi - y_lo_grid, 0.0, None)
+
+        # integrate to get CDF over x (trapezoid rule)
+        cdf = np.concatenate([[0.0], np.cumsum(0.5*(y_height[1:]+y_height[:-1])*np.diff(x_grid))])  
+        if cdf[-1] <= 0:
+            raise ValueError(f"No positive-width region found in x range {self._x_lo}-{self._x_hi}.")
+        cdf /= cdf[-1]
+
+        # inverse-CDF sample x
+        xx = np.interp(uu[:,0], cdf, x_grid)
+
+        # uniform y within the strip at each sampled x
+        #y_lo = y_lo_interp(xx)
+        y_lo = self._y_lo_func(xx, self._parspace_defaults, 
+                               absmin=self._y_abs_lo, **self._y_lo_kwargs)
+        yy = y_lo + (self._y_hi - y_lo) * uu[:,1]
+
+        return np.vstack([xx, yy]).T
+
 class PD_Piecewise_Uniform_Mass(_Param_Dist):
     def __init__(self, name, edges, weights, **kwargs):
         super().__init__(name, **kwargs)
@@ -1067,7 +1181,8 @@ def run_model(
         data["number"] = number
         data["redz_final"] = redz_final
 
-        gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final = _calc_model_details(edges, redz_final, number)
+        gwb_pars, num_pars, gwb_mtot_redz_final, num_mtot_redz_final = _calc_model_details(
+            edges, redz_final, number, dnum=diff_num)
 
         data["gwb_params"] = gwb_pars
         data["num_params"] = num_pars
@@ -1085,6 +1200,7 @@ def run_model(
             realize=nreals,
             loudest=nloudest,
             params=params_flag,
+            dnum=diff_num,
         )
         if params_flag:
             hc_ss, hc_bg, sspar, bgpar = vals
@@ -1099,14 +1215,16 @@ def run_model(
 
     if gwb_flag:
         negative_mask = use_redz < 0.0 # galaxy mergers that stall
-        use_redz[negative_mask] = -np.inf # set to -inf so they can't contribute to GWB
-        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, nreals)
+        # set to -inf so they can't contribute to GWB; this only matters for the 'legacy' method,
+        # since 'weighted' gives -1 and -inf corners zero weight alike
+        use_redz[negative_mask] = -np.inf
+        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, nreals, dnum=diff_num)
         data["gwb"] = gwb
 
     return data
 
 
-def _calc_model_details(edges, redz_final, number):
+def _calc_model_details(edges, redz_final, number, dnum=None, redz_method=None):
     """Calculate derived properties from the given populations.
 
     Parameters
@@ -1117,6 +1235,12 @@ def _calc_model_details(edges, redz_final, number):
         Redshift final (redshift at the given frequencies).
     number : (M-1, Q-1, Z-1, F)
         Absolute number of binaries in the given bin (dimensionless).
+    dnum : (M,Q,Z,F) or None
+        Differential number of binaries on the same grid as `redz_final`, used to weight
+        redshifts when averaging to bin centers. Required for the `weighted` method.
+    redz_method : str or None
+        Method passed to `holo.gravwaves.redz_at_bin_centers`. None uses
+        `holo.gravwaves.REDZ_CENTERS_METHOD`.
 
     Returns
     -------
@@ -1132,7 +1256,8 @@ def _calc_model_details(edges, redz_final, number):
     nzbins = len(redz) - 1
     nfreqs = len(edges[3]) - 1
     # (M-1, Q-1, Z-1, F) characteristic-strain squared for each bin
-    hc2 = holo.gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz_final)
+    hc2 = holo.gravwaves.char_strain_sq_from_bin_edges_redz(
+        edges, redz_final, dnum=dnum, redz_method=redz_method)
     # strain-squared weighted number of binaries
     hc2_num = hc2 * number
     # (F,) total GWB in each frequency bin
@@ -1164,9 +1289,7 @@ def _calc_model_details(edges, redz_final, number):
     # ---- calculate redz_final based distributions
 
     # get final-redshift at bin centers
-    rz = redz_final.copy()
-    for ii in range(3):
-        rz = utils.midpoints(rz, axis=ii)
+    rz = holo.gravwaves.redz_at_bin_centers(redz_final, method=redz_method, dnum=dnum)
 
     gwb_mtot_redz_final = np.zeros((nmbins, nzbins, nfreqs))
     num_mtot_redz_final = np.zeros((nmbins, nzbins, nfreqs))

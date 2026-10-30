@@ -29,7 +29,7 @@ log = holo.log
 log.setLevel(logging.INFO)
 
 par_names = np.array(['mtot', 'mrat', 'redz_init', 'redz_final', 'dcom_final', 'sepa_final', 'angs_final'])
-par_labels = np.array(['Total Mass $M$ ($M_\odot$)', 'Mass Ratio $q$', 'Initial Redshift $z_i$', 'Final Redshift $z_f$',
+par_labels = np.array([r'Total Mass $M$ ($M_\odot$)', 'Mass Ratio $q$', 'Initial Redshift $z_i$', 'Final Redshift $z_f$',
                    'Final Comoving Distance $d_c$ (Mpc)', 'Final Separation (pc)', 'Final Angular Separation (rad)'])
 par_units = np.array([1/MSOL, 1, 1, 1, 1/MPC,  1/PC, 1])
 
@@ -37,7 +37,7 @@ par_units = np.array([1/MSOL, 1, 1, 1, 1/MPC,  1/PC, 1])
 ############## STRAIN CALCULATIONS ################
 ###################################################
 
-def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
+def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False, dnum=None, redz_method=None):
        
     """ Calculate strain from the loudest single sources and background.
 
@@ -58,7 +58,13 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
         Specification of how many discrete realizations to construct.
     loudest : int
         Number of loudest single sources to separate from background.
-    
+    dnum : (M, Q, Z, F) NDarray or None
+        Differential number of binaries on the same grid as `redz`, used to weight redshifts
+        when averaging to bin centers. Required for the `weighted` method.
+    redz_method : str or None
+        Method passed to `gravwaves.redz_at_bin_centers`. None uses
+        `gravwaves.REDZ_CENTERS_METHOD`.
+
 
     Returns
     -------
@@ -83,7 +89,7 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
 
 
     # hsfdf = hsamp^2 * f/df # this is same as hc^2
-    h2fdf = gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz)
+    h2fdf = gravwaves.char_strain_sq_from_bin_edges_redz(edges, redz, dnum=dnum, redz_method=redz_method)
 
     # indices of bins sorted by h2fdf
     indices = np.argsort(-h2fdf[...,0].flatten()) # just sort for first frequency
@@ -111,10 +117,7 @@ def ss_gws_redz(edges, redz, number, realize, loudest = 1, params = False):
             # redshifts are defined across 4D grid, shape (M, Q, Z, Fc)
             #    where M, Q, Z are edges and Fc is frequency centers
             # find midpoints of redshifts in M, Q, Z dimensions, to end up with (M-1, Q-1, Z-1, Fc)
-            for dd in range(3):
-                redz = np.moveaxis(redz, dd, 0)
-                redz = kale.utils.midpoints(redz, axis=0)
-                redz = np.moveaxis(redz, 0, dd)
+            redz = gravwaves.redz_at_bin_centers(redz, method=redz_method, dnum=dnum)
 
             # if np.any(np.logical_and(redz<0, redz!=-1)):
             #     err = np.sum(np.logical_and(redz<0, redz!=-1))
@@ -1554,7 +1557,7 @@ def number_test(num, bgnum, fobs, exname='', plot_test=False):
         # print(num[...,0].shape)
         for f in range(len(fobs)):
             ax[f].scatter(bins, (num[...,f] - bgnum[...,f]))
-            ax[f].set_title('$f_\mathrm{obs}$ = %dnHz' % (fobs[f]*10**9))
+            ax[f].set_title(r'$f_\mathrm{obs}$ = %dnHz' % (fobs[f]*10**9))
             ax[f].set_xlabel('bin')
         fig.tight_layout()
     print('number test passed')
@@ -2027,9 +2030,9 @@ def plot_params(axs, xx, REALS=1, LABEL='', grid=None,
                 BG_MEDIAN=True, SS_MEDIAN=True,
                 BG_ERRORS=True, SS_ERRORS=True,
                 BG_COLOR='k', SS_COLOR='mediumorchid',
-                TITLES = np.array([['Total Mass $M/M_\odot$', 'Mass Ratio $q$'], 
+                TITLES = np.array([[r'Total Mass $M/M_\odot$', 'Mass Ratio $q$'], 
                                    ['Redshift $z$', 'Characteristic Strain $h_c$']]),
-                XLABEL = 'Frequency $f_\mathrm{obs}$ (1/yr)',
+                XLABEL = r'Frequency $f_\mathrm{obs}$ (1/yr)',
                 SHOW_LEGEND = True):             
     """
     Plot mass, ratio, redshift, and strain in 4 separate subplots.
@@ -2148,7 +2151,7 @@ def plot_params(axs, xx, REALS=1, LABEL='', grid=None,
 
 
 def threshold_hc():
-    """
+    r"""
     Rosado+ 2015, SNR calculation
     S := cross correlation between pulsars 
     S = \int_{-T/2}^{T/2} dt \int dt' s_i(t) s_j(t') Q(t,t')
