@@ -707,11 +707,11 @@ cdef int _dynamic_binary_number_at_fobs_innerpwl(
     # ---- Calculate ages corresponding to SAM `redz` grid
 
     cdef double *redz_age = <double *>malloc(n_redz * sizeof(double))     # (Z,) age of the universe in [sec]
+    cdef int rev
     if redz_age == NULL:
         raise MemoryError()
     try:
         ii = 0
-        cdef int rev
         for kk in range(n_redz):
             # iterate in reverse order to match with `redz_interp_grid` which is decreasing
             rev = n_redz - 1 - kk
@@ -961,11 +961,11 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
     # ---- Calculate ages corresponding to SAM `redz` grid
 
     cdef double *redz_age = <double *>malloc(n_redz * sizeof(double))     # (Z,) age of the universe in [sec]
+    cdef int rev
     if redz_age == NULL:
         raise MemoryError()
     try:
         ii = 0
-        cdef int rev
         for kk in range(n_redz):
             # iterate in reverse order to match with `redz_interp_grid` which is decreasing
             rev = n_redz - 1 - kk
