@@ -185,7 +185,7 @@ cdef void _integrate_differential_number_3dx1d(
     cdef int n_freq = dln_freq.size
 
     cdef int mm, qq, zz, ff, ii, jj, kk
-    cdef double dm, dmdq, dmdqdz
+    cdef double dm, dmdq, dmdqdz, temp
 
     for mm in range(n_mtot-1):                              # iterate over output-shape of mass-grid
         dm = log10_mtot[mm+1] - log10_mtot[mm]              # get the bin-length
@@ -442,7 +442,7 @@ cdef void _get_hardening_norm_2pwl(
 
     cdef int num = mtot.size
     assert mtot.size == mrat.size
-    cdef double time
+    cdef double time, dt
 
     cdef int ii
     for ii in range(num):
@@ -699,210 +699,214 @@ cdef int _dynamic_binary_number_at_fobs_innerpwl(
     cdef double hard_rchar_log10
     
     cdef int ii, jj, kk, ff, step, interp_left_idx, interp_right_idx, new_interp_idx
-    cdef double mt, mr, risco, dx, new_redz, gmt, ftarget, target_frst_orb
-    cdef double sepa_log10, sepa, sepa_left, sepa_right, dadt_left, dadt_right
-    cdef double time_evo, redz_left, redz_right, time_left, time_right, new_time
+    cdef double mt, mr, risco, dx, new_redz, gmt, ftarget, target_frst_orb, cosmo_fact
+    cdef double sepa_log10, sepa, sepa_left, sepa_right, dadt_left, dadt_right, dadt, dt
+    cdef double time_evo, redz_left, redz_right, time_left, time_right, new_time, dcom, tres
     cdef double frst_orb_left, fobs_orb_left, frst_orb_right, fobs_orb_right
 
     # ---- Calculate ages corresponding to SAM `redz` grid
 
     cdef double *redz_age = <double *>malloc(n_redz * sizeof(double))     # (Z,) age of the universe in [sec]
-    ii = 0
-    cdef int rev
-    for kk in range(n_redz):
-        # iterate in reverse order to match with `redz_interp_grid` which is decreasing
-        rev = n_redz - 1 - kk
-        # get to the right index of the interpolation-grid
-        while (redz_interp_grid[ii+1] > redz[rev]) and (ii < n_interp - 1):
-            ii += 1
+    if redz_age == NULL:
+        raise MemoryError()
+    try:
+        ii = 0
+        cdef int rev
+        for kk in range(n_redz):
+            # iterate in reverse order to match with `redz_interp_grid` which is decreasing
+            rev = n_redz - 1 - kk
+            # get to the right index of the interpolation-grid
+            while (ii < n_interp - 1) and (redz_interp_grid[ii+1] > redz[rev]):
+                ii += 1
 
-        # interpolate
-        redz_age[rev] = interp_at_index(ii, redz[rev], redz_interp_grid, tage_interp_grid)
+            # interpolate
+            redz_age[rev] = interp_at_index(ii, redz[rev], redz_interp_grid, tage_interp_grid)
 
-    # ---- calculate dynamic binary numbers for all SAM grid bins
+        # ---- calculate dynamic binary numbers for all SAM grid bins
 
-    for ii in range(n_mtot):
-        mt = mtot[ii]
+        for ii in range(n_mtot):
+            mt = mtot[ii]
 
-        # Determine separation step-size, in log10-space, to integrate from hard_rchar to ISCO
-        risco = 3.0 * MY_SCHW * mt     # ISCO is 3x combined schwarzschild radius
-        hard_rchar = hard_rchar_9 * pow(mt/(1.0e9*MY_MSOL), hard_alpha_char+1)
-        hard_rchar_log10 = log10(hard_rchar)
-        dx = (hard_rchar_log10 - log10(risco)) / num_steps
+            # Determine separation step-size, in log10-space, to integrate from hard_rchar to ISCO
+            risco = 3.0 * MY_SCHW * mt     # ISCO is 3x combined schwarzschild radius
+            hard_rchar = hard_rchar_9 * pow(mt/(1.0e9*MY_MSOL), hard_alpha_char+1)
+            hard_rchar_log10 = log10(hard_rchar)
+            dx = (hard_rchar_log10 - log10(risco)) / num_steps
 
-        for jj in range(n_mrat):
-            mr = mrat[jj]
+            for jj in range(n_mrat):
+                mr = mrat[jj]
 
-            # Binary evolution is determined by M and q only
-            # so integration is started for each of these bins
-            sepa_log10 = hard_rchar_log10                # set initial separation to initial value
+                # Binary evolution is determined by M and q only
+                # so integration is started for each of these bins
+                sepa_log10 = hard_rchar_log10                # set initial separation to initial value
 
-            # Get total hardening rate at left-most edge
-            sepa_left = pow(10.0, sepa_log10)
-            #### UPDATED TO NEW FUNCTION ####
-            dadt_left =  _hard_func_innerpwl_gw(
-                mt, mr, sepa_left, hard_inner_model_type, 
-                hard_dadt_rchar, hard_rchar, hard_nu_inner, 
-                hard_r_gwcrit_9, hard_gwcrit_units_rg, hard_alpha_gwcrit, hard_beta_gwcrit
-            )
-
-            # get rest-frame orbital frequency of binary at left edge
-            frst_orb_left = kepler_freq_from_sepa(mt, sepa_left)
-
-            # ---- Integrate of `num_steps` discrete intervals in binary separation from large to small
-
-            time_evo = 0.0                  # track total binary evolution time
-            interp_left_idx = 0                 # interpolation index, will be updated in each step
-            for step in range(num_steps):
-                # Increment the current separation
-                sepa_log10 -= dx
-                sepa_right = pow(10.0, sepa_log10)
-                frst_orb_right = kepler_freq_from_sepa(mt, sepa_right)
-
-                # Get total hardening rate at the right-edge of this step (left-edge already obtained)
-                #### UPDATED TO NEW FUNCTION ####                
-                dadt_right =  _hard_func_innerpwl_gw(
-                    mt, mr, sepa_right, hard_inner_model_type, 
+                # Get total hardening rate at left-most edge
+                sepa_left = pow(10.0, sepa_log10)
+                #### UPDATED TO NEW FUNCTION ####
+                dadt_left =  _hard_func_innerpwl_gw(
+                    mt, mr, sepa_left, hard_inner_model_type, 
                     hard_dadt_rchar, hard_rchar, hard_nu_inner, 
                     hard_r_gwcrit_9, hard_gwcrit_units_rg, hard_alpha_gwcrit, hard_beta_gwcrit
                 )
 
-                # Find time to move from left- to right- edges:  dt = da / (da/dt)
-                # average da/dt on the left- and right- edges of the bin (i.e. trapezoid rule)
-                dt = 2.0 * (sepa_right - sepa_left) / (dadt_left + dadt_right)
-                # if ii == 8 and jj == 0:
-                #     printf("cy %03d : %.2e ==> %.2e  ==  %.2e\n", step, sepa_left, sepa_right, dt)
+                # get rest-frame orbital frequency of binary at left edge
+                frst_orb_left = kepler_freq_from_sepa(mt, sepa_left)
 
-                time_evo += dt
+                # ---- Integrate of `num_steps` discrete intervals in binary separation from large to small
 
-                # ---- Iterate over starting redshift bins
+                time_evo = 0.0                  # track total binary evolution time
+                interp_left_idx = 0                 # interpolation index, will be updated in each step
+                for step in range(num_steps):
+                    # Increment the current separation
+                    sepa_log10 -= dx
+                    sepa_right = pow(10.0, sepa_log10)
+                    frst_orb_right = kepler_freq_from_sepa(mt, sepa_right)
 
-                for kk in range(n_redz-1, -1, -1):
-                    # get the total time from each starting redshift, plus GMT time, plus outer time, plus evolution time to this step
-                    gmt = gmt_time[ii, jj, kk]
-                    time_right = time_evo + gmt + hard_outer_time + redz_age[kk]
-                    # also get the evolution-time to the left edge
-                    time_left = time_right - dt
+                    # Get total hardening rate at the right-edge of this step (left-edge already obtained)
+                    #### UPDATED TO NEW FUNCTION ####                
+                    dadt_right =  _hard_func_innerpwl_gw(
+                        mt, mr, sepa_right, hard_inner_model_type, 
+                        hard_dadt_rchar, hard_rchar, hard_nu_inner, 
+                        hard_r_gwcrit_9, hard_gwcrit_units_rg, hard_alpha_gwcrit, hard_beta_gwcrit
+                    )
 
-                    # if we pass the age of the universe, this binary has stalled, no further redshifts will work
-                    # NOTE: if `gmt_time` decreases faster than redshift bins increase the universe age,
-                    #       then systems in later `redz` bins may no longer stall, so we still need to calculate them.
-                    #       i.e. we can NOT use a `break` statement here, must use `continue` statement.
-                    if time_left > age_universe:
-                        continue
+                    # Find time to move from left- to right- edges:  dt = da / (da/dt)
+                    # average da/dt on the left- and right- edges of the bin (i.e. trapezoid rule)
+                    dt = 2.0 * (sepa_right - sepa_left) / (dadt_left + dadt_right)
+                    # if ii == 8 and jj == 0:
+                    #     printf("cy %03d : %.2e ==> %.2e  ==  %.2e\n", step, sepa_left, sepa_right, dt)
 
-                    # find the redshift bins corresponding to left- and right- side of step
-                    # left edge
-                    interp_left_idx = while_while_increasing(interp_left_idx, n_interp, time_left, tage_interp_grid)
+                    time_evo += dt
 
-                    redz_left = interp_at_index(interp_left_idx, time_left, tage_interp_grid, redz_interp_grid)
+                    # ---- Iterate over starting redshift bins
 
-                    # double check that left-edge is within age of Universe (should rarely if ever be a problem
-                    # but possible due to rounding/interpolation errors
-                    if redz_left < 0.0:
-                        continue
+                    for kk in range(n_redz-1, -1, -1):
+                        # get the total time from each starting redshift, plus GMT time, plus outer time, plus evolution time to this step
+                        gmt = gmt_time[ii, jj, kk]
+                        time_right = time_evo + gmt + hard_outer_time + redz_age[kk]
+                        # also get the evolution-time to the left edge
+                        time_left = time_right - dt
 
-                    # find right-edge starting from left edge, i.e. `interp_left_idx` (`interp_left_idx` is not a typo!)
-                    interp_right_idx = while_while_increasing(interp_left_idx, n_interp, time_right, tage_interp_grid)
-                    # NOTE: because `time_right` can be larger than age of universe, it can exceed `tage_interp_grid`
-                    #       in this case `interp_right_idx=n_interp-2`, and the `interp_at_index` function can still
-                    #       be used to extrapolate to further out values, which will likely be negative
-
-                    redz_right = interp_at_index(interp_right_idx, time_right, tage_interp_grid, redz_interp_grid)
-                    # NOTE: at this point `redz_right` could be negative, even though `redz_left` is definitely not
-                    if redz_right < 0.0:
-                        redz_right = 0.0
-
-                    # if ii == 8 and jj == 0 and kk == 11:
-                    #     printf("cy %03d : t=%.2e z=%.2e\n", step, time_right, redz_right)
-
-                    # convert to frequencies
-                    fobs_orb_left = frst_orb_left / (1.0 + redz_left)
-                    fobs_orb_right = frst_orb_right / (1.0 + redz_right)
-
-                    # ---- Iterate over all target frequencies
-
-                    # NOTE: there should be a more efficient way to do this.
-                    #       Tried a different implementation in `_dynamic_binary_number_at_fobs_1`, but not working
-                    #       some of the frequency bins seem to be getting skipped in that version.
-
-                    for ff in range(n_freq):
-                        ftarget = target_fobs_orb[ff]
-
-                        # If the integration-step does NOT bracket the target frequency, continue to next frequency
-                        if (ftarget < fobs_orb_left) or (fobs_orb_right < ftarget):
+                        # if we pass the age of the universe, this binary has stalled, no further redshifts will work
+                        # NOTE: if `gmt_time` decreases faster than redshift bins increase the universe age,
+                        #       then systems in later `redz` bins may no longer stall, so we still need to calculate them.
+                        #       i.e. we can NOT use a `break` statement here, must use `continue` statement.
+                        if time_left > age_universe:
                             continue
 
-                        # ------------------------------------------------------
-                        # ---- TARGET FOUND ----
+                        # find the redshift bins corresponding to left- and right- side of step
+                        # left edge
+                        interp_left_idx = while_while_increasing(interp_left_idx, n_interp, time_left, tage_interp_grid)
 
-                        # At this point in the code, this target frequency is inbetween the left- and right- edges
-                        # of the integration step, so we can interpolate the evolution to exactly this frequency,
-                        # and perform the actual dynamic_binary_number calculation
+                        redz_left = interp_at_index(interp_left_idx, time_left, tage_interp_grid, redz_interp_grid)
 
-                        new_time = _interp_between_vals(ftarget, fobs_orb_left, fobs_orb_right, time_left, time_right)
+                        # double check that left-edge is within age of Universe (should rarely if ever be a problem
+                        # but possible due to rounding/interpolation errors
+                        if redz_left < 0.0:
+                            continue
 
-                        # `time_right` can be after age of Universe, make sure interpolated value is not
-                        #    if it is, then all higher-frequencies will also, so break out of target-frequency loop
-                        if new_time > tage_interp_grid[n_interp - 1]:
-                            break
+                        # find right-edge starting from left edge, i.e. `interp_left_idx` (`interp_left_idx` is not a typo!)
+                        interp_right_idx = while_while_increasing(interp_left_idx, n_interp, time_right, tage_interp_grid)
+                        # NOTE: because `time_right` can be larger than age of universe, it can exceed `tage_interp_grid`
+                        #       in this case `interp_right_idx=n_interp-2`, and the `interp_at_index` function can still
+                        #       be used to extrapolate to further out values, which will likely be negative
 
-                        # find index in interpolation grid for this exact time
-                        new_interp_idx = interp_left_idx      # start from left-step edge
-                        new_interp_idx = while_while_increasing(new_interp_idx, n_interp, new_time, tage_interp_grid)
+                        redz_right = interp_at_index(interp_right_idx, time_right, tage_interp_grid, redz_interp_grid)
+                        # NOTE: at this point `redz_right` could be negative, even though `redz_left` is definitely not
+                        if redz_right < 0.0:
+                            redz_right = 0.0
 
-                        # get redshift
-                        new_redz = interp_at_index(new_interp_idx, new_time, tage_interp_grid, redz_interp_grid)
-                        # get comoving distance
-                        dcom = interp_at_index(new_interp_idx, new_time, tage_interp_grid, dcom_interp_grid)
+                        # if ii == 8 and jj == 0 and kk == 11:
+                        #     printf("cy %03d : t=%.2e z=%.2e\n", step, time_right, redz_right)
 
-                        # if (ii == 0) and (jj == 0) and (kk == 0):
-                        #     printf("cy f=%03d (step=%03d)\n", ff, step)
-                        #     printf(
-                        #         "fl=%.6e, f=%.6e, fr=%.6e ==> tl=%.6e, t=%.6e, tr=%.6e\n",
-                        #         fobs_orb_left, ftarget, fobs_orb_right,
-                        #         time_left, new_time, time_right
-                        #     )
-                        #     printf(
-                        #         "interp (%d) time: %.6e, %.6e, %.6e ==> z: %.6e, %.6e, %.6e\n",
-                        #         new_interp_idx,
-                        #         tage_interp_grid[new_interp_idx], new_time, tage_interp_grid[new_interp_idx+1],
-                        #         redz_interp_grid[new_interp_idx], new_redz, redz_interp_grid[new_interp_idx+1],
-                        #     )
-                        #     printf("======> z=%.6e\n", new_redz)
+                        # convert to frequencies
+                        fobs_orb_left = frst_orb_left / (1.0 + redz_left)
+                        fobs_orb_right = frst_orb_right / (1.0 + redz_right)
 
-                        # Store redshift
-                        redz_final[ii, jj, kk, ff] = new_redz
+                        # ---- Iterate over all target frequencies
 
-                        # find rest-frame orbital frequency and binary separation
-                        target_frst_orb = ftarget * (1.0 + new_redz)
-                        sepa = kepler_sepa_from_freq(mt, target_frst_orb)
+                        # NOTE: there should be a more efficient way to do this.
+                        #       Tried a different implementation in `_dynamic_binary_number_at_fobs_1`, but not working
+                        #       some of the frequency bins seem to be getting skipped in that version.
 
-                        # calculate total hardening rate at this exact separation
-                        #### UPDATED TO NEW FUNCTION ####
-                        dadt =  _hard_func_innerpwl_gw(
-                            mt, mr, sepa, hard_inner_model_type, 
-                            hard_dadt_rchar, hard_rchar, hard_nu_inner, 
-                            hard_r_gwcrit_9, hard_gwcrit_units_rg, hard_alpha_gwcrit, hard_beta_gwcrit
-                        )
+                        for ff in range(n_freq):
+                            ftarget = target_fobs_orb[ff]
 
-                        # calculate residence/hardening time = f/[df/dt] = -(2/3) a/[da/dt]
-                        tres = - (2.0/3.0) * sepa / dadt
+                            # If the integration-step does NOT bracket the target frequency, continue to next frequency
+                            if (ftarget < fobs_orb_left) or (fobs_orb_right < ftarget):
+                                continue
 
-                        # calculate number of binaries
-                        cosmo_fact = FOUR_PI_SPLC_OVER_MPC * (1.0 + new_redz) * pow(dcom / MY_MPC, 2)
-                        diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
+                            # ------------------------------------------------------
+                            # ---- TARGET FOUND ----
 
-                        # ----------------------
-                        # ------------------------------------------------------
+                            # At this point in the code, this target frequency is inbetween the left- and right- edges
+                            # of the integration step, so we can interpolate the evolution to exactly this frequency,
+                            # and perform the actual dynamic_binary_number calculation
 
-                # update new left edge
-                dadt_left = dadt_right
-                sepa_left = sepa_right
-                frst_orb_left = frst_orb_right
-                # note that we _cannot_ do this for redz or freqs because the redshift _bin_ is changing
+                            new_time = _interp_between_vals(ftarget, fobs_orb_left, fobs_orb_right, time_left, time_right)
 
-    free(redz_age)
+                            # `time_right` can be after age of Universe, make sure interpolated value is not
+                            #    if it is, then all higher-frequencies will also, so break out of target-frequency loop
+                            if new_time > tage_interp_grid[n_interp - 1]:
+                                break
+
+                            # find index in interpolation grid for this exact time
+                            new_interp_idx = interp_left_idx      # start from left-step edge
+                            new_interp_idx = while_while_increasing(new_interp_idx, n_interp, new_time, tage_interp_grid)
+
+                            # get redshift
+                            new_redz = interp_at_index(new_interp_idx, new_time, tage_interp_grid, redz_interp_grid)
+                            # get comoving distance
+                            dcom = interp_at_index(new_interp_idx, new_time, tage_interp_grid, dcom_interp_grid)
+
+                            # if (ii == 0) and (jj == 0) and (kk == 0):
+                            #     printf("cy f=%03d (step=%03d)\n", ff, step)
+                            #     printf(
+                            #         "fl=%.6e, f=%.6e, fr=%.6e ==> tl=%.6e, t=%.6e, tr=%.6e\n",
+                            #         fobs_orb_left, ftarget, fobs_orb_right,
+                            #         time_left, new_time, time_right
+                            #     )
+                            #     printf(
+                            #         "interp (%d) time: %.6e, %.6e, %.6e ==> z: %.6e, %.6e, %.6e\n",
+                            #         new_interp_idx,
+                            #         tage_interp_grid[new_interp_idx], new_time, tage_interp_grid[new_interp_idx+1],
+                            #         redz_interp_grid[new_interp_idx], new_redz, redz_interp_grid[new_interp_idx+1],
+                            #     )
+                            #     printf("======> z=%.6e\n", new_redz)
+
+                            # Store redshift
+                            redz_final[ii, jj, kk, ff] = new_redz
+
+                            # find rest-frame orbital frequency and binary separation
+                            target_frst_orb = ftarget * (1.0 + new_redz)
+                            sepa = kepler_sepa_from_freq(mt, target_frst_orb)
+
+                            # calculate total hardening rate at this exact separation
+                            #### UPDATED TO NEW FUNCTION ####
+                            dadt =  _hard_func_innerpwl_gw(
+                                mt, mr, sepa, hard_inner_model_type, 
+                                hard_dadt_rchar, hard_rchar, hard_nu_inner, 
+                                hard_r_gwcrit_9, hard_gwcrit_units_rg, hard_alpha_gwcrit, hard_beta_gwcrit
+                            )
+
+                            # calculate residence/hardening time = f/[df/dt] = -(2/3) a/[da/dt]
+                            tres = - (2.0/3.0) * sepa / dadt
+
+                            # calculate number of binaries
+                            cosmo_fact = FOUR_PI_SPLC_OVER_MPC * (1.0 + new_redz) * pow(dcom / MY_MPC, 2)
+                            diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
+
+                            # ----------------------
+                            # ------------------------------------------------------
+
+                    # update new left edge
+                    dadt_left = dadt_right
+                    sepa_left = sepa_right
+                    frst_orb_left = frst_orb_right
+                    # note that we _cannot_ do this for redz or freqs because the redshift _bin_ is changing
+
+    finally:
+        free(redz_age)
 
     return 0
 ######### end of innerpwl function #######
@@ -949,181 +953,184 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
     cdef double sepa_init_log10 = log10(sepa_init)
 
     cdef int ii, jj, kk, ff, step, interp_left_idx, interp_right_idx, new_interp_idx
-    cdef double mt, mr, norm, risco, dx, new_redz, gmt, ftarget, target_frst_orb
-    cdef double sepa_log10, sepa, sepa_left, sepa_right, dadt_left, dadt_right
-    cdef double time_evo, redz_left, redz_right, time_left, time_right, new_time
+    cdef double mt, mr, norm, risco, dx, new_redz, gmt, ftarget, target_frst_orb, cosmo_fact
+    cdef double sepa_log10, sepa, sepa_left, sepa_right, dadt_left, dadt_right, dadt, dt
+    cdef double time_evo, redz_left, redz_right, time_left, time_right, new_time, dcom, tres
     cdef double frst_orb_left, fobs_orb_left, frst_orb_right, fobs_orb_right
 
     # ---- Calculate ages corresponding to SAM `redz` grid
 
     cdef double *redz_age = <double *>malloc(n_redz * sizeof(double))     # (Z,) age of the universe in [sec]
-    ii = 0
-    cdef int rev
-    for kk in range(n_redz):
-        # iterate in reverse order to match with `redz_interp_grid` which is decreasing
-        rev = n_redz - 1 - kk
-        # get to the right index of the interpolation-grid
-        while (redz_interp_grid[ii+1] > redz[rev]) and (ii < n_interp - 1):
-            ii += 1
+    if redz_age == NULL:
+        raise MemoryError()
+    try:
+        ii = 0
+        cdef int rev
+        for kk in range(n_redz):
+            # iterate in reverse order to match with `redz_interp_grid` which is decreasing
+            rev = n_redz - 1 - kk
+            # get to the right index of the interpolation-grid
+            while (ii < n_interp - 1) and (redz_interp_grid[ii+1] > redz[rev]):
+                ii += 1
 
-        # interpolate
-        redz_age[rev] = interp_at_index(ii, redz[rev], redz_interp_grid, tage_interp_grid)
+            # interpolate
+            redz_age[rev] = interp_at_index(ii, redz[rev], redz_interp_grid, tage_interp_grid)
 
-    # ---- calculate dynamic binary numbers for all SAM grid bins
+        # ---- calculate dynamic binary numbers for all SAM grid bins
 
-    for ii in range(n_mtot):
-        mt = mtot[ii]
+        for ii in range(n_mtot):
+            mt = mtot[ii]
 
-        # Determine separation step-size, in log10-space, to integrate from sepa_init to ISCO
-        risco = 3.0 * MY_SCHW * mt     # ISCO is 3x combined schwarzschild radius
-        dx = (sepa_init_log10 - log10(risco)) / num_steps
+            # Determine separation step-size, in log10-space, to integrate from sepa_init to ISCO
+            risco = 3.0 * MY_SCHW * mt     # ISCO is 3x combined schwarzschild radius
+            dx = (sepa_init_log10 - log10(risco)) / num_steps
 
-        for jj in range(n_mrat):
-            mr = mrat[jj]
+            for jj in range(n_mrat):
+                mr = mrat[jj]
 
-            # Binary evolution is determined by M and q only
-            # so integration is started for each of these bins
-            sepa_log10 = sepa_init_log10                # set initial separation to initial value
-            norm = hard_norm[ii, jj]                    # get hardening-rate normalization for this bin
+                # Binary evolution is determined by M and q only
+                # so integration is started for each of these bins
+                sepa_log10 = sepa_init_log10                # set initial separation to initial value
+                norm = hard_norm[ii, jj]                    # get hardening-rate normalization for this bin
 
-            # Get total hardening rate at left-most edge
-            sepa_left = pow(10.0, sepa_log10)
-            dadt_left = _hard_func_2pwl_gw(
-                mt, mr, sepa_left,
-                norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
-            )
-
-            # get rest-frame orbital frequency of binary at left edge
-            frst_orb_left = kepler_freq_from_sepa(mt, sepa_left)
-
-            # ---- Integrate of `num_steps` discrete intervals in binary separation from large to small
-
-            time_evo = 0.0                  # track total binary evolution time
-            interp_left_idx = 0                 # interpolation index, will be updated in each step
-            for step in range(num_steps):
-                # Increment the current separation
-                sepa_log10 -= dx
-                sepa_right = pow(10.0, sepa_log10)
-                frst_orb_right = kepler_freq_from_sepa(mt, sepa_right)
-
-                # Get total hardening rate at the right-edge of this step (left-edge already obtained)
-                dadt_right = _hard_func_2pwl_gw(
-                    mt, mr, sepa_right,
+                # Get total hardening rate at left-most edge
+                sepa_left = pow(10.0, sepa_log10)
+                dadt_left = _hard_func_2pwl_gw(
+                    mt, mr, sepa_left,
                     norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
                 )
 
-                # Find time to move from left- to right- edges:  dt = da / (da/dt)
-                dt = 2.0 * (sepa_right - sepa_left) / (dadt_left + dadt_right)
-                time_evo += dt
+                # get rest-frame orbital frequency of binary at left edge
+                frst_orb_left = kepler_freq_from_sepa(mt, sepa_left)
 
-                # ---- Iterate over starting redshift bins
+                # ---- Integrate of `num_steps` discrete intervals in binary separation from large to small
 
-                for kk in range(n_redz-1, -1, -1):
-                    # get the total time from each starting redshift, plus GMT time, plus evolution time to this step
-                    gmt = gmt_time[ii, jj, kk]
-                    time_right = time_evo + gmt + redz_age[kk]
-                    # also get the evolution-time to the left edge
-                    time_left = time_right - dt
+                time_evo = 0.0                  # track total binary evolution time
+                interp_left_idx = 0                 # interpolation index, will be updated in each step
+                for step in range(num_steps):
+                    # Increment the current separation
+                    sepa_log10 -= dx
+                    sepa_right = pow(10.0, sepa_log10)
+                    frst_orb_right = kepler_freq_from_sepa(mt, sepa_right)
 
-                    # if we pass the age of the universe, this binary has stalled, no further redshifts will work
-                    # NOTE: if `gmt_time` decreases faster than redshift bins increase the universe age,
-                    #       then systems in later `redz` bins may no longer stall, so we still need to calculate them
-                    #       i.e. we can NOT use a `break` statement here
-                    if time_left > age_universe:
-                        continue
+                    # Get total hardening rate at the right-edge of this step (left-edge already obtained)
+                    dadt_right = _hard_func_2pwl_gw(
+                        mt, mr, sepa_right,
+                        norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
+                    )
 
-                    # find the redshift bins corresponding to left- and right- side of step
-                    # left edge
-                    interp_left_idx = while_while_increasing(interp_left_idx, n_interp, time_left, tage_interp_grid)
+                    # Find time to move from left- to right- edges:  dt = da / (da/dt)
+                    dt = 2.0 * (sepa_right - sepa_left) / (dadt_left + dadt_right)
+                    time_evo += dt
 
-                    redz_left = interp_at_index(interp_left_idx, time_left, tage_interp_grid, redz_interp_grid)
+                    # ---- Iterate over starting redshift bins
 
-                    # double check that left-edge is within age of Universe (should rarely if ever be a problem
-                    # but possible due to rounding/interpolation errors
-                    if redz_left < 0.0:
-                        continue
+                    for kk in range(n_redz-1, -1, -1):
+                        # get the total time from each starting redshift, plus GMT time, plus evolution time to this step
+                        gmt = gmt_time[ii, jj, kk]
+                        time_right = time_evo + gmt + redz_age[kk]
+                        # also get the evolution-time to the left edge
+                        time_left = time_right - dt
 
-                    # find right-edge starting from left edge, i.e. `interp_left_idx` (`interp_left_idx` is not a typo!)
-                    interp_right_idx = while_while_increasing(interp_left_idx, n_interp, time_right, tage_interp_grid)
-                    # NOTE: because `time_right` can be larger than age of universe, it can exceed `tage_interp_grid`
-                    #       in this case `interp_right_idx=n_interp-2`, and the `interp_at_index` function can still
-                    #       be used to extrapolate to further out values, which will likely be negative
-
-                    redz_right = interp_at_index(interp_right_idx, time_right, tage_interp_grid, redz_interp_grid)
-                    # NOTE: at this point `redz_right` could be negative, even though `redz_left` is definitely not
-                    if redz_right < 0.0:
-                        redz_right = 0.0
-
-                    # convert to frequencies
-                    fobs_orb_left = frst_orb_left / (1.0 + redz_left)
-                    fobs_orb_right = frst_orb_right / (1.0 + redz_right)
-
-                    # ---- Iterate over all target frequencies
-
-                    # NOTE: there should be a more efficient way to do this.
-                    #       Tried a different implementation in `_dynamic_binary_number_at_fobs_1`, but not working
-                    #       some of the frequency bins seem to be getting skipped in that version.
-
-                    for ff in range(n_freq):
-                        ftarget = target_fobs_orb[ff]
-
-                        # If the integration-step does NOT bracket the target frequency, continue to next frequency
-                        if (ftarget < fobs_orb_left) or (fobs_orb_right < ftarget):
+                        # if we pass the age of the universe, this binary has stalled, no further redshifts will work
+                        # NOTE: if `gmt_time` decreases faster than redshift bins increase the universe age,
+                        #       then systems in later `redz` bins may no longer stall, so we still need to calculate them
+                        #       i.e. we can NOT use a `break` statement here
+                        if time_left > age_universe:
                             continue
 
-                        # ------------------------------------------------------
-                        # ---- TARGET FOUND ----
+                        # find the redshift bins corresponding to left- and right- side of step
+                        # left edge
+                        interp_left_idx = while_while_increasing(interp_left_idx, n_interp, time_left, tage_interp_grid)
 
-                        # At this point in the code, this target frequency is inbetween the left- and right- edges
-                        # of the integration step, so we can interpolate the evolution to exactly this frequency,
-                        # and perform the actual dynamic_binary_number calculation
+                        redz_left = interp_at_index(interp_left_idx, time_left, tage_interp_grid, redz_interp_grid)
 
-                        new_time = _interp_between_vals(ftarget, fobs_orb_left, fobs_orb_right, time_left, time_right)
+                        # double check that left-edge is within age of Universe (should rarely if ever be a problem
+                        # but possible due to rounding/interpolation errors
+                        if redz_left < 0.0:
+                            continue
 
-                        # `time_right` can be after age of Universe, make sure interpolated value is not
-                        #    if it is, then all higher-frequencies will also, so break out of target-frequency loop
-                        if new_time > tage_interp_grid[n_interp - 1]:
-                            break
+                        # find right-edge starting from left edge, i.e. `interp_left_idx` (`interp_left_idx` is not a typo!)
+                        interp_right_idx = while_while_increasing(interp_left_idx, n_interp, time_right, tage_interp_grid)
+                        # NOTE: because `time_right` can be larger than age of universe, it can exceed `tage_interp_grid`
+                        #       in this case `interp_right_idx=n_interp-2`, and the `interp_at_index` function can still
+                        #       be used to extrapolate to further out values, which will likely be negative
 
-                        # find index in interpolation grid for this exact time
-                        new_interp_idx = interp_left_idx      # start from left-step edge
-                        new_interp_idx = while_while_increasing(new_interp_idx, n_interp, new_time, tage_interp_grid)
+                        redz_right = interp_at_index(interp_right_idx, time_right, tage_interp_grid, redz_interp_grid)
+                        # NOTE: at this point `redz_right` could be negative, even though `redz_left` is definitely not
+                        if redz_right < 0.0:
+                            redz_right = 0.0
 
-                        # get redshift
-                        new_redz = interp_at_index(new_interp_idx, new_time, tage_interp_grid, redz_interp_grid)
-                        # get comoving distance
-                        dcom = interp_at_index(new_interp_idx, new_time, tage_interp_grid, dcom_interp_grid)
+                        # convert to frequencies
+                        fobs_orb_left = frst_orb_left / (1.0 + redz_left)
+                        fobs_orb_right = frst_orb_right / (1.0 + redz_right)
 
-                        # Store redshift
-                        redz_final[ii, jj, kk, ff] = new_redz
+                        # ---- Iterate over all target frequencies
 
-                        # find rest-frame orbital frequency and binary separation
-                        target_frst_orb = ftarget * (1.0 + new_redz)
-                        sepa = kepler_sepa_from_freq(mt, target_frst_orb)
+                        # NOTE: there should be a more efficient way to do this.
+                        #       Tried a different implementation in `_dynamic_binary_number_at_fobs_1`, but not working
+                        #       some of the frequency bins seem to be getting skipped in that version.
 
-                        # calculate total hardening rate at this exact separation
-                        dadt = _hard_func_2pwl_gw(
-                            mt, mr, sepa,
-                            norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
-                        )
+                        for ff in range(n_freq):
+                            ftarget = target_fobs_orb[ff]
 
-                        # calculate residence/hardening time = f/[df/dt] = -(2/3) a/[da/dt]
-                        tres = - (2.0/3.0) * sepa / dadt
+                            # If the integration-step does NOT bracket the target frequency, continue to next frequency
+                            if (ftarget < fobs_orb_left) or (fobs_orb_right < ftarget):
+                                continue
 
-                        # calculate number of binaries
-                        cosmo_fact = FOUR_PI_SPLC_OVER_MPC * (1.0 + new_redz) * pow(dcom / MY_MPC, 2)
-                        diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
+                            # ------------------------------------------------------
+                            # ---- TARGET FOUND ----
 
-                        # ----------------------
-                        # ------------------------------------------------------
+                            # At this point in the code, this target frequency is inbetween the left- and right- edges
+                            # of the integration step, so we can interpolate the evolution to exactly this frequency,
+                            # and perform the actual dynamic_binary_number calculation
 
-                # update new left edge
-                dadt_left = dadt_right
-                sepa_left = sepa_right
-                frst_orb_left = frst_orb_right
-                # note that we _cannot_ do this for redz or freqs because the redshift _bin_ is changing
+                            new_time = _interp_between_vals(ftarget, fobs_orb_left, fobs_orb_right, time_left, time_right)
 
-    free(redz_age)
+                            # `time_right` can be after age of Universe, make sure interpolated value is not
+                            #    if it is, then all higher-frequencies will also, so break out of target-frequency loop
+                            if new_time > tage_interp_grid[n_interp - 1]:
+                                break
+
+                            # find index in interpolation grid for this exact time
+                            new_interp_idx = interp_left_idx      # start from left-step edge
+                            new_interp_idx = while_while_increasing(new_interp_idx, n_interp, new_time, tage_interp_grid)
+
+                            # get redshift
+                            new_redz = interp_at_index(new_interp_idx, new_time, tage_interp_grid, redz_interp_grid)
+                            # get comoving distance
+                            dcom = interp_at_index(new_interp_idx, new_time, tage_interp_grid, dcom_interp_grid)
+
+                            # Store redshift
+                            redz_final[ii, jj, kk, ff] = new_redz
+
+                            # find rest-frame orbital frequency and binary separation
+                            target_frst_orb = ftarget * (1.0 + new_redz)
+                            sepa = kepler_sepa_from_freq(mt, target_frst_orb)
+
+                            # calculate total hardening rate at this exact separation
+                            dadt = _hard_func_2pwl_gw(
+                                mt, mr, sepa,
+                                norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
+                            )
+
+                            # calculate residence/hardening time = f/[df/dt] = -(2/3) a/[da/dt]
+                            tres = - (2.0/3.0) * sepa / dadt
+
+                            # calculate number of binaries
+                            cosmo_fact = FOUR_PI_SPLC_OVER_MPC * (1.0 + new_redz) * pow(dcom / MY_MPC, 2)
+                            diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
+
+                            # ----------------------
+                            # ------------------------------------------------------
+
+                    # update new left edge
+                    dadt_left = dadt_right
+                    sepa_left = sepa_right
+                    frst_orb_left = frst_orb_right
+                    # note that we _cannot_ do this for redz or freqs because the redshift _bin_ is changing
+    finally:
+        free(redz_age)
 
     return 0
 
@@ -1158,7 +1165,8 @@ cdef int _dynamic_binary_number_at_fobs_gw(
     cdef int n_interp = redz_interp_grid.size
 
     cdef int ii, jj, kk, ff, interp_idx, _kk
-    cdef double mt, mr, ftarget, target_frst_orb, sepa, rad_isco, frst_orb_isco, rzp
+    cdef double mt, mr, ftarget, target_frst_orb, sepa, rad_isco, frst_orb_isco, rzp, 
+    cdef double cosmo_fact, dcom, tres
 
 
     # ---- calculate dynamic binary numbers for all SAM grid bins
