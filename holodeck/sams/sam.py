@@ -1464,8 +1464,8 @@ components as arguments:
     subclasses of the :class:`_Galaxy_Pair_Fraction` subclass.
 (3) Galaxy Merger Time (GMT): gives the characteristic time duration for galaxy 'mergers' to occur.
     Implemented as subclasses of the :class:`_Galaxy_Merger_Time` subclass.
-(4) M_bh - M_bulge Relation (mmbulge): gives MBH properties for a given galaxy stellar-bulge mass.
-    Implemented as subcalsses of the :class:`holodeck.host_relations._MMBulge_Relation` subclass.
+(4) M_bh - Host Relation (relation): gives MBH properties for a given galaxy stellar-bulge mass or velocity dispersion.
+    Implemented as subclasses of the :class:`holodeck.host_relations._MMBulge_Relation` and :class:`holodeck.host_relations._MSigma_Relation` subclasses.
 
 The :class:`Semi_Analytic_Model` class defines a grid in parameter space of total MBH mass ($M=M_1 + M_2$),
 MBH mass ratio ($q \\equiv M_1/M_2$), redshift ($z$), and at times binary separation
@@ -1476,10 +1476,6 @@ distribution, and to calculate GW signatures.
 
 The step of going from a number-density of binaries in $(M, q, z)$ space, to also the distribution
 in $a$ or $f$ is subtle, as it requires modeling the binary evolution (i.e. hardening rate).
-
-To-Do (sam.py)
---------------
-* Allow SAM class to take M-sigma in addition to M-Mbulge.
 
 References
 ----------
@@ -1501,13 +1497,13 @@ from holodeck import cosmo, utils, log
 from holodeck.constants import SPLC, MSOL, MPC
 from holodeck import host_relations, single_sources
 from holodeck.sams.components import (
-    _Galaxy_Pair_Fraction, _Galaxy_Stellar_Mass_Function, _Galaxy_Merger_Time, _Galaxy_Merger_Rate,
+    _Galaxy_Pair_Fraction, _Galaxy_Number_Density_Function, _Galaxy_Merger_Time, _Galaxy_Merger_Rate,
     GSMF_Schechter, GPF_Power_Law, GMT_Power_Law, GMR_Illustris
 )
 
 REDZ_SAMPLE_VOLUME = True    #: get redshifts by sampling uniformly in 3D spatial volume, and converting
 
-GSMF_USES_MTOT = False       #: the mass used in the GSMF is interpretted as M=m1+m2, otherwise use primary m1
+GNDF_USES_MTOT = False       #: the mass used in the GNDF is interpretted as M=m1+m2, otherwise use primary m1
 GPF_USES_MTOT = False        #: the mass used in the GPF  is interpretted as M=m1+m2, otherwise use primary m1
 GMT_USES_MTOT = False        #: the mass used in the GMT  is interpretted as M=m1+m2, otherwise use primary m1
 
@@ -1532,10 +1528,10 @@ class Semi_Analytic_Model:
 
     Conceptually, three components are required to build SAMs.
 
-    (1) Galaxies and stellar-masses (i.e. how many galaxies there are as a function of stellar mass
-        and redshift).  This component is provided by the Galaxy Stellar-Mass Function (GSMF), which
+    (1) Galaxies and host properties (i.e. how many galaxies there are as a function of stellar mass/velocity dispersion
+        and redshift).  This component is provided by the Galaxy Number Density Function (GNDF), which
         are implemented as subclasses of the
-        :class:`holodeck.sams.components._Galaxy_Stellar_Mass_Function` base-class.
+        :class:`holodeck.sams.components._Galaxy_Number_Density_Function` base-class.
 
     (2) Galaxy merger rates (GMRs; i.e. how often galaxies merge as a function of stellar mass, mass
         ratio, and redshift.)  This component can be provided in two ways:
@@ -1550,8 +1546,8 @@ class Semi_Analytic_Model:
           that galaxies spend in the merger process.
 
     (3) MBH-Host relationships which determine MBH properties for a given host galaxy.  Currently
-        these relationships are only fully implemented as Mbh-MBulge (MMBulge) relationships, which
-        are subclasses of :class:`holodeck.host_relations._MMBulge_Relation`.
+        these relationships are fully implemented as Mbh-MBulge (MMBulge) and Mbh-Sigma (MSigma) relationships, which
+        are subclasses of :class:`holodeck.host_relations._MMBulge_Relation` and :class:`holodeck.host_relations._MSigma_Relation`.
 
     """
 
@@ -1562,11 +1558,11 @@ class Semi_Analytic_Model:
         redz=(1e-3, 10.0, 101),
         shape=None,
         log=None,
-        gsmf=GSMF_Schechter,
+        gndf=GSMF_Schechter,
         gpf=None,
         gmt=None,
         gmr=None,
-        mmbulge=host_relations.MMBulge_KH2013,
+        relation=host_relations.MMBulge_KH2013,
         **kwargs
     ):
         """Construct a new ``Semi_Analytic_Model`` instance.
@@ -1601,11 +1597,11 @@ class Semi_Analytic_Model:
               example, ``shape=(12, None, 14)`` would produce 12 grid edges in total mass, the
               default number of grid edges in mass ratio, and 14 grid edges in redshit.
 
-        gsmf : None  or  :class:`_Galaxy_Stellar_Mass_Function` subclass instance
+        gndf : None  or  :class:`_Galaxy_Number_Density_Function` subclass instance
         gpf : None  or  :class:`_Galaxy_Pair_Fraction` subclass instance
         gmt : None  or  :class:`_Galaxy_Merger_Time` subclass instance
         gmr : None  or  :class:`_Galaxy_Merger_Rate` subclass instance
-        mmbulge : None  or  :class:`_MMBulge_Relation` subclass instance
+        relation : None or :class:`_MMBulge_Relation`, or :class:`_MSigma_Relation` subclass instance
 
         """
         if log is None:
@@ -1623,8 +1619,17 @@ class Semi_Analytic_Model:
 
         # ---- Process SAM components
 
-        gsmf = utils.get_subclass_instance(gsmf, None, _Galaxy_Stellar_Mass_Function)
-        mmbulge = utils.get_subclass_instance(mmbulge, None, host_relations._MMBulge_Relation)
+        gndf = utils.get_subclass_instance(gndf, None, _Galaxy_Number_Density_Function)
+        
+        if 'mbulge' in relation._PROPERTIES:
+            relation = utils.get_subclass_instance(relation, None, host_relations._MMBulge_Relation)
+        elif 'vdisp' in relation._PROPERTIES:
+            relation = utils.get_subclass_instance(relation, None, host_relations._MSigma_Relation)
+        else:
+            err = "Must use either `_MMBulge_Relation`, or `_MSigma_Relation` subclass instance."
+            log.exception(err)
+            raise ValueError()
+            
         if gpf is None:
             log.info("No galaxy pair-fraction given, using galaxy merger-rate.")
             gmr = utils.get_subclass_instance(gmr, GMR_Illustris, _Galaxy_Merger_Rate)
@@ -1639,12 +1644,12 @@ class Semi_Analytic_Model:
             gmt = utils.get_subclass_instance(gmt, GMT_Power_Law, _Galaxy_Merger_Time)
             gpf = utils.get_subclass_instance(gpf, GPF_Power_Law, _Galaxy_Pair_Fraction)
 
-        self._gsmf = gsmf             #: Galaxy Stellar-Mass Function (`_Galaxy_Stellar_Mass_Function` instance)
+        self._gndf = gndf             #: Galaxy Number Density Function (`_Galaxy_Number_Density_Function` instance)
         self._gmr = gmr               #: Galaxy Merger Rate (`_Galaxy_Merger_Rate` instance)
         self._gpf = gpf               #: Galaxy Pair Fraction (`_Galaxy_Pair_Fraction` instance)
         self._gmt = gmt               #: Galaxy Merger Time (`_Galaxy_Merger_Time` instance)
-        self._mmbulge = mmbulge       #: Mbh-Mbulge relation (`host_relations._MMBulge_Relation` instance)
-        log.debug(f"{gsmf=}, {gmr=}, {gpf=}, {gmt=}, {mmbulge=}")
+        self._relation = relation       #: Mbh-host relation (`host_relations._MMBulge_Relation` or `host_relations._MSigma_Relation` instance)
+        log.debug(f"{gndf=}, {gmr=}, {gpf=}, {gmt=}, {relation=}")
 
         # ---- Create SAM grid edges
 
@@ -1701,7 +1706,7 @@ class Semi_Analytic_Model:
         return self._shape
 
     def mass_stellar(self):
-        """Calculate stellar masses for each MBH based on the M-MBulge relation.
+        """Calculate stellar masses for each MBH based on the Mbh-host relation.
 
         Returns
         -------
@@ -1718,8 +1723,8 @@ class Semi_Analytic_Model:
         args = [mbh_pri[..., np.newaxis], mbh_sec[..., np.newaxis], redz]
         # Convert to shape (M, Q, Z)
         mbh_pri, mbh_sec, redz = np.broadcast_arrays(*args)
-        mstar_pri = self._mmbulge.mstar_from_mbh(mbh_pri, redz=redz, scatter=False)
-        mstar_sec = self._mmbulge.mstar_from_mbh(mbh_sec, redz=redz, scatter=False)
+        mstar_pri = self._relation.mstar_from_mbh(mbh_pri, redz=redz, scatter=False)
+        mstar_sec = self._relation.mstar_from_mbh(mbh_sec, redz=redz, scatter=False)
 
         # q = m2 / m1
         mstar_rat = mstar_sec / mstar_pri
@@ -1730,6 +1735,36 @@ class Semi_Analytic_Model:
         # mstar_rat = np.broadcast_arrays(*args)
         return mstar_pri, mstar_rat, mstar_tot, redz
 
+    def velocity_dispersions(self):
+        """Calculate velocity dispersions for each MBH based on the Mbh-host relation.
+
+        Returns
+        -------
+        vdisps : (2, N) ndarray of scalar,
+            Galaxy velocity dispersions for all MBH. [0, :] is primary, [1, :] is secondary [km/s].
+
+        """
+        redz = self.redz[np.newaxis, np.newaxis, :]
+        # total-mass, mass-ratio ==> (M1, M2)
+        masses = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
+        # BH-masses to stellar-masses
+        mbh_pri = masses[0]
+        mbh_sec = masses[1]
+        args = [mbh_pri[..., np.newaxis], mbh_sec[..., np.newaxis], redz]
+        # Convert to shape (M, Q, Z)
+        mbh_pri, mbh_sec, redz = np.broadcast_arrays(*args)
+        vdisp_pri = self._relation.vdisp_from_mbh(mbh_pri, redz=redz, scatter=False)
+        vdisp_sec = self._relation.vdisp_from_mbh(mbh_sec, redz=redz, scatter=False)
+
+        # q = m2 / m1
+        vdisp_rat = vdisp_sec / vdisp_pri
+        # M = m1 + m2
+        vdisp_tot = vdisp_pri + vdisp_sec
+        # args = [mstar_rat[..., np.newaxis]]
+        # # Convert to shape (M, Q, Z)
+        # mstar_rat = np.broadcast_arrays(*args)
+        return vdisp_pri, vdisp_rat, vdisp_tot, redz
+        
     @property
     def static_binary_density(self):
         r"""The number-density of binaries at the edges of the grid in mtot, mrat, redz.
@@ -1764,7 +1799,7 @@ class Semi_Analytic_Model:
             mstar_pri, mstar_rat, mstar_tot, redz = self.mass_stellar()
 
             # choose whether the primary mass, or total mass, is used in different calculations
-            mass_gsmf = mstar_tot if GSMF_USES_MTOT else mstar_pri
+            mass_gndf = mstar_tot if GNDF_USES_MTOT else mstar_pri
 
             # ---- find galaxy-merger duration and redshift after merger
 
@@ -1796,30 +1831,45 @@ class Semi_Analytic_Model:
                 log.debug("Calculating galaxy merger rate directly from GMR")
                 gal_merger_rate = self._gmr(mstar_tot, mstar_rat, redz)
 
-            # `gsmf` returns [1/Mpc^3]   `dtdz` returns [sec]   `gal_merger_rate` is [1/sec]  ===>  [Mpc^-3]
-            dens = self._gsmf(mass_gsmf, redz) * gal_merger_rate * cosmo.dtdz(redz)
-
+            # `gndf` returns [1/Mpc^3]   `dtdz` returns [sec]   `gal_merger_rate` is [1/sec]  ===>  [Mpc^-3]
+            if 'vdisp' in self._relation._PROPERTIES:
+                vdisp_pri, vdisp_rat, vdisp_tot, redz = self.velocity_dispersions()
+                vdisp_gndf = vdisp_tot if GNDF_USES_MTOT else vdisp_pri
+                gndf_input = vdisp_gndf
+            else:
+                gndf_input = mass_gndf
+                
+            dens = self._gndf(gndf_input, redz) * gal_merger_rate * cosmo.dtdz(redz)
+            
             # ---- Convert to MBH Binary density
 
             # we want ``dn_mbhb / [dlog10(M_bh) dq_bh qz]``
             # so far we have ``dn_gal / [dlog10(M_gal) dq_gal dz]``
 
             # dn / [dM dq dz] = (dn_gal / [dM_gal dq_gal dz]) * (dM_gal/dM_bh) * (dq_gal / dq_bh)
-            mplaw = self._mmbulge._mplaw
+            mplaw = self._relation._mplaw
             dqbh_dqgal = mplaw * np.power(mstar_rat, mplaw - 1.0)
             # (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) = (dMstar-pri / dMstar-tot) * (dMstar-tot/dMbh-tot)
             # ==> (dMstar-tot/dMbh-tot) = (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) / (dMstar-pri / dMstar-tot)
             #                           = (dMstar-pri / dMbh-pri) * (1 / (1+q_bh)) / (1 / (1+q_star))
             #                           = (dMstar-pri / dMbh-pri) * ((1+q_star) / (1+q_bh))
-            dmstar_dmbh_pri = self._mmbulge.dmstar_dmbh(mstar_pri, redz=redz)   # [unitless]
-            qterm = (1.0 + mstar_rat) / (1.0 + self.mrat[np.newaxis, :, np.newaxis])
-            dmstar_dmbh = dmstar_dmbh_pri * qterm
+            if 'vdisp' in self._relation._PROPERTIES:
+                dvdisp_dmbh_pri = self._relation.dsigma_dmbh(vdisp_pri,redz=redz)
+                qterm = (1.0 + vdisp_rat) / (1.0 + self.mrat[np.newaxis, :, np.newaxis])
+                dvdisp_dmbh = dvdisp_dmbh_pri * qterm
+                mstar_plaw = self._relation._mstar_plaw
+                dqbh_dqgal = mplaw * mstar_plaw * np.power(mstar_rat, mplaw * mstar_plaw - 1.0)
+                dens *= (self.mtot[:, np.newaxis, np.newaxis] / vdisp_tot) * (dvdisp_dmbh / dqbh_dqgal)
+            else:
+                dmstar_dmbh_pri = self._relation.dmstar_dmbh(mstar_pri, redz=redz)   # [unitless]
+                qterm = (1.0 + mstar_rat) / (1.0 + self.mrat[np.newaxis, :, np.newaxis])
+                dmstar_dmbh = dmstar_dmbh_pri * qterm
 
-            dens *= (self.mtot[:, np.newaxis, np.newaxis] / mstar_tot) * (dmstar_dmbh / dqbh_dqgal)
+                dens *= (self.mtot[:, np.newaxis, np.newaxis] / mstar_tot) * (dmstar_dmbh / dqbh_dqgal)
 
             # ---- Add scatter from the M-Mbulge relation
 
-            scatter = self._mmbulge._scatter_dex
+            scatter = self._relation._scatter_dex
             log.debug(f"mmbulge scatter = {scatter}")
             if scatter > 0.0:
                 log.info(f"Adding MMbulge scatter ({scatter:.4e})")
@@ -2524,27 +2574,27 @@ class Semi_Analytic_Model:
         return integ
 
     def _ndens_gal(self, mass_gal, mrat_gal, redz):
-        if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
-            self._log.warning("{self.__class__}._ndens_gal assumes that primary mass is used for GSMF, GPF and GMT!")
+        if GNDF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
+            self._log.warning("{self.__class__}._ndens_gal assumes that primary mass is used for GNDF, GPF and GMT!")
 
         # NOTE: dlog10(M_1) / dlog10(M) = (M/M_1) * (dM_1/dM) = 1
-        nd = self._gsmf(mass_gal, redz) * self._gpf(mass_gal, mrat_gal, redz)
+        nd = self._gndf(mass_gal, redz) * self._gpf(mass_gal, mrat_gal, redz)
         nd = nd * cosmo.dtdz(redz) / self._gmt(mass_gal, mrat_gal, redz)
         return nd
 
     def _ndens_mbh(self, mass_gal, mrat_gal, redz):
-        if GSMF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
-            self._log.warning("{self.__class__}._ndens_mbh assumes that primary mass is used for GSMF, GPF and GMT!")
+        if GNDF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
+            self._log.warning("{self.__class__}._ndens_mbh assumes that primary mass is used for GNDF, GPF and GMT!")
 
         # this is  d^3 n / [dlog10(M_gal-pri) dq_gal dz]
         nd_gal = self._ndens_gal(mass_gal, mrat_gal, redz)
 
-        mplaw = self._mmbulge._mplaw
+        mplaw = self._relation._mplaw
         dqbh_dqgal = mplaw * np.power(mrat_gal, mplaw - 1.0)
 
-        dmstar_dmbh__pri = self._mmbulge.dmstar_dmbh(mass_gal)   # [unitless]
-        mbh_pri = self._mmbulge.mbh_from_mstar(mass_gal, scatter=False)
-        mbh_sec = self._mmbulge.mbh_from_mstar(mass_gal * mrat_gal, scatter=False)
+        dmstar_dmbh__pri = self._relation.dmstar_dmbh(mass_gal)   # [unitless]
+        mbh_pri = self._relation.mbh_from_mstar(mass_gal, scatter=False)
+        mbh_sec = self._relation.mbh_from_mstar(mass_gal * mrat_gal, scatter=False)
         mbh = mbh_pri + mbh_sec
         mrat_mbh = mbh_sec / mbh_pri
 

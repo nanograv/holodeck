@@ -21,4 +21,5 @@ from .components import (                           # noqa
     GPF_Power_Law,
     GMT_Power_Law,
     GMR_Illustris,
+    GMR_SDSS,
 )

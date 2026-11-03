@@ -26,6 +26,12 @@ References
 * [Taylor2022]_  Taylor, Bezanson, van der Wel, et. al 2022.
     The Velocity Dispersion Function for Massive Quiescent and Star-forming Galaxies at 0.6 < z ≤ 1.0 
     https://ui.adsabs.harvard.edu/abs/2022ApJ...939...90T/abstract
+* [O'Leary2021]_ O'Leary, Moster, Krämer 2021.
+    Emerge: Constraining merging probabilities and timescales of close galaxy pairs
+    https://ui.adsabs.harvard.edu/abs/2021MNRAS.503.5646O/abstract
+* [Comerford2025] Comerford and Simon 2025.
+    Preferential Accretion onto the Secondary Black Hole Strengthens Gravitational-wave Signals
+    https://ui.adsabs.harvard.edu/abs/2025ApJ...994..168C/abstract
 
 """
 
@@ -73,7 +79,7 @@ class _Galaxy_Number_Density_Function(abc.ABC):
         """
         return
 
-    def mbh_mass_func(self, mbh, redz, relation_type, relation, scatter=None):
+    def mbh_mass_func(self, mbh, redz, relation, scatter=None):
         """Convert from the GNDF to a MBH mass function (number density), using a given Mbh-Host scaling relation.
 
         Parameters
@@ -82,9 +88,6 @@ class _Galaxy_Number_Density_Function(abc.ABC):
             Blackhole masses at which to evaluate the mass function.
         redz : array_like
             Redshift(s) at which to evaluate the mass function.
-        relation_type: str
-            * `mmbulge` : ``relation`` argument is a :class:`_MMBulge_Relation` subclass instance
-            * `msigma` : ``relation`` argument is a :class:`_MSigma_Relation` subclass instance
         relation : `host_relations._MMBulge_Relation` or `host_relations._MSigma_Relation` subclass instance
             Scaling relation between galaxy property and MBH masses.
         scatter : None, bool, or float
@@ -102,16 +105,16 @@ class _Galaxy_Number_Density_Function(abc.ABC):
         if scatter in [None, True]:
             scatter = relation._scatter_dex
 
-        if relation_type ==  'mmbulge':
+        if 'mbulge' in relation._PROPERTIES:
             prop = relation.mstar_from_mbh(mbh, scatter=scatter)
              # dM_star / dM_bh
             dprop_dmbh = relation.dmstar_dmbh(prop)   # [unitless]
-        elif relation_type ==  'msigma':
+        elif 'vdisp' in relation._PROPERTIES:
             prop = relation.vdisp_from_mbh(mbh, scatter=scatter)   
             # dsigma / dM_bh
             dprop_dmbh = relation.dsigma_dmbh(prop)   # [unitless]
         else:
-            raise ValueError("relation_type must be `mmbulge` or `msigma`.")
+            raise ValueError("Relation must be `mmbulge` or `msigma`.")
         
         # This is `dn_star / dlog10(X)`
         ndens = self(prop, redz)    # units of  [1/Mpc^3]
@@ -356,18 +359,17 @@ class VDF_Modified_Schechter(_Galaxy_Number_Density_Function):
     See: [Taylor2022]_ Eq.2 and enclosing section, [Bernardi2010]_ Table B4, and [Taylor2022]_ Table 2.
 
     """
-
-    def __init__(self, phistars=[24.736*1e-2,11*1e-3], sigstars=[140.96*KMPERSEC,156*KMPERSEC], alphas=[0.07,0.8], betas=[2.22,2.19], zbound = 0.5 ):
+    def __init__(self, phistar0=24.736*1e-2, phistar1=11*1e-3, sigstar0 =140.96*KMPERSEC, sigstar1=156*KMPERSEC, alpha0=0.07, alpha1=0.8, beta0=2.22, beta1=2.19):
         
-        self._phistars = phistars         # 24.736  +/- [-8.376, +8.376] [1/(10^2 Mpc^3)], Bernardi 2010
-                                        # 11  +/- [-5, +12] [1/(10^3 Mpc^3)], Taylor 2022 
-        self._sigstars = sigstars         # 140.96  +/- [-7.09, +7.09] [km/s], Bernardi 2010
-                                        # 156  +/- [-60, +29] [km/s], Taylor 2022
-        self._alphas = alphas         # 0.07  +/- [-0.02, +0.02], Bernardi 2010
-                                        # 0.8  +/- [-0.5, +1.4], Taylor 2022
-        self._betas = betas         # 2.22  +/- [-0.13, +0.13], Bernardi 2010
-                                        # 2.19  +/- [-0.57, +0.45], Taylor 2022
-        self._zbound = zbound     # defines redshift boundary between the low-z VDF and high-z VDF
+        self._phistar0 = phistar0         # 24.736  +/- [-8.376, +8.376] [1/(10^2 Mpc^3)], Bernardi 2010
+        self._phistar1 = phistar1          # 11  +/- [-5, +12] [1/(10^3 Mpc^3)], Taylor 2022 
+        self._sigstar0 = sigstar0         # 140.96  +/- [-7.09, +7.09] [km/s], Bernardi 2010
+        self._sigstar1 = sigstar1      # 156  +/- [-60, +29] [km/s], Taylor 2022
+        self._alpha0 = alpha0         # 0.07  +/- [-0.02, +0.02], Bernardi 2010
+        self._alpha1 = alpha1        # 0.8  +/- [-0.5, +1.4], Taylor 2022
+        self._beta0 = beta0         # 2.22  +/- [-0.13, +0.13], Bernardi 2010
+        self._beta1 = beta1       # 2.19  +/- [-0.57, +0.45], Taylor 2022
+        self._zbound = 0.5     # defines redshift boundary between the low-z VDF and high-z VDF
         return
 
     def __call__(self, vdisp, redz):
@@ -396,7 +398,7 @@ class VDF_Modified_Schechter(_Galaxy_Number_Density_Function):
         return rv
 
     def _vdf_params(self, redz):
-        return [np.where(redz < self._zbound,param[0],param[1]) for param in [self._phistars, self._sigstars, self._alphas, self._betas]]
+        return [np.where(redz < self._zbound,param[0],param[1]) for param in [[self._phistar0,self._phistar1], [self._sigstar0,self._sigstar1], [self._alpha0,self._alpha1], [self._beta0,self._beta1]]]
 
 # ----    Galaxy Merger Rate    ----
 
@@ -444,6 +446,58 @@ class _Galaxy_Merger_Rate(abc.ABC):
 
         """
         return
+
+
+class GMR_SDSS(_Galaxy_Merger_Rate):
+    """Galaxy Merger Rate - based on pair fractions from SDSS and merger timescale from EMERGE [O'Leary2021].
+
+    See [Comerford2025]_, Equation 3.
+
+    """
+    def __init__(
+        self,
+
+        fpairz=None
+        
+    ):
+
+        
+        norm0 = 0.04      # +0.04   Merger rate at z~0 [1/Gyr]
+        
+        if fpairz is None:
+            fpairz = 0.8      # +0.8 ± 0.2   Redshift evolution of pair fraction
+        
+        tobsz = -1      # -1.0   Redshift evolution of galaxy merger timescale
+
+        self._norm0 = norm0 / GYR
+        self._fpairz = fpairz
+        self._tobsz = tobsz
+        return
+
+    def __call__(self, mtot, mrat, redz):
+        """Return the galaxy merger rate for the given parameters.
+
+        Parameters
+        ----------
+        mtot : (N,) array_like[scalar]
+            Total mass of the system, units of [grams].
+        mrat : (N,) array_like[scalar]
+            Mass ratio of each binary.
+        redz : (N,) array_like[scalar]
+            Redshifts of each binary.
+
+        Returns
+        -------
+        rate : array_like
+            Merger rate in [1/sec].
+
+        """
+        norm = self._norm0
+        redz_evol = self._fpairz - self._tobsz
+
+        rate = norm / mrat * (1+redz)**redz_evol
+        
+        return rate
 
 
 class GMR_Illustris(_Galaxy_Merger_Rate):

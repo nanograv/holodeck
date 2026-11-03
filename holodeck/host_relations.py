@@ -967,10 +967,10 @@ class MSigma_Standard(_MSigma_Relation):
     SCATTER_DEX = 0.0
     MSTAR_PLAW = 0.293
 
-    def __init__(self, mamp=None, sigma_plaw=None, sigma_ref=None, scatter_dex=None, mstar_plaw=None):
+    def __init__(self, mamp=None, mplaw=None, sigma_ref=None, scatter_dex=None, mstar_plaw=None):
         if mamp is None:
             mamp = self.MASS_AMP
-        if sigma_plaw is None:
+        if mplaw is None:
             mplaw = self.MASS_PLAW
         if sigma_ref is None:
             sigma_ref = self.SIGMA_REF
@@ -1063,9 +1063,7 @@ class MSigma_Standard(_MSigma_Relation):
         a_1 = 0.403 # power law index above break point
         a_2 = 0.293 # power law index below break point
         
-        #alpha = np.where(vdisp <= sigma_break, a_1,a_2)
-
-        alpha = a_2
+        alpha = np.where(vdisp <= sigma_break, a_1,a_2)
         
         mstar = M_break*(vdisp/sigma_break)**(1/alpha)  # Zahid et. al 2016 equation 5 and first row of table 1
         
@@ -1079,10 +1077,8 @@ class MSigma_Standard(_MSigma_Relation):
         a_1 = 0.403 # power law index above break point
         a_2 = 0.293 # power law index below break point
         
-        #alpha = np.where(mstar <= M_break, a_1,a_2)
+        alpha = np.where(mstar <= M_break, a_1,a_2)
 
-        alpha  = a_2
-        
         vdisp = sigma_break*(mstar/M_break)**alpha # Zahid et. al 2016 equation 5 and first row of table 1
         
         return vdisp
@@ -1141,7 +1137,7 @@ class MSigma_DN2019(MSigma_Standard):
     [DN2019]_ Eq. 3, with values taken from first row of Table 2 ("Variable sigma_e", "Subgroup All").
     """
 
-    MASS_AMP = MSOL * 10.0 ** 8.30    # 8.30 ± 0.05   in units of [Msol]
+    MASS_AMP = MSOL * 10.0 ** 8.30    # 8.30 ± 0.05   in units of [log10(M/Msol)]
     SIGMA_REF = KMPERSEC * 10**2.291      # 195.4 km/s
     MASS_PLAW = 5.07                  # 5.07 ± 0.27
     SCATTER_DEX = 0.42                # 0.42 ± 0.04
