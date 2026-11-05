@@ -3,7 +3,7 @@
 
 import numpy as np
 import holodeck as holo
-from holodeck.constants import GYR, PC, MSOL
+from holodeck.constants import GYR, PC, MSOL, YR, NG20_PTA_DUR
 from holodeck.librarian.lib_tools import _Param_Space, PD_Uniform, PD_Normal, PD_Uniform_Log, PD_MVNormal, PD_2D_Uniform_Variable_Ymin
 
 
@@ -1402,7 +1402,7 @@ class _PS_NG20_Base(_Param_Space):
         hard_rchar_9=0.1,             # [pc] 
         hard_alpha_char=-2.0/3.0,
         hard_dadt_rchar=None,    # unused for Model 0
-        fobs_min=9.0e-10,        # [Hz]
+        fobs_min=0.5/(NG20_PTA_DUR*YR),        # [Hz]
 
         # Galaxy stellar-mass Function (``GSMF_Double_Schechter``)
         # Parameters based on conversions from [Leja2020]_
@@ -1520,7 +1520,7 @@ class _PS_NG20_Base(_Param_Space):
             rchar_9=params.get("hard_rchar_9",0.1) * PC,
             alpha_char=params.get("hard_alpha_char", -2.0 / 3.0),
             dadt_rchar=params.get("hard_dadt_rchar",None),
-            fobs_min=params.get("fobs_min",9.0e-10),
+            fobs_min=params.get("fobs_min",0.5/(NG20_PTA_DUR*YR)),
             enforce_physical_params=True,
         )
         return hard
