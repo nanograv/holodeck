@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 # import holodeck as holo
-from holodeck.constants import MSOL
+from holodeck.constants import MSOL, KMPERSEC
 
 from holodeck.sams import components
 
@@ -44,8 +44,8 @@ def _test_abc_parent(parent_class):
 # ==============================================================================
 
 
-def test_gsmf_base():
-    _test_abc_parent(components._Galaxy_Stellar_Mass_Function)
+def test_gndf_base():
+    _test_abc_parent(components._Galaxy_Number_Density_Function)
     return
 
 
@@ -68,6 +68,19 @@ def test_GSMF_Double_Schechter():
     vals = gsmf(mstar, redz)   # noqa
     return
 
+# ==============================================================================
+# ====    Velocity Dispersion Function    ====
+# ==============================================================================
+
+
+def test_VDF_Modified_Schechter():
+    vdf = components.VDF_Modified_Schechter()
+    SIZE = 100
+    vdisp = KMPERSEC * np.random.uniform(50, 500, SIZE)
+    redz = np.random.uniform(0.0, 10.0, SIZE)
+
+    vals = vdf(vdisp, redz)   # noqa
+    return
 
 # ==============================================================================
 # ====    Galaxy Pair Fraction    ====

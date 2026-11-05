@@ -62,13 +62,13 @@ def test_sam_basics_gpf_gmt():
     gsmf = holo.sams.GSMF_Schechter()
     gpf = holo.sams.GPF_Power_Law()
     gmt = holo.sams.GMT_Power_Law()
-    sam = holo.sams.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, shape=SHAPE)
+    sam = holo.sams.Semi_Analytic_Model(gndf=gsmf, gpf=gpf, gmt=gmt, shape=SHAPE)
     _test_sam_basics(sam)
 
     # With MMBulge also
 
     mmbulge = holo.host_relations.MMBulge_KH2013()
-    sam = holo.sams.Semi_Analytic_Model(mmbulge=mmbulge, gpf=gpf, gmt=gmt, shape=SHAPE)
+    sam = holo.sams.Semi_Analytic_Model(relation=mmbulge, gpf=gpf, gmt=gmt, shape=SHAPE)
     _test_sam_basics(sam)
     return
 
@@ -80,14 +80,14 @@ def test_sam_basics_gmr():
 
     gsmf = holo.sams.GSMF_Schechter()
     gmr = holo.sams.GMR_Illustris()
-    sam = holo.sams.Semi_Analytic_Model(gsmf=gsmf, gmr=gmr, shape=SHAPE)
+    sam = holo.sams.Semi_Analytic_Model(gndf=gsmf, gmr=gmr, shape=SHAPE)
     _test_sam_basics(sam)
 
     # With MMBulge and GMT also
 
     gmt = holo.sams.GMT_Power_Law()
     mmbulge = holo.host_relations.MMBulge_KH2013()
-    sam = holo.sams.Semi_Analytic_Model(mmbulge=mmbulge, gmr=gmr, gmt=gmt, shape=SHAPE)
+    sam = holo.sams.Semi_Analytic_Model(relation=mmbulge, gmr=gmr, gmt=gmt, shape=SHAPE)
     _test_sam_basics(sam)
 
     return
@@ -99,7 +99,7 @@ def test_sam_basics__gsmf_double_chechter():
     SHAPE = 12
 
     gsmf = holo.sams.GSMF_Double_Schechter()
-    sam = holo.sams.Semi_Analytic_Model(gsmf=gsmf, shape=SHAPE)
+    sam = holo.sams.Semi_Analytic_Model(gndf=gsmf, shape=SHAPE)
     _test_sam_basics(sam)
 
     return
