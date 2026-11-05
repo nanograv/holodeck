@@ -351,7 +351,7 @@ def run_sam_at_pspace_params(args, space, pnum, params):
     log.debug(f"Saving {pnum} to file | {args.gwb_flag=} {args.ss_flag=} {args.params_flag=}")
     log.debug(f"data has keys: {list(data.keys())}")
     np.savez(sim_fname, **data)
-    del sam, hard, data
+    del sam, hard
     log.info(f"Saved to {sim_fname}, size {holo.utils.get_file_size(sim_fname)} after {(datetime.now()-beg)}")
 
     # ---- make diagnostic plots
