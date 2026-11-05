@@ -54,7 +54,7 @@ from holodeck import utils, cosmo, log, _PATH_DATA, galaxy_profiles
 from holodeck.host_relations import (
     get_stellar_mass_halo_mass_relation, get_mmbulge_relation, get_msigma_relation
 )
-from holodeck.constants import GYR, NWTG, PC, MSOL, SPLC
+from holodeck.constants import GYR, NWTG, PC, MSOL, SPLC, NG20_PTA_DUR
 
 #: number of influence radii to set minimum radius for dens calculation
 _MIN_DENS_RAD__INFL_RAD_MULT = 10.0
@@ -1684,11 +1684,11 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
     CONSISTENT = True
     
     def __init__(self, sam, num_steps=300, outer_time=1.0*GYR, 
-                 inner_model_type=0, rchar_9=1.0*PC, alpha_char=-2.0/3.0,
+                 inner_model_type=0, rchar_9=0.1*PC, alpha_char=-2.0/3.0,
                  nu_inner=0.0, dadt_rchar=None, inner_time=None,
                  gw_crit_units='rg', r_gw_crit_9=10**2.5, 
                  alpha_gw_crit=-0.25, beta_gw_crit=+0.25,
-                 fobs_min=9.0e-10,
+                 fobs_min=0.5/(NG20_PTA_DUR*YR),
                  enforce_physical_params=False,
                  require_inner_and_gw_phases=False):
         """
@@ -1744,7 +1744,12 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
 
         else:
             raise ValueError(f"Invalid {inner_model_type=}. Must be one of: 0, 1, 2, 3.")
-        
+
+        if fobs_min is not None and fobs_min > 0.5/(utils.get_current_pta_dur()*YR):
+                warn(f"{fobs_min=} >0.5/(current PTA Tspan): {0.5/(utils.get_current_pta_dur()*YR)}. "
+                     f"This is *incorrect* unless you are using an older PTA data set.")
+                log.warning(warn)
+            
         self._inner_model_type = inner_model_type  
         self._fobs_min = fobs_min # if not None, ensure all binaries start outside the PTA band
         self._enforce_physical_params = enforce_physical_params # throw error if not physical
