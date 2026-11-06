@@ -1991,7 +1991,7 @@ class PS_NG20_NoAstroVar_MMbz3Par(_PS_NG20_Base):
                                        mrat=self.mrat_for_nuin_lims),
             # MMBulge (Matt et al. redshift evolution)
             PD_Uniform("mmb_zplaw_amp", -2.0, +2.0, default=0.0),
-            PD_Uniform("mmb_zplaw_scatter", -2.0, +2.0, default=0.0),
+            PD_Uniform("mmb_zplaw_scatter", -0.2, +2.0, default=0.0),
             PD_Uniform("mmb_zplaw_slope", -2.0, +2.0, default=0.0),
         ]
         _Param_Space.__init__(
