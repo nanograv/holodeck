@@ -1214,11 +1214,12 @@ def run_model(
             data["hc_bg"] = hc_bg
 
     if gwb_flag:
-        negative_mask = use_redz < 0.0 # galaxy mergers that stall
+        # galaxy mergers that stall
         # set to -inf so they can't contribute to GWB; this only matters for the 'legacy' method,
         # since 'weighted' gives -1 and -inf corners zero weight alike
-        use_redz[negative_mask] = -np.inf
-        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, use_redz, number, nreals, dnum=diff_num)
+        redz_gwb = np.where(use_redz < 0.0, -np.inf, use_redz)
+        gwb = holo.gravwaves._gws_from_number_grid_integrated_redz(edges, redz_gwb, number, nreals, dnum=diff_num)
+        del redz_gwb
         data["gwb"] = gwb
 
     return data
