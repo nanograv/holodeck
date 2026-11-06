@@ -3,7 +3,7 @@
 
 import numpy as np
 import holodeck as holo
-from holodeck.constants import GYR, PC, MSOL
+from holodeck.constants import GYR, PC, MSOL, YR, NG20_PTA_DUR
 from holodeck.librarian.lib_tools import _Param_Space, PD_Uniform, PD_Normal, PD_Uniform_Log, PD_MVNormal, PD_2D_Uniform_Variable_Ymin
 
 
@@ -1402,7 +1402,7 @@ class _PS_NG20_Base(_Param_Space):
         hard_rchar_9=0.1,             # [pc] 
         hard_alpha_char=-2.0/3.0,
         hard_dadt_rchar=None,    # unused for Model 0
-        fobs_min=9.0e-10,        # [Hz]
+        fobs_min=0.5/(NG20_PTA_DUR*YR),        # [Hz]
 
         # Galaxy stellar-mass Function (``GSMF_Double_Schechter``)
         # Parameters based on conversions from [Leja2020]_
@@ -1520,7 +1520,7 @@ class _PS_NG20_Base(_Param_Space):
             rchar_9=params.get("hard_rchar_9",0.1) * PC,
             alpha_char=params.get("hard_alpha_char", -2.0 / 3.0),
             dadt_rchar=params.get("hard_dadt_rchar",None),
-            fobs_min=params.get("fobs_min",9.0e-10),
+            fobs_min=params.get("fobs_min",0.5/(NG20_PTA_DUR*YR)),
             enforce_physical_params=True,
         )
         return hard
@@ -1531,7 +1531,7 @@ class PS_NG20_Fiducial(_PS_NG20_Base):
 
     In addition to parameters that use astro-informed priors with means and uncertainties from 
     empirical EM data, parameters are varied that control binary hardening and the redshift 
-    evolution of the M-Mbulge normalization.
+    evolution of the M-Mbulge normalization (with uniform priors).
 
     Components:
     - Blecha (2026) Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0)
@@ -1583,12 +1583,12 @@ class PS_NG20_Fiducial(_PS_NG20_Base):
             seed=seed,
         )
         return
-
+    
 class PS_NG20_Fiducial_Hard(_PS_NG20_Base):
     """NG20 'Hard' Fiducial Parameter Space for Astrophysical Interpretation.
 
     In addition to parameters that use astro-informed priors with means and uncertainties from 
-    empirical EM data, parameters are varied that control binary hardening.
+    empirical EM data, parameters are varied that control binary hardening (with uniform priors).
 
     Components:
     - Blecha (2026) Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0)
@@ -1640,19 +1640,141 @@ class PS_NG20_Fiducial_Hard(_PS_NG20_Base):
         )
         return
 
-
-class PS_NG20_Fiducial_Extended(_PS_NG20_Base):
-    """NG20 Extended Fiducial Parameter Space for Astrophysical Interpretation.
+class PS_NG20_Fiducial_MMbz2Par(_PS_NG20_Base):
+    """NG20 Fiducial Parameter Space with z-evolution of M-Mbulge scatter (in addition to amplitude).
 
     In addition to parameters that use astro-informed priors with means and uncertainties from 
-    empirical EM data, parameters are varied that control binary hardening, the redshift evolution 
-    of the M-Mbulge relation, and the stellar bulge fraction in galaxies.
+    empirical EM data, parameters are varied that control binary hardening and the redshift 
+    evolution of the M-Mbulge normalization and scatter (with uniform priors).
 
     Components:
     - Blecha (2026) Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0)
     - Double-Schechter GSMF with Leja+2020 11-D covariance matrix (`PD_MVNormal`)
     - Illustris Galaxy Merger Rate (`GMR_Illustris`)
-    - Kormendy & Ho (2013) M-Mbulge with Matt et al. (2026a) redshift-evolving amplitude, slope, and scatter
+    - Kormendy & Ho (2013) M-Mbulge with Matt et al. (2026a) redshift-evolving amplitude & scatter
+    """
+
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+
+        # NOTE: the ranges should match those in SAM, and shapes should 
+        # not be smaller than SAM shape for robust interpolation
+        self.mtot_for_nuin_lims = holo.utils.default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = holo.utils.default_sam_grid(var='mrat')
+        
+        parameters = [
+            # Hardening model (BIO-hardening / FixedOuterTime_InnerPL_SAM)
+            PD_Uniform("hard_outer_time", 0.1, 10.0, default=1.0),  # [Gyr]
+            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
+                                       0.778, 4.0, # [log10(Rg)] (0.778 is rISCO=6Rg)
+                                       -4.0, +4.0, # largest allowed range of nu_inner
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
+                                       mtot=self.mtot_for_nuin_lims, 
+                                       mrat=self.mrat_for_nuin_lims),            
+            # GSMF (Leja+2020 11-D Covariance)
+            PD_MVNormal(GSMF_COV_NAMES, GSMF_COV_MEANS, np.array(GSMF_COV_MATRIX)),
+            # GMR (Illustris)
+            PD_Normal("gmr_norm0_log10", -2.2287, 0.0045),
+            PD_Normal("gmr_normz", +2.4644, 0.0128),
+            PD_Normal("gmr_malpha0", +0.2241, 0.0038),
+            PD_Normal("gmr_malphaz", -1.1759, 0.0316),
+            PD_Normal("gmr_mdelta0", +0.7668, 0.0202),
+            PD_Normal("gmr_mdeltaz", -0.4695, 0.0440),
+            PD_Normal("gmr_qgamma0", -1.2595, 0.0026),
+            PD_Normal("gmr_qgammaz", +0.0611, 0.0021),
+            PD_Normal("gmr_qgammam", -0.0477, 0.0013),
+            # MMBulge (KH2013 + Matt et al. redshift evolution)
+            PD_Normal("mmb_mamp_log10", 8.69, 0.05),
+            PD_Normal("mmb_plaw", 1.17, 0.08),
+            PD_Normal("mmb_scatter_dex", 0.28, 0.05),
+            PD_Uniform("mmb_zplaw_amp", -2.0, +2.0, default=0.0),
+            PD_Uniform("mmb_zplaw_scatter", -2.0, +2.0, default=0.0),
+        ]
+        _Param_Space.__init__(
+            self,
+            parameters,
+            log=log,
+            nsamples=nsamples,
+            sam_shape=sam_shape,
+            seed=seed,
+        )
+        return
+    
+class PS_NG20_Fiducial_MMbz3Par(_PS_NG20_Base):
+    """NG20 Fiducial Parameter Space with z-evolution of M-Mbulge scatter & slope (+ amplitude)
+
+    In addition to parameters that use astro-informed priors with means and uncertainties from 
+    empirical EM data, parameters are varied that control binary hardening and the redshift evolution 
+    of the M-Mbulge amplitude, scatter, and slope (with uniform priors).
+
+    Components:
+    - Blecha (2026) Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0)
+    - Double-Schechter GSMF with Leja+2020 11-D covariance matrix (`PD_MVNormal`)
+    - Illustris Galaxy Merger Rate (`GMR_Illustris`)
+    - Kormendy & Ho (2013) M-Mbulge with Matt et al. (2026a) redshift-evolving amplitude, 
+      scatter, and slope
+    """
+
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+
+        # NOTE: the ranges should match those in SAM, and shapes should 
+        # not be smaller than SAM shape for robust interpolation
+        self.mtot_for_nuin_lims = holo.utils.default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = holo.utils.default_sam_grid(var='mrat')
+        
+        parameters = [
+            # Hardening model (BIO-hardening / FixedOuterTime_InnerPL_SAM)
+            PD_Uniform("hard_outer_time", 0.1, 10.0, default=1.0),  # [Gyr]
+            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
+                                       0.778, 4.0, # [log10(Rg)] (0.778 is rISCO=6Rg)
+                                       -4.0, +4.0, # largest allowed range of nu_inner
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
+                                       mtot=self.mtot_for_nuin_lims, 
+                                       mrat=self.mrat_for_nuin_lims),            
+            # GSMF (Leja+2020 11-D Covariance)
+            PD_MVNormal(GSMF_COV_NAMES, GSMF_COV_MEANS, np.array(GSMF_COV_MATRIX)),
+            # GMR (Illustris)
+            PD_Normal("gmr_norm0_log10", -2.2287, 0.0045),
+            PD_Normal("gmr_normz", +2.4644, 0.0128),
+            PD_Normal("gmr_malpha0", +0.2241, 0.0038),
+            PD_Normal("gmr_malphaz", -1.1759, 0.0316),
+            PD_Normal("gmr_mdelta0", +0.7668, 0.0202),
+            PD_Normal("gmr_mdeltaz", -0.4695, 0.0440),
+            PD_Normal("gmr_qgamma0", -1.2595, 0.0026),
+            PD_Normal("gmr_qgammaz", +0.0611, 0.0021),
+            PD_Normal("gmr_qgammam", -0.0477, 0.0013),
+            # MMBulge (KH2013 + Matt et al. redshift evolution)
+            PD_Normal("mmb_mamp_log10", 8.69, 0.05),
+            PD_Normal("mmb_plaw", 1.17, 0.08),
+            PD_Normal("mmb_scatter_dex", 0.28, 0.05),
+            PD_Uniform("mmb_zplaw_amp", -2.0, +2.0, default=0.0),
+            PD_Uniform("mmb_zplaw_scatter", -2.0, +2.0, default=0.0),
+            PD_Uniform("mmb_zplaw_slope", -2.0, +2.0, default=0.0),
+        ]
+        _Param_Space.__init__(
+            self,
+            parameters,
+            log=log,
+            nsamples=nsamples,
+            sam_shape=sam_shape,
+            seed=seed,
+        )
+        return
+    
+
+class PS_NG20_Fiducial_Extended_All(_PS_NG20_Base):
+    """NG20 Extended Fiducial Parameter Space for Astrophysical Interpretation.
+
+    In addition to parameters that use astro-informed priors with means and uncertainties from 
+    empirical EM data, parameters are varied that control binary hardening, the redshift 
+    evolution of the M-Mbulge relation (amplitude, scatter, & slope), and the stellar bulge 
+    fraction in galaxies (with uniform priors).
+
+    Components:
+    - Blecha (2026) Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0)
+    - Double-Schechter GSMF with Leja+2020 11-D covariance matrix (`PD_MVNormal`)
+    - Illustris Galaxy Merger Rate (`GMR_Illustris`)
+    - Kormendy & Ho (2013) M-Mbulge with Matt et al. (2026a) redshift-evolving 
+      amplitude, scatter, & slope
     - Variable bulge fraction and scatter
     """
 
@@ -1689,8 +1811,6 @@ class PS_NG20_Fiducial_Extended(_PS_NG20_Base):
             PD_Normal("mmb_plaw", 1.17, 0.08),
             PD_Normal("mmb_scatter_dex", 0.28, 0.05),
             PD_Uniform("mmb_zplaw_amp", -2.0, +2.0, default=0.0),
-            ### TO DO: decide if we want to vary mmb_zplaw_slope and/or
-            ###        mmb_zplaw_scatter parameters in extended model       
             PD_Uniform("mmb_zplaw_slope", -2.0, +2.0, default=0.0),
             PD_Uniform("mmb_zplaw_scatter", -2.0, +2.0, default=0.0),
             # Bulge Fraction
@@ -1708,6 +1828,181 @@ class PS_NG20_Fiducial_Extended(_PS_NG20_Base):
         )
         return
     
+
+class PS_NG20_NoAstroVar(_PS_NG20_Base):
+    """NG20 Parameter Space with all astro-informed parameters fixed to mean values.
+
+    3 parameters controlling binary hardening are varied, plus the redshift evolution of
+    the M-Mbulge normalization, all with uniform priors. All other parameters are fixed 
+    to the mean values of astro-informed priors from empirical EM data.
+
+    Components:
+    - Blecha (2026) Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0)
+    - Double-Schechter GSMF (Leja+2020)
+    - Illustris Galaxy Merger Rate (`GMR_Illustris`)
+    - Kormendy & Ho (2013) M-Mbulge with Matt et al. (2026a) redshift-evolving amplitude
+    """
+
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+
+        # NOTE: the ranges should match those in SAM, and shapes should 
+        # not be smaller than SAM shape for robust interpolation
+        self.mtot_for_nuin_lims = holo.utils.default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = holo.utils.default_sam_grid(var='mrat')
+        
+        parameters = [
+            # Hardening model (BIO-hardening / FixedOuterTime_InnerPL_SAM)
+            PD_Uniform("hard_outer_time", 0.1, 10.0, default=1.0),  # [Gyr]
+            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
+                                       0.778, 4.0, # [log10(Rg)] (0.778 is rISCO=6Rg)
+                                       -4.0, +4.0, # largest allowed range of nu_inner
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
+                                       mtot=self.mtot_for_nuin_lims, 
+                                       mrat=self.mrat_for_nuin_lims),
+            # MMBulge (Matt et al. redshift evolution)
+            PD_Uniform("mmb_zplaw_amp", -2.0, +2.0, default=0.0),
+        ]
+        _Param_Space.__init__(
+            self,
+            parameters,
+            log=log,
+            nsamples=nsamples,
+            sam_shape=sam_shape,
+            seed=seed,
+        )
+        return
+
+class PS_NG20_NoAstroVar_Hard(_PS_NG20_Base):
+    """NG20 Parameter Space with astro-informed params fixed to means, & no M-Mbulge z-evolution.
+
+    3 parameters controlling binary hardening are varied, with uniform priors. 
+    All other parameters are fixed to the mean values of astro-informed priors 
+    from empirical EM data.
+
+    Components:
+    - Blecha (2026) Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0)
+    - Double-Schechter GSMF (Leja+2020)
+    - Illustris Galaxy Merger Rate (`GMR_Illustris`)
+    - Kormendy & Ho (2013) M-Mbulge with no redshift evolution
+    """
+
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+
+        # NOTE: the ranges should match those in SAM, and shapes should 
+        # not be smaller than SAM shape for robust interpolation
+        self.mtot_for_nuin_lims = holo.utils.default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = holo.utils.default_sam_grid(var='mrat')
+        
+        parameters = [
+            # Hardening model (BIO-hardening / FixedOuterTime_InnerPL_SAM)
+            PD_Uniform("hard_outer_time", 0.1, 10.0, default=1.0),  # [Gyr]
+            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
+                                       0.778, 4.0, # [log10(Rg)] (0.778 is rISCO=6Rg)
+                                       -4.0, +4.0, # largest allowed range of nu_inner
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
+                                       mtot=self.mtot_for_nuin_lims, 
+                                       mrat=self.mrat_for_nuin_lims),
+        ]
+        _Param_Space.__init__(
+            self,
+            parameters,
+            log=log,
+            nsamples=nsamples,
+            sam_shape=sam_shape,
+            seed=seed,
+        )
+        return
+    
+class PS_NG20_NoAstroVar_MMbz2Par(_PS_NG20_Base):
+    """NG20 Parameter Space with astro params fixed to means + M-Mbulge z-evolving amp & scatter.
+
+    3 parameters controlling binary hardening are varied, plus the redshift evolution of
+    the M-Mbulge normalization and scatter, all with uniform priors. All other parameters 
+    are fixed to the mean values of astro-informed priors from empirical EM data.
+
+    Components:
+    - Blecha (2026) Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0)
+    - Double-Schechter GSMF (Leja+2020)
+    - Illustris Galaxy Merger Rate (`GMR_Illustris`)
+    - Kormendy & Ho (2013) M-Mbulge with Matt et al. (2026a) redshift-evolving amplitude &
+      normalization
+    """
+
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+
+        # NOTE: the ranges should match those in SAM, and shapes should 
+        # not be smaller than SAM shape for robust interpolation
+        self.mtot_for_nuin_lims = holo.utils.default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = holo.utils.default_sam_grid(var='mrat')
+        
+        parameters = [
+            # Hardening model (BIO-hardening / FixedOuterTime_InnerPL_SAM)
+            PD_Uniform("hard_outer_time", 0.1, 10.0, default=1.0),  # [Gyr]
+            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
+                                       0.778, 4.0, # [log10(Rg)] (0.778 is rISCO=6Rg)
+                                       -4.0, +4.0, # largest allowed range of nu_inner
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
+                                       mtot=self.mtot_for_nuin_lims, 
+                                       mrat=self.mrat_for_nuin_lims),
+            # MMBulge (Matt et al. redshift evolution)
+            PD_Uniform("mmb_zplaw_amp", -2.0, +2.0, default=0.0),
+            PD_Uniform("mmb_zplaw_scatter", -2.0, +2.0, default=0.0),
+        ]
+        _Param_Space.__init__(
+            self,
+            parameters,
+            log=log,
+            nsamples=nsamples,
+            sam_shape=sam_shape,
+            seed=seed,
+        )
+        return
+
+class PS_NG20_NoAstroVar_MMbz3Par(_PS_NG20_Base):
+    """NG20 Parameter Space with astro params fixed + M-Mbulge z-evolving amp, slope, scatter.
+
+    3 parameters controlling binary hardening are varied, plus the redshift evolution of
+    the M-Mbulge normalization, scatter, and slope, all with uniform priors. All other 
+    parameters are fixed to the mean values of astro-informed priors from empirical EM data.
+
+    Components:
+    - Blecha (2026) Inside-Out (BIO) Hardening (`FixedOuterTime_InnerPL_SAM`, Model 0)
+    - Double-Schechter GSMF (Leja+2020)
+    - Illustris Galaxy Merger Rate (`GMR_Illustris`)
+    - Kormendy & Ho (2013) M-Mbulge with Matt et al. (2026a) redshift-evolving amplitude, 
+      normalization, & slope
+    """
+
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+
+        # NOTE: the ranges should match those in SAM, and shapes should 
+        # not be smaller than SAM shape for robust interpolation
+        self.mtot_for_nuin_lims = holo.utils.default_sam_grid(var='mtot')
+        self.mrat_for_nuin_lims = holo.utils.default_sam_grid(var='mrat')
+        
+        parameters = [
+            # Hardening model (BIO-hardening / FixedOuterTime_InnerPL_SAM)
+            PD_Uniform("hard_outer_time", 0.1, 10.0, default=1.0),  # [Gyr]
+            PD_2D_Uniform_Variable_Ymin("hard_r_gw_crit_9_log10", "hard_nu_inner",
+                                       0.778, 4.0, # [log10(Rg)] (0.778 is rISCO=6Rg)
+                                       -4.0, +4.0, # largest allowed range of nu_inner
+                                       holo.utils.get_nuin_min, self.DEFAULTS,
+                                       mtot=self.mtot_for_nuin_lims, 
+                                       mrat=self.mrat_for_nuin_lims),
+            # MMBulge (Matt et al. redshift evolution)
+            PD_Uniform("mmb_zplaw_amp", -2.0, +2.0, default=0.0),
+            PD_Uniform("mmb_zplaw_scatter", -0.2, +2.0, default=0.0),
+            PD_Uniform("mmb_zplaw_slope", -2.0, +2.0, default=0.0),
+        ]
+        _Param_Space.__init__(
+            self,
+            parameters,
+            log=log,
+            nsamples=nsamples,
+            sam_shape=sam_shape,
+            seed=seed,
+        )
+        return
 
 _param_spaces_dict = {
     "PS_Test": PS_Test,
@@ -1732,6 +2027,12 @@ _param_spaces_dict = {
     "PS_AstroStrongBIO_Hard_MMbulge_Covariant_GSMF": PS_AstroStrongBIO_Hard_MMbulge_Covariant_GSMF,
     "PS_NG20_Fiducial": PS_NG20_Fiducial,
     "PS_NG20_Fiducial_Hard": PS_NG20_Fiducial_Hard,
-    "PS_NG20_Fiducial_Extended": PS_NG20_Fiducial_Extended,
+    "PS_NG20_Fiducial_MMbz2Par": PS_NG20_Fiducial_MMbz2Par,
+    "PS_NG20_Fiducial_MMbz3Par": PS_NG20_Fiducial_MMbz3Par,
+    "PS_NG20_Fiducial_Extended_All": PS_NG20_Fiducial_Extended_All,
+    "PS_NG20_NoAstroVar": PS_NG20_NoAstroVar,
+    "PS_NG20_NoAstroVar_Hard": PS_NG20_NoAstroVar_Hard,
+    "PS_NG20_NoAstroVar_MMbz2Par": PS_NG20_NoAstroVar_MMbz2Par,
+    "PS_NG20_NoAstroVar_MMbz3Par": PS_NG20_NoAstroVar_MMbz3Par,
 }
 
