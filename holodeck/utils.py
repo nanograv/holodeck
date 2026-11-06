@@ -2617,7 +2617,8 @@ def char_strain_to_strain_amp(hc, fc, df):
 
 
 def get_nuin_min(_lgr9rg, DEFAULTS, absmin=-4.0, speed_limit=SPLC,
-                 mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91), mrat=(1e-3, 1.0, 81)):
+                 mtot=(1.0e4*MSOL, 1.0e12*MSOL, 91), mrat=(1e-3, 1.0, 81),
+                 etol=1.0e-8, chunk=256):
     """
     Minimum allowed inner hardening power-law index, nu_inner, for a given r_gw_crit_9.
 
@@ -2667,7 +2668,12 @@ def get_nuin_min(_lgr9rg, DEFAULTS, absmin=-4.0, speed_limit=SPLC,
     mrat : tuple (float, float, int), optional
         ``(min, max, n)`` for the log-spaced grid of mass ratios
         (default 1e-3 to 1, 81 points).
-
+    etol: float, optional
+        Min nu_inner calcuated such that max dadt < (1.0-etol)*speed_limit, 
+        to avoid exceeding speed limit due to floating point error. (default 1.0e-8)
+    chunk : int, optional
+        Number of lgr9rg values processed at a time (default 256)
+        
     Returns
     -------
     float or array-like
@@ -2685,67 +2691,65 @@ def get_nuin_min(_lgr9rg, DEFAULTS, absmin=-4.0, speed_limit=SPLC,
 
     mtot_arr = np.logspace(*np.log10(mtot[:2]),mtot[2])
     mrat_arr = np.logspace(*np.log10(mrat[:2]),mrat[2])
-    if np.isscalar(_lgr9rg):
-        lgr9rg = _lgr9rg
-        mt, mr = np.broadcast_arrays(mtot_arr[:, np.newaxis], mrat_arr[np.newaxis, :])
-    else:
-        lgr9rg, mt, mr = np.broadcast_arrays(_lgr9rg[:, np.newaxis, np.newaxis], 
-                                             mtot_arr[np.newaxis, :, np.newaxis], 
-                                             mrat_arr[np.newaxis, np.newaxis, :]) 
+
+    # ---- quantities that do NOT depend on lgr9rg: computed once, shape (M, Q)
+    mt, mr = np.broadcast_arrays(mtot_arr[:, np.newaxis], mrat_arr[np.newaxis, :])
     m9 = mt / (1.0e9 * MSOL)
     m1, m2 = m1m2_from_mtmr(mt, mr)
     eta_norm = 4.0 * mr / np.square(1 + mr)
-
     rchar = (DEFAULTS['hard_rchar_9'] * PC) * m9**(DEFAULTS['hard_alpha_char'] + 1)
     risco = rad_isco(m1,m2)
+    lg_rchar = np.log10(rchar)
+    # rgw_crit = 10**lgr9rg * rgw_fac
+    rgw_fac = (gravitational_radius(1.0e9 * MSOL)
+               * m9**(DEFAULTS['hard_alpha_gw_crit'] + 1)
+               * eta_norm**DEFAULTS['hard_beta_gw_crit'])
 
-    r9cm = (10.0**lgr9rg) * gravitational_radius(1.0e9 * MSOL)
-    rgw_crit = (r9cm * m9**(DEFAULTS['hard_alpha_gw_crit'] + 1) * 
-                eta_norm**DEFAULTS['hard_beta_gw_crit'])
+    r9isscalar = np.isscalar(_lgr9rg)
+    lgr = np.atleast_1d(np.asarray(_lgr9rg, dtype=float))
+    nuin_min_out = np.empty(lgr.shape)
+    warned = False
 
-    # mask to identify binaries with an inner hardening phase
-    mask_inner = rgw_crit < rchar
-    # mask to identify binaries with a GW-dominated phase
-    mask_isco = rgw_crit > risco
+    for lo in range(0, lgr.size, chunk):
+        sl = slice(lo, lo + chunk)
+        # (C, M, Q)
+        rgw_crit = (10.0 ** lgr[sl])[:, np.newaxis, np.newaxis] * rgw_fac[np.newaxis]
 
-    # set rgw_crit to isco for any rgw_crit<risco
-    if np.any(~mask_isco):
-        rgw_crit[~mask_isco] = risco[~mask_isco]
-        warn="found rgw_crit<=risco. Setting to risco for these binaries with no GW phase."
-        log.warning(warn)
+        mask_inner = rgw_crit < rchar             # has an inner hardening phase
+        if np.any(rgw_crit <= risco):
+            if not warned:
+                log.warning("found rgw_crit<=risco. Setting to risco for these binaries with no GW phase.")
+                warned = True
+            np.maximum(rgw_crit, risco, out=rgw_crit)
 
-    # calculate dadt_gw_crit and lgrdiff 
-    dadt_gw_crit = gw_hardening_rate_dadt(m1, m2, rgw_crit)
-    lgrdiff = np.log10(rchar) - np.log10(rgw_crit)
+        dadt_gw_crit = gw_hardening_rate_dadt(m1, m2, rgw_crit)
+        lgrdiff = lg_rchar - np.log10(rgw_crit)
 
-    # calculate min allowed nuin for each mt,mr
-    nuin_min_calc = 1.0 - np.log10(speed_limit/np.abs(dadt_gw_crit)-1) / lgrdiff
-    nuin_min_calc = np.maximum(absmin, nuin_min_calc)
+        nuin_min_calc = 1.0 - np.log10((1.0-etol)*speed_limit / np.abs(dadt_gw_crit) - 1) / lgrdiff
+        np.maximum(nuin_min_calc, absmin, out=nuin_min_calc)
+        nuin_min_calc = np.where(mask_inner, nuin_min_calc, np.nan)
 
-    # set nuin_min = nan if rgw > rchar
-    nuin_min = np.where(mask_inner, nuin_min_calc, np.nan)
+        # perform checks
+        if np.any(lgrdiff[mask_inner] < 0):
+            err = f"something went wrong: negative lgrdiff for {lgr[sl]=}"
+            log.error(err)
+            raise ValueError(err)
+        if np.any(nuin_min_calc > 1):
+            err=f"something went wrong. {np.nanmax(nuin_min_calc)=}"
+            log.error(err)
+            raise ValueError(err)
+        if np.any(np.abs(dadt_gw_crit * (1 + (rchar/rgw_crit)**(1.0-nuin_min_calc))) > speed_limit):
+            _dadt_rch = np.abs(dadt_gw_crit * (1 + (rchar/rgw_crit)**(1.0-nuin_min_calc)))
+            err=("something went wrong. "
+                 f"max dadt(rchar)={np.nanmax(_dadt_rch)}, "
+                 f"{speed_limit=}, diff={np.nanmax(_dadt_rch)-speed_limit} {np.nanmax(nuin_min_calc)=}")
+            log.error(err)
+            raise ValueError(err)   
 
-    # perform checks
-    if np.any(lgrdiff[mask_inner] < 0):
-        err = f"something went wrong: negative lgrdiff for {lgr9rg=}"
-        log.error(err)
-        raise ValueError(err)
-    if np.any(nuin_min > 1):
-        err=f"something went wrong. {np.nanmax(nuin_min)=}"
-        log.error(err)
-        raise ValueError(err)
-    if np.any(dadt_gw_crit * (1 + (rchar/rgw_crit)**(1.0-nuin_min)) >= speed_limit):
-        err=("something went wrong. "
-             f"max dadt={dadt_gw_crit * (1 + (rchar/rgw_crit)**(1.0-nuin_min))}, "
-             f"{speed_limit=}, {np.nanmax(nuin_min)=}")
-        log.error(err)
-        raise ValueError(err)        
+        nuin_min_out[sl] = np.nanmax(nuin_min_calc, axis=(-2, -1))
 
-    if np.isscalar(_lgr9rg):
-        return np.nanmax(nuin_min)
-    else:
-        #print(f"{nuin_min.shape=}, {np.nanmax(nuin_min,axis=(-2,-1)).shape=}")
-        return np.nanmax(nuin_min,axis=(-2,-1))
+    return nuin_min_out[0] if r9isscalar else nuin_min_out
+
 
 def default_sam_grid(var):
     """Returns default SAM grid min, max, & shape for mtot, mrat, or redz.

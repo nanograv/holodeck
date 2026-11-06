@@ -390,9 +390,7 @@ class Semi_Analytic_Model:
                 log.info(f"\tdens bef: ({utils.stats(dens)})")
                 dur = datetime.now()
                 mass_bef = self._integrated_binary_density(dens, sum=True)
-                self._dens_bef = np.copy(dens)
                 dens = add_scatter_to_masses(self.mtot, self.mrat, dens, scatter, log=log)
-                self._dens_aft = np.copy(dens)
 
                 mass_aft = self._integrated_binary_density(dens, sum=True)
                 dur = datetime.now() - dur
