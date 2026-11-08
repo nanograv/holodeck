@@ -48,7 +48,8 @@ __version__ = "1.3"
 DEF_NUM_REALS = 100     #: Default number of realizations to construct in libraries.
 DEF_NUM_FBINS = 40      #: Default number of frequency bins at which to calculate GW signals.
 DEF_NUM_LOUDEST = 5     #: Default number of loudest binaries to calculate in each frequency bin.
-DEF_PTA_DUR = 16.03     #: Default PTA duration which determines Nyquist frequency bins [yrs].
+from ..utils import get_current_pta_dur
+DEF_PTA_DUR = get_current_pta_dur()     #: Default PTA duration which determines Nyquist frequency bins [yrs].
 
 FITS_NBINS_PLAW = [3, 4, 5, 10, 15]
 FITS_NBINS_TURN = [5, 10, 15]

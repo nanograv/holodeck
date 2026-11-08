@@ -48,6 +48,10 @@ SIGMA_T = 6.6524587321000005e-25   #: Thomson/Electron -Scattering cross-section
 # EDDT = 4.0 * math.pi * NWTG * SPLC * MPRT / SIGMA_T          #: Eddington Luminosity prefactor factor [erg/s/g]
 EDDT = 63219.620781981204          #: Eddington Luminosity prefactor factor [erg/s/g]
 
+# ---- PTA Dataset-Specific Constants
+NG15_PTA_DUR = 16.03   # NANOGrav 15-yr dataset time span [yr]
+NG20_PTA_DUR = 20.62   # NANOGrav 20-yr dataset time span [yr]
+
 # ---- Astronomical Constants
 MSOL = 1.988409870698051e+33       #: Solar Mass [g]
 LSOL = 3.828e+33                   #: Solar Luminosity [erg/s]

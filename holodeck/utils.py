@@ -30,7 +30,7 @@ import numpy.typing as npt
 from scipy.interpolate import PchipInterpolator
 
 from holodeck import log, cosmo
-from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC, EDDT, MSOL
+from holodeck.constants import NWTG, SCHW, SPLC, YR, GYR, MPC, PC, EDDT, MSOL, NG15_PTA_DUR, NG20_PTA_DUR
 
 class _LazyNJIT:
     """A lazy proxy decorator for numba.njit to prevent compiler loading at import."""
@@ -872,8 +872,17 @@ def ndinterp(xx, xvals, yvals, xlog=False, ylog=False):
 
     return ynew
 
+def get_current_pta_dur():
+    """Return maximum duration of PTA datasets defined in `pta_dur_list`."""
 
-def pta_freqs(dur=16.03*YR, num=40, cad=None):
+    pta_dur_list = [
+        NG15_PTA_DUR, 
+        NG20_PTA_DUR
+        ]
+    
+    return max(pta_dur_list)
+
+def pta_freqs(dur=None, num=40, cad=None):
     """Get Fourier frequency bin specifications for the given parameters.
 
     Arguments
@@ -881,7 +890,7 @@ def pta_freqs(dur=16.03*YR, num=40, cad=None):
     dur : float,
         Total observing duration, which determines the minimum sensitive frequency, ``1/dur``.
         Typically `dur` should be given in units of [sec], such that the returned frequencies are
-        in units of [1/sec] = [Hz]
+        in units of [1/sec] = [Hz]. If None, value is set using `get_current_pta_dur`. Default: None.
     num : int,
         Number of frequency bins.  If `cad` is not None, then the number of frequency bins is
         determined by `cad` and the `num` value is disregarded.
@@ -903,6 +912,10 @@ def pta_freqs(dur=16.03*YR, num=40, cad=None):
         or determined by `cad` if it is given.
 
     """
+    if dur is None:
+        dur = get_current_pta_dur() * YR
+        log.warning(f"WARNING: set `dur` to longest defined PTA duration ({dur/YR} yr).")
+
     fmin = 1.0 / dur
     if cad is not None:
         num = dur / (2.0 * cad)
@@ -914,7 +927,7 @@ def pta_freqs(dur=16.03*YR, num=40, cad=None):
     cents = cents[:-1]
     return cents, edges
 
-def gaussian_freqs(num, fmax, dur=16.03*YR):
+def gaussian_freqs(num, fmax, dur=None):
     """Get Fourier frequency bin specifications for the given parameters.
 
     Arguments
@@ -940,6 +953,10 @@ def gaussian_freqs(num, fmax, dur=16.03*YR):
         The number of frequency bins, `F` is the argument `num`.
 
     """
+    if dur is None:
+        dur = get_current_pta_dur() * YR
+        log.warning(f"WARNING: set `dur` to longest defined PTA duration ({dur/YR} yr).")
+
     ## get the minimum sensitive frequency
     fmin = 1.0 / dur
 

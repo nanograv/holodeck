@@ -54,7 +54,7 @@ from holodeck import utils, cosmo, log, _PATH_DATA, galaxy_profiles
 from holodeck.host_relations import (
     get_stellar_mass_halo_mass_relation, get_mmbulge_relation, get_msigma_relation
 )
-from holodeck.constants import GYR, NWTG, PC, MSOL, SPLC
+from holodeck.constants import GYR, NWTG, PC, MSOL, SPLC, YR
 
 #: number of influence radii to set minimum radius for dens calculation
 _MIN_DENS_RAD__INFL_RAD_MULT = 10.0
@@ -63,6 +63,9 @@ _SCATTERING_DATA_FILENAME = "SHM06_scattering_experiments.json"
 # Absolute upper limit on dadt for binary hardening
 # Currently implemented only for FixedOuterTime_InnerPL_SAM hardening method.
 _DADT_SPEED_LIMIT = 1.0 * SPLC
+
+# Default PTA duration
+DEF_PTA_DUR = utils.get_current_pta_dur()
 
 # =================================================================================================
 # ====    Hardening Classes    ====
@@ -1625,7 +1628,8 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
         normalized symmetric mass ratio. Default: +0.25.
     fobs_min : float, optional
         Minimum observed GW frequency to consider [Hz]. All binaries must have 
-        2*forb(rchar) < fobs_min if `enforce_physical_params`=True. Default: 9.0e-10.
+        2*forb(rchar) < fobs_min if `enforce_physical_params`=True. 
+        Default: 0.5/(DEF_PTA_DUR*YR). 
     enforce_physical_params : bool, optional
         If True, require that all model parameters satisfy physical constraints
         (e.g., allowed ranges from `check_params_allowed`). Default: False.
@@ -1684,11 +1688,11 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
     CONSISTENT = True
     
     def __init__(self, sam, num_steps=300, outer_time=1.0*GYR, 
-                 inner_model_type=0, rchar_9=1.0*PC, alpha_char=-2.0/3.0,
+                 inner_model_type=0, rchar_9=0.1*PC, alpha_char=-2.0/3.0,
                  nu_inner=0.0, dadt_rchar=None, inner_time=None,
                  gw_crit_units='rg', r_gw_crit_9=10**2.5, 
                  alpha_gw_crit=-0.25, beta_gw_crit=+0.25,
-                 fobs_min=9.0e-10,
+                 fobs_min=0.5/(DEF_PTA_DUR*YR),
                  enforce_physical_params=False,
                  require_inner_and_gw_phases=False):
         """
@@ -1744,7 +1748,12 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
 
         else:
             raise ValueError(f"Invalid {inner_model_type=}. Must be one of: 0, 1, 2, 3.")
-        
+
+        if fobs_min is not None and fobs_min > 0.5/(DEF_PTA_DUR*YR):
+                warn = (f"{fobs_min=} >0.5/(current PTA Tspan): {0.5/(DEF_PTA_DUR*YR)}. "
+                        f"This is *incorrect* unless you are using an older PTA data set.")
+                log.warning(warn)
+            
         self._inner_model_type = inner_model_type  
         self._fobs_min = fobs_min # if not None, ensure all binaries start outside the PTA band
         self._enforce_physical_params = enforce_physical_params # throw error if not physical
@@ -1774,14 +1783,8 @@ class FixedOuterTime_InnerPL_SAM(_Hardening):
                     if not k.startswith('__') and not callable(v)
                 }
                 log.error(f"Invalid params: {classvars}")
-                mt, mr, = np.broadcast_arrays(
-                    _mtot[:, np.newaxis],
-                    _mrat[np.newaxis, :]
-                )
                 log.error(f"total # of bad mt,mr combos: "
                           f"{self._params_allowed[self._params_allowed==False].shape}")
-                log.error(f"Bad mt values: {mt[self._params_allowed==False]}")
-                log.error(f"Bad mr values: {mr[self._params_allowed==False]}") 
                 raise ValueError(err)
         else:
             if np.any(self._params_allowed==False):
