@@ -1687,7 +1687,7 @@ class PS_NG20_Fiducial_MMbz2Par(_PS_NG20_Base):
             PD_Normal("mmb_plaw", 1.17, 0.08),
             PD_Normal("mmb_scatter_dex", 0.28, 0.05),
             PD_Uniform("mmb_zplaw_amp", -2.0, +2.0, default=0.0),
-            PD_Uniform("mmb_zplaw_scatter", -2.0, +2.0, default=0.0),
+            PD_Uniform("mmb_zplaw_scatter", -0.2, +2.0, default=0.0),
         ]
         _Param_Space.__init__(
             self,
@@ -1747,8 +1747,8 @@ class PS_NG20_Fiducial_MMbz3Par(_PS_NG20_Base):
             PD_Normal("mmb_plaw", 1.17, 0.08),
             PD_Normal("mmb_scatter_dex", 0.28, 0.05),
             PD_Uniform("mmb_zplaw_amp", -2.0, +2.0, default=0.0),
-            PD_Uniform("mmb_zplaw_scatter", -2.0, +2.0, default=0.0),
-            PD_Uniform("mmb_zplaw_slope", -2.0, +2.0, default=0.0),
+            PD_Uniform("mmb_zplaw_scatter", -0.2, +2.0, default=0.0),
+            PD_Uniform("mmb_zplaw_slope", -0.5, +1.0, default=0.0),
         ]
         _Param_Space.__init__(
             self,
@@ -1811,8 +1811,8 @@ class PS_NG20_Fiducial_Extended_All(_PS_NG20_Base):
             PD_Normal("mmb_plaw", 1.17, 0.08),
             PD_Normal("mmb_scatter_dex", 0.28, 0.05),
             PD_Uniform("mmb_zplaw_amp", -2.0, +2.0, default=0.0),
-            PD_Uniform("mmb_zplaw_slope", -2.0, +2.0, default=0.0),
-            PD_Uniform("mmb_zplaw_scatter", -2.0, +2.0, default=0.0),
+            PD_Uniform("mmb_zplaw_slope", -0.5, +1.0, default=0.0),
+            PD_Uniform("mmb_zplaw_scatter", -0.2, +2.0, default=0.0),
             # Bulge Fraction
             PD_Uniform("bf_frac_lo", 0.1, 0.4, default=0.4),
             PD_Uniform("bf_frac_hi", 0.6, 1.0, default=0.8),
@@ -1946,7 +1946,7 @@ class PS_NG20_NoAstroVar_MMbz2Par(_PS_NG20_Base):
                                        mrat=self.mrat_for_nuin_lims),
             # MMBulge (Matt et al. redshift evolution)
             PD_Uniform("mmb_zplaw_amp", -2.0, +2.0, default=0.0),
-            PD_Uniform("mmb_zplaw_scatter", -2.0, +2.0, default=0.0),
+            PD_Uniform("mmb_zplaw_scatter", -0.2, +2.0, default=0.0),
         ]
         _Param_Space.__init__(
             self,
@@ -1992,7 +1992,7 @@ class PS_NG20_NoAstroVar_MMbz3Par(_PS_NG20_Base):
             # MMBulge (Matt et al. redshift evolution)
             PD_Uniform("mmb_zplaw_amp", -2.0, +2.0, default=0.0),
             PD_Uniform("mmb_zplaw_scatter", -0.2, +2.0, default=0.0),
-            PD_Uniform("mmb_zplaw_slope", -2.0, +2.0, default=0.0),
+            PD_Uniform("mmb_zplaw_slope", -0.5, +1.0, default=0.0),
         ]
         _Param_Space.__init__(
             self,
