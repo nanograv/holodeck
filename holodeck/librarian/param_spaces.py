@@ -562,5 +562,6 @@ _param_spaces_dict = {
     'PS_Astro_Strong_GMR': PS_Astro_Strong_GMR,
     'PS_Astro_Strong_MMBulge': PS_Astro_Strong_MMBulge,
     'PS_Astro_Strong_MMBulge_BFrac': PS_Astro_Strong_MMBulge_BFrac,
+    'PS_Astro_Strong_MSigma_All': PS_Astro_Strong_MSigma_All,
 }
 

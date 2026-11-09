@@ -23,10 +23,6 @@ distribution, and to calculate GW signatures.
 The step of going from a number-density of binaries in $(M, q, z)$ space, to also the distribution
 in $a$ or $f$ is subtle, as it requires modeling the binary evolution (i.e. hardening rate).
 
-To-Do (sam.py)
---------------
-* Allow SAM class to take M-sigma in addition to M-Mbulge.
-
 References
 ----------
 * [Sesana2008]_ Sesana, Vecchio, Colacino 2008.
@@ -112,7 +108,6 @@ class Semi_Analytic_Model:
         gpf=None,
         gmt=None,
         gmr=None,
-        relation_type='mmbulge',
         relation=host_relations.MMBulge_KH2013,
         **kwargs
     ):
@@ -152,9 +147,6 @@ class Semi_Analytic_Model:
         gpf : None  or  :class:`_Galaxy_Pair_Fraction` subclass instance
         gmt : None  or  :class:`_Galaxy_Merger_Time` subclass instance
         gmr : None  or  :class:`_Galaxy_Merger_Rate` subclass instance
-        relation_type: str
-            * `mmbulge` : ``relation`` argument is a :class:`_MMBulge_Relation` subclass instance
-            * `msigma` : ``relation`` argument is a :class:`_MSigma_Relation` subclass instance
         relation : None or :class:`_MMBulge_Relation`, or :class:`_MSigma_Relation` subclass instance
 
         """
@@ -175,12 +167,14 @@ class Semi_Analytic_Model:
 
         gndf = utils.get_subclass_instance(gndf, None, _Galaxy_Number_Density_Function)
         
-        if relation_type == 'mmbulge':
-            relation = utils.get_subclass_instance(relation, None, host_relations._MMBulge_Relation)
-        elif relation_type == 'msigma':
+        if 'mbulge' in relation._PROPERTIES:
+           relation = utils.get_subclass_instance(relation, None, host_relations._MMBulge_Relation)
+        elif 'vdisp' in relation._PROPERTIES:
             relation = utils.get_subclass_instance(relation, None, host_relations._MSigma_Relation)
         else:
-            raise ValueError('Must specify `relation_type` as `mmbulge` or `msigma`.')
+            err = "Must use either `_MMBulge_Relation`, or `_MSigma_Relation` subclass instance."
+            log.exception(err)
+            raise ValueError()
             
         if gpf is None:
             log.info("No galaxy pair-fraction given, using galaxy merger-rate.")
@@ -200,9 +194,8 @@ class Semi_Analytic_Model:
         self._gmr = gmr               #: Galaxy Merger Rate (`_Galaxy_Merger_Rate` instance)
         self._gpf = gpf               #: Galaxy Pair Fraction (`_Galaxy_Pair_Fraction` instance)
         self._gmt = gmt               #: Galaxy Merger Time (`_Galaxy_Merger_Time` instance)
-        self._relation_type = relation_type #: Type of Mbh-host relation (`mmbulge` or `msigma`)
         self._relation = relation       #: Mbh-host relation (`host_relations._MMBulge_Relation` or `host_relations._MSigma_Relation` instance)
-        log.debug(f"{gndf=}, {gmr=}, {gpf=}, {gmt=}, {relation_type=}, {relation=}")
+        log.debug(f"{gndf=}, {gmr=}, {gpf=}, {gmt=}, {relation=}")
 
         # ---- Create SAM grid edges
 
@@ -374,20 +367,18 @@ class Semi_Analytic_Model:
 
             # ---- get galaxy merger rate
 
-            # if self._gmr is None:
-            #     log.debug("Calculating galaxy merger rate using pair-fraction (GPF) and merger-time (GMT)")
-            #     log.debug(f"GPF_USES_MTOT ={GPF_USES_MTOT}")
-            #     mass_gpf = mstar_tot if GPF_USES_MTOT else mstar_pri
-            #     # `gmt` returns [sec]  `gpf` is dimensionless,  so this is [1/sec]
-            #     gal_merger_rate = self._gpf(mass_gpf, mstar_rat, redz) / gmt_time
-            # else:
-            #     log.debug("Calculating galaxy merger rate directly from GMR")
-            #     gal_merger_rate = self._gmr(mstar_tot, mstar_rat, redz)
-
-            gal_merger_rate = 0.04 / mstar_rat / GYR 
+            if self._gmr is None:
+                log.debug("Calculating galaxy merger rate using pair-fraction (GPF) and merger-time (GMT)")
+                log.debug(f"GPF_USES_MTOT ={GPF_USES_MTOT}")
+                mass_gpf = mstar_tot if GPF_USES_MTOT else mstar_pri
+                # `gmt` returns [sec]  `gpf` is dimensionless,  so this is [1/sec]
+                gal_merger_rate = self._gpf(mass_gpf, mstar_rat, redz) / gmt_time
+            else:
+                log.debug("Calculating galaxy merger rate directly from GMR")
+                gal_merger_rate = self._gmr(mstar_tot, mstar_rat, redz) 
 
             # `gndf` returns [1/Mpc^3]   `dtdz` returns [sec]   `gal_merger_rate` is [1/sec]  ===>  [Mpc^-3]
-            if self._relation_type == 'msigma':
+            if 'vdisp' in self._relation._PROPERTIES:
                 vdisp_pri, vdisp_rat, vdisp_tot, redz = self.velocity_dispersions()
                 vdisp_gndf = vdisp_tot if GNDF_USES_MTOT else vdisp_pri
                 gndf_input = vdisp_gndf
@@ -403,31 +394,32 @@ class Semi_Analytic_Model:
 
             # dn / [dM dq dz] = (dn_gal / [dM_gal dq_gal dz]) * (dM_gal/dM_bh) * (dq_gal / dq_bh)
             mplaw = self._relation._mplaw
-            dqbh_dqgal = mplaw * np.power(mstar_rat, mplaw - 1.0)
+            
             # (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) = (dMstar-pri / dMstar-tot) * (dMstar-tot/dMbh-tot)
             # ==> (dMstar-tot/dMbh-tot) = (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) / (dMstar-pri / dMstar-tot)
             #                           = (dMstar-pri / dMbh-pri) * (1 / (1+q_bh)) / (1 / (1+q_star))
             #                           = (dMstar-pri / dMbh-pri) * ((1+q_star) / (1+q_bh))
-            if self._relation_type == 'msigma':
+            if 'vdisp' in self._relation._PROPERTIES:
                 dvdisp_dmbh_pri = self._relation.dsigma_dmbh(vdisp_pri,redz=redz)
                 qterm = (1.0 + vdisp_rat) / (1.0 + self.mrat[np.newaxis, :, np.newaxis])
                 dvdisp_dmbh = dvdisp_dmbh_pri * qterm
-                mstar_plaw = self._relation._mstar_plaw
+                mstar_plaw = self._relation._mstar_sigma._alpha
                 dqbh_dqgal = mplaw * mstar_plaw * np.power(mstar_rat, mplaw * mstar_plaw - 1.0)
                 dens *= (self.mtot[:, np.newaxis, np.newaxis] / vdisp_tot) * (dvdisp_dmbh / dqbh_dqgal)
             else:
+                dqbh_dqgal = mplaw * np.power(mstar_rat, mplaw - 1.0)
                 dmstar_dmbh_pri = self._relation.dmstar_dmbh(mstar_pri, redz=redz)   # [unitless]
                 qterm = (1.0 + mstar_rat) / (1.0 + self.mrat[np.newaxis, :, np.newaxis])
                 dmstar_dmbh = dmstar_dmbh_pri * qterm
 
                 dens *= (self.mtot[:, np.newaxis, np.newaxis] / mstar_tot) * (dmstar_dmbh / dqbh_dqgal)
 
-            # ---- Add scatter from the M-Mbulge relation
+            # ---- Add scatter from the black hole-host galaxy relation
 
-            scatter = self._relation._scatter_dex
-            log.debug(f"mmbulge scatter = {scatter}")
+            scatter = self._relation._scatter_dex1
+            log.debug(f"scatter = {scatter}")
             if scatter > 0.0:
-                log.info(f"Adding MMbulge scatter ({scatter:.4e})")
+                log.info(f"Adding scaling relation scatter ({scatter:.4e})")
                 log.info(f"\tdens bef: ({utils.stats(dens)})")
                 dur = datetime.now()
                 mass_bef = self._integrated_binary_density(dens, sum=True)
@@ -1857,7 +1849,7 @@ class Semi_Analytic_Model:
                 dvdisp_dmbh_pri = self._relation.dsigma_dmbh(vdisp_pri,redz=redz)
                 qterm = (1.0 + vdisp_rat) / (1.0 + self.mrat[np.newaxis, :, np.newaxis])
                 dvdisp_dmbh = dvdisp_dmbh_pri * qterm
-                mstar_plaw = self._relation._mstar_plaw
+                mstar_plaw = self._relation._mstar_sigma._alpha
                 dqbh_dqgal = mplaw * mstar_plaw * np.power(mstar_rat, mplaw * mstar_plaw - 1.0)
                 dens *= (self.mtot[:, np.newaxis, np.newaxis] / vdisp_tot) * (dvdisp_dmbh / dqbh_dqgal)
             else:

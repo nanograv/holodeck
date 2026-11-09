@@ -23,9 +23,7 @@ among two groups (and corresponding base classes):
     simplest case a constant bulge fraction using :py:class:`BF_Constant`.
 
   * **Mbh-Sigma relations** ("M-Sigma"; subclasses of :py:class:`_MSigma_Relation`): mapping from
-    host galaxy velocity dispersion (sigma) to black-hole mass.  NOTE: as of writing this
-    (2024-03-29) the M-Sigma relationships are not fully supported in semi-analytic models in that
-    the initial galaxy populations do not have stellar velocity-dispersions set.
+    host galaxy velocity dispersion (sigma) to black-hole mass. Stellar masses must also be calculated for use in galaxy merger rates, so conversions between velocity dispersion and total stellar-mass are implemented in subclasses of the :py:class:`_Mstar_Sigma`. A power-law scaling relation is implemented in :py:class:`Mstar_Sigma_Plaw`.
 
 * **Stellar-Mass vs. Halo-Mass Relations** (subclasses of :py:class:`_StellarMass_HaloMass`):
   mapping from dark matter halo-mass to stellar-mass.
@@ -60,6 +58,7 @@ References
 * [KH2013]_ Kormendy & Ho 2013.
 * [MM2013]_ McConnell & Ma 2013.
 * [DN2019]_ deNicola et. al 2019.
+* [Zahid2016]_ Zahid et. al 2016.
 
 """
 
@@ -325,6 +324,103 @@ _bulge_frac_class_dict = {
     "BF_Sigmoid": BF_Sigmoid,
 }
 
+# ---------------------------------------------
+# ----     Total Mass-Sigma Relationships    ----
+# ---------------------------------------------
+
+
+class _Mstar_Sigma(abc.ABC):
+    r"""Base class for converting between the total stellar-mass of galaxies and velocity dispersions. This is necessary when using a velocity
+    dispersion function in conjunction with a stellar-mass-based galaxy merger rate.
+
+    Subclasses must implement the ``mstar_from_vdisp`` method, which returns a total stellar mass; and the
+    ``dmstar_dsigma`` method, which returns the partial derivative of stellar mass w.r.t. velocity dispersion.
+
+    """
+
+    # ---- Required API Methods (MUST be provided in all subclass implementations)
+
+    @abc.abstractmethod
+    def mstar_from_vdisp(vdisp, redz=None, **kwargs):
+        """Convert velocity dispersion to total stellar-mass.
+        """
+        return
+
+    @abc.abstractmethod
+    def dmstar_dsigma(vdisp=None, redz=None, **kwargs):
+        """Partial derivative of stellar-mass w.r.t. velocity dispersion.
+        """
+        return
+
+    # ---- Optional API Methods
+
+    def vdisp_from_mstar(self, mstar, redz=None, **kwargs):
+        """Convert total stellar-mass to velocity dispersion.
+
+        Arguments
+        ---------
+        vdisp : array_like, [cm/s]
+            Velocity dispersions in units of centimeters per second.
+        redz : array_like  or  None
+            Redshift.
+        **kwargs : dict
+            Additional key-word arguments.  NOTE: these are not used in this function, but are
+            included to provide a uniform API.
+
+        Returns
+        -------
+        mstar : array_like, [g]
+            Total stellar mass in units of grams.
+
+        """
+        raise NotImplementedError(f"``vdisp_from_mstar`` is not implemented in {self}!")
+
+
+class Mstar_Sigma_Plaw(_Mstar_Sigma):
+    r"""Power-law scaling relation between the total stellar-mass and velocity dispersion. 
+
+    The total stellar-mass is calculated as: $M_* = M_\textrm{b} \left(\frac{\sigma}{\sigma_{\textrm{b}}}\right)^{\frac{1}{\alpha}}$ where $M_\textrm{b}$
+    and $\sigma_{\textrm{b}$ are the total stellar-mass and velocity dispersion break points respectively.
+
+    Default values are taken from [Zahid2016]_. We note that the full relation is a broken power law with a steeper index for $M_* \leq 10^10.26 M_\odot$, but we simplify to a single power law under in order to convert between the black hole and total stellar mass ratios in the galaxy merger rate (assuming that the bulk of the systems that contribute significantly to the GWB are more massive than the break point).
+
+    """
+
+    def __init__(self, M_break=np.power(10,10.26)*MSOL,sigma_break=np.power(10,2.073)*KMPERSEC,alpha=0.293):
+        """Initialize a :class:`Mstar_Sigma_Plaw(_Mstar_Sigma)` instance.
+
+        Arguments
+        ---------
+        M_break : float, [g]
+            Break point in total stellar-mass in grams.
+        sigma_break : float, [cm/s]
+            Break point in velocity dispersion in centimeters per second.
+        alpha : float, []
+            Power law index.
+
+        """
+        self._M_break = M_break
+        self._sigma_break = sigma_break
+        self._alpha = alpha
+        
+        return
+
+    def mstar_from_vdisp(self, vdisp, redz=None, **kwargs):
+        mstar = self._M_break*(vdisp/self._sigma_break)**(1/self._alpha)
+        return mstar
+
+    def dmstar_dsigma(self, vdisp, redz=None, **kwargs):
+        dmstar_dsigma = self._M_break/(alpha*vdisp)*(vdisp/self._sigma_break)**(1/self._alpha)
+        return dmstar_dsigma
+
+    def vdisp_from_mstar(self, mstar, redz=None, **kwargs):
+        vdisp = self._sigma_break*(mstar/self._M_break)**self._alpha
+        return vdisp
+
+# Include a dictionary of all ``_Mstar_Sigma`` subclasses (primarily for unit-testing)
+_mstar_sigma_class_dict = {
+    "Mstar_Sigma_Plaw": Mstar_Sigma_Plaw
+}
 
 # --------------------------------------
 # ----     BH-Host Relationships    ----
@@ -925,31 +1021,89 @@ class _MSigma_Relation(_BH_Host_Relation):
     """
 
     _PROPERTIES = ['vdisp']
+    
+    def __init__(self, mstar_sigma=None):
+        """Initializer.
+
+        Arguments
+        ---------
+        mstar_sigma : instance of a ``_Mstar_Sigma`` subclass
+            Convert between total stellar-mass and velocity dispersion.
+
+        """
+
+        if mstar_sigma is None:
+            mstar_sigma = Mstar_Sigma_Plaw()
+
+        self._mstar_sigma = mstar_sigma  #: ``_Mstar_Sigma`` subclass instance to obtain total stellar masses
+        return
+
+    # ---- Provided API Methods (no additional implementation needed)
+    def dmstar_dmbh(self, mstar, redz=None, **bfkwargs):
+        vdisp = self._mstar_sigma.vdisp_from_mstar(mstar,redz=redz)
+        dmstar_dsigma = self._mstar_sigma.dmstar_dsigma(vdisp, redz=redz, **bfkwargs)
+        dsigma_dmbh = self.dsigma_dmbh(vdisp, redz=redz)
+        dmstar_dmbh = dmstar_dsigma * dsigma_dmbh
+        return dmstar_dmbh
+
+    def mstar_from_mbh(self, mbh, redz, scatter, **kwargs):
+        vdisp = self.vdisp_from_mbh(mbh, redz=redz, scatter=scatter)
+        mstar = self._mstar_sigma.mstar_from_vdisp(vdisp, redz=redz, **kwargs)
+        return mstar
+
+    def mbh_from_mstar(self, mstar, redz, scatter):
+        vdisp = self._mstar_sigma.vdisp_from_mstar(mstar,redz=redz)
+        mbh = self.mbh_from_vdisp(vdisp, redz=redz, scatter=scatter)
+        return mbh
+
+     # ---- Required API Methods (MUST be implementated in subclasses)
 
     @abc.abstractmethod
-    def dsigma_dmbh(self, vdisp, redz):
-        pass
+    def dsigma_dmbh(self, vdisp, redz=None):
+        """The partial derivative of velocity dispersion versus black-hole mass.
+
+        Parameters
+        ----------
+        vdisp : array_like, [cm/s]
+            Velocity dispersion of the host galaxy bulges in units of centimeters per second.
+        redz : array_like  or  `None`
+            Redshifts of the galaxies under consideration.
+
+        Returns
+        -------
+        dsigma_dmbh : array_like, []
+            Jacobian term: partial derivative of velocity dispersion w.r.t. black-hole mass.
+            This quantity is unitless.
+
+        """
+        return
 
     @abc.abstractmethod
-    def mbh_from_vdisp(self, vdisp, scatter):
-        pass
+    def mbh_from_vdisp(self, vdisp, redz=None, scatter=None):
+        """Convert from velocity dispersion to black-hole mass.
+
+        Arguments
+        -------
+        vdisp : array_like  [cm/s]
+            Velocity dispersion in units of centimeters per second.
+        redz : array_like  or  `None`
+            Redshifts of the galaxies under consideration.
+        scatter : bool,
+            Whether or not to include scatter when converting to BH masses.
+        kwargs : dict,
+            Additional keyword-arguments.
+
+        Returns
+        -------
+        mbh : array_like  [g]
+            Black-hole masses in units of grams.
+
+        """
+        return
 
     @abc.abstractmethod
     def vdisp_from_mbh(self, mbh, redz, scatter):
-        pass
-        
-    @abc.abstractmethod
-    def mstar_from_vdisp(self, vdisp, redz, scatter):
-        pass
-
-    @abc.abstractmethod
-    def vdisp_from_mstar(self, mstar, redz, scatter):
-        pass
-
-    @abc.abstractmethod
-    def mstar_from_mbh(self, mbh, redz, scatter):
-        pass
-
+        return
 
 class MSigma_Standard(_MSigma_Relation):
     """Simple M-sigma relation (BH mass vs. host velocity dispersion) as a single power-law.
@@ -965,9 +1119,12 @@ class MSigma_Standard(_MSigma_Relation):
     MASS_PLAW = 4.24
     SIGMA_REF = 200.0 * KMPERSEC
     SCATTER_DEX = 0.0
-    MSTAR_PLAW = 0.293
+    
 
-    def __init__(self, mamp=None, mplaw=None, sigma_ref=None, scatter_dex=None, mstar_plaw=None):
+    def __init__(self, mamp=None, mplaw=None, sigma_ref=None, scatter_dex=None,mstar_sigma=None):
+
+        super().__init__(mstar_sigma=mstar_sigma)
+        
         if mamp is None:
             mamp = self.MASS_AMP
         if mplaw is None:
@@ -976,14 +1133,14 @@ class MSigma_Standard(_MSigma_Relation):
             sigma_ref = self.SIGMA_REF
         if scatter_dex is None:
             scatter_dex = self.SCATTER_DEX
-        if mstar_plaw is None:
-            mstar_plaw = self.MSTAR_PLAW
 
         self._mamp = mamp   # Mass-Amplitude [grams]
         self._mplaw = mplaw   # Mass Power-law index
         self._sigma_ref = sigma_ref   # Reference Sigma (argument normalization)
         self._scatter_dex = scatter_dex
-        self._mstar_plaw = mstar_plaw
+
+        
+        
         return
 
     def mbh_from_host(self, pop, scatter):
@@ -1056,57 +1213,6 @@ class MSigma_Standard(_MSigma_Relation):
         deriv = vdisp / (plaw * mbh)
         return deriv
 
-    def mstar_from_vdisp(self, vdisp, redz=None, **kwargs): # Zahid et. al 2016 broken power law
-
-        M_break = np.power(10,10.26)*MSOL # break point stellar mass [log10(M/Msol)]
-        sigma_break = np.power(10,2.073)*KMPERSEC # break point velocity dispersion [log10(sigma/km s^-1)]
-        a_1 = 0.403 # power law index above break point
-        a_2 = 0.293 # power law index below break point
-        
-        alpha = np.where(vdisp <= sigma_break, a_1,a_2)
-        
-        mstar = M_break*(vdisp/sigma_break)**(1/alpha)  # Zahid et. al 2016 equation 5 and first row of table 1
-        
-        return mstar
-
-    def vdisp_from_mstar(self, mstar, redz=None, **kwargs): # Zahid et. al 2016 broken power law
-        
-        M_break = np.power(10,10.26)*MSOL # break point stellar mass [log10(M/Msol)]
-        sigma_break = np.power(10,2.073)*KMPERSEC # break point velocity dispersion [log10(sigma/km s^-1)]
-        
-        a_1 = 0.403 # power law index above break point
-        a_2 = 0.293 # power law index below break point
-        
-        alpha = np.where(mstar <= M_break, a_1,a_2)
-
-        vdisp = sigma_break*(mstar/M_break)**alpha # Zahid et. al 2016 equation 5 and first row of table 1
-        
-        return vdisp
-
-    def mstar_from_mbh(self, mbh, redz=None, scatter=None, **kwargs):
-        vdisp = self.vdisp_from_mbh(mbh, redz=redz, scatter=scatter)
-        mstar = self.mstar_from_vdisp(vdisp, redz=redz, **kwargs)
-        return mstar
-        
-    def dmstar_dsigma(self, vdisp, redz=None, **bfkwargs):
-        M_break = np.power(10,10.26)*MSOL # break point stellar mass [log10(M/Msol)]
-        sigma_break = np.power(10,2.073)*KMPERSEC # break point velocity dispersion [log10(sigma/km s^-1)]
-        a_1 = 0.403 # power law index above break point
-        a_2 = 0.293 # power law index below break point
-        
-        #alpha = np.where(vdisp <= sigma_break, a_1,a_2)
-
-        alpha = a_2
-        
-        dmstar_dsigma = M_break/(alpha*vdisp)*(vdisp/sigma_break)**(1/alpha)
-        return dmstar_dsigma
-    
-    def dmstar_dmbh(self, mstar, redz=None, **bfkwargs):
-        vdisp = self.vdisp_from_mstar(mstar, redz=redz)
-        dmstar_dsigma = self.dmstar_dsigma(vdisp, redz=redz, **bfkwargs)
-        dsigma_dmbh = self.dsigma_dmbh(vdisp, redz=redz)
-        dmstar_dmbh = dmstar_dsigma * dsigma_dmbh
-        return dmstar_dmbh
 
 class MSigma_MM2013(MSigma_Standard):
     """Mbh-Sigma Relation from McConnell & Ma 2013.

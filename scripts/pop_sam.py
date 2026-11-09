@@ -81,13 +81,13 @@ def main():
 
     # ---- Construct Semi-Analytic Models
 
-    gsmf = holo.sam.GSMF_Schechter()               # Galaxy Stellar-Mass Function (GSMF)
+    gndf = holo.sam.GSMF_Schechter()               # Galaxy Stellar-Mass Function (GSMF)
     gpf = holo.sam.GPF_Power_Law()                 # Galaxy Pair Fraction         (GPF)
     gmt = holo.sam.GMT_Power_Law()                 # Galaxy Merger Time           (GMT)
-    mmbulge = holo.host_relations.MMBulge_Standard()    # M-MBulge Relation            (MMB)
+    relation = holo.host_relations.MMBulge_Standard()    # M-MBulge Relation            (MMB)
     hard = holo.hardening.Hard_GW()
 
-    sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge, shape=args.shape)
+    sam = holo.sam.Semi_Analytic_Model(gndf=gndf, gpf=gpf, gmt=gmt, relation=relation, shape=args.shape)
 
     # ---- Calculate Number of Binaries
 
