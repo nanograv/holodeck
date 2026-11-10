@@ -410,7 +410,7 @@ class Mstar_Sigma_Plaw(_Mstar_Sigma):
         return mstar
 
     def dmstar_dsigma(self, vdisp, redz=None, **kwargs):
-        dmstar_dsigma = self._M_break/(alpha*vdisp)*(vdisp/self._sigma_break)**(1/self._alpha)
+        dmstar_dsigma = self._M_break/(self._alpha*vdisp)*(vdisp/self._sigma_break)**(1/self._alpha)
         return dmstar_dsigma
 
     def vdisp_from_mstar(self, mstar, redz=None, **kwargs):
@@ -1046,12 +1046,12 @@ class _MSigma_Relation(_BH_Host_Relation):
         dmstar_dmbh = dmstar_dsigma * dsigma_dmbh
         return dmstar_dmbh
 
-    def mstar_from_mbh(self, mbh, redz, scatter, **kwargs):
+    def mstar_from_mbh(self, mbh, redz=None, scatter=None, **kwargs):
         vdisp = self.vdisp_from_mbh(mbh, redz=redz, scatter=scatter)
         mstar = self._mstar_sigma.mstar_from_vdisp(vdisp, redz=redz, **kwargs)
         return mstar
 
-    def mbh_from_mstar(self, mstar, redz, scatter):
+    def mbh_from_mstar(self, mstar, redz=None, scatter=None):
         vdisp = self._mstar_sigma.vdisp_from_mstar(mstar,redz=redz)
         mbh = self.mbh_from_vdisp(vdisp, redz=redz, scatter=scatter)
         return mbh
@@ -1102,7 +1102,7 @@ class _MSigma_Relation(_BH_Host_Relation):
         return
 
     @abc.abstractmethod
-    def vdisp_from_mbh(self, mbh, redz, scatter):
+    def vdisp_from_mbh(self, mbh, redz=None, scatter=None):
         return
 
 class MSigma_Standard(_MSigma_Relation):
@@ -1143,12 +1143,12 @@ class MSigma_Standard(_MSigma_Relation):
         
         return
 
-    def mbh_from_host(self, pop, scatter):
+    def mbh_from_host(self, pop, scatter=None):
         host = self.get_host_properties(pop, copy=False)
         vdisp = host['vdisp']    # shape (N, 2)
         return self.mbh_from_vdisp(vdisp, scatter=scatter)
 
-    def mbh_from_vdisp(self, vdisp, scatter):
+    def mbh_from_vdisp(self, vdisp, redz=None, scatter=None):
         """Convert from host galaxy stellar velocity dispersion to black-hole mass.
 
         Parameters
@@ -1169,7 +1169,7 @@ class MSigma_Standard(_MSigma_Relation):
         mbh = _log10_relation(vdisp, self._mamp, self._mplaw, scatter_dex, x0=self._sigma_ref)
         return mbh
 
-    def vdisp_from_mbh(self, mbh, redz, scatter):
+    def vdisp_from_mbh(self, mbh, redz=None, scatter=None):
         """Convert from black-hole mass to host galaxy stellar velocity dispersion.
 
         Parameters
@@ -1190,7 +1190,7 @@ class MSigma_Standard(_MSigma_Relation):
         vdisp = _log10_relation_reverse(mbh, self._mamp, self._mplaw, scatter_dex, x0=self._sigma_ref)
         return vdisp
 
-    def dsigma_dmbh(self, vdisp, redz):
+    def dsigma_dmbh(self, vdisp, redz=None):
         """Calculate the partial derivative of velocity dispersion versus BH mass :math:`d sigma / d M_bh`.
 
         .. math::
@@ -1265,6 +1265,13 @@ def get_msigma_relation(msigma: Union[_MSigma_Relation, Type[_MSigma_Relation]] 
     """
     return utils.get_subclass_instance(msigma, MSigma_KH2013, _MSigma_Relation)
 
+# Include a dictionary of all ``_MSigma_Relation`` subclasses (primarily for unit-testing)
+_msigma_relation_class_dict = {
+    "MSigma_Standard": MSigma_Standard,
+    "MSigma_KH2013": MSigma_KH2013,
+    "MSigma_MM2013": MSigma_MM2013,
+    "MSigma_DN2019": MSigma_DN2019,
+}
 
 def _add_scatter(vals: ArrayLike, eps: ArrayLike) -> ArrayLike:
     """Add scatter to the input values with a given standard deviation.

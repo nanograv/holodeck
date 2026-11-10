@@ -43,7 +43,7 @@ class _PS_Classic_Phenom(_Param_Space):
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
-        gsmf = sams.GSMF_Schechter(
+        gndf = sams.GSMF_Schechter(
             phi0=params['gsmf_phi0_log10'],
             phiz=params['gsmf_phiz'],
             mchar0_log10=params['gsmf_mchar0_log10'],
@@ -64,14 +64,14 @@ class _PS_Classic_Phenom(_Param_Space):
             qgamma=params['gmt_qgamma'],
             zbeta=params['gmt_zbeta'],
         )
-        mmbulge = host_relations.MMBulge_KH2013(
+        relation = host_relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
         )
 
         sam = sams.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            gndf=gndf, gpf=gpf, gmt=gmt, relation=relation,
             shape=sam_shape,
         )
         return sam
@@ -189,7 +189,7 @@ class _PS_Classic_GWOnly(_Param_Space):
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
-        gsmf = sams.GSMF_Schechter(
+        gndf = sams.GSMF_Schechter(
             phi0=params['gsmf_phi0_log10'],
             phiz=params['gsmf_phiz'],
             mchar0_log10=params['gsmf_mchar0_log10'],
@@ -210,14 +210,14 @@ class _PS_Classic_GWOnly(_Param_Space):
             qgamma=params['gmt_qgamma'],
             zbeta=params['gmt_zbeta'],
         )
-        mmbulge = host_relations.MMBulge_KH2013(
+        relation = host_relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
         )
 
         sam = sams.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            gndf=gndf, gpf=gpf, gmt=gmt, relation=relation,
             shape=sam_shape,
         )
         return sam

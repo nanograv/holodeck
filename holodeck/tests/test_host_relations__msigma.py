@@ -73,7 +73,7 @@ def test_all_msigma_relation_classes_with_vdisp(vdisp_redz):
         # Use default instantiation
         msigma = msigma_class()
         # perform basic checks
-        _check_any_msigma_relation_with_vdisp(msigma, vdisp, redz)
+        _check_any_msigma_relation_with_sigma(msigma, vdisp, redz)
 
 
     return
@@ -286,7 +286,7 @@ def check_mass_reset(msigma_relation, truth_func):
     pop.modify(mod_MM2013)
     mass = pop.mass
 
-    truth = truth_func(pop.mbulge)
+    truth = truth_func(pop.vdisp)
     print(f"Modified masses: {holo.utils.stats(mass/MSOL)}")
     print(f"Expected masses: {holo.utils.stats(truth/MSOL)}")
     assert np.allclose(mass, truth), "Modified masses do not match true values from M-Sigma relation!"
