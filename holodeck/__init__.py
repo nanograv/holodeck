@@ -103,11 +103,7 @@ from . import utils           # noqa
 
 # ---- Handle version
 
-fname_version = os.path.join(_PATH_PACKAGE, 'version.txt')
-with open(fname_version) as inn:
-    version = inn.read().strip()
-
-__version__ = version
+from ._version import version as __version__
 
 # cleanup module namespace
 del os, logging, _check_paths

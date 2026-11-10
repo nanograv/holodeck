@@ -22,7 +22,7 @@ This package provides a comprehensive framework for MBH binary population synthe
 
 The `holodeck` framework is currently under substantial, active development.  Stable versions are now available with `pip install holodeck-gw` (see [holodeck on pypi](https://pypi.org/project/holodeck-gw)).  However, recent versions and many development tools will not generally be available with ``pip`` or ``conda`` install.
 
-`holodeck` requires ``python >= 3.9`` (with support for: ``3.9, 3.10, 3.11``).  The recommended installation is:
+`holodeck` requires ``python >= 3.11`` (with support for: ``3.11, 3.12``).  The recommended installation is:
 
 (0) OPTIONAL & recommended: create and activate a new **anaconda** environment to isolate your build:
 
