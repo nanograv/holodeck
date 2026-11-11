@@ -5,8 +5,8 @@ from unittest.mock import DEFAULT
 import numpy as np
 from scipy.interpolate import PchipInterpolator
 import holodeck as holo
-from holodeck.constants import GYR, PC, MSOL, KMPERSEC, SPLC, PD_MVNormal, PD_2D_Uniform_Variable_Ymin
-from holodeck.librarian.lib_tools import _Param_Space, PD_Uniform, PD_Normal, PD_Uniform_Log
+from holodeck.constants import GYR, PC, MSOL, KMPERSEC, SPLC
+from holodeck.librarian.lib_tools import _Param_Space, PD_Uniform, PD_Normal, PD_Uniform_Log, PD_MVNormal, PD_2D_Uniform_Variable_Ymin
 
 
 # Define a new Parameter-Space class by subclassing the base class:
