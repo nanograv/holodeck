@@ -97,7 +97,7 @@ class Parameter_Space_Mix01(holo.librarian._Parameter_Space):
         gmt = holo.sam.GMT_Power_Law()
         mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
 
-        sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge, shape=self.sam_shape)
+        sam = holo.sam.Semi_Analytic_Model(gndf=gsmf, gpf=gpf, gmt=gmt, relation=mmbulge, shape=self.sam_shape)
         hard = holo.hardening.Fixed_Time.from_sam(sam, time, gamma_sc=hard_gamma_inner, exact=True, progress=False)
         return sam, hard
 
@@ -133,7 +133,7 @@ class Parameter_Space_Hard01(holo.librarian._Parameter_Space):
         mmbulge = holo.host_relations.MMBulge_KH2013()
 
         sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            gndf=gsmf, gpf=gpf, gmt=gmt, relation=mmbulge,
             shape=self.sam_shape
         )
         hard = holo.hardening.Fixed_Time.from_sam(
@@ -179,7 +179,7 @@ class Parameter_Space_Hard02_BAD(holo.librarian._Parameter_Space):
         mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
         sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            gndf=gsmf, gpf=gpf, gmt=gmt, relation=mmbulge,
             shape=self.sam_shape
         )
         hard = holo.hardening.Fixed_Time.from_sam(
@@ -225,7 +225,7 @@ class Parameter_Space_Hard03(holo.librarian._Parameter_Space):
         mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
         sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            gndf=gsmf, gpf=gpf, gmt=gmt, relation=mmbulge,
             shape=self.sam_shape
         )
         hard = holo.hardening.Fixed_Time.from_sam(
@@ -271,7 +271,7 @@ class Parameter_Space_Hard04(holo.librarian._Parameter_Space):
         mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
         sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            gndf=gsmf, gpf=gpf, gmt=gmt, relation=mmbulge,
             shape=self.sam_shape
         )
         hard = holo.hardening.Fixed_Time.from_sam(
@@ -329,7 +329,7 @@ class Parameter_Space_Debug01(holo.librarian._Parameter_Space):
         mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
         sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            gndf=gsmf, gpf=gpf, gmt=gmt, relation=mmbulge,
             shape=self.sam_shape
         )
         hard = holo.hardening.Fixed_Time.from_sam(
@@ -386,7 +386,7 @@ class Parameter_Space_Simple01(holo.librarian._Parameter_Space):
         mmbulge = holo.host_relations.MMBulge_KH2013()
 
         sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            gndf=gsmf, gpf=gpf, gmt=gmt, relation=mmbulge,
             shape=self.sam_shape
         )
         hard = holo.hardening.Fixed_Time.from_sam(
@@ -432,7 +432,7 @@ class LHS_Parameter_Space_Hard04(holo.librarian._LHS_Parameter_Space):
         mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
         sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            gndf=gsmf, gpf=gpf, gmt=gmt, relation=mmbulge,
             shape=self.sam_shape
         )
         hard = holo.evolution.Fixed_Time.from_sam(
@@ -477,7 +477,7 @@ class LHS_PSpace_Eccen_01(holo.librarian._LHS_Parameter_Space):
         mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
         sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            gndf=gsmf, gpf=gpf, gmt=gmt, relation=mmbulge,
             shape=self.sam_shape
         )
 
@@ -539,7 +539,7 @@ class LHS_PSpace_Eccen_02(holo.librarian._LHS_Parameter_Space):
         mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
 
         sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            gndf=gsmf, gpf=gpf, gmt=gmt, relation=mmbulge,
             shape=self.sam_shape
         )
 

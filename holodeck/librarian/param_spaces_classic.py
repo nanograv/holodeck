@@ -52,7 +52,7 @@ class _PS_Classic_Phenom(_Param_Space):
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
-        gsmf = sams.GSMF_Schechter(
+        gndf = sams.GSMF_Schechter(
             phi0=params['gsmf_phi0_log10'],
             phiz=params['gsmf_phiz'],
             mchar0_log10=params['gsmf_mchar0_log10'],
@@ -73,14 +73,14 @@ class _PS_Classic_Phenom(_Param_Space):
             qgamma=params['gmt_qgamma'],
             zbeta=params['gmt_zbeta'],
         )
-        mmbulge = host_relations.MMBulge_KH2013(
+        relation = host_relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
         )
 
         sam = sams.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            gndf=gndf, gpf=gpf, gmt=gmt, relation=relation,
             shape=sam_shape,
         )
         return sam
@@ -187,8 +187,10 @@ class _PS_Classic_GWOnly(_Param_Space):
         parameters = [
             PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
             PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
+
             PD_Uniform("mmb_mamp_log10", +7.6, +9.0),   # [log10(Msol)]
             PD_Uniform("mmb_scatter_dex", +0.0, +0.9),
+
         ]
         super().__init__(
             parameters,
@@ -198,7 +200,8 @@ class _PS_Classic_GWOnly(_Param_Space):
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
-        gsmf = sams.GSMF_Schechter(
+
+        gndf = sams.GSMF_Schechter(
             phi0=params['gsmf_phi0_log10'],
             phiz=params['gsmf_phiz'],
             mchar0_log10=params['gsmf_mchar0_log10'],
@@ -219,14 +222,14 @@ class _PS_Classic_GWOnly(_Param_Space):
             qgamma=params['gmt_qgamma'],
             zbeta=params['gmt_zbeta'],
         )
-        mmbulge = host_relations.MMBulge_KH2013(
+        relation = host_relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
         )
 
         sam = sams.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            gndf=gndf, gpf=gpf, gmt=gmt, relation=relation,
             shape=sam_shape,
         )
         return sam
@@ -250,6 +253,7 @@ class PS_Classic_GWOnly_Uniform(_PS_Classic_GWOnly):
             PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
             PD_Uniform("mmb_mamp_log10", +7.6, +9.0),   # [log10(Msol)]
             PD_Uniform("mmb_scatter_dex", +0.0, +0.9),
+
         ]
         _Param_Space.__init__(
             self, parameters,
