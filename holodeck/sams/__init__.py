@@ -17,7 +17,10 @@ from . import components
 from .sam import Semi_Analytic_Model
 from .components import (
     GSMF_Schechter, GSMF_Double_Schechter,
+    VDF_Modified_Schechter,
     GPF_Power_Law,
     GMT_Power_Law,
     GMR_Illustris,
+    GMR_SDSS,
 )
+
