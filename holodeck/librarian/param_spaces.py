@@ -1707,7 +1707,31 @@ class PS_NG20_Fiducial_Extended(_PS_NG20_Base):
             seed=seed,
         )
         return
-    
+
+
+class PS_NG20_Iso_HardTauOut(_PS_NG20_Base):
+    """NG20 Fiducial with only the outer hardening time varied.
+
+    For isolated-parameter flow libraries: `hard_outer_time` keeps its `PS_NG20_Fiducial` prior,
+    and every other parameter is fixed at `_PS_NG20_Base.DEFAULTS` (which `model_for_params`
+    fills in for any parameter not listed here).
+    """
+
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
+            # Hardening model (BIO-hardening / FixedOuterTime_InnerPL_SAM), as in PS_NG20_Fiducial
+            PD_Uniform("hard_outer_time", 0.1, 10.0, default=1.0),  # [Gyr]
+        ]
+        _Param_Space.__init__(
+            self,
+            parameters,
+            log=log,
+            nsamples=nsamples,
+            sam_shape=sam_shape,
+            seed=seed,
+        )
+        return
+
 
 _param_spaces_dict = {
     "PS_Test": PS_Test,
@@ -1733,5 +1757,6 @@ _param_spaces_dict = {
     "PS_NG20_Fiducial": PS_NG20_Fiducial,
     "PS_NG20_Fiducial_Hard": PS_NG20_Fiducial_Hard,
     "PS_NG20_Fiducial_Extended": PS_NG20_Fiducial_Extended,
+    "PS_NG20_Iso_HardTauOut": PS_NG20_Iso_HardTauOut,
 }
 
