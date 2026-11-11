@@ -7,6 +7,7 @@ for Hasasia PTA's.
 
 import numpy as np
 from scipy import special, integrate
+from sympy import nsolve, Symbol
 import h5py
 import matplotlib.pyplot as plt
 import os
@@ -15,8 +16,8 @@ import warnings
 
 import holodeck as holo
 from holodeck import utils, log, plot  # , cosmo, anisotropy
-from holodeck.constants import YR
-from holodeck import cyutils
+from holodeck.constants import MPC, YR
+from holodeck.sams import cyutils as sam_cyutils
 
 try:
     from sympy import nsolve, Symbol
@@ -44,7 +45,7 @@ DEF_THRESH=0.5
 
 def _gammaij_from_thetaij(theta_ij):
     """ Calculate gamma_ij for two pulsars of relative angle theta_ij.
-
+    
     Parameters
     ----------
     theta_ij : scalar
@@ -460,7 +461,7 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret = False
     """
 
     print("Detect_bg() is deprecated. Use detect_bg_pta() instead for red noise and ss noise.")
-
+    
     # Overlap Reduction Function
     num = len(thetas) # number of pulsars, P
     Gamma = np.zeros((num, num)) # (P,P) 2Darray of scalars, Overlap reduction function between all puolsar
@@ -476,7 +477,7 @@ def detect_bg(thetas, phis, sigmas, fobs, cad, hc_bg, alpha_0=0.001, ret = False
     Sh0_bg = Sh_bg # appropsimation used in Rosado et al. 2015
     # print('Sh_bg:', Sh_bg.shape)
 
-    # Noise
+    # Noise 
     noise = _white_noise(cad, sigmas)[:,np.newaxis, np.newaxis] # P, 1, 1
     # print('noise:', noise.shape)
 
@@ -527,7 +528,7 @@ def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss=None, custom_noise=None,
         Background detection probability
     snr_bg : (R,) 1Darray
         Signal to noise ratio of the background, using the
-        B statistic.
+        B statistic. 
 
 
     If a pulsar had differing toaerrs, the mean of that pulsar's
@@ -571,7 +572,7 @@ def detect_bg_pta(pulsars, fobs, hc_bg, hc_ss=None, custom_noise=None,
         noise = noise[:,:,np.newaxis]
         if ss_noise:
             noise = noise + _Sh_ss_noise(hc_ss, fobs) # (P, F, R)
-
+    
     mu_1B = _mean1_Bstatistic(noise, Gamma, Sh_bg, Sh0_bg)
 
     sigma_0B = _sigma0_Bstatistic(noise, Gamma, Sh0_bg)
@@ -673,7 +674,7 @@ def snr_hasasia_noise_bg(scGWB):
     Sh_h = _Sh_hasasia_noise_bg(scGWB)
     snr_h = scGWB.SNR(Sh_h)
     return snr_h
-
+    
 
 def _Sh_hasasia_modeled_bg(freqs, hc_bg):
     """ Calculate Sh for hsen.GWBSensitivityCurve.SNR(Sh) from a
@@ -715,7 +716,7 @@ def snr_hasasia_modeled_bg(scGWB, hc_bg):
     for rr in range(len(hc_bg[0])):
         snr_h[rr] = scGWB.SNR(Sh_h[:,rr])
     return snr_h
-
+    
 
 
 
@@ -908,6 +909,7 @@ def _Sh_rest_noise(hc_ss, hc_bg, freqs, nexcl=0):
         Number of loudest single sources to exclude from hc_rest noise, in addition
         to the source in question.
 
+
     Returns
     -------
     Sh_rest : (F,R,L) NDarray of scalars
@@ -928,7 +930,7 @@ def _Sh_rest_noise(hc_ss, hc_bg, freqs, nexcl=0):
 
 
 def _Sh_ss_noise(hc_ss, freqs):
-    """ Calculate the noise spectral density contribution from all but the first loudest
+    """ Calculate the noise spectral density contribution from all but the first loudest 
     single sources.
 
     Parameters
@@ -1001,6 +1003,7 @@ def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=N
     exclude_loudest : int
         Number of loudest single sources to exclude from hc_rest noise
 
+
     Returns
     -------
     noise : (P,F,R,L) NDarray of scalars
@@ -1016,7 +1019,6 @@ def _total_noise(delta_t, sigmas, hc_ss, hc_bg, freqs, red_amp=None, red_gamma=N
         red_noise = _red_noise(red_amp, red_gamma, freqs) # (F,)
         noise = noise + red_noise[np.newaxis,:,np.newaxis,np.newaxis] # (P,F,R,L)
     return noise
-
 
 def psrs_spectra_gwbnoise(psrs, fobs, nreals, npsrs, divide_flag=False):
     """ Get GWBSensitivityCurve noise and spectra for psrs
@@ -1170,7 +1172,7 @@ def _snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
     """
 
 
-    snr_ss = cyutils.snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs)
+    snr_ss = sam_cyutils.snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs)
     return snr_ss
 
 def _snr_ss_5dim(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
@@ -1205,16 +1207,24 @@ def _snr_ss_5dim(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
     """
 
     amp = amp[np.newaxis,:,:,np.newaxis,:]  # (F,R,L) to (P,F,R,S,L)
+    # print('amp', amp.shape)
 
     a_pol, b_pol = _a_b_polarization(iotas) # (F,S,L)
     a_pol = a_pol[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
     b_pol = b_pol[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
+    # print('a_pol', a_pol.shape)
+    # print('b_pol', b_pol.shape)
 
     Phi_T = _gw_phase(dur, freqs, Phi_0) # (F,)
+    # print('Phi_T', Phi_T.shape)
     Phi_T = Phi_T[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
+    # print('Phi_T', Phi_T.shape)
 
     Phi_0 = Phi_0[np.newaxis,:,np.newaxis,:,:] # (F,S,L) to (1,F,1,S,L)
+    # print('Phi_0', Phi_0.shape)
+
     freqs = freqs[np.newaxis,:,np.newaxis,np.newaxis,np.newaxis] # (F,) to (1,F,1,1,1)
+    # print('freqs', freqs.shape)
 
     S_i = S_i[:,:,:,np.newaxis,:] # (P,F,R,L) to (P,F,R,1,L)
     F_iplus = F_iplus[:,:,np.newaxis,:,:] # (P,F,S,L) to (P,F,1,S,L)
@@ -1416,7 +1426,7 @@ def _gamma_ssi_cython(rho, grid_path):
     #         # interpolate for gamma in cython
     #         rho_flat = rho[ff,rr].flatten()
     #         rsort = np.argsort(rho_flat)
-    #         gamma_flat = cyutils.gamma_of_rho_interp(rho_flat, rsort, rho_interp_grid, gamma_interp_grid)
+    #         gamma_flat = sam_cyutils.gamma_of_rho_interp(rho_flat, rsort, rho_interp_grid, gamma_interp_grid)
     #         gamma_ssi[ff,rr] = gamma_flat.reshape(rho[ff,rr].shape)
 
     for rr in range(len(rho[0])):
@@ -1508,7 +1518,6 @@ def detect_ss(thetas, phis, sigmas, fobs, hc_ss, hc_bg,
         SNR of each single source.
 
     """
-
     warnings.warn("'detect_ss()' is deprecated. Use 'detect_ss_pta()' instead.", DeprecationWarning)
     dur = 1.0/fobs[0]
     cad = 1.0/(2*fobs[-1])
@@ -1556,8 +1565,7 @@ def detect_ss(thetas, phis, sigmas, fobs, hc_ss, hc_bg,
         return gamma_ss
 
 
-def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,
-                custom_noise=None, nexcl_noise=0,
+def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,custom_noise=None, nexcl_noise=0,
               theta_ss=None, phi_ss=None, Phi0_ss=None, iota_ss=None, psi_ss=None, nskies=25,
               Fe_bar = None, red_amp=None, red_gamma=None, alpha_0=0.001, Fe_bar_guess=15,
               ret_snr=False, print_nans=False, snr_cython=True, gamma_cython=True, grid_path=GAMMA_RHO_GRID_PATH):
@@ -1666,6 +1674,7 @@ def detect_ss_pta(pulsars, fobs, hc_ss, hc_bg,
         S_i = custom_noise
     else:
         S_i = _total_noise(cad, sigmas, hc_ss, hc_bg, fobs, red_amp, red_gamma, nexcl=nexcl_noise)
+
 
     # amplitudw
     amp = _amplitude(hc_ss, fobs, dfobs) # (F,R,L)
@@ -1798,7 +1807,7 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
     df_ss = np.zeros(nsamps)
     df_bg = np.zeros(nsamps)
     ev_ss = np.zeros((nsamps, nreals, nskies))
-    if save_ssi:
+    if save_ssi: 
         snr_ss = np.zeros((nsamps, nfreqs, nreals, nskies, nloudest))
         gamma_ssi = np.zeros((nsamps, nfreqs, nreals, nskies, nloudest))
 
@@ -1842,24 +1851,24 @@ def detect_lib(hdf_name, output_dir, npsrs, sigma, nskies, thresh=DEF_THRESH,
     else:
         np.savez(output_dir+'/detstats.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
               snr_bg=snr_bg, ev_ss = ev_ss)
-
-    # return dictionary
+        
+    # return dictionary 
     if ret_dict:
         data = {
             'dp_ss':dp_ss, 'dp_bg':dp_bg, 'df_ss':df_ss, 'df_bg':df_bg,
             'snr_bg':snr_bg, 'ev_ss':ev_ss
         }
-        if save_ssi:
+        if save_ssi: 
             data.update({'gamma_ssi':gamma_ssi})
             data.update({'snr_ss':snr_ss})
         return data
-    return
+    return 
 
 
 def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
                          sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
-                plot=True, debug=False,
-                save_ssi=False, ret_dict=False, ss_noise=False):
+                plot=True, debug=False, grid_path=GAMMA_RHO_GRID_PATH, 
+                snr_cython = True, save_ssi=False, ret_dict=False, ss_noise=True):
     """ Calculate detection statistics for an ss library output.
 
     Parameters
@@ -1914,8 +1923,8 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
         Expectation number of single source detections, averaged across realizations,
         for each sample.
 
-    # TODO: Add an option to calculate just for a particular selection of samples,
-    e.g. pass in nn_min and nn_max and use for nn in range(nn_min, nn_max) instead of
+    # TODO: Add an option to calculate just for a particular selection of samples, 
+    e.g. pass in nn_min and nn_max and use for nn in range(nn_min, nn_max) instead of 
     nn in range(neals). Then combine these into an hdf file separately.
     """
 
@@ -1924,6 +1933,9 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
     fobs = ssfile['fobs'][:]
     dur = 1.0/fobs[0]
     cad = 1.0/(2*fobs[-1])
+    # if dfobs is None: dfobs = ssfile['dfobs'][:]
+    # if dur is None: dur = ssfile['pta_dur'][0]
+    # if cad is None: cad = ssfile['pta_cad'][0]
     hc_ss = ssfile['hc_ss'][...]
     hc_bg = ssfile['hc_bg'][...]
     shape = hc_ss.shape
@@ -1956,12 +1968,16 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
     df_ss = np.zeros(nsamps)
     df_bg = np.zeros(nsamps)
     ev_ss = np.zeros((nsamps, nreals, nskies))
-    if save_ssi:
+    if save_ssi: 
         snr_ss = np.zeros((nsamps, nfreqs, nreals, nskies, nloudest))
         gamma_ssi = np.zeros((nsamps, nfreqs, nreals, nskies, nloudest))
 
+    # # one time calculations
+    # Num = nfreqs * nloudest # number of single sources in a single strain realization (F*L)
+    # Fe_bar = _Fe_thresh(Num) # scalar
+
     for nn in range(nsamps):
-        if debug:
+        if debug: 
             print('\non sample nn=%d out of N=%d' % (nn,nsamps))
             samp_dur = datetime.now()
             real_dur = datetime.now()
@@ -1969,40 +1985,48 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
         # calibrate individual realization PTAs
         for rr in range(nreals):
             if rr==0:
-                _sigstart, _sigmin, _sigmax = sigstart, sigmin, sigmax
-            if debug:
+                _sigstart, _sigmin, _sigmax = sigstart, sigmin, sigmax 
+            if debug: 
                 now = datetime.now()
                 if (rr%10==0):
                     print(f"{nn=}, {rr=}, {now-real_dur} s per realization, {_sigmin=:.2e}, {_sigmax=:.2e}, {_sigstart=:.2e}")
                 real_dur = now
 
-            # use sigmin and sigmax from previous realization,
+            # use sigmin and sigmax from previous realization, 
             # unless it's the first realization of the sample
-            psrs, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[nn,:,rr], hc_ss[nn,:,rr,:], fobs, npsrs, tol=tol, maxbads=maxbads,
+            psrs, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[nn,:,rr], fobs, npsrs, tol=tol, maxbads=maxbads,
                                      sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True, ss_noise=ss_noise)
             _sigmin /= 2
             _sigmax *= 2
-
+            
             # get background detstats
             _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs, hc_bg[nn,:,rr:rr+1], ret_snr=True)
             dp_bg[nn,rr], snr_bg[nn,:,rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
 
             # get single source detstats
             _dp_ss, _snr_ss, _gamma_ssi = detect_ss_pta(
-                    psrs, fobs, hc_ss[nn,:,rr:rr+1], hc_bg[nn,:,rr:rr+1],
+                    psrs, fobs, hc_ss[nn,:,rr:rr+1], hc_bg[nn,:,rr:rr+1], 
                     nskies=nskies, ret_snr=True,
-                    theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss,
+                    theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss, 
                     iota_ss=iota_ss, psi_ss=psi_ss)
             dp_ss[nn,rr,:] = _dp_ss.squeeze()
             if save_ssi:
                 snr_ss[nn,:,rr] = _snr_ss.squeeze()
-                gamma_ssi[nn,:,rr] = _gamma_ssi.squeeze()
+                gamma_ssi[nn,:,rr] = _gamma_ssi.squeeze() 
             ev_ss[nn,rr] = expval_of_ss(_gamma_ssi)
         if debug:
             now = datetime.now()
             print(f"Sample {nn} took {now-samp_dur} s")
             samp_dur = now
-
+        # dp_bg[nn,:], snr_bg[nn,...] = detect_bg_pta(psrs, fobs, hc_bg[nn], ret_snr=True)
+        # vals_ss = detect_ss_pta(psrs, fobs, hc_ss[nn], hc_bg[nn], 
+        #                         ret_snr=True, gamma_cython=True, snr_cython=snr_cython,
+        #                         theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss,
+        #                         iota_ss=iota_ss, psi_ss=psi_ss, grid_path=grid_path)
+        # dp_ss[nn,:,:]  = vals_ss[0]
+        # if save_ssi: 
+        #     snr_ss[nn] = vals_ss[1]
+        #     gamma_ssi[nn] = vals_ss[2]
         df_ss[nn], df_bg[nn] = detfrac_of_reals(dp_ss[nn], dp_bg[nn], thresh)
 
         if save_ssi:
@@ -2011,7 +2035,7 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
         else:
             np.savez(output_dir+f'/detstats_p{nn:06d}.npz', dp_ss=dp_ss[nn], dp_bg=dp_bg[nn], df_ss=df_ss[nn], df_bg=df_bg[nn],
                 snr_bg=snr_bg[nn], ev_ss = ev_ss[nn])
-
+        
         if plot:
             fig = plot_sample_nn(fobs, hc_ss[nn], hc_bg[nn],
                          dp_ss[nn], dp_bg[nn],
@@ -2033,18 +2057,18 @@ def detect_lib_clbrt_pta(hdf_name, output_dir, npsrs, nskies, thresh=DEF_THRESH,
     else:
         np.savez(output_dir+'/detstats_lib.npz', dp_ss=dp_ss, dp_bg=dp_bg, df_ss=df_ss, df_bg=df_bg,
               snr_bg=snr_bg, ev_ss = ev_ss)
-
-    # return dictionary
+        
+    # return dictionary 
     if ret_dict:
         data = {
             'dp_ss':dp_ss, 'dp_bg':dp_bg, 'df_ss':df_ss, 'df_bg':df_bg,
             'snr_bg':snr_bg, 'ev_ss':ev_ss
         }
-        if save_ssi:
+        if save_ssi: 
             data.update({'gamma_ssi':gamma_ssi})
             data.update({'snr_ss':snr_ss})
         return data
-    return
+    return 
 
 
 
@@ -2077,19 +2101,19 @@ def detfrac_of_reals(dp_ss, dp_bg, thresh=DEF_THRESH):
         Background detectin probability.
     thresh : float
         Fractional threshold for DP to claim a detection.
-
+    
     Returns
     -------
     df_ss : float
         Fraction of realizations with dp_ss>threshold
     def_bg : float
         Fraction of realizations with dp_bg>threshold
-    """
+    """ 
 
     df_ss = np.sum(dp_ss>thresh)/(dp_ss.size)
     df_bg = np.sum(dp_bg>thresh)/(dp_bg.size)
     return df_ss, df_bg
-
+    
 
 
 def expval_of_ss(gamma_ssi,):
@@ -2103,8 +2127,8 @@ def expval_of_ss(gamma_ssi,):
     Returns
     -------
     ev_ss : (R,S)
-        Expected (fractional) number of single source detection for each strain and sky realizations.
-
+        Expected (fractional) number of single source detection (dp_ss>thresh) for each strain and sky realizations.
+    
     """
     # print(f"{gamma_ssi.shape=}, {[*gamma_ssi.shape]}")
     # nfreqs, nreals, nskies, nloudest = [*gamma_ssi.shape]
@@ -2130,8 +2154,6 @@ def count_n_ss(gamma_ssi):
     randoms = np.random.uniform(0,1, size=gamma_ssi.size).reshape(gamma_ssi.shape)
     nn_ss = np.sum((gamma_ssi>randoms), axis=(0,3))
     return nn_ss
-
-
 
 
 ############################# Plot Library #############################
@@ -2315,11 +2337,11 @@ def rank_samples(hc_ss, hc_bg, fobs, fidx=None, dfobs=None, amp_ref=None, hc_ref
         return nsort, fidx, hc_ref
     return nsort
 
-######################### Param Space Models ###########################
+######################### Param Space Models ########################### 
 
 def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
                         npsrs, sigma, nskies, thresh=DEF_THRESH, debug=False):
-
+    
     nfreqs, nreals, nloudest = [*hc_ss.shape]
     dur = 1/fobs_cents[0]
     cad = 1.0 / (2 * fobs_cents[-1])
@@ -2345,8 +2367,8 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
     dp_bg, snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg, ret_snr=True)
     # print(f"{np.mean(dp_bg)=}")
     vals_ss = detect_ss_pta(
-        psrs, fobs_cents, hc_ss, hc_bg,
-        gamma_cython=True, snr_cython=True, ret_snr=True,
+        psrs, fobs_cents, hc_ss, hc_bg, 
+        gamma_cython=True, snr_cython=True, ret_snr=True, 
         theta_ss=theta_ss, phi_ss=phi_ss, Phi0_ss=Phi0_ss, iota_ss=iota_ss, psi_ss=psi_ss,
         )
     dp_ss, snr_ss, gamma_ssi = vals_ss[0], vals_ss[1], vals_ss[2]
@@ -2357,13 +2379,12 @@ def detect_pspace_model(fobs_cents, hc_ss, hc_bg,
     # print(f"{np.mean(ev_ss)=}")
 
     dsdata = {
-        'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi,
+        'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi, 
         'dp_bg':dp_bg, 'snr_bg':snr_bg,
         'df_ss':df_ss, 'df_bg':df_bg, 'ev_ss':ev_ss,
     }
 
     return dsdata
-
 
 def detect_pspace_model_psrs(fobs_cents, hc_ss, hc_bg, psrs, nskies, hc_bg_noise=None,
                         thresh=DEF_THRESH, debug=False, nexcl_noise=0):
@@ -2410,14 +2431,13 @@ def detect_pspace_model_psrs(fobs_cents, hc_ss, hc_bg, psrs, nskies, hc_bg_noise
 
     return dsdata
 
-def detect_pspace_model_clbrt_pta(
-        fobs_cents, hc_ss, hc_bg, npsrs, nskies,
-        hc_bg_noise=None,
-        sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
-        thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
-        red_amp=None, red_gamma=None, red2white=None, ss_noise=False, dsc_flag=False, nexcl_noise=0):
+def detect_pspace_model_clbrt_pta(fobs_cents, hc_ss, hc_bg, npsrs, nskies,
+                        hc_bg_noise=None,
+                        sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, tol=0.01, maxbads=5,
+                        thresh=DEF_THRESH, debug=False, save_snr_ss=False, save_gamma_ssi=True,
+                        red_amp=None, red_gamma=None, red2white=None, ss_noise=False, dsc_flag=False, nexcl_noise=0):
     """ Detect pspace model using individual sigma calibration for each realization
-
+    
     Parameters
     ----------
     fobs_cents : 1Darray
@@ -2426,10 +2446,10 @@ def detect_pspace_model_clbrt_pta(
     hc_bg : (F,R) NDarray
     npsrs : int
     nskies : int
-    hc_bg_noise " (F,R) NDarray or None
+    hc_bg_noise : (F,R) NDarray or None
         the background to use as single source noise, when normal hc_bg has extra SS added to it.
     red2white : scalar or None
-        Fixed ratio between red and white noise amplitude, if not None.
+        Fixed ratio between red and white noise amplitude, if not None. 
         Otherwise, red noise stays fixed
     nexcl_noise : int
         Number of loudest single sources to exclude from hc_rest noise, in addition
@@ -2439,7 +2459,6 @@ def detect_pspace_model_clbrt_pta(
     cad = 1.0/(2*fobs_cents[-1])
 
     nfreqs, nreals, nloudest = [*hc_ss.shape]
-
     if hc_bg_noise is None:
         hc_bg_noise=hc_bg
     elif debug:
@@ -2447,7 +2466,6 @@ def detect_pspace_model_clbrt_pta(
         if np.any(hc_bg_noise>hc_bg):
             err = f"hc_bg_noise excluding SS is somehow larger than hc_bg with SS added in!!"
             raise ValueError(err)
-
     # form arrays for individual realization detstats
     # set all to nan, only to be replaced if successful pta is found
     dp_ss = np.ones((nreals, nskies)) * np.nan
@@ -2458,8 +2476,8 @@ def detect_pspace_model_clbrt_pta(
     sigmas = np.ones((nreals)) * np.nan
 
 
-    # for each realization,
-    # use sigmin and sigmax from previous realization,
+    # for each realization, 
+    # use sigmin and sigmax from previous realization, 
     # unless it's the first realization of the sample
     _sigstart, _sigmin, _sigmax = sigstart, sigmin, sigmax
     if debug:
@@ -2473,8 +2491,7 @@ def detect_pspace_model_clbrt_pta(
                 print(f"{rr=}, {(now-real_dur)/100} s per realization, {_sigmin=:.2e}, {_sigmax=:.2e}, {_sigstart=:.2e}")
                 real_dur = now
 
-
-        # get calibrated psrs
+        # get calibrated psrs 
         psrs, red_amp, _sigstart, _sigmin, _sigmax = calibrate_one_pta(hc_bg[:,rr], hc_ss[:,rr,:], fobs_cents, npsrs, tol=tol, maxbads=maxbads,
                                     sigstart=_sigstart, sigmin=_sigmin, sigmax=_sigmax, debug=debug, ret_sig=True,
                                     red_amp=red_amp, red_gamma=red_gamma, red2white=red2white, ss_noise=ss_noise)
@@ -2485,11 +2502,14 @@ def detect_pspace_model_clbrt_pta(
         if psrs is None:
             failed_psrs += 1
             continue # leave values as nan, if no successful PTA was found
-
-
+        # print(f"before calculation: {utils.stats(psrs[0].toaerrs)=}, \n{utils.stats(hc_bg[rr])=},\
+        #         {utils.stats(fobs_cents)=}")
         # use those psrs to calculate realization detstats
         _dp_bg, _snr_bg = detect_bg_pta(psrs, fobs_cents, hc_bg[:,rr:rr+1],  hc_ss[:,rr:rr+1,:], ret_snr=True, red_amp=red_amp, red_gamma=red_gamma)
-
+        # print(f"{utils.stats(psrs[0].toaerrs)=}, {utils.stats(hc_bg[rr])=},\
+        #         {_dp_bg=},")
+        # _dp_bg,  = detect_bg_pta(psrs, fobs_cents, hc_bg=hc_bg[:,rr:rr+1], red_amp=red_amp, red_gamma=red_gamma) #, ret_snr=True)
+        # print(f"test2: {_dp_bg=}")
         dp_bg[rr], snr_bg[rr] = _dp_bg.squeeze(), _snr_bg.squeeze()
 
 
@@ -2534,7 +2554,6 @@ def detect_pspace_model_clbrt_pta(
     if debug:
         print(f"Model took {datetime.now() - mod_start} s, {failed_psrs}/{nreals} realizations failed.")
     return _dsdat
-
 
 def detect_pspace_model_clbrt_pta_gsc(
         fobs_cents, hc_ss, hc_bg, npsrs, nskies, hc_bg_noise=None,
@@ -2652,50 +2671,50 @@ def detect_pspace_model_clbrt_ramp(fobs_cents, hc_ss, hc_bg, npsrs, nskies, sigm
     """ Detect pspace model using individual red noise amplitude calibration for each realization
 
     NOTE: Not supported, not updated for including single sources as noise for BG.
-
+    
     """
     dur = 1.0/fobs_cents[0]
     cad = 1.0/(2*fobs_cents[-1])
 
     nfreqs, nreals, nloudest = [*hc_ss.shape]
-
+        
     # form arrays for individual realization detstats
     # set all to nan, only to be replaced if successful pta is found
-    dp_ss = np.ones((nreals, nskies)) * np.nan
+    dp_ss = np.ones((nreals, nskies)) * np.nan   
     dp_bg = np.ones(nreals) * np.nan
     snr_ss = np.ones((nfreqs, nreals, nskies, nloudest)) * np.nan
     snr_bg = np.ones((nreals)) * np.nan
     gamma_ssi = np.ones((nfreqs, nreals, nskies, nloudest)) * np.nan
 
-    # get psrs
+    # get psrs 
     phis = np.random.uniform(0, 2*np.pi, size = npsrs)
     thetas = np.random.uniform(np.pi/2, np.pi/2, size = npsrs)
     psrs = hsim.sim_pta(timespan=dur/YR, cad=1/(cad/YR), sigma=sigma,
                     phi=phis, theta=thetas)
 
-    # for each realization,
-    # use sigmin and sigmax from previous realization,
+    # for each realization, 
+    # use sigmin and sigmax from previous realization, 
     # unless it's the first realization of the sample
-    _rampstart, _rampmin, _rampmax = rampstart, rampmin, rampmax
-    if debug:
+    _rampstart, _rampmin, _rampmax = rampstart, rampmin, rampmax 
+    if debug: 
         mod_start = datetime.now()
         real_dur = datetime.now()
     failed_psrs=0
     for rr in range(nreals):
-        if debug:
+        if debug: 
             now = datetime.now()
             if (rr%10==0):
                 print(f"{rr=}, {now-real_dur} s per realization, {_rampmin=:.2e}, {_rampmax=:.2e}, {_rampstart=:.2e}")
             real_dur = now
 
-        # get calibrated psrs
+        # get calibrated psrs 
         ramp, _rampmin, _rampmax = calibrate_one_ramp(hc_bg[:,rr], fobs_cents, psrs,
                                     tol=tol, maxbads=maxbads,
-                                    rampstart=_rampstart, rampmin=_rampmin, rampmax=_rampmax, debug=debug,
+                                    rampstart=_rampstart, rampmin=_rampmin, rampmax=_rampmax, debug=debug, 
                                     rgam=red_gamma, ss_noise=ss_noise)
         _rampstart = ramp
         _rampmin /= 2
-        _rampmax *= 2 + 2e-50 # >1e-20 to make sure it doesnt immediately fail the 0 check
+        _rampmax *= 2 + 2e-50 # >1e-20 to make sure it doesnt immediately fail the 0 check 
 
         if ramp is None:
             failed_psrs += 1
@@ -2717,7 +2736,7 @@ def detect_pspace_model_clbrt_ramp(fobs_cents, hc_ss, hc_bg, npsrs, nskies, sigm
     ev_ss = expval_of_ss(gamma_ssi)
     df_ss, df_bg = detfrac_of_reals(dp_ss, dp_bg)
     _dsdat = {
-        'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi,
+        'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi, 
         'dp_bg':dp_bg, 'snr_bg':snr_bg,
         'df_ss':df_ss, 'df_bg':df_bg, 'ev_ss':ev_ss,
         }
@@ -2730,26 +2749,26 @@ def detect_pspace_model_clbrt_ramp(fobs_cents, hc_ss, hc_bg, npsrs, nskies, sigm
 
 
 
-def detect_pspace_model_clbrt_sigma(fobs_cents, hc_ss, hc_bg,
+def detect_pspace_model_clbrt_sigma(fobs_cents, hc_ss, hc_bg, 
                         npsrs, nskies, maxtrials=1):
     """ Detect pspace model using individual PTA calibration for each realization
-
+    
     """
     dur = 1.0/fobs_cents[0]
     cad = 1.0/(2*fobs_cents[-1])
 
     nfreqs, nreals, nloudest = [*hc_ss.shape]
-    # get calibrated sigmas
+    # get calibrated sigmas 
     sigmas, avg_dps, std_dps = calibrate_all_sigma(hc_bg, fobs_cents, npsrs, maxtrials=maxtrials)
-
+        
     # form arrays for individual realization detstats
-    dp_ss = np.zeros((nreals, nskies))
+    dp_ss = np.zeros((nreals, nskies))     
     dp_bg = np.zeros(nreals)
     snr_ss = np.zeros((nfreqs, nreals, nskies, nloudest))
     snr_bg = np.zeros((nreals))
     gamma_ssi = np.zeros((nfreqs, nreals, nskies, nloudest))
 
-    # for each realization, get individual detstats
+    # for each realization, get individual detstats   
     for rr in range(nreals):
             # get psrs for the given calibrated sigma
             psrs = _build_pta(npsrs, sigmas[rr], dur, cad)
@@ -2762,7 +2781,7 @@ def detect_pspace_model_clbrt_sigma(fobs_cents, hc_ss, hc_bg,
     ev_ss = expval_of_ss(gamma_ssi)
     df_ss, df_bg = detfrac_of_reals(dp_ss, dp_bg)
     _dsdat = {
-        'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi,
+        'dp_ss':dp_ss, 'snr_ss':snr_ss, 'gamma_ssi':gamma_ssi, 
         'dp_bg':dp_bg, 'snr_bg':snr_bg,
         'df_ss':df_ss, 'df_bg':df_bg, 'ev_ss':ev_ss,
         }
@@ -2770,15 +2789,15 @@ def detect_pspace_model_clbrt_sigma(fobs_cents, hc_ss, hc_bg,
 
 
 ########################################################################
-############################ Calibrate PTA #############################
+############################ Calibrate PTA ############################# 
 ########################################################################
 
-def binary_sigma_calibration(hc_bg, fobs, npsrs, maxtrials=2, debug=False,
+def binary_sigma_calibration(hc_bg, fobs, npsrs, maxtrials=2, debug=False, 
                           sig_start = 1e-6, sig_min = 1e-10, sig_max = 1e-3, ):
     """ Calibrate the PTA to a 50% target DP for a given model, average over many realizations
-
-    # BUG: This seems to get stuck on bad guesses, when requiring high max trials.
-    # TODO: Set up a check for bar guesses.
+    
+    # BUG: This seems to get stuck on bad guesses, when requiring high max trials. 
+    # TODO: Set up a check for bar guesses. 
     """
     dur = 1.0/fobs[0]
     cad = 1.0/(2*fobs[-1])
@@ -2791,7 +2810,7 @@ def binary_sigma_calibration(hc_bg, fobs, npsrs, maxtrials=2, debug=False,
         avg_dp, std_dp = _get_dpbg(hc_bg, npsrs=npsrs, sigma=sigma, trials=trials,
                           fobs=fobs, dur=dur, cad=cad)
         if debug: print(f"{avg_dp=}, {sigma=}, {sig_min=}, {sig_max=}, {trials=}")
-
+        
         # if we're close, raise the number of trials
         if avg_dp>0.4 and avg_dp<0.5:
             if trials == maxtrials:
@@ -2804,7 +2823,7 @@ def binary_sigma_calibration(hc_bg, fobs, npsrs, maxtrials=2, debug=False,
             sigma = np.mean([sig_min, sig_max])
         elif avg_dp<=0.49: # avg_dp too low, decrease sigma
             sig_max = sigma
-            sigma = np.mean([sig_min, sig_max])
+            sigma = np.mean([sig_min, sig_max])     
     return sigma, avg_dp, std_dp
 
 def _get_dpbg(hc_bg, npsrs, sigma, trials, fobs, dur, cad,):
@@ -2824,7 +2843,7 @@ def _get_dpbg(hc_bg, npsrs, sigma, trials, fobs, dur, cad,):
     std_dp = np.std(all_dp)
     return avg_dp, std_dp
 
-def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials,
+def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials, 
                          sig_start=1e-6, sig_min=1e-9, sig_max=1e-4, debug=False):
     """ Calibrate the PTA independently for each background realizations
 
@@ -2853,17 +2872,15 @@ def calibrate_all_sigma(hc_bg, fobs, npsrs, maxtrials,
         hc_bg_rr = hc_bg[:,rr:rr+1]
         # print(hc_bg_rr.shape)
         rsigmas[rr], avg_dps[rr], std_dps[rr] = binary_sigma_calibration(
-            hc_bg_rr, fobs, npsrs, maxtrials, debug=debug,
-            sig_start = sig_start, sig_min=sig_min, sig_max=sig_max,
+            hc_bg_rr, fobs, npsrs, maxtrials, debug=debug, 
+            sig_start = sig_start, sig_min=sig_min, sig_max=sig_max, 
         )
     return rsigmas, avg_dps, std_dps
-
 
 def _red_amp_from_white_noise(cad, sigma, red2white, fref=1/YR):
     red_amp = np.sqrt(12 * np.pi**2 * fref**3 *
                       red2white * _white_noise(cad, sigma))
     return red_amp
-
 def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs,
                       sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
                       phis=None, thetas=None, ret_sig = False, red_amp=None, red_gamma=None, red2white=None,
@@ -2931,7 +2948,7 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs,
         if (nfar>5*maxbads  # if we've had many bad guesses
             or (sigmin/sigmax > 0.99 # or our range is small and we are far from the goal
                 and (dp_bg<0.4 or dp_bg>0.6))):
-
+            
             # then we must expand the range
             if debug: print(f"STUCK! {nfar=}, {dp_bg=}, {sigmin=:e}, {sigmax=:e}")
             if dp_bg < 0.5-tol: # stuck way too low, allow much lower sigmin to raise DP
@@ -2950,7 +2967,7 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs,
         else:
             nclose += 1 # check how many attempts between 0.49 and 0.51 fail
 
-        # check if we are stuck near the goal value with a bad range
+        # check if we are stuck near the goal value with a bad range    
         if nclose>maxbads: # if many fail, we're stuck; expand sampling range
             if debug: print(f"{nclose=}, {dp_bg=}, {sigmin=:e}, {sigmax=:e}")
             sigmin = sigmin/3
@@ -2969,7 +2986,6 @@ def calibrate_one_pta(hc_bg, hc_ss, fobs, npsrs,
     if ret_sig:
         return psrs, red_amp, sigma, sigmin, sigmax
     return psrs
-
 
 def calibrate_one_pta_gsc(hc_bg, fobs, npsrs,
                       sigstart=1e-6, sigmin=1e-9, sigmax=1e-4, debug=False, maxbads=20, tol=0.03,
@@ -3083,7 +3099,7 @@ def calibrate_one_pta_gsc(hc_bg, fobs, npsrs,
     if ret_sig:
         return psrs, red_amp, sigma, sigmin, sigmax, spectra, noise_gsc
     return psrs, red_amp
-
+    
 
 def calibrate_one_ramp(hc_bg, hc_ss, fobs, psrs,
                       rampstart=1e-6, rampmin=1e-9, rampmax=1e-4, debug=False, maxbads=20, tol=0.03,
@@ -3140,7 +3156,7 @@ def calibrate_one_ramp(hc_bg, hc_ss, fobs, psrs,
         if (nfar>5*maxbads  # if we've had many bad guesses
             or (rampmin/rampmax > 0.99 # or our range is small and we are far from the goal
                 and (dp_bg<0.4 or dp_bg>0.6))):
-
+            
             # then we must expand the range
             if debug: print(f"STUCK! {nfar=}, {dp_bg=}, {rampmin=:e}, {rampmax=:e}")
             if dp_bg < 0.5-tol: # stuck way too low, allow much lower sigmin to raise DP
@@ -3176,7 +3192,6 @@ def calibrate_one_ramp(hc_bg, hc_ss, fobs, psrs,
     # print(f"in calibration: {utils.stats(psrs[0].toaerrs)=}, \n{utils.stats(hc_bg)=},\
     #             {utils.stats(fobs)=}, {dp_bg=}")
     return ramp, rampmin, rampmax
-
 
 
 ########################################################################

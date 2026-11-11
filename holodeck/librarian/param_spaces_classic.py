@@ -1,4 +1,13 @@
 """'Classic' parameter spaces used in the NANOGrav 15yr analysis.
+
+15yr Astrophysics Analysis
+https://ui.adsabs.harvard.edu/abs/2023ApJ...952L..37A/abstract
+
+Notes
+-----
+[1] : The 15yr Astro paper quotes an initial separation (the `hard_sepa_init`) variable of "1e3 pc",
+      this is incorrect and the actual value used in the analysis was 1e4 pc.
+
 """
 
 from holodeck.constants import PC, GYR
@@ -178,8 +187,10 @@ class _PS_Classic_GWOnly(_Param_Space):
         parameters = [
             PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
             PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
-            PD_Uniform("mmb_mamp_log10", +7.5, +9.5),   # [log10(Msol)]
-            PD_Uniform("mmb_scatter_dex", +0.0, +1.2),
+
+            PD_Uniform("mmb_mamp_log10", +7.6, +9.0),   # [log10(Msol)]
+            PD_Uniform("mmb_scatter_dex", +0.0, +0.9),
+
         ]
         super().__init__(
             parameters,
@@ -189,6 +200,7 @@ class _PS_Classic_GWOnly(_Param_Space):
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
+
         gndf = sams.GSMF_Schechter(
             phi0=params['gsmf_phi0_log10'],
             phiz=params['gsmf_phiz'],
@@ -239,8 +251,9 @@ class PS_Classic_GWOnly_Uniform(_PS_Classic_GWOnly):
         parameters = [
             PD_Uniform("gsmf_phi0_log10", -3.5, -1.5),
             PD_Uniform("gsmf_mchar0_log10", 10.5, 12.5),   # [log10(Msol)]
-            PD_Uniform("mmb_mamp_log10", +7.5, +9.5),   # [log10(Msol)]
-            PD_Uniform("mmb_scatter_dex", +0.0, +1.2),
+            PD_Uniform("mmb_mamp_log10", +7.6, +9.0),   # [log10(Msol)]
+            PD_Uniform("mmb_scatter_dex", +0.0, +0.9),
+
         ]
         _Param_Space.__init__(
             self, parameters,
@@ -280,7 +293,7 @@ class PS_Classic_GWOnly_Astro_Extended(_PS_Classic_GWOnly):
         return
 
 
-class PS_Test(_PS_Classic_Phenom):
+class PS_Classic_Test(_PS_Classic_Phenom):
     """Simple test parameter space in 2D.
     """
 
@@ -299,10 +312,9 @@ class PS_Test(_PS_Classic_Phenom):
 
 
 _param_spaces_dict = {
-    "PS_Test": PS_Test,
+    "PS_Classic_Test": PS_Classic_Test,
     "PS_Classic_Phenom_Uniform": PS_Classic_Phenom_Uniform,    # PS_Uniform_09B
     "PS_Classic_Phenom_Astro_Extended": PS_Classic_Phenom_Astro_Extended,
     "PS_Classic_GWOnly_Uniform": PS_Classic_GWOnly_Uniform,
     "PS_Classic_GWOnly_Astro_Extended": PS_Classic_GWOnly_Astro_Extended,
 }
-

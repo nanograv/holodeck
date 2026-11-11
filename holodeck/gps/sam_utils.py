@@ -360,7 +360,6 @@ class PS_Circ_01(SamModel):
                                                   progress=False)
         return sam, hard
 
-
 class Broad_Uniform_02B(SamModel):
     _PARAM_NAMES = [
         'hard_time',
@@ -369,10 +368,8 @@ class Broad_Uniform_02B(SamModel):
         'mmb_amp_log10',
         'mmb_scatter',
     ]
-
     def __init__(self, param_names=_PARAM_NAMES):
         super().__init__(param_names=param_names)
-
     def sam_for_params(self, env_pars, sam_shape):
         hard_gamma_inner = -1.0
         hard_rchar = 10.0 * PC

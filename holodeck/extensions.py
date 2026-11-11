@@ -12,7 +12,6 @@ from holodeck.sams import sam_cyutils
 PSPACE = holo.librarian.param_spaces_classic.PS_Classic_Phenom_Uniform
 
 
-
 class Realizer:
 
     def __init__(self, fobs_orb_edges, resample=None, lifetime=2*GYR, dens=None, **mmbulge_kwargs):
@@ -60,7 +59,6 @@ class Realizer:
         weights = self._binary_weights
         samples = evo._sample_universe__resample(fobs_orb_edges, vals, weights, down_sample)
         return names, samples
-
 
 class Realizer_SAM:
     def __init__(

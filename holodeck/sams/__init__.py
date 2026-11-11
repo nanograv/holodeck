@@ -12,10 +12,10 @@ in the :mod:`holodeck.hardening` module.
 
 """
 
-from . import sam                              # noqa
-from . import components                            # noqa
-from .sam import Semi_Analytic_Model           # noqa
-from .components import (                           # noqa
+from . import sam
+from . import components
+from .sam import Semi_Analytic_Model
+from .components import (
     GSMF_Schechter, GSMF_Double_Schechter,
     VDF_Modified_Schechter,
     GPF_Power_Law,
@@ -23,3 +23,4 @@ from .components import (                           # noqa
     GMR_Illustris,
     GMR_SDSS,
 )
+

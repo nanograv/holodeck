@@ -23,6 +23,14 @@ distribution, and to calculate GW signatures.
 The step of going from a number-density of binaries in $(M, q, z)$ space, to also the distribution
 in $a$ or $f$ is subtle, as it requires modeling the binary evolution (i.e. hardening rate).
 
+<<<<<<< HEAD
+=======
+
+To-Do (sam.py)
+--------------
+* Allow SAM class to take M-sigma in addition to M-Mbulge.
+
+>>>>>>> upstream/dev
 References
 ----------
 * [Sesana2008]_ Sesana, Vecchio, Colacino 2008.
@@ -42,6 +50,7 @@ import holodeck as holo
 from holodeck import cosmo, utils, log
 from holodeck.constants import SPLC, MSOL, KMPERSEC, MPC, GYR
 from holodeck import host_relations, single_sources
+from . import sam_cyutils
 from holodeck.sams.components import (
     _Galaxy_Pair_Fraction, _Galaxy_Number_Density_Function, _Galaxy_Merger_Time, _Galaxy_Merger_Rate,
     GSMF_Schechter, VDF_Modified_Schechter, GPF_Power_Law, GMT_Power_Law, GMR_Illustris
@@ -185,8 +194,9 @@ class Semi_Analytic_Model:
                 err = "Can only use one of `gpf` and `gmr`!"
                 log.exception(err)
                 raise ValueError(err)
-
             log.info("Galaxy pair-fraction provided, using galaxy pair-fraction and merger-time.")
+            # gpf = utils.get_subclass_instance(gpf, None, _Galaxy_Pair_Fraction)
+            # gmt = utils.get_subclass_instance(gmt, None, _Galaxy_Merger_Time)
             gmt = utils.get_subclass_instance(gmt, GMT_Power_Law, _Galaxy_Merger_Time)
             gpf = utils.get_subclass_instance(gpf, GPF_Power_Law, _Galaxy_Pair_Fraction)
 
@@ -232,9 +242,8 @@ class Semi_Analytic_Model:
         self._density = None          #: Binary comoving number-density
         self._shape = None            #: Shape of the parameter-space domain (mtot, mrat, redz)
         self._redz_prime = None       #: redshift following galaxy merger process
-        #: GMT timescale of galaxy mergers [sec], set in `static_binary_density`
+        #: GMT timescale of galaxy mergers [sec], set in 'static_binary_density'
         self._gmt_time = None
-
         return
 
     @property
@@ -264,6 +273,7 @@ class Semi_Analytic_Model:
         # total-mass, mass-ratio ==> (M1, M2)
         masses = utils.m1m2_from_mtmr(self.mtot[:, np.newaxis], self.mrat[np.newaxis, :])
         # BH-masses to stellar-masses
+        #masses = self._mmbulge.mstar_from_mbh(masses, scatter=False)
         mbh_pri = masses[0]
         mbh_sec = masses[1]
         args = [mbh_pri[..., np.newaxis], mbh_sec[..., np.newaxis], redz]
@@ -280,6 +290,7 @@ class Semi_Analytic_Model:
         # # Convert to shape (M, Q, Z)
         # mstar_rat = np.broadcast_arrays(*args)
         return mstar_pri, mstar_rat, mstar_tot, redz
+        #return masses
 
     def velocity_dispersions(self):
         """Calculate velocity dispersions for each MBH based on the Mbh-host relation.
@@ -341,7 +352,16 @@ class Semi_Analytic_Model:
 
             # ---- convert from MBH ===> mstar
 
+            # `mstar_tot` starts as the secondary mass, sorry
+            # mstar_pri, mstar_tot = self.mass_stellar()
+            # # q = m2 / m1
+            # mstar_rat = mstar_tot / mstar_pri
+            # # M = m1 + m2
+            # mstar_tot = mstar_pri + mstar_tot
             redz = self.redz[np.newaxis, np.newaxis, :]
+            #args = [mstar_pri[..., np.newaxis], mstar_rat[..., np.newaxis], mstar_tot[..., np.newaxis], redz]
+            # Convert to shape (M, Q, Z)
+            #mstar_pri, mstar_rat, mstar_tot, redz = np.broadcast_arrays(*args)
             mstar_pri, mstar_rat, mstar_tot, redz = self.mass_stellar()
 
             # choose whether the primary mass, or total mass, is used in different calculations
@@ -1839,7 +1859,11 @@ class Semi_Analytic_Model:
             # so far we have ``dn_gal / [dlog10(M_gal) dq_gal dz]``
 
             # dn / [dM dq dz] = (dn_gal / [dM_gal dq_gal dz]) * (dM_gal/dM_bh) * (dq_gal / dq_bh)
+<<<<<<< HEAD
             mplaw = self._relation._mplaw
+=======
+            mplaw = self._mmbulge._mplaw * (1.0 + redz)**self._mmbulge._zplaw_slope
+>>>>>>> upstream/dev
             dqbh_dqgal = mplaw * np.power(mstar_rat, mplaw - 1.0)
             # (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) = (dMstar-pri / dMstar-tot) * (dMstar-tot/dMbh-tot)
             # ==> (dMstar-tot/dMbh-tot) = (dMstar-pri / dMbh-pri) * (dMbh-pri/dMbh-tot) / (dMstar-pri / dMstar-tot)
@@ -1860,11 +1884,20 @@ class Semi_Analytic_Model:
                 dens *= (self.mtot[:, np.newaxis, np.newaxis] / mstar_tot) * (dmstar_dmbh / dqbh_dqgal)
 
             # ---- Add scatter from the M-Mbulge relation
+<<<<<<< HEAD
 
             scatter = self._relation._scatter_dex
+=======
+            
+            zplaw_scatter = getattr(self._mmbulge, '_zplaw_scatter', 0)
+            scatter = self._mmbulge._scatter_dex + zplaw_scatter * np.log10(1 + redz)
+            scatter = scatter[-1][-1]
+                
+>>>>>>> upstream/dev
             log.debug(f"mmbulge scatter = {scatter}")
-            if scatter > 0.0:
-                log.info(f"Adding MMbulge scatter ({scatter:.4e})")
+            if scatter[0] > 0.0:
+                # log.info(f"Adding MMbulge scatter ({scatter[0]:.4e})")
+                log.info(f"Adding MMbulge scatter ({', '.join(f'{ww:.4e}' for ww in scatter)})")
                 log.info(f"\tdens bef: ({utils.stats(dens)})")
                 dur = datetime.now()
                 mass_bef = self._integrated_binary_density(dens, sum=True)
@@ -1960,7 +1993,7 @@ class Semi_Analytic_Model:
 
         return grid, dnum, redz_final
 
-    def _dynamic_binary_number_at_fobs_consistent(self, hard, fobs_orb, steps=200, details=False):
+    def _dynamic_binary_number_at_fobs_consistent(self, hard, fobs_orb, steps=300, details=False):
         r"""Calculate the differential number of binaries in at each grid point, at each frequency.
 
         See :meth:`dynamic_binary_number_at_fobs` for general information.
@@ -1998,7 +2031,6 @@ class Semi_Analytic_Model:
         # (M, S)  <==  (M,1) * (1,S)
         rads = extr[0][:, np.newaxis] + (extr[1] - extr[0])[:, np.newaxis] * rads
         rads = 10.0 ** rads
-
         # ---- Calculate binary hardening rate (da/dt) at each separation, for each grid point
 
         # broadcast arrays to a consistent shape
@@ -2011,7 +2043,6 @@ class Semi_Analytic_Model:
         )
         # calculate hardening rate (negative values, in units of [cm/s])
         dadt_evo = hard.dadt(mt, mr, rads, norm=norm)
-
         # ---- Integrate evolution
         # to find times and redshifts at which binaries reach each separation
 
@@ -2052,6 +2083,11 @@ class Semi_Analytic_Model:
         #! ---------------------------------------------------------------- !#
 
         # ---- interpolate to target frequencies
+        # Combine the binary-evolution time, with the galaxy-merger time
+        # (M, Q, Z, S-1)
+        # rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis]
+        # times_tot = times_evo[:, :, np.newaxis, :] + self._gmt_time[:, :, :, np.newaxis]
+        # redz_evo = utils.redz_after(times_tot, redz=rz)
 
         # convert from separations to rest-frame orbital frequencies
         # (M, Q, S)
@@ -2061,13 +2097,17 @@ class Semi_Analytic_Model:
 
         # (M, Q, Z, S)  ==>  (M*Q*Z, S)
         fobs_orb_evo, redz_evo = [tt.reshape(-1, steps+1) for tt in [fobs_orb_evo, redz_evo]]
+
+        # ---- interpolate to target frequencies
         # `ndinterp` interpolates over 1th dimension
+
+        # (M, Q, Z, S-1)  ==>  (M*Q*Z, S-1)
+        #fobs_orb_evo, redz_evo = [mm.reshape(-1, steps-1) for mm in [fobs_orb_evo[:, :, :, 1:], redz_evo]]
         # (M*Q*Z, X)
         redz_final = utils.ndinterp(fobs_orb, fobs_orb_evo, redz_evo, xlog=True, ylog=False)
 
-        # (M, Q, Z, X)  <===  (M*Q*Z, X)
+      # (M, Q, Z, X)  <===  (M*Q*Z, X)
         redz_final = redz_final.reshape(self.shape + (fobs_orb.size,))
-
         coal = (redz_final > 0.0)
         frst_orb = fobs_orb * (1.0 + redz_final)
         frst_orb[frst_orb < 0.0] = 0.0
@@ -2126,6 +2166,7 @@ class Semi_Analytic_Model:
             rz = self._redz_prime[..., np.newaxis] * np.ones(new_shape)
         else:
             rz = self.redz[np.newaxis, np.newaxis, :, np.newaxis] * np.ones(new_shape)
+        #rz = self._redz_prime[..., np.newaxis] * np.ones(new_shape)
         coal = (rz > 0.0)
 
         dc = cosmo.comoving_distance(rz[coal]).to('Mpc').value
@@ -2139,7 +2180,7 @@ class Semi_Analytic_Model:
         # (Z,) this is `(dVc/dz) * (dz/dt)` in units of [Mpc^3/s]
         cosmo_fact = 4 * np.pi * (SPLC/MPC) * np.square(dc) * (1.0 + rz[coal])
 
-        # broadcast to full shape, then take coalescing elements
+       # broadcast to full shape, then take coalescing elements
         # (M,) ==> (M, 1, 1, 1)
         mt = self.mtot[:, np.newaxis, np.newaxis, np.newaxis]
         risco = risco[:, np.newaxis, np.newaxis, np.newaxis]
@@ -2150,7 +2191,6 @@ class Semi_Analytic_Model:
 
         # Convert from observer-frame orbital freq, to rest-frame orbital freq
         sa = utils.kepler_sepa_from_freq(mt, fro)
-
         # (C,), hardening rate, negative values, units of [cm/sec]
         args = [mt, mr, sa]
         dadt = hard.dadt(*args)
@@ -2167,6 +2207,7 @@ class Semi_Analytic_Model:
         coal[coal] = coal[coal] & live
 
         dnum[coal] = (dens[..., np.newaxis] * np.ones(new_shape))[coal] * cosmo_fact[live] * tau[live]
+        #dnum[coal] = (dens[..., np.newaxis] * np.ones(new_shape))[coal] * cosmo_fact * tau
 
         return edges, dnum, rz
 
@@ -2279,13 +2320,28 @@ class Semi_Analytic_Model:
 
         return edges, dnum, redz_final
 
-    def gwb_new(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100):
+    def gwb_new(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100,
+                enforce_physical_hard_params=False):
         """Calculate GWB using new cython implementation, 10x faster!
         """
         from . import sam_cyutils
 
-        assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
+        #assert isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW))
+        if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, 
+                                 holo.hardening.FixedOuterTime_InnerPL_SAM, 
+                                 holo.hardening.Hard_GW)):
+            err = (
+                "`sam_cyutils` methods only work with `Fixed_Time_2PL_SAM`, "
+                "`FixedOuterTime_InnerPL_SAM`, or `Hard_GW` hardening models!  "
+                "Use `gwb_only` for alternative classes!"
+            )
+            self._log.exception(err)
+            raise ValueError(err)
 
+        # check whether hardening params are physical
+        # (only implemented for FixedOuterTime_InnerPL_SAM hardening model)
+        self._check_physical_hard_params(hard, fobs_gw_edges, enforce_physical_hard_params)
+            
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
 
         # convert to orbital-frequency (from GW-frequency)
@@ -2341,6 +2397,11 @@ class Semi_Analytic_Model:
         """
         redz = self.redz[np.newaxis, np.newaxis, :]
         mstar_pri, mstar_rat, mstar_tot, redz = self.mass_stellar()
+        # mstar_pri, mstar_tot = self.mass_stellar()
+        # # q = m2 / m1
+        # mstar_rat = mstar_tot / mstar_pri
+        # # M = m1 + m2
+        # mstar_tot = mstar_pri + mstar_tot
 
         # default to using `redz_prime` values if a GMT instance is stored
         if redz_prime is None:
@@ -2351,7 +2412,12 @@ class Semi_Analytic_Model:
             raise AttributeError(err)
 
         rz = self.redz
+        #rz = rz[np.newaxis, np.newaxis, :]
         if redz_prime:
+            #args = [mstar_pri[..., np.newaxis], mstar_rat[..., np.newaxis], mstar_tot[..., np.newaxis], rz]
+            # Convert to shape (M, Q, Z)
+            #mstar_pri, mstar_rat, mstar_tot, rz = np.broadcast_arrays(*args)
+
             gmt_mass = mstar_tot if GMT_USES_MTOT else mstar_pri
             rz, _ = self._gmt.zprime(gmt_mass, mstar_rat, rz)
             print(f"{self} :: {utils.stats(rz)=}")
@@ -2364,7 +2430,8 @@ class Semi_Analytic_Model:
         gwb = holo.gravwaves.gwb_ideal(fobs_gw, ndens, mt, mr, rz, dlog10=True, sum=sum)
         return gwb
 
-    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100, loudest=1, params=False):
+    def gwb(self, fobs_gw_edges, hard=holo.hardening.Hard_GW(), realize=100, loudest=1, params=False,
+           enforce_physical_hard_params=False):
         """Calculate the (smooth/semi-analytic) GWB and CWs at the given observed GW-frequencies.
 
         Parameters
@@ -2382,6 +2449,9 @@ class Semi_Analytic_Model:
             Number of loudest single sources to distinguish from the background.
         params : Boolean
             Whether or not to return astrophysical parameters of the binaries.
+        enforce_physical_hard_params : Boolean
+            If True and if hard is instance of FixedOuterTime_InnerPL_SAM, raise error
+            if hardening model params are not physical (default: False)
 
         Returns
         -------
@@ -2398,18 +2468,24 @@ class Semi_Analytic_Model:
             final redshift, final comoving distance, final separation, final angular separation)
             for background sources at each frequency and realization,
             Returned only if params = True.
-
         """
         from . import sam_cyutils
 
-        if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, holo.hardening.Hard_GW)):
+        if not isinstance(hard, (holo.hardening.Fixed_Time_2PL_SAM, 
+                                 holo.hardening.FixedOuterTime_InnerPL_SAM, 
+                                 holo.hardening.Hard_GW)):
             err = (
-                "`sam_cyutils` methods only work with `Fixed_Time_2PL_SAM` or `Hard_GW` hardening models!  "
+                "`sam_cyutils` methods only work with `Fixed_Time_2PL_SAM`, "
+                "`FixedOuterTime_InnerPL_SAM`, or `Hard_GW` hardening models!  "
                 "Use `gwb_only` for alternative classes!"
             )
             self._log.exception(err)
             raise ValueError(err)
 
+        # check whether hardening params are physical
+        # (only implemented for FixedOuterTime_InnerPL_SAM hardening model)
+        self._check_physical_hard_params(hard, fobs_gw_edges, enforce_physical_hard_params)
+                
         fobs_gw_cents = kale.utils.midpoints(fobs_gw_edges)
 
         # convert to orbital-frequency (from GW-frequency)
@@ -2516,7 +2592,8 @@ class Semi_Analytic_Model:
         fisco_rst = utils.kepler_freq_from_sepa(mt, risco)
         fisco = fisco_rst / (1.0 + redz_final)
 
-        dc = cosmo.z_to_dcom(redz_final)
+        dc = np.ones_like(redz_final) * np.nan
+        dc[valid] = cosmo.z_to_dcom(redz_final[valid])
         hs = utils.gw_strain_source(mc, dc, fisco_rst)
         dadt = utils.gw_hardening_rate_dadt(m1, m2, risco)
         dfdt, _ = utils.dfdt_from_dadt(dadt, risco, mtot=mt, frst_orb=fisco_rst)
@@ -2564,7 +2641,6 @@ class Semi_Analytic_Model:
         integ = 0.5 * (integ[:, :-1, :] + integ[:, 1:, :]) * dq[np.newaxis, :, np.newaxis]
 
         return integ
-
     def _ndens_gal(self, mass_gal, mrat_gal, redz):
         if GNDF_USES_MTOT or GPF_USES_MTOT or GMT_USES_MTOT:
             self._log.warning("{self.__class__}._ndens_gal assumes that primary mass is used for GNDF, GPF and GMT!")
@@ -2581,7 +2657,11 @@ class Semi_Analytic_Model:
         # this is  d^3 n / [dlog10(M_gal-pri) dq_gal dz]
         nd_gal = self._ndens_gal(mass_gal, mrat_gal, redz)
 
+<<<<<<< HEAD
         mplaw = self._relation._mplaw
+=======
+        mplaw = self._mmbulge._mplaw * (1.0 + redz)**self._mmbulge._zplaw_slope
+>>>>>>> upstream/dev
         dqbh_dqgal = mplaw * np.power(mrat_gal, mplaw - 1.0)
 
         dmstar_dmbh__pri = self._relation.dmstar_dmbh(mass_gal)   # [unitless]
@@ -2605,7 +2685,70 @@ class Semi_Analytic_Model:
             integ = integ.sum()
         return integ
 
+    def _check_physical_hard_params(self, hard, freq_edges, enforce):
+        """
+        Check whether hardening model parameters are physical using `hard._params_allowed`.
 
+        Raises an error if enforce=True or a warning otherwise. Implemented only for 
+        FixedOuterTime_InnerPL_SAM hardening method.
+        
+        Parameters
+        ----------
+        hard : `_Hardening` subclass instance
+        enforce : bool
+
+        Returns
+        -------
+        none.
+        """
+        
+        if enforce:
+            if isinstance(hard, holo.hardening.FixedOuterTime_InnerPL_SAM):
+                if (hard._fobs_min) is None or (hard._fobs_min > freq_edges.min()):
+                    err = (
+                        f"Hardening model has invalid _fobs_min={hard._fobs_min}!" 
+                        f"Must be <= {freq_edges.min()}"
+                    )
+                    log.error(err)
+                    raise ValueError(err)
+                if np.any(hard._params_allowed==False):
+                    err = f"Invalid hardening model!"
+                    log.error(err)
+                    raise ValueError(err)
+            else:
+                log.warning(
+                    f"Enforcement of physical hardening params not implemented for "
+                    f"hardening model type {hard.__class__.__name__}."
+                )
+        else:
+            if isinstance(hard, holo.hardening.FixedOuterTime_InnerPL_SAM):
+                if hard._fobs_min is None or hard._fobs_min > freq_edges.min():
+                    warn = (
+                        f"Hardening model has invalid _fobs_min={hard._fobs_min}! "
+                        f"Must be <= {freq_edges.min()}. "
+                        f"This model should not be used for GWB calculations!"
+                    )
+                    log.warning(warn)
+                if np.any(hard._params_allowed==False):
+                    log.warning(
+                        "Invalid hardening params, but enforce_physical_hard_params=False. "
+                        "This model should not be used for GWB calculations!"
+                    )
+            else:
+                log.warning(
+                    f"Check for physical hardening params not implemented for "
+                    f"hardening model type {hard.__class__.__name__}."
+                )
+                pass
+
+    @utils.deprecated_fail("`dynamic_binary_number_at_fobs` or `sam_cyutils.dynamic_binary_number_at_fobs`")
+    def dynamic_binary_number(self, *args, **kwargs):
+        pass
+
+    @utils.deprecated_fail("`gwb_new`")
+    def new_gwb(self, *args, **kwargs):
+        pass
+            
 # ===========================================
 # ====    Evolution & Utility Methods    ====
 # ===========================================
@@ -2787,14 +2930,11 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
     """Add the given scatter to masses m1 and m2, for the given distribution of binaries.
 
     The procedure is as follows (see `dev-notebooks/sam-ndens-scatter.ipynb`):
-
-    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.  A 2nd
-          order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
+    * (1) The density is first interpolated to a uniform, regular grid in (m1, m2) space.
+          A 2nd-order interpolant is used first.  A 0th-order interpolant is used to fill-in bad values.
           In-between, a 1st-order interpolant is used if `linear_interp_backup` is True.
-
-    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2)
-          to account for scatter.
-
+    * (2) The density distribution is convolved with a smoothing function along each axis (m1, m2) to
+          account for scatter.
     * (3) The new density distribution is interpolated back to the original (mtot, mrat) grid.
 
     Parameters
@@ -2827,7 +2967,6 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
 
     assert np.ndim(dens) == 3
     assert np.shape(dens)[:2] == (mtot.size, mrat.size)
-    dist = sp.stats.norm(loc=0.0, scale=scatter)
     output = np.zeros_like(dens)
 
     # Get the primary and secondary masses corresponding to these total-mass and mass-ratios
@@ -2849,9 +2988,10 @@ def add_scatter_to_masses(mtot, mrat, dens, scatter, refine=4, log=None):
     # Interpolate from irregular m1m2 space (based on mtmr space), into regular m1m2 grid
     numz = np.shape(dens)[2]
     dlay = None
-    weights = utils._get_rolled_weights(mgrid_log10, dist)
-
+    
     for ii in range(numz):
+        dist = sp.stats.norm(loc=0.0, scale=scatter[ii])
+        weights = utils._get_rolled_weights(mgrid_log10, dist)
         dens_redz = dens[:, :, ii]
         if dlay is None:
             points = m1m2_on_mtmr_grid

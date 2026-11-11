@@ -16,7 +16,7 @@ from scipy.optimize.cython_optimize cimport brentq
 from libc.stdio cimport printf, fflush, stdout
 from libc.stdlib cimport malloc, free
 # make sure to use c-native math functions instead of python/numpy
-from libc.math cimport pow, sqrt, M_PI, NAN, log10, sin, cos
+from libc.math cimport pow, sqrt, M_PI, NAN, log10, sin, cos, log
 
 import holodeck as holo
 from holodeck.cyutils cimport interp_at_index, _interp_between_vals
@@ -27,9 +27,9 @@ from holodeck.cyutils cimport interp_at_index, _interp_between_vals
 
 # ---- Define Constants
 
-cdef double MY_NWTG = 6.6742999e-08
+cdef double MY_NWTG = 6.674299999999999e-08
 cdef double MY_SPLC = 29979245800.0
-cdef double MY_MPC = 3.08567758e+24
+cdef double MY_MPC = 3.0856775814913674e+24
 cdef double MY_MSOL = 1.988409870698051e+33
 cdef double MY_YR = 31557600.0
 cdef double MY_SCHW = 1.4852320538237328e-28     #: Schwarzschild Constant  2*G/c^2  [cm]
@@ -40,7 +40,7 @@ cdef double MY_GYR = MY_YR * 1.0e9
 cdef double KEPLER_CONST_FREQ = (1.0 / (2.0*M_PI)) * sqrt(MY_NWTG)
 cdef double KEPLER_CONST_SEPA = pow(MY_NWTG, 1.0/3.0) / pow(2.0*M_PI, 2.0/3.0)
 cdef double FOUR_PI_SPLC_OVER_MPC = 4 * M_PI * MY_SPLC / MY_MPC
-
+cdef double MY_RGRV = MY_NWTG / (MY_SPLC*MY_SPLC)
 
 @cython.cdivision(True)
 cpdef double hard_gw(double mtot, double mrat, double sepa):
@@ -120,19 +120,16 @@ def integrate_differential_number_3dx1d(edges, dnum):
     mtot is integrated over `log10(mtot)` and frequency is integrated over `ln(f)`.
 
     Note on array shapes:
-
-    * input  `dnum` is shaped (M, Q, Z, F)
-    * input  `edges` must be (4,) of array_like of lengths:  M, Q, Z, F+1
-    * output `numb` is shaped (M-1, Q-1, Z-1, F)
+    input  `dnum` is shaped (M, Q, Z, F)
+    input  `edges` must be (4,) of array_like of lengths:  M, Q, Z, F+1
+    output `numb` is shaped (M-1, Q-1, Z-1, F)
 
     Arguments
     ---------
     edges : (4,) array_like  w/ lengths M, Q, Z, F+1
-        Grid edges of `mtot`, `mrat`, `redz`, and `freq`.  NOTE:
-
-        * `mtot` should be passed as regular `mtot`, NOT log10(mtot)
-        * `freq` should be passed as regular `freq`, NOT    ln(freq)
-
+        Grid edges of `mtot`, `mrat`, `redz`, and `freq`
+        NOTE: `mtot` should be passed as regular `mtot`, NOT log10(mtot)
+              `freq` should be passed as regular `freq`, NOT    ln(freq)
     dnum : (M, Q, Z, F)
         Differential number of binaries, dN/[dlog10M dq qz dlnf] where 'N' is in units of dimensionless number.
 
@@ -144,10 +141,9 @@ def integrate_differential_number_3dx1d(edges, dnum):
 
     # each edge should have the same length as the corresponding dimension of `dnum`
     shape = [len(ee) for ee in edges]
-    err = f"Shape of edges={shape} does not match dnum={np.shape(dnum)}"
     # except the last edge (freq), where `dnum` should be 1-shorter
     shape[-1] -= 1
-    assert np.shape(dnum) == tuple(shape), err
+    assert np.shape(dnum) == tuple(shape)
     # the number will be shaped as one-less the size of each dimension of `dnum`
     new_shape = [sh-1 for sh in dnum.shape]
     # except for the last dimension (freq) which is the same shape
@@ -214,6 +210,85 @@ cdef void _integrate_differential_number_3dx1d(
                     numb[mm, qq, zz, ff] = temp * dmdqdz * dln_freq[ff] / 8.0
 
     return
+
+
+# ==================================================================================================
+# ====    Fixed_OuterTime_InnerPL_SAM - Hardening Model    ====
+# ==================================================================================================
+
+
+
+
+@cython.cdivision(True)
+cdef double _hard_func_innerpwl_model0(double mtot, double mrat, double sepa, 
+                                       double nu_inner, double rchar,
+                                       double r_gwcrit):
+
+    cdef double dadt = 0.0
+
+    # "inner" PL and hardening rate
+    # if this isn't true, there is no inner hardening phase
+    if r_gwcrit < rchar:
+        dadt = hard_gw(mtot, mrat, r_gwcrit) * pow(sepa/r_gwcrit, 1.0-nu_inner)
+    
+    return dadt
+
+
+@cython.cdivision(True)
+cdef double _hard_func_innerpwl_model1(double mtot, double mrat, double sepa, 
+                                       double dadt_rchar, double rchar, 
+                                       double r_gwcrit):
+
+    cdef double dadt = 0.0
+    cdef double dadt_gw_crit = 0.0
+    cdef double eta_norm = 0.0
+    cdef double nu_inner = 0.0
+    
+    # "inner" PL and hardening rate
+    # if this isn't true, there is no inner hardening phase
+    if r_gwcrit < rchar:
+        dadt_gw_crit = hard_gw(mtot, mrat, r_gwcrit)
+        eta_norm = 4 * mrat / (1 + mrat) / (1 + mrat) 
+        nu_inner = 1.0 - ( (log10(-dadt_gw_crit)-log10(-dadt_rchar*eta_norm)) / 
+                          (log10(r_gwcrit)-log10(rchar)) )
+        dadt = dadt_gw_crit * ( sepa / r_gwcrit ) ** (1.0-nu_inner)
+    
+    return dadt
+
+
+@cython.cdivision(True)
+cdef double _hard_func_innerpwl_gw(
+    double mtot, double mrat, double sepa, int inner_model_type, 
+    double dadt_rchar, double rchar, double nu_inner, 
+    double r_gwcrit_9, int gwcrit_units_rg, double alpha_gwcrit 
+):
+
+    cdef double dadt = 0.0
+    cdef double r_gwcrit = 0.0
+    
+    if gwcrit_units_rg == 0:
+        r_gwcrit = (r_gwcrit_9 * MY_PC) * pow(mtot/(1.0e9*MY_MSOL), alpha_gwcrit+1)
+    else:
+        r_gwcrit = (r_gwcrit_9 * MY_RGRV * 1.0e9*MY_MSOL) * pow(mtot/(1.0e9*MY_MSOL), 
+                                                                alpha_gwcrit+1)
+    
+    if inner_model_type == 0:
+        dadt = _hard_func_innerpwl_model0(mtot, mrat, sepa, nu_inner, 
+                                          rchar, r_gwcrit)
+    elif inner_model_type == 1:
+        dadt = _hard_func_innerpwl_model1(mtot, mrat, sepa, dadt_rchar, 
+                                          rchar, r_gwcrit)
+    else: 
+        raise ValueError(f"inner_model_type not defined: ", inner_model_type)
+
+    # if this isn't true, there is no GW hardening phase
+    if r_gwcrit > (3.0 * MY_SCHW * mtot):
+        dadt += hard_gw(mtot, mrat, sepa)
+    
+    return dadt
+
+
+
 
 
 # ==================================================================================================
@@ -419,50 +494,22 @@ def integrate_binary_evolution_2pwl(norm_log10, mtot, mrat, sepa_init, rchar, ga
 
 
 def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
-    """Calculate the differential number of binaries at the given frequencies.
 
-    This function converts from differential binary volume-density to differential number of
-    binaries.  The differential binary volume-density is:
-
-    .. math::
-        d^3 n / [d \log_{10} M  d q  d z]
-
-    Where the number density is $n = d N/d V_c$ for a comoving volume $V_c$.  The differential
-    binary number is:
-
-    .. math::
-        d^4 N / [d \log_{10} M  d q  d z  d \ln f]
-
-    Arguments
-    ---------
-    fobs_orb : (F,) array of float, [1/s]
-        The observer-frame orbital frequencies of interest, in units of inverse seconds.
-    sam : :py:class:`holodeck.sams.sam.Semi_Analytic_Model` instance
-        The semi-analytic model population.
-    hard : :py:class:`holodeck.hardening._Hardening` subclass instance,
-        The binary evolution model to evolve binaries from galaxy merger to the given frequencies.
-    cosmo : :py:class:`astropy.cosmology.core.Cosmology` instance
-        Cosmology object used for calculating cosmological measurements.
-
-    Returns
-    -------
-    redz_final : (M, Q, Z, F) array of float, []
-        The redshifts at which binaries at each grid point reach the frequencies of interest.
-        Unitless.
-    diff_num : (M, Q, Z, F) array of float, []
-        The differential number of binaries at each grid point.  Unitless.
-
-    """
-
-    nden = sam.static_binary_density
+    dens = sam.static_binary_density
 
     shape = sam.shape + (fobs_orb.size,)
     cdef np.ndarray[np.double_t, ndim=4] diff_num = np.zeros(shape)
     cdef np.ndarray[np.double_t, ndim=4] redz_final = -1.0 * np.ones(shape)
+    cdef int hard_gwcrit_units_rg = 1
+    cdef double nu_inner = NAN
+    cdef double dadt_rchar = NAN
 
+    sam._log.info("checking class type of `hard`...")
+                  
     # ---- Fixed_Time_2pwl_SAM
 
     if isinstance(hard, holo.hardening.Fixed_Time_2PL_SAM):
+        sam._log.info("`hard` is instance of Fixed_Time_2PL_SAM")
         gmt_time = sam._gmt_time
         # if `sam` is using galaxy merger rate (GMR), then `gmt_time` will be `None`
         if gmt_time is None:
@@ -472,30 +519,63 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
         _dynamic_binary_number_at_fobs_2pwl(
             fobs_orb, hard._sepa_init, hard._num_steps,
             hard._norm, hard._rchar, hard._gamma_inner, hard._gamma_outer,
-            nden, sam.mtot, sam.mrat, sam.redz, gmt_time,
+            dens, sam.mtot, sam.mrat, sam.redz, gmt_time,
             cosmo._grid_z, cosmo._grid_dcom, cosmo._grid_age,
             # output:
             redz_final, diff_num
         )
 
+    # ---- FixedOuterTime_InnerPL_SAM
+
+    elif isinstance(hard, holo.hardening.FixedOuterTime_InnerPL_SAM):
+        sam._log.info("`hard` is instance of FixedOuterTime_InnerPL_SAM")
+        gmt_time = sam._gmt_time
+        # if `sam` is using galaxy merger rate (GMR), then `gmt_time` will be `None`
+        if gmt_time is None:
+            sam._log.info("`gmt_time` not calculated in SAM.  Setting to zeros.")
+            gmt_time = np.zeros(sam.shape)
+
+        # params not used in all models are initialized to NAN
+        if hard._inner_model_type == 0:
+            nu_inner = hard._nu_inner
+        elif hard._inner_model_type == 1:
+            dadt_rchar = hard._dadt_rchar
+        else:
+            raise NotImplementedError()
+            
+        if hard._gw_crit_units == 'rg':
+            hard_gwcrit_units_rg = 1
+        else:
+            hard_gwcrit_units_rg = 0
+            
+        _dynamic_binary_number_at_fobs_innerpwl(
+            fobs_orb, hard._num_steps, hard._outer_time, 
+            hard._inner_model_type, dadt_rchar, hard._rchar_9, hard._alpha_char, 
+            nu_inner, hard._r_gw_crit_9, hard_gwcrit_units_rg, hard._alpha_gw_crit,
+            dens, sam.mtot, sam.mrat, sam.redz, gmt_time,
+            cosmo._grid_z, cosmo._grid_dcom, cosmo._grid_age,
+            # output:
+            redz_final, diff_num
+        )
+        
     # ---- Hard_GW
 
     elif isinstance(hard, holo.hardening.Hard_GW) or issubclass(hard, holo.hardening.Hard_GW):
+        sam._log.info("`hard` is instance or subclass of Hard_GW")
         redz_prime = sam._redz_prime
-        # if `sam` doesn't use a galaxy merger time (GMT), then `redz_prime` will be `None`,
-        # set to initial redshift values instead
+        # if `sam` is using galaxy merger rate (GMR), then `redz_prime` will be `None`
         if redz_prime is None:
             sam._log.info("`redz_prime` not calculated in SAM.  Setting to `redz` (initial) values.")
             redz_prime = sam.redz[np.newaxis, np.newaxis, :] * np.ones(sam.shape)
 
         _dynamic_binary_number_at_fobs_gw(
             fobs_orb,
-            nden, sam.mtot, sam.mrat, sam.redz, redz_prime,
+            dens, sam.mtot, sam.mrat, sam.redz, redz_prime,
             cosmo._grid_z, cosmo._grid_dcom,
             # output:
             redz_final, diff_num
         )
-
+        
     # ---- OTHER
 
     else:
@@ -503,21 +583,27 @@ def dynamic_binary_number_at_fobs(fobs_orb, sam, hard, cosmo):
 
     return redz_final, diff_num
 
+
+######### new hardening --- innerpwl function #######
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.nonecheck(False)
 @cython.cdivision(True)
-cdef int _dynamic_binary_number_at_fobs_2pwl(
+cdef int _dynamic_binary_number_at_fobs_innerpwl(
     double[:] target_fobs_orb,
-    double sepa_init,
     int num_steps,
 
-    double[:, :] hard_norm,
-    double hard_rchar,
-    double hard_gamma_inner,
-    double hard_gamma_outer,
+    double hard_outer_time,
+    int hard_inner_model_type,
+    double hard_dadt_rchar,
+    double hard_rchar_9,
+    double hard_alpha_char,
+    double hard_nu_inner,  
+    double hard_r_gwcrit_9,
+    int hard_gwcrit_units_rg,
+    double hard_alpha_gwcrit, 
 
-    double[:, :, :] nden,
+    double[:, :, :] dens,
     double[:] mtot,
     double[:] mrat,
     double[:] redz,
@@ -531,12 +617,12 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
     double[:, :, :, :] redz_final,
     double[:, :, :, :] diff_num,
 ) except -1:
-    """Calculate differential binary number at the given frequencies, with phenom 2pl evolution.
+    """Calculate differential binary number at the given frequencies, with inner pl evolution.
 
     This function converts from differential binary volume-density to differential binary number.
-    Binary evolution follows the 'phenomenological' double power-law model implemented in the
-    :py:func:`_hard_func_2pwl_gw`, which matches the implementation in
-    :py:class:`Fixed_Time_2PL_SAM`.
+    Binary evolution follows the fixed outer time, inner power-law model implemented in the
+    :py:func:`_hard_func_innerpwl_gw`, which matches the implementation in
+    :py:class:`FixedOuterTime_InnerPL_SAM`.
 
     See :py:func:`dynamic_binary_number_at_fobs` for more information.
 
@@ -544,7 +630,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
     ---------
     target_fobs_orb : (F,) array of float [1/s]
         The observer-frame orbital frequencies of interest, in units of inverse seconds.
-    nden : (M, Q, Z) array of float [Mpc^{-3}]
+    dens : (M, Q, Z) array of float [Mpc^{-3}]
         The differential binary volume-density in units of inverse-cubic comoving-Mpc.
     mtot : (M,) array of float [g]
         The edges of the total-mass grid dimension in units of grams.
@@ -577,10 +663,11 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
     cdef int n_freq = target_fobs_orb.size
     cdef int n_interp = redz_interp_grid.size
     cdef double age_universe = tage_interp_grid[n_interp - 1]
-    cdef double sepa_init_log10 = log10(sepa_init)
-
+    ## note: sepa_init not defined for this hardening model; hardening tracked only below hard_rchar
+    cdef double hard_rchar_log10
+    
     cdef int ii, jj, kk, ff, step, interp_left_idx, interp_right_idx, new_interp_idx
-    cdef double mt, mr, norm, risco, dx, new_redz, gmt, ftarget, target_frst_orb
+    cdef double mt, mr, risco, dx, new_redz, gmt, ftarget, target_frst_orb
     cdef double sepa_log10, sepa, sepa_left, sepa_right, dadt_left, dadt_right
     cdef double time_evo, redz_left, redz_right, time_left, time_right, new_time
     cdef double frst_orb_left, fobs_orb_left, frst_orb_right, fobs_orb_right
@@ -605,23 +692,26 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
     for ii in range(n_mtot):
         mt = mtot[ii]
 
-        # Determine separation step-size, in log10-space, to integrate from sepa_init to ISCO
+        # Determine separation step-size, in log10-space, to integrate from hard_rchar to ISCO
         risco = 3.0 * MY_SCHW * mt     # ISCO is 3x combined schwarzschild radius
-        dx = (sepa_init_log10 - log10(risco)) / num_steps
+        hard_rchar = hard_rchar_9 * pow(mt/(1.0e9*MY_MSOL), hard_alpha_char+1)
+        hard_rchar_log10 = log10(hard_rchar)
+        dx = (hard_rchar_log10 - log10(risco)) / num_steps
 
         for jj in range(n_mrat):
             mr = mrat[jj]
 
             # Binary evolution is determined by M and q only
             # so integration is started for each of these bins
-            sepa_log10 = sepa_init_log10                # set initial separation to initial value
-            norm = hard_norm[ii, jj]                    # get hardening-rate normalization for this bin
+            sepa_log10 = hard_rchar_log10                # set initial separation to initial value
 
             # Get total hardening rate at left-most edge
             sepa_left = pow(10.0, sepa_log10)
-            dadt_left = _hard_func_2pwl_gw(
-                mt, mr, sepa_left,
-                norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
+            #### UPDATED TO NEW FUNCTION ####
+            dadt_left =  _hard_func_innerpwl_gw(
+                mt, mr, sepa_left, hard_inner_model_type, 
+                hard_dadt_rchar, hard_rchar, hard_nu_inner, 
+                hard_r_gwcrit_9, hard_gwcrit_units_rg, hard_alpha_gwcrit 
             )
 
             # get rest-frame orbital frequency of binary at left edge
@@ -638,9 +728,11 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
                 frst_orb_right = kepler_freq_from_sepa(mt, sepa_right)
 
                 # Get total hardening rate at the right-edge of this step (left-edge already obtained)
-                dadt_right = _hard_func_2pwl_gw(
-                    mt, mr, sepa_right,
-                    norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
+                #### UPDATED TO NEW FUNCTION ####                
+                dadt_right =  _hard_func_innerpwl_gw(
+                    mt, mr, sepa_right, hard_inner_model_type, 
+                    hard_dadt_rchar, hard_rchar, hard_nu_inner, 
+                    hard_r_gwcrit_9, hard_gwcrit_units_rg, hard_alpha_gwcrit 
                 )
 
                 # Find time to move from left- to right- edges:  dt = da / (da/dt)
@@ -654,9 +746,9 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
                 # ---- Iterate over starting redshift bins
 
                 for kk in range(n_redz-1, -1, -1):
-                    # get the total time from each starting redshift, plus GMT time, plus evolution time to this step
+                    # get the total time from each starting redshift, plus GMT time, plus outer time, plus evolution time to this step
                     gmt = gmt_time[ii, jj, kk]
-                    time_right = time_evo + gmt + redz_age[kk]
+                    time_right = time_evo + gmt + hard_outer_time + redz_age[kk]
                     # also get the evolution-time to the left edge
                     time_left = time_right - dt
 
@@ -755,6 +847,229 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
                         sepa = kepler_sepa_from_freq(mt, target_frst_orb)
 
                         # calculate total hardening rate at this exact separation
+                        #### UPDATED TO NEW FUNCTION ####
+                        dadt =  _hard_func_innerpwl_gw(
+                            mt, mr, sepa, hard_inner_model_type, 
+                            hard_dadt_rchar, hard_rchar, hard_nu_inner, 
+                            hard_r_gwcrit_9, hard_gwcrit_units_rg, hard_alpha_gwcrit 
+                        )
+
+                        # calculate residence/hardening time = f/[df/dt] = -(2/3) a/[da/dt]
+                        tres = - (2.0/3.0) * sepa / dadt
+
+                        # calculate number of binaries
+                        cosmo_fact = FOUR_PI_SPLC_OVER_MPC * (1.0 + new_redz) * pow(dcom / MY_MPC, 2)
+                        diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
+
+                        # ----------------------
+                        # ------------------------------------------------------
+
+                # update new left edge
+                dadt_left = dadt_right
+                sepa_left = sepa_right
+                frst_orb_left = frst_orb_right
+                # note that we _cannot_ do this for redz or freqs because the redshift _bin_ is changing
+
+    free(redz_age)
+
+    return 0
+######### end of innerpwl function #######
+
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef int _dynamic_binary_number_at_fobs_2pwl(
+    double[:] target_fobs_orb,
+    double sepa_init,
+    int num_steps,
+
+    double[:, :] hard_norm,
+    double hard_rchar,
+    double hard_gamma_inner,
+    double hard_gamma_outer,
+
+    double[:, :, :] dens,
+    double[:] mtot,
+    double[:] mrat,
+    double[:] redz,
+    double[:, :, :] gmt_time,
+
+    double[:] redz_interp_grid,
+    double[:] dcom_interp_grid,
+    double[:] tage_interp_grid,
+
+    # output
+    double[:, :, :, :] redz_final,
+    double[:, :, :, :] diff_num,
+) except -1:
+    """Convert from binary volume-density (all separations) to binary number at particular frequencies.
+    """
+
+    cdef int n_mtot = mtot.size
+    cdef int n_mrat = mrat.size
+    cdef int n_redz = redz.size
+    cdef int n_freq = target_fobs_orb.size
+    cdef int n_interp = redz_interp_grid.size
+    cdef double age_universe = tage_interp_grid[n_interp - 1]
+    cdef double sepa_init_log10 = log10(sepa_init)
+
+    cdef int ii, jj, kk, ff, step, interp_left_idx, interp_right_idx, new_interp_idx
+    cdef double mt, mr, norm, risco, dx, new_redz, gmt, ftarget, target_frst_orb
+    cdef double sepa_log10, sepa, sepa_left, sepa_right, dadt_left, dadt_right
+    cdef double time_evo, redz_left, redz_right, time_left, time_right, new_time
+    cdef double frst_orb_left, fobs_orb_left, frst_orb_right, fobs_orb_right
+
+    # ---- Calculate ages corresponding to SAM `redz` grid
+
+    cdef double *redz_age = <double *>malloc(n_redz * sizeof(double))     # (Z,) age of the universe in [sec]
+    ii = 0
+    cdef int rev
+    for kk in range(n_redz):
+        # iterate in reverse order to match with `redz_interp_grid` which is decreasing
+        rev = n_redz - 1 - kk
+        # get to the right index of the interpolation-grid
+        while (redz_interp_grid[ii+1] > redz[rev]) and (ii < n_interp - 1):
+            ii += 1
+
+        # interpolate
+        redz_age[rev] = interp_at_index(ii, redz[rev], redz_interp_grid, tage_interp_grid)
+
+    # ---- calculate dynamic binary numbers for all SAM grid bins
+
+    for ii in range(n_mtot):
+        mt = mtot[ii]
+
+        # Determine separation step-size, in log10-space, to integrate from sepa_init to ISCO
+        risco = 3.0 * MY_SCHW * mt     # ISCO is 3x combined schwarzschild radius
+        dx = (sepa_init_log10 - log10(risco)) / num_steps
+
+        for jj in range(n_mrat):
+            mr = mrat[jj]
+
+            # Binary evolution is determined by M and q only
+            # so integration is started for each of these bins
+            sepa_log10 = sepa_init_log10                # set initial separation to initial value
+            norm = hard_norm[ii, jj]                    # get hardening-rate normalization for this bin
+
+            # Get total hardening rate at left-most edge
+            sepa_left = pow(10.0, sepa_log10)
+            dadt_left = _hard_func_2pwl_gw(
+                mt, mr, sepa_left,
+                norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
+            )
+
+            # get rest-frame orbital frequency of binary at left edge
+            frst_orb_left = kepler_freq_from_sepa(mt, sepa_left)
+
+            # ---- Integrate of `num_steps` discrete intervals in binary separation from large to small
+
+            time_evo = 0.0                  # track total binary evolution time
+            interp_left_idx = 0                 # interpolation index, will be updated in each step
+            for step in range(num_steps):
+                # Increment the current separation
+                sepa_log10 -= dx
+                sepa_right = pow(10.0, sepa_log10)
+                frst_orb_right = kepler_freq_from_sepa(mt, sepa_right)
+
+                # Get total hardening rate at the right-edge of this step (left-edge already obtained)
+                dadt_right = _hard_func_2pwl_gw(
+                    mt, mr, sepa_right,
+                    norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
+                )
+
+                # Find time to move from left- to right- edges:  dt = da / (da/dt)
+                dt = 2.0 * (sepa_right - sepa_left) / (dadt_left + dadt_right)
+                time_evo += dt
+
+                # ---- Iterate over starting redshift bins
+
+                for kk in range(n_redz-1, -1, -1):
+                    # get the total time from each starting redshift, plus GMT time, plus evolution time to this step
+                    gmt = gmt_time[ii, jj, kk]
+                    time_right = time_evo + gmt + redz_age[kk]
+                    # also get the evolution-time to the left edge
+                    time_left = time_right - dt
+
+                    # if we pass the age of the universe, this binary has stalled, no further redshifts will work
+                    # NOTE: if `gmt_time` decreases faster than redshift bins increase the universe age,
+                    #       then systems in later `redz` bins may no longer stall, so we still need to calculate them
+                    #       i.e. we can NOT use a `break` statement here
+                    if time_left > age_universe:
+                        continue
+
+                    # find the redshift bins corresponding to left- and right- side of step
+                    # left edge
+                    interp_left_idx = while_while_increasing(interp_left_idx, n_interp, time_left, tage_interp_grid)
+
+                    redz_left = interp_at_index(interp_left_idx, time_left, tage_interp_grid, redz_interp_grid)
+
+                    # double check that left-edge is within age of Universe (should rarely if ever be a problem
+                    # but possible due to rounding/interpolation errors
+                    if redz_left < 0.0:
+                        continue
+
+                    # find right-edge starting from left edge, i.e. `interp_left_idx` (`interp_left_idx` is not a typo!)
+                    interp_right_idx = while_while_increasing(interp_left_idx, n_interp, time_right, tage_interp_grid)
+                    # NOTE: because `time_right` can be larger than age of universe, it can exceed `tage_interp_grid`
+                    #       in this case `interp_right_idx=n_interp-2`, and the `interp_at_index` function can still
+                    #       be used to extrapolate to further out values, which will likely be negative
+
+                    redz_right = interp_at_index(interp_right_idx, time_right, tage_interp_grid, redz_interp_grid)
+                    # NOTE: at this point `redz_right` could be negative, even though `redz_left` is definitely not
+                    if redz_right < 0.0:
+                        redz_right = 0.0
+
+                    # convert to frequencies
+                    fobs_orb_left = frst_orb_left / (1.0 + redz_left)
+                    fobs_orb_right = frst_orb_right / (1.0 + redz_right)
+
+                    # ---- Iterate over all target frequencies
+
+                    # NOTE: there should be a more efficient way to do this.
+                    #       Tried a different implementation in `_dynamic_binary_number_at_fobs_1`, but not working
+                    #       some of the frequency bins seem to be getting skipped in that version.
+
+                    for ff in range(n_freq):
+                        ftarget = target_fobs_orb[ff]
+
+                        # If the integration-step does NOT bracket the target frequency, continue to next frequency
+                        if (ftarget < fobs_orb_left) or (fobs_orb_right < ftarget):
+                            continue
+
+                        # ------------------------------------------------------
+                        # ---- TARGET FOUND ----
+
+                        # At this point in the code, this target frequency is inbetween the left- and right- edges
+                        # of the integration step, so we can interpolate the evolution to exactly this frequency,
+                        # and perform the actual dynamic_binary_number calculation
+
+                        new_time = _interp_between_vals(ftarget, fobs_orb_left, fobs_orb_right, time_left, time_right)
+
+                        # `time_right` can be after age of Universe, make sure interpolated value is not
+                        #    if it is, then all higher-frequencies will also, so break out of target-frequency loop
+                        if new_time > tage_interp_grid[n_interp - 1]:
+                            break
+
+                        # find index in interpolation grid for this exact time
+                        new_interp_idx = interp_left_idx      # start from left-step edge
+                        new_interp_idx = while_while_increasing(new_interp_idx, n_interp, new_time, tage_interp_grid)
+
+                        # get redshift
+                        new_redz = interp_at_index(new_interp_idx, new_time, tage_interp_grid, redz_interp_grid)
+                        # get comoving distance
+                        dcom = interp_at_index(new_interp_idx, new_time, tage_interp_grid, dcom_interp_grid)
+
+                        # Store redshift
+                        redz_final[ii, jj, kk, ff] = new_redz
+
+                        # find rest-frame orbital frequency and binary separation
+                        target_frst_orb = ftarget * (1.0 + new_redz)
+                        sepa = kepler_sepa_from_freq(mt, target_frst_orb)
+
+                        # calculate total hardening rate at this exact separation
                         dadt = _hard_func_2pwl_gw(
                             mt, mr, sepa,
                             norm, hard_rchar, hard_gamma_inner, hard_gamma_outer
@@ -765,7 +1080,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
 
                         # calculate number of binaries
                         cosmo_fact = FOUR_PI_SPLC_OVER_MPC * (1.0 + new_redz) * pow(dcom / MY_MPC, 2)
-                        diff_num[ii, jj, kk, ff] = nden[ii, jj, kk] * tres * cosmo_fact
+                        diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
 
                         # ----------------------
                         # ------------------------------------------------------
@@ -788,7 +1103,7 @@ cdef int _dynamic_binary_number_at_fobs_2pwl(
 cdef int _dynamic_binary_number_at_fobs_gw(
     double[:] target_fobs_orb,
 
-    double[:, :, :] nden,
+    double[:, :, :] dens,
     double[:] mtot,
     double[:] mrat,
     double[:] redz,
@@ -801,41 +1116,7 @@ cdef int _dynamic_binary_number_at_fobs_gw(
     double[:, :, :, :] redz_final,
     double[:, :, :, :] diff_num,
 ) except -1:
-    """Calculate differential binary number at the given frequencies, under GW-only evolution.
-
-    This function converts from differential binary volume-density to differential binary number.
-
-    See :py:func:`dynamic_binary_number_at_fobs` for more information.
-
-    Arguments
-    ---------
-    target_fobs_orb : (F,) array of float [1/s]
-        The observer-frame orbital frequencies of interest, in units of inverse seconds.
-    nden : (M, Q, Z) array of float [Mpc^{-3}]
-        The differential binary volume-density in units of inverse-cubic comoving-Mpc.
-    mtot : (M,) array of float [g]
-        The edges of the total-mass grid dimension in units of grams.
-    mrat : (Q,) array of float []
-        The edges of the mass-ratio grid dimension.  Unitless.
-    redz : (Z,) array of float []
-        The edges of the redshift grid dimension.  Unitless.
-    redz_prime : (M, Q, Z) array of float []
-        The redshifts of binaries after galaxy merger, but before binary evolution to the
-        frequencies of interest.  Unitless.
-    redz_interp_grid : (Zi,) array of float, []
-        The redshift values at which comoving distances are calculated; used for interpolation.
-    dcom_interp_grid : (Zi,) array of float, [cm]
-        The comoving-distance values at the ``redz_interp_grid`` redshifts, in units of centimeters,
-        used for interpolation.
-
-    Returns
-    -------
-    redz_final : (M, Q, Z, F) array of float, []
-        The redshifts at which binaries at each grid point reach the frequencies of interest.
-        Unitless.
-    diff_num : (M, Q, Z, F) array of float, []
-        The differential number of binaries at each grid point.  Unitless.
-
+    """Convert from binary volume-density (all separations) to binary number at particular frequencies.
     """
 
     cdef int n_mtot = mtot.size
@@ -894,7 +1175,199 @@ cdef int _dynamic_binary_number_at_fobs_gw(
 
                     # calculate number of binaries
                     cosmo_fact = FOUR_PI_SPLC_OVER_MPC * (1.0 + rzp) * pow(dcom / MY_MPC, 2)
-                    diff_num[ii, jj, kk, ff] = nden[ii, jj, kk] * tres * cosmo_fact
+                    diff_num[ii, jj, kk, ff] = dens[ii, jj, kk] * tres * cosmo_fact
 
     return 0
+
+
+
+# ==================================================================================================
+# ====    DetStats Functions    ====
+# ==================================================================================================
+
+
+def gamma_of_rho_interp(rho, rsort, rho_interp_grid, gamma_interp_grid):
+    """
+    rho : 1Darray of scalars
+        SNR of single sources, in flat array
+    rsort : 1Darray
+        order of flat rho values smallest to largest
+    rho_interp_grid : 1Darray
+        rho values corresponding to each gamma
+    gamma_interp_grid : 1Darray
+        gamma values corresponding to each rho
+
+    """
+    # pass in the interp grid
+    cdef np.ndarray[np.double_t, ndim=1] gamma = np.zeros(rho.shape)
+
+    _gamma_of_rho_interp(rho, rsort, rho_interp_grid, gamma_interp_grid, gamma)
+
+    return gamma
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef int _gamma_of_rho_interp(
+    double[:] rho, long[:] rsort,
+    double[:] rho_interp_grid, double[:] gamma_interp_grid,
+    # output
+    double[:] gamma
+    ):
+    """ Find gamma of rho by interpolation over rho and gamma grids.
+    """
+
+    cdef int n_rho = rho.size
+    cdef int n_interp = rho_interp_grid.size
+    cdef int ii, kk, rr
+    ii = 0 # get rho in order using rho[rsort[ii]]
+
+    for kk in range(n_rho):
+        rr = rsort[kk] # index of next largest rho, equiv to rev in redz calculation
+        # print('kk =',kk,' rr =', rr, 'rho[rr] =', rho[rr])
+        # get to the right index of the interpolation-grid
+        while (rho_interp_grid[ii+1] < rho[rr]) and (ii < n_interp -2):
+            ii += 1
+        # print('ii =',ii, ' rho_interp[ii] =', rho_interp_grid[ii], ' rho_interp[ii+1] =', rho_interp_grid[ii+1])
+        # interpolate
+        gamma[rr] = interp_at_index(ii, rho[rr], rho_interp_grid, gamma_interp_grid)
+        # print('rho =', rho[rr], ' gamma =', gamma[rr], '\n')\
+
+    return 0
+
+
+def snr_ss(amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs):
+    """ Calculate single source SNR
+
+
+    Parameters
+    ----------
+    amp : (F,R,L) NDarray
+        Dimensionless strain amplitude of loudest single sources
+    F_iplus : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    F_icross : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    iotas : (F,S,L) NDarray
+        Inclination, used to calculate:
+        a_pol = 1 + np.cos(iotas) **2
+        b_pol = -2 * np.cos(iotas)
+    dur : scalar
+        Duration of observations.
+    Phi_0 : (F,S,L) NDarray
+        Initial GW phase
+    S_i : (P,F,R,L) NDarray
+        Total noise of each pulsar wrt detection of each single source, in s^3
+    freqs : (F,) 1Darray
+        Observed frequency bin centers.
+
+    Returns
+    -------
+    snr_ss : (F,R,S,L) NDarray
+        SNR from the whole PTA for each single source with
+        each realized sky position (S) and realized strain (R)
+
+    """
+    nfreqs, nreals, nloudest = amp.shape[0], amp.shape[1], amp.shape[2]
+    npsrs, nskies = F_iplus.shape[0], F_iplus.shape[2]
+    cdef np.ndarray[np.double_t, ndim=4] snr_ss = np.zeros((nfreqs, nreals, nskies, nloudest))
+    _snr_ss(
+        amp, F_iplus, F_icross, iotas, dur, Phi_0, S_i, freqs,
+        npsrs, nfreqs, nreals, nskies, nloudest,
+        snr_ss)
+    return snr_ss
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+cdef int _snr_ss(
+    double[:,:,:] amp,
+    double[:,:,:,:] F_iplus,
+    double[:,:,:,:] F_icross,
+    double[:,:,:] iotas,
+    double dur,
+    double[:,:,:] Phi_0,
+    double[:,:,:,:] S_i,
+    double[:] freqs,
+    long npsrs, long nfreqs, long nreals, long nskies, long nloudest,
+    # output
+    double[:,:,:,:] snr_ss
+    ):
+    """
+
+    Parameters
+    ----------
+    amp : (F,R,L) NDarray
+        Dimensionless strain amplitude of loudest single sources
+    F_iplus : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    F_icross : (P,F,S,L) NDarray
+        Antenna pattern function for each pulsar.
+    iotas : (F,S,L) NDarray
+        Inclination, used to calculate:
+        a_pol = 1 + np.cos(iotas) **2
+        b_pol = -2 * np.cos(iotas)
+    dur : scalar
+        Duration of observations.
+    Phi_0 : (F,S,L) NDarray
+        Initial GW phase
+    S_i : (P,F,R,L) NDarray
+        Total noise of each pulsar wrt detection of each single source, in s^3
+    freqs : (F,) 1Darray
+        Observed frequency bin centers.
+    snr_ss : (F,R,S,L) NDarray
+        Pointer to single source SNR array, to be calculated.
+
+    NOTE: This may be improved by moving some of the math outside the function.
+    I.e., passing in sin/cos of NDarrays to be used.
+    """
+
+    cdef int pp, ff, rr, ss, ll
+    cdef float a_pol, b_pol, Phi_T, pta_snr_sq, coef, term1, term2, term3
+    # print('npsrs %d, nfreqs %d, nreals %d, nskies %d, nloudest %d' % (npsrs, nfreqs, nreals, nskies, nloudest))
+
+    for ff in range(nfreqs):
+        for ss in range(nskies):
+            for ll in range(nloudest):
+                a_pol = 1 + pow(cos(iotas[ff,ss,ll]), 2.0)
+                b_pol = -2 * cos(iotas[ff,ss,ll])
+                Phi_T = 2 * M_PI * freqs[ff] * dur + Phi_0[ff,ss,ll]
+                for rr in range(nreals):
+                    pta_snr_sq = 0
+                    for pp in range(npsrs):
+                        # calculate coefficient depending on
+                        # function of amp, S_i, and freqs
+                        coef = pow(amp[ff,rr,ll], 2.0) / (S_i[pp,ff,rr,ll] * 8 * pow(M_PI * freqs[ff], 3.0))
+
+                        # calculate terms that depend on p, f, s, and l
+                        # functions of F_iplus, F_icross, a_pol, b_pol, Phi_0, and Phi_T
+                        term1 = (
+                            pow(a_pol * F_iplus[pp,ff,ss,ll], 2.0)
+                            * (Phi_T * (1.0 + 2.0 * pow(sin(Phi_0[ff,ss,ll]), 2.0))
+                                + cos(Phi_T) * (-1.0 * sin(Phi_T) + 4.0 * cos(Phi_0[ff,ss,ll]))
+                                - 4.0 * sin(Phi_0[ff,ss,ll])
+                                )
+                        )
+                        term2 = (
+                            pow(b_pol * F_icross[pp,ff,ss,ll], 2.0)
+                            * (Phi_T * (1.0 + 2.0 * pow(cos(Phi_0[ff,ss,ll]), 2.0))
+                                + sin(Phi_T) * cos(Phi_T) - 4.0 * cos(Phi_0[ff,ss,ll])
+                                )
+                        )
+                        term3 = (
+                            -2.0 * a_pol * b_pol * F_iplus[pp,ff,ss,ll] * F_icross[pp,ff,ss,ll]
+                            * (2.0 * Phi_T * sin(Phi_T) *cos(Phi_0[ff,ss,ll])
+                                + sin(Phi_T) * (sin(Phi_T) - 2.0 * sin(Phi_0[ff,ss,ll])
+                                                + 2.0 * cos(Phi_T) * cos(Phi_0[ff,ss,ll])
+                                                - 2.0 * cos(Phi_0[ff,ss,ll])
+                                                )
+                            )
+                        )
+                        pta_snr_sq += coef*(term1 + term2 + term3) # sum snr^2 of all pulsars for a single source
+
+                    # set snr for a single source, using sum from all pulsars
+                    snr_ss[ff,rr,ss,ll] = sqrt(pta_snr_sq)
+
 
