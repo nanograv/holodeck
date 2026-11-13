@@ -1495,6 +1495,8 @@ class _PS_NG20_Base(_Param_Space):
             mplaw=params["mmb_plaw"],
             scatter_dex=params["mmb_scatter_dex"],
             zplaw_amp=params["mmb_zplaw_amp"],
+            zplaw_scatter=params["mmb_zplaw_scatter"],
+            zplaw_slope=params["mmb_zplaw_slope"],
             bulge_frac=bulge_frac,
         )
 
