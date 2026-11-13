@@ -41,7 +41,7 @@ __version__ = "0.6"
 DEF_NUM_REALS = 100
 DEF_NUM_FBINS = 40
 DEF_NUM_LOUDEST = 10
-DEF_PTA_DUR = 16.03     # [yrs]
+DEF_PTA_DUR = utils.get_current_pta_dur()     # [yrs]
 
 # FITS_NBINS_PLAW = [2, 3, 4, 5, 8, 9, 14]
 # FITS_NBINS_TURN = [4, 9, 14, 30]

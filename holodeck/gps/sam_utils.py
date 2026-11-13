@@ -9,7 +9,7 @@ import sys
 DEF_SAM_SHAPE = 50
 DEF_NUM_REALS = 100
 DEF_NUM_FBINS = 40
-DEF_PTA_DUR = 16.03  # [yrs]
+DEF_PTA_DUR = holo.utils.get_current_pta_dur()  # [yrs]
 
 DEF_ECCEN_NUM_STEPS = 123
 DEF_ECCEN_NHARMS = 100

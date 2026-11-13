@@ -104,6 +104,7 @@ def main():   # noqa : ignore complexity warning
 
         # get parameter-space class (created new, or load previous save when `args.resume`)
         space = _setup_param_space(args)
+        lib_tools.log_mem_usage(log)
 
         # copy certain files to output directory
         copy_files = FILES_COPY_TO_OUTPUT
@@ -210,6 +211,8 @@ def main():   # noqa : ignore complexity warning
             log.debug(msg)
 
         rv, _sim_fname = run_sam_at_pspace_params(args, space, sim_num, params)
+        lib_tools.log_mem_usage(log)
+        log.info(f"{sim_num=} {rv=}")
 
         if rv is False:
             failures += 1
@@ -348,6 +351,7 @@ def run_sam_at_pspace_params(args, space, pnum, params):
     log.debug(f"Saving {pnum} to file | {args.gwb_flag=} {args.ss_flag=} {args.params_flag=}")
     log.debug(f"data has keys: {list(data.keys())}")
     np.savez(sim_fname, **data)
+    del sam, hard
     log.info(f"Saved to {sim_fname}, size {holo.utils.get_file_size(sim_fname)} after {(datetime.now()-beg)}")
 
     # ---- make diagnostic plots
@@ -562,6 +566,8 @@ def _save_config(args):
     # Add additional entries
     config['holodeck_version'] = holo.__version__
     config['holodeck_librarian_version'] = holo.librarian.__version__
+    # how redshifts were averaged to bin centers (#165); absent from libraries made before this fix, equivalent to the 'legacy' method
+    config['redz_centers_method'] = holo.gravwaves.REDZ_CENTERS_METHOD
     config['holodeck_git_hash'] = holo.utils.get_git_hash()
     config['created'] = str(datetime.now())
 

@@ -239,7 +239,7 @@ def load_population_for_pars(pars, pta_dur=TDUR, nfreqs=NFREQS, nreals=NREALS, n
 
     vals = holo.single_sources.ss_gws_redz(
         edges, redz_final, number,
-        realize=nreals, loudest=nloudest, params=True,
+        realize=nreals, loudest=nloudest, params=True, dnum=diff_num,
     )
 
     # `sspar` parameters are (total mass, mass ratio, initial redshift, final redshift)

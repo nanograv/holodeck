@@ -18,6 +18,7 @@ import h5py
 import tqdm
 
 import holodeck as holo
+import holodeck.utils as utils
 import holodeck.librarian
 import holodeck.librarian.gen_lib
 from holodeck.librarian import (
@@ -89,15 +90,16 @@ def sam_lib_combine(
 ):
     """Combine individual simulation files into a single library (hdf5) file.
 
+    Data are streamed one simulation at a time into pre-allocated on-disk datasets, so memory use
+    does not scale with the number of simulations.  Failed simulations are left as NaN (the
+    datasets use ``fillvalue=NaN``).
+
     Arguments
     ---------
     path_output : str or Path,
         Path to output directory where combined library will be saved.
     log : `logging.Logger`
         Logging instance.
-    path_sims : str or None,
-        Path to output directory containing simulation files.
-        If `None` this is set to be the same as `path_output`.
     path_pspace : str or None,
         Path to file containing _Param_Space subclass instance.
         If `None` then `path_output` is searched for a `_Param_Space` save file.
@@ -143,6 +145,7 @@ def sam_lib_combine(
     param_samples = pspace.param_samples[()]
 
     # Standard Library: vary all parameters together
+    nsamp_dim = None
     if library:
         if param_samples is None:
             log.error(f"`library`={library} but `param_samples`={param_samples}`")
@@ -171,6 +174,12 @@ def sam_lib_combine(
     fobs_cents, fobs_edges, nreals, nloudest, has_gwb, has_ss, has_params = _check_files_and_load_shapes(
         log, path_sims, nsamp_all, library
     )
+
+    if (fobs_cents is None) or (nreals is None):
+        err = f"After checking files, {fobs_cents=} and {nreals=}!"
+        log.exception(err)
+        raise ValueError(err)
+        
     nfreqs = fobs_cents.size
     log.debug(f"{nfreqs=}, {nreals=}, {nloudest=}")
     log.debug(f"{has_gwb=}, {has_ss=}, {has_params=}")
@@ -180,74 +189,45 @@ def sam_lib_combine(
         log.exception(err)
         raise RuntimeError(err)
 
-    if (fobs_cents is None) or (nreals is None):
-        err = f"After checking files, {fobs_cents=} and {nreals=}!"
-        log.exception(err)
-        raise ValueError(err)
+    # ---------------------------------
+    # ---- Write to output file, streaming one simulation at a time ----
 
-    # ---- load results from all files
-
-    gwb = np.zeros((nsamp_all, nfreqs, nreals)) if has_gwb else None
-
-    if (not gwb_only) and has_ss:
-        hc_ss = np.zeros((nsamp_all, nfreqs, nreals, nloudest))
-        hc_bg = np.zeros((nsamp_all, nfreqs, nreals))
-    else:
-        hc_ss = None
-        hc_bg = None
-
-    if (not gwb_only) and has_params:
-        sspar = np.zeros((nsamp_all, 4, nfreqs, nreals, nloudest))
-        bgpar = np.zeros((nsamp_all, 7, nfreqs, nreals))
-    else:
-        sspar = None
-        bgpar = None
-
-    gwb, hc_ss, hc_bg, sspar, bgpar, param_samples, bad_files = _load_library_from_all_files(
-        path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, param_samples, log, library
-    )
-    if has_gwb:
-        log.info(f"Loaded data from all library files | {holo.utils.stats(gwb)=}")
-    if library:
-        param_samples[bad_files] = np.nan
-
-    # ---- Save to concatenated output file ----
-
-    log.info(f"Writing collected data to file {lib_path}")
-    with h5py.File(lib_path, 'w') as h5:
+    # Write to a temporary file and rename at the end, so an interrupted run never leaves a
+    # partial/corrupt library at the final path.
+    tmp_path = lib_path.with_name(lib_path.name + ".tmp")
+    log.info(f"Writing collected data to file {lib_path} (via {tmp_path})")
+ 
+    with h5py.File(tmp_path, 'w') as h5:
         h5.create_dataset('fobs_cents', data=fobs_cents)
         h5.create_dataset('fobs_edges', data=fobs_edges)
-
-        if not library:
-            new_shape = (ndim, nsamp_dim) + param_samples.shape[1:]
-            param_samples = param_samples.reshape(new_shape)
+ 
+        # Datasets are filled with NaN, so any failed/unfilled simulation is NaN automatically
+        dsets = {}
+        if has_gwb:
+            dsets['gwb'] = _create_dset(h5, 'gwb', (nfreqs, nreals), library, nsamp_all, ndim, nsamp_dim)
+        if (not gwb_only) and has_ss:
+            dsets['hc_ss'] = _create_dset(
+                h5, 'hc_ss', (nfreqs, nreals, nloudest), library, nsamp_all, ndim, nsamp_dim
+            )
+            dsets['hc_bg'] = _create_dset(h5, 'hc_bg', (nfreqs, nreals), library, nsamp_all, ndim, nsamp_dim)
+        if (not gwb_only) and has_params:
+            dsets['sspar'] = _create_dset(
+                h5, 'sspar', (4, nfreqs, nreals, nloudest), library, nsamp_all, ndim, nsamp_dim
+            )
+            dsets['bgpar'] = _create_dset(
+                h5, 'bgpar', (7, nfreqs, nreals), library, nsamp_all, ndim, nsamp_dim
+            )
+ 
+        bad_files = _stream_library_from_all_files(
+            path_sims, dsets, param_samples, log, library, nsamp_all, nsamp_dim
+        )
+ 
+        if library:
+            param_samples[bad_files] = np.nan
+        else:
+            param_samples = param_samples.reshape((ndim, nsamp_dim) + param_samples.shape[1:])
         h5.create_dataset('sample_params', data=param_samples)
-
-        if gwb is not None:
-            # if 'domain', reshape to include each dimension
-            if not library:
-                new_shape = (ndim, nsamp_dim) + gwb.shape[1:]
-                gwb = gwb.reshape(new_shape)
-            h5.create_dataset('gwb', data=gwb)
-        if not gwb_only:
-            if has_ss:
-                # if 'domain', reshape to include each dimension
-                if not library:
-                    new_shape = (ndim, nsamp_dim) + hc_ss.shape[1:]
-                    hc_ss = hc_ss.reshape(new_shape)
-                    new_shape = (ndim, nsamp_dim) + hc_bg.shape[1:]
-                    hc_bg = hc_bg.reshape(new_shape)
-                h5.create_dataset('hc_ss', data=hc_ss)
-                h5.create_dataset('hc_bg', data=hc_bg)
-            if has_params:
-                # if 'domain', reshape to include each dimension
-                if not library:
-                    new_shape = (ndim, nsamp_dim) + sspar.shape[1:]
-                    sspar = sspar.reshape(new_shape)
-                    new_shape = (ndim, nsamp_dim) + bgpar.shape[1:]
-                    bgpar = bgpar.reshape(new_shape)
-                h5.create_dataset('sspar', data=sspar)
-                h5.create_dataset('bgpar', data=bgpar)
+ 
         h5.attrs['param_names'] = np.array(param_names).astype('S')
         # new in librarian-v1.1
         h5.attrs['parameter_space_class_name'] = pspace.name
@@ -259,15 +239,35 @@ def sam_lib_combine(
             git_hash = "None"
         h5.attrs['holodeck_git_hash'] = git_hash
         h5.attrs['holodeck_librarian_version'] = holo.librarian.__version__
-
+ 
+    tmp_path.replace(lib_path)
     log.warning(f"Saved to {lib_path}, size: {holo.utils.get_file_size(lib_path)}")
-
+ 
+    # ---- Sanity check the saved file (reads only small slices)
+ 
     with h5py.File(lib_path, 'r') as h5:
         assert np.all(h5['fobs_cents'][()] > 0.0)
         if has_gwb:
-            log.info(f"Checking library file: {holo.utils.stats(gwb)=}")
-
+            # only look at a bounded slice so that the check doesn't load the whole dataset
+            check = h5['gwb'][:100]
+            log.info(f"Checking library file (first {check.shape[0]} entries): {holo.utils.stats(check)=}")
+ 
     return lib_path
+ 
+def _create_dset(h5, name, tail_shape, library, nsamp_all, ndim, nsamp_dim):
+    """Create an on-disk float64 dataset (NaN-filled), chunked so that one simulation = one chunk.
+ 
+    For a library, the shape is ``(nsamp_all,) + tail_shape``.
+    For a domain, the shape is ``(ndim, nsamp_dim) + tail_shape``.
+    """
+    if library:
+        shape = (nsamp_all,) + tuple(tail_shape)
+        chunks = (1,) + tuple(tail_shape)
+    else:
+        shape = (ndim, nsamp_dim) + tuple(tail_shape)
+        chunks = (1, 1) + tuple(tail_shape)
+    return h5.create_dataset(name, shape=shape, dtype='f8', chunks=chunks, fillvalue=np.nan)
+ 
 
 
 def _check_files_and_load_shapes(log, path_sims, nsamp, library):
@@ -315,55 +315,118 @@ def _check_files_and_load_shapes(log, path_sims, nsamp, library):
         if (fobs_cents is not None) and (nreals is not None) and (nloudest is not None):
             continue
 
-        temp = np.load(temp_fname)
-        data_keys = list(temp.keys())
-        log.debug(f"{ii=} {temp_fname.name=} {data_keys=}")
+        with np.load(temp_fname) as temp:
+            data_keys = list(temp.keys())
+            log.debug(f"{ii=} {temp_fname.name=} {data_keys=}")
 
-        if 'fail' in data_keys:
-            err = f"File {ii=} is a failed simulation file.  {temp_fname=}"
-            log.error(err)
-            log.error(f"Error in file: {temp['fail']}")
-            continue
+            if 'fail' in data_keys:
+                err = f"File {ii=} is a failed simulation file.  {temp_fname=}"
+                log.error(err)
+                log.error(f"Error in file: {temp['fail']}")
+                continue
 
-        if fobs_cents is None:
-            _fobs = temp.get('fobs', None)
-            if _fobs is not None:
-                err = "Found `fobs` in data, expected only `fobs_cents` and `fobs_edges`!"
-                log.exception(err)
-                raise ValueError(err)
-            fobs_cents = temp['fobs_cents']
-            fobs_edges = temp['fobs_edges']
+            if fobs_cents is None:
+                _fobs = temp.get('fobs', None)
+                if _fobs is not None:
+                    err = "Found `fobs` in data, expected only `fobs_cents` and `fobs_edges`!"
+                    log.exception(err)
+                    raise ValueError(err)
+                fobs_cents = temp['fobs_cents']
+                fobs_edges = temp['fobs_edges']
 
-        if (not has_gwb) and ('gwb' in data_keys):
-            has_gwb = True
+            if (not has_gwb) and ('gwb' in data_keys):
+                has_gwb = True
 
-        if (not has_ss) and ('hc_ss' in data_keys):
-            assert 'hc_bg' in data_keys
-            has_ss = True
+            if (not has_ss) and ('hc_ss' in data_keys):
+                assert 'hc_bg' in data_keys
+                has_ss = True
 
-        if (not has_params) and ('sspar' in data_keys):
-            assert 'bgpar' in data_keys
-            has_params = True
+            if (not has_params) and ('sspar' in data_keys):
+                assert 'bgpar' in data_keys
+                has_params = True
 
-        # find a file that has GWB data in it (not all of them do, if the file was a 'failure' file)
-        if (nreals is None):
-            nreals_1 = None
-            nreals_2 = None
-            if ('gwb' in data_keys):
-                nreals_1 = temp['gwb'].shape[-1]
-                nreals = nreals_1
-            if ('hc_bg' in data_keys):
-                nreals_2 = temp['hc_bg'].shape[-1]
-                nreals = nreals_2
-            if (nreals_1 is not None) and (nreals_2 is not None):
-                assert nreals_1 == nreals_2
+            # find a file that has GWB data in it (not all of them do, if the file was a 'failure' file)
+            if (nreals is None):
+                nreals_1 = None
+                nreals_2 = None
+                if ('gwb' in data_keys):
+                    nreals_1 = temp['gwb'].shape[-1]
+                    nreals = nreals_1
+                if ('hc_bg' in data_keys):
+                    nreals_2 = temp['hc_bg'].shape[-1]
+                    nreals = nreals_2
+                if (nreals_1 is not None) and (nreals_2 is not None):
+                    assert nreals_1 == nreals_2
 
-        if (nloudest is None) and ('hc_ss' in data_keys):
-            nloudest = temp['hc_ss'].shape[-1]
+            if (nloudest is None) and ('hc_ss' in data_keys):
+                nloudest = temp['hc_ss'].shape[-1]
 
     return fobs_cents, fobs_edges, nreals, nloudest, has_gwb, has_ss, has_params
 
 
+def _stream_library_from_all_files(path_sims, dsets, param_samples, log, library, nsamp_all, nsamp_dim):
+    """Stream data from each individual simulation file into pre-allocated hdf5 datasets.
+ 
+    Only one simulation file is held in memory at a time.
+ 
+    Arguments
+    ---------
+    path_sims : str
+        Path to find individual simulation files.
+    dsets : dict
+        Mapping of key (e.g. 'gwb', 'hc_ss', ...) to an open, pre-allocated ``h5py.Dataset``.
+        Only keys present here are copied from the simulation files.
+    param_samples : (S, P) ndarray
+        Parameter samples, filled in-place from the files for 'domain' runs.
+    log : ``logging.Logger``
+        Logging instance.
+    library : bool
+        Whether this is a standard library or a domain exploration.
+    nsamp_all : int
+        Total number of simulation files.
+    nsamp_dim : int or None
+        Number of samples per dimension (domain only).
+ 
+    Returns
+    -------
+    bad_files : (S,) ndarray of bool
+        Which files were failures (their entries in the datasets remain NaN).
+ 
+    """
+    log.info(f"Collecting data from {nsamp_all} files")
+    bad_files = np.zeros(nsamp_all, dtype=bool)     #: track which files contain UN-useable data
+    for pnum in tqdm.trange(nsamp_all):
+        fname = lib_tools._get_sim_fname(path_sims, pnum, library=library)
+        # location of this simulation in the output datasets
+        idx = pnum if library else (pnum // nsamp_dim, pnum % nsamp_dim)
+ 
+        with np.load(fname, allow_pickle=True) as temp:
+            # When a processor fails for a given parameter, the output file is still created with
+            # the 'fail' key added.  The datasets are NaN-filled, so just skip these.
+            if 'fail' in temp:
+                log.info(f"file {pnum=:06d} is a failure file, leaving values as NaN ({fname})")
+                bad_files[pnum] = True
+                continue
+ 
+            # for 'domain' simulations, we need to load the parameters.  For 'library' runs, we
+            # already have them.
+            if not library:
+                #! NOTE: this is just temporary until bug is fixed
+                try:
+                    param_samples[pnum, :] = temp['params'][:]
+                except:  # noqa
+                    pvals = temp['params'][()]
+                    param_samples[pnum, :] = np.array([pvals[str(pn)] for pn in temp['param_names']])
+ 
+            for key, dset in dsets.items():
+                dset[idx] = temp[key][...]
+ 
+    log.info(f"{holo.utils.frac_str(bad_files)} files are failures")
+ 
+    return bad_files
+
+
+@utils.deprecated_fail("`_stream_library_from_all_files`")
 def _load_library_from_all_files(
     path_sims, gwb, hc_ss, hc_bg, sspar, bgpar, param_samples,
     log, library,
