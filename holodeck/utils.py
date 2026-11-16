@@ -383,7 +383,7 @@ def get_git_hash(short=True) -> str:
     args = ['git', 'rev-parse', 'HEAD']
     if short:
         args.insert(2, "--short")
-    return subprocess.check_output(args).decode('ascii').strip()
+    return subprocess.check_output(args, cwd=os.path.dirname(__file__)).decode('ascii').strip()
 
 
 # =================================================================================================
