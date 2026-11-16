@@ -2,10 +2,10 @@
 """
 
 import holodeck as holo
-from holodeck.constants import PC, GYR, MSOL
+from holodeck.constants import GYR, PC, MSOL, KMPERSEC, SPLC
 from holodeck.librarian import (
     _Param_Space, PD_Uniform, PD_Piecewise_Uniform_Density,
-    PD_Normal,
+    PD_Normal,PD_MVNormal, PD_2D_Uniform_Variable_Ymin
     # PD_Uniform_Log,
 )
 

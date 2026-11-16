@@ -133,15 +133,15 @@ class Hard04(SamModel):
         rchar = (10.0**rchar) * PC
         mmb_amp = (10**mmb_amp) * MSOL
 
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gndf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
+        relation = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
-        sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf,
+        sam = holo.sam.Semi_Analytic_Model(gndf=gndf,
                                            gpf=gpf,
                                            gmt=gmt,
-                                           mmbulge=mmbulge,
+                                           relation=relation,
                                            shape=sam_shape)
         hard = holo.hardening.Fixed_Time.from_sam(sam,
                                                   time,
@@ -199,15 +199,15 @@ class Eccen01(SamModel):
         # favor higher values of eccentricity instead of uniformly distributed
         eccen = eccen**(1.0 / 5.0)
 
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gndf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law(zbeta=gpf_zbeta)
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
+        relation = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
-        sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf,
+        sam = holo.sam.Semi_Analytic_Model(gndf=gndf,
                                            gpf=gpf,
                                            gmt=gmt,
-                                           mmbulge=mmbulge,
+                                           relation=relation,
                                            shape=sam_shape)
 
         sepa_evo, eccen_evo = holo.sam.evolve_eccen_uniform_single(
@@ -254,7 +254,7 @@ class BigCirc01(SamModel):
         hard_time = (10.0**hard_time) * GYR
         hard_rchar = (10.0**hard_rchar) * PC
 
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0,
+        gndf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0,
                                        phiz=gsmf_phiz,
                                        alpha0=gsmf_alpha0)
         gpf = holo.sam.GPF_Power_Law(malpha=gpf_malpha,
@@ -263,12 +263,12 @@ class BigCirc01(SamModel):
         gmt = holo.sam.GMT_Power_Law(malpha=gmt_malpha,
                                      qgamma=gmt_qgamma,
                                      zbeta=gmt_zbeta)
-        mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
+        relation = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp, mplaw=mmb_plaw)
 
-        sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf,
+        sam = holo.sam.Semi_Analytic_Model(gndf=gndf,
                                            gpf=gpf,
                                            gmt=gmt,
-                                           mmbulge=mmbulge,
+                                           relation=relation,
                                            shape=sam_shape)
         hard = holo.hardening.Fixed_Time.from_sam(sam,
                                                   hard_time,
@@ -293,15 +293,15 @@ class PS_2Par_Circ_01(SamModel):
 
         time = (10.0**time) * GYR
 
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
+        gndf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0)
         gpf = holo.sam.GPF_Power_Law()
         gmt = holo.sam.GMT_Power_Law()
-        mmbulge = holo.host_relations.MMBulge_KH2013()
+        relation = holo.host_relations.MMBulge_KH2013()
 
-        sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf,
+        sam = holo.sam.Semi_Analytic_Model(gndf=gndf,
                                            gpf=gpf,
                                            gmt=gmt,
-                                           mmbulge=mmbulge,
+                                           relation=relation,
                                            shape=sam_shape)
         hard = holo.hardening.Fixed_Time.from_sam(sam, time, progress=False)
         return sam, hard
@@ -340,19 +340,19 @@ class PS_Circ_01(SamModel):
         hard_time = (10.0**hard_time) * GYR
         gmt_norm = gmt_norm * GYR
 
-        gsmf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0,
+        gndf = holo.sam.GSMF_Schechter(phi0=gsmf_phi0,
                                        mchar0_log10=gsmf_mchar0,
                                        alpha0=gsmf_alpha0)
         gpf = holo.sam.GPF_Power_Law(qgamma=gpf_qgamma, zbeta=gpf_zbeta)
         gmt = holo.sam.GMT_Power_Law(time_norm=gmt_norm, zbeta=gmt_zbeta)
-        mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp,
+        relation = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp,
                                                 mplaw=mmb_plaw,
                                                 scatter_dex=mmb_scatter)
 
-        sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf,
+        sam = holo.sam.Semi_Analytic_Model(gndf=gndf,
                                            gpf=gpf,
                                            gmt=gmt,
-                                           mmbulge=mmbulge,
+                                           relation=relation,
                                            shape=sam_shape)
         hard = holo.hardening.Fixed_Time.from_sam(sam,
                                                   hard_time,
@@ -402,7 +402,7 @@ class Broad_Uniform_02B(SamModel):
         )
         hard_time *= GYR
 
-        gsmf = holo.sam.GSMF_Schechter(
+        gndf = holo.sam.GSMF_Schechter(
             phi0=gsmf_phi0,
             phiz=gsmf_phiz,
             mchar0_log10=gsmf_mchar0_log10,
@@ -423,7 +423,7 @@ class Broad_Uniform_02B(SamModel):
             qgamma=gmt_qgamma,
             zbeta=gmt_zbeta,
         )
-        mmbulge = holo.host_relations.MMBulge_KH2013(
+        relation = holo.host_relations.MMBulge_KH2013(
             mamp_log10=mmb_amp_log10,
             mplaw=mmb_plaw,
             scatter_dex=mmb_scatter,
@@ -431,7 +431,7 @@ class Broad_Uniform_02B(SamModel):
 
         kw = {} if sam_shape is None else dict(shape=sam_shape)
         sam = holo.sam.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            gndf=gndf, gpf=gpf, gmt=gmt, relation=relation,
             ZERO_DYNAMIC_STALLED_SYSTEMS=True,
             ZERO_GMT_STALLED_SYSTEMS=False,
             **kw

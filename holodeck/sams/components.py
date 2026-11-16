@@ -1,5 +1,15 @@
 """Semi-Analytic Model - Components
 
+This module provides the key building blocks for the holodeck SAMs.  In particular, the:
+
+* Galaxy Number Density Function (GNDF): number-density of galaxies as a function of either stellar mass or velocity dispersion.;
+* Galaxy Merger Rate (GMR) : rate of galaxy mergers per galaxy;
+* Galaxy Pair Fraction (GPF) : fraction of galaxy pairs, relative to all galaxies;
+* Galaxy Merger Time (GMT) : duration over which galaxy pairs are observable as pairs.
+
+For more information see the :mod:`holodeck.sams` module, or the :doc:`SAMs getting-started guide
+<../getting_started/index>`.
+
 
 References
 ----------
@@ -11,6 +21,18 @@ References
 * [Leja2020]_ Leja, Speagle, Johnson, et al. 2020.
     A New Census of the 0.2 < z < 3.0 Universe. I. The Stellar Mass Function
     https://ui.adsabs.harvard.edu/abs/2020ApJ...893..111L/abstract
+* [Bernardi2010]_  Bernardi, Shankar, Hyde, et a. 2010.
+    Galaxy luminosities, stellar masses, sizes, velocity dispersions as a function of morphological type 
+    https://ui.adsabs.harvard.edu/abs/2010MNRAS.404.2087B/abstract
+* [Taylor2022]_  Taylor, Bezanson, van der Wel, et. al 2022.
+    The Velocity Dispersion Function for Massive Quiescent and Star-forming Galaxies at 0.6 < z ≤ 1.0 
+    https://ui.adsabs.harvard.edu/abs/2022ApJ...939...90T/abstract
+* [O'Leary2021]_ O'Leary, Moster, Krämer 2021.
+    Emerge: Constraining merging probabilities and timescales of close galaxy pairs
+    https://ui.adsabs.harvard.edu/abs/2021MNRAS.503.5646O/abstract
+* [Comerford2025] Comerford and Simon 2025.
+    Preferential Accretion onto the Secondary Black Hole Strengthens Gravitational-wave Signals
+    https://ui.adsabs.harvard.edu/abs/2025ApJ...994..168C/abstract
 
 """
 
@@ -20,14 +42,16 @@ import numpy as np
 
 import holodeck as holo
 from holodeck import cosmo, utils
-from holodeck.constants import GYR, MSOL
+from holodeck.constants import GYR, MSOL, KMPERSEC
+from scipy.special import gamma
 from scipy.stats import norm as stnorm
 
-# ----    Galaxy Stellar-Mass Function    ----
+
+# ----    Galaxy Number Density Function    ----
 
 
-class _Galaxy_Stellar_Mass_Function(abc.ABC):
-    """Galaxy Stellar-Mass Function base-class.  Used to calculate number-density of galaxies.
+class _Galaxy_Number_Density_Function(abc.ABC):
+    """Galaxy Number Density Function base-class.  Used to calculate number-density of galaxies.
     """
 
     @abc.abstractmethod
@@ -35,18 +59,20 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
         return
 
     @abc.abstractmethod
-    def __call__(self, mstar, redz):
-        """Return the number-density of galaxies at a given stellar mass, per log10 interval of stellar-mass.
+    def __call__(self, prop, redz):
+        """Return the number-density of galaxies at a given galaxy property X, either stellar mass or velocity dispersion, per log10 interval.
 
-        i.e. Phi = dn / dlog10(M)
+        i.e. Phi = dn / dlog10(X)
 
         Parameters
         ----------
-        mstar : scalar or ndarray
-            Galaxy stellar-mass in units of [grams]
+        prop : scalar or ndarray
+            Galaxy property that goes into number density function.
+                * Galaxy stellar-mass in units of [grams] 
+                * Host-galaxy velocity dispersion in units of [cm/s]
         redz : scalar or ndarray
             Redshift.
-
+            
         Returns
         -------
         rv : scalar or ndarray
@@ -55,12 +81,9 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
         """
         return
 
-    def mbh_mass_func(self, mbh, redz, mmbulge, scatter=None):
-        """
-        !!!!! DEPRICATED: use mbh_mass_func_conv instead !!!!!
-        This function is faster, but less accurate than mbh_mass_func_conv, scatter is not handled effectively.
-        
-        Convert from the GSMF to a MBH mass function (number density), using a given Mbh-Mbulge relation.
+
+    def mbh_mass_func(self, mbh, redz, relation, scatter=None):
+        """Convert from the GNDF to a MBH mass function (number density), using a given Mbh-Host scaling relation.
 
         Parameters
         ----------
@@ -68,11 +91,11 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
             Blackhole masses at which to evaluate the mass function.
         redz : array_like
             Redshift(s) at which to evaluate the mass function.
-        mmbulge : `relations._MMBulge_Relation` subclass instance
-            Scaling relation between galaxy and MBH masses.
+        relation : `host_relations._MMBulge_Relation` or `host_relations._MSigma_Relation` subclass instance
+            Scaling relation between galaxy property and MBH masses.
         scatter : None, bool, or float
             Introduce scatter in masses.
-            * `None` or `True` : use the value from `mmbulge._scatter_dex`
+            * `None` or `True` : use the value from `relation._scatter_dex`
             * `False` : do not introduce scatter
             * float : introduce scatter with this amplitude (in dex)
 
@@ -82,18 +105,25 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
             Number density of MBHs, in units of [Mpc^-3]
 
         """
-        print('WARNING: mbh_mass_func is deprecated.  Use mbh_mass_func_conv instead.')
         if scatter in [None, True]:
-            scatter = mmbulge._scatter_dex
+            scatter = relation._scatter_dex
 
-        mstar = mmbulge.mstar_from_mbh(mbh, scatter=False)
-        # This is `dn_star / dlog10(M_star)`
-        ndens = self(mstar, redz)    # units of  [1/Mpc^3]
+        if 'mbulge' in relation._PROPERTIES:
+            prop = relation.mstar_from_mbh(mbh, scatter=scatter)
+             # dM_star / dM_bh
+            dprop_dmbh = relation.dmstar_dmbh(prop)   # [unitless]
+        elif 'vdisp' in relation._PROPERTIES:
+            prop = relation.vdisp_from_mbh(mbh, scatter=scatter)   
+            # dsigma / dM_bh
+            dprop_dmbh = relation.dsigma_dmbh(prop)   # [unitless]
+        else:
+            raise ValueError("Relation must be `mmbulge` or `msigma`.")
+        
+        # This is `dn_star / dlog10(X)`
+        ndens = self(prop, redz)    # units of  [1/Mpc^3]
 
-        # dM_star / dM_bh
-        dmstar_dmbh = mmbulge.dmstar_dmbh(mstar)   # [unitless]
-        # convert to dlog10(M_star) / dlog10(M_bh) = (M_bh / M_star) * (dM_star / dM_bh)
-        jac = (mbh/mstar) * dmstar_dmbh
+        # convert to dlog10(X) / dlog10(M_bh) = (M_bh / X) * (dX / dM_bh)
+        jac = (mbh/prop) * dprop_dmbh
         # convert galaxy number density to  to dn_bh / dlog10(M_bh)
         ndens *= jac
 
@@ -102,56 +132,7 @@ class _Galaxy_Stellar_Mass_Function(abc.ABC):
 
         return ndens
 
-    def mbh_mass_func_conv(self, mbh, redz, mmbulge, scatter=None):
-        """Convert from the GSMF to a MBH mass function (number density), using a given Mbh-Mbulge relation.
-        This version convolves the GSMF with the Mbh-Mbulge relation including scatter.
-        This will very minorly underestimate the number density at the high-mass end, but this is negligible for scatter_dex > 0.2
-
-        Parameters
-        ----------
-        mbh : array_like
-            Blackhole masses at which to evaluate the mass function.
-        redz : array_like
-            Redshift(s) at which to evaluate the mass function.
-        mmbulge : `relations._MMBulge_Relation` subclass instance
-            Scaling relation between galaxy and MBH masses.
-        scatter : None, bool, or float
-            Introduce scatter in masses.
-            * `None` or `True` : use the value from `mmbulge._scatter_dex`
-            * `False` : do not introduce scatter
-            * float : introduce scatter with this amplitude (in dex)
-
-        Returns
-        -------
-        ndens : array_like
-            Number density of MBHs, in units of [Mpc^-3]
-
-        """
-        if scatter in [None, True]:
-            scatter = mmbulge._scatter_dex + mmbulge._zplaw_scatter * np.log10(1.0 + redz)
-
-        mstar = mmbulge.mstar_from_mbh(mbh, redz=redz, scatter=False)
-        # This is `dn_star / dlog10(M_star)`
-        ndens = self(mstar, redz)    # units of  [1/Mpc^3]
-        
-        mstar_log10 = np.log10(mstar/MSOL)
-        mbh_log10 = np.log10(mbh/MSOL)
-
-        bhmf_conv = np.zeros_like(mbh_log10)
-
-        for i, logMbh in enumerate(mbh_log10):
-            mamp_z = mmbulge._mamp * (1.0 + redz)**mmbulge._zplaw_amp
-            mplaw_z = mmbulge._mplaw * (1.0 + redz)**mmbulge._zplaw_slope
-
-            logMbh_mean = np.log10(mamp_z/MSOL) + mplaw_z * (mstar_log10 - 11.0)
-            pdf = stnorm.pdf(logMbh, loc=logMbh_mean, scale=scatter)
-            # bhmf_conv[i] = np.trapezoid(ndens * pdf, mstar_log10)
-            dlogM = mstar_log10[1] - mstar_log10[0]
-            bhmf_conv[i] = np.sum(ndens * pdf) * dlogM
-        
-        return bhmf_conv
-
-class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
+class GSMF_Schechter(_Galaxy_Number_Density_Function):
     r"""Single Schechter Function - Galaxy Stellar Mass Function.
 
     This is density per unit log10-interval of stellar mass, i.e. $\Phi = dn / d\log_{10}(M)$
@@ -216,7 +197,7 @@ class GSMF_Schechter(_Galaxy_Stellar_Mass_Function):
         return self._alpha0 + self._alphaz * redz
 
 
-class _GSMF_Single_Schechter(_Galaxy_Stellar_Mass_Function):
+class _GSMF_Single_Schechter(_Galaxy_Number_Density_Function):
     r"""Schechter function, with parameters as quadratics with respect to redshift.
 
     Parameterization follows [Leja2020]_ and is primarily for use in the
@@ -317,7 +298,7 @@ class _GSMF_Single_Schechter(_Galaxy_Stellar_Mass_Function):
         return mstar
 
 
-class GSMF_Double_Schechter(_Galaxy_Stellar_Mass_Function):
+class GSMF_Double_Schechter(_Galaxy_Number_Density_Function):
     r"""Sum of two Schechter functions, each parameterized as quadratics in redshift.
 
     For each Schechter Function (:class:`_GSMF_Single_Schechter`), the normalizations ($\phi$) and
@@ -372,6 +353,54 @@ class GSMF_Double_Schechter(_Galaxy_Stellar_Mass_Function):
         vals += self._gsmf_two(mstar, redz)
         return vals
 
+class VDF_Modified_Schechter(_Galaxy_Number_Density_Function):
+    r"""Modified Schechter Function - Velocity Dispersion Function.
+
+    This is density per unit interval of velocity dispersion, i.e. $\Phi = dn / d\log_{10}(\sigma)$
+
+    See: [Taylor2022]_ Eq.2 and enclosing section, [Bernardi2010]_ Table B4, and [Taylor2022]_ Table 2.
+
+    """
+    def __init__(self, phistar0=24.736*1e-2, phistar1=11*1e-3, sigstar0 =140.96*KMPERSEC, sigstar1=156*KMPERSEC, alpha0=0.07, alpha1=0.8, beta0=2.22, beta1=2.19):
+        
+        self._phistar0 = phistar0         # 24.736  +/- [-8.376, +8.376] [1/(10^2 Mpc^3)], Bernardi 2010
+        self._phistar1 = phistar1          # 11  +/- [-5, +12] [1/(10^3 Mpc^3)], Taylor 2022 
+        self._sigstar0 = sigstar0         # 140.96  +/- [-7.09, +7.09] [km/s], Bernardi 2010
+        self._sigstar1 = sigstar1      # 156  +/- [-60, +29] [km/s], Taylor 2022
+        self._alpha0 = alpha0         # 0.07  +/- [-0.02, +0.02], Bernardi 2010
+        self._alpha1 = alpha1        # 0.8  +/- [-0.5, +1.4], Taylor 2022
+        self._beta0 = beta0         # 2.22  +/- [-0.13, +0.13], Bernardi 2010
+        self._beta1 = beta1       # 2.19  +/- [-0.57, +0.45], Taylor 2022
+        self._zbound = 0.5     # defines redshift boundary between the low-z VDF and high-z VDF
+        return
+
+    def __call__(self, vdisp, redz):
+        r"""Return the number-density of galaxies at a given velocity dispersion.
+
+        See: [Taylor2022]_ Eq.2
+
+        Parameters
+        ----------
+        vdisp : scalar or ndarray
+            Host-galaxy velocity dispersion in units of [cm/s]
+        redz : scalar or ndarray
+            Redshift.
+
+        Returns
+        -------
+        rv : scalar or ndarray
+            Number-density of galaxies per log-10 interval of velocity dispersion in units of [Mpc^-3]
+            i.e.  ``Phi = dn / d\\log_{10}(\sigma)``
+
+        """
+        phistar, sigstar, alpha, beta = self._vdf_params(redz)
+        xx = vdisp / sigstar
+        # [Taylor2022]_ Eq.2
+        rv = np.log(10.0) * phistar * np.power(xx, alpha) * np.exp(-np.power(xx,beta)) / gamma(alpha/beta) * beta
+        return rv
+
+    def _vdf_params(self, redz):
+        return [np.where(redz < self._zbound,param[0],param[1]) for param in [[self._phistar0,self._phistar1], [self._sigstar0,self._sigstar1], [self._alpha0,self._alpha1], [self._beta0,self._beta1]]]
 
 # ----    Galaxy Merger Rate    ----
 
@@ -421,6 +450,56 @@ class _Galaxy_Merger_Rate(abc.ABC):
         """
         return
 
+class GMR_SDSS(_Galaxy_Merger_Rate):
+    """Galaxy Merger Rate - based on pair fractions from SDSS and merger timescale from EMERGE [O'Leary2021].
+
+    See [Comerford2025]_, Equation 3.
+
+    """
+    def __init__(
+        self,
+
+        fpairz=None
+        
+    ):
+
+        
+        norm0 = 0.04      # +0.04   Merger rate at z~0 [1/Gyr]
+        
+        if fpairz is None:
+            fpairz = 0.8      # +0.8 ± 0.2   Redshift evolution of pair fraction
+        
+        tobsz = -1      # -1.0   Redshift evolution of galaxy merger timescale
+
+        self._norm0 = norm0 / GYR
+        self._fpairz = fpairz
+        self._tobsz = tobsz
+        return
+
+    def __call__(self, mtot, mrat, redz):
+        """Return the galaxy merger rate for the given parameters.
+
+        Parameters
+        ----------
+        mtot : (N,) array_like[scalar]
+            Total mass of the system, units of [grams].
+        mrat : (N,) array_like[scalar]
+            Mass ratio of each binary.
+        redz : (N,) array_like[scalar]
+            Redshifts of each binary.
+
+        Returns
+        -------
+        rate : array_like
+            Merger rate in [1/sec].
+
+        """
+        norm = self._norm0
+        redz_evol = self._fpairz - self._tobsz
+
+        rate = norm / mrat * (1+redz)**redz_evol
+        
+        return rate
 
 class GMR_Power_Law(_Galaxy_Merger_Rate):
     """Galaxy Merger Rate - based on multiple power-laws.

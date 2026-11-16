@@ -44,15 +44,15 @@ def sam_hard(env_pars, shape=40):
     rchar = (10.0**env_pars["hard_rchar"]) * PC
     mmb_amp = (10.0**env_pars["mmb_amp"]) * MSOL
 
-    gsmf = holo.sam.GSMF_Schechter(phi0=env_pars["gsmf_phi0"])
+    gndf =  holo.sam.GSMF_Schechter(phi0=env_pars["gsmf_phi0"])
     gpf = holo.sam.GPF_Power_Law()
     gmt = holo.sam.GMT_Power_Law()
-    mmbulge = holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
+    relation =  holo.host_relations.MMBulge_KH2013(mamp=mmb_amp)
 
-    sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf,
+    sam = holo.sam.Semi_Analytic_Model(gndf=gndf,
                                        gpf=gpf,
                                        gmt=gmt,
-                                       mmbulge=mmbulge,
+                                       relation=relation,
                                        shape=shape)
 
     hard = holo.hardening.Fixed_Time.from_sam(

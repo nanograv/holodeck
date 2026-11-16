@@ -5,7 +5,7 @@ from unittest.mock import DEFAULT
 import numpy as np
 from scipy.interpolate import PchipInterpolator
 import holodeck as holo
-from holodeck.constants import GYR, PC, MSOL, SPLC
+from holodeck.constants import GYR, PC, MSOL, KMPERSEC, SPLC
 from holodeck.librarian.lib_tools import _Param_Space, PD_Uniform, PD_Normal, PD_Uniform_Log, PD_MVNormal, PD_2D_Uniform_Variable_Ymin
 
 
@@ -91,15 +91,16 @@ class PS_Test(_Param_Space):
     def _init_sam(self, sam_shape, params):
 
         # Schechter Galaxy Stellar-Mass Function
-        gsmf = holo.sams.GSMF_Schechter(
-            phi0=params["gsmf_phi0_log10"],
-            phiz=params["gsmf_phiz"],
-            mchar0_log10=params["gsmf_mchar0_log10"],
-            mcharz=params["gsmf_mcharz"],
-            alpha0=params["gsmf_alpha0"],
-            alphaz=params["gsmf_alphaz"],
-        )
 
+        gndf = holo.sams.GSMF_Schechter(
+            phi0=params['gsmf_phi0_log10'],
+            phiz=params['gsmf_phiz'],
+            mchar0_log10=params['gsmf_mchar0_log10'],
+            mcharz=params['gsmf_mcharz'],
+            alpha0=params['gsmf_alpha0'],
+            alphaz=params['gsmf_alphaz'],
+        )
+        
         # Illustris Galaxy Merger Rate
         gmr = holo.sams.GMR_Illustris(
             norm0_log10=params["gmr_norm0_log10"],
@@ -118,18 +119,16 @@ class PS_Test(_Param_Space):
         # the M-Mbulge class itself is defined such that the normalization is in units of grams.
         # This is a very easy place to make mistakes, and so any/all units (and particularly unit
         # conversions) should be described carefully in docstrings.
-        mmbulge = holo.host_relations.MMBulge_KH2013(
-            mamp=params["mmb_mamp"] * MSOL,
-            mplaw=params["mmb_plaw"],
-            scatter_dex=params["mmb_scatter_dex"],
+
+        relation = holo.host_relations.MMBulge_KH2013(
+            mamp=params['mmb_mamp']*MSOL,
+            mplaw=params['mmb_plaw'],
+            scatter_dex=params['mmb_scatter_dex'],
         )
 
         sam = holo.sams.Semi_Analytic_Model(
-            gsmf=gsmf,
-            gmr=gmr,
-            mmbulge=mmbulge,
-            shape=sam_shape,
-            log=self._log,
+            gndf=gndf, gmr=gmr, relation=relation, shape=sam_shape, log=self._log,
+
         )
         return sam
 
@@ -219,7 +218,7 @@ class _PS_Astro_Strong(_Param_Space):
             params["gsmf_log10_mstar_z1"],
             params["gsmf_log10_mstar_z2"],
         ]
-        gsmf = holo.sams.GSMF_Double_Schechter(
+        gndf = holo.sams.GSMF_Double_Schechter(
             log10_phi1=log10_phi_one,
             log10_phi2=log10_phi_two,
             log10_mstar=log10_mstar,
@@ -247,19 +246,18 @@ class _PS_Astro_Strong(_Param_Space):
             mstar_char_log10=params["bf_mstar_crit"],
             width_dex=params["bf_width_dex"],
         )
-        mmbulge = holo.host_relations.MMBulge_KH2013(
-            mamp_log10=params["mmb_mamp_log10"],
-            mplaw=params["mmb_plaw"],
-            scatter_dex=params["mmb_scatter_dex"],
+
+        relation = holo.host_relations.MMBulge_KH2013(
+            mamp_log10=params['mmb_mamp_log10'],
+            mplaw=params['mmb_plaw'],
+            scatter_dex=params['mmb_scatter_dex'],
             bulge_frac=bulge_frac,
         )
 
         sam = holo.sams.Semi_Analytic_Model(
-            gsmf=gsmf,
-            gmr=gmr,
-            mmbulge=mmbulge,
-            shape=sam_shape,
-            log=self._log,
+
+            gndf=gndf, gmr=gmr, relation=relation, shape=sam_shape, log=self._log,
+
         )
         return sam
 
@@ -274,6 +272,122 @@ class _PS_Astro_Strong(_Param_Space):
         )
         return hard
 
+class _PS_Astro_Strong_MSigma(_Param_Space):
+    """SAM Model with strongly astrophysically-motivated parameters.
+    
+    This model uses an observationally-derived galaxy merger rate, the modified Schechter VDF, the deNicola 2019 M-sigma scaling relation, and a phenomenology binary evolution model.
+
+    """
+
+    __version__ = "0.2"
+
+    DEFAULTS = dict(
+        # Hardening model (phenom 2PL)
+        hard_time=3.0,          # [Gyr]
+        hard_sepa_init=1e4,     # [pc]
+        hard_rchar=10.0,        # [pc]
+        hard_gamma_inner=-1.0,
+        hard_gamma_outer=0.0,
+
+        # Velocity dispersion function (``VDF_Modified_Schechter``)
+        # Parameters are based on [Taylor2022]_ and [Bernardi2010]_
+        vdf_phistar0 = 24.736*1e-2, # 24.736  +/- [-8.376, +8.376] [1/(10^2 Mpc^3)]
+        vdf_phistar1 = 11*1e-3,     # 11  +/- [-5, +12] [1/(10^3 Mpc^3)]
+        vdf_sigstar0 = 140.96, # 140.96  +/- [-7.09, +7.09] [km/s]
+        vdf_sigstar1 = 156, # 156  +/- [-60, +29] [km/s]
+        vdf_alpha0 = 0.07, # 0.07  +/- [-0.02, +0.02]
+        vdf_alpha1 = 0.8,  # 0.8  +/- [-0.5, +1.4]
+        vdf_beta0 = 2.22, # 2.22  +/- [-0.13, +0.13]
+        vdf_beta1 = 2.19,  # 2.19  +/- [-0.57, +0.45], Taylor 2022
+
+        # Galaxy merger rate (``GMR_SDSS``)
+        # Parameters are taken directly from [Comerford2025]_
+        gmr_fpairz = 0.8,       # +0.8 ± 0.2   Redshift evolution of pair fraction
+
+        # M-Sigma Relationship (``MSigma_DN2019``)
+        # From [DN2019]_
+        ms_mamp= 8.30,             # 8.30 ± 0.05   in units of [log10(M/Msol)]
+        ms_plaw=5.07,                  # 5.07 ± 0.27
+        ms_scatter_dex=0.42                # 0.42 ± 0.04
+    )
+
+    def _init_sam(self, sam_shape, params):
+        
+        gndf = holo.sams.VDF_Modified_Schechter(
+            phistar0=params['vdf_phistar0'],
+            phistar1=params['vdf_phistar1'],
+            sigstar0=params['vdf_sigstar0']*KMPERSEC,
+            sigstar1=params['vdf_sigstar1']*KMPERSEC,
+            alpha0=params['vdf_alpha0'],
+            alpha1=params['vdf_alpha1'],
+            beta0=params['vdf_beta0'],
+            beta1=params['vdf_beta1']
+        )
+
+        # SDSS Galaxy Merger Rate
+        gmr = holo.sams.GMR_SDSS(
+            fpairz=params['gmr_fpairz']
+            
+        )
+
+        # Mbh-Sigma relationship
+        
+        relation = holo.host_relations.MSigma_DN2019(
+            mamp=10**params['ms_mamp'] * MSOL,
+            mplaw=params['ms_plaw'],
+            scatter_dex=params['ms_scatter_dex'],
+        )
+
+        sam = holo.sams.Semi_Analytic_Model(
+            gndf=gndf, gmr=gmr, relation=relation, shape=sam_shape, log=self._log,
+        )
+        return sam
+
+    def _init_hard(self, sam, params):
+        hard = holo.hardening.Fixed_Time_2PL_SAM(
+            sam,
+            params['hard_time']*GYR,
+            sepa_init=params['hard_sepa_init']*PC,
+            rchar=params['hard_rchar']*PC,
+            gamma_inner=params['hard_gamma_inner'],
+            gamma_outer=params['hard_gamma_outer'],
+        )
+        return hard
+
+class PS_Astro_Strong_MSigma_All(_PS_Astro_Strong_MSigma):
+
+    def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
+        parameters = [
+            # Hardening model (phenom 2PL)
+            PD_Uniform("hard_time", 0.1, 11.0, default=3.0),   # [Gyr]
+            PD_Uniform("hard_gamma_inner", -2.0, +0.0, default=-1.0),
+            PD_Uniform("hard_rchar", 2.0, 20.0, default=10.0),    # [pc]
+
+            # VDF
+            PD_Normal('vdf_phistar0', 24.736*1e-2, 8.376*1e-2),   # 24.736 ± 8.376 [1/(10^2 Mpc^3)]
+            PD_Normal('vdf_phistar1', 11*1e-3, 8.5*1e-3),   # 11 [-5, +12] [1/(10^3 Mpc^3)]
+            PD_Normal('vdf_sigstar0', 140.96, 7.09),   # 140.96 ± 7.09
+            PD_Normal('vdf_sigstar1', 156, 44.5),   # 156 [-60, +29]
+            PD_Normal('vdf_alpha0', 0.07, 0.02),   # 0.07 ± 0.02
+            PD_Normal('vdf_alpha1', 0.8, 0.95),   # 0.8 [-0.5, +1.4]
+            PD_Normal('vdf_beta0', 2.22, 0.13),   # 2.22 ± 0.13
+            PD_Normal('vdf_beta1', 2.19, 0.51),   # 2.19 [-0.57, +0.45]
+
+            # GMRs
+            PD_Normal('gmr_fpairz', +0.8, 0.02),              # +0.8 ± 0.02   
+
+            # MSigma
+            # From [DN2019]_
+            PD_Normal('ms_mamp', 8.30, 0.05),              # 8.30 ± 0.05  [log10(M/Msol)]
+            PD_Normal('ms_plaw', 5.07, 0.27),                    # 5.07 ± 0.27
+            # Extra
+            PD_Normal('ms_scatter_dex', 0.42, 0.04),             # 0.42 ± 0.04
+        ]
+        _Param_Space.__init__(
+            self, parameters,
+            log=log, nsamples=nsamples, sam_shape=sam_shape, seed=seed,
+        )
+        return
 
 class PS_Astro_Strong_All(_PS_Astro_Strong):
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
@@ -323,7 +437,6 @@ class PS_Astro_Strong_All(_PS_Astro_Strong):
             seed=seed,
         )
         return
-
 
 class PS_Astro_Strong_Hard(_PS_Astro_Strong):
     def __init__(self, log=None, nsamples=None, sam_shape=None, seed=None):
@@ -651,7 +764,6 @@ class PS_Astro_Strong_MMBulge(_PS_Astro_Strong):
         )
         return
 
-
 class PS_Test_Astro_Strong_Covariant_MMBulge(_PS_Astro_Strong):
     """
     Test Parameter Space derived from PS_Astro_Strong, demonstrating a
@@ -778,7 +890,7 @@ class _PS_ClassicPlusBIO_NoLims(_Param_Space):
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
-        gsmf = holo.sams.GSMF_Schechter(
+        gndf = holo.sams.GSMF_Schechter(
             phi0=params['gsmf_phi0_log10'],
             phiz=params['gsmf_phiz'],
             mchar0_log10=params['gsmf_mchar0_log10'],
@@ -799,14 +911,14 @@ class _PS_ClassicPlusBIO_NoLims(_Param_Space):
             qgamma=params['gmt_qgamma'],
             zbeta=params['gmt_zbeta'],
         )
-        mmbulge = holo.host_relations.MMBulge_KH2013(
+        relation = holo.host_relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
         )
 
         sam = holo.sams.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            gndf=gndf, gpf=gpf, gmt=gmt, relation=relation,
             shape=sam_shape,
         )
         return sam
@@ -895,7 +1007,7 @@ class _PS_ClassicPlusBIO_WithLims(_Param_Space):
 
     @classmethod
     def _init_sam(cls, sam_shape, params):
-        gsmf = holo.sams.GSMF_Schechter(
+        gndf = holo.sams.GSMF_Schechter(
             phi0=params['gsmf_phi0_log10'],
             phiz=params['gsmf_phiz'],
             mchar0_log10=params['gsmf_mchar0_log10'],
@@ -916,14 +1028,14 @@ class _PS_ClassicPlusBIO_WithLims(_Param_Space):
             qgamma=params['gmt_qgamma'],
             zbeta=params['gmt_zbeta'],
         )
-        mmbulge = holo.host_relations.MMBulge_KH2013(
+        relation = holo.host_relations.MMBulge_KH2013(
             mamp_log10=params['mmb_mamp_log10'],
             mplaw=params['mmb_plaw'],
             scatter_dex=params['mmb_scatter_dex'],
         )
 
         sam = holo.sams.Semi_Analytic_Model(
-            gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge,
+            gndf=gndf, gpf=gpf, gmt=gmt, relation=relation,
             shape=sam_shape,
         )
         return sam
@@ -1207,7 +1319,7 @@ class _PS_AstroStrongBIO(_Param_Space):
             params["gsmf_log10_mstar_z1"],
             params["gsmf_log10_mstar_z2"],
         ]
-        gsmf = holo.sams.GSMF_Double_Schechter(
+        gndf = holo.sams.GSMF_Double_Schechter(
             log10_phi1=log10_phi_one,
             log10_phi2=log10_phi_two,
             log10_mstar=log10_mstar,
@@ -1235,7 +1347,7 @@ class _PS_AstroStrongBIO(_Param_Space):
             mstar_char_log10=params["bf_mstar_crit"],
             width_dex=params["bf_width_dex"],
         )
-        mmbulge = holo.host_relations.MMBulge_KH2013(
+        relation = holo.host_relations.MMBulge_KH2013(
             mamp_log10=params["mmb_mamp_log10"],
             mplaw=params["mmb_plaw"],
             scatter_dex=params["mmb_scatter_dex"],
@@ -1243,9 +1355,9 @@ class _PS_AstroStrongBIO(_Param_Space):
         )
 
         sam = holo.sams.Semi_Analytic_Model(
-            gsmf=gsmf,
+            gndf=gndf,
             gmr=gmr,
-            mmbulge=mmbulge,
+            relation=relation,
             shape=sam_shape,
             log=self._log,
         )
@@ -1401,4 +1513,5 @@ _param_spaces_dict = {
     "PS_AstroStrongBIO_Hard": PS_AstroStrongBIO_Hard,
     "PS_AstroStrongBIO_Covariant_All": PS_AstroStrongBIO_Covariant_All,
     "PS_AstroStrongBIO_Hard_MMbulge_Covariant_GSMF": PS_AstroStrongBIO_Hard_MMbulge_Covariant_GSMF,
+    "PS_Astro_Strong_MSigma_All": PS_Astro_Strong_MSigma_All,
 }

@@ -87,7 +87,7 @@ def main():
     mmbulge = holo.host_relations.MMBulge_Standard()    # M-MBulge Relation            (MMB)
     hard = holo.hardening.Hard_GW()
 
-    sam = holo.sam.Semi_Analytic_Model(gsmf=gsmf, gpf=gpf, gmt=gmt, mmbulge=mmbulge, shape=args.shape)
+    sam = holo.sam.Semi_Analytic_Model(gndf=gsmf, gpf=gpf, gmt=gmt, relation=mmbulge, shape=args.shape)
 
     # ---- Calculate Number of Binaries
 
