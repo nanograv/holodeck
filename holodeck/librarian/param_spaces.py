@@ -193,6 +193,9 @@ class _PS_Astro_Strong(_Param_Space):
         mmb_mamp_log10=8.69,  # 8.69±0.05  [log10(M/Msol)]  approx uncertainties!
         mmb_plaw=1.17,  # 1.17 ± 0.08
         mmb_scatter_dex=0.28,  # no uncertainties given
+        mmb_zplaw_amp=0.0,
+        mmb_zplaw_scatter=0.0,
+        mmb_zplaw_slope=0.0,
         # bulge fraction
         bf_frac_lo=0.4,
         bf_frac_hi=0.8,
@@ -244,10 +247,13 @@ class _PS_Astro_Strong(_Param_Space):
             mstar_char_log10=params["bf_mstar_crit"],
             width_dex=params["bf_width_dex"],
         )
-        mmbulge = holo.host_relations.MMBulge_KH2013(
+        mmbulge = holo.host_relations.MMBulge_Redshift_KH2013(
             mamp_log10=params["mmb_mamp_log10"],
             mplaw=params["mmb_plaw"],
             scatter_dex=params["mmb_scatter_dex"],
+            zplaw_amp=params['mmb_zplaw_amp'],
+            zplaw_scatter=params['mmb_zplaw_scatter'],
+            zplaw_slope=params['mmb_zplaw_slope']
             bulge_frac=bulge_frac,
         )
 
