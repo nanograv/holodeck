@@ -26,6 +26,7 @@ import os
 import holodeck as holo
 from holodeck import _PATH_DATA, cosmo, log
 from holodeck.constants import MSOL
+from holodeck.discrete.population import _Population_Discrete
 
 # physical constants for natural units c = G = 1
 c = 2.99792458*(10**8)
@@ -41,7 +42,7 @@ sqrt = np.sqrt
 _DEF_OBSERVATIONAL_FNAME = "observational_2mass_galaxy-catalog_extended.npz"
 
 
-class BP_Observational(holo.population._Population_Discrete):
+class BP_Observational(_Population_Discrete):
 
     FREQ_MIN = 1e-9    # Hz, minimum of PTA band of interest
 

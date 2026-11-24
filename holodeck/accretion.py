@@ -180,7 +180,7 @@ class Accretion:
 
         See Also
         --------
-        :meth: `Evolution._take_next_step()` : Relationship
+        :meth:`Evolution._take_next_step()` : Relationship
 
         Notes
         -----

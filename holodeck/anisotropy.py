@@ -253,7 +253,7 @@ def sph_harm_from_hc(hc_ss, hc_bg, nside = NSIDE, lmax = LMAX):
 
 def plot_ClC0_medians(fobs, Cl_best, lmax, nshow):
     xx = fobs*YR
-    fig, ax = holo.plot.figax(figsize=(8,5), xlabel=holo.plot.LABEL_GW_FREQUENCY_YR, ylabel='$C_{\ell>0}/C_0$')
+    fig, ax = holo.plot.figax(figsize=(8,5), xlabel=holo.plot.LABEL_GW_FREQUENCY_YR, ylabel=r'$C_{\ell>0}/C_0$')
 
     yy = Cl_best[:,:,:,1:]/Cl_best[:,:,:,0,np.newaxis] # (B,F,R,l)
     yy = np.median(yy, axis=-1) # (B,F,l) median over realizations
@@ -689,7 +689,7 @@ def plot_ClC0_versions(fobs_gw_cents, spk=True, bayes=True,
               analytic=False, Cl_analytic=None, C0_analytic=None, label_analytic='analytic',
               anreals=False, Cl_anreals=None, C0_anreals=None, label_anreals=None, 
               xmax = 1/YR, leg_anchor=(0,-0.15), leg_cols=3, legend=False):
-    fig, ax = plot.figax(xlabel=plot.LABEL_GW_FREQUENCY_HZ, ylabel='$C_{\ell>0}/C_0$')
+    fig, ax = plot.figax(xlabel=plot.LABEL_GW_FREQUENCY_HZ, ylabel=r'$C_{\ell>0}/C_0$')
 
     if analytic: draw_analytic(ax, Cl_analytic, C0_analytic, fobs_gw_cents, label=label_analytic)
     if anreals: draw_reals(ax, Cl_anreals, C0_anreals, fobs_gw_cents, label=label_anreals)

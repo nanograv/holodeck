@@ -1,3 +1,5 @@
+.. _gravitational waves:
+
 ================================================
 Getting Started: Calculating Gravitational Waves
 ================================================
