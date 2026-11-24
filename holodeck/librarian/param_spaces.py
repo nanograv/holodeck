@@ -253,7 +253,7 @@ class _PS_Astro_Strong(_Param_Space):
             scatter_dex=params["mmb_scatter_dex"],
             zplaw_amp=params['mmb_zplaw_amp'],
             zplaw_scatter=params['mmb_zplaw_scatter'],
-            zplaw_slope=params['mmb_zplaw_slope']
+            zplaw_slope=params['mmb_zplaw_slope'],
             bulge_frac=bulge_frac,
         )
 
